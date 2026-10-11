@@ -29,10 +29,6 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 
 import { workflowsCommands } from './commands'
 
-// The search that replaced this plugin's `paletteRows` source on 2026-09-03. Start semantics are
-// untouched: the whole definition goes to `start`, and an error comes back as the frame's message
-// rather than as a closed palette.
-
 const run = workflowsCommands[0] as SearchCommand
 const find = workflowsCommands[1] as SearchCommand
 const create = workflowsCommands[2] as { run: (context: CommandExecutionContext) => Promise<CommandOutcome> }
@@ -66,8 +62,7 @@ describe('the workflows plugin catalogue', () => {
   })
 
   it('is a task-scoped search and a project-scoped action, both gated on a node that runs terminals', () => {
-    // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one. The gate
-    // the row source declared, unchanged.
+    // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one.
     expect(workflowsCommands.map((command) => command.id)).toEqual([
       'workflows.run',
       'workflows.runs.find',
@@ -79,7 +74,6 @@ describe('the workflows plugin catalogue', () => {
     expect(run.minQueryLength).toBe(0)
   })
 
-  // "Find a run" waited for somewhere to open one (docs/workflows/routes-and-ui.md § The run pane).
   it("lists this task's runs and opens the one that was picked", async () => {
     mocks.runs.mockResolvedValue([
       { id: 'run-2', name: 'Investigate an issue', status: 'running', createdAt: Date.now() },
@@ -138,7 +132,7 @@ describe('the workflows plugin catalogue', () => {
   })
 
   // A definition that asks for something opens the dialog instead of starting a run with an empty
-  // required input (./editor/StartDialog.tsx).
+  // required input.
   it('opens the start dialog for a definition whose required input has no value yet', async () => {
     const inputs = [{ name: 'issue', required: true }]
     mocks.defs.mockResolvedValue({ workflows: [{ ...def('ship'), inputs }], errors: [] })

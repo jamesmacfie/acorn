@@ -12,11 +12,9 @@ import {
 } from '@acorn/plugin-api/testkit/client'
 import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '../contract/toolbarActions'
 
-// What a terminal tab switch costs, in jsdom. This is the tier the drawer never had, and phase 6 of
-// the performance programme is the reason it needs one: the panel used to mount the active tab alone,
-// so every switch destroyed an xterm and its WebGL context and asked the node to serialize a
-// thousand-line framebuffer, and nothing short of a person clicking tabs would notice a regression
-// back to that.
+// What a terminal tab switch costs, in jsdom. A switch must not destroy an xterm and its WebGL context
+// or ask the node to serialize a thousand-line framebuffer, and nothing short of a person clicking tabs
+// would notice that regression.
 //
 // The real `TerminalSurface` runs here. What is stubbed is xterm, because it draws to a canvas and
 // jsdom has no layout to draw into; everything this file is about — when a surface is built, when it
@@ -80,7 +78,7 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: StubWebgl }))
 // These tests exercise terminal rendering and session lifetime with a running terminal service.
-// The shared host gate now withholds an unknown roster, so supply that premise explicitly.
+// The shared host gate withholds an unknown roster, so supply that premise explicitly.
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   hasHostCapability: () => true,

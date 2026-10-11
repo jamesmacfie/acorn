@@ -4,7 +4,7 @@ import type { WorkflowInput } from '../../shared/workflowContracts'
 import TypedValueField from './TypedValueField'
 import { INPUT_NAME_RE } from './draft'
 
-/** The words for each schema type, shared with the result-schema editor (./SchemaFieldEditor.tsx). */
+/** The words for each schema type, shared with the result-schema editor (`SchemaFieldEditor`). */
 export const TYPE_LABELS: Record<string, string> = {
   string: 'Text',
   number: 'Number',

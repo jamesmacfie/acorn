@@ -7,8 +7,7 @@ import { _resetPrModels } from './prModel'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
-// (docs/panes/layout.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
-// deferred it and the pane has been unexercised since.
+// (docs/panes/layout.md § Layout model).
 //
 // What this holds is the shape rather than the content. The pane mounts, both columns draw, and
 // nothing throws — which is the failure a broken import, a hook called outside a root, or a region
@@ -111,9 +110,8 @@ describe('the PR pane', () => {
   })
 
   // The pane itself, not `regions.body`, which is the `lazy()` the contribution registers: a pending
-  // lazy component needs the `Suspense` the pane registry puts around every region
-  // (client-core host/registries/panes/panes.ts), and the assertion above is what holds the two to
-  // the same component.
+  // lazy component needs the `Suspense` the pane registry puts around every region, and the assertion
+  // above is what holds the two to the same component.
   const draw = () => {
     disposers.push(render(() => <PrPane task={task} />, host))
     return host

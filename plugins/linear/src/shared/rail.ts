@@ -1,7 +1,7 @@
 import { parseRailItemId, railItemId, type PluginRailItem } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from './api'
 
-// The encoding is the host's (protocol/api.ts § railItemId); these two name its halves for Linear. The
+// The encoding is the host's (protocol's `railItemId`); these two name its halves for Linear. The
 // connection has to travel with the identifier because Linear issue keys are not globally unique
 // across connections (docs/integrations/linear.md § Linear).
 export type LinearRailTarget = { connectionId: string; identifier: string }
@@ -26,8 +26,8 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // chose, so this map holds for every workspace. The rail source filters completed and canceled out
 // (../server/index.ts), and they are here because the same row shape is reachable from a link.
 //
-// It earns its place twice over: the icon gives the expanded list a leading mark it never had, and it
-// is the only thing a collapsed row has room to show beside the key.
+// It earns its place twice over: the icon gives the expanded list a leading mark, and it is the only
+// thing a collapsed row has room to show beside the key.
 //
 // Every name here is in the host's eager icon set. The census only scans names spelled in the client
 // tree, so a name reached through this map is not checked for us: picking one the set lacks would
@@ -44,8 +44,8 @@ const STATE_GLYPH: Record<string, string> = {
 
 export function linearRailItem(issue: LinearProjectIssue, connection?: string): PluginRailItem {
   // The state glyph, the title, and the key. One column, because the host reserves a track per field
-  // and a second one left the title a few letters in a 300-pixel list. The state's name repeated what
-  // the glyph already says. Assignee, priority, and labels are a click away in the detail pane.
+  // and a second one leaves the title a few letters in a 300-pixel list. The state's name would repeat
+  // what the glyph already says. Assignee, priority, and labels are a click away in the detail pane.
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title,

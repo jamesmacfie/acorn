@@ -59,8 +59,8 @@ function manifest(id, name, rectangle = false) {
     JSON.stringify(
       {
         // Editor completion and inline errors for every field below, from the schema generated out of
-        // the host's own Zod contract (packages/protocol/src/pluginSchema.test.ts). Nothing reads it at
-        // load time; it is there so a typo is a red squiggle rather than a failed boot.
+        // the host's own Zod contract (packages/plugin-types/acorn-plugin.schema.json). Nothing reads it
+        // at load time; it is there so a typo is a red squiggle rather than a failed boot.
         $schema: SCHEMA_URL,
         id,
         name,
@@ -634,7 +634,7 @@ export function dataSourceFiles(id, name, { row, inputs }) {
       $schema: SCHEMA_URL, id, name, version: '1.0.0', baseline: BASELINE, apiVersion: API_VERSION,
       node: './dist/node.js',
       permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
-      // `npm run build` rewrites this entry from src/source.ts, so the two can't disagree.
+      // `npm run build` rewrites this entry from the built source module, so the two can't disagree.
       contributions: { dataSources: [definition] },
     }, null, 2) + '\n',
     'package.json': JSON.stringify({

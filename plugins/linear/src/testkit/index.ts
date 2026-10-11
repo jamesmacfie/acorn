@@ -1,11 +1,11 @@
 // The test seam for this package (docs/architecture/packages.md § Package boundaries).
 //
-//   apps/node/test/integration/linear.test.ts   everything below
-//   apps/node/test/registerProviders.ts         linearProvider, createLinearFetch
+//   apps/node/test/integration/plugins/linear.test.ts   everything below
+//   apps/node/test/helpers/registerProviders.ts         linearProvider, createLinearFetch
 //
 // `linearFetch` is re-exported for the test's imports, but the test still mocks the module it lives
 // in by its own path — a `vi.mock` has to name the module the code under test imports, and linear's
-// routes import `../index` relatively. That is why `./server/index.ts` stays in this package's
+// routes import `../index` relatively. That is why the `server/index` entry stays in this package's
 // `exports` map alongside this file.
 export { linearFetch, type LinearNode } from '../server/index'
 export { linearProvider, linearRef } from '../server/provider'

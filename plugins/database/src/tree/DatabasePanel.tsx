@@ -405,7 +405,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const connected = () => status() === 'connected'
 
   // `grow`, so the frame's region gives the list and the grid their height and each scrolls inside
-  // it. A plain stack grew past the region, which clipped the table list and the rows below the fold.
+  // it. A plain stack grows past the region and clips the table list and the rows below the fold.
   return (
     <Stack gap="none" grow>
       {/* One bar: the pane's title, the connection, and every query action. It sits below the SQL
@@ -442,7 +442,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         />
         {/* The editor's content is on the other side of a port, so this cannot be
             disabled-when-empty without polling it — an empty document just makes the click a
-            no-op. Same trade the compiled version made against an editor document that was not a signal. */}
+            no-op. */}
         <Button
           size="sm"
           onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
@@ -554,9 +554,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               <Grid
                 ariaLabel="Query results"
                 columns={r().columns}
-                // The kit's Grid takes strings, so a SQL NULL is spelled here rather than styled. It was
-                // a dimmed cell with a class; it is the word now, which is what the terminal projection
-                // of this node says anyway.
+                // The kit's Grid takes strings, so a SQL NULL is spelled here rather than styled. The word
+                // is also what the terminal projection of this node says.
                 rows={r().rows.map((row) => row.map((cell) => cell ?? 'NULL'))}
                 selected={activeRow()}
                 onSelect={(i: number) =>

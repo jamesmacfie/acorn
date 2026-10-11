@@ -87,11 +87,11 @@ export const previewClientPlugin: ClientPlugin = {
         if (context.taskId) openPane(context.taskId, 'preview')
       },
     })
-    // Drop an archived task's preview view. Every archive path raises this event.
     clientEvents.on('runtime:node-switched', () => previewViews()?.evictAll())
     clientEvents.on('runtime:node-removed', ({ nodeId }) => {
       if (nodeId === activeNodeId()) previewViews()?.evictAll()
     })
+    // Drop an archived task's preview view. Every archive path raises this event.
     clientEvents.on('runtime:task-archived', ({ taskId }) => previewViews()?.evict(taskId))
   },
 }

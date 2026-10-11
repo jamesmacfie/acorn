@@ -49,7 +49,7 @@ export type HelperOptions = {
   // Custody root: fleet.json, the encrypted device tokens, the plugin cache and the trust store. The
   // node's own data root is `service.dataDir`.
   userDataDir: string
-  // How this host encrypts a device token (helper/deviceTokenStore.ts).
+  // How this host encrypts a device token (`TokenCipher`).
   tokenCipher: TokenCipher
   // Where broker pushes go. The shell owns the target, because only it knows whether a renderer is
   // currently attached.
@@ -225,7 +225,7 @@ export function createHelper(options: HelperOptions): Helper {
   // exists, so without it: the service crashes, `recover()` waits out its backoff, the owner clicks
   // Restart, Restart succeeds, and `recover()`'s own `start()` throws. Its catch calls
   // `service.stop()`, kills the working node, re-enters `recover()`, and spends another crash. Two
-  // clicks during recovery tripped the recovery dialog on a healthy node.
+  // clicks during recovery would trip the recovery dialog on a healthy node.
   //
   // A failure here also has to reach `recover()`. If `start()` rejects on a taken port or a corrupt
   // plugin DB, no child was ever spawned, so `unexpectedExit` never fires and the app sits with a

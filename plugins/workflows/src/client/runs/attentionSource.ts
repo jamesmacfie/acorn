@@ -2,8 +2,7 @@
 // (docs/notifications/rows-and-targets.md § What a row points at).
 //
 // Addressed at the node it is passed, never the active one: the inbox fans out over the fleet, and a
-// source that read the ambient node would report one node's gates under every card
-// (client-core registries/rail/attention.ts).
+// source that read the ambient node would report one node's gates under every card.
 import type { AttentionItem, AttentionSourceContribution } from '@acorn/plugin-api/client'
 import { workflowApi } from '../workflowsClient'
 

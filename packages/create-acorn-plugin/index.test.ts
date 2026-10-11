@@ -175,7 +175,7 @@ it('emits an owned tree pane that the command can open', () => {
 
 it('emits a rectangle plugin under --rectangle, as a layout with a frame region', () => {
   // The other path: an iframe whose pixels are the author's. Same node half, same permissions, and a
-  // `single` layout whose one region is the frame — the only way a surface asks for pixels now.
+  // `single` layout whose one region is the frame, which is the only way a surface asks for pixels.
   const files = scaffoldFiles('my-widget', 'My widget', { rectangle: true }) as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
   expect(manifest.contributions.extensions).toBeUndefined()
@@ -296,13 +296,9 @@ it('refuses a name with no usable id in it', () => {
 it('runs the packed scaffold and type-checks it against the packed declarations outside the repository', () => {
   // The acceptance test for `acorn-plugin-types`, and the only one that runs the way a stranger does:
   // a scaffolded directory somewhere else on disk, resolving the package by name out of its own
-  // node_modules, with `checkJs` and `strict` on and library checking NOT skipped.
-  //
-  // Everything else about the types package is asserted from inside the workspace, where the
-  // declarations resolve by path and the repo's own compiler options apply. Neither of those is true
-  // for the person this package exists for. What this catches: a JSDoc annotation the scaffold writes
-  // that names a type the package does not export, and a declaration file that needs something the
-  // package never told anyone to install.
+  // node_modules, with `checkJs` and `strict` on and library checking NOT skipped. It catches a JSDoc
+  // annotation that names a type the package doesn't export, and a declaration file that needs
+  // something the package never told anyone to install.
   const root = mkdtempSync(join(tmpdir(), 'scaffold-types-'))
   try {
     const cli = join(root, 'create-acorn-plugin')
@@ -627,9 +623,8 @@ it('builds, type-checks, and runs the documented extension example from the pack
   }
 }, 120_000)
 
-// The one flag the CLI has, exercised through the CLI. Every other test here calls `scaffoldFiles`
-// directly, which skips the argv reading entirely — so the flag could have stopped being read and
-// nothing would have said so.
+// `--rectangle`, exercised through the CLI. The other tests call `scaffoldFiles` directly, which skips
+// reading argv, so the flag could stop being read and nothing would say so.
 it('--rectangle picks the render path, wherever it sits in the argv', () => {
   const before = runCli('--rectangle', 'sink one')
   const after = runCli('sink two', '--rectangle')

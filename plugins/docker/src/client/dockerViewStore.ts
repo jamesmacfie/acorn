@@ -1,7 +1,7 @@
 // Session-only docker view state (selected container per task; detail tab/scroll/find per
-// container), kept outside the components so navigating away and back restores the same spot, the
-// same shape as editorViewState. Evicted when the owning task is archived (the PreviewPane
-// precedent: the plugin owns its eviction by subscribing to the core lifecycle event).
+// container), kept outside the components so navigating away and back restores the same spot.
+// Evicted when the owning task is archived: the plugin owns its eviction by subscribing to the core
+// lifecycle event.
 import { createSignal } from 'solid-js'
 import { clientEvents } from '@acorn/plugin-api/client'
 import { dockerScopeKey, onDockerRetired } from './dockerScope'
@@ -100,7 +100,7 @@ clientEvents.on('runtime:task-archived', ({ taskId }) => {
 })
 
 // A container state's StatusDot tone. One mapping for the browse list, the task pane, and the detail
-// header, which otherwise each render `.docker-dot[data-state]` and rely on one stylesheet agreeing.
+// header, so the three agree.
 export const containerTone = (state: string): 'ok' | 'warn' | 'danger' | 'muted' =>
   state === 'running'
     ? 'ok'

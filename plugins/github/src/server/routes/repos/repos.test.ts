@@ -43,10 +43,9 @@ const publicRepo: Repo = {
 const responseJson = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
-// Two handles, and no getDb mock any more: `repos`/`sync_state` are this plugin's tables in
-// <data-root>/plugins/github.sqlite and the router is a factory over that handle, while the stored
-// GitHub credential still lives in core's `integrations` table and is read through the core seam off
-// `env.DB`.
+// Two handles: `repos`/`sync_state` are this plugin's tables in <data-root>/plugins/github.sqlite and
+// the router is a factory over that handle, while the stored GitHub credential lives in core's
+// `integrations` table and is read through the core seam off `env.DB`.
 describe('repos list (serve-then-revalidate via the sync engine)', () => {
   let core: TestDb
   let plugin: TestPluginDb
@@ -58,7 +57,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
     emit = vi.fn<GithubEmit>()
-    // The GitHub token comes from a stored integration row now, not from the caller's identity.
+    // The GitHub token comes from a stored integration row, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {

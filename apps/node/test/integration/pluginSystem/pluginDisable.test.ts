@@ -37,7 +37,7 @@ const buildPlugins = (dataDir: string) =>
 
 // Every registry a node plugin can write to. For why connection and integration are separate lists,
 // see docs/integrations/contributions.md § Connection and integration contributions. github is the only
-// provider-owning plugin left in this graph, so `providerRoutes` and `modelProviders` are asserted
+// provider-owning plugin in this graph, so `providerRoutes` and `modelProviders` are asserted
 // empty in the baseline case.
 type Snapshot = {
   routes: string[]

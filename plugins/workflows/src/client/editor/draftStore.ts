@@ -1,5 +1,5 @@
 // The editor's state around one open definition: the draft, its history, what the node says about it,
-// and the four writes (docs/workflows/authoring.md § Authoring).
+// and its writes (docs/workflows/authoring.md § Authoring).
 //
 // The rules are next door and pure (./draft.ts). What is here is everything reactive: the load, the
 // catalog and provider reads the inspector draws from, the debounced validate, the dirty flag, and the
@@ -58,7 +58,7 @@ export function createDraftStore(input: {
   const ref = createMemo<DefRef | null>(() => parseDefRef(input.item()))
   const readOnly = () => !ref() || loaded.loading || !!loaded.error
   // Told apart from `readOnly`, because "this is committed, copy it" and "this address names nothing"
-  // are different things to say and the second one used to wear the first one's words.
+  // are different things to say.
   const unreadable = () => !!input.item() && !ref()
 
   const [draft, setDraftRaw] = createSignal<WorkflowDraft>(newDraft(emptyDefinition()))
@@ -285,7 +285,7 @@ export function createDraftStore(input: {
   }
 
   /** A rename carries the node's canvas position with it, or the layout would name a node that is
-   *  gone (../layoutPrefs.ts). */
+   *  gone. A version 1 step's position is keyed by its id, which a rename leaves alone. */
   const rename = (from: string, to: string): void => {
     apply((current) => renameNode(current, from, to))
     const current = ref()

@@ -1,12 +1,10 @@
 // Turning a definition back into the file the loader reads (docs/workflows/definitions.md § Database
-// definitions). "Save to repo" is the one caller: a row drafted in the editor becomes
-// `.acorn/workflows/<slug>.toml`, which the trust snapshot then covers like any other committed
-// configuration.
+// definitions). Exporting a row and publishing a file draft both write through it, and the trust
+// snapshot then covers the file like any other committed configuration.
 //
-// The keys here are the mirror of ./files.ts § parseStep, snake case on the wire. The
-// property that keeps the two honest is a round trip, not a reading: parse, write, parse again, and
-// the two definitions must match (./toml.test.ts). Serialising is `smol-toml`'s job rather
-// than ours, apart from the one thing it will not do, below.
+// The keys here mirror `parseStep` in the file loader, snake case on the wire. A round trip keeps the
+// two honest: parse, write, parse again, and the two definitions must match. Serialising is
+// `smol-toml`'s job, apart from the one thing it will not do, below.
 import { stringify } from 'smol-toml'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import type {
@@ -39,7 +37,7 @@ const drop = <T extends Record<string, unknown>>(table: T): Record<string, unkno
   Object.fromEntries(Object.entries(table).filter(([, value]) => value !== undefined))
 
 // The three the loader collapses when they are empty, so writing an empty one would not survive the
-// next read (./files.ts § parseInputs, parseStringTable, parseBranches).
+// next read (`parseInputs`, `parseStringTable`, and `parseBranches` in the file loader).
 const some = <T extends object>(value: T | undefined): T | undefined =>
   value && (Array.isArray(value) ? value.length : Object.keys(value).length) ? value : undefined
 

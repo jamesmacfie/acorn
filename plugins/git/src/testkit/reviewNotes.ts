@@ -1,6 +1,6 @@
 // Review notes written straight into this plugin's table, for the large-surface fixture
-// (docs/testing/desktop.md § The large-surface fixture). The same row the POST route writes, minus the task
-// lookup: the seeder writes the task into core itself and runs before the node is up.
+// (docs/testing/desktop.md § The large-surface fixture). The same row the POST route writes, minus the
+// task lookup: the seeder writes the task into core itself and runs before the node is up.
 //
 // Test scaffolding: imported by tests and the agent-automation seeder only.
 import { randomUUID } from 'node:crypto'

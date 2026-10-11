@@ -1,10 +1,10 @@
 // The `http:request` workflow step (docs/workflows/step-kinds.md § Contributed step kinds), and this plugin's
 // only node-side contribution to another plugin.
 //
-// It exists here rather than in workflows for the reason the extensibility review gave: everything an
-// HTTP call needs to be safe already lives in this package — the scheme check that runs *after*
-// interpolation, the 5 MB response cap, the variable layers with their secret redaction, the command
-// deadline. A second caller in the workflows plugin would be a second, worse copy of all of it.
+// It lives here rather than in workflows because everything an HTTP call needs to be safe already
+// lives in this package — the scheme check that runs *after* interpolation, the 5 MB response cap, the
+// variable layers with their secret redaction, the command deadline. A second caller in the workflows
+// plugin would be a second, worse copy of all of it.
 import type { StepHandler, StepKindDescription, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import { bodyModes, httpMethods, type HttpSendInput, type KeyValue } from '../shared/model'

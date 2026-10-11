@@ -269,7 +269,7 @@ export const labelOptions = (labels: Record<string, string>): { value: string; l
   Object.entries(labels).map(([value, label]) => ({ value, label }))
 
 /** The name of the plan part a problem path points at: "Source Workspace tasks", "Column Status",
- *  "Step 2". Phase 2's outline names parts the same way. */
+ *  "Step 2". The outline names parts the same way. */
 export function planPartLabel(plan: PanelPlan, path: string): string {
   const [part, index] = path.split('/').slice(1)
   const at = Number(index)

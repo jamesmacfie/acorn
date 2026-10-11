@@ -19,8 +19,8 @@ import type { SendSubmit } from '../../shared/send'
 export type { SendSubmit }
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
-  // Answers from the same session map that server/transport/wsHub.ts reads through StreamHandlers.streamTaskId,
-  // not re-derived from list(), so the HTTP and WS halves cannot disagree about who owns a session
+  // Answers from the same session map the WS hub reads through StreamHandlers.streamTaskId, not
+  // re-derived from list(), so the HTTP and WS halves cannot disagree about who owns a session
   // (docs/security/transport-and-auth.md § Transport and auth). Null means no such session.
   taskIdFor(sessionId: string): string | null
   list(): Promise<TerminalSession[]>
@@ -107,8 +107,8 @@ export const terminal = new Hono<AppEnv>()
   )
   // Running the setup script, opening a terminal, and typing into one each run a command as the person,
   // outside any agent's sandbox, so all three are device-only. An agent starts commands through the
-  // run_* tools, which check its tool permissions and signed ceiling. A task token used to open a
-  // terminal with any `command` here (docs/security/transport-and-auth.md § Execution routes).
+  // run_* tools, which check its tool permissions and signed ceiling (docs/security/transport-and-auth.md
+  // § Execution routes).
   .post('/tasks/:taskId/setup', requireDevice, (c) =>
     viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))),
   )

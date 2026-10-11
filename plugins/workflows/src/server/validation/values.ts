@@ -94,7 +94,7 @@ export function workflowOutputs(def: WorkflowDef, rows: readonly WorkflowStepRow
   return result
 }
 
-/** Uses the existing after representation, including transitive edges, never completion order. */
+/** Values from every transitive predecessor by `after`, never by completion order. */
 export function predecessorValues(
   def: WorkflowDef,
   step: WorkflowStepDef,

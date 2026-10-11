@@ -38,12 +38,12 @@ export const BUNDLED_TRUST_OPT_OUT = 'ACORN_PROMPT_BUNDLED_PLUGIN_TRUST'
 
 /** Whether to auto-accept the application's own bundled client bundles on this launch.
  *
- * Not `app.isPackaged`. This grant covers the bytes the build produced from the first-party roster,
+ * Not whether the app is packaged. This grant covers the bytes the build produced from the first-party roster,
  * `apps/desktop/scripts/build-bundled-plugins.mjs`, into this application's own resource directory:
  * bundle resources when packaged, `dist/bundled-plugins` in a development build, and in both cases a
- * directory the build owns and nothing else writes to. Gating on packaging made every dev boot answer
- * four dialogs about the developer's own build output, which taught people to click Trust without
- * reading.
+ * directory the build owns and nothing else writes to. Gating on packaging would make every dev boot
+ * answer a dialog per bundled plugin about the developer's own build output, which teaches people to
+ * click Trust without reading.
  *
  * It says nothing about packages in the data root. A hand-installed or third-party package, and
  * anything a node serves this device, still prompts. */

@@ -7,7 +7,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The desktop opens in three processes and the helper is the middle one: Rust spawns it, it sweeps its
 // caches, starts and supervises the node, binds the WebSocket the renderer talks to, and only then
 // prints the ready line Rust is blocked on. Every one of those steps is in front of the window
-// appearing, and none of them was timed (docs/local-development/profiling.md § Timing a cold start).
+// appearing, so each is timed here (docs/local-development/profiling.md § Timing a cold start).
 //
 // stderr, not stdout: stdout is the line protocol Rust parses, and a timing line on it is a handshake
 // Rust cannot read (apps/desktop/src/helper/helperMain.ts). The *printing* is behind the switch rather
@@ -20,7 +20,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 
 export const HELPER_PERF = process.env.ACORN_PERF === '1'
 
-// The tag is the prefix the account has always carried, so `[helper:boot] <label> +<ms>ms (<ms>ms)`
+// The tag is the account's prefix, so `[helper:boot] <label> +<ms>ms (<ms>ms)`
 // is what reaches stderr and what the desktop boot test reads (apps/desktop/test/boot.test.ts).
 const log = createLogger('helper:boot')
 

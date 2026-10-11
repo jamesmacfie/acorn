@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { notesAgentTools, type NotesToolCoreServices } from './agentTools'
 import { NotesStore } from './notes'
 
-// The agent's route to a note, pinned as the counterweight to the device gate covering plugins/memory's
-// `/workspaces/:wsId/notes*` HTTP routes. Those routes were the only way a task-scoped credential could
-// write a workspace or global note, and closing them is only correct if these four tools are the honest
-// replacement. So this file asserts the properties that make them so:
+// The agent's route to a note, pinned as the counterweight to the device gate covering the
+// `/workspaces/:wsId/notes*` HTTP routes. Closing those routes to a task-scoped credential is only
+// correct if these four tools are an honest way for an agent to reach a workspace or global note. So
+// this file asserts the properties that make them so:
 //
 //   - all three scopes are still reachable, so nothing an agent legitimately needs was taken away;
 //   - the workspace is resolved from the agent's own taskId, never from a caller-supplied id, which is

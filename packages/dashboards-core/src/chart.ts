@@ -56,7 +56,7 @@ const PAD = { top: 8, right: 8, bottom: 22 } as const
 const MIN_LEFT = 14
 
 /** The plot rect the marks are placed in. Not a constant, because the left gutter is however wide the
- *  y axis labels turn out to be. At a fixed `36` a count of 200,000 rendered as "00000" with the rest
+ *  y axis labels turn out to be. A fixed width would draw a count of 200,000 as "00000" with the rest
  *  of itself outside the box. */
 export type ChartFrame = {
   width: number
@@ -102,7 +102,7 @@ const frameFor = (yLabels: readonly string[], tickFont: number): ChartFrame => {
 export const CHART_FRAME: ChartFrame = frameWithLeft(MIN_LEFT)
 
 /** Keep a tick label inside the box. A label centred on the last gridline hangs half of itself off the
- *  right edge, which is how `Aug 18` rendered as "Aug 1". `undefined` means centred, the normal case. */
+ *  right edge, so `Aug 18` would draw as "Aug 1". `undefined` means centred, the normal case. */
 const tickAnchor = (at: number, label: string, tickFont: number): ChartTick['anchor'] => {
   const half = (label.length * tickFont * GLYPH_RATIO) / 2
   if (at - half < 0) return 'start'
@@ -246,17 +246,11 @@ export function defaultChartView(schema: DashboardDisplaySchema, shaping: PanelS
   return {
     shape,
     ...(x ? { x } : {}),
-    // Always a count, never the first number field.
-    //
-    // This used to pre-pick `sum` over the first `number` in the schema, on the reasoning that a real
-    // measure is more interesting than a row count. It is, when the number is a quantity. The field
-    // vocabulary has no way to say that: `number` covers both a size in MB and github's pull request
-    // number, and the pulls collection declares the identifier first. So the headline chart of every
-    // PR panel opened as "the sum of PR numbers per day", whose axis reached 200,000.
-    //
-    // A count is meaningful over every collection, and the person is one select away from the sum they
-    // wanted. Adding an `id`-ish role to the field vocabulary to tell the two apart is not worth it
-    // for a default.
+    // Always a count, never the first number field. The field vocabulary can't tell a quantity from an
+    // identifier: `number` covers both a size in MB and github's pull request number, so a sum over the
+    // first number can chart "the sum of PR numbers per day". A count is meaningful over every
+    // collection, and the person is one select away from the sum they wanted. Adding an `id`-ish role to
+    // the field vocabulary to tell the two apart is not worth it for a default.
     aggregate: 'count' as const,
     // Only where the grouping is already a decision the person made. A series split nobody asked for
     // turns one readable line into five.
@@ -420,8 +414,8 @@ function buildBar(
   const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max, tickFont)
 
   const slot = frame.plotWidth / Math.max(1, columns.length)
-  // The cluster keeps the width one bar used to have, and the series divide it, so a chart with no
-  // split is laid out exactly as it was before grouping existed.
+  // The cluster keeps the width a single bar has, and the series divide it, so a chart with no split
+  // lays out exactly like an ungrouped bar.
   const cluster = slot * 0.7
   const width = cluster / groups.length
 
@@ -539,10 +533,10 @@ function buildLine(
 
   // ── A day with no rows is a zero, not a gap ───────────────────────────────────────────────────
   //
-  // This used to plot only the days that had rows and join them up, so a fortnight in which nothing
-  // was updated drew as a straight segment held at whatever height its two neighbours happened to
-  // have. That reads as "steady at 4" when the truth is "nothing happened". `trend.ts` already fills
-  // its sparkline across the window for the same reason, and the two should not disagree.
+  // Plotting only the days that have rows and joining them up would draw a fortnight in which nothing
+  // was updated as a straight segment held at whatever height its two neighbours happen to have. That
+  // reads as "steady at 4" when the truth is "nothing happened". `trend.ts` fills its sparkline across
+  // the window for the same reason, and the two should not disagree.
   //
   // Additive aggregates only. A count or a sum over no rows is 0, so filling is the honest answer. An
   // average, minimum or maximum over no rows is undefined, and filling those would draw a dip to the
@@ -551,7 +545,7 @@ function buildLine(
   const span = (last - first) / 86_400_000 + 1
   // Past the fill limit the gaps stay gaps. A span that wide has more days than this box has
   // pixels to put them in, so the fill would be invisible arithmetic. Upgrade path: bucket by week or
-  // month once the span asks for it, which is a real feature rather than part of this fix.
+  // month once the span asks for it.
   const FILL_DAY_LIMIT = 400
   const fill = (aggregate === 'count' || aggregate === 'sum') && span <= FILL_DAY_LIMIT
   const spanDays = fill ? Array.from({ length: span }, (_, index) => first + index * 86_400_000) : undefined

@@ -26,7 +26,7 @@ import type { WorkflowGateForm } from '../../shared/workflowContracts'
 //
 // The second half is which shape a node draws. An agent node hands its detail to the conversation
 // plugins/agents publishes, and every other kind — and an agent node on a machine where that plugin
-// is switched off — keeps the summary this pane has always drawn.
+// is switched off — keeps this pane's own summary.
 
 vi.mock('@acorn/plugin-terminal/contract/sessionsClient.ts', () => ({
   terminalSessions: { create: async () => ({ id: 'term-1' }) },
@@ -293,7 +293,7 @@ describe('which shape a node draws', () => {
 
   it('keeps the summary when nothing provides a conversation', () => {
     mount(step({}))
-    // The harness and the model, which is what this pane drew before the transcript was here.
+    // The harness and the model.
     expect(host.textContent).toContain('claude-code')
     expect(buttons()).toEqual(['Stop step'])
   })

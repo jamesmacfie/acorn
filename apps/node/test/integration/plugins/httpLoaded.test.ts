@@ -18,8 +18,8 @@ import { openSqlite } from '@acorn/node-core/server/storage'
 import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 
-// http is the first plugin to ship loaded with tables of its own, so this is the suite the storage
-// path never had: a manifest-declared migrations directory staged inside the package, a host-opened
+// http ships loaded with tables of its own, so this suite covers the loaded storage path: a
+// manifest-declared migrations directory staged inside the package, a host-opened
 // database bound to the manifest id, and a schema change arriving through the installer against a
 // database that already has rows in it (docs/plugins/data-ownership.md § Data ownership).
 //
@@ -121,7 +121,7 @@ describe('http as a loaded plugin with its own tables', () => {
   it('stages its migration chain inside the package and declares it', () => {
     const dir = pluginDir(dataRoot, 'http')
     const manifest = JSON.parse(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')) as { migrations?: string }
-    // The whole point of the builder change: without a staged chain the manifest declaration would name a
+    // The point of staging the chain: without it the manifest declaration would name a
     // directory the loader confines and then fails to find, which is a plugin that dies on first open.
     expect(manifest.migrations).toBe('./migrations')
     expect(existsSync(join(dir, 'migrations/meta/_journal.json'))).toBe(true)

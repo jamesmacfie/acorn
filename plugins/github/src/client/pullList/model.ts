@@ -1,7 +1,7 @@
 import type { Pull } from '../../shared/api'
 
-// Client-side text filter over the loaded tab. This intentionally stays local to
-// the current PR list; older PR search/pagination belongs in the server workflow.
+// Client-side text filter over the loaded tab. Pulls past the loaded pages come from GitHub's search
+// (`pullSearchOptions`), not from here.
 export const filterPulls = (pulls: Pull[], query: string) => {
   const q = query.trim().toLowerCase()
   if (!q) return pulls

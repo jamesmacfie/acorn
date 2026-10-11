@@ -19,8 +19,8 @@ const log = createLogger('node-keys')
 // The protection is only as good as where the data key lives. A dev build, or a machine where the
 // keychain refused the item, keeps it in a plain `data.key` file (apps/desktop/src-tauri/src/keychain.rs).
 //
-// A Node that ran before this wrote both keys in plain form. The first start after upgrade seals the
-// session key as it is, because a new one would make every stored credential unreadable, and mints a
+// A data root from an older Node holds both keys in plain form. The first start seals the session
+// key as it is, because a new one would make every stored credential unreadable, and mints a
 // new signing key, because any agent that ran before could have read the old one. Nothing re-signs
 // with the old key: the Node writes fresh token files for the terminal sessions it reattaches, and an
 // agent session gets one when its process starts. A plain `internal-token` is never read, so one an
@@ -35,12 +35,12 @@ type SealedKeys = { sessionKey: string; signingKey: string }
 export type NodeKeyCustody = {
   // The keys for the next start, sealing them first when the data root has no sealed file.
   prepare(): NodeKeys
-  // After the Node started with `keys`: delete the plain files it has shown it no longer needs.
+  // After the Node started with `keys`: delete the plain files it has shown it doesn't need.
   settle(keys: NodeKeys, check: NodeKeyCheck): void
 }
 
 // `envSessionKey` is SESSION_ENC_KEY from the helper's environment or a `.env` file. It wins over the
-// sealed key, as it won over session.key before, so a developer's pinned key keeps working.
+// sealed key, so a developer's pinned key keeps working.
 export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionKey?: string): NodeKeyCustody {
   const sealedPath = join(dataDir, SEALED_NODE_KEYS_FILE)
 

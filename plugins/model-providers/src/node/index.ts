@@ -2,11 +2,11 @@
 // and the connection-before-model registration order this file follows, see docs/integrations.md
 // § Model providers.
 //
-// This ships as a loaded package, so a grep of apps/node/src/server/plugins.ts will not find it. The
-// manifest declaration is in plugins/model-providers/acorn-plugin.config.mjs and the distribution roster is in
+// This ships as a loaded package. The manifest declaration is in
+// plugins/model-providers/acorn-plugin.config.mjs and the distribution roster is in
 // apps/desktop/scripts/build-bundled-plugins.mjs. Nothing below changes across that boundary:
-// ctx.providers.connection and ctx.providers.model are identical for both tiers. There is no client
-// bundle, so no device holds interface code of ours.
+// ctx.providers.connection and ctx.providers.model are identical for both tiers. There is no client bundle,
+// so no device holds interface code of ours.
 //
 // No database and no routes. This plugin turns a stored credential into an OpenAI or Anthropic HTTP
 // call and persists nothing. The credential is core's integrations row, read inside a secret scope.

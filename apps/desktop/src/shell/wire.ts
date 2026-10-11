@@ -66,18 +66,15 @@ export const isPush = (message: HelperMessage): message is HelperPush => 'push' 
 
 // ── The binary push ───────────────────────────────────────────────────────────────────────────────
 //
-// One push does not ride the JSON above: terminal output. The upgrade this file used to describe as
-// hypothetical — "an id-tagged binary WebSocket frame beside the JSON reply" — is built, in
-// @acorn/protocol/ws.ts § The one binary frame, and phase 6 of the performance programme took it for
-// the one channel measured in frames per second.
+// One push does not ride the JSON above: terminal output, the one channel measured in frames per
+// second. It uses the id-tagged binary frame in @acorn/protocol (ws.ts § The one binary frame).
 //
 // The frame is the node id, then the frame the node sent, which is itself the session id and then the
 // pseudo-terminal's bytes. So the renderer peels two ids and hands the rest to the xterm for that
 // session, with no JSON parse and no base64 on the way.
 //
-// Request and response bodies stay base64 below. Nothing but terminal output has reached the ceiling
-// that would justify moving them: the largest body measured, the agent snapshot's first page at about
-// 2 MB on 2026-09-03, is an order of magnitude under it.
+// Request and response bodies stay base64 below. Their largest, the agent snapshot's first page, is
+// an order of magnitude under the size that would justify moving them.
 
 // Request and response bodies are bytes, and this channel is JSON, so they ride as base64.
 //

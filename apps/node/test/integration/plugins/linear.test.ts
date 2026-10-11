@@ -58,7 +58,7 @@ describe('Linear provider parity', () => {
       await next()
     })
     // Through the portable carrier, exactly as production mounts it: linear has no compiled router
-    // to hand `app.route` any more. `servePluginFetch` builds the identity-bound request context the
+    // to hand `app.route`. `servePluginFetch` builds the identity-bound request context the
     // routes' helpers require.
     const fetch = createLinearFetch()
     app.all('/api/linear/*', (c) => servePluginFetch(c, { pluginId: 'linear', mount: '/api/linear', fetch }))
@@ -132,8 +132,7 @@ describe('Linear provider parity', () => {
 
   // The reference-panel path, and the one with no connection to name: github scans `ENG-42` out of a
   // PR body and cannot know which connected Linear owns it. Asking each workspace in turn is the
-  // resolution. It replaced a hand-rolled cache read plus a second fan-out, so this is the case that
-  // has to keep working, and the one nothing covered before.
+  // resolution.
   it('resolves a bare identifier by asking each connection until one answers', async () => {
     vi.mocked(linearFetch).mockImplementation(async (secret) =>
       graphQl({ issues: { nodes: secret === 'token-b' ? [node('Workspace B')] : [] } }),
@@ -158,8 +157,8 @@ describe('Linear provider parity', () => {
   // The declarative rail source. This router carries no `projects` scope, the loaded package's does,
   // so nothing is mapped for any connection here.
   it('contributes no rows when a connection has no linked projects, rather than the viewer’s own issues', async () => {
-    // The fallback this replaces showed whatever was assigned to you, which answered a question nobody
-    // asked and whose rows belonged to no project in the workspace. The rail says so instead, through the
+    // Falling back to whatever is assigned to you would answer a question nobody asked, with rows that
+    // belong to no project in the workspace. The rail says so instead, through the
     // source's authored `emptyState` (docs/integrations/linear.md § Linear).
     vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [node('Urgent')] } }))
 
@@ -167,7 +166,7 @@ describe('Linear provider parity', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ items: [] })
-    // And it costs no provider call at all, which the fallback did once per connection on every visit.
+    // And it costs no provider call at all, where a fallback would cost one per connection on every visit.
     expect(linearFetch).not.toHaveBeenCalled()
   })
 

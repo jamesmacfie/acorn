@@ -1070,10 +1070,9 @@ export function createEditorController(input: EditorControllerInput) {
   }
 
   // Reload-on-focus, where there is a window to lose focus. A host without one — the terminal client
-  // runs this pane under Node — has nothing to listen to, and reaching for the listener took the whole
-  // pane down: the throw landed inside the mount and the pane drew nothing at all
-  // (docs/tui.md). The agent and the human still share the worktree
-  // there; what a reader gets instead of the automatic reload is the pane's own refetch.
+  // runs this pane under Node — has nothing to listen to, and reaching for the listener there throws
+  // inside the mount, so the pane draws nothing at all (docs/tui.md). The agent and the human still
+  // share the worktree there; what a reader gets instead of the automatic reload is the pane's own refetch.
   const watchFocus = (add: boolean): void => {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
     if (add) window.addEventListener('focus', onFocus)
@@ -1404,7 +1403,7 @@ export function createEditorController(input: EditorControllerInput) {
     onCleanup(() => {
       fileStatus.stop()
       // Flush first, then mark this mount gone: the flush is a save, and `save` below finishes its
-      // bookkeeping either way now that the bookkeeping outlives the mount.
+      // bookkeeping either way, because the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
       for (const held of menuHolds.values()) held.release()
@@ -1428,10 +1427,9 @@ export function createEditorController(input: EditorControllerInput) {
         setRoot(null)
         return featureUsable('editor', 'error')
       }
-      // Opening this pane used to be three steps in a row — read the root, mount the rectangle the
-      // root gated, read the file — of which two are requests. The file the reader left open does not
-      // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
-      // (docs/editor/editor-pane.md § One round trip to text).
+      // The file the reader left open does not depend on the root, so it is read now, beside the
+      // root, and `show()` finds it already in the pool (docs/editor/editor-pane.md § One round trip
+      // to text).
       // Warm text under the host capability; imports and document state wait for surface admission.
       const remembered = active()
       if (graphical && mode() === 'graphical' && remembered && !imageTypeForPath(remembered)) {

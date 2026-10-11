@@ -81,7 +81,7 @@ describe('linear connection validate', () => {
   })
 
   // 200, no errors array, and nothing to name the workspace with. An application token looks like
-  // this, and it used to reach normalize and throw a TypeError there.
+  // this, and without the check it reaches normalize and throws a TypeError there.
   it('refuses a key with no person behind it rather than letting normalize dereference null', async () => {
     respond({ data: { viewer: null } })
     await expect(validate('lin_api_test')).rejects.toMatchObject({ code: 'provider_needs_auth' })

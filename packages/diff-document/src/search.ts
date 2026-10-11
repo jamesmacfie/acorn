@@ -12,7 +12,7 @@ import {
 // segment it takes the reader to.
 //
 // Code rows only, the text a line shows, and occurrences in one line never overlap because the scan
-// steps past each hit. That is what the in-pane find always did over the rows it had.
+// steps past each hit.
 //
 // A page stops at its match limit or its segment budget, whichever comes first, so a page can be
 // empty and still carry a cursor. The caller keeps reading until it has matches or the cursor ends.

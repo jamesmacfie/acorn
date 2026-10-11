@@ -12,8 +12,8 @@ import { closeWorkflowStart, startRequest, type StartRequest } from './startRequ
 // "Run this workflow": one box per declared input, and a task to run it on.
 //
 // One dialog, one mount point. The editor's Run and the palette's "Run a workflow" both ask for it
-// through ./startRequest.ts and the browse list draws it, because that region is on screen whenever
-// the Workflows source is (../WorkflowsBrowse.tsx). A second mount would be a second dialog.
+// through `requestWorkflowStart`, and the browse list draws it, because that region is on screen
+// whenever the Workflows source is. A second mount would be a second dialog.
 
 /** The one mount point. Draws nothing until something asks. */
 

@@ -3,7 +3,7 @@ import { defRefKey, parseDefRef } from './draftAddress'
 
 // The address of an open definition, round-tripped. Solid Router hands a path parameter back exactly
 // as it sits in the URL, so the `:` that `workflowsSurfacePath` escapes arrives as `%3A`. Reading that
-// as nothing opened the whole editor read-only, with no Add, no Save, and a banner calling a fresh row
+// as nothing opens the whole editor read-only, with no Add, no Save, and a banner calling a fresh row
 // a committed file.
 
 describe('a definition reference', () => {

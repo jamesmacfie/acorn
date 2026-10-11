@@ -5,8 +5,8 @@ import PullDetail from './PullDetail'
 import { _resetPrModels } from './pullDetail/prModel'
 
 // The browse detail follows the routed pull all the way into its diff column. `Sections` renders the
-// diff once and `DiffForPull` reads its route once, so without a keyed mount the column kept the
-// first pull's diff while the navigator moved on.
+// diff once and `DiffForPull` reads its route once, so without a keyed mount the column keeps the
+// first pull's diff while the navigator moves on.
 
 const route = vi.hoisted(() => ({ params: undefined as unknown as { projectId: string; number: string } }))
 vi.mock('@solidjs/router', () => ({

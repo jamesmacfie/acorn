@@ -8,7 +8,7 @@
 // The rest of the interlock (`disposed`, `recovering`) stays in index.ts: those are ordering flags
 // around the shell's own lifecycle events.
 //
-// It also reports, because a node dying under the helper is a silent event today and the count in
+// It also reports, because a node dying under the helper is otherwise a silent event and the count in
 // the window is the number that decides what happens next (docs/shell/node-child.md § What the helper reports).
 import { emitError, emitEvent } from '@acorn/node-core/server/telemetry'
 

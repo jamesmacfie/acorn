@@ -46,10 +46,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let stopScheduleRecovery: (() => void) | null = null
   let stopCheckoutActivity: (() => void) | null = null
   let agentTools: { dispose(): void } | null = null
-  // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
-  // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
-  // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
-  // a plugin does not deep-import server/notify.ts.
+  // The step stream (`WORKFLOWS_NOTICES`). It goes out on core's `workflow:` channel as a frame written
+  // here, because `ctx.events` is the seam and a plugin does not import core's notifier.
   const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
     stepEvent: (runId, stepId, event) => ctx.events.send({ channel: 'workflow:step:event', runId, stepId, event }),
   })
@@ -63,8 +61,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       { verb: 'child-changed', description: 'A dispatched child workflow changed durable state' },
       { verb: 'completed', description: 'A workflow run reached a terminal status' },
     ],
-    // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
-    // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
+    // This module's own URL: the chain sits at plugins/workflows/migrations, and the host's plugin
+    // storage owns open, migrate, and close from there.
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       let active = true
@@ -128,7 +126,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
-      // (server/runs/runner.ts explains the ordering).
+      // (`WorkflowsRunnerHandle` explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, {
         reconcile: async () => {
           const recovered = await dispatcher.reconcile()

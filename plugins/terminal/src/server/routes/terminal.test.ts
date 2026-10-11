@@ -93,8 +93,7 @@ describe('terminal control routes', () => {
   it('no longer serves the routes that moved to core', async () => {
     setTerminalBridge(fake())
     const app = authed()
-    // The scope-shed only counts if these routes are gone from the plugin, not merely duplicated in
-    // core.
+    // These routes are core's. The plugin must not serve a duplicate.
     for (const [path, method] of [
       ['/api/terminal/sessions', 'GET'],
       ['/api/terminal/repo-path', 'GET'],
@@ -121,7 +120,7 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
     const typed: string[] = []
     setTerminalBridge(fake({ sendToAgent: async (id, text) => (typed.push(`${id}:${text}`), { ok: true }) }))
     const app = asTask1()
-    // The original probe, verbatim: type a shell command into another task's shell.
+    // The probe: type a shell command into another task's shell.
     const foreign = await app.fetch(
       req('/api/sessions/s2/send', 'POST', { text: 'rm -rf ~', submit: 'now' }),
       {} as Env,
@@ -172,8 +171,8 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
       }),
     )
     const app = asTask1()
-    // A task token with a read-only ceiling opened a terminal running any command here. Opening one
-    // is the person's, like typing into one.
+    // A task token, even one with a read-only ceiling, must not open a terminal running any command.
+    // Opening one is the person's, like typing into one.
     for (const taskId of ['task1', 'task2']) {
       expect(
         (await app.fetch(req('/api/sessions', 'POST', { taskId, command: 'printf probe' }), {} as Env)).status,

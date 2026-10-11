@@ -45,8 +45,8 @@ const COMMAND: Record<Exclude<RemoteAction, 'abort'>, string> = {
 const countsTip = (state: ReturnType<ChangesModel['status']>): string | undefined =>
   state.upstream == null ? undefined : `${state.behind ?? 0} behind, ${state.ahead ?? 0} ahead`
 
-/** Which verb the primary button runs. Publish and Push are one call
- *  (../server/localDiff.ts § pushArgs). Never `abort`, which only the banner offers. */
+/** Which verb the primary button runs. Publish and Push are one call (`pushArgs` on the node).
+ *  Never `abort`, which only the banner offers. */
 const actionFor = (verb: RemoteVerb): Exclude<RemoteAction, 'abort'> => (verb === 'publish' ? 'push' : verb)
 
 const OPERATION_TITLE = {
@@ -96,10 +96,9 @@ function OperationBanner(props: { model: ChangesModel }) {
  *
  *  No heading above the run. Each label says the whole verb instead.
  *
- *  Force push sits last, below a rule, as every destructive item does (docs/ui-design/interaction.md § Menus and
- *  right-click). It is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
- *  the armed label is the prompt on every host, and a dialog was refused by the programme's
- *  decisions table. */
+ *  Force push sits last, below a rule, as every destructive item does
+ *  (docs/ui-design/interaction.md § Menus and right-click). It is a `Menu.Item` with `confirm`, like
+ *  the row's Discard: the armed label is the prompt on every host. */
 function RemoteMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const run = (action: RemoteAction) => void model().remote(action)
@@ -163,7 +162,8 @@ function RemoteMenu(props: { model: ChangesModel }) {
 /** The banner, the bar, and the `git:push-actions` slot under it.
  *
  *  Mounted at the top of the footer, above the commit editor, because the order top to bottom is what
- *  happens in order: see where you are, land the commit, then send it (docs/panes/layout.md § Layout model).
+ *  happens in order: see where you are, land the commit, then send it
+ *  (docs/panes/layout.md § Layout model).
  */
 export function RemoteBar(props: { model: ChangesModel }) {
   const model = () => props.model

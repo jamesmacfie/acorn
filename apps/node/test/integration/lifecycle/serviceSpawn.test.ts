@@ -138,7 +138,7 @@ describe('the service as a spawned child process', () => {
     const service = new ServiceChild({
       GITHUB_CLIENT_ID: 'test-client',
       // The parent inherits vitest's environment, and an ACORN_PORT leaking in would pin the port and
-      // hide the ephemeral path this whole phase depends on.
+      // hide the ephemeral port path the service depends on.
       ACORN_PORT: '',
     })
     child = service

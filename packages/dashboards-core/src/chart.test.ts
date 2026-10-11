@@ -88,8 +88,8 @@ describe('type-inferred defaults', () => {
 
   it('always counts rows, and never pre-picks a number field to sum', () => {
     // The field vocabulary cannot tell a quantity from an identifier, since `number` covers a size in
-    // MB and github's pull request number alike. Summing "the first number there is" opened the PR
-    // panel on the sum of PR numbers, an axis reaching 200,000 that meant nothing. A count always
+    // MB and github's pull request number alike. Summing "the first number there is" would open the PR
+    // panel on the sum of PR numbers, an axis reaching 200,000 that means nothing. A count always
     // means something, and the sum is one select away.
     expect(defaultChartView(schema(status, size), {})).toMatchObject({ aggregate: 'count' })
     expect(defaultChartView(schema(status, size), {}).field).toBeUndefined()
@@ -323,7 +323,7 @@ describe('the grouped bar', () => {
     const plot = buildChart(rows, schema(status, kind), grouped, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     // `kind` declares no tones, so the two series take identity slots, and the status enum's own warn
-    // and ok never reach the marks because the category is no longer what the colour answers.
+    // and ok never reach the marks because the category is not what the colour answers.
     expect(plot.bars.map((bar) => bar.series)).toEqual([1, 1, 2, 2])
     expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
   })
@@ -528,7 +528,7 @@ describe('a day with no rows', () => {
     const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     // Three days in the span, three vertices, the middle one on the floor. Joining day 1 straight to
-    // day 3 drew "steady at 1" across a day on which nothing happened.
+    // day 3 would draw "steady at 1" across a day on which nothing happened.
     expect(vertices(plot.lines[0].path)).toBe(3)
     const middle = plot.lines[0].path.split(/[ML]/).filter(Boolean)[1]
     expect(Number(middle.trim().split(' ')[1])).toBeCloseTo(plot.frame.baseline, 6)
@@ -625,8 +625,8 @@ describe('the axis gutter', () => {
   })
 
   it('anchors an end label inward rather than letting half of it hang outside the box', () => {
-    // The last tick sits on the last gridline, a few units from the right edge. Centred, "Aug 18" lost
-    // its second digit off the side of the SVG.
+    // The last tick sits on the last gridline, a few units from the right edge. Centred, "Aug 18" would
+    // lose its second digit off the side of the SVG.
     const rows = [row('1', { updated: day(1) }), row('2', { updated: day(40) })]
     const plot = buildChart(rows, schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')

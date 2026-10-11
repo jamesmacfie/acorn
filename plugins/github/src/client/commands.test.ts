@@ -11,10 +11,9 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 
 import { githubCommands, type GithubCommandDeps } from './commands'
 
-// The two searches that replaced this plugin's private file finder, and the two commands beside them.
-// What is pinned is what the overlay guaranteed: the ranking is over the whole path, an empty query is
-// the pull request's own file order, picking one writes `?file=`, and every PR command is gated on a
-// pull request actually being open.
+// The two searches and the two commands beside them. What is pinned: the ranking is over the whole
+// path, an empty query is the pull request's own file order, picking one writes `?file=`, and every PR
+// command is gated on a pull request actually being open.
 
 const file = (path: string): PullFile => ({
   path,

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fileSummariesKey, pullDiffKey, pullKey } from '../shared/api'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
-// Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.
+// Bodies cross the transport as bytes, so assert the decoded payload rather than a JSON string.
 const batchBodyOf = (mock: { mock: { calls: unknown[][] } }, call: number): unknown =>
   JSON.parse(new TextDecoder().decode((mock.mock.calls[call][1] as { body: Uint8Array }).body))
 
@@ -94,7 +94,7 @@ describe('open PR warmup', () => {
       expect.objectContaining({
         method: 'POST',
         // `objectContaining`, because `apiClient.send()` names every request with an
-        // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
+        // `x-request-id` header (docs/telemetry/renderer.md § Renderer seams).
         headers: expect.objectContaining({ 'content-type': 'application/json' }),
         signal,
       }),
@@ -119,7 +119,7 @@ describe('open PR warmup', () => {
       expect.objectContaining({
         method: 'POST',
         // `objectContaining`, because `apiClient.send()` names every request with an
-        // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
+        // `x-request-id` header (docs/telemetry/renderer.md § Renderer seams).
         headers: expect.objectContaining({ 'content-type': 'application/json' }),
         signal,
       }),

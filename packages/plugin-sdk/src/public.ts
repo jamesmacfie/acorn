@@ -183,7 +183,7 @@ export declare function connect(): Promise<AcornBridge>
  * own frame you may bundle anything.
  *
  * `styles` is your stylesheet as a string, injected rather than linked: a plugin origin serves exactly
- * one file, so a frame with a separate asset is a broken frame.
+ * one file of yours, `/client.js`, so a frame with a separate asset is a broken frame.
  */
 export declare function mountFrame(
   options: { styles: string },
@@ -207,7 +207,7 @@ export declare function openLinkOnClick(bridge: AcornBridge, event: MouseEvent):
 // behaviour, keyboard handling, ARIA and style pack — none of which an iframe can borrow.
 //
 // You do not build these nodes by hand unless you want to. `acorn-plugin-sdk/remote` is the Solid
-// adapter, and it is fifteen lines because the JSX preset compiles straight onto the functions below.
+// adapter, and it is small because the JSX preset compiles straight onto the functions below.
 
 /** One node in a remote tree. Opaque: build it with the functions below, or with a framework adapter. */
 export type RemoteNode = {

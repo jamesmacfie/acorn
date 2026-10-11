@@ -38,7 +38,7 @@ const reviewerBody = z.object({ login: z.string().optional() })
 const labelBody = z.object({ name: z.string().optional() })
 
 /** The parsed body, or `null` when it does not fit. `missing` is what an absent body parses as, for the
- *  routes whose fields are all defaulted and which have always accepted a bodyless POST. */
+ *  routes whose fields are all defaulted and which accept a bodyless POST. */
 async function readBody<S extends z.ZodType>(
   c: Context<AppEnv>,
   schema: S,

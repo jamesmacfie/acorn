@@ -44,8 +44,7 @@ export function personInitials(name: string): string {
   return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters[0]).toUpperCase()
 }
 
-/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision yet;
- *  workstream 2's units decide their own. */
+/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision. */
 const NUMBER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
 
 /** `%` reads wrong with a space and every other unit reads wrong without one. */
@@ -126,7 +125,7 @@ export function formatCell(
     case 'link': {
       const url = String(value)
       // Host-mediated: the same check `openUrl` applies before handing a plugin's URL to the
-      // browser (plugins/chrome/actions.ts). A cell that fails it is a string, not a link.
+      // browser. A cell that fails it is a string, not a link.
       if (!isPluginOpenableUrl(url)) return { kind: 'text', text: url }
       return { kind: 'link', url, text: url.replace(/^https?:\/\//, '') }
     }

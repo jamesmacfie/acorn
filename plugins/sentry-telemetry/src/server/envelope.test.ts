@@ -137,8 +137,8 @@ describe('spans', () => {
   })
 
   it('sends a span whose parent is in another batch as its own transaction, still naming the parent', () => {
-    // Sentry stitches the two halves by trace id. Holding the child back to wait for a root is the
-    // persistence this programme refuses.
+    // Sentry stitches the two halves by trace id. Holding the child back to wait for a root would be
+    // persistence, which this exporter refuses.
     const orphan = span({ spanId: hex16('4'), parentSpanId: hex16('9'), name: 'http.request' })
     const [envelope] = buildEnvelopes(batchOf([orphan]), options())
     expect(payloadOf(envelope).contexts.trace).toMatchObject({ span_id: hex16('4'), parent_span_id: hex16('9') })

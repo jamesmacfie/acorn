@@ -4,7 +4,7 @@ import { type AppEnv, ownerId, respondError } from '@acorn/plugin-api/node'
 import type { RunJobs } from '../../../shared/api'
 import { githubToken } from '../../githubToken'
 
-// Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
+// Read-only Actions endpoints for the checks side panel. Writes (rerun) live in `prActions`.
 // Uncached on the server: no mirror table, no BLOBS entry. The client query cache
 // (IndexedDB-persisted) already covers reuse on this machine, and job/log payloads go stale fast.
 

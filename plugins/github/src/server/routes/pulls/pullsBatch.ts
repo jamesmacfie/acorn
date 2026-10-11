@@ -13,10 +13,10 @@ import { githubToken } from '../../githubToken'
 import { syncState } from '../../../node/schema'
 
 // Batch prefetch: warm the mirror for several open PRs at once so client navigation is instant.
-// Each stale PR goes through the same complete refresh as the single-PR routes (pullRefresh.ts), a
-// few PRs at a time. There is no batch-only query: a multi-alias query would have to stop at each
-// connection's first page, which is the truncation the single-PR path no longer allows. Per-PR TTL
-// skip means already-fresh PRs cost no GitHub calls.
+// Each stale PR goes through the same complete refresh as the single-PR routes, a few PRs at a time.
+// There is no batch-only query: a multi-alias query would have to stop at each connection's first
+// page, which is the truncation the single-PR path refuses. Per-PR TTL skip means already-fresh PRs
+// cost no GitHub calls.
 //
 // Not on the serve-then-revalidate engine (docs/caching.md). A multi-item prefetch has no single
 // response resource to hand back stale, so this always blocks. It shares the engine's TTL
@@ -25,7 +25,7 @@ import { syncState } from '../../../node/schema'
 // (docs/plugin-authoring/telemetry.md § Telemetry and logging).
 const log = createLogger('github', 'github')
 
-const MAX_BATCH = 10 // the client sends ~5
+const MAX_BATCH = 10 // the client's prefetch sends at most 5
 // PRs refreshed at once. Each walks its own connections, so this bounds the GitHub requests in flight.
 const REFRESH_CONCURRENCY = 3
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>

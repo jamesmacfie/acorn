@@ -26,7 +26,7 @@ const backends: ModelBackendsResponse = {
 }
 
 // No providers and no connections: the machine has an agent CLI and nothing else, which is the case
-// this whole programme exists for.
+// this step exists for.
 const noProviders: IntegrationsResponse = { providers: [], integrations: [] }
 
 let host: HTMLDivElement

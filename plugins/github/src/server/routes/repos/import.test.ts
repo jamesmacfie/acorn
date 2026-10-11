@@ -117,7 +117,7 @@ describe('GitHub project importer', () => {
     expect(update).toHaveBeenCalledWith('placeholder-id', { path: '/checkouts/placeholder-me', githubRepoId: 103 })
   })
 
-  // Two clones of one repository are legal (schema.ts keeps projects_github_idx non-unique), so a
+  // Two clones of one repository are legal (`projects_github_idx` is non-unique), so a
   // project that already has a path must not be repointed by the next import.
   it('creates a new project when the existing one is already a real checkout', async () => {
     byGithub.mockResolvedValue(ref('existing-id', '/elsewhere/map-me'))
@@ -142,7 +142,7 @@ describe('GitHub project importer', () => {
 
   it('validates the mutation boundary and rejects unknown mirror candidates', async () => {
     expect((await post({ repositories: [{ repoId: '101', action: 'map', path: '/x' }] })).status).toBe(400)
-    // 'defer' was removed from the contract: not importing is what deferring meant.
+    // 'defer' is not in the contract: not importing is what deferring would mean.
     expect((await post({ repositories: [{ repoId: 101, action: 'defer' }] })).status).toBe(400)
     const response = await post({ repositories: [{ repoId: 999, action: 'map', path: '/x' }] })
     expect(response.status).toBe(200)

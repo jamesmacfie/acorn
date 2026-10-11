@@ -78,7 +78,7 @@ await node.reconciled
 
 // Unattended enrollment, if and only if the provisioner set both environment variables
 // (docs/node-enrollment.md). With neither set this returns before it reads a file, so a node nobody
-// provisioned behaves exactly as it did before this line existed.
+// provisioned behaves exactly as if this call were not here.
 //
 // Here rather than earlier because it needs the endpoint and the fingerprint, which only exist once
 // the listener has bound. Before the device count below on purpose: a node that just handed its
@@ -87,8 +87,8 @@ await node.reconciled
 //
 // The endpoint it enrolls with is the advertised one, not `listener.endpoint.origin`. That value is
 // deliberately loopback whatever `advertiseHost` says, because every child process this node spawns
-// dials it (server/transport/listener.ts), and a control plane handed `https://127.0.0.1:<port>` would vouch for an
-// address no other machine can reach. With no advertised host the loopback origin is still what goes,
+// dials it, and a control plane handed `https://127.0.0.1:<port>` would vouch for an address no
+// other machine can reach. With no advertised host the loopback origin is still what goes,
 // which is right for a control plane running on this same machine and useless for one that is not —
 // the operator's exposure decision either way (docs/node-distribution.md § Reaching a node from
 // another machine).

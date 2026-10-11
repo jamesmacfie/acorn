@@ -67,8 +67,7 @@ describe('check-renderer-budget', () => {
       ...extra,
     })
 
-  // index.html loading a small guard module that dynamic-imports the app, the shape the renderer had
-  // from 2026-09-20 to 2026-09-25.
+  // index.html loading a small guard module that dynamic-imports the app.
   const guarded = (imported: string) =>
     build(
       {
@@ -97,8 +96,8 @@ describe('check-renderer-budget', () => {
   })
 
   it('counts the app behind a startup guard, not just the guard index.html names', () => {
-    // The shape that blinded the check on 2026-09-24: the HTML named one small script and the check
-    // reported that, while the window loaded everything the guard imports.
+    // The shape that can blind the check: the HTML names one small script, while the window loads
+    // everything the guard imports.
     guarded('store-cccc.js')
     const { code, output } = run(dir)
     expect(code).toBe(0)
@@ -121,8 +120,8 @@ describe('check-renderer-budget', () => {
   })
 
   it('fails on a denylisted module that merged into a chunk named after something else', () => {
-    // How plugin code reached startup before 2026-09-25: a client entry imported a component
-    // statically, the component landed in the entry chunk, and every chunk name stayed innocent.
+    // How plugin code reaches startup unseen: a client entry imports a component statically, the
+    // component lands in the entry chunk, and every chunk name stays innocent.
     build(
       {
         'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
@@ -157,15 +156,14 @@ describe('check-renderer-budget', () => {
   })
 
   it('fails when the whole icon set is in the startup list', () => {
-    // The reason the split in kit/tokens/iconNodes.ts exists. 371 KB of geometry was a quarter of the
-    // budget, and a byte total on its own let it back in whenever something else shrank.
+    // The reason the icon set is split (kit/tokens/iconNodes.ts). Its geometry is a large share of the
+    // budget, and a byte total on its own would let it back in whenever something else shrank.
     direct('icon-nodes-dddd.js')
     expect(run(dir).output).toContain('icon-nodes-dddd.js')
   })
 
   it('fails on the highlighter, which is the chunk this check was written for', () => {
-    // Phase 0 allowed this one and reported it; phase 1 took it out of the startup list and deleted
-    // the allowance, so it fails the build outright now.
+    // No allowance covers it, so it fails the build outright.
     direct('shiki-eeee.js')
     const { code, output } = run(dir)
     expect(code).toBe(1)
@@ -174,9 +172,8 @@ describe('check-renderer-budget', () => {
 
   it('excuses nothing', () => {
     // The allowance list is the one thing in the script that can turn a red build green, so it is
-    // asserted rather than trusted. It held `shiki`, `DiffPane` and `prModel` while phase 1 was owed
-    // and has been empty since. Adding a name back is a deliberate act and this is where it argues
-    // for itself.
+    // asserted rather than trusted. Adding a name to it is a deliberate act and this is where it
+    // argues for itself.
     expect(readFileSync(SCRIPT, 'utf8')).toContain('const KNOWN = []')
   })
 

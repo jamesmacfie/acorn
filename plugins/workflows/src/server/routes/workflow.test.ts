@@ -469,7 +469,7 @@ describe('a task-scoped credential is confined to its own runs', () => {
   })
 
   it('still answers 503 rather than 404 when the runner is not wired', async () => {
-    // dev:node's degraded mode must not be shadowed by the guard.
+    // The guard must not shadow the 503 a node with no runner answers.
     expect((await asTask1().fetch(req('/api/workflows/runs/run2/cancel', 'POST'), {} as Env)).status).toBe(503)
   })
 })

@@ -23,7 +23,7 @@ export function evictNotesPaneState(taskId: string, nodeId: string | null = acti
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// clears it are one edit apart (client-core's `onScopeEvicted` states the full argument).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictNotesPaneState(e.taskId)
 })

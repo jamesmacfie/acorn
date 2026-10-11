@@ -25,7 +25,7 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { Env } from '@acorn/plugin-api/testkit'
 
 // Wiring test over a real git worktree: working-tree status, a stage mutation, auth, body validation,
-// and bridge-unavailable. ../localDiff.test.ts covers the git parsing.
+// and bridge-unavailable. The `localDiff` tests cover the git parsing.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -34,8 +34,8 @@ const req = (url: string, method = 'GET', body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-// The model seam the bridge now takes. Every test in this file is about git, so both members refuse:
-// what a real generate does is ../commitMessage.test.ts and the two route tests below.
+// The model seam the bridge takes. Every test in this file is about git, so both members refuse: what
+// a real generate does is in the commit-message prompt tests and the two route tests below.
 const noModels = {
   generateText: () => Promise.reject(new Error('no provider in this test')),
   available: () => Promise.resolve([]),
@@ -231,8 +231,8 @@ describe('local-git routes over a real worktree', () => {
 })
 
 // The two hook chains, from the owner's side: the bridge is what runs them, so this is where the
-// payload each hands over is pinned. ../registerChanges.ts declares the points; ../localGit.ts
-// § CHANGES_HOOKS spells the payloads beside the calls.
+// payload each hands over is pinned. `registerChanges` declares the points; `CHANGES_HOOKS` spells the
+// payloads beside the calls.
 describe('the hook chains, as the bridge runs them', () => {
   let t: TestDb
   let work: string
@@ -368,7 +368,7 @@ describe('the hook chains, as the bridge runs them', () => {
 
 // The two model routes: the owner gate, the bodies, and how a provider's refusal reaches the reader.
 // A real bridge over a real worktree with a stub model seam, so what is under test is the whole path
-// down to the prompt — ../commitMessage.test.ts pins what the prompt says.
+// down to the prompt. The `buildCommitPrompt` tests pin what the prompt says.
 describe('the generated commit message', () => {
   let t: TestDb
   let work: string
@@ -526,7 +526,7 @@ describe('the generated commit message', () => {
   })
 
   // The status the reader has to act on: 401 means reconnect the key, 429 means wait. `viaBridge`
-  // would have turned both into a 500.
+  // would turn both into a 500.
   it('maps a provider refusal to its own status and code', async () => {
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
     fail = new ProviderOperationError('provider_needs_auth', 401)

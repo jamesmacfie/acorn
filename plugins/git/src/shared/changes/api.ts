@@ -1,9 +1,7 @@
 // The Changes tab's wire contract: the working-tree review and its inline notes.
 //
-// Types, route builders, and the query key live together, following the docker and http convention:
-// the plugin that owns the namespace owns the shape of what crosses it. The query key is
-// byte-identical to the one in @acorn/protocol/api.ts, because changing it orphans a user's
-// IndexedDB (docs/caching.md).
+// Types, route builders, and the query key live together: the plugin that owns the namespace owns the
+// shape of what crosses it.
 
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { DiffSearchRequest, DiffSegmentDescriptor, DiffSegmentRequest } from '@acorn/diff-document/document'
@@ -45,9 +43,9 @@ export const emptyLocalStatus = (): LocalStatus => ({
   operation: null,
   changes: [],
 })
-// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at a time:
-// the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
-// for the file, which is how the node knows a file has not moved and need not be diffed again.
+// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at
+// a time: the same path can be in both, and a document keys a file by its path. `key` is the pane's
+// status key for the file, which is how the node knows a file has not moved and need not be diffed again.
 export const localDocumentRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document`
 export const localSegmentsRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document/segments`
 export const localSearchRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document/search`
@@ -143,7 +141,7 @@ export const COMMIT_MESSAGE_MAX_OUTPUT_TOKENS = 512
 
 /** Which backend and model the wand spends, as the body a commit-message POST carries and as the
  *  device preference that remembers the last pick. A backend is a stored key or an agent CLI installed
- *  on this machine (@acorn/protocol/modelProviders.ts § ModelBackend). `modelId` is `''` when the
+ *  on this machine (`ModelBackend`). `modelId` is `''` when the
  *  backend declares neither a default nor a list, which is a real answer: the node omits it and the
  *  backend falls back to its own recommendation — an adapter's for a key, the CLI's own configured
  *  default for a harness. */
@@ -163,7 +161,6 @@ export const localCommitMessageRoute = (taskId: string) => `/v1/p/git/tasks/${ta
  *
  *  This plugin's own route rather than a read of core's roster: `/v1/core/integrations` has no bridge
  *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
- *  (docs/integrations/model-providers.md § Model providers). The path still says `model-connections` after the rename:
- *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
- *  side of it. */
+ *  (docs/integrations/model-providers.md § Model providers). The path says `model-connections` where
+ *  the type says backends; only this plugin's own client reads it. */
 export const localModelBackendsRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/model-connections`

@@ -6,7 +6,7 @@
 // either of them.
 //
 // A compiled plugin's regions are components in the shell's realm and get this from the host, as a
-// `model` on the pane contribution (client-core registries/paneModels.ts). A loaded plugin needs no
+// `model` on the pane contribution (client-core's `paneModel`). A loaded plugin needs no
 // such seam, and this file is why: both regions are entries in one bundle running in one worker, so
 // module scope already is the shared thing. That is the whole of the loaded half — one `createRoot`
 // keyed by the subject the host mounted.

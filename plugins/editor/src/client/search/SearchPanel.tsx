@@ -25,10 +25,8 @@ import { taskSearchState, updateTaskSearchState } from './searchState'
 // is a sidebar panel rather than its own pane, and why it stays mounted when hidden, see
 // docs/panes/contributions.md § Contributions.
 //
-// Entirely kit nodes since phase 9 of the layout programme, and its stylesheet went with them. Two
-// things came back for free in the trade: the results are a `Rows` collection, so arrow keys, Home,
-// End, the page keys and type-ahead work in a list that had none of them, and `TabPanel` owns the
-// hidden-but-mounted half that the panel used to spell as an inline `display: none`.
+// Entirely kit nodes: the results are a `Rows` collection, so arrow keys, Home, End, the page keys
+// and type-ahead work, and `TabPanel` owns the hidden-but-mounted half.
 export default function SearchPanel(props: { taskId: string; active: boolean }) {
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)

@@ -226,7 +226,7 @@ export const resolveThreadRoute = (owner: string, repo: string, number: string |
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const autoMergeRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'auto-merge')
-// Trial-merge conflicts (server/routes/pullConflicts.ts). `base` is the PR's base ref.
+// Trial-merge conflicts. `base` is the PR's base ref.
 export const conflictsRoute = (owner: string, repo: string, number: string | number, base: string) =>
   `${pullRoute(owner, repo, number, 'conflicts')}?base=${encodeURIComponent(base)}`
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) =>
@@ -255,8 +255,8 @@ export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, re
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
 export const conflictsKey = (owner: string, repo: string, number: string, base: string) =>
   ['conflicts', owner, repo, number, base] as const
-// 'v2': the response became PullFilesResponse, and a persisted summary array from before must not
-// hydrate into it.
+// The version marker changes with the response shape. The persisted cache has no buster, so an
+// answer saved in an older shape would otherwise hydrate into PullFilesResponse.
 export const fileSummariesKey = (owner: string, repo: string, number: string) =>
   ['files', owner, repo, number, 'summary', 'v2'] as const
 // Under 'files' and not 'summary', so it is not persisted: a document can be large, and it is
@@ -265,8 +265,8 @@ export const pullDiffKey = (owner: string, repo: string, number: string) =>
   ['files', owner, repo, number, 'diff'] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
-// 'v3': Compare's `files` became a `document` (v2 added `completeness`). A persisted answer from before
-// must not hydrate into the new shape.
+// The version marker changes with Compare's shape, so a persisted answer in an older shape never
+// hydrates into the current one.
 export const compareKey = (owner: string, repo: string, base: string, head: string) =>
   ['compare', owner, repo, base, head, 'v3'] as const
 export const pinsKey = ['pins'] as const

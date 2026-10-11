@@ -4,7 +4,7 @@ import { gh, ghError } from './githubApi'
 type GithubViewer = { login: string; name: string | null; avatar_url: string | null }
 type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] }
 
-// GitHub is an ordinary stored provider connection. Its encrypted token is read by githubToken.ts and
+// GitHub is an ordinary stored provider connection. Its encrypted token is read by `githubToken` and
 // can be rotated or disconnected like any other connection.
 //
 // `fields` is empty and `connectable` can still be true, which looks contradictory but is right: the

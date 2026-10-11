@@ -12,8 +12,7 @@ type Db = PluginDatabase
 type PrFailure = { error: 'bad_number'; status: 400 } | { error: 'repo_not_found'; status: 404 }
 type PrContext = {
   // The two things every write path actually needs, instead of a whole SessionUser: the GitHub
-  // credential (now a stored integration, not a field on the principal) and the row-ownership scope.
-  // Splitting them is what let all 14 `r.user.token` reads in prActions.ts move at once.
+  // credential (a stored integration, not a field on the principal) and the row-ownership scope.
   token: string
   userId: string
   db: Db
@@ -28,8 +27,8 @@ type PrContext = {
   autoMergeEnabled: boolean | null
 }
 
-// Write-path PR resolution, mirror-only and stricter than the read path's resolveRepoForUser
-// (repoMirror.ts), which falls through to a live GitHub fetch on a miss. Every PR write targets a PR
+// Write-path PR resolution, mirror-only and stricter than the read path's resolveRepoForUser, which
+// falls through to a live GitHub fetch on a miss. Every PR write targets a PR
 // the user is looking at, so its repo (and usually the PR row) is already mirrored; a miss here means
 // the client skipped the read path, and 404 is the honest answer rather than lazily mirroring on a
 // write.

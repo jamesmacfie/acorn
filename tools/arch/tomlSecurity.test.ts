@@ -77,7 +77,7 @@ it.each(callers)(
 )
 
 // GHSA-r4xh-jqrq-34v2: smol-toml up to 1.8.0 scanned the rest of the document for every key, so a
-// flat list of plain keys parsed in quadratic time. This document took over 20 seconds on 1.8.0.
+// flat list of plain keys parsed in quadratic time.
 it.each(callers)(
   '%s parses a few megabytes of plain keys within the child deadline',
   (path, _malformed, large) => {

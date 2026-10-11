@@ -61,8 +61,8 @@ export function RollbarItemView(props: {
 
   return (
     <Stack gap="section">
-      {/* Was a header div, an eyebrow div and an h1 with three classes. `Heading` is that shape with a
-          name, and the spacing comes from the Stack's role rather than from padding this plugin picked. */}
+      {/* `Heading` is the header shape with a name, and the spacing comes from the Stack's role rather
+          than from padding this plugin picks. */}
       <Toolbar variant="bar">
         <Heading level={2} eyebrow={`${item().integrationLabel} · #${item().identifier}`}>
           {item().title}

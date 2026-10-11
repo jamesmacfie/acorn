@@ -131,8 +131,9 @@ export async function refreshOpenPulls(
   return { ok: true }
 }
 
-/** Force-refresh one PR's GraphQL composite. Every connection is walked before anything is written. */
-// Load provider pagination on demand to keep it out of the Node service's startup graph.
+/** Force-refresh one PR's GraphQL composite. Every connection is walked before anything is written.
+ *  The fetcher loads on demand, which keeps provider pagination out of the Node service's startup
+ *  graph. */
 export async function refreshPullDetail(
   token: string,
   db: PluginDatabase,

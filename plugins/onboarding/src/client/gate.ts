@@ -1,10 +1,7 @@
-// Whether the first-run wizard opens. A pure predicate rather than a boolean expression inside the
-// component, because this is the part that was wrong and nothing could test it: the original gated on
-// "a workspace exists", which is neither necessary nor sufficient. Nothing at boot creates a
-// workspace. The Default one is minted lazily by the first project, so a genuinely fresh install
-// never saw onboarding, while an established install with fifty projects saw it on every launch.
-//
-// The condition that actually describes a first run is "this node has no projects yet".
+// Whether the first-run wizard opens, as a pure predicate so it can be tested. "A workspace exists" is
+// neither necessary nor sufficient: nothing at boot creates a workspace, and the Default one is minted
+// lazily by the first project. The condition that describes a first run is "this node has no projects
+// yet".
 
 export type OnboardingGateInput = {
   /** Closed for this session without completing. */
@@ -28,13 +25,12 @@ export function shouldShowOnboarding(input: OnboardingGateInput): boolean {
 }
 
 /**
-/**
  * Whether the wizard is on screen, which is not the same question as whether it should open.
  *
  * "No projects yet" is the right trigger and the wrong latch: the wizard's own first step creates a
  * project, so the condition that opened it stops holding the instant it is used. Re-evaluating the
- * trigger every render therefore unmounted the wizard mid-flow. The owner picked a folder and was
- * dropped into the app on that new project, having never seen the naming step.
+ * trigger every render would unmount the wizard mid-flow, dropping the owner into the app on the new
+ * project before the naming step.
  *
  * So opening is a one-way door. Once open it stays open until the wizard closes itself, which it does
  * by writing the `onboarded` preference on both Finish and Skip.

@@ -44,7 +44,7 @@ export type TerminalScreen = {
 export type TerminalDisplaySink = (message: ServerMsg) => void
 
 // The PTY stream is a sequence of cursor operations, not a screen that can safely be replayed from
-// an arbitrary byte offset. Keep a real terminal framebuffer in main and serialize that canonical
+// an arbitrary byte offset. Keep a real terminal framebuffer on the node and serialize that canonical
 // state whenever a client attaches. Operations share one promise chain so a snapshot is an exact
 // barrier: output received after it is requested cannot leak into the snapshot.
 export class HeadlessTerminalScreen implements TerminalScreen {
@@ -115,19 +115,15 @@ type PendingAttachment = { frames: ServerMsg[] }
 // **Emulation is a consequence of restoring a screen.** There is an emulator here only while an
 // attach is waiting for its snapshot. Its only reader is that snapshot, so an attach builds one from
 // the raw ring, serializes it, and the emulator goes as soon as no attach is waiting. A client that is
-// already attached does not need one: it has every byte, in its own xterm.
-//
-// It used to run for every session from the moment it was spawned, and then for as long as anybody
-// was attached. The desktop client now keeps a terminal tab attached from its first open until it is
-// closed (docs/terminal/client.md § Client), so "while attached" came to mean "for ever" for every tab
-// anybody had opened, and a build in a tab on another task paid the node's parser for a screen no
-// attach would read.
+// already attached does not need one: it has every byte, in its own xterm. The desktop client keeps a
+// tab attached from its first open until it is closed, so an emulator kept "while attached" would parse
+// every build in every tab anybody had opened, for a screen no attach would read.
 //
 // The price is scrollback: every attach rebuilds from what the ring still holds, so history older
 // than the ring is gone and an alternate-screen program whose state depends on older bytes redraws
-// from its next output. That is the right trade: a megabyte of output costs the node the ring's 1 to
-// 2 ms of CPU rather than the parser's 45 to 120 ms, and an attach pays a rebuild of 15 to 25 ms, once
-// per tab and again after a reconnect (docs/terminal/sessions.md § The screen, and who pays for it).
+// from its next output. Copying output into the ring costs far less than parsing it, and an attach pays
+// one rebuild, once per tab and again after a reconnect (docs/terminal/sessions.md § The screen, and who
+// pays for it).
 export class TerminalDisplay {
   private readonly live = new Set<TerminalDisplaySink>()
   private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()
@@ -138,8 +134,7 @@ export class TerminalDisplay {
     private cols: number,
     private rows: number,
     // Injected so a test can drive the ordering without a real emulator, and called per emulator
-    // rather than once per session, since there is now one per watched period rather than one for
-    // life.
+    // rather than once per session, since there is one per watched period rather than one for life.
     private readonly makeScreen: (cols: number, rows: number) => TerminalScreen = (cols, rows) =>
       new HeadlessTerminalScreen(cols, rows),
   ) {}

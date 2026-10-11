@@ -6,7 +6,7 @@
 // and needs none. `mergedList` reads both and a repo id wins, because a definition a reviewer can see
 // in a pull request beats a local draft with the same name.
 //
-// Cross-database ids are plain ids, as the runs table already does with `task_id`.
+// Cross-database ids are plain ids, like the runs table's `task_id`.
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'

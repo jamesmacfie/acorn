@@ -1,7 +1,7 @@
 // Pure terminal helpers: no node-pty imports, so they are unit-testable under plain Node
 // (terminalUtils.test.ts). The PTY and IPC wiring that needs those lives in terminal.ts. Helpers that
-// are not terminal-specific live in core: path and checkout guards in core/server/worktrees/pathGuards.ts, the
-// task-scoped child environment in core/server/taskEnv.ts.
+// are not terminal-specific live in node-core: path and checkout guards in server/worktrees/pathGuards.ts,
+// the task-scoped child environment in server/taskEnv.ts.
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 
@@ -83,8 +83,8 @@ export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 // `-e KEY=VAL` sets the session environment explicitly (tmux >=3.2), and it is load-bearing. The tmux
 // server is a singleton, so a session created against an already-running one does not inherit the env
 // handed to execFileSync. It takes the server's stale global env plus the `update-environment`
-// allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN. That made agent panes show
-// "connected, no tools" while shell panes worked. Session names are unique per pane, so -A never
+// allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN, and agent panes show "connected, no
+// tools" while shell panes work. Session names are unique per pane, so -A never
 // attaches to an existing session where -e would not apply.
 export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, env: Record<string, string> = {}) => [
   'new-session',

@@ -355,10 +355,9 @@ export function buildPanel(
   /**
    * The URL bar committed. A curl command pasted in expands into the whole request, as Bruno does.
    *
-   * On commit rather than on paste, and that is the one visible difference the move to a tree cost
-   * here: a paste event is a DOM event, so it cannot cross to a sandbox that has no DOM. Pressing
-   * Enter or leaving the field does the expansion instead, which is one keystroke later and the same
-   * result (docs/http-client/client.md § Client).
+   * On commit rather than on paste: a paste event is a DOM event, so it cannot cross to a sandbox that
+   * has no DOM. Pressing Enter or leaving the field does the expansion instead, one keystroke later and
+   * with the same result (docs/http-client/client.md § Client).
    */
   function commitUrl(value: string): boolean {
     if (/^\s*curl\s/i.test(value)) {

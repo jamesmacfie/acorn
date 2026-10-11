@@ -1,6 +1,6 @@
 // The client's notes surface (docs/notes-and-memory.md), backed by loopback HTTP to the
 // node's NotesStore, so it 503s in dev:node. Note shapes are canonical in
-// @acorn/protocol/notes.ts; re-exported here so existing feature imports keep working.
+// @acorn/protocol/notes.ts; re-exported here for this plugin's callers.
 import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../shared/api'
 import { activeNodeId, openPane, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'

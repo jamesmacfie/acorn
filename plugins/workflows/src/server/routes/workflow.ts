@@ -19,7 +19,7 @@ import type { WorkflowRecordFilter } from '../../shared/workflowProcessing'
 
 // Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,
 // resolve a human gate. Commands use HTTP while notices and live events use the shared WebSocket.
-// The routes need the node's WorkflowRunner, so they return 503 under dev:node.
+// The routes need the node's WorkflowRunner, so they answer 503 when no runner is provided.
 
 export type WorkflowBridge = {
   records?(
@@ -173,7 +173,7 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
   const runId = c.req.param('runId')
   if (!runId || !isTaskConfined(c)) return next()
   const bridge = routeCapabilityFor(c, WORKFLOW_ROUTE)
-  if (!bridge) return next() // let viaBridge answer 503, dev:node has no runner
+  if (!bridge) return next() // let viaBridge answer 503 when there is no runner
   const taskId = await bridge.taskIdForRun(runId)
   if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
   await next()
@@ -314,6 +314,6 @@ export const workflow = new Hono<AppEnv>()
   .get('/runs', (c) =>
     isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()),
   )
-// No trigger-poll route. The sweep is a node schedule now (../../node/index.ts), and "check now" is
-// the scheduler's own run-now on the settings page, which every schedule already has. A second,
-// workflow-only door to the same sweep would need its own confinement rule for no extra reach.
+// No trigger-poll route. The sweep is a node schedule, and "check now" is the scheduler's own run-now
+// on the settings page. A second, workflow-only door to the same sweep would need its own confinement
+// rule for no extra reach.

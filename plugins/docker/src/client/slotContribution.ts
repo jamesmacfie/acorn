@@ -11,9 +11,8 @@ export const dockerFooterSlotContribution: TaskSlotContribution = {
   component: DockerFooterBadge,
 }
 
-// The rail-row marker used to be a component in a `tabrail.task-row` slot, which meant Docker
-// positioning itself in the shell's pixel geography from its own stylesheet. It publishes the state
-// now and the host decides where it lands, so it can no longer collide with core's pin.
+// Docker publishes the rail marker's state and the host decides where it lands, so it cannot collide
+// with core's pin.
 export const dockerRailMarkerContribution: RailMarkerContribution = {
   id: 'docker',
   order: 50,

@@ -1,8 +1,8 @@
 // What the node says on its way out when nothing caught the error.
 //
-// Until this existed, an `uncaughtException` printed Node's own stack and the process died, which
-// is fine for a developer watching a terminal and invisible to everyone else: a supervised node's
-// stderr goes to the helper's log, and nothing correlated the death with what the owner was doing.
+// Without this, an `uncaughtException` prints Node's own stack and the process dies, which is fine
+// for a developer watching a terminal and invisible to everyone else: a supervised node's stderr goes
+// to the helper's log, and nothing correlates the death with what the owner was doing.
 //
 // **Installing a listener changes what Node does.** With any `uncaughtException` listener
 // registered, Node stops printing the stack and stops exiting, so a handler that only records would

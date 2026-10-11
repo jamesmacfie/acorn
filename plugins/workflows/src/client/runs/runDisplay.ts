@@ -28,7 +28,7 @@ const STEP_TONE: Record<string, Tone> = {
   failed: 'danger',
   'safety-rail': 'danger',
 }
-// `waiting` is the merged run list's word for `gated` (@acorn/protocol/runtime/runs.ts), which the rail reads.
+// `waiting` is the merged run list's word for `gated` (@acorn/protocol/runs.ts), which the rail reads.
 const RUN_GLYPH: Record<string, string> = {
   running: 'loader-circle',
   gated: 'hand',

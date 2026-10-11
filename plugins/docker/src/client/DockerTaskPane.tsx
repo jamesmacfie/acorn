@@ -1,4 +1,4 @@
-// The Docker task pane: containers linked to this task (matched main-side by worktree/slug), a chip
+// The Docker task pane: containers linked to this task (matched on the node by worktree/slug), a chip
 // per container switching the shared ContainerDetail, the same shape as RollbarPane.
 //
 // A `header-body` pane: the chips are the header and do not scroll, the detail is the body and does

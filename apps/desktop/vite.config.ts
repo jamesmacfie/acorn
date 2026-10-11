@@ -70,10 +70,10 @@ export default defineConfig({
       // drawn. The bundler cannot see that: Solid compiles each file that uses a delegated event into
       // a module-level `delegateEvents([...])` call, and that call keeps every component behind a
       // barrel on the startup graph, used or not. Declaring the files side-effect-free lets an unused
-      // one drop out, while one whose exports are used keeps its own `delegateEvents` call. That took
-      // about 67 KB off startup on 2026-09-25. Only the kit's `.tsx` files are named, because much of
-      // the rest of client-core creates its stores at import time. tools/arch boundaries.test.ts holds
-      // the kit to it (docs/frontend/startup-budget.md § Startup budget).
+      // one drop out, while one whose exports are used keeps its own `delegateEvents` call. Only the
+      // kit's `.tsx` files are named, because much of the rest of client-core creates its stores at
+      // import time. tools/arch boundaries.test.ts holds the kit to it
+      // (docs/frontend/startup-budget.md § Startup budget).
       treeshake: {
         moduleSideEffects: [{ test: /\/packages\/client-core\/src\/kit\/components\/.*\.tsx$/, sideEffects: false }],
       },

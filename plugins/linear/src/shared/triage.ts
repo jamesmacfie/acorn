@@ -1,6 +1,6 @@
 // Ordering and the priority projection for the browse list. A rail row is data the host renders, with
-// no filter inputs, facet selects, or state columns, so the filter, group, and facet halves are gone
-// (docs/integrations/linear.md § Linear). Ordering stays, because the rail is still a list.
+// no filter inputs, facet selects, or state columns (docs/integrations/linear.md § Linear), so ordering
+// is all the list needs.
 //
 // Both runtimes use both halves: the node sorts and labels rows, the frame labels the open ticket. So
 // this sits in shared/.

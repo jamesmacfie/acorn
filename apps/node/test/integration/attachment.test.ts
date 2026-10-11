@@ -17,8 +17,7 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 //
 // Detaching is the buy-back that makes the trust inversion acceptable, so the two things asserted here
 // are that it really revokes the credential and that it really leaves the node alone. A hand-written
-// attachment record stands in for an enrollment, which is exactly the phase's "done when": a node with
-// a hand-written record shows it and can drop it.
+// attachment record stands in for an enrollment: a node with one shows it and can drop it.
 
 const INTERNAL = 'internal-secret'
 const ENC_KEY = '0'.repeat(64)

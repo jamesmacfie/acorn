@@ -35,7 +35,7 @@ import {
 //
 // Mounted in the shell's `overlay` slot, because the row that opens it is on a list this plugin does
 // not draw. The terminal client mounts no overlay slot and its source panel has no row menu, so this
-// never draws there (apps/tui/src/plugins/SourcePanel.tsx).
+// never draws there.
 
 /** The one mount point. Draws nothing until a row menu asks. */
 export default function StartFromItemHost() {
@@ -51,7 +51,7 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
   const workspace = () => workspaceForProject(workspaces.data, props.target.projectId)
 
   // Every definition the workspace can run: its own rows, its projects' committed files, and the user
-  // layer, merged by the node (./workflowsClient.ts § defsList). Only published database definitions
+  // layer, merged by the node (`workflowApi.defsList`). Only published database definitions
   // and file definitions without known problems can be offered for a run.
   const [defs] = createResource(
     () => workspace()?.id || null,

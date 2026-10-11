@@ -17,9 +17,7 @@ import type { DatabaseClient } from './databaseClient'
 // overwrites it, so the button says "Overwrite" when it will. The notes travel with the query into the
 // AI prompt when it is picked as an example.
 //
-// The host draws the dialog now, so it covers the window rather than only this pane's lower region:
-// a tree is not confined to a rectangle the way the iframe was. That is the one visible difference the
-// move made here, and it is the better of the two.
+// The host draws the dialog, so it covers the window rather than only this pane's lower region.
 export default function SaveQueryModal(props: {
   client: Pick<DatabaseClient, 'saveQuery'>
   taskId: string
@@ -52,9 +50,8 @@ export default function SaveQueryModal(props: {
   }
 
   return (
-    // ⌘Enter used to be a `keydown` on the dialog. A DOM event does not cross to a sandbox with no
-    // DOM, so the name field's own submit carries it: Enter in the name saves, which is the gesture
-    // anyone reaching for ⌘Enter in a two-field dialog was already close to.
+    // A `keydown` on the dialog is a DOM event and does not cross to a sandbox with no DOM, so the name
+    // field's own submit stands in for ⌘Enter: Enter in the name saves.
     <Modal title="Save query" onDismiss={props.onDismiss}>
       <ModalBody>
         <Field label="Name">

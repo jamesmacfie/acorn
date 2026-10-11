@@ -50,7 +50,7 @@ export default {
     // link in a note.
     frames: [
       // `providerId` marks the task pane as a linked-items view: the host hides it on tasks with no
-      // linear link (client-core plugins/frames/register.ts).
+      // linear link (client-core's frame registration).
       // All three draw the same ticket from the same renderer, so all three name the same entry; what
       // differs is the subject the host mounts each slot with. `single` is the layout, because one tree
       // fills each of them (docs/panes/layout.md § Layout model).
@@ -108,8 +108,7 @@ export default {
       // Both routes read `?project=` (src/server/routes/linear.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
-      // A task with a Linear link and no pull request opens on the ticket. Core used to make that
-      // choice itself, by name, in client-core/features/tasks/activate.ts.
+      // A task with a Linear link and no pull request opens on the ticket.
       defaultPane: 'linear',
       // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
@@ -118,10 +117,9 @@ export default {
       // `openPane` addresses a task pane, `openUrl` leaves the app, and settings is shell
       // state behind a client event with no descriptor form.
       //
-      // It no longer offers to link projects either. The shell hides this source outright where the
-      // workspace links none (client-core/features/tabs/railSources.ts), so the two empty lists left to explain are
-      // followed projects with nothing active in them, and a repository its workspace follows Linear
-      // for but which follows no Linear project of its own.
+      // The shell hides this source outright where the workspace links no Linear projects, so the two
+      // empty lists left to explain are followed projects with nothing active in them, and a repository
+      // its workspace follows Linear for but which follows no Linear project of its own.
       emptyState: { message: 'No open issues in the linked Linear projects.' },
     }],
     // `openPane: 'linear'` is the task pane, deliberately not the project surface. A content link is
@@ -129,7 +127,7 @@ export default {
     //
     // Naming a pane here says an item can land in that pane; the `linear-ref` panel above says an
     // item can also be shown on its own, over whatever the reader was looking at. The clicking
-    // surface picks which (client-core/host/registries/panes/contentLinks.ts § ContentLinkPresentation). A
+    // surface picks which (`ContentLinkPresentation` in client-core). A
     // plugin with items but no task pane would omit `openPane` and get the panel alone.
     //
     // Two entries for one URL shape. The pattern grammar is exact-arity by design, a bounded
@@ -139,7 +137,7 @@ export default {
       { id: 'linear.issue', match: 'https://linear.app/{workspace}/issue/{identifier}', openPane: 'linear', item: 'identifier' },
       { id: 'linear.issue-slug', match: 'https://linear.app/{workspace}/issue/{identifier}/{slug}', openPane: 'linear', item: 'identifier' },
     ],
-    // The enrichment half of the same relationship, and why github no longer depends on this package.
+    // The enrichment half of the same relationship.
     // Resolves a set of identifiers across every connected workspace, with a ten-minute cache.
     refResolvers: [{ id: 'linear-refs', kind: 'linear.issue', resolve: '/v1/p/linear/issues' }],
     commands: [{

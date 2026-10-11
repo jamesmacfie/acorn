@@ -1,7 +1,7 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // What "run this workflow" is, before anything draws it.
 //
-// A module of its own rather than a signal inside ./StartDialog.tsx, because the palette asks for the
+// A module of its own rather than a signal inside the dialog, because the palette asks for the
 // dialog and a palette command is a `.ts` file with a node-environment test: one Solid component on
 // the path makes that module unloadable there (docs/plugin-authoring/testing.md § Testing).
 import { createSignal } from 'solid-js'
@@ -14,7 +14,8 @@ export type StartRequest = {
   defId: string
   name: string
   inputs?: readonly WorkflowInput[]
-  /** Values the caller already knows — the item a run was started from, in phase 5. */
+  /** Values the caller already knows. The dialog fills them in, and a required input with one
+   *  does not make it ask. */
   prefill?: Readonly<Record<string, DataValue>>
   /** The task to run on. Absent means the dialog asks. */
   taskId?: string
@@ -37,7 +38,7 @@ export const closeWorkflowStart = (): void => {
  *
  * Exported because the palette's "Run a workflow" row needs the same answer before it starts, and it
  * cannot call `requestWorkflowStart` for the other half: a command's refusal belongs in the palette
- * frame rather than in a toast, so that row throws (../commands.ts). One rule, two readers.
+ * frame rather than in a toast, so that row throws. One rule, two readers.
  */
 export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
   !next.taskId ||

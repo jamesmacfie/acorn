@@ -30,20 +30,16 @@ import { PrConversation } from './Conversation'
 import { PrFileList } from './PrFiles'
 import type { PrModel } from './prModel'
 
-// What a pull request is made of, as a list a host arranges (`Sections`, docs/ui-design/closed-kit.md § The
-// closed kit).
-//
-// These were seven `Fold`s written down the middle of ./PrOverview.tsx and ./PrPane.tsx, and the two
-// files had drifted: browse showed Files and Comments, the pane showed the same two, and each had its
-// own copy of the column that held them. The list is here once now, and each host decides what a
-// section is — a fold beside the diff on a desktop, a tab in a terminal.
+// What a pull request is made of, as a list a host arranges
+// (`Sections`, docs/ui-design/closed-kit.md § The closed kit). The list is here once, and each host
+// decides what a section is: a fold beside the diff on a desktop, a tab in a terminal.
 //
 // A section that has nothing to say is left out rather than drawn empty. That is a decision about the
 // pull request rather than about the screen, which is why it is made here and not in either host: a
 // repository with no Linear links has no Linked issues tab, on any host.
 
 // The copy button is the section's action, in its header, and reads the text this body hands the
-// model. It used to sit on a line of its own above the text.
+// model.
 function Description(props: { model: PrModel; onLinkClick: (event: MouseEvent) => void }) {
   return (
     <ProviderHtml

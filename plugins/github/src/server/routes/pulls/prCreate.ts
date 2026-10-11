@@ -108,7 +108,7 @@ export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>
     //
     // GitHub sends every patch inline. Each is stored under its digest, as a pull request's are, and
     // the answer carries only the descriptors, so the preview loads its segments through the same
-    // routes a pull's diff does (./diffDocument.ts) rather than holding the whole comparison.
+    // routes a pull's diff does rather than holding the whole comparison.
     .get('/:owner/:repo/compare', async (c) => {
       ownerId(c) // gate on auth; the credential itself comes from the stored integration
       const token = await githubToken(c)

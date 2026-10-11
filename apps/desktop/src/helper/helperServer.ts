@@ -45,13 +45,11 @@ import { RendererConnection } from './rendererConnection'
 
 const log = createLogger('helper')
 
-// The renderer's projection of the custody stack, over one loopback WebSocket. This is the Tauri half
-// of what Electron's `nodeBrokerIpc.ts` and `pluginIpc.ts` were: same
-// vocabulary, same Zod parsing, same "every decision lives in @acorn/custody and this file only
-// validates and forwards" rule. Read those two files for why each decision is where it is; this one
-// deliberately restates none of it.
+// The renderer's projection of the custody stack, over one loopback WebSocket. Every decision lives in
+// @acorn/custody; this file only parses with Zod and forwards, and deliberately restates none of the
+// reasons behind those decisions.
 //
-// Two things are Tauri-specific and load-bearing:
+// Two things are load-bearing:
 //
 // The gate is the secret, not the origin. The helper binds an ephemeral loopback port and mints a
 // 32-byte secret that only Rust and, through one capability-scoped Tauri command, the renderer ever
@@ -67,9 +65,8 @@ export type HelperServer = {
   port: number
   secret: string
   // Broker pushes and the node-replaced signal, fanned out to whatever renderer is attached. Held as a
-  // method on the server rather than captured at construction for the same reason Electron holds its
-  // push target as a function of the window: there may be no renderer yet, and there may be a
-  // different one later.
+  // method on the server rather than captured at construction, because there may be no renderer yet,
+  // and there may be a different one later.
   push(message: HelperPush, viewerId?: string): void
   // Terminal output, forwarded as the one binary frame this wire carries. Separate from `push`
   // because it is not a JSON message and never becomes one: it arrives from the node already tagged
@@ -134,8 +131,8 @@ export function startHelperServer(
   }
   const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
 
-  // The same filter as `push` above, and the same reason: an N-node fleet used to deliver every node's
-  // terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
+  // The same filter as `push` above, and the same reason: without it an N-node fleet delivers every
+  // node's terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
   // than wrapped in JSON, so what came off the node's socket is copied once and forwarded.
   const pushBytes = (nodeId: string, frame: Uint8Array, viewerId?: string): void => {
     let tagged: Uint8Array | null | undefined
@@ -225,7 +222,7 @@ export function startHelperServer(
       connect(node.nodeId)
       return toNodeRecord(node)
     },
-    // The fleet's second door (@acorn/protocol/broker.ts § nodeAdoptRequestSchema). Four steps, and
+    // The fleet's second door (`nodeAdoptRequestSchema` in @acorn/protocol). Four steps, and
     // the order is the security of it: ask the node that listed this record, probe the endpoint it
     // named, refuse a certificate whose fingerprint is not the one the provider vouched for, and only
     // then remember it.

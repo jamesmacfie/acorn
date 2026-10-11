@@ -88,8 +88,8 @@ export default function GenerateSqlModal(props: {
   }
 
   return (
-    // ⌘Enter used to be a `keydown` on the dialog. A DOM event does not cross to a sandbox with no
-    // DOM, so the Generate button is the only way to fire it now.
+    // A `keydown` on the dialog is a DOM event and does not cross to a sandbox with no DOM, so ⌘Enter
+    // does nothing here and the Generate button is the only way to fire it.
     <Modal title="Generate SQL" onDismiss={dismiss}>
       <ModalBody>
         <Field label="What should the query return?">

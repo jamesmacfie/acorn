@@ -1,4 +1,4 @@
-// Main-process backing for the /v1/p/docker routes (server/routes/docker.ts). Maps the CLI failure
+// Node backing for the /v1/p/docker routes (server/routes/docker.ts). Maps the CLI failure
 // taxonomy onto BridgeError statuses: refs the daemon doesn't know → 404, state conflicts → 409,
 // daemon down/CLI missing → 409 docker_unavailable (info() reports availability for UI gating),
 // anything else → 422 with the stderr tail.
@@ -155,7 +155,7 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
           for (const c of matched) {
             if (c.state === 'paused') await docker(['unpause', c.id], { timeout: 60_000 })
             if (isActive(c)) await docker(['stop', c.id], { timeout: 60_000 })
-            // Retain old Compose removal / loose-container stop semantics without deleting shared
+            // Compose containers are removed and loose ones only stopped, without deleting shared
             // networks or volumes (-v). Never force-remove a container restarted during cleanup.
             if (c.composeProject) await docker(['rm', c.id], { timeout: 60_000 })
           }

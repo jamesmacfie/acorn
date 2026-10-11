@@ -78,7 +78,7 @@ export const levelWord = (level: string) => word(LEVELS, level)
 export const statusWord = (status: string) => word(STATUSES, status)
 
 // What to tell a person when a route fails. The routes answer with a code and no prose
-// (server/routes/rollbar.ts), and this pane used to print the code.
+// (server/routes/rollbar.ts).
 const REASONS: Record<string, string> = {
   provider_needs_auth: "Rollbar turned down acorn's token. Reconnect Rollbar in Settings.",
   provider_rate_limited: 'Rollbar is limiting requests. Try again in a minute.',

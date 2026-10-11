@@ -51,9 +51,8 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
         </Text>
       </Show>
 
-      {/* One row per variable, as an Inline of controls. It was a five-column CSS grid this plugin
-          declared itself; the kit has no grid whose cells are controls, and a row of fields reads the
-          same at every width without one. */}
+      {/* One row per variable, as an Inline of controls: the kit has no grid whose cells are controls,
+          and a row of fields reads the same at every width without one. */}
       {/* <Index>, not <For>: rows are keyed by position, so editing one doesn't recreate its input. */}
       <Index each={rows()}>
         {(row, index) => (

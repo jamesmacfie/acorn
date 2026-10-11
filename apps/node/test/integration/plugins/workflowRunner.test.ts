@@ -29,7 +29,7 @@ const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../../__fix
 describe('WorkflowRunner (docs/workflows.md)', () => {
   // Two databases, because there are two: the runner writes its runs and steps into the workflows
   // plugin's own file, and core's holds the `tasks` rows the mapped-child test asserts over. A test reaching
-  // both through one handle would keep passing after the plugin started reading a table it no longer owns.
+  // both through one handle would keep passing if the plugin started reading a table it doesn't own.
   let t: TestDb
   let wf: TestPluginDb
   let dir: string
@@ -680,7 +680,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   it('contributed step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
     // What `ctx.extensionPoints` hands the runner: entry ids already qualified by the host, which is
-    // also the name a workflow file writes for a contributed kind (plugins/workflows/contract/extensions.ts).
+    // also the name a workflow file writes for a contributed kind (plugins/workflows/src/contract/extensions.ts).
     const contributed: Record<string, Extension<unknown>[]> = {
       [WORKFLOW_STEP_KIND]: [
         {

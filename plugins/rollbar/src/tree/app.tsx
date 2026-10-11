@@ -25,10 +25,8 @@ export type RollbarPaneProps = { taskId?: string; item?: string }
 /**
  * The Rollbar pane, as a tree.
  *
- * The bridge is still this plugin's only data and I/O seam, exactly as it was in the frame. What
- * changed is the other direction: the pane's own brand header is gone, because the pane switcher
- * already draws the name and the mark, and an iframe drew its own only because it had no chrome to
- * borrow.
+ * The bridge is this plugin's only data and I/O seam. The pane draws no brand header of its own,
+ * because the pane switcher already draws the name and the mark.
  */
 export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [linkedTargets, setLinkedTargets] = createSignal<RollbarRailTarget[]>([])
@@ -199,7 +197,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 
   // `split` with two column nodes rather than ListDetail's `list` prop: a tree's props are JSON on a
   // message port, so an element cannot be one of them (docs/plugins/tree-contract.md § The tree contract). The
-  // column only appears when there is more than one linked item, as it did before.
+  // column only appears when there is more than one linked item.
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>
       <ListDetail split listWidth="narrow">
@@ -223,8 +221,8 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 }
 
 // `Show`s, not a bare ternary. A component body runs once, so a ternary there stays on whichever
-// branch the first state picked: the pane mounts loading, the fetch fails, and the error had nowhere
-// to draw. What was left was the EmptyState with its text removed, which reads as a blank pane.
+// branch the first state picked: the pane mounts loading, the fetch fails, and the error has nowhere
+// to draw, leaving the EmptyState with its text removed, which reads as a blank pane.
 //
 // Loading is the start-aligned busy line; nothing to show and a failure are the centred state a detail
 // column uses, the failure with its reason and **Try again** (linear/src/tree/app.tsx says why).

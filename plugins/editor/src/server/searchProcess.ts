@@ -4,8 +4,8 @@ import { SearchFailure } from '../shared/search'
 import type { SearchResult } from '../shared/search'
 import { RgResults } from './searchResults'
 
-// The former whole-output ceiling was 32 MiB. A 64 MiB per-record ceiling preserves those
-// supported minified lines without max-columns changing their exact match positions.
+// A 64 MiB per-record ceiling keeps very long minified lines whole, without max-columns changing their
+// exact match positions.
 const MAX_RECORD_BYTES = 64 * 1024 * 1024
 const MAX_STDERR_BYTES = 64 * 1024
 const MAX_PATH_BYTES = 4 * 1024 * 1024

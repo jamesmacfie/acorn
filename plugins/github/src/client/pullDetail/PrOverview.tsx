@@ -32,15 +32,13 @@ import type { PrModel } from './prModel'
 
 // What this pull request is, what state it is in, and every verb that changes that state.
 //
-// The header of the surface rather than a section of it, which is why it is not in ./prSections.tsx
-// with the rest: a desktop pins it above the folds and a terminal makes it the first tab, and both
-// of those are the host's call. What it is not is a fold — the seven that used to be written down the
-// middle of this file are in ./prSections.tsx now, one list for both surfaces.
+// The header of the surface rather than a section of it, which is why it is not in `prSections` with
+// the rest: a desktop pins it above the folds and a terminal makes it the first tab, and both of those
+// are the host's call.
 //
 // The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
-// pull's title is text this component owns and its body is opaque provider HTML. The twin used to
-// mint the same raw anchor with the same private class; the kit has a word for a clickable run of
-// text now, so it writes a node (docs/ui-design/closed-kit.md § The closed kit).
+// pull's title is text this component owns and its body is opaque provider HTML. The kit has a word
+// for a clickable run of text, so it writes a node (docs/ui-design/closed-kit.md § The closed kit).
 function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; onOpen: (id: string) => void }) {
   const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
   return (

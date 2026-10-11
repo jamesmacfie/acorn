@@ -39,10 +39,9 @@ vi.mock('./recipes', () => ({ invokeLayoutRecipe: mocks.invokeLayoutRecipe }))
 
 import { terminalCommands, TERMINAL_GROUP } from './commands'
 
-// The three searches that replaced this plugin's `paletteRows` source on 2026-09-03. What is pinned is
-// what the old source's tests pinned — the run/stop decision, the guards that kept one task's row from
-// acting in another, and the error a failed layout reports — plus the two things the migration adds: a
-// failed configuration read is now a message rather than an empty list, and one frame is one fetch.
+// The three searches this plugin contributes. What is pinned: the run/stop decision, the guards that
+// keep one task's row from acting in another, the error a failed layout reports, a failed configuration
+// read surfacing as a message rather than an empty list, and one frame being one fetch.
 
 const search = (id: string): SearchCommand => terminalCommands.find((command) => command.id === id) as SearchCommand
 const setupCommand = () =>
@@ -128,7 +127,7 @@ describe('the terminal plugin catalogue', () => {
 
   it('says why the list is empty when the configuration read failed', async () => {
     mocks.targets.mockResolvedValue({ error: 'repo config is untrusted' })
-    // The old source answered with no rows here, so a reader saw an empty list and no reason for it.
+    // A reason, rather than an empty list with none.
     await expect(search('terminal.run.targets').query('', context('task-1'), signal())).rejects.toThrow(
       'repo config is untrusted',
     )
@@ -157,8 +156,7 @@ describe('the terminal plugin catalogue', () => {
     expect(mocks.setTerminalOpen).not.toHaveBeenCalled()
   })
 
-  // The second half of the defect the old source's guard was written for: the row's label is as old as
-  // the last time the frame drew, so it is not what the decision is made on.
+  // The row's label is as old as the last time the frame drew, so it is not what the decision is made on.
   it('trusts this session’s fetch over the label the row was drawn with', async () => {
     mocks.targets.mockResolvedValue({ targets: [target('dev', false)], layouts: [], errors: [] })
     const world = context('task-1')

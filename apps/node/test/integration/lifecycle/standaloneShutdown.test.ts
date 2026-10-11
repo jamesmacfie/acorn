@@ -42,9 +42,8 @@ class StandaloneNode {
       let buffered = ''
       this.child.stdout?.on('data', (chunk: Buffer) => {
         buffered += chunk.toString()
-        // The handshake is one line of JSON among free-form logging (server/standalone.ts's head
-        // comment calls it the contract), so scan lines rather than assuming it arrives first or
-        // alone.
+        // The handshake is one line of JSON among free-form logging, so scan lines rather than
+        // assuming it arrives first or alone.
         for (const line of buffered.split('\n')) {
           try {
             const parsed = JSON.parse(line) as Partial<Handshake>

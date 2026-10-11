@@ -1,13 +1,12 @@
 // Migration tooling for EVERY chain in the workspace, not just core's.
 //
-// Phase 2 split the single 45-table core.sqlite into core plus one SQLite file per plugin
-// (docs/data-layer/plugin-databases.md § Plugin databases), so "the migration chain" became N chains: core's plus one per
-// plugin that owns tables. This script discovers them from the filesystem — any package with a
-// drizzle.config.ts is a chain — so adding a plugin DB needs no edit here.
+// Core and each table-owning plugin have their own SQLite file and migration chain
+// (docs/data-layer/plugin-databases.md § Plugin databases). This script discovers the chains from
+// the filesystem — any package with a drizzle.config.ts is a chain — so adding a plugin DB needs no
+// edit here.
 //
-// It lives at the root because migrations are a workspace concern now. Putting the loop in
-// @acorn/node-core would mean a shared library's build scripts naming plugin directories, which is
-// the coupling the split removes.
+// It lives at the root because migrations are a workspace concern. Putting the loop in
+// @acorn/node-core would mean a shared library's build scripts naming plugin directories.
 //
 //   node scripts/db.mjs generate   # drizzle-kit generate for every chain, then replay them all
 //   node scripts/db.mjs check      # replay every chain against a throwaway database

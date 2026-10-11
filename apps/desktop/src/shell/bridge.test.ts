@@ -26,8 +26,8 @@ describe('the Tauri bridge satisfies the platform seam', () => {
   it('implements every group in the seam', () => {
     vi.stubGlobal('window', { acorn: (globalThis as { acorn?: unknown }).acorn })
     expect(seamProblems(IMPLEMENTED)).toEqual([])
-    // Phase 3 closed the last two, so there is nothing left to exempt. A group added to the seam and
-    // not to this shell fails here rather than in the product.
+    // Nothing is exempt. A group added to the seam and not to this shell fails here rather than in the
+    // product.
     expect(IMPLEMENTED).toHaveLength(SEAM_GROUPS.length)
   })
 })

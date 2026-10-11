@@ -24,9 +24,8 @@ describe('clampDim', () => {
   })
 })
 
-// The chunk-list ring (phase 6 of the performance programme). What it replaced was one string rebuilt
-// as `ring = trimRing(ring + data)` on every chunk, so that expression is the reference implementation
-// the ASCII cases below are measured against, spelled out here because it no longer exists in src.
+// The chunk-list ring, checked against the naive reference: one string rebuilt as
+// `ring = trimRing(ring + data)` on every chunk. The ASCII cases below compare the two.
 const oldRing = (chunks: readonly string[]): string => {
   let ring = ''
   for (const chunk of chunks) {
@@ -91,8 +90,8 @@ describe('OutputRing', () => {
   })
 
   it('counts the tail in bytes, which is what changed for its two readers', () => {
-    // `slice(-n)` counted UTF-16 code units; this counts bytes, so a tail full of non-ASCII is a
-    // slightly shorter window. Both readers are heuristics over recent output — the blocked-prompt
+    // This counts bytes, not UTF-16 code units, so a tail full of non-ASCII is a slightly shorter
+    // window. Both readers are heuristics over recent output — the blocked-prompt
     // scan over the last 4,000 and the transcript tail over the last 10,000 (./terminal.ts) — so a
     // shorter window is a smaller sample of the same thing, and worth knowing rather than fixing.
     const ring = fill(['x'.repeat(100), '中'.repeat(100)])

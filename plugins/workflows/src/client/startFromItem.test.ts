@@ -26,8 +26,7 @@ describe('what an item fills in', () => {
   })
 
   it('offers nothing for a name outside the rule', () => {
-    // The point of the phase's decision: guessing at `focus` from an error title puts words in a
-    // prompt nobody chose.
+    // Guessing at `focus` from an error title puts words in a prompt nobody chose.
     expect(Object.keys(prefillFromItem({ title: 'a', body: 'b', link: 'c' })).sort()).toEqual([
       'context',
       'issue',

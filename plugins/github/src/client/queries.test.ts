@@ -16,7 +16,6 @@ const jsonResponse = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   })
 
-// Moved here from @acorn/client-core/queries.test.ts with the factories it covers.
 describe('github query options', () => {
   afterEach(() => {
     vi.unstubAllGlobals()

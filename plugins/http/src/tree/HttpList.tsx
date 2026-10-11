@@ -32,7 +32,7 @@ export default function HttpList(props: { model: HttpPanelModel }) {
     <>
       <SectionHeader level="pane">Requests</SectionHeader>
       {/* A second bar, because a tree cannot fill a header's actions slot. No spacer: in the default
-          300-pixel column the second gap is what wrapped the button onto its own line. */}
+          300-pixel column a second gap wraps the button onto its own line. */}
       <Toolbar variant="actions" size="sm">
         <SegmentedControl
           size="sm"
@@ -106,10 +106,8 @@ export default function HttpList(props: { model: HttpPanelModel }) {
 }
 
 // Named RequestRow because the shared component owns the name TreeRow. This adapter adds the leading
-// method label and the two row actions.
-//
-// The method chip's colour-per-verb went with the stylesheet: a plugin no longer names a colour, and
-// the kit has no role that means "POST". The verb is still the first thing on the row, in mono.
+// method label and the two row actions. A plugin names no colour and the kit has no role that means
+// "POST", so the verb is the first thing on the row, in mono.
 function RequestRow(props: { model: HttpPanelModel; row: HttpRequest }) {
   return (
     <TreeRow

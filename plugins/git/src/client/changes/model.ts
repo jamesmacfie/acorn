@@ -184,8 +184,8 @@ export type PickedBackend = Pick<ModelBackend, 'kind' | 'label'>
  *
  *  Matched on the error envelope's `code` rather than on an `ApiError` instance: the class is not on
  *  the plugin surface, and the code is the part of the envelope that is a contract
- *  (docs/api-reference/transport.md § Errors). Shared provider codes get a next step; everything else keeps
- *  the node's own prose, which for a refusal is the sentence the bridge wrote. */
+ *  (docs/api-reference/transport.md § Errors). Shared provider codes get a next step; everything else
+ *  keeps the node's own prose, which for a refusal is the sentence the bridge wrote. */
 export function generateReason(error: unknown, backend?: PickedBackend): string {
   return (
     modelProviderFailure(error, backend) ??
@@ -193,7 +193,7 @@ export function generateReason(error: unknown, backend?: PickedBackend): string 
   )
 }
 
-/** How the list is drawn, remembered per device (./changesPrefs.ts). Three choices that do not
+/** How the list is drawn, remembered per device. Three choices that do not
  *  interact: the shape, the order inside a flat list, and what the rows are grouped by. */
 export type ChangeView = {
   mode: 'list' | 'tree'
@@ -201,7 +201,7 @@ export type ChangeView = {
   groupBy: 'none' | 'tracked' | 'staged'
 }
 
-/** What the pane drew before it had a menu: a flat run in path order, in three groups. */
+/** A flat run in path order, in three groups. */
 export const DEFAULT_CHANGE_VIEW: ChangeView = { mode: 'list', sort: 'path', groupBy: 'tracked' }
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -364,11 +364,10 @@ export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string =>
   `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
 
 // What one file's patch currently says, so the node can tell which files a poll moved
-// (../server/localDocument.ts). The node's `contentKey` is the objects and the stat behind the patch
-// (../server/localDiff.ts), so a poll that finds nothing new reads no patch. A node too old to send
-// one, or an entry it could not key, falls back to `poll`, the status read's count, which reads that
-// file again on every poll: the old behaviour, and the only safe one, since an edit can keep both
-// line counts.
+// (`localDocument`). The node's `contentKey` is the objects and the stat behind the patch, so a poll
+// that finds nothing new reads no patch. A node too old to send one, or an entry it could not key,
+// falls back to `poll`, the status read's count, which reads that file again on every poll: the only
+// safe choice, since an edit can keep both line counts.
 export const patchKey = (c: LocalChange, poll: number): string =>
   `${changeKey(c)}:${c.status}:${c.oldPath ?? ''}:${c.additions}:${c.deletions}:${c.contentKey ?? `poll ${poll}`}`
 

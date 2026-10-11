@@ -4,11 +4,11 @@ import { PrOverview } from './PrOverview'
 import type { PrModel } from './prModel'
 
 // A bare `CRA-404` in a pull title is clickable, and clicking it opens the ticket. The host learns
-// the prefix from a Linear URL it already saw in the same pull (contentLinks.ts § Bare tokens), and
-// this component renders the result as its own text nodes rather than as provider HTML.
+// the prefix from a Linear URL it already saw in the same pull, and this component renders the result
+// as its own text nodes rather than as provider HTML.
 //
-// What is worth pinning is that the token is a control a person can reach: it used to be a raw
-// anchor with no href, which no keyboard could land on, and it is a `Link` node now.
+// What is worth pinning is that the token is a control a person can reach: a `Link` node, not a raw
+// anchor with no href that no keyboard could land on.
 
 vi.mock('@solidjs/router', () => ({
   useNavigate: () => () => {},
@@ -30,7 +30,7 @@ const opened: string[] = []
 
 // Read-only, open, no body and no labels, checks or refs, so the only thing rendered below the
 // heading is the facts table. Cast because `PrModel` is what `build()` returns: nothing here needs
-// the twenty-odd mutations the toolbar would have asked for.
+// the mutations the toolbar would have asked for.
 const idle = { isPending: false, mutateAsync: async () => {} }
 const model = (title: string, overrides: Record<string, unknown> = {}): PrModel =>
   ({

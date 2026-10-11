@@ -1,7 +1,7 @@
 // A V8 stack string, turned into the frames Sentry draws.
 //
 // acorn carries a stack as the string `Error.stack` gave it, because a record is scalars and a
-// frame list is not (protocol/telemetry.ts). Sentry wants `stacktrace.frames[]`, so somebody has to
+// frame list is not (`TelemetryRecord` in protocol). Sentry wants `stacktrace.frames[]`, so somebody has to
 // take the string apart, and the exporter is the only side that knows it needs to.
 //
 // Two details that are easy to get wrong and invisible when you do:

@@ -230,7 +230,7 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
         ariaLabel="Request"
       />
       {/* A remote-tree prop is data, not another tree. Passing these controls through Tabs.actions
-          put Solid nodes and handlers onto the worker message and stopped both API regions with a
+          puts Solid nodes and handlers onto the worker message and stops both API regions with a
           DataCloneError. Keep them adjacent to the strip as ordinary tree children instead. */}
       <Show when={tab() === 'body'}>
         <Toolbar variant="actions" size="sm">

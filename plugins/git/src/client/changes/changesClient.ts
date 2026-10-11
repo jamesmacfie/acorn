@@ -1,5 +1,5 @@
-// Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
-// on the server, so it works in a plain browser (dev:node) too.
+// Local-changes review over loopback HTTP. Pure Node on the server, so it works in a plain browser
+// (dev:node) too.
 import {
   dependencyReviewRoute,
   type DependencyReview,
@@ -45,8 +45,8 @@ export const localGitApi = {
   secretCheck: (taskId: string, operation: 'commit' | 'push') =>
     readJson<GitSecretCheckResult>(secretCheckRoute(taskId, operation)),
   status: (taskId: string) => readJson<LocalStatus>(localStatusRoute(taskId)),
-  // The stacked diff as a document, its segments, and its search pages (docs/diff-rendering/document.md § The
-  // document).
+  // The stacked diff as a document, its segments, and its search pages
+  // (docs/diff-rendering/document.md § The document).
   document: (taskId: string, request: LocalDocumentRequest, signal?: AbortSignal) =>
     post<LocalDocumentResponse>(localDocumentRoute(taskId), request, signal),
   segments: (taskId: string, request: LocalSegmentsRequest, signal?: AbortSignal) =>
@@ -72,7 +72,7 @@ export const localGitApi = {
   push: (taskId: string, options: PushOptions = {}) => post<ActionResult>(localActionRoute(taskId, 'push'), options),
   abort: (taskId: string) => post<ActionResult>(localActionRoute(taskId, 'abort')),
   // The wand's two calls. Neither answers `{ ok, reason }`: a refusal comes back as an error envelope
-  // with a code the footer turns into a next step (./model.ts § generateReason), because "the provider
+  // with a code the footer turns into a next step (`generateReason`), because "the provider
   // key was rejected" and "nothing is staged" need different sentences.
   modelBackends: (taskId: string) => readJson<ModelBackend[]>(localModelBackendsRoute(taskId)),
   commitMessage: (taskId: string, request: CommitMessageRequest) =>

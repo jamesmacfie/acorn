@@ -95,7 +95,7 @@ export function readingOrder(layout: PanelLayout): PanelId[] {
 
 /** Slide a rect along one axis until it clears everything already placed.
  *
- *  `pushRight` and `pushDown` are this one function with an axis and a bound. On `y` the page scrolls,
+ *  A rightward push and a downward push are this one function with an axis and a bound. On `y` the page scrolls,
  *  so there is no wall and the slide always succeeds. On `x` the grid has a right edge, and running
  *  into it answers `undefined`, which is how the resize clamp finds the widest width that fits.
  *

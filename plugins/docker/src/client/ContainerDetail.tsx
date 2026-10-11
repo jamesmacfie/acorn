@@ -244,7 +244,7 @@ function ContainerDetailView(props: ContainerDetailProps) {
   })
 
   // `grow`, so the region gives the log its height and the log scrolls inside it. Without it the
-  // column clipped the newest lines, and Follow had no scroller to follow.
+  // column clips the newest lines, and Follow has no scroller to follow.
   return (
     <Stack gap="none" grow>
       <Show
@@ -332,8 +332,8 @@ function ContainerDetailView(props: ContainerDetailProps) {
             </TabPanel>
 
             <TabPanel id="logs" active={tab()} idPrefix="docker-detail">
-              {/* The three surfaces that had a find strip disagreed on the keyboard contract;
-                  FindBar owns it (⏎ next, ⇧⏎ prev, Esc close) and the count is announced. */}
+              {/* FindBar owns the keyboard contract (⏎ next, ⇧⏎ prev, Esc close) and announces the
+                  count. */}
               <Log
                 ariaLabel={`${d().name} logs`}
                 lines={logLines()}

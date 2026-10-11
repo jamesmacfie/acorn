@@ -7,9 +7,8 @@ import { incompleteFilesMessage } from '../completeness'
 // The changed files of a pull request, with a warning above them when GitHub's API limit cut the
 // list short.
 //
-// Accepted difference from the plan: the list is flat rather than a directory tree. A tree is a
-// change in what the navigator says, not a move to the kit, and this list has always been the file
-// order the finder and `[` / `]` cycling agree on (../changedFiles.ts).
+// The list is flat rather than a directory tree, so it keeps the file order the finder and `[` / `]`
+// cycling agree on.
 
 export function PrFileList(props: {
   model: PrModel

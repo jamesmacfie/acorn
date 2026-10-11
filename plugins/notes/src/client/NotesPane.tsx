@@ -77,8 +77,8 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
   const words = createWorkspaceWords()
   const scopeLabel = (scope: NoteScope) => (scope === 'workspace' ? words().capitalized : NOTE_SCOPE_LABEL[scope])
 
-  // "In the agent's context" as the checkbox it always was. It used to be a 10px round button with a
-  // stylesheet of its own; the state it reports and the state a Checkbox reports are the same state.
+  // "In the agent's context" as a checkbox, because the state it reports is the state a Checkbox
+  // reports.
   // The row's last trailing control, as an include or stage box is in every list, so titles keep one
   // left edge whether or not a row has a box.
   const IncludeBox = (boxProps: { scope: NoteScope; note: NoteSummary }) => (

@@ -135,7 +135,7 @@ export async function revision(
   const files = all.slice(0, MAX_FILES)
   const omitted = all.length > MAX_FILES ? `Showing the first ${MAX_FILES} of ${all.length} changed files.` : null
   // This bounded one-process patch read computes segment descriptors. The client receives only
-  // descriptors now and asks for row payloads when they enter the viewport.
+  // descriptors and asks for row payloads when they enter the viewport.
   let patches: string[] = []
   let patchOmission: string | null = null
   try {

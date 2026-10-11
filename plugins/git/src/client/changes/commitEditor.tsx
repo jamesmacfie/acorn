@@ -4,8 +4,8 @@ import type { ChangesModel } from './changesModel'
 // The commit editor's shared parts: the field, the options menu, and the two strings that describe
 // what pressing the button will do.
 //
-// Their own module because two surfaces draw them — the footer in ./ChangesPane.tsx and the expanded
-// ./CommitModal.tsx — and the footer imports the modal, so anything both need cannot live in either.
+// Their own module because two surfaces draw them, `ChangesFooter` and the expanded `CommitModal`, and
+// the footer imports the modal, so anything both need cannot live in either.
 
 /** The menu's own context, as its children are handed it. Read off `Menu` rather than restated,
  *  because the type is not on the plugin surface and a copy here would be a second one to keep. */
@@ -62,7 +62,7 @@ export function CommitField(props: {
       ref={props.onField}
       onInput={(value) => model().setDraft(value)}
       // Which field the keys are in is what gates the two chords: they are pane-scoped bindings and
-      // a pane is wider than its editor (./commands.ts).
+      // a pane is wider than its editor.
       onFocus={() => model().setEditorFocused(true)}
       onBlur={() => model().setEditorFocused(false)}
     />

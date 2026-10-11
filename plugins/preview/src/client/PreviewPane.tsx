@@ -202,7 +202,7 @@ export default function PreviewPane(props: {
       >
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
             the address box is an `Input`, so it takes the reader's style pack like every other box
-            in the app instead of the three rules this plugin used to ship for it. */}
+            in the app. */}
         <Toolbar ariaLabel="Preview">
           <IconButton
             icon="chevron-left"

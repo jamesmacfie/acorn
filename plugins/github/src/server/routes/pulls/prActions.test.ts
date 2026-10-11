@@ -81,7 +81,7 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
   })
 
   // Core folds the project facet it hands the client (`runn-fast`), the mirror keeps GitHub's own
-  // spelling (`Runn-Fast`), so a case-sensitive match reported every such repo as unmirrored.
+  // spelling (`Runn-Fast`), so a case-sensitive match would report every such repo as unmirrored.
   it('resolves a mirrored repo whose owner differs only in case', async () => {
     await plugin.db
       .insert(repos)

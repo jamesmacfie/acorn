@@ -55,8 +55,8 @@ async function measure(name: string, run: () => Promise<{ files: readonly unknow
   )
 }
 
-// Reproduces the first Phase 06 two-pass owner: the text pass scans the whole root
-// and discards matches whose names the filename pass did not select.
+// The two-pass baseline: the text pass scans the whole root and discards matches whose names the
+// filename pass did not select.
 async function main() {
   const { runRipgrep } = await import('../../plugins/editor/src/server/searchProcess')
   const { searchInFiles } = await import('../../plugins/editor/src/server/search')

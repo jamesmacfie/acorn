@@ -10,10 +10,10 @@ import type {
   PullScalars,
 } from './prFetch'
 
-// A deterministic GitHub for one pull request, answering the requests prFetch.ts makes: the GraphQL
-// first page, every cursor continuation, the REST files pages with their `Link` header, and the pull
-// itself. It paginates the way GitHub documents: 100 nodes a page, files capped at 3,000. Tests
-// stub `fetch` with `fake.fetch` and read back what was asked for.
+// A deterministic GitHub for one pull request, answering the requests the prFetch module makes: the
+// GraphQL first page, every cursor continuation, the REST files pages with their `Link` header, and
+// the pull itself. It paginates the way GitHub documents: 100 nodes a page, files capped at 3,000.
+// Tests stub `fetch` with `fake.fetch` and read back what was asked for.
 
 export type FakePull = PullScalars & {
   labels: GqlLabel[]

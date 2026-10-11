@@ -18,14 +18,13 @@ import {
 import type { PanelMapping, PanelProjectionSource } from './model'
 import { boardColumns, shapeRows, UNGROUPED_COLUMN_ID } from './shaping'
 
-// The mapping layer, which is the whole cross-source phase. The editor that drives it cannot be
+// The mapping layer, which is what makes a panel cross-source. The editor that drives it cannot be
 // rendered here, because vitest runs in node with no Solid plugin, so everything that can actually be
 // wrong lives in these functions and is checked here.
 //
-// The two source schemas below are the real ones, trimmed. github declares its status statically
-// (plugins/github/src/contract/collections.ts) and linear folds the workspace's own state names into
-// its response (plugins/linear/src/shared/collections.ts). That difference is why the scenario is hard
-// and why it is worth testing against.
+// The two source schemas below are modelled on the real ones, trimmed. github declares its status statically and linear
+// folds the workspace's own state names into its response. That difference is why the scenario is hard and why it is
+// worth testing against.
 
 const githubSchema: DashboardDisplaySchema = {
   fields: [
@@ -203,8 +202,8 @@ describe('the panel-local schema', () => {
   })
 
   it('keeps one source’s own field names and status words when it is mapped without columns', () => {
-    // A mapping with a field override and no columns still maps the panel. It used to drop the
-    // source's declared values, so a status drew its raw id on a grey dot.
+    // A mapping with a field override and no columns still maps the panel. Dropping the source's declared
+    // values here would draw a status as its raw id on a grey dot.
     const mapped: PanelMapping = { fields: { 'linear:issues-mine': { assignee: 'assignee' } } }
     const schema = panelSchema([linear], mapped)
     expect(schema.fields.find((field) => field.id === 'status')?.values).toEqual(linearSchema.fields[2]!.values)
@@ -585,9 +584,9 @@ describe('pruning', () => {
 
 describe('partial availability', () => {
   it('renders one source’s rows when the other answered with nothing', () => {
-    // What a failed source looks like to this layer: an empty page. The fan-out reports why separately
-    // (data.ts, `PanelUnavailable`), so the panel says which source is missing and still draws the rest
-    // rather than blanking.
+    // What a failed source looks like to this layer: an empty page. The run reports why separately, as a
+    // `SourceFailure` problem, so the panel says which source is missing and still draws the rest rather
+    // than blanking.
     const down: PanelSourcePage = { ...linear, rows: [] }
     const united = unionRows([github, down], todoBoard)
     expect(united.map((entry) => entry.pluginId)).toEqual(['github', 'github'])

@@ -128,9 +128,9 @@ describe('parsePorcelainV2 (pure)', () => {
   })
 })
 
-// The four `# branch.*` headers the parser used to skip. Every later region of the panel reads them,
-// and the difference between null and zero is the difference between "no upstream" and "level with
-// it", which the remote bar says two different things about.
+// The four `# branch.*` headers. Every later region of the panel reads them, and the difference between null
+// and zero is the difference between "no upstream" and "level with it", which the remote bar says two
+// different things about.
 describe('the branch headers', () => {
   const HEADERS = [
     '# branch.oid 1111111111111111111111111111111111111111',
@@ -230,7 +230,8 @@ describe('the remote argv (pure)', () => {
   })
 
   // `--set-upstream` on every push, which is what makes Publish and Push one call. `--force-with-lease`
-  // and never a bare `--force` (docs/security/process-and-paths.md § Process, path, and configuration controls).
+  // and never a bare `--force`
+  // (docs/security/process-and-paths.md § Process, path, and configuration controls).
   it('pushes with an upstream always, and with a lease when forced', () => {
     expect(pushArgs()).toEqual(['push', '--set-upstream', 'origin', 'HEAD'])
     expect(pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) })).toEqual([
@@ -540,8 +541,8 @@ describe('local diff over a real worktree', () => {
     expect((await commitStaged(dir, 'nothing staged')).ok).toBe(false) // git refuses an empty commit
   })
 
-  // A file staged for the first time: a worktree-only restore rewrote it from the index, which is
-  // where the staged copy was, so the row never went away.
+  // A file staged for the first time: a worktree-only restore rewrites it from the index, which is
+  // where the staged copy is, so the row never goes away.
   it('discards a staged add', { timeout: 15_000 }, async () => {
     writeFileSync(join(dir, 'fresh.ts'), 'brand new\n')
     await stageFiles(dir, ['fresh.ts'])
@@ -680,8 +681,8 @@ describe('local diff over a real worktree', () => {
     })
   })
 
-  // The pane re-reads a file's patch only when this key moves (DiffSource.contentKey), so it has to
-  // stay put across a read that changed nothing and move for every change a patch can show.
+  // The node reads a file's patch again only when this key moves (through the client's `patchKey`), so
+  // it has to stay put across a read that changed nothing and move for every change a patch can show.
   describe('contentKey', () => {
     const keyOf = async (path: string, staged: boolean) =>
       (await localStatus(dir)).changes.find((c) => c.path === path && c.staged === staged)?.contentKey
@@ -864,8 +865,7 @@ describe('the remote verbs over a real origin', () => {
     await fetchRemote(dir)
     expect(await localStatus(dir)).toMatchObject({ ahead: 1, behind: 1 })
 
-    // The reason the client turns into "Use Pull with rebase from the menu" (client/model.ts
-    // § remoteReason).
+    // The reason the client turns into "Use Pull with rebase from the menu" (`remoteReason`).
     expect(await pullRemote(dir)).toMatchObject({ ok: false, reason: expect.stringMatching(/fast-forward/i) })
 
     expect(await pullRemote(dir, { rebase: true })).toEqual({ ok: true })
@@ -873,8 +873,8 @@ describe('the remote verbs over a real origin', () => {
     other.cleanup()
   })
 
-  // The story phase 2 left for this phase: after an amend the branch is ahead of an upstream that
-  // still holds the old commit, so a plain push is rejected and Force push is the next step.
+  // After an amend the branch is ahead of an upstream that still holds the old commit, so a plain push
+  // is rejected and Force push is the next step.
   it('rejects a push after an amend, and lets the leased force through', { timeout: 30_000 }, async () => {
     await pushBranch(dir)
     writeFileSync(join(dir, 'a.txt'), 'two\n', 'utf8')

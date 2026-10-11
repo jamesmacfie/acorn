@@ -62,11 +62,9 @@ export default function TaskView(props: {
   onToggleTerminal: () => void
   onOpenTerminal: () => void
 }) {
-  // "Does this node run terminals", from the node's plugin roster, not "is this Electron", which is
-  // what it used to mean and why the whole run-target/agent block vanished off-desktop.
+  // "Does this node run terminals", from the node's plugin roster, not from which app is running.
   // `terminalSessions` is terminal's contract surface (create + list), not its renderer client: the
-  // shell has no business holding write/attach/kill/resize, which is what importing
-  // client/terminalClient handed it.
+  // shell has no business holding write/attach/kill/resize.
   const hasEngine = () => hasHostCapability({ plugin: 'terminal' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()

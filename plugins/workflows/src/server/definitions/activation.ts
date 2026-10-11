@@ -43,8 +43,8 @@ export const workflowDefinitions = (
     )
   })
   const bridge: WorkflowDefsBridge = {
-    // File authoring and export load on first use: about 28 KB of the node's boot graph for an action a
-    // person starts from the editor.
+    // File authoring and export load on first use, so an action a person starts from the editor stays
+    // off the node's boot graph.
     files: async (request) => {
       const { workflowFileAuthoring } = await import('../files/authoring')
       const result = await workflowFileAuthoring(store, {
@@ -177,7 +177,7 @@ export const workflowDefinitions = (
         }),
       }
     },
-    // Wiring only; the two calls and the repair pass are in ../server/authoring/generationRequest.ts.
+    // Wiring only; the two calls and the repair pass are in `generateWorkflowRequest`.
     // The runner's validation catalog rather than the pure one built from the kinds alone: it
     // carries each contributed kind's own `validate`, without which a workspace definition with a
     // broken step passes the example filter and teaches the model the mistake.

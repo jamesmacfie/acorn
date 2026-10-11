@@ -64,9 +64,9 @@ export default function GraphView(props: {
   // Flushed rather than dropped: a view swapped away 200 ms after a drag still owes the write.
   onCleanup(() => persist.flush())
 
-  // Renaming a node and deleting one both rewrite the stored layout from outside this component
-  // (../layoutPrefs.ts), so the held copy is re-read whenever the set of names changes. A memo, not
-  // an inline getter: `on()` re-fires on identity and this list is rebuilt on every keystroke.
+  // Renaming a node and deleting one both rewrite the stored layout from outside this component, so
+  // the held copy is re-read whenever the set of names changes. A memo, not an inline getter: `on()`
+  // re-fires on identity and this list is rebuilt on every keystroke.
   const names = createMemo(() =>
     cards()
       .map((card) => card.id)

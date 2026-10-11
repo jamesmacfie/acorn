@@ -16,8 +16,8 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { previewConfiguredRoute } from '../shared/api'
 
 // Null when the Node has no answer to give: a build older than the route, which is what an
-// unrestarted local Node or an out-of-date remote one is. It offers the pane on every task, as it did
-// before this gate, rather than hiding preview on a Node that can still draw it.
+// unrestarted local Node or an out-of-date remote one is. It offers the pane on every task rather
+// than hiding preview on a Node that can still draw it.
 const [configured, setConfigured] = createSignal<Record<string, boolean> | null>({})
 
 export const previewConfigured = (taskId: string): boolean => {

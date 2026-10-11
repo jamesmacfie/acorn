@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 // Golden lists for the compiled-plugin composition, kept the way packages/plugin-api/src/surface.test.ts
 // keeps the facade's export surface: the expected value is a committed file next to the test, not a
-// literal inside it. Adding a pane, rail source, route or registry entry used to fail a test whose fix
-// was "find the table, hand-add a row". Now the fix is one command:
+// literal inside it. When adding a pane, rail source, route or registry entry fails a test, the fix is
+// one command:
 //
 //   UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
 //
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url'
 // order-sensitive: registration order is part of what must survive a sibling's disable. Every row is a
 // flat string, because a tuple would pretty-print over five lines and make the diff unreadable.
 //
-// Ceiling: these fifteen lines exist twice, once per app (see apps/node/test/integration/golden.ts). Two
+// Ceiling: these fifteen lines exist twice, once per app (see apps/node/test/helpers/golden.ts). Two
 // apps must not import each other's test helpers, and a shared package would cost more than the
 // duplication does.
 

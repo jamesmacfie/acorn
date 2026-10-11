@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { LinearProjectIssue } from './api'
 import { priorityMeta, priorityTone, sortLinearIssues, stateTone } from './triage'
 
-// What survives of client/model.test.ts. The filter, group and facet cases went with the code they
-// covered: the browse they served is a host-drawn rail now, so there is nothing to filter or group.
+// Ordering and the priority projection. The browse is a host-drawn rail, so there is nothing to filter
+// or group.
 const issue = (over: Partial<LinearProjectIssue>): LinearProjectIssue => ({
   identifier: 'ENG-1',
   title: 'thing',

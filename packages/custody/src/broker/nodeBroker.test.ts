@@ -98,7 +98,7 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
 
 // Select by path, never by index. upsert() probes `/v1/node` and then opens the WebSocket, so the
 // call under test is never the first request the server sees. Indexing into `received` silently
-// asserts against the probe or the upgrade instead, and used to pass, because the upgrade carries the
+// asserts against the probe or the upgrade instead, and passes, because the upgrade carries the
 // same bearer.
 const requestTo = (path: string): Received => {
   const match = received.find((r) => r.path === path)
@@ -129,7 +129,7 @@ describe('broker HTTP', () => {
     const res = await broker.fetch('n1', { requestId: 'r1', path: '/v1/core/tasks' })
     expect(res.status).toBe(200)
     expect(JSON.parse(text(res.body))).toEqual({ ok: true })
-    // The renderer never supplies this: the broker exists so the token stays in main.
+    // The renderer never supplies this: the broker exists so the token stays in the helper.
     expect(requestTo('/v1/core/tasks').headers.authorization).toBe('Bearer acorn_dt_secret')
   })
 
@@ -215,8 +215,8 @@ describe('broker HTTP', () => {
     await expect(pending).rejects.toThrow()
   })
 
-  // The regression: a cancelled request was reported as a failed one, so the node went `offline` and
-  // apiClient then refused every mutation with "This node is offline" even though it was answering.
+  // A cancelled request reported as a failed one would take the node `offline`, and apiClient would
+  // then refuse every mutation with "This node is offline" even though it was answering.
   it('does not mark a node offline when the renderer cancels a request', async () => {
     const { origin } = await listen(false)
     respond = () => ({ status: 200, body: 'ok' })
@@ -230,9 +230,9 @@ describe('broker HTTP', () => {
     expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
   })
 
-  // The regression: one slow route took the whole node down. A plugin panel waiting on a credential
-  // or a third-party API passed the broker's own deadline, the timeout was read as evidence about the
-  // transport, and every other surface in the app then said the node was unreachable.
+  // One slow route must not take the whole node down. A plugin panel waiting on a credential or a
+  // third-party API can pass the broker's own deadline, and reading that timeout as evidence about the
+  // transport would make every other surface in the app say the node was unreachable.
   it('does not mark a node offline when one route passes the request deadline', async () => {
     const { origin } = await listen(false)
     const broker = makeBroker()
@@ -297,11 +297,10 @@ describe('broker HTTP', () => {
     expect(statuses.at(-1)).toMatchObject({ state: 'revoked', error: { code: 'unauthorized' } })
   })
 
-  // The regression this exists for: reading the status alone, a fresh node was marked `revoked`, a
-  // security state that also stops the socket being retried, by the ordinary 403 a never-connected
-  // GitHub integration answers with. The two-node e2e caught it as "the local node is revoked" seconds
-  // after a clean boot. Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake
-  // one status code over, so both are asserted.
+  // Reading the status alone would mark a fresh node `revoked`, a security state that also stops the
+  // socket being retried, on the ordinary 403 a never-connected GitHub integration answers with.
+  // Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake one status code
+  // over, so both are asserted.
   it('leaves the node alone for a route-level 401/403 about a third-party credential', async () => {
     const { origin } = await listen(false)
     // Scoped to the two paths under test. Answering the /v1/events upgrade with a 401 as well would
@@ -347,7 +346,7 @@ describe('broker TLS pinning', () => {
     expect(res.status).toBe(200)
   })
 
-  // The security assertion of the whole phase: a changed identity must fail closed. If pinning were
+  // The security assertion of this file: a changed identity must fail closed. If pinning were
   // implemented with rejectUnauthorized:false, checkServerIdentity would never be consulted and this
   // request would succeed.
   it('refuses a certificate that does not match the pin, and reports identity_mismatch', async () => {
@@ -534,8 +533,8 @@ describe('broker WebSocket', () => {
 
   // A `ws:shed` marker is the node saying "you were behind, so I dropped some invalidation frames".
   // Shed load, not lost data. Closing the socket here would re-attach every terminal and refetch every
-  // active query at the moment the node is busiest, which is the amplification phase 5 removed
-  // (node-core/server/transport/wsHub.ts, docs/terminal/activity.md § Backpressure).
+  // active query at the moment the node is busiest (node-core/server/transport/wsHub.ts,
+  // docs/terminal/activity.md § Backpressure).
   it('does not reset the socket on a shed marker, even one that skipped a number', async () => {
     const { origin, server } = await listen(false)
     let connections = 0
@@ -665,9 +664,8 @@ describe('broker WebSocket', () => {
   })
 })
 
-// The version gate (docs/api-reference/transport.md § Versioning). Before this, `incompatible` and
-// `protocol_mismatch` were declared in the protocol and produced by nothing: a node that upgraded past
-// the client kept connecting, and the mismatch surfaced as an undefined deep inside a component.
+// The version gate (docs/api-reference/transport.md § Versioning). Without it, a node that upgraded
+// past the client keeps connecting, and the mismatch surfaces as an undefined deep inside a component.
 describe('broker protocol version', () => {
   const nodeInfo = (protocolVersion: number) => ({
     status: 200,

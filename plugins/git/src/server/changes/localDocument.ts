@@ -1,16 +1,14 @@
-// A working tree's diff as a document (docs/diff-rendering/document.md § The document): the stacked files'
-// patches, cut into segments on the node, answered as descriptors, and then segment by segment as the
-// viewer comes near them.
+// A working tree's diff as a document (docs/diff-rendering/document.md § The document): the stacked
+// files' patches, cut into segments on the node, answered as descriptors, then segment by segment as
+// the viewer comes near them.
 //
-// Nothing here is durable. A working tree moves every time an agent saves, so the parsed files live in
-// a process-local cache keyed by worktree and patch digest, and a file is diffed again only when its
-// status key says it moved. A segment request names the digest it was cut from; if that is not the
-// digest the last document gave the file, or not what git says now when the node has no document to
-// go by, the request is refused as a revision conflict, so the viewer never draws rows from two states
-// of the tree.
+// Parsed files live in a process-local cache keyed by worktree and patch digest, and a file is diffed
+// again only when its status key says it moved. A segment request whose digest is not the one the
+// last document gave the file, or not what git says now, is refused as a revision conflict, so the
+// viewer never draws rows from two states of the tree.
 //
-// Patches are read in batches of paths, one `git diff` per batch, rather than a process per file. An
-// untracked file has no index entry to diff against and still takes its own `--no-index` call.
+// Patches are read in batches of paths, one `git diff` per batch. An untracked file has no index
+// entry to diff against and still takes its own `--no-index` call.
 
 import { createHash } from 'node:crypto'
 import { BridgeError, gitOrThrow } from '@acorn/plugin-api/node'
@@ -27,7 +25,7 @@ import {
 } from '@acorn/diff-document/document'
 import { isValidRelPath, literalPath, localDiff, pathChunks, stripToHunks, type LocalScope } from './localDiff'
 
-/** One stacked file, by path and the status key the pane last saw for it (../client/model.ts § patchKey). */
+/** One stacked file, by path and the status key the pane last saw for it (`patchKey` in the client). */
 export type DocumentFileRequest = { path: string; key: string }
 /** What the node answers per file: which patch, and how it cuts. The pane already holds the rest. */
 export type LocalDocumentFile = { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }
@@ -130,8 +128,8 @@ async function patchesFor(worktree: string, scope: LocalScope, paths: readonly s
   }
   for (const path of paths) {
     if (out.has(path)) continue
-    // Untracked, in a failed batch, or a name the batch could not match: read on its own, the way a
-    // single file always was. A tracked file the batch printed nothing for has no diff.
+    // Untracked, in a failed batch, or a name the batch could not match: read on its own. A tracked
+    // file the batch printed nothing for has no diff.
     if (!tracked.has(path) || alone.has(path) || /["\\\u0000-\u001f\u007f]/.test(path))
       out.set(path, await aloneOrEmpty(worktree, path, scope))
     else out.set(path, '')

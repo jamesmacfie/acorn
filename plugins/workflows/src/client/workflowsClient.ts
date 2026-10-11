@@ -1,13 +1,7 @@
 import type { AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-// The workflow control client, and the routes it drives.
-//
-// Lives in contract/ rather than client/ because plugins/agents' task sidebar calls it as well as
-// this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin surface
-// (docs/plugins/package-shape.md § Package shape). It reads only client-core and protocol's workflow row types,
-// never this plugin's own client/, so transitive contract purity holds.
-//
-// Commands use HTTP. Workflow notices and step events use the shared WebSocket.
+// The workflow control client, and the routes it drives. Commands use HTTP. Workflow notices and step
+// events use the shared WebSocket.
 
 import type { QueryClient } from '@tanstack/solid-query'
 import {
@@ -80,10 +74,11 @@ export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // What the owner can generate with — a stored key, or an agent CLI installed on this machine — for
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key
-// ever leaves the node. The path keeps its old spelling, which only this client reads.
+// ever leaves the node. The path says `model-connections`, though it lists backends; only this client
+// reads it.
 export const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
-// Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
+// Add menu and its inspector are both built from it (`WorkflowCatalog`).
 export const workflowCatalogRoute = '/v1/p/workflows/catalog'
 export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
 export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
@@ -206,7 +201,7 @@ function workflowApiAt(nodeId?: string | null) {
       ),
     runForSession: (sessionId: string) =>
       readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
-    // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
+    // Never throws: a failed request comes back as `{ error }`, which is what callers check.
     // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
     // is what lets it apply the repo trust snapshot to a committed file.
     start: async (
@@ -274,7 +269,7 @@ function workflowApiAt(nodeId?: string | null) {
         timeoutMs: 11 * 60_000,
       }),
     modelBackends: () => readJson<ModelBackend[]>(workflowModelBackendsRoute),
-    // The one call here that says how long it may take, because the broker's default kills it first.
+    // Given its own timeout, because the broker's default kills it first.
     generateDef: (input: WorkflowGenerateRequest) =>
       writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {
         method: 'POST',

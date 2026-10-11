@@ -175,8 +175,8 @@ describe('the run pane model', () => {
     expect(model.selectedStepId()).toBe('st1')
   })
 
-  // A step's id is what edges and selection key on; a person reads its name. Rows printed the id
-  // once steps gained one, and a step that has not run has only the definition to name it.
+  // A step's id is what edges and selection key on; a person reads its name. A step that has not run
+  // has only the definition to name it.
   it('names each step by its name, not its id, including one not yet run', async () => {
     runRows = [
       run({
@@ -280,8 +280,8 @@ describe('the run pane model', () => {
     expect(model.selectedStepId()).toBe('st9')
   })
 
-  // Run… opens the run it just started, before this pane has listed it. The newest-run fallback
-  // used to take the selection back to the previous run while the list was still being read.
+  // Run… opens the run it just started, before this pane has listed it. The newest-run fallback must
+  // not take the selection back to the previous run while the list is still being read.
   it('follows an intent to a run it has not listed yet', async () => {
     const model = await mount()
     runRows = [run({ id: 'run-new', createdAt: 300 }), ...runRows]

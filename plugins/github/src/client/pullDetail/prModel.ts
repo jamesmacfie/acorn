@@ -42,13 +42,13 @@ import { actionFailure, type ActionFailure } from '../actionErrors'
 // (docs/github-integration.md, docs/panes/layout.md § Layout model).
 //
 // Overview, the file list and the conversation are three components rather than one long closure, and
-// browse and the PR pane draw them in different arrangements. They share fifteen queries, six
-// mutations, two persisted drafts and one error line, so the shared thing lives in its own reactive
-// root keyed by the pull, the same pattern the changes pane follows.
+// browse and the PR pane draw them in different arrangements. They share queries, mutations,
+// persisted drafts and one error line, so the shared thing lives in its own reactive root keyed by
+// the pull, the same pattern the changes pane follows.
 //
 // File selection is deliberately not here. In browse it is `?file=` and in a task pane it is the
 // file-scroll event, so it belongs to whichever surface has a router rather than to the pull
-// (../changedFiles.ts).
+// (`useChangedFiles`).
 
 /** Which pull request, seen from where. `taskId` separates a task's review from the browse surface
  *  showing the same pull, the same way the diff viewer's scope does. */
@@ -146,8 +146,8 @@ function build(scope: PrScope) {
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
 
   // Linear tickets linked from the pull's body, comments, reviews and threads. The host reads every
-  // registered recogniser, so this finds any provider's URLs; it is narrowed to Linear because what
-  // is downstream of it, the enrichment route and the chip, still is.
+  // registered recogniser, so this finds any provider's URLs; it is narrowed to Linear because the
+  // enrichment route and the chip downstream of it are Linear-only.
   const linearRefs = createMemo(() => {
     const data = detail.data
     if (!data) return []
@@ -162,9 +162,10 @@ function build(scope: PrScope) {
     (integrations.data?.integrations ?? []).some(
       (entry) => entry.providerId === 'linear' && entry.status === 'connected',
     )
-  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § First-party for one specific reason). The
-  // connection check stays because a 403 with no connection wastes a round trip when the "connect
-  // Linear" fallback is what should render.
+  // Enrichment through the host, addressed by provider
+  // (docs/first-party-plugins.md § First-party for one specific reason). The connection check stays
+  // because a 403 with no connection wastes a round trip when the "connect Linear" fallback is what
+  // should render.
   const linearIssues = createQuery(() =>
     refResolutionsOptions(
       'linear',

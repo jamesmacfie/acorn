@@ -96,9 +96,9 @@ describe('notes-owned routes', () => {
     ).toBe(503)
   })
 
-  // The list and the create carry no trailing segment, so the original `/workspaces/:wsId/notes/*`
-  // gate did not reach them and a task-scoped agent could read and write the owner's workspace notes.
-  // Both forms are asserted, because the fix is the second `.use()` line and nothing else would fail
+  // The list and the create carry no trailing segment, so a `/workspaces/:wsId/notes/*` gate alone may
+  // not reach them, and a task-scoped agent could read and write the owner's workspace notes. Both forms
+  // are asserted, because the bare-path `.use()` line is what covers them and nothing else would fail
   // if someone deleted it.
   it('answers 403 to a task-confined principal on every workspace note path', async () => {
     setRouteTestCapability(NOTES_STORE, fakeStore())

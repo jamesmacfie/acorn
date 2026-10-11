@@ -1,6 +1,6 @@
 // What to tell a person when a GitHub write fails. A route that fails without GitHub's own prose
-// answers with only its code, and the client used to print that code: "merge_failed", "reauth".
-// The codes are the ones server/routes/pulls/prActions.ts and server/githubApi.ts return.
+// answers with only its code, and a code such as "merge_failed" or "reauth" means nothing to a
+// person. The codes are the ones the `prActions` routes and `ghError` return.
 
 import { READ_SENTENCES } from '../shared/readFailures'
 
@@ -38,7 +38,7 @@ export function actionFailure(cause: unknown): ActionFailure {
 
 /** Why a GitHub read failed, as a sentence, or undefined when there is nothing better than the title.
  *  A read is a different question from a write: nothing was refused, the list just isn't there. Its
- *  sentences are shared with the pull requests data source (../shared/readFailures.ts). */
+ *  sentences are shared with the pull requests data source (`READ_SENTENCES`). */
 export function readFailure(cause: unknown): string | undefined {
   if (cause == null) return undefined
   const code = codeOf(cause)

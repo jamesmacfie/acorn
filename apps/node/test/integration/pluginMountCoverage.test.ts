@@ -11,8 +11,8 @@ import { initCompiledPlugins } from '../helpers/compiledPlugins'
 
 // The compiled plugins' version of packages/node-core/src/server/mountCoverage.test.ts. A task's agent
 // holds a token that `requireUser` accepts, so every plugin route is open to it unless something says
-// otherwise. Two reviews found a plugin route whose device gate depended on how the pinned Hono
-// matches a trailing `/*`. This test reads the assembled mount table and fails unless each route
+// otherwise. A plugin route's device gate can silently depend on how the pinned Hono matches a
+// trailing `/*`. This test reads the assembled mount table and fails unless each route
 // under /v1/p is gated or named below with the reason it's open.
 //
 // A route counts as gated when, before its handler, one of these covers it:

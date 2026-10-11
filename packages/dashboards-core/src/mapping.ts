@@ -263,8 +263,8 @@ const EMPTY_SCHEMA: DashboardDisplaySchema = { fields: [] }
  *  `boardColumns` draw the user's board without knowing a mapping exists.
  *
  *  A mapped panel with one source names each field as that source does, and a status field with no
- *  columns keeps the values that source declares. Without that, a panel of tasks printed the raw id
- *  "active" on a grey dot though the source says "Active", and called its fields "Title" and "Status"
+ *  columns keeps the values that source declares. Without that, a panel of tasks would print the raw
+ *  id "active" on a grey dot though the source says "Active", and call its fields "Title" and "Status"
  *  whatever the source called them. */
 export function panelSchema(
   sources: readonly PanelSourcePage[],
@@ -362,9 +362,8 @@ export function unionRows(
 // ── Pruning ───────────────────────────────────────────────────────────────────────────────────
 
 /** The mapping with everything naming a source or column the panel no longer has removed, and
- *  `undefined` when nothing is left. The counterpart of `normalizePanel`'s stale-shaping sweep: a value
- *  mapping written against a dropped source is valid config addressing nothing, and it would come back
- *  the day a source with the same key was added again. */
+ *  `undefined` when nothing is left. A value mapping written against a dropped source is valid config
+ *  addressing nothing, and it would come back the day a source with the same key was added again. */
 export function pruneMapping(
   mapping: PanelMapping | undefined,
   sources: readonly PanelProjectionSource[],

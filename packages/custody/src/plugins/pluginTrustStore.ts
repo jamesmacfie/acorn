@@ -27,7 +27,7 @@ const log = createLogger('plugins')
 // in the update diff.
 //
 // Not encrypted, unlike the device tokens next door. A decision record is not a secret, and
-// safeStorage would mean a machine with no keychain forgets every decision the owner made and
+// keychain-backed encryption would mean a machine with no keychain forgets every decision the owner made and
 // re-prompts for all of them. Otherwise the file discipline matches fleet.json: 0700 dir, 0600 file,
 // chmod after write.
 
@@ -366,11 +366,11 @@ export class PluginTrustStore {
     )
   }
 
-  // One row at a time, and that granularity is the point. Parsing the file as a unit meant one
-  // acknowledgement this shell could not read failed all of them, and the damage did not stop at
-  // re-prompting: the empty list became the cache and the next record() or forgetPlugin() wrote it
-  // back. One unreadable row erased every decision on the device, including the rejections that keep
-  // unwanted plugins quiet.
+  // One row at a time, and that granularity is the point. Parsing the file as a unit would mean one
+  // acknowledgement this shell could not read fails all of them, and the damage would not stop at
+  // re-prompting: the empty list would become the cache and the next record() or forgetPlugin() would
+  // write it back. One unreadable row would erase every decision on the device, including the
+  // rejections that keep unwanted plugins quiet.
   //
   // Still fails closed per row. A row this code cannot read is one it asks about again, because
   // guessing could mean running code on the strength of a half-parsed record.

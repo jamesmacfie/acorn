@@ -1,8 +1,8 @@
 // The Changes tab's agent tools: read-only git over the task worktree. Registered through the
 // tools contribution point (docs/agent-tools.md § Contribution).
 //
-// These three read the same module the review pane's LocalGitBridge reads (./localGit.ts), so the
-// agent and the human see one truth about the working tree.
+// These three call the same `localDiff` functions the pane's `localGitBridge` calls, so the agent and
+// the human see one truth about the working tree.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import { gitLog, localDiff, localStatus } from './localDiff'

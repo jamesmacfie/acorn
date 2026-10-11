@@ -26,7 +26,7 @@ vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
 
 describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § The task context route)', () => {
   let t: TestDb
-  // The github mirror is a second database now (docs/data-layer/plugin-databases.md § Plugin databases), so the `pr`
+  // The github mirror is a second database (docs/data-layer/plugin-databases.md § Plugin databases), so the `pr`
   // section's fixture is seeded into the plugin's own migrated file and reaches the section through
   // the same injected source production uses. Two handles in one test is the honest shape: the
   // assertions below still exercise `mirroredPullRequest` for real rather than a hand-written
@@ -40,7 +40,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
     t = makeTestDb()
     gh = makeTestPluginDb('github')
     notesSource = async () => []
-    // Sections are registered per owner now (server/pluginHost/types.ts § PluginContextSectionRegistry), so the
+    // Sections are registered per owner (`PluginContextSectionRegistry`), so the
     // fixture registers them the way production does: core's `issues` under 'core', and the two
     // plugin-owned ones under the plugin that owns their rows. `PluginContextSection.assemble` takes no `db`,
     // which is why these two read only what their source gives them.

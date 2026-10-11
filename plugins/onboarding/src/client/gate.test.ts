@@ -15,8 +15,8 @@ describe('shouldShowOnboarding', () => {
   })
 
   it('stays shut once a project exists', () => {
-    // The bug this replaces: the old gate asked whether a workspace existed, so a set-up user
-    // with projects still met it and saw the modal on every launch.
+    // A gate on whether a workspace exists would show a set-up user with projects the modal on every
+    // launch.
     expect(shouldShowOnboarding({ ...firstRun, projectCount: 3 })).toBe(false)
   })
 
@@ -37,8 +37,8 @@ describe('shouldShowOnboarding', () => {
 
 describe('onboardingVisible', () => {
   it('keeps an open wizard on screen once its own first step has created a project', () => {
-    // The bug this closes: "no projects" is the right trigger and the wrong latch. Adding the first
-    // project unmounted the wizard mid-flow and dropped the owner into the app on that new project.
+    // "No projects" is the right trigger and the wrong latch. Adding the first project must not
+    // unmount the wizard mid-flow and drop the owner into the app on that new project.
     expect(onboardingVisible({ ...firstRun, projectCount: 1, open: true })).toBe(true)
     expect(onboardingVisible({ ...firstRun, projectCount: 1, open: false })).toBe(false)
   })

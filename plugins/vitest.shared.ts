@@ -1,19 +1,13 @@
-// The vitest config every plugin package runs, in one file. It was seventeen byte-identical copies,
-// comment included.
+// The vitest config every plugin package runs. Each plugin's own vitest.config.ts is
+// `export { default } from '../vitest.shared'`. Vitest still loads the per-package file, which is what fixes
+// the project root, so `src/**` and the temp dirs the suites write resolve inside the package.
 //
-// Each plugin's own vitest.config.ts is now `export { default } from '../vitest.shared'`. Vitest
-// still loads the per-package file, which is what fixes the project root, so `src/**` and the temp
-// dirs the suites write resolve inside the package. Vite inlines this relative import when it
-// bundles it.
-//
-// Two projects, the same split `packages/client-core/vitest.config.ts` makes and for the same reason:
+// Two projects, the same split client-core's vitest config makes and for the same reason:
 //
 //   logic  `.test.ts` in bare Node, no DOM, no Solid transform. Everything a plugin's node half does,
 //          and everything on its client half that is a pure function.
-//   hosts  `.test.tsx` under jsdom with vite-plugin-solid. Every region a plugin ships is a Solid
-//          component, and without this tier none of them was tested where it lives — phases 7 and 8
-//          both deferred it and phase 9 did not answer, so a pane's regions could only be checked
-//          from client-core, which does not have them.
+//   hosts  `.test.tsx` under jsdom with vite-plugin-solid, so a plugin's Solid regions are tested
+//          beside the code that ships them.
 //
 // Split by extension rather than by folder so a region's test sits beside the region.
 //
@@ -23,11 +17,11 @@ import solid from 'vite-plugin-solid'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
-// Plugin suites spawn real agent processes, PTYs, git and HTTP listeners, and `turbo run test` starts
-// every package at once. The 5-second default was tight enough that these timed out under that load
-// while passing in isolation, which is red that teaches people to re-run rather than read. A genuine
-// hang still fails, 15 seconds later. hookTimeout defaults to 10s independently of testTimeout, and
-// the heavy setup (minting a certificate, building a bundle, seeding a git repo) lives in beforeAll.
+// Plugin suites spawn real agent processes, PTYs, git and HTTP listeners, and `turbo run test` starts every
+// package at once. The 5-second default times them out under that load while they pass in isolation, which
+// teaches people to re-run rather than read. A genuine hang still fails, 15 seconds later. hookTimeout
+// defaults to 10s independently of testTimeout, and the heavy setup (minting a certificate, building a
+// bundle, seeding a git repo) lives in beforeAll.
 const timeouts = { testTimeout: 20_000, hookTimeout: 20_000 }
 
 // Some plugins (the profile shims) are a single declaration with nothing to test; an empty suite is

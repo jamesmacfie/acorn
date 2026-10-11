@@ -4,15 +4,13 @@ import { mountEmbeddedEditor, type EmbeddedEditor } from '@acorn/plugin-api/ui/e
 
 // The escape hatch: the definition as the runner's own JSON.
 //
-// The box is a rectangle rather than a node, because what fills it is a code editor and that is the
-// one shape the closed kit cannot express (docs/ui-design/closed-kit.md § The closed kit). The editor itself is
-// the host's — the library, the theme and the JSON grammar all arrive through
-// `@acorn/plugin-api/ui/editor`, so this file holds no CodeMirror and the terminal client carries
-// none. There the same rectangle is a plain textarea, which is what a host with cells can draw.
+// The box is a rectangle, because a code editor is the one shape the closed kit cannot express
+// (docs/ui-design/closed-kit.md § The closed kit). The editor itself is the host's, through
+// `@acorn/plugin-api/ui/editor`, so this file holds no CodeMirror and the terminal client draws a plain
+// textarea instead.
 //
-// The text stays this component's either way: it is the reader's until they apply it. Apply is atomic
-// — a document that does not parse leaves the draft alone and stays in the box for correction — and
-// Revert puts the draft's own projection back.
+// The text is the reader's until they apply it. Apply is atomic: a document that does not parse leaves
+// the draft alone and stays in the box for correction. Revert puts the draft's own projection back.
 
 export default function JsonTab(props: {
   /** The draft as JSON. Read on mount and on Revert, not on every keystroke. */
@@ -89,7 +87,7 @@ export default function JsonTab(props: {
         label="Workflow as JSON"
         // Once, with the box the host drew. `readOnly` is read here rather than watched: a committed
         // file and a database row are two different surfaces, and moving between them rebuilds this
-        // one (../WorkflowsBrowse.tsx keys on the item).
+        // one (the browse detail keys on the item).
         mount={(element) => {
           editor = mountEmbeddedEditor(element, {
             doc: text(),

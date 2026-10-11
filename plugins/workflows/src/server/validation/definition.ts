@@ -33,8 +33,8 @@ const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
 
 /**
  * The edges, derived and never stored. A step with an `after` list waits on exactly those steps; a
- * step without one waits on the step declared before it, which is what a plain list always meant.
- * `after = []` is an explicit root.
+ * step without one waits on the step declared before it, so a plain list is a chain. `after = []` is
+ * an explicit root.
  */
 export function workflowEdges(steps: readonly WorkflowStepDef[]): Map<string, string[]> {
   const edges = new Map<string, string[]>()

@@ -38,8 +38,8 @@ export default function SaveRequestModal(props: {
     <Modal title="Save request" size="sm" onDismiss={props.onDismiss}>
       <ModalBody>
         <Field label="Name">
-          {/* Enter saves, through the kit's own submit event. The frame did this with a `keydown` on the
-              dialog, which is a DOM event and does not cross. */}
+          {/* Enter saves, through the kit's own submit event. A `keydown` on the dialog is a DOM event and
+              does not cross. */}
           <Input
             value={name()}
             maxLength={120}

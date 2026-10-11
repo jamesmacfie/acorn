@@ -49,17 +49,14 @@ export const editorClientPlugin: ClientPlugin = {
       sections: [{ id: 'defaults', label: 'Editing defaults', rows: ['Word wrap', 'Indentation'] }],
       component: EditorSettings,
     })
-    // ⌘P quick-open and find-in-files (./commands.ts). Quick-open was an overlay slot of its own
-    // until 2026-09-03; it is a search command on the shared session now, so the chord opens the
-    // palette at its frame instead of a second dialog with its own query and cursor.
+    // ⌘P quick-open and find-in-files (./commands.ts). Quick-open is a search command on the shared
+    // palette session, so the chord opens the palette at its frame.
     for (const contribution of editorCommands) ctx.commands.register(contribution)
     ctx.keybindings.register({
       id: 'editor.files.open',
       command: 'editor.files.open',
       description: 'Go to file',
       category: 'Global',
-      // `global` with an `active` gate, which is the scope and the gate the overlay's own binding
-      // carried. What changed is the command it names, not when it fires.
       defaultChord: 'meta+p',
       when: 'global',
       active: () => !!activeTaskId(),

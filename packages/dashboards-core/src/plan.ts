@@ -24,7 +24,8 @@ export { authoringAccountProblems } from './authoringAccounts'
  *  partial read with its cause in `reason`. `source` is `<pluginId>:<sourceId>` when it's known, and
  *  `input` names the derived-source input at fault. */
 export type SourceFailure = { code: string; source?: string; input?: string; reason?: string; count?: number }
-/** `message` is the Node's own wording, kept for clients that predate `failure`. */
+/** `message` is the Node's own wording, which a client draws for a problem with no `failure`. A source
+ *  failure is worded from `failure` instead. */
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning'; failure?: SourceFailure }
 export type PlanSource = {
   instanceId: string
@@ -734,7 +735,8 @@ export function runPlanStages(
 
 export { sortPlanRows, groupPlanRows } from './planShaping'
 
-/** A drill-down begins before the summary it explains. Phase 05 can pass its summary stage and measure filter here. */
+/** A drill-down begins before the summary it explains. `stageIndex` names that summary stage, and
+ *  `measureFilter` narrows the rows to one measure's. */
 export function deriveDrilldownPlan(
   plan: PanelPlan,
   rows: readonly Pick<PlanRow, 'values'>[],

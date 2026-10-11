@@ -11,7 +11,7 @@ export type TerminalSession = {
   idle: boolean // agent has produced no output for a while (docs/terminal/activity.md § Activity and status); always false for shells
   agentState: AgentState // docs/terminal/activity.md § Activity and status: PTY tier emits working|idle|blocked|unknown
   // cwd is the task's isolated worktree, derived and never stored: `tasks.worktreePath` is the truth
-  // (docs/workspaces-and-tasks.md), and main computes `cwd === task.worktreePath` at session create
+  // (docs/workspaces-and-tasks.md), and the node computes `cwd === task.worktreePath` at session create
   // and during `reconcileTmux`, so the flag survives app restarts. It stays on the wire as a
   // denormalized copy so the renderer doesn't need the task join for a per-session badge/cleanup
   // affordance.
@@ -21,8 +21,8 @@ export type TerminalSession = {
   cwd: string
   command: string
   tmuxSession?: string
-  repo?: { owner: string; name: string } // derived from the task join (main process)
-  pull?: { number: number } // derived from the task join (main process)
+  repo?: { owner: string; name: string } // derived from the task join on the node
+  pull?: { number: number } // derived from the task join on the node
   cols: number
   rows: number
   createdAt: number
@@ -46,7 +46,7 @@ export type CreateOpts = {
 }
 
 // A launchable profile as the renderer sees it (docs/terminal.md § Profiles). `available` is false when the command
-// isn't on PATH, the UI disables it. command/backend stay in main. `tmuxMissing` is true when the
+// isn't on PATH, the UI disables it. command/backend stay on the node. `tmuxMissing` is true when the
 // profile prefers the durable tmux backend but tmux isn't installed, so a session would silently
 // degrade to node-pty (no restart survival). The drawer surfaces the hint.
 export type TerminalProfile = {
@@ -57,8 +57,7 @@ export type TerminalProfile = {
   tmuxMissing?: boolean
 }
 
-// Pushed from main to a subscribed renderer inside a `term:out` WebSocket frame (shared/ws.ts;
-// wsHub → wsClient).
+// Pushed from the node to a subscribed renderer inside a `term:out` WebSocket frame (wsHub → wsClient).
 export type ServerMsg =
   | { type: 'ready'; session: TerminalSession; replayed: boolean } // replayed = a canonical display snapshot follows
   | { type: 'output'; data: string }

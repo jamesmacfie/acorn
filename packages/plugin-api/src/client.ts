@@ -13,7 +13,7 @@ export { queryOwner } from '@acorn/client-core/infra/node'
 // probes PATH per read, so no plugin can assemble it from the integrations query.
 // `workspaceExternalProjectsOptions` is the workspace's whole external-project map, every provider's
 // rows in one read. A plugin needs it to answer "which of my connections serves this repo", which is
-// the question a task link has to settle before it can name one (github/src/client/pullTasks.ts).
+// the question a task link has to settle before it can name one.
 // `deletedTasksOptions` is every deleted task's id, so a reference to one reads "Deleted task".
 export {
   deletedTasksOptions,
@@ -211,8 +211,8 @@ export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 // The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
 export { activeCollectionItem, revealCollectionItem } from '@acorn/client-core/kit/keys'
 export { agentContextContributions } from '@acorn/client-core/host/registries/sources'
-// The tone of a tool call's status dot. Shared because two plugins draw that dot: agents owns the
-// `agents:tool-card` point and changes fills it.
+// Lets module-level plugin state drop its entries when a task is archived, a workspace is removed, or
+// the active node changes.
 export { onScopeEvicted } from '@acorn/client-core/host/registries/shell'
 
 // ── Tasks, sessions, layout ───────────────────────────────────────────────────────────────────
@@ -371,13 +371,10 @@ export {
 } from '@acorn/client-core/kit/lib'
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
-// The client half of what `ctx.telemetry` and `ctx.log` are on the node, and the id is an argument
-// here because a compiled client plugin's context is contribution points and nothing else: `init`
-// is the one place its own id is in hand (docs/plugin-authoring/telemetry.md § Telemetry and logging).
-//
-// Not on ./ui, because none of it draws. A sandboxed frame gets neither: it has no host module to
-// import, and posts a `telemetry` message over the bridge instead, which the host stamps from the
-// binding.
+// The client half of what `ctx.telemetry` and `ctx.log` are on the node. The id is an argument because
+// a compiled client plugin's context is contribution points and nothing else: `init` is the one place
+// its own id is in hand (docs/plugin-authoring/telemetry.md § Telemetry and logging). A sandboxed frame
+// gets neither; it posts a `telemetry` message over the bridge instead.
 export { telemetryFor } from '@acorn/client-core/infra/telemetry/emitter.ts'
 export type { PluginTelemetry, RenderTransitionHandle, SpanHandle } from '@acorn/client-core/infra/telemetry/emitter.ts'
 export { createLogger, describeError } from '@acorn/client-core/infra/telemetry'
@@ -400,8 +397,8 @@ export { latestOnly, latestSignal } from '@acorn/client-core/kit/lib'
 export type { LatestSignal } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 
-// Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
-// that mounts it is `RemoteTree` on ./ui/host. See docs/plugins/tree-contract.md § The tree contract.
+// One sandboxed plugin's bound tree contribution. Data, not a component: the component that mounts it
+// is `RemoteTree` on ./ui/host. See docs/plugins/tree-contract.md § The tree contract.
 export type { RemoteContribution } from '@acorn/client-core/host/tree'
 // "Is anyone offering to fill this slot?", for an owner's model that decides whether to draw the box.
 // From the rule's own module, so a plugin model asking it doesn't load the tree host on ./ui/host.
@@ -410,7 +407,7 @@ export { slotFills } from '@acorn/client-core/host/tree/arbitration.ts'
 // Per-device scraps — an unsent draft, a closed fold — through one guarded accessor. On this barrel
 // rather than on ./ui because a plugin's own model is a `.ts` file with a node-environment test, and
 // ./ui carries Solid components: one of those makes the whole entrypoint unloadable there
-// (docs/plugin-authoring/testing.md § Testing). Nothing in the module below imports anything.
+// (docs/plugin-authoring/testing.md § Testing).
 export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib'
 export {
   DATA_VERSION,

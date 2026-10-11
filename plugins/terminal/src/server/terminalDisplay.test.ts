@@ -316,7 +316,7 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
       'ünïcøde 🌰 and a tail\r\n',
     ]
 
-    // Fed from the first byte: what the display used to keep running while anybody was attached.
+    // Fed from the first byte: the screen a cold rebuild has to match.
     const throughout = new HeadlessTerminalScreen(20, 5)
     for (const chunk of chunks) throughout.write(chunk)
 

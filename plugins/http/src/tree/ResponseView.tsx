@@ -18,9 +18,8 @@ import {
 import { formatSize, type SendFailure, type SendResult, type SendSuccess, type TimelineEntry } from '../shared/model'
 import { decodeBody } from './httpClient'
 
-// The response half of the API panel. Every box, rule and monospace block here used to be a class in
-// this plugin's stylesheet; now the status strip is a `Toolbar`, the header table is `Facts`, and the
-// body is a `CodeBlock`, so the panel follows the reader's appearance pack without this file knowing
+// The response half of the API panel. The status strip is a `Toolbar`, the header table is `Facts`, and
+// the body is a `CodeBlock`, so the panel follows the reader's appearance pack without this file knowing
 // one exists.
 
 type ResponseTab = 'body' | 'headers' | 'timeline'
@@ -94,8 +93,8 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
     { id: 'timeline', label: 'Timeline', count: props.result.timeline.length },
   ]
 
-  // `grow`, so the response takes the rest of the region and its body scrolls inside it; the region
-  // clipped a long body at the pane's edge.
+  // `grow`, so the response takes the rest of the region and its body scrolls inside it; without it the
+  // region clips a long body at the pane's edge.
   //
   // The status and the time are one template string each. A host from before tree text could hold
   // numbers drew a bare number as nothing.

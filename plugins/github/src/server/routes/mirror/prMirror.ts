@@ -36,14 +36,12 @@ import {
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)
 // and the batch route (pullsBatch) read+write the same mirror tables, so the logic lives here
 // once to avoid drift. PR data is "fast-changing" (docs/caching.md); freshness is a TTL gate in
-// sync_state (PULLS_STALE_AFTER_MS, server/syncPolicy.ts).
+// sync_state (`PULLS_STALE_AFTER_MS`).
 //
-// Writers take a value prFetch.ts has already fetched in full, and swap it in with one db.batch, so
+// Writers take a value that has already been fetched in full, and swap it in with one db.batch, so
 // the rows, their order, and sync_state move together or not at all. Every child row carries its
 // provider `position`, and every read orders by it.
 
-// Every exported helper here already took the handle as a parameter, which is why this module needed
-// no reshaping when the tables moved. Only the type of the thing being passed in changed.
 type Db = PluginDatabase
 const log = createLogger('github', 'github')
 export type PrKey = { userId: string; repoId: number; number: number }
@@ -60,7 +58,7 @@ const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQL
   and(eq(t.userId, key.userId), eq(t.repoId, key.repoId), eq(t.number, key.number))
 
 // Atomically re-mirror one PR's detail composite: upsert the pull row, replace all child rows,
-// bump sync_state. Rows per insert are capped by the bound-parameter budget in db/batch.ts.
+// bump sync_state. Rows per insert are capped by the bound-parameter budget (`chunkRowsByColumnBudget`).
 // Runs in one db.batch; callers can fan these out in parallel across PRs.
 //
 // Reports whether the checks rows differ from what was mirrored before, so the caller can announce
@@ -320,9 +318,9 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
 
 // ─── Files (REST /files → SQLite rows + BLOBS patch bodies) ──────────────────
 
-// Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings put
+// Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings would put
 // `SECRETS`, `ACTIVE_IDENTITY` and `INTERNAL_TOKEN` on the plugin contract to reach one blob cache, and
-// a plugin should be reading what it needs off `ctx` or off the two methods it actually calls.
+// a plugin should read what it needs off `ctx` or off the two methods it actually calls.
 export type PatchBlobStore = {
   get(key: string): Promise<string | null>
   put(key: string, value: string): Promise<void>
@@ -336,10 +334,10 @@ const BLOB_WRITE_CONCURRENCY = 8
 export const patchDigest = (patch: string) => `sha256:${createHash('sha256').update(patch).digest('hex')}`
 
 // Re-mirror one PR's files from a fetch that already holds every page. Patch bodies go to on-disk
-// BLOBS first, keyed by their digest, each with its segment descriptors beside it. That is safe before the swap because an orphaned body is only
-// cache data. Only when every write has landed do the rows, their order, and the files sync row
-// (with its completeness) replace the old ones in one db.batch. A failed write throws and leaves the
-// previous mirror untouched.
+// BLOBS first, keyed by their digest, each with its segment descriptors beside it. That is safe
+// before the swap because an orphaned body is only cache data. Only when every write has landed do
+// the rows, their order, and the files sync row (with its completeness) replace the old ones in one
+// db.batch. A failed write throws and leaves the previous mirror untouched.
 export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fetched: FilesFetch, now = Date.now()) => {
   const rows = fetched.files.map((f, position) => {
     const patchKey = f.patch != null ? patchDigest(f.patch) : null
@@ -359,7 +357,7 @@ export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fet
     const patchKey = rows[i]!.patchKey
     if (!patchKey) return
     await blobs.put(patchBlobKey(patchKey), f.patch as string)
-    // Cut once here, so a topology read never parses (./prDocument.ts).
+    // Cut once here, so a topology read never parses.
     await writePatchDocument(blobs, patchKey, f.filename, f.patch as string)
   })
   const c = fetched.completeness

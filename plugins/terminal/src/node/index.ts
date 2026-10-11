@@ -38,7 +38,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     required: true,
     emits: [{ verb: 'completed', description: 'A task agent terminal exited' }],
     // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
-    // open/migrate/close from there (@acorn/node-core/server/plugins/storage.ts).
+    // open/migrate/close from there (node-core's plugin storage).
     migrationsModule: import.meta.url,
     init: (ctx) => {
       // Opened and migrated by the host before init returns: registerTerminalChannel installs the handle into
@@ -47,8 +47,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       const db = ctx.storage.open()
       ctx.extensionPoints.declare(TERMINAL_LAUNCH_CONTEXT, 'Agent launch context')
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
-      // guard in server/transport/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
-      // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
+      // guard in the WS hub refuses attachment without), core's archive-time task-sessions bridge and its
+      // on-task-created hook, and the worktree-created hook that runs a repo's setup script.
       const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
         launchContextText: (taskId) =>
@@ -67,9 +67,9 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         completed: (event) => ctx.events.send({ channel: 'plugin:terminal:completed', ...event }),
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
         // `terminal:sessions-changed`, not `ctx.events.status`. This fires on every idle-to-working
-        // edge, which is machine speed, and the old ping had six subscribers. Written as a frame here for
-        // the same reason `run:changed` is: `ctx.events` is the seam and a plugin does not
-        // deep-import server/notify.ts.
+        // edge, which is machine speed, so it gets its own channel. Written as a frame here for the same
+        // reason `run:changed` is: `ctx.events` is the seam and a plugin does not deep-import core's
+        // notify module.
         status: () => ctx.events.send({ channel: 'terminal:sessions-changed' }),
         worktreeChanged: ctx.events.worktreeStatus,
         streams: ctx.events.streams,
@@ -79,17 +79,16 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TASK_SESSIONS, registrations.taskSessions),
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
       ]
-      // The repo's setup script, as a handler on core's `core:worktree-created` hook rather than the
-      // single slot it used to fill (docs/plugins/hooks.md § Hooks). `transform` and not `observe` because
-      // core awaits the chain: the terminal that opens next expects the setup to have finished, and an
-      // observer runs alongside by design. The payload comes back untouched — there is nothing here to
-      // change, only work to do before the caller carries on.
       // Archive already stopped and dropped the task's sessions, so only exited rows are left.
       registerDeletedTaskPurge(
         ctx,
         async (taskIds) =>
           (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes,
       )
+      // The repo's setup script, as a handler on core's `core:worktree-created` hook (docs/plugins/hooks.md
+      // § Hooks). `transform` and not `observe` because core awaits the chain: the terminal that opens next
+      // expects the setup to have finished, and an observer runs alongside by design. The payload comes back
+      // untouched — there is nothing here to change, only work to do before the caller carries on.
       ctx.hooks.handle('core:worktree-created', {
         id: 'setup-script',
         mode: 'transform',
@@ -117,11 +116,11 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where
       // the session map is. Two projections consume it: the harness RunBridge, behind the client's
-      // run pane and preview home, and the capability, which is how the agent-tool and workflow
-      // projections in apps/node/src/wiring/ reach it without a mutable global.
-      // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
-      // holds the process, not because it owns the fact; the core-side spelling is
-      // node-core/server/notify.ts § broadcastRunTargetChanged.
+      // run pane and preview home, and the `TERMINAL_RUN_TARGETS` capability, which other plugins resolve
+      // without a mutable global.
+      // `run:changed` is a core event (nodeEvents in @acorn/protocol) sent from here because terminal
+      // holds the process, not because it owns the fact; the core-side spelling is node-core's
+      // `broadcastRunTargetChanged`.
       // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a turn before a
       // process starts in a task's worktree.
       ctx.hooks.declare({
@@ -153,8 +152,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // a node with workflows disabled, because the point is never opened.
       ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'command', value: commandStep(ctx.core) })
       ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'run-target', value: runTargetStep(runTargetService) })
-      // The five run_* agent tools, over the service built two lines up. The capability stays published
-      // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
+      // The run_* agent tools, over the service built above.
       for (const tool of runAgentTools(runTargetService, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
       // terminal.sendToAgent (contract/sendToAgent.ts): PTY delivery for explicit actions such as
       // Memory's send-to-agent command. Consumers resolve it at call time.

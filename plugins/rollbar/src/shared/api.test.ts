@@ -20,7 +20,7 @@ describe('rollbar wire contract', () => {
     ])
   })
 
-  // The same net protocol's api.test.ts keeps over its own builders, now scoped to this plugin:
+  // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin:
   // enumerated from the module rather than listed, so a new route is covered the day it lands. A path
   // outside /v1/p/rollbar/ escapes this plugin's mount and would 404 into the SPA shell.
   it('namespaces every exported route builder under its own plugin prefix', () => {

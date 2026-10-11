@@ -18,7 +18,7 @@ const isBlank = (value: DashboardDisplayCell | undefined): boolean =>
   value === null || value === undefined || value === ''
 
 /** What a cell equals. `enum` keys off the declared value id, never its label: the label is the part a
- *  workspace gets to rename (plugins/linear/src/shared/collections.ts), so a filter written against it
+ *  workspace gets to rename (linear's workflow states, for one), so a filter written against it
  *  would break the day someone renamed a column. */
 const matchKey = (
   field: DashboardDisplayField | undefined,
@@ -213,8 +213,8 @@ export type PanelBoardColumn = {
  *  docs/dashboards/views.md § Views are derived, not chosen from a menu.
  *
  *  One case is worth spelling here: an undeclared value gets a column of its own after the declared
- *  ones, and a query-shaped collection cannot always know its values ahead of the data
- *  (@acorn/protocol/collections.ts), so that is the ordinary case there and schema drift here. */
+ *  ones, and a query-shaped collection cannot always know its values ahead of the data, so that is
+ *  the ordinary case there and schema drift here. */
 export function boardColumns(rows: readonly DashboardDisplayRow[], field: DashboardDisplayField): PanelBoardColumn[] {
   const declared = field.values ?? []
   const buckets = new Map<string, DashboardDisplayRow[]>(declared.map((value) => [value.id, []]))

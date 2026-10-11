@@ -117,7 +117,7 @@ describe('chunk graph', () => {
 
     expect(lazy.modules).not.toContain('heavy.js')
     expect(eager.modules).toContain('heavy.js')
-    // Less the few bytes of dynamic-import glue the eager build no longer needs.
+    // Less the few bytes of dynamic-import glue the eager build doesn't need.
     expect(eager.bytes - lazy.bytes).toBeGreaterThan(HEAVY - 100)
   })
 

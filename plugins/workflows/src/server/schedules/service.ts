@@ -336,7 +336,7 @@ export class WorkflowScheduleService {
     const run = this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, runId)).get()
     if (!run || ACTIVE_RUN.includes(run.status as (typeof ACTIVE_RUN)[number])) return
     // The root is the tree's schedule-overlap owner. Keep that ownership until every descendant
-    // is terminal as well, even if a malformed/legacy runner settles the root prematurely.
+    // is terminal as well, even if a runner settles the root before its descendants.
     const activeDescendant = this.db
       .select({ id: schema.workflowRuns.id })
       .from(schema.workflowRuns)

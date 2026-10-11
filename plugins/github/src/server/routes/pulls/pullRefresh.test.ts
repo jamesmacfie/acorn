@@ -167,8 +167,8 @@ describe('shared pull refresh operations', () => {
     expect(await plugin.db.select().from(prFiles)).toEqual([])
     expect(await plugin.db.select().from(comments)).toEqual([])
     expect(await plugin.db.select().from(checks)).toEqual([])
-    // Flow B, in core's file. This proves the outcome, not that the two writes share a transaction:
-    // two SQLite files cannot. The ordering test below covers what replaced that guarantee.
+    // The adoption, in core's file. This proves the outcome, not that the two writes share a transaction:
+    // two SQLite files cannot. The ordering test below covers the guarantee that stands in for one.
     expect((await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBe(5)
     expect(
       (
@@ -210,8 +210,8 @@ describe('shared pull refresh operations', () => {
     expect(emit.mock.calls[2][1]).toEqual({ repoOwner: 'acme', repoName: 'web', pullNumber: 5, headSha: 'abc123' })
   })
 
-  // The guarantee that replaced "it was all one transaction": adoption runs only after the mirror
-  // batch commits, so a refresh that never reaches the batch cannot adopt a PR into a task.
+  // The guarantee in place of a shared transaction: adoption runs only after the mirror batch
+  // commits, so a refresh that never reaches the batch cannot adopt a PR into a task.
   it('does not adopt a PR into a task when the open-PR fetch fails', async () => {
     await core.db.insert(schema.tasks).values({
       id: 'task-1',

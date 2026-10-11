@@ -1,7 +1,7 @@
 // Wire types for the Database pane HTTP/bridge boundary, shared between the node handlers
-// (main/database.ts) and the frame client (frame/databaseClient.ts). Cell values are normalized to
-// string | null in main (numbers/booleans to string, objects to JSON, dates to ISO) so the grid renders
-// uniformly and `null` stays distinct for NULL styling.
+// (server/routes/database.ts) and the tree client (tree/databaseClient.ts). Cell values are normalized to
+// string | null on the node (numbers/booleans to string, objects to JSON, dates to ISO) so the grid
+// renders uniformly and `null` stays distinct for NULL styling.
 export type DbCell = string | null
 
 export type DbColumn = { name: string; dataType: string; nullable: boolean; isPk: boolean }
@@ -79,7 +79,7 @@ export const databaseQueryRoute = (taskId: string, queryId: string) =>
 // machine. A plugin route rather than a bridge call because `/v1/core/integrations` has no bridge
 // scope, and the frame needs ids and labels, not keys.
 //
-// The path still says `model-connections` after the rename. Only code that ships with this plugin
-// reads it — this client and the `optionsRoute` on the `database:generate` step field — so a rename
-// would be churn with nothing on the other side of it.
+// The path says `model-connections`, not backends. Only code that ships with this plugin reads it —
+// this client and the `optionsRoute` on the `database:generate` step field — so renaming it would be
+// churn with nothing on the other side of it.
 export const databaseModelBackendsRoute = (taskId: string) => taskRoute(taskId, '/model-connections')

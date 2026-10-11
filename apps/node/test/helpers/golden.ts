@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 // and order-sensitive. `JSON.parse` round-trips that with no parser of ours to get wrong.
 //
 // The caller passes a full path, because the snapshots sit beside the suites that read them and this
-// helper no longer shares their directory. apps/desktop/test/client/golden.ts is the same idea with
+// helper doesn't share their directory. apps/desktop/test/client/golden.ts is the same idea with
 // one directory to worry about; two apps must not import each other's test helpers, and a shared
 // package would cost more than the duplication does.
 

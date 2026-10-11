@@ -2,7 +2,7 @@
 // session commands, the WebSocket for every stream (PTY input/output/status, workflow notices).
 //
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
-// platform concerns and live in client-core/features/tasks/taskBridge.ts.
+// platform concerns and live in client-core's task bridge.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import {
   terminalProfilesRoute,
@@ -41,10 +41,9 @@ export type TerminalApi = {
   }
 }
 
-// Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
-// return null unless the shell exposed a native folder picker, which is neither a PTY nor
-// anything this file has an opinion about (the node-first platform seam design, in Git history). Whether the node
-// runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin roster.
+// Always available: every verb here is an HTTP route or a WebSocket frame against the node. Whether the
+// node runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin
+// roster.
 export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi => {
   const post = <T>(url: string, body?: unknown) =>
     writeJson<T>(url, {

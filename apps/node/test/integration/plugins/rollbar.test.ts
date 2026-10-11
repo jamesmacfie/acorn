@@ -87,7 +87,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
     })
     app.route('/api/integrations', integrations)
     // Through the portable carrier, exactly as production mounts it: rollbar has no compiled router to
-    // hand `app.route` any more.
+    // hand `app.route`.
     const fetch = createRollbarFetch()
     app.all('/api/rollbar/*', (c) => servePluginFetch(c, { pluginId: 'rollbar', mount: '/api/rollbar', fetch }))
   })

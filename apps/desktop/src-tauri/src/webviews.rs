@@ -140,9 +140,8 @@ impl<R: Runtime> Webviews<R> {
 }
 
 // ── URL policy ────────────────────────────────────────────────────────────────────────────────────
-// Ports of `isAllowedPreviewUrl` (plugins/preview/src/main/browserAuto.ts) and `isAllowedWebviewUrl`
-// (@acorn/protocol/webview.ts). Ported rather than called: a second implementation is what makes the
-// second check independent.
+// `is_allowed_webview_url` is a port of `isAllowedWebviewUrl` in @acorn/protocol. Ported rather than
+// called: a second implementation is what makes the second check independent.
 
 fn parsed(url: &str) -> Option<Url> {
     let parsed = Url::parse(url).ok()?;

@@ -20,8 +20,8 @@ export type RecipeServices = {
 }
 
 // Recipe panes to a validated TaskLayout: the known panes open left to right. Unknown and duplicate
-// panes are dropped, because configs may name ids we no longer model, and none valid means null. Panes
-// split equally: main's parser dropped the old `ratio` key and this type followed.
+// panes are dropped, because configs may name ids this build does not model, and none valid means null. Panes
+// split equally; the config has no ratio.
 export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
   const panes = [...new Set(recipe.panes.filter((id) => isPaneId(id) && !!paneContribution(id)))]
   if (!panes.length) return null

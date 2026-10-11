@@ -1,7 +1,5 @@
-// Docker's WebSocket frame contracts. They lived in @acorn/protocol/docker.ts, and protocol's ws.ts
-// imported this file to build eleven docker channels into a union core owned. The envelope is open now
-// (@acorn/protocol/ws.ts), so the payloads come home: core routes on the `docker` prefix and never
-// looks inside.
+// Docker's WebSocket frame contracts. The envelope is open (@acorn/protocol/ws.ts): core routes on the
+// `docker` prefix and never looks inside, so the payloads belong to this plugin.
 
 // One sample per `docker stats` tick, about 1s.
 export type DockerStatsSample = {

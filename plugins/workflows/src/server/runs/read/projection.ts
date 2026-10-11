@@ -81,7 +81,7 @@ export async function workflowTaskNavigation(db: PluginDatabase) {
         or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.trigger, 'reprocess')),
       ),
     )
-    // Keep the full-scan insertion order for timestamp ties explicit as projections evolve.
+    // rowid breaks timestamp ties in insertion order.
     .orderBy(desc(workflowRuns.updatedAt), sql`${workflowRuns}.rowid`)
   const latestByTask = new Map<string, (typeof children)[number]>()
   for (const run of children) if (!latestByTask.has(run.taskId)) latestByTask.set(run.taskId, run)
@@ -148,7 +148,7 @@ export async function workflowStepProjections(
   return Promise.all(
     (await runner.steps(runId)).map(async (step): Promise<WorkflowStepProjection> => {
       // Record loops have their own paged projection. Putting up to 500 child summaries on every step
-      // refresh made the supposedly compact run read eagerly load the entire batch.
+      // refresh would make the compact run read load the entire batch.
       const children = step.kind === 'workflow-map' ? [] : await runner.childRuns(step.id)
       const projected = { ...step, status: step.status as WorkflowStepProjection['status'], children }
       if (!step.sessionId || !step.profileId || /[^A-Za-z0-9_-]/.test(step.sessionId)) return projected

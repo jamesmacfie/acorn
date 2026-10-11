@@ -17,7 +17,7 @@ export const contextPaneContribution: PaneLayoutContribution<ContextModel> = {
   defaultChord: 'meta+shift+x',
   layout: 'header-body-footer',
   // The inventory, the selection, the expanded rows and the sync state, held once per task by the host
-  // (client-core registries/paneModels.ts).
+  // (client-core's `paneModel`).
   model: (task) => createContextModel(task),
   regions: { header: ContextHeader, body: ContextBody, footer: ContextFooter },
 }

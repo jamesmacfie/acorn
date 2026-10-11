@@ -48,10 +48,10 @@ const AiSetup = lazy(() => import('./AiSetup'))
 type Step = 'welcome' | 'arrange' | 'add' | 'github' | 'organize' | 'ai' | 'done'
 
 // The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
-// shares `add`'s place in the strip rather than taking an entry of its own, which is what the
-// hand-drawn dot strip's `DOT_OF` map used to say. `welcome` has a place of its own, so the host
-// draws Next on it and Back on the step after it, which is the GitHub detour's way out. `arrange`
-// asks how to arrange projects, and the wizard drops it when the Node already has an answer.
+// shares `add`'s place in the strip rather than taking an entry of its own. `welcome` has a place of
+// its own, so the host draws Next on it and Back on the step after it, which is the GitHub detour's way
+// out. `arrange` asks how to arrange projects, and the wizard drops it when the Node already has an
+// answer.
 export const STEPS = [
   { id: 'welcome', label: 'Welcome' },
   { id: 'arrange', label: 'Layout' },
@@ -82,7 +82,7 @@ const NEW_WORKSPACE = '__new__'
 
 // Hardcoded rather than read from the keybinding registry. `onboarded` is a node preference, so
 // this screen only ever renders for someone who has not rebound anything, and reaching the
-// registry would pull registries/keybindings.ts onto the @acorn/plugin-api/client barrel, which a
+// registry would pull the keybinding registry onto the @acorn/plugin-api/client barrel, which a
 // plugin's node-environment test suite has to be able to import.
 const SHORTCUTS: [string, string][] = [
   ['⌘⇧N', 'New task'],
@@ -103,9 +103,8 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   // The ids of every project this run added, in the order they were added, reported by whatever did
   // the adding, never inferred. Importing is not a one-shot choice: an account has many repositories
   // and the natural move is to take three, so the wizard stays on the list until you say you are
-  // done and then names the whole batch. An earlier version diffed the project list against a
-  // snapshot taken on entry, which dropped any import that repaired an existing project instead of
-  // creating one: the batch then showed the last repository only.
+  // done and then names the whole batch. Diffing the project list against a snapshot taken on entry
+  // would drop any import that repairs an existing project instead of creating one.
   const [addedIds, setAddedIds] = createSignal<string[]>([])
   const [names, setNames] = createSignal<Record<string, string>>({})
   // Chosen workspace per project, empty until the owner picks one.
@@ -147,8 +146,8 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const blankNames = () => added().filter((project) => !nameOf(project).trim()).length
 
   // GitHub is offered only when this node can start a sign-in, or already holds one. A build without
-  // a GitHub client id reports the provider as not connectable, and the card used to lead to an
-  // error the reader could do nothing about.
+  // a GitHub client id reports the provider as not connectable, and offering the card there would
+  // lead to an error the reader can do nothing about.
   const githubOffered = () => {
     const data = integrations.data
     return (
@@ -169,7 +168,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
     setTrail(seen.slice(0, -1))
   }
 
-  // Projects refetch on the node's `project:changed` frame now; workspaces still have no event.
+  // Projects refetch on the node's `project:changed` frame; workspaces have no event.
   const refresh = () => queryClient.invalidateQueries({ queryKey: workspacesKey })
 
   // Finish and Skip both save the same preference, so the wizard does not ambush the user again on
@@ -563,7 +562,6 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   )
 
   // `dismissOn={[]}`: a full-run setup must not vanish on a stray Escape or a backdrop click. The
-  // custom full-screen backdrop this used to draw is gone, and so is the hand-rolled dot strip — the
   // `wizard` layout draws the step indicator and every action in its footer, including skip and the
   // last step's finish (docs/panes/layout.md § Layout model). What is left for the plugin is the step body.
   // Busy blocks Next and finish, so a slow save cannot be pressed twice.

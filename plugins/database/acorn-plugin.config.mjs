@@ -2,21 +2,17 @@
 // build the bundles and generate `acorn-plugin.json`. It lives here, not in the build script, so the
 // plugin's declared surface is visible from the plugin's own directory.
 //
-// THE FIRST CONSUMER OF `document-over-frame` (docs/editor/composed-panes.md § Composed panes), and that is
-// why this plugin moved rather than because the migration bought it anything on the storage path. It was
-// stuck first-party for one measured reason: the pane embedded Monaco, a single-file Monaco frame comes
-// to 7.93 MiB against an 8.00 MiB cap with a stub UI, and its four language-service workers (14.58 MiB)
-// cannot be served AT ALL — a plugin origin serves one file and the frame CSP has no `worker-src`. The
-// answer was not to widen the sandbox for every installed plugin to serve two first-party panes; it was
-// for the host to own one editor and lend it. So the `layout` block below is the whole editor: the host
-// draws it, and this plugin's contribution to it is two routes and a language id.
+// A consumer of `document-over-frame` (docs/editor/composed-panes.md § Composed panes). A plugin origin
+// serves one file and the frame CSP has no `worker-src`, so a plugin cannot ship an editor with its
+// language-service workers. The host owns one editor and lends it instead: the `layout` block below is
+// the whole editor, the host draws it, and this plugin's contribution to it is two routes and a language id.
 //
 // `id: "database"` (the directory name, which the builder uses as the id) is load-bearing and must never
 // change. It binds `/v1/p/database`, the `database` pane's persisted layout key, and — the one that
 // loses data rather than just breaking a link — `<dataRoot>/plugins/database.sqlite`. Renaming it
 // orphans every saved query on the machine.
 //
-// On the permissions, and where they differ from what the migration brief sketched:
+// On the permissions:
 //
 //   exec: false — URL and schema scripts execute inside the host data service after core applies the
 //     repo-config trust gate. The loaded package has no process broker.
@@ -27,10 +23,9 @@
 //     is the AI generate feature: `models.available` for the connection dropdown and
 //     `models.generateText` for the SQL itself — core still resolves the provider key, this plugin only
 //     ever sees ids and labels. `identity` is the `database:generate` workflow step: a step has no
-//     request to read an owner from, and a model connection is spent as somebody. The brief listed
-//     `prefs`; nothing reads or writes one, so it is not here.
-//   secrets: false — the brief sketched `true`. It is wrong, and the reason is the nicest property this
-//     plugin has: the connection URL is resolved per connect and NEVER PERSISTED, so there is no
+//     request to read an owner from, and a model connection is spent as somebody. No `prefs`: nothing
+//     reads or writes one.
+//   secrets: false — the connection URL is resolved per connect and NEVER PERSISTED, so there is no
 //     credential at rest for the host secret service to hold. Postgres credentials live in the reader's
 //     own `.env` or come out of their own script.
 //   net: [] — core opens the PostgreSQL socket. The plugin has no destination of its own.
@@ -84,20 +79,13 @@ export default {
       id: 'database',
       label: 'Database',
       glyph: 'database',
-      // Its shipped position in the switcher, declared where a loaded plugin declares one. It was
-      // implied by this plugin's place in the compiled pane list; a move is not a reason to renumber
-      // panes under everyone who has this one open.
+      // Its position in the switcher. Renumbering moves panes under everyone who has this one open.
       order: 70,
       // Hidden on a task with no database source: no connection script, and no DATABASE_URL in the
       // worktree `.env` or the node's environment. There would be nothing to connect to.
       availability: '/v1/p/database/available',
       // The composed pane. The host draws the SQL editor and the drag handle; this plugin's frame draws
       // the button bar, the table sidebar, the result grid and its two modals below.
-      //
-      // What the client DELETED in the move, which is the argument for the whole contract in one list:
-      // constructing an editor and all its options, the theme application and its appearance
-      // subscription, the ⌘Enter binding, the `editorH` signal and the splitter's pointer handlers —
-      // and the editor dependency itself.
       layout: 'document-over-frame',
       regions: {
         document: {
@@ -116,8 +104,8 @@ export default {
         },
         // This plugin's own bundle below the editor, as a tree in a worker rather than a rectangle in
         // an iframe. Same bytes, same trust prompt; what differs is that the host mounts its own
-        // components for what the bundle emits, so the two halves of this pane are now the same kind
-        // of thing (docs/plugins/tree-contract.md § The tree contract).
+        // components for what the bundle emits, so the two halves of this pane are the same kind of
+        // thing (docs/plugins/tree-contract.md § The tree contract).
         frame: { kind: 'remote', entry: 'panel' },
       },
     }],
@@ -143,7 +131,7 @@ export default {
         // The group the three visible rows hang under. Grouping is what keeps four rows saying
         // "Database" out of the palette root; the root search still finds a child by its own words,
         // because the breadcrumb is one of the terms a node is indexed under
-        // (client-core/host/registries/commands/graph.ts).
+        // (client-core's command graph).
         //
         // `db` rather than `database`, which is the pane's id: contribution ids are unique across the
         // whole manifest, so a group cannot be named after the surface it is about.
@@ -155,9 +143,8 @@ export default {
       {
         id: 'execute',
         kind: 'action',
-        // Was 'Database: run query'. The id and the chord are unchanged, which is what a reader's
-        // muscle memory and a stored override are keyed on; the prefix went because the group above now
-        // says it.
+        // No "Database:" prefix, because the group above says it. The id and the chord are what a
+        // reader's muscle memory and a stored override are keyed on, so they never change.
         title: 'Run query',
         parentId: 'db',
         category: 'action',
@@ -177,7 +164,7 @@ export default {
         //
         // `openPane`, not `navigate`: a saved query has no detail surface of its own. Picking one loads
         // its SQL into the pane's editor through the same path the pane's own picker uses, and running
-        // it stays the reader's next keystroke (../tree/DatabasePanel.tsx).
+        // it stays the reader's next keystroke (src/tree/DatabasePanel.tsx).
         id: 'find-query',
         title: 'Find a saved query',
         parentId: 'db',
@@ -212,8 +199,6 @@ export default {
       },
     ],
     keybindings: [
-      // Was `defaultChord` on the compiled pane contribution. Same chord, declared where a loaded
-      // plugin declares one.
       { command: 'open', defaultChord: 'meta+shift+j', when: 'task' },
       // ⌘Enter, and the acceptance test for the whole document-surface design: the chord is pressed with
       // focus in the HOST's editor, where this plugin's frame has no keyboard at all. The host resolves

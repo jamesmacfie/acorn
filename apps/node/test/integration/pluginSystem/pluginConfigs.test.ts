@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit'
 import { PUBLIC_EXTENSION_POINTS } from '@acorn/protocol/publicExtensionPoints.ts'
 
-// Checked against the real manifest schema at `pnpm test` time, for every loadable plugin
-// (docs/plugins/dev-loop.md § The dev loop: "A malformed acorn-plugin.config.mjs no longer waits for a
-// rebuild or a boot to announce itself").
+// Checked against the real manifest schema at `pnpm test` time, for every loadable plugin, so a
+// malformed acorn-plugin.config.mjs doesn't wait for a rebuild or a boot to announce itself
+// (docs/plugins/dev-loop.md § The dev loop).
 //
 // The rules it catches are the ones no reviewer checks by eye: a route or rail-items path outside
 // the plugin's own `/v1/p/<id>/` prefix, an `openPane` naming a frame the manifest never declared, a
@@ -25,7 +25,7 @@ const configs = readdirSync(PLUGINS, { withFileTypes: true })
 
 describe('loadable plugin configs', () => {
   it('finds the loadable plugins (anti-vacuity)', () => {
-    // Five as of writing: database, http, linear, model-providers, rollbar. The assertion is a floor, so
+    // Five: database, http, linear, model-providers, rollbar. The assertion is a floor, so
     // adding one is ordinary work and losing them all is a failure.
     expect(configs.length).toBeGreaterThanOrEqual(4)
   })

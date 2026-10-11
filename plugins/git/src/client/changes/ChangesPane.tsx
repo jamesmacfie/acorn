@@ -46,7 +46,7 @@ import { GIT_PANE } from '../gitPane'
 
 // The four regions of the Git pane's Changes tab: a PR-style "Files changed" view over the task worktree's
 // uncommitted changes (docs/diff-rendering.md). The host draws the split, the divider and the drag
-// handle; everything the regions share is in ./changesModel.tsx.
+// handle; everything the regions share is in the model.
 //
 // The list is a navigator, not a selector: every file's hunks are stacked in one scroller and clicking
 // a row scrolls to it, the way the pull-request pane's file list works. Staging is a checkbox per row
@@ -74,7 +74,7 @@ const changedCount = (model: ChangesModel): number => {
 
 // Every section the list can draw, in the order it draws them. Conflicts first because a conflict
 // blocks everything; then whichever pair or single run the grouping asks for, of which only one set
-// is ever present at a time (model.ts § groupSections).
+// is ever present at a time (`groupSections`).
 //
 // A static list rather than a loop over the sections the model returns: the components below stay
 // mounted across a refetch, so roving focus and an open row menu survive one, where a `<For>` over
@@ -144,9 +144,9 @@ function ViewMenu(props: { model: ChangesModel }) {
   )
 }
 
-// The house list header: the label and its count, then the list's own controls. The line totals
-// are gone, because every row already carries its own, and Send moved into a banner at the top of
-// the list, where it has room to say whether the send worked.
+// The house list header: the label and its count, then the list's own controls. No line totals,
+// because every row carries its own. Send is a banner at the top of the list, where it has room to
+// say whether the send worked.
 export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   return (
@@ -493,9 +493,9 @@ type RowItem = Parameters<Parameters<typeof Rows>[0]['children']>[1]
 type Section = ReturnType<ChangesModel['sections']>[number]
 
 export function ChangesList(props: { task: Task; model: ChangesModel }) {
-  // Collapsed, the row is the git status letter it already leads with. That badge was always the
-  // fastest read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and
-  // the path in the tooltip (client-core kit/lib/layout/collapseState.ts).
+  // Collapsed, the row is the git status letter it already leads with. That badge is the fastest
+  // read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and the path
+  // in the tooltip.
   const collapsed = sidebarCollapsed(paneCollapseKey(GIT_PANE))
   const model = () => props.model
   // Usable once the first status read has answered, with changes or a clean tree, or once it is
@@ -516,10 +516,9 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
   // `depth` is passed straight to the kit row, which is how the tree view nests the same row rather
   // than shipping a second one.
   //
-  // No `reveal` on the row, which the hover buttons before it had: `reveal` hides the whole trailing
-  // slot until the pointer is over the row, and a checkbox that only appears on hover is a checkbox
-  // that cannot say whether the file is staged. `RowActions` brings its own reveal for the verbs,
-  // which is what that prop is for (kit/components/layout/RowActions.tsx).
+  // No `reveal` on the row: it hides the whole trailing slot until the pointer is over the row, and a
+  // checkbox that only appears on hover cannot say whether the file is staged. `RowActions` brings its
+  // own reveal for the verbs.
   const FileEntry = (rowProps: {
     row: FileRow
     item: RowItem
@@ -735,9 +734,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
 // went wrong, land the commit — and the reason the bar is drawn above the editor rather than beside
 // the commit button.
 //
-// The editor is always drawn on a git tree, where the one-line field before it appeared only once
-// something was staged: with nothing staged the button reads Commit tracked and commits every tracked
-// change, which is one fewer click and the rule Zed follows.
+// The editor is always drawn on a git tree: with nothing staged the button reads Commit tracked and
+// commits every tracked change, which is the rule Zed follows.
 export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   const [expanded, setExpanded] = createSignal(false)
@@ -752,7 +750,7 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
         <CommitField model={model()} rows={3} />
         <Toolbar variant="actions" size="sm">
           {/* At the left of the row, where Zed's is. Draws nothing until a model provider is
-              connected (./GenerateButton.tsx). */}
+              connected. */}
           <GenerateButton model={model()} />
           <IconButton
             icon="square-pen"
@@ -801,7 +799,8 @@ export function ChangesDiff(props: { task: Task; model: ChangesModel }) {
         fallback={<EmptyState title="No changes">Everything is committed.</EmptyState>}
       >
         {/* Marks from other plugins land under the same lines this pane's own review notes do
-            (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind). */}
+            (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the
+            `annotation` kind). */}
         <DiffPane source={model().source} annotations={DIFF_LINE_POINT} />
       </Show>
     </Show>

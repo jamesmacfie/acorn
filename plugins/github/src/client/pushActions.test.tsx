@@ -4,8 +4,8 @@ import type { Task } from '@acorn/plugin-api/client'
 import { GIT_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 
 // This plugin's one contribution into somebody else's surface: the button that turns a pushed branch
-// into a pull request, drawn under the Changes tab's branch bar (docs/plugins/cooperative-extension-points.md § Cooperative
-// extension points).
+// into a pull request, drawn under the Changes tab's branch bar
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // Three states worth pinning, and all three are decisions this side makes from facts the owner handed
 // over. The owner draws the slot and knows none of them, which is the whole point of the seam, so this
@@ -88,7 +88,7 @@ describe('Open pull request', () => {
   it('opens the create form with this branch as the head', () => {
     draw()!.click()
     // The rail source first, then the route: the shell draws from the selected source rather than from
-    // the location (./commands.ts § github.pull.list).
+    // the location.
     expect(seams.setSelectedSource).toHaveBeenCalledWith('github')
     expect(seams.navigate).toHaveBeenCalledWith('/p/p1/pulls/new?head=james%2Ffix-login')
   })

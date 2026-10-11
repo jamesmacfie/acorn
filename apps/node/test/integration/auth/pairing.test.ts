@@ -105,7 +105,7 @@ describe('GET /v1/node', () => {
     const info = (await (await send('/v1/node', { token: deviceToken })).json()) as NodeInfo
     // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
     // every client forever (docs/api-reference/transport.md § Versioning), so the bar for a field on it is a
-    // consumer. `appVersion` used to ride along here with no reader anywhere and was dropped.
+    // consumer.
     expect(info).toEqual({
       baseline: ACORN_BASELINE,
       protocolVersion: NODE_PROTOCOL_VERSION,

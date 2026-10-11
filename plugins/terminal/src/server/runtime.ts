@@ -1,9 +1,8 @@
 // Runtime service: owns run-target instances per task (docs/terminal/run-targets.md § Process
 // broker). An instance is just a terminal session in the task's worktree, so status derives from the
 // session map. Reachability comes from the target's `url` (fixed) or `url_command`
-// (run-and-parse-stdout, the existing term:previewUrl shape). acorn allocates no ports; isolation is
-// the script's job via ACORN_*. Deps are injected so the service is unit-testable under plain Node
-// (the run IPC wires the PTY glue).
+// (run it and parse its stdout). acorn allocates no ports; isolation is the script's job via ACORN_*.
+// Deps are injected so the service is unit-testable under plain Node (terminalRunGlue wires the PTY).
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/runTargets.ts' // canonical wire shapes — never redeclared here
 import type { LayoutRecipe, PluginHookRegistry, RunTarget } from '@acorn/plugin-api/node'
 
@@ -12,10 +11,9 @@ export type RuntimeDeps = {
   // `errors` carries structured config parse errors for the palette rows; `layouts` the
   // [layout.<id>] recipes (docs/workspaces-and-tasks/project-config.md § Layout recipes).
   // `repoTargetIds` names the targets whose winning layer was the checkout's own `.acorn/config.toml`,
-  // which is untrusted input: those are the ones that must pass the trust gate before they run. It is
-  // required, not optional. Both halves of this gate used to be optional, so a deps object that simply
-  // omitted them compiled fine and silently ran a cloned repository's committed command with no
-  // review. The type carries the gate now, and a caller that cannot answer has to say so out loud.
+  // which is untrusted input: those are the ones that must pass the trust gate before they run. Both
+  // halves of the gate are required, so a deps object that omits them does not compile and cannot
+  // silently run a cloned repository's committed command with no review.
   loadTargets(taskId: string): Promise<
     | {
         targets: RunTarget[]
@@ -49,7 +47,7 @@ export type RuntimeDeps = {
   onChange?(taskId: string, targetId: string, running: boolean): void
 }
 
-// The last non-empty stdout line is the URL (same parse as term:previewUrl).
+// The last non-empty stdout line is the URL.
 export const parseUrlOutput = (output: string | undefined): string | undefined =>
   output
     ?.split('\n')

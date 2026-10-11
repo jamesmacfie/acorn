@@ -181,7 +181,7 @@ describe('pull files stale-while-revalidate', () => {
     const blobGet = vi.fn()
 
     // GitHub never answers until the test says so, so a route that waited on it would lose this race
-    // however long the timer is. It is generous because 20ms lost on a loaded CI runner.
+    // however long the timer is. It is generous because 20ms loses on a loaded CI runner.
     const response = await Promise.race([
       app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'), {
         DB: core.db,

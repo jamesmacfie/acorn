@@ -56,14 +56,14 @@ export type PluginStateInput = {
   disabled(): readonly string[]
   setDisabled(names: readonly string[]): void
   // The running plugin host, for the one mutation that does not wait for a restart
-  // (@acorn/node-core/server/plugins/reload.ts). Both roots hold the `initPlugins` result already.
+  // (`createPluginReloader` in node-core). Both roots hold the `initPlugins` result already.
   reloadHost: Pick<PluginHostResult, 'reload'>
 }
 
 /** The bridge, plus the one thing it holds open: development mode's file watches. */
 export async function buildPluginStateBridge(input: PluginStateInput): Promise<PluginsBridge & { dispose(): void }> {
   const { dataDir } = input
-  // Built here, not in each root, so the two cannot drift the way install/uninstall once did. The
+  // Built here, not in each root, so the two cannot drift. The
   // built-in names come from the build (composition.ts), not the assembled graph: they only warn when
   // a disk package shadows a compiled one.
   const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
@@ -137,8 +137,9 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // leaves a running plugin whose state has been deleted underneath it.
     //
     // The input grant and skill approvals go before both, whether or not the data stays. They're keyed
-    // by plugin id, so a package installed later under the same id would otherwise read without asking. Dropping it
-    // first means a failed uninstall leaves a plugin that asks again, never one that kept a grant.
+    // by plugin id, so a package installed later under the same id would otherwise read without asking.
+    // Dropping them first means a failed uninstall leaves a plugin that asks again, never one that kept a
+    // grant.
     // Development mode ends first of all, so its watch doesn't outlive the package.
     uninstall: async (id, options) => {
       development.set(id, false)

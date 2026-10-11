@@ -1,6 +1,5 @@
 // GitHub's TanStack Query definitions. They live with the plugin that owns the routes and the keys
-// (../shared/api.ts) rather than in client-core, so the shell no longer carries a feature's read
-// layer.
+// rather than in client-core, so the shell does not carry a feature's read layer.
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type {
   DiffDocumentTopology,
@@ -126,8 +125,8 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
     readJson<PullDetail>(pullRoute(owner, repo, number), { signal }),
 })
 
-// The pull and its files from GitHub again. The files come back as the diff's document, which is
-// the only whole-file read left; the file list's summaries refetch from the refreshed mirror.
+// The pull and its files from GitHub again. The files come back as the diff's document, the only
+// whole-file read; the file list's summaries refetch from the refreshed mirror.
 export const forceRefreshPull = async (
   owner: string,
   repo: string,

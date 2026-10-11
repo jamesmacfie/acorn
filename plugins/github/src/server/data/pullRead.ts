@@ -77,8 +77,8 @@ const pull = z.object({
   }),
 })
 // GitHub gives a search query about 10 seconds. These nested fields make each match expensive, so
-// 100 matches per page times out on any broad search. 25 takes about 5 seconds, and 10 of those
-// pages fit inside a dashboard run's 60-second budget.
+// 100 matches per page times out on any broad search. A page of 25 stays well inside that limit, and
+// 10 of those pages fit inside a dashboard run's 60-second budget.
 const SEARCH_PAGE_SIZE = 25
 const SEARCH_PAGES = 10
 const searchPage = z.object({
@@ -285,8 +285,8 @@ const repositoriesPage = z.object({
 const REPOSITORY_SEARCH_PAGES = 10
 
 // An option's id is the repository folded to lower case, and its label keeps GitHub's spelling. A
-// workspace's repositories come from its projects, which store the name folded (node-core
-// queries/sourceContext.ts), and the Node checks each chosen repository against these ids exactly.
+// workspace's repositories come from its projects, which store the name folded, and the Node checks
+// each chosen repository against these ids exactly.
 // GitHub ignores case in repository names, so a search reads the same pull requests either way.
 export async function readRepositoryOptions(
   token: string,

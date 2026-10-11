@@ -257,11 +257,10 @@ it('terminates an oversized peer still waiting in its closing handshake during h
 
 // The helper forwards the active node's frames and nobody else's.
 //
-// The broker opens a socket to every paired node and pushes every frame across this boundary, and the
-// renderer drops whatever is not the active node on arrival
-// (@acorn/client-core/infra/node/wsClient.ts). So an N-node fleet paid two process boundaries, a
-// stringify and a parse per frame to deliver frames that were then thrown away.
-// Interest is declared by selection, independently of reads and cleanup writes.
+// The broker opens a socket to every paired node, and the renderer drops whatever is not the active
+// node on arrival. Forwarding every frame would cost an N-node fleet two process boundaries, a
+// stringify and a parse per frame, to deliver frames that are then thrown away. Interest is declared
+// by selection, independently of reads and cleanup writes.
 describe('the helper forwards only the active node', () => {
   const connect = async () => {
     const { helper } = stubHelper()

@@ -20,8 +20,9 @@ import {
 import { normalizeItemMetadata, normalizeOccurrence, normalizeSummary, occurrenceSummary } from './normalize'
 
 const OCCURRENCE_PAGE_SIZE = 50
-// v3 widened occurrence summaries (environment/codeVersion/request/personUsername) and added
-// environment to the detail; rejecting older rows forces a refresh instead of serving sparse rows.
+// Version 3 summaries carry environment/codeVersion/request/personUsername and the detail carries
+// environment. A row of an older version is rejected, which forces a refresh instead of serving a
+// sparse row.
 const CHILD_CACHE_SCHEMA_VERSION = 3
 type ChildResource = 'occurrence-list' | 'occurrence'
 

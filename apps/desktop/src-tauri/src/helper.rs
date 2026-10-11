@@ -139,9 +139,9 @@ fn group_has_members(group: i32) -> bool {
 ///
 /// The wait is on the group rather than on the helper, and that is the whole point. The helper exits
 /// promptly and politely; the node it supervises is the one that can wedge, and the node is what
-/// holds the data root's exclusive lock. Returning as soon as the helper was reaped left a live node
-/// behind in an abandoned group, so the next launch failed with "Another acorn node already holds
-/// <dataDir>" until somebody killed a pid by hand.
+/// holds the data root's exclusive lock. Returning as soon as the helper is reaped would leave a live
+/// node behind in an abandoned group, so the next launch would fail with "Another acorn node already
+/// holds <dataDir>" until somebody killed a pid by hand.
 ///
 /// The ceiling is that the group id is the helper's pid, which the kernel may reuse once the helper
 /// is reaped. Escalating onto a recycled group would need that exact pid to be handed to a new group
@@ -310,10 +310,8 @@ mod tests {
 
     /// A shell in its own process group, with stdout piped so it can say when it is ready.
     ///
-    /// Both group tests below used to set their scene with `sleep(300ms)` and then assert on it. That
-    /// was long enough on an idle machine and not inside a full `pnpm test`, where the assert read
-    /// "the backgrounded sleep should still hold the group" and told nobody why. The scene is
-    /// observable, so these wait for it.
+    /// The group tests below wait for their scene rather than sleeping and asserting on it: a fixed
+    /// sleep is long enough on an idle machine and not inside a full `pnpm test`.
     #[cfg(unix)]
     fn shell_in_its_own_group(script: &str) -> (Child, i32, Receiver<String>) {
         use std::os::unix::process::CommandExt;

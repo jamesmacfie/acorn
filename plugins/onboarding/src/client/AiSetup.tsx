@@ -43,10 +43,9 @@ export default function AiSetup() {
   // nothing is broken, a program is simply not installed here.
   const missing = () => status.data?.missing ?? []
 
-  // Derived from the descriptors rather than named here. The plan called for an OpenAI card and an
-  // Anthropic card, and both are model providers that ask for a typed key, so asking the registry
-  // gives the same two cards without this plugin knowing either provider exists — and gives a third
-  // for free the day someone contributes one.
+  // Derived from the descriptors rather than named here. OpenAI and Anthropic are both model providers
+  // that ask for a typed key, so asking the registry gives their two cards without this plugin knowing
+  // either provider exists — and gives a third for free the day someone contributes one.
   const keyProviders = createMemo(() => {
     const connected = integrations.data?.integrations ?? []
     const count = (providerId: string) => connected.filter((entry) => entry.providerId === providerId).length
@@ -87,7 +86,7 @@ export default function AiSetup() {
         computer, or an API key you add here.
       </Text>
 
-      {/* A list of facts, not cards: a card here looked exactly like the key cards below it, which
+      {/* A list of facts, not cards: a card here would look exactly like the key cards below it, which
           can be pressed. Index, not For: this list refetches on a 30 second stale time, so every row
           would be a new object each time. */}
       <Show when={backends().length || missing().length}>
@@ -138,7 +137,7 @@ export default function AiSetup() {
       <Show when={open()}>
         {(provider) => (
           // `focus` scrolls the form into view as it opens. It opens below the cards, and without
-          // this the press looked like it did nothing whenever the form landed under the fold.
+          // this the press looks like it does nothing whenever the form lands under the fold.
           <Card focus>
             <Stack gap="row">
               <Text emphasis="strong">{`Connect ${provider().label}`}</Text>

@@ -12,8 +12,8 @@ import {
   type GroundedWorkflow,
 } from './ground'
 
-// One test per row of the grounding table, driven from a fixture catalog: the module is pure, so
-// none of this needs a runner, a provider or a database.
+// Driven from a fixture catalog: the module is pure, so none of this needs a runner, a provider or a
+// database.
 
 // The real `http:request` fields, `auth` and `vars` deliberately absent, so the known false positive
 // below is pinned against the shape it actually has (../../../../http/src/server/workflowStep.ts).

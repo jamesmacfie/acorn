@@ -1,5 +1,4 @@
-// The notes pane's route builders (docs/notes-and-memory.md), moved verbatim out of
-// @acorn/protocol/api.ts.
+// The notes pane's route builders (docs/notes-and-memory.md).
 //
 // Notes owns the wire surface under /v1/p/notes.
 import type { NoteLocation } from '@acorn/protocol/notes.ts'

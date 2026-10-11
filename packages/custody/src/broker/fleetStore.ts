@@ -19,7 +19,7 @@ const FLEET_FILE = `${ACORN_BASELINE}-fleet.json`
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
 export const fleetNodeSchema = nodeRecordSchema.extend({
   // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but
-  // main performs the TLS, so the renderer has no use for it.
+  // the helper performs the TLS, so the renderer has no use for it.
   certPem: z.string().optional(),
   // This device's row in the node's `devices` table, so "Revoke" can name it. Absent for the local
   // node, which is adopted from the service start handoff rather than paired.

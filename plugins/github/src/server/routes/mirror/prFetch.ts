@@ -5,7 +5,7 @@ import { mapLimited } from '../../mapLimited'
 
 // Fetching one pull request from GitHub, completely, before anything is written. The GraphQL detail
 // walks every connection to its end through one cursor walker, and the REST files list walks every
-// page up to GitHub's ceiling. Both return a staged value; prMirror.ts swaps it into the mirror in one
+// page up to GitHub's ceiling. Both return a staged value; `mirrorPr` or `mirrorFiles` swaps it in one
 // batch, so a failure on any page leaves the previous mirror exactly as it was.
 //
 // A module with no `ctx` in reach, so the owner is stated here (docs/plugin-authoring/telemetry.md §

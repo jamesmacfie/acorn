@@ -11,8 +11,8 @@ export type PanelViewKind = DashboardView['kind']
 // The panel definition: what a user composed, independent of where it is placed. The four layers and
 // what each one owns are in docs/dashboards/panels.md § Panels.
 //
-// Two shapes here were fixed before the mapping layer existed, because getting either wrong would
-// have been a migration rather than an addition. Both survived it unchanged:
+// Two shapes here are load-bearing, because getting either wrong would be a migration rather than an
+// addition:
 //
 //   `sources` is genuinely plural. A projected panel may union several typed query instances.
 //
@@ -71,7 +71,7 @@ export type PanelAggregate = 'count' | 'sum' | 'avg' | 'min' | 'max'
 // One open object rather than a discriminated union, because an unknown `kind` has to survive. A
 // definition written by a client that has the board view must round-trip through one that does not,
 // and a union would force the codec to coerce it to something this build can draw. Same posture as an
-// unknown pane id in a task layout (tasks/layout.ts): retained here, resolved at render.
+// unknown pane id in a task layout: retained here, resolved at render.
 export type PanelView = {
   /** One of PANEL_VIEW_KINDS. Anything else renders inert. */
   kind: string
@@ -106,13 +106,12 @@ export type PanelView = {
 
 /** One (source, column) cell of the value mapping.
  *
- *  A record per column rather than a bare value-to-column lookup, and that shape was fixed before
- *  anything read it. Value mappings are many-to-one and so not invertible: github's `merged` and
- *  `closed` may both land in a `Done` column, so dropping a card on `Done` has no unique answer. A
- *  future write-back design would need a designated write value per (source, column), with drag
- *  disabled wherever none is set. A lookup has nowhere to put that; this has a field to grow, and
- *  `writeValue` is that field. Nothing writes or reads it in this read-only build, and the codec
- *  carries it across unread so the shape is real rather than promised. */
+ *  A record per column rather than a bare value-to-column lookup. Value mappings are many-to-one and so not
+ * invertible: github's `merged` and `closed` may both land in a `Done` column, so dropping a card on `Done`
+ * has no unique answer. A future write-back design would need a designated write value per (source, column),
+ * with drag disabled wherever none is set. A lookup has nowhere to put that; this has a field to grow, and
+ * `writeValue` is that field. Nothing writes or reads it in this read-only build, and the codec carries it
+ * across unread so the shape is real rather than promised. */
 export type PanelMappingColumn = {
   /** The source's own enum values that land in this column. */
   values?: string[]
@@ -181,9 +180,9 @@ export type PanelDefinition = {
 // the editor offers only what passes. See docs/dashboards/views.md § Views are derived, not chosen from a
 // menu.
 
-/** The views this build draws. The list moved to the wire when a manifest gained the ability to narrow
- *  it (@acorn/protocol/dashboards.ts); re-exported here because forty call sites
- *  say `./model` and one vocabulary cannot live in two places. */
+/** The views this build draws. The list lives in @acorn/protocol because a manifest can narrow it, and
+ *  is re-exported here so callers can import it from `./model`: one vocabulary cannot live in two
+ *  places. */
 export { PANEL_VIEW_KINDS }
 
 const VIEW_REQUIRES: Record<PanelViewKind, (schema: DashboardDisplaySchema) => boolean> = {

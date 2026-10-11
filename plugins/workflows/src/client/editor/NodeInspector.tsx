@@ -38,11 +38,11 @@ import { canConnect, effectiveAfter, precedes, renameProblem, type WorkflowDraft
 // The inspector: whatever the list column has selected, as a form under a header bar.
 //
 // Three subjects, because "Definition" and "Inputs" are rows in that list too. Each opens with the
-// same bar the run pane's step detail has (../runs/NodeDetail.tsx): the mark, the title at level 2,
-// and for a step, its kind and the controls that act on it. A node's form is drawn
-// from its kind's description, so a plugin's own step kind gets an inspector without shipping a
-// component (docs/workflows/step-kinds.md § Contributed step kinds). The two shapes a field cannot express —
-// a decide's branches are drawn beside it.
+// same bar the run pane's step detail has: the mark, the title at level 2, and for a step, its kind
+// and the controls that act on it. A node's form is drawn from its kind's description, so a plugin's
+// own step kind gets an inspector without shipping a component
+// (docs/workflows/step-kinds.md § Contributed step kinds). A decide's branches, which a field cannot
+// express, are drawn beside it.
 
 export type InspectorActions = {
   rename: (from: string, to: string) => void
@@ -189,8 +189,8 @@ export default function NodeInspector(props: {
           <>
             <Toolbar ariaLabel="Step">
               <Show when={describe()?.icon}>{(name) => <Icon name={name()} />}</Show>
-              {/* The kind's description goes behind the heading's mark. It used to sit under the
-                  heading, in the Add menu's tip, on the outline row, and in Preview: four copies. */}
+              {/* The kind's description goes behind the heading's help mark, and nowhere else, so it
+                  is said once. */}
               <Heading level={2} help={describe()?.description}>
                 {current().name}
               </Heading>

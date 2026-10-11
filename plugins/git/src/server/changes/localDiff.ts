@@ -1,8 +1,8 @@
 // Local diff source for uncommitted changes. Parses `git status --porcelain=v2` into unified patches
 // per file and scope, plus blob reads, all against a task's worktree. Patches carry only hunks, like
-// GitHub's per-file patch, so the client's diff.ts synth and gitdiff-parser path handle them
-// unchanged. Every git call uses execFile with an argument array, and repo-relative paths are
-// validated at this boundary: no `..` segments, no absolute paths.
+// GitHub's per-file patch, so `@acorn/diff-document` parses them the same way. Every git call uses
+// execFile with an argument array, and repo-relative paths are validated at this boundary: no `..`
+// segments, no absolute paths.
 
 import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
@@ -231,21 +231,20 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   return { ...parsed, upstreamId: upstreamId?.trim() || null, changes, operation: await operation }
 }
 
-// Everything before the first hunk header is git's file header. The client re-synthesizes its
-// own (client diff.ts synth), so this emits hunks-only, like GitHub's per-file patch.
+// Everything before the first hunk header is git's file header. The document parser synthesizes its
+// own, so this emits hunks only, like GitHub's per-file patch.
 export const stripToHunks = (patch: string): string => {
   const i = patch.indexOf('\n@@')
   if (patch.startsWith('@@')) return patch
   return i < 0 ? '' : patch.slice(i + 1)
 }
 
-// Git's default -U3 for both callers: the pane wants hunks with expandable gaps between them, and the
-// MCP tool wants them for the tokens. The pane used to ask for a huge -U to get a whole-file view,
-// which made every change harder to find, not easier.
-/** A path as a pathspec that matches only itself: `app/[slug]/page.tsx` is a file name, not a pattern
- *  that also matches `app/s/page.tsx`. */
+/** A path as a pathspec that matches only itself: a file named `[slug]` is a file name, not a pattern
+ *  that also matches a file named `s`. */
 export const literalPath = (path: string) => `:(literal)${path}`
 
+// Git's default -U3 for both callers: the pane wants hunks with expandable gaps between them, and the
+// MCP tool wants them for the tokens.
 export async function localDiff(worktree: string, path: string, scope: LocalScope): Promise<{ patch: string }> {
   if (!isValidRelPath(path)) throw new Error('Invalid path.')
   // Staged diffs read Git objects. Every disk-backed diff, including --no-index for untracked
@@ -280,7 +279,7 @@ export type GitActionResult = { ok: true } | { ok: false; reason: string }
 /** How long a git command that talks to a remote is given. Four times the local budget below,
  *  because the clock is somebody else's server and a slow fetch is not a wedged one. Nothing waits
  *  forever: `GIT_TERMINAL_PROMPT=0` in the git seam turns expired credentials into a fast failure
- *  rather than a blocked prompt (`packages/node-core/src/server/core/git.ts`). */
+ *  rather than a blocked prompt. */
 export const NETWORK_TIMEOUT_MS = 120_000
 
 const run = async (
@@ -346,10 +345,9 @@ export function unstageFiles(worktree: string, paths: readonly string[], size = 
 // Discard puts the file back the way HEAD has it. It is destructive, so the caller must confirm first.
 //
 // Both halves on purpose. `git restore -- path` alone only rewrites the worktree from the index, so a
-// file that was staged came straight back and the row never went away: discarding a newly added file
-// did nothing at all, because the index still held it. `--source=HEAD --staged --worktree` is the one
-// form that covers every row the pane can show — a staged add, a staged edit, an unstaged edit, a
-// deletion either way, and an unmerged file, which it resolves to our side.
+// staged file comes straight back and a newly added file is not discarded at all. `--source=HEAD
+// --staged --worktree` is the one form that covers every row the pane can show: a staged add, a staged
+// edit, an unstaged edit, a deletion either way, and an unmerged file, which it resolves to our side.
 //
 // A rename takes both names. Restoring only the new one leaves the old one deleted in the worktree,
 // which is half a discard and reads as a bug.
@@ -501,10 +499,9 @@ export const abortOperation = (
 
 /** The diff a commit would take, over the paths named, as one patch.
  *
- *  For the prompt behind the commit editor's wand (./commitMessage.ts), which splits the answer back
- *  apart per file. One call for the whole set rather than `localDiff` per path: the caller has
- *  already bounded which paths it wants, and a spawn per file over a hundred small files is a hundred
- *  spawns to build one prompt.
+ *  For the prompt behind the commit editor's wand, which splits the answer back apart per file. One
+ *  call for the whole set rather than `localDiff` per path: the caller has already bounded which
+ *  paths it wants, and a spawn per file is a hundred spawns to build one prompt.
  *
  *  Every path is validated here as everywhere else in this file, and an empty list answers an empty
  *  patch rather than running `git diff` with nothing after the `--`, which would diff the whole tree. */

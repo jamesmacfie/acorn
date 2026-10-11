@@ -1,6 +1,6 @@
-// Shared types for the find-in-files feature (docs/panes.md): the Search pane POSTs to the
+// Shared types for the find-in-files feature (docs/panes.md): the Search panel POSTs to the
 // searchRoute (server/routes/search.ts), whose SearchBridge (server/search.ts) runs ripgrep against
-// the task's worktree. Types live here so node + client stay in lockstep, like shared/terminal.ts.
+// the task's worktree. Types live here so node + client stay in lockstep.
 
 export type SearchOpts = {
   caseSensitive?: boolean

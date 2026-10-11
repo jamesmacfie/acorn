@@ -43,8 +43,7 @@ import { workflowApi } from './workflowsClient'
 //
 // The list is the workspace's definitions — the rows somebody typed here and the files their projects
 // committed, read as one — with its recent runs under them. The detail is the editor, addressed by the
-// URL, which is what makes a row press, a pasted link and the back button the same thing
-// (client-core registries/panes/projectSurfaces.ts).
+// URL, which is what makes a row press, a pasted link and the back button the same thing.
 
 const RECENT_RUNS = 20
 
@@ -86,8 +85,8 @@ function useScope() {
   return {
     projectId,
     // Back through `parseDefRef`, because the address escapes the `db:` separator and the rows are
-    // keyed by what `defRefKey` produced. `db%3Aabc` matches no row, which is why the list showed
-    // nothing selected while its editor was open.
+    // keyed by what `defRefKey` produced. `db%3Aabc` matches no row, so the list would show nothing
+    // selected while its editor is open.
     item: () => {
       const ref = parseDefRef(params.id)
       return ref ? defRefKey(ref) : params.id
@@ -102,7 +101,7 @@ function useScope() {
 export function WorkflowsBrowseList() {
   const words = createWorkspaceWords()
   // The same signal the source's list column reads, keyed by the source id, so rows and column
-  // narrow together (client-core kit/lib/layout/collapseState.ts).
+  // narrow together.
   const collapsed = sidebarCollapsed(WORKFLOWS_SOURCE_ID)
   const scope = useScope()
   const navigate = useNavigate()
@@ -119,8 +118,7 @@ export function WorkflowsBrowseList() {
     refetchInterval: 30_000,
   }))
 
-  // The node says when either moved. Both channels are this plugin's own; nothing else reads them yet
-  // and the rail list is the first consumer of `defs-changed` (../node/index.ts).
+  // The node says when either moved, on this plugin's own channels.
   createEffect(() => {
     const stopDefs = onPluginFrame('workflows', pluginChannel('workflows', 'defs-changed'), () => void refetchDefs())
     const stopPlugins = wsOnPluginsChanged(() => void refetchDefs())
@@ -180,7 +178,7 @@ export function WorkflowsBrowseList() {
 
   // The three ways into a definition: a mouse press on the row, and the collection's own select and
   // activate for the keyboard. All of them come here, because a `Row` in a `Rows` has no click of its
-  // own unless it is given one (client-core kit/components/layout/Row.tsx).
+  // own unless it is given one.
   const open = (key: string): void => {
     navigate(workflowsSurfacePath(scope.projectId(), key))
   }
@@ -414,7 +412,7 @@ export function WorkflowsBrowseList() {
         <Alert tone="warn">Couldn't load recent runs.</Alert>
       </Show>
       {/* The one mount for the start dialog: this region is on screen whenever the source is, and the
-          editor's Run button asks for it from the other half of the layout (./editor/StartDialog.tsx). */}
+          editor's Run button asks for it from the other half of the layout. */}
       <StartDialogHost />
       <ScheduleDialogHost />
     </Stack>
@@ -425,7 +423,7 @@ export function WorkflowsBrowseDetail() {
   const scope = useScope()
   return (
     // `keyed`, so moving to another definition is a fresh editor rather than the same one with the
-    // last draft's JSON still in its box (client-core § useParams).
+    // last draft's JSON still in its box.
     <Show
       when={scope.item()}
       keyed

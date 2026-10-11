@@ -75,7 +75,7 @@ function exportedFile(pkg: Pkg, subpath: string): string | null {
 }
 
 // Every import form, including side-effect `import '…'` and the vi.mock family: a mock path is a real
-// dependency edge, and missing them is how the database -> editor edge went undeclared.
+// dependency edge, and missing them lets an edge such as database -> editor go undeclared.
 //
 // It does not strip comments, and that is a sharp edge: a comment containing an import call becomes a
 // phantom edge and fails the resolver rule below. Stripping would mean parsing, and missing a real edge
@@ -187,7 +187,7 @@ function kitPurity(dir: string, { skipTests = false } = {}): { offences: string[
     if (file.endsWith('.css')) offences.push(`${rel(file)}: a stylesheet`)
     if (!file.endsWith('.tsx') || (skipTests && isTestCode(file))) continue
     scanned++
-    // Comments hold prose about the markup that used to be here, and prose is allowed to name a div.
+    // Comments may hold prose about markup, and prose is allowed to name a div.
     const code = readFileSync(file, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '')
@@ -207,7 +207,7 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   // to 'shared' and a renderer importing @acorn/plugin-api/node drags node code into the bundle with no
   // rule firing. Testkit files count as node unless their name marks a client-only seam.
   if (pkg.name === '@acorn/plugin-api') {
-    // Bare entrypoint files (`node.ts`, `client.ts`, `testkit.ts`) classify like the folders they replaced.
+    // Bare entrypoint files (`node.ts`, `client.ts`, `testkit.ts`) classify like the folders of the same name.
     const seg = segment(pkg, file).replace(/\.ts$/, '')
     if (seg === 'testkit') return file.endsWith('/client.ts') || file.endsWith('.client.ts') ? 'client' : 'node'
     return seg === 'node' ? 'node' : 'client'
@@ -215,7 +215,6 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
   // `entries` and `composition` are apps/node's two folders (docs/local-development.md).
-  // `main` was a side until it merged into `server` on 2026-08-30.
   if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
 }
@@ -339,9 +338,8 @@ describe('architecture boundaries', () => {
   })
 
   it('the renderer and the other client runtimes log through the logger, not console (shrinking baseline)', () => {
-    // The renderer's half of the same rule. Its 66 call sites moved on 2026-09-11, and a line
-    // written through `createLogger` reaches every sink and says who wrote it
-    // (docs/telemetry/logging.md § The rule).
+    // The renderer's half of the same rule. A line written through `createLogger` reaches every sink
+    // and says who wrote it (docs/telemetry/logging.md § The rule).
     //
     // The terminal client is scanned with it, because it runs client-core in process and writes
     // through the same logger. The desktop helper and `packages/custody` are the other rule's,
@@ -390,16 +388,12 @@ describe('architecture boundaries', () => {
   it('the node logs through the logger, not console (shrinking baseline)', () => {
     // A log line written through `console.error` carries nothing but the prefix the author typed:
     // no owner, no scrubbing, and no way for a sink to see it. `createLogger` gives all three
-    // (docs/telemetry/logging.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
-    // keeps them moved; the renderer and the other runtimes follow in phases 1 and 3.
+    // (docs/telemetry/logging.md § Logging).
     //
     // A source scan and not a graph edge: `console` is a global, so there is no import to trace.
     // Comments are stripped, or the logger's own comments about `console.error` would fail it.
-    // Tests are exempt: thirty-one of them spy on `console.warn` and `console.error`, which is
-    // exactly how the logger's output is asserted.
-    //
-    // The node's own 81 sites moved on 2026-09-10; the helper's and the custody stack's 25 followed
-    // in phase 3.
+    // Tests are exempt: many of them spy on `console.warn` and `console.error`, which is exactly how
+    // the logger's output is asserted.
     const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
     const callsConsole = (source: string): boolean =>
       CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
@@ -428,7 +422,7 @@ describe('architecture boundaries', () => {
         .map(rel)
         .sort(),
     ).toEqual([...CONSOLE_BASELINE].sort())
-    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
+    // Anti-vacuity: the predicate must still recognise the forms it exists to catch.
     expect(callsConsole('console.warn(`[hooks] ${id} failed:`, error)')).toBe(true)
     expect(callsConsole("if (x) console.log('hi')")).toBe(true)
     expect(callsConsole('console\n  .error(x)')).toBe(true)
@@ -446,9 +440,8 @@ describe('architecture boundaries', () => {
     // `createLogger(tag, '<plugin id>')` from `@acorn/plugin-api` where one is not: a module-level
     // engine, a route factory, a driver (docs/plugin-authoring/telemetry.md § Telemetry and logging).
     //
-    // The baseline is empty and stays empty. Thirteen sites moved on 2026-09-11, and the arguments
-    // the other two rules make for their entries, that stdout is a wire, that the file is the
-    // logger, that `kit/` may import nothing, are true of no file under `plugins/`.
+    // The baseline is empty and stays empty. The arguments the other two rules make for their entries, that stdout is a
+    // wire, that the file is the logger, that `kit/` may import nothing, are true of no file under `plugins/`.
     const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
     const callsConsole = (source: string): boolean =>
       CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
@@ -463,8 +456,7 @@ describe('architecture boundaries', () => {
         .map(rel)
         .sort(),
     ).toEqual([])
-    // Anti-vacuity: a field named `console` is not a call, and used to be three lines in browser's
-    // driver that the predicate must keep ignoring.
+    // Anti-vacuity: a field named `console` is not a call, and the predicate must keep ignoring it.
     expect(callsConsole('session.console.push(text)')).toBe(false)
     expect(callsConsole("console.warn('[github] pruned 3 rows')")).toBe(true)
   })
@@ -507,8 +499,8 @@ describe('architecture boundaries', () => {
   it('a tree reaches the host through the bridge it was mounted with, never connect()', () => {
     // In a tree worker, `connect()` resolves to the bundle's shared port, and the host refuses every
     // request on it from a bundle whose SDK hands each tree its own bridge (host/tree/workerHost.ts).
-    // The database and API panes both shipped that way and showed "this bridge is not bound to a
-    // mounted tree" on open. Their tests mocked the client module, so only a static rule sees it.
+    // A pane that does shows "this bridge is not bound to a mounted tree" on open, and a test that mocks
+    // the client module can't see it, so only a static rule does.
     const offences: string[] = []
     let scanned = 0
     for (const plugin of readdirSync(join(ROOT, 'plugins'))) {
@@ -528,19 +520,13 @@ describe('architecture boundaries', () => {
 
   it('a compiled plugin pane writes no DOM either', () => {
     // Same rule, other tier. A compiled pane runs in the shell's process and could reach for a `<form>`
-    // or a `class` and have it work today, which is how seven files of raw DOM accumulated behind a
-    // convention. It works only on a host that draws to a document: a terminal client draws the same
-    // panes to cells and can see the kit nodes, not the markup between them.
+    // or a `class` and have it work, but only on a host that draws to a document: a terminal client
+    // draws the same panes to cells and can see the kit nodes, not the markup between them.
     //
-    // The baseline is empty, and stays empty. It was seven files on 2026-08-31 — the agents context
-    // picker and its two settings forms, the pricing tables, the composer's hidden file input and the
-    // two download anchors, the github ref links, the editor pane's Monaco root and the preview pane's
-    // — and the before-terminal-ui programme emptied it phase by phase, which is why this rule could
-    // land in its endgame shape. An exception costs a line here and a comment saying why it survived.
-    //
-    // The editor's image preview is the one exception. The kit has no image node, so it draws an
-    // `<img>` with inline sizing, and a terminal client sees nothing there. An `Image` kit node with a
-    // text projection on the terminal would empty this again.
+    // An exception costs a line here and a comment saying why it survives. The editor's image preview
+    // is the one exception. The kit has no image node, so it draws an `<img>` with inline sizing, and a
+    // terminal client sees nothing there. An `Image` kit node with a text projection on the terminal
+    // would empty this.
     const CLIENT_DOM_BASELINE: string[] = [
       'plugins/editor/src/client/ImagePreview.tsx: a class, a style or an innerHTML',
       'plugins/editor/src/client/ImagePreview.tsx: a raw element',
@@ -593,8 +579,7 @@ describe('architecture boundaries', () => {
 
   it('the testkit is imported only by tests', () => {
     // Keeps a production file from importing test scaffolding, which is how a tmp-dir SQLite factory
-    // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
-    // same shape in plugins/github.
+    // ends up shipped. Any package's testkit/, not just node-core's.
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
     // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
     // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
@@ -607,9 +592,8 @@ describe('architecture boundaries', () => {
   })
 
   it('plugins broadcast through the plugin context (shrinking baseline)', () => {
-    // Plugins used to deep-import the hub and the notifier directly because NodePluginContext had no
-    // `events` member. Keep this ratchet empty: a new direct import is a regression, not an item to
-    // append here.
+    // Plugins reach the hub and the notifier through `ctx.events`, never a direct import. Keep this
+    // ratchet empty: a new direct import is a regression, not an item to append here.
     const BROADCAST_BASELINE: string[] = []
     const HUB = ['@acorn/node-core/server/transport/wsHub.ts', '@acorn/node-core/server/notify.ts']
     const offenders = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !e.isTest)
@@ -619,8 +603,7 @@ describe('architecture boundaries', () => {
   })
 
   it('every plugin package declares an explicit exports map', () => {
-    // This rule replaced "apps reach plugins through entrypoints or contract/", which was a shrinking
-    // baseline at zero. The module system enforces that now: a plugin's `exports` map names four
+    // The module system keeps apps out of a plugin's internals: a plugin's `exports` map names four
     // kinds of subpath and nothing else, so a deep import is a `tsc` error at the import site rather
     // than a test failure somewhere else in the repo.
     //
@@ -642,9 +625,9 @@ describe('architecture boundaries', () => {
         continue
       }
       for (const [subpath, target] of Object.entries(exports)) {
-        // `linear` and `rollbar` each declare `./server/index.ts` on top of the four kinds, because a
-        // `vi.mock` has to name the module the code under test imports and both plugins' routes
-        // import their own `../index` relatively. Their testkits record it; nothing else may.
+        // `linear` and `rollbar` each declare their server index as a subpath on top of the four kinds, because a
+        // `vi.mock` has to name the module the code under test imports and both plugins' routes import their own
+        // `../index` relatively. Their testkits record it; nothing else may.
         const extra =
           subpath === './server/index.ts' && ['@acorn/plugin-linear', '@acorn/plugin-rollbar'].includes(pkg.name)
         if (!KINDS.test(subpath) && !extra)
@@ -662,32 +645,17 @@ describe('architecture boundaries', () => {
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
       '@acorn/protocol': 84, // Includes the static dependency policy capability, the secret check contracts, and the plugin_authoring point list.
-      // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
-      // the kit/lib barrel here would pull renderer-only modules into those consumers. Three more on
-      // 2026-09-29 for the settings pages split out of Security, Appearance and Plugins, each its own
-      // lazy chunk behind its own rail row. One more for `kit/lib/savedSignal`, the Saved timer both
-      // hosts' SettingRow share, which the terminal kit cannot take from the renderer-only barrel.
-      // One more for a project's own settings page, a lazy chunk the desktop registers like the others.
-      // One more for Rail and surfaces, split off the plugin list on 2026-09-30. One more when Integrations
-      // split into Services and AI models the same day. One more for the shared model picker popover
-      // (settings/models/ModelPickerPopover.tsx), merged in from main the same day. One more for
-      // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
-      // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
-      // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
-      // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
-      // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
-      // The address parser is a pure leaf for the terminal before its renderer host connects.
-      // Two more on 2026-10-09: `host/tree/arbitration.ts`, so `slotFills` on the plugin API's client
-      // barrel doesn't load the tree host, and `ContributionBoundary.tsx`, for the desktop's lazy
-      // promotion modal (docs/frontend/startup-budget.md).
-      // Phase 05 of the git-pane work exposes a lean task launch signal and lazy draft model to both hosts.
-      // Two more on 2026-10-10 for link previews: `host/linkPreview/linkPreview.ts`, the JSX-free state
-      // both hosts import, and `LinkPreviewHost.tsx`, the desktop's popover, which the terminal can't load.
-      // One more on 2026-10-10 for rail status: `host/annotations/statusAnnotations.ts`, which the
-      // terminal imports directly because the annotations barrel carries the DOM's AnnotationMarks.
+      // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
+      // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
+      // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
+      // parser. JSX-free state both hosts import: `host/tree/arbitration`, so `slotFills` doesn't load the
+      // tree host, `host/linkPreview/linkPreview`, `host/annotations/statusAnnotations`, and the git pane's
+      // task launch signal and draft model. Lazy chunks the desktop registers on their own: each settings
+      // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
+      // `LinkPreviewHost` (docs/frontend/startup-budget.md).
       '@acorn/client-core': 183, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
-      // One more on 2026-10-11 for `mcp/fileGuard.ts`, the read block's file guard, a build entry like
-      // `mcp/loopHook.ts` (docs/managed-agents/read-block.md).
+      // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
+      // (docs/managed-agents/read-block.md).
       '@acorn/node-core': 66,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
@@ -793,7 +761,7 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
-    // The routes are gone, but a plugin's types can still accumulate here. Each survivor has a reason:
+    // A plugin's types can accumulate here. Each survivor has a reason:
     const PLUGIN_NAMED_BASELINE = [
       // `NoteLocation` addresses a task, workspace or global scope, which is core's own scheme.
       'notes.ts',
@@ -894,8 +862,8 @@ describe('architecture boundaries', () => {
       // Where a task's terminals live is a node question, asked of the roster
       // (infra/node/hostCapabilities.ts). Sanctioned permanently: "does this host have that plugin"
       // is the host's own question, and the probe is what lets a compiled plugin's absence degrade
-      // cleanly rather than crash. What moved out of core on 2026-08-31 is each decision that used
-      // the answer, not the asking.
+      // cleanly rather than crash. What stays out of core is each decision that uses the answer, not
+      // the asking.
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the
       // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
@@ -911,7 +879,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
       ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
       ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
-      // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a
+      // Shared by both hosts so the terminal lists the same pages. Search words name the services a
       // Services page lists, which is text a person types, not a branch on a plugin.
       [
         'packages/client-core/src/features/settings/corePages.ts',
@@ -919,9 +887,8 @@ describe('architecture boundaries', () => {
       ],
     ])
 
-    // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the
-    // reasoning about why a name moved does. A `//` inside a multi-line template literal truncates
-    // early, which can only hide a match, never invent one.
+    // A `//` outside a string starts a comment. Prose is allowed to name a plugin. A `//` inside a multi-line template
+    // literal truncates early, which can only hide a match, never invent one.
     const codeOnly = (source: string): string =>
       source
         .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -978,7 +945,7 @@ describe('architecture boundaries', () => {
     expect([...NAMES_A_PLUGIN_OK.keys()].filter((path) => !matched.has(path)).sort()).toEqual([])
 
     // Anti-vacuity: the walk covers core, the matcher finds a name in code, and does not find one in
-    // the prose explaining where that name went.
+    // the prose around it.
     expect(scanned).toBeGreaterThan(300)
     expect(namesAPlugin("const x = 'linear'")).toEqual(['linear'])
     expect(namesGitPlugin("import x from '@acorn/plugin-git/client/index.ts'")).toBe(true)
@@ -1030,8 +997,8 @@ describe('architecture boundaries', () => {
     const naming = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))]
     expect(naming.map(rel).sort()).toEqual([])
     // Any call whose sole argument is the string, which covers
-    // `createRequire(import.meta.url)('electron')`. Comments are stripped so prose about the deleted
-    // shell is not a failure.
+    // `createRequire(import.meta.url)('electron')`. Comments are stripped so prose about Electron
+    // is not a failure.
     const LAZY_REQUIRE = /\(\s*['"]electron['"]\s*\)/
     const withoutComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     const files = PACKAGES.flatMap((p) => walk(p.src))
@@ -1096,11 +1063,11 @@ describe('architecture boundaries', () => {
     const files = PACKAGES.flatMap((p) => walk(p.src))
       .filter((f) => !isTestCode(f) && !f.startsWith(SEAM))
       .filter((f) => readsHostGlobal(readFileSync(f, 'utf8')))
-    // Baseline, not an allowlist: entries may only be removed. Empty since the seam landed. If the seam
+    // Baseline, not an allowlist: entries may only be removed. If the seam
     // doesn't carry what you need, widen the seam.
     const PLATFORM_BASELINE: string[] = []
     expect(files.map(rel).sort()).toEqual(PLATFORM_BASELINE)
-    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
+    // Anti-vacuity: the predicate must still recognise the forms it exists to catch.
     expect(readsHostGlobal('const off = window.acorn?.onClosePane?.(cb)')).toBe(true)
     expect(readsHostGlobal('window.acorn?.preview?.evict(taskId)')).toBe(true)
     expect(readsHostGlobal('if (!window.acorn?.terminal) return null')).toBe(true)
@@ -1139,7 +1106,7 @@ describe('architecture boundaries', () => {
     // `apps/tui/src/keys/` is the keyboard's: five levels, one settle pass, and no idea which region
     // is the rail (docs/tui/focus.md § Focus regions). Everything the shell knows about its own
     // arrangement arrives through `setTopology` and `setPaneCycler`, installed from `chrome/Shell.tsx`.
-    // An import the other way is how `moveBack` came to find Browse by spelling its id.
+    // An import the other way lets a key module find a region by spelling its id.
     const reaching = EDGES.filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
       .filter((e) => /\/src\/keys\//.test(e.fromFile))
       .filter((e) => e.target.pkg?.name === '@acorn/tui')
@@ -1188,7 +1155,7 @@ describe('architecture boundaries', () => {
     // module, or that entrypoint stops loading from a plugin's node-environment suite.
     //
     // A direct-specifier grep for a transitive property, so it's incomplete: `/client` reaches
-    // client-core/host/registries/keybindings in two hops, and `.tsx` isn't the only way to lose node-safety
+    // client-core's keybindings registry in two hops, and `.tsx` isn't the only way to lose node-safety
     // — a dependency that reads `window` at module scope does it from a plain `.ts` too.
     // packages/plugin-api/src/entrypoints.test.ts is what actually knows; this stays because it's
     // instant and names the offending specifier.
@@ -1339,8 +1306,8 @@ describe('architecture boundaries', () => {
     // docs/command-palette-and-shortcuts.md. Registration, availability, the
     // execution context and the graph projection are what the desktop and the terminal share; the
     // rectangle each of them draws is not. One import of a component from this folder and the other
-    // host can no longer use it, so the session stops being host-neutral and each renderer goes back
-    // to owning its own transitions, which is the duplication this programme exists to remove.
+    // host can't use it, so the session stops being host-neutral and each renderer goes back to owning
+    // its own transitions.
     //
     // Two destinations, and a component is either. A component in this repo is a `.tsx` file
     // (docs/conventions.md § Files); `host/palette/` is a renderer's own controller even where a file
@@ -1358,9 +1325,8 @@ describe('architecture boundaries', () => {
 
   // ── The palette is one session, and every row in it is a command ────────────────────────────────
   //
-  // Five properties, from the cutover that removed the second row vocabulary on 2026-09-03
-  // (docs/command-palette-and-shortcuts.md). Each one was true of the code before it was written
-  // down; what these stop is the drift back, which is cheap and quiet in every direction.
+  // Five properties (docs/command-palette-and-shortcuts.md). What these stop is drift, which is cheap
+  // and quiet in every direction.
 
   const SESSION = 'packages/client-core/src/host/registries/commands/sessionStore.ts'
   // Each host in two files: the one that builds the session and captures the identity, and the one
@@ -1372,9 +1338,8 @@ describe('architecture boundaries', () => {
   const HOST_RENDERERS = ['packages/client-core/src/host/palette/CommandPalette.tsx', 'apps/tui/src/chrome/Palette.tsx']
 
   it('has exactly one palette session, and both hosts render that one', () => {
-    // The duplication this whole programme existed to remove: two hosts each owning the query, the
-    // order, the cursor and the invocation, so a nested or asynchronous command had to be built twice
-    // or built once and be missing from the other product.
+    // Two hosts each owning the query, the order, the cursor and the invocation would mean a nested or
+    // asynchronous command has to be built twice, or is built once and missing from the other product.
     // The three source trees a session could plausibly be written in, rather than `apps/` whole: that
     // one holds the desktop's worktree checkouts, which are other copies of this repository.
     const defining = ['packages/client-core/src', 'apps/tui/src', 'apps/desktop/src']
@@ -1400,8 +1365,8 @@ describe('architecture boundaries', () => {
 
   it('leaves the hosts nothing to compose, fetch or invoke', () => {
     // A renderer draws `rows()`, marks `selectedIndex()` and calls `activate()`. The moment one of
-    // them fetches a row or runs a command itself the two products can differ again, and the way that
-    // happened before was never a decision — it was one host needing one more row than the other.
+    // them fetches a row or runs a command itself the two products can differ, and that happens without
+    // anyone deciding it, when one host needs one more row than the other.
     const FORBIDDEN: [RegExp, string][] = [
       [/\bcreateResource\b/, 'fetches rows itself'],
       [/\bfetch\(/, 'fetches rows itself'],
@@ -1413,7 +1378,7 @@ describe('architecture boundaries', () => {
     const offences: string[] = []
     for (const host of [...HOST_ADAPTERS, ...HOST_RENDERERS]) {
       const text = readFileSync(join(ROOT, host), 'utf8')
-      // Comments say what these files used to do, and saying so is the point of them.
+      // Comments are stripped, because prose may name what the rule forbids.
       const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
       for (const [pattern, why] of FORBIDDEN) if (pattern.test(code)) offences.push(`${host}: ${why}`)
       // A renderer may not even reach the registry. An adapter may: `paletteView.ts` registers the
@@ -1457,17 +1422,16 @@ describe('architecture boundaries', () => {
   })
 
   it('keeps no palette-row registry beside the command one', () => {
-    // The second contribution vocabulary. It had `rows` and `invoke` and no owner, no capability gate,
-    // no disposal and no shortcut, so each of those was arranged for it separately — and only a
-    // compiled plugin could supply its callbacks, which is why a loaded plugin could never contribute a
-    // live row at all. Its last two contributors became `search` commands on 2026-09-03.
+    // A second contribution vocabulary, with `rows` and `invoke`, would have no owner, no capability
+    // gate, no disposal and no shortcut, so each would need arranging separately, and only a compiled
+    // plugin could supply its callbacks. A plugin that wants live rows contributes a `search` command.
     const registries = join(ROOT, 'packages/client-core/src/host/registries')
     const offenders = walk(registries)
       .filter((file) => /palette/i.test(rel(file)))
       .map(rel)
     expect(offenders).toEqual([])
 
-    // And nothing hands the session a row source. `providers` was the option that carried them.
+    // And nothing hands the session a row source.
     const session = readFileSync(join(ROOT, SESSION), 'utf8')
     expect(session).not.toMatch(/SessionRowProvider/)
   })
@@ -1496,9 +1460,8 @@ describe('architecture boundaries', () => {
     // imports through these framework-free SDK modules and the protocol leaves they use. Keep external
     // runtime dependencies out of that closure.
     //
-    // The failure this catches happened on the first day of the tree path: `mountTree` wanted a
-    // protocol constant and took it from the module beside the Zod schemas, which put the whole of Zod
-    // into every plugin's bundle and grew the published file sixfold. The vite config says so in a
+    // The failure this catches: an SDK module taking a protocol constant from the module beside the
+    // Zod schemas puts the whole of Zod into every plugin's bundle. The vite config says so in a
     // comment; a comment is not a check.
     //
     // Value imports and re-exports. An `import type` or `export type` is erased, which lets the SDK
@@ -1546,7 +1509,7 @@ describe('architecture boundaries', () => {
 
   it('a plugin contract/ never re-exports its own internals', () => {
     // A contract file must not smuggle the internals back in. Transitively, not just the direct edge:
-    // `contract/x.ts -> shared/y.ts -> server/heavy.ts` reaches the implementation in one extra hop, and
+    // `contract/x -> shared/y -> server/heavy` reaches the implementation in one extra hop, and
     // `side()` classifies `shared` as 'shared', so no other rule stops it.
     const internal = (pkg: Pkg, file: string) => ['client', 'server'].includes(segment(pkg, file))
     const withinPkg = new Map<string, { file: string; spec: string }[]>()
@@ -1581,7 +1544,7 @@ describe('architecture boundaries', () => {
     // Any import from core's db module that isn't exclusively type-only.
     //
     // `[^'"]*?` for the clause, not `[^;]*?`. A clause never contains a quote but a preceding import's
-    // specifier does, so in semicolon-free source the lazy match spanned two statements.
+    // specifier does, so in semicolon-free source the lazy match would span two statements.
     const DB_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]@acorn\/node-core\/server\/db[^'"]*['"]/g
     const importsCoreTables = (text: string): boolean => {
       DB_IMPORT_RE.lastIndex = 0
@@ -1608,11 +1571,10 @@ describe('architecture boundaries', () => {
   })
 
   it('a contribution props type never names a member `ref`', () => {
-    // Solid rewrites `ref={value}` on a component into a `ref(r$)` call, so a contribution whose props
-    // declare `ref` as data receives a function instead. That shipped: a Linear reference panel opened
-    // with a blank title over an empty frame, and TypeScript can't see it because `ref` lives on
-    // `IntrinsicAttributes`. A callback `ref` is the legitimate form, so that's what the rule allows.
-    // Scoped to registries/, where the props types that cross a registry call site are declared.
+    // Solid rewrites `ref={value}` on a component into a `ref(r$)` call, so a contribution whose props declare `ref` as
+    // data receives a function instead: a reference panel opens with a blank title over an empty frame, and TypeScript
+    // can't see it because `ref` lives on `IntrinsicAttributes`. A callback `ref` is the legitimate form, so that's
+    // what the rule allows. Scoped to registries/, where the props types that cross a registry call site are declared.
     const dir = join(ROOT, 'packages/client-core/src/host/registries')
     const files = walk(dir).filter((f) => !isTestCode(f))
     // `(el) => void` and `((el) => void) | undefined` are both fine; a type is not.
@@ -1663,16 +1625,10 @@ describe('architecture boundaries', () => {
     expect([...new Set(seen)].sort()).toEqual([])
   })
 
-  // A CSS class defined in a plugin's stylesheet must not be worn by markup outside that plugin.
-  //
-  // This kept happening: `.linear-md` worn by notes and defined by github, `.editor-save` worn by notes
-  // and defined by editor, `.new-pr-btn` worn by docker and defined by github, `.file-status*` worn by
-  // core's diff rows and defined by github. Each meant a pane silently lost its styling when an
-  // unrelated plugin was switched off, invisible to the compiler.
   it('a request body is parsed, not cast', () => {
     // docs/architecture/packages.md § Package boundaries: a mutation route parses its body with a Zod
-    // schema. The rule the review found drifted was written down and nowhere enforced, so ten route
-    // files had gone back to `as { field?: string }`, which type-checks and validates nothing.
+    // schema. Without a check, route files drift back to `as { field?: string }`, which type-checks and
+    // validates nothing.
     //
     // File-level, not call-level: a route file that parses one body and casts another is rare, and
     // matching a `safeParse` to the `c.req.json()` it belongs to means parsing rather than grepping.
@@ -1715,20 +1671,16 @@ describe('architecture boundaries', () => {
   })
 
   it('no plugin ships a stylesheet, and none mounts its own root', () => {
-    // The permanent form of two rules phase 9 of the layout programme could finally state.
-    //
-    // The old rule here was narrower — a plugin's stylesheet must not style another package's markup —
-    // because plugins had stylesheets and the question was only whose markup they reached. They have
-    // none now: a plugin draws kit nodes, which carry no `class` and no `style`, and the appearance a
-    // reader chose reaches a plugin because the host draws it. A plugin with a stylesheet is a plugin
-    // that has written an element to hang it on, and `ui/adoption.test.ts` refuses that separately.
+    // A plugin draws kit nodes, which carry no `class` and no `style`, and the appearance a reader chose
+    // reaches a plugin because the host draws it. A plugin with a stylesheet is a plugin that has written
+    // an element to hang it on, and primitiveAdoption.test.ts refuses that separately.
     //
     // The second half is the render path. A tree is mounted by the host, or by `mountTree` for a bundle
     // in a worker. A plugin calling Solid's `render` has made a root nothing knows about: outside every
     // focus group, reachable by no intent, wrapped in no contribution boundary, and impossible to move
     // to a worker later.
-    // `walk` yields only JS and TS, so a stylesheet scan built on it would pass unconditionally — the
-    // trap the rule this replaced fell into first. Its own reader, over the plugin source trees only,
+    // `walk` yields only JS and TS, so a stylesheet scan built on it would pass unconditionally. Its own
+    // reader, over the plugin source trees only,
     // so a dependency's stylesheet under node_modules is not mistaken for a plugin's own.
     const filesIn = (dir: string, out: string[] = []): string[] => {
       if (!existsSync(dir)) return out
@@ -1809,11 +1761,9 @@ describe('architecture boundaries', () => {
   })
 
   it('no folder is named main, service, or wiring', () => {
-    // `main/` meant "the Electron main process". Electron is gone, and while the word survived it was
-    // arbitrary which of `main/` or `server/` a module landed in: agentTools.ts sat under both in
-    // different plugins. `service/` and `wiring/` were the same kind of non-word. They are retired
-    // (docs/conventions.md § Folders), and this is what keeps them retired — including nested, so
-    // `server/main/` cannot bring the word back one level down.
+    // `main/`, `service/` and `wiring/` say nothing about where code runs, so a module's choice between
+    // one of them and `server/` is arbitrary. They are retired (docs/conventions.md § Folders), and this
+    // keeps them retired, including nested, so `server/main/` cannot bring the word back one level down.
     const RETIRED = ['main', 'service', 'wiring']
     const dirs = (dir: string, out: string[] = []): string[] => {
       if (!existsSync(dir)) return out

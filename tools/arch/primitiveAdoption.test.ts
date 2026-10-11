@@ -3,8 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Primitive adoption ledger. See docs/ui-design/closed-kit.md § The closed kit for why this
-// exists and how the list grew.
+// Primitive adoption rules. See docs/ui-design/closed-kit.md § The closed kit for why this
+// exists.
 
 // Anchored on the workspace root rather than a fixed hop to a src/ dir, because renderer code is
 // spread across several packages and a relative hop breaks on every move. Ledger entries below are
@@ -165,8 +165,8 @@ describe('primitive adoption', () => {
   })
 
   // `.ui-check` lays the box beside its label with no `flex-direction` of its own, so a caller class
-  // that says `column` wins on cascade order and stacks the label under the box. Docker and Terminal
-  // both passed `.settings-field` and got that. CSS_CLASH above only reads the `.ui-x[data-…]` rules,
+  // that says `column`, such as `.settings-field`, wins on cascade order and stacks the label under the
+  // box. CSS_CLASH above only reads the `.ui-x[data-…]` rules,
   // so it cannot see this one.
   it('no class handed to a Checkbox stacks the box above its label', () => {
     const columnClasses = new Set<string>()
@@ -195,10 +195,9 @@ describe('primitive adoption', () => {
 
   // ── The invariants, inverted ────────────────────────────────────────────────────────────────
   //
-  // This file was a ledger: a growing list of files someone had converted, each checked for raw
-  // controls. Phase 9 of the layout programme finished the conversion, so the list is gone and the
-  // rules below hold for everything. A ledger only ever answers "has this file been done"; a rule
-  // answers "can this be written at all", which is the question that stays useful.
+  // Rules that hold for every plugin component, rather than a ledger of converted files. A ledger only
+  // ever answers "has this file been done"; a rule answers "can this be written at all", which is the
+  // question that stays useful.
 
   // A plugin's own components, which is what these rules are about. Test files are excluded: a
   // `.test.tsx` in a plugin package renders a region under jsdom and stubs its neighbours
@@ -210,10 +209,10 @@ describe('primitive adoption', () => {
     // Anti-vacuity first: this rule reads a file list, and a list that came back empty — a renamed
     // directory, a changed `rel` — would make every assertion below pass by finding nothing.
     expect(pluginTsx().length).toBeGreaterThan(50)
-    // The one that took the whole programme. A plugin's tree is kit nodes: `Stack` and `Inline` for
-    // grouping, `Text` for a run of words, `Rectangle` for pixels somebody else owns. A raw element is
-    // how a plugin used to reach a class in the host's stylesheet, and it is the one thing that cannot
-    // cross to a worker — so a plugin that emits one has written something a loaded plugin could not.
+    // A plugin's tree is kit nodes: `Stack` and `Inline` for grouping, `Text` for a run of words,
+    // `Rectangle` for pixels somebody else owns. A raw element is how a plugin would reach a class in
+    // the host's stylesheet, and it is the one thing that cannot cross to a worker — so a plugin that
+    // emits one has written something a loaded plugin could not.
     //
     // `div` and `span` only. A `section`, a `table` or an `input` inside a host component is markup
     // with meaning; a div is markup with a class.

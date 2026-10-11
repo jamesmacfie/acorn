@@ -55,7 +55,6 @@ const bounded = (value: string | null | undefined): string | null => {
   return value.length <= SUMMARY_LIMIT ? value : `${value.slice(0, SUMMARY_LIMIT - 3)}...`
 }
 
-/** Coordinates a dispatch step without occupying an agent execution slot. */
 /** An agent item's goal in brief, for the parent's summary. Absent when the item had none. */
 function itemGoal(steps: readonly WorkflowStepRow[]): Pick<WorkflowChildRunSummary, 'goal'> {
   const raw = steps.find((step) => step.goalJson)?.goalJson
@@ -70,6 +69,7 @@ function itemGoal(steps: readonly WorkflowStepRow[]): Pick<WorkflowChildRunSumma
   }
 }
 
+/** Coordinates a dispatch step without occupying an agent execution slot. */
 export class WorkflowChildLifecycle {
   readonly #waiters = new Map<string, Set<() => void>>()
 

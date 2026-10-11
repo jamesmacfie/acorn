@@ -42,15 +42,14 @@ export type NodePlugin = {
 
 /** Everything the host hands a loaded plugin, and nothing it does not.
  *
- * This is the loaded tier's projection. A compiled plugin's context has six more members —
- * `routes.register`, `tools`, `contextSections`, `events.channel` and
- * `events.streams` — each either a live object that cannot survive a message-passing boundary or a
- * live object that cannot survive the message-passing boundary. Agent tools and context sections
- * have manifest descriptor types above; they deliberately do not become live `ctx` registries.
+ * This is the loaded tier's projection. A compiled plugin's context adds members such as
+ * `routes.register`, `tools`, `contextSections`, `events.channel` and `events.streams`, each a live
+ * object that cannot survive the message-passing boundary a loaded plugin sits behind. Agent tools and
+ * context sections have manifest descriptor types instead; they deliberately do not become live `ctx`
+ * registries.
  *
- * The host's own declaration of this type is
- * `packages/node-core/src/server/pluginHost/types.ts § NodePluginContext`, and a test holds the two
- * equal member for member, so this file cannot quietly fall behind.
+ * A test holds this type equal, member for member, to the host's own `NodePluginContext`, so this file
+ * cannot quietly fall behind.
  *
  * A facet under `core` is present only if the manifest asked for it. Reaching for one it did not
  * declare is an immediate "not a function", which is the intended failure. */

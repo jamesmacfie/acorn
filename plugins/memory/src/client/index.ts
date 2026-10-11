@@ -5,7 +5,7 @@ import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 
 // Two lazy chunks off one module, because a terminal draws the list and the detail in two panels
-// (client-core registries/sources.ts § regions).
+// (the `regions` of a source in client-core's sources registry).
 const MemoryList = lazy(() => import('./MemoryCenter').then((module) => ({ default: module.MemoryList })))
 const MemoryCenterDetail = lazy(() =>
   import('./MemoryCenter').then((module) => ({ default: module.MemoryCenterDetail })),

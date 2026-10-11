@@ -18,23 +18,18 @@ import { terminalApi } from './terminalClient'
 import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 
 // The three things this plugin knows about the open task: what it can run, how it can be laid out, and
-// which terminals are alive in it (docs/terminal/run-targets.md § From the command palette).
-//
-// These were a `paletteRows` source until 2026-09-03 — a second contribution vocabulary with `rows` and
-// `invoke`, fetched when the palette opened whatever the reader was after, and merged into the root
-// beside the commands. They are ordinary `search` commands now, so the root shows three named rows
-// instead of one row per target, layout and session, and the fetch happens when a frame is entered
+// which terminals are alive in it (docs/terminal/run-targets.md § From the command palette). Each is a
+// `search` command, so the root shows three named rows and the fetch happens when a frame is entered
 // rather than on every ⌘K.
 //
 // **Load once, filter here.** The rows are one read of the task's repo configuration and one signal
 // this window already holds, so there is nothing for a debounce to wait for: `localSearch` fetches
-// when the frame opens and fuzzy-filters locally after that
-// (client-core/host/registries/commands/localSearch.ts). A configuration edit shows up the next time a
-// frame is entered, which is what the palette did before.
+// when the frame opens and fuzzy-filters locally after that. A configuration edit shows up the next
+// time a frame is entered.
 //
-// **What the shell and agents keep.** The drawer toggle and the plain shell are the shell's
-// (apps/desktop/src/client/TaskView.tsx), and a terminal running a harness CLI is that harness's
-// (plugins/agents/src/client/terminalProfileCommands.ts). Neither is repeated here: two rows saying one
+// **What the shell and agents keep.** The drawer toggle and the plain shell are the shell's (the
+// desktop `TaskView`), and a terminal running a harness CLI is that harness's (the agents plugin's
+// terminal profile commands). Neither is repeated here: two rows saying one
 // thing is one too many, and cross-owner parenting is refused anyway
 // (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
@@ -46,8 +41,7 @@ export const TERMINAL_GROUP = 'terminal.run'
  *
  *  Keyed on the captured execution context, which is one object per open palette. So `select` decides
  *  against the very fetch its row was drawn from, and a row from a session over another task cannot
- *  reach this map at all. The old source held one `lastTargets` and compared task ids on the way in,
- *  which is the same guard written after the fact rather than into the shape. */
+ *  reach this map at all. */
 type Snapshot = {
   targets: { id: string; command: string; running: boolean }[]
   layouts: RecipeSpec[]
@@ -62,8 +56,7 @@ const readSnapshot = (context: CommandExecutionContext): Promise<Snapshot> => {
   const pending = (async (): Promise<Snapshot> => {
     const result = await runApi.targets(context.taskId ?? '')
     // The read itself failed — untrusted repo config, a node that will not answer. Thrown rather than
-    // swallowed: the old source answered with no rows at all, so a reader saw an empty list and no
-    // reason for it.
+    // swallowed, so a reader sees the reason instead of an empty list.
     if (!('targets' in result)) throw new Error(result.error)
     return {
       targets: result.targets.map((target) => ({ id: target.id, command: target.command, running: target.running })),
@@ -80,8 +73,7 @@ const readSnapshot = (context: CommandExecutionContext): Promise<Snapshot> => {
 /**
  * A parse error from `.acorn/config.toml`, as a row.
  *
- * The flat palette floated every source's errors to the top of the whole list, because an error
- * explains why a row somebody expected is missing. A frame has no separate error channel for a compiled
+ * An error explains why a row somebody expected is missing. A frame has no separate error channel for a compiled
  * provider, so the explanation is a row of its own: first, badged, and carrying no `ref`, which is what
  * `select` reads to know it is not a target. Pressing Enter on one restates the message and stays,
  * because there is nothing else it could honestly do.
@@ -213,7 +205,7 @@ export const terminalCommands: readonly ContributedCommand[] = [
       const snapshot = await readSnapshot(context)
       const recipe = snapshot.layouts.find((candidate) => candidate.id === item.ref)
       if (!recipe) throw new Error(`'${item.ref}' is no longer a layout of this task`)
-      // The pure executor, with the runtime injected, exactly as the row source wired it (./recipes.ts).
+      // The pure executor from ./recipes.ts, with the runtime injected.
       const result = await invokeLayoutRecipe(taskId, recipe, {
         setLayout: (id, layout) => dispatchLayout(id, { type: 'replace', layout }),
         startTarget: (id, targetId) => runApi.start(id, targetId),

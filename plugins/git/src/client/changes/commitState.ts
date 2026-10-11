@@ -6,10 +6,9 @@ import { commitMode, generateReason, type ChangesGroups, type CommitMode, type P
 // The commit editor's state: the message, the three options, what the button will do, and the two
 // verbs behind it.
 //
-// Its own module rather than another hundred lines of ./changesModel.tsx, because everything here is
-// about one field and it needs four things from the world — a task id, the groups, HEAD's message,
-// and a way to commit. That makes it testable beside the pane instead of only inside a model that
-// fetches over HTTP and subscribes to a poll.
+// Its own module because everything here is about one field and it needs four things from the world:
+// a task id, the groups, HEAD's message, and a way to commit. That makes it testable beside the pane
+// instead of only inside a model that fetches over HTTP and subscribes to a poll.
 
 /** What the state needs from outside it. `commit` and `headCommit` are the HTTP calls, injected so a
  *  test can answer them without a node. */
@@ -19,8 +18,7 @@ export type CommitDeps = {
   headCommit: () => Promise<HeadCommit | null>
   commit: (message: string, options: CommitOptions) => Promise<{ ok: boolean; reason?: string }>
   /** Ask the picked backend for a message. Throws on a refusal, unlike `commit`: the node answers a
-   *  failed generate as an error envelope, and the code in it is what the alert needs
-   *  (./model.ts § generateReason). */
+   *  failed generate as an error envelope, and the code in it is what `generateReason` needs. */
   commitMessage: (request: CommitMessageRequest) => Promise<GeneratedCommitMessage>
   /** The footer's alert line. Cleared with `''`, which is what a commit that landed writes. */
   onError: (reason: string) => void
@@ -37,8 +35,9 @@ export const DRAFT_PREFIX = 'changes:commit-draft:'
 
 export function createCommitState(deps: CommitDeps) {
   // A draft is losable and device-local by the recorded decision
-  // (docs/state-ownership/scope-rules.md § Scope rules), which is what lets it live in `localStorage` rather than
-  // in a row somebody has to migrate. Written on every keystroke and reseeded when the task changes.
+  // (docs/state-ownership/scope-rules.md § Scope rules), which is what lets it live in `localStorage`
+  // rather than in a row somebody has to migrate. Written on every keystroke and reseeded when the task
+  // changes.
   //
   // Held here, above the footer, because the footer is a region the host can unmount on its own:
   // below 80 columns the pane shows the list or the diff and never both, and a message typed before
@@ -127,11 +126,11 @@ export function createCommitState(deps: CommitDeps) {
    * There is no second path to a commit.
    *
    * Whether it is safe to overwrite what is there is the button's question, not this one's: the wand
-   * arms before it replaces a message somebody wrote (./GenerateButton.tsx).
+   * arms before it replaces a message somebody wrote.
+   *
+   * `backend` is only for the failure copy: an installed CLI that is signed out fails the same way an
+   * unreachable provider does, and the two need different next steps.
    */
-  //
-  // `backend` is only for the failure copy: an installed CLI that is signed out fails the same way an
-  // unreachable provider does, and the two need different next steps (./model.ts § generateReason).
   async function generate(pick: CommitMessageRequest, backend?: PickedBackend): Promise<void> {
     if (generating()) return
     setGenerating(true)
@@ -142,8 +141,8 @@ export function createCommitState(deps: CommitDeps) {
       // provider that answered with whitespace has said nothing to put there.
       //
       // A real answer does overwrite, including text typed while the provider was working. That is
-      // the one thing the wand asked about before it started (./GenerateButton.tsx), which is the
-      // difference from `toggleAmend` above, where nobody was asked.
+      // the one thing the wand asked about before it started, which is the difference from
+      // `toggleAmend` above, where nobody was asked.
       if (result.message.trim()) setDraft(result.message)
     } catch (error) {
       deps.onError(generateReason(error, backend))

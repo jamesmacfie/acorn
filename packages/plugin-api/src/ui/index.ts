@@ -4,9 +4,8 @@
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather
 // than a primitive, and its `Row` type would collide with the `Row` layout component below.
 //
-// Off this surface: ContributionBoundary (host machinery), IconPicker/iconNodes,
-// tokenAxes, focus.ts. No plugin imports them, and page-level components on a contract are how a
-// design system stops being able to change.
+// Off this surface: ContributionBoundary (host machinery) and IconPicker. No plugin imports them, and
+// page-level components on a contract are how a design system stops being able to change.
 
 export {
   Alert,
@@ -53,9 +52,9 @@ export { default as Picker } from '@acorn/client-core/kit/components/inputs/Pick
 export { default as PickerRow } from '@acorn/client-core/kit/components/inputs/PickerRow.tsx'
 export { default as Popover } from '@acorn/client-core/kit/components/overlays'
 export { Menu } from '@acorn/client-core/kit/components/overlays'
-// The per-row overflow menu. Every list that offers a row-level action ("Create task" today, more
-// to come) uses this rather than its own button, so the affordance sits in the same place and
-// reveals on the same rules in a plugin's list as in a first-party one.
+// The per-row overflow menu. Every list that offers a row-level action uses this rather than its own
+// button, so the affordance sits in the same place and reveals on the same rules in a plugin's list as
+// in a first-party one.
 export { RowActions } from '@acorn/client-core/kit/components/layout'
 export { Fold } from '@acorn/client-core/kit/components/layout'
 // A header, its named sections, and the region they are about. One declaration, two shapes: folds
@@ -131,8 +130,8 @@ export type { LineComposerController, ThreadCollapseController } from '@acorn/cl
 // StackedDiff is the read-only one already built: one file's patch shown inside something else.
 export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 
-// ── The nodes the kit gained when it closed ───────────────────────────────────────────────────
-// Each one replaces a shape two or more panes were drawing with raw tags and a private class. See
+// ── Closed-kit nodes ──────────────────────────────────────────────────────────────────────────
+// Each one covers a shape two or more panes would otherwise draw with raw tags and a private class. See
 // docs/ui-design/closed-kit.md § The closed kit for the admission rule they had to pass, and
 // @acorn/plugin-api/ui/tokens for the role enums their props take.
 export { Stack } from '@acorn/client-core/kit/components/layout'
@@ -175,16 +174,13 @@ export { Rows } from '@acorn/client-core/kit/components/layout'
 // The kit's one admission that not everything is a tree, and the keyboard contract for getting in
 // and out of one.
 export { Rectangle } from '@acorn/client-core/kit/components/content'
-// The other half of a `pty` rectangle. A `Rectangle` promises the host draws what is inside the box,
-// and for `pty` the DOM used to keep only half of it: three plugins each built their own xterm on the
-// element it handed back. The caller now says what the channel is — open at a size, bytes in, bytes
-// out — and the host draws the emulator, which is what let the editor handoff and docker exec cross to
-// a terminal (docs/terminal/client.md § Client).
+// The other half of a `pty` rectangle. The caller says what the channel is (open at a size, bytes in,
+// bytes out) and the host draws the emulator, so no plugin builds its own xterm on the element
+// (docs/terminal/client.md § Client).
 export { attachPty } from '@acorn/client-core/features/terminal/attachPty.ts'
 export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
 
-// The two host wrappers. Here before there is a second host, so a plugin can be written against one
-// before it arrives: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where
+// The two host wrappers: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where
 // the node cannot be drawn".
 export { Only } from '@acorn/client-core/kit/components/layout'
 export { Fallback } from '@acorn/client-core/kit/components/content'

@@ -259,9 +259,9 @@ describe('reviewing an AI proposal', () => {
     expect(button('Undo')?.disabled).toBe(true)
   })
 
-  // A new workflow's proposal is all additions, which carry no `before`. Drawing one used to throw
-  // inside the render, so the dialog froze on its first status line and showed nothing.
-  // A change names the step it touches, found in the proposal when the change adds it.
+  // A new workflow's proposal is all additions, which carry no `before`, and drawing one must not throw
+  // inside the render: the dialog would freeze on its first status line. A change names the step it
+  // touches, found in the proposal when the change adds it.
   it('draws a proposal that adds and removes paths', async () => {
     const candidate = { ...generated, steps: [{ ...generated.steps[0]!, id: 'step-7', name: 'Angle one' }] }
     authorTurn.mockResolvedValue({

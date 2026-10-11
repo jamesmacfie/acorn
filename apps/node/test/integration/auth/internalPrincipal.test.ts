@@ -199,8 +199,8 @@ describe('scope decides who may spend the owner provider credential', () => {
 })
 
 describe('a task-scoped credential is confined to its own task', () => {
-  // The concrete escalation scoping closes. routes/agentTools.ts takes the taskId from the URL, so
-  // before the credential carried one, a token handed to task A's agent could drive task B's tools.
+  // The concrete escalation scoping closes. The agent tool routes take the taskId from the URL, so
+  // without one on the credential, a token handed to task A's agent could drive task B's tools.
   // 404 rather than 403, matching every other denial on that surface, so it reveals nothing about which
   // tasks exist.
   it('is refused another task tool surface', async () => {
@@ -254,7 +254,7 @@ describe('the task-scope gate covers the plugin namespace', () => {
   // What the mount does not reach, so the limit is recorded rather than assumed: docs/security/transport-and-auth.md §
   // Transport and auth covers why these opaque-id routes resolve their own owning task. If this ever
   // starts returning 404, a mount has begun covering them by accident and the in-router checks are
-  // no longer what's being relied on.
+  // not what's being relied on.
   it('does not reach an opaque-id route, which is why those resolve their own owner', async () => {
     const cleanup = await probeRoutes('', '/widgets/:wid/act')
     try {

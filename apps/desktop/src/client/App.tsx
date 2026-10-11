@@ -138,7 +138,7 @@ import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import type { SettingsRequest } from '@acorn/client-core/features/settings/SettingsView.tsx'
 import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio/studioOpen.ts'
 
-// The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
+// The shell is the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
 const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
@@ -156,8 +156,8 @@ const PromoteToTaskModal = lazy(() =>
   })),
 )
 
-// Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
-// and PullDetail (mid) read useParams() directly; routes exist only to populate params.
+// The Router root: the top bar, the rails, and a content region that draws the selected source or the
+// active task. Routes render nothing themselves; they exist to populate params.
 export default function App() {
   const linkLog = createLogger('links')
   const queryClient = useQueryClient()
@@ -166,8 +166,8 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted
-  // (client-core/features/settings/SettingsView.tsx). `null` is closed. A request is a fresh object per
+  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted.
+  // `null` is closed. A request is a fresh object per
   // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
   // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
@@ -230,12 +230,12 @@ export default function App() {
   }
 
   // The one place that holds both the QueryClient and the whole mounted app, which is what
-  // client-core's module-level task lookup needs (tasks/taskLookup.ts states why it cannot reach
-  // either itself). Installed before anything is clickable, so a content-link click can ask whether a
+  // client-core's module-level task lookup needs (`setTaskLookup` states why it cannot reach either
+  // itself). Installed before anything is clickable, so a content-link click can ask whether a
   // pane is available on the task it names rather than claiming the event and rendering nothing.
   setTaskLookup((taskId) => queryClient.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
   // Same argument, one entity over: a content-link path resolver asks whether an external URL names a
-  // repo acorn tracks, and only the project rows know (projects/projectLookup.ts).
+  // repo acorn tracks, and only the project rows know.
   setProjectsLookup(() => queryClient.getQueryData<Project[]>(projectsKey) ?? [])
 
   // Shell-owned commands are registered once; the single dispatcher below owns the only global
@@ -337,13 +337,11 @@ export default function App() {
       onCleanup(() => binding.dispose())
     })
     // The two settings core owns, as bounded choices with the current value marked. Both write through
-    // the same accessors Settings → Appearance and Settings → Notifications call
-    // (client-core/host/registries/commands/coreCommands.ts), so there is one persistence path per
-    // value and not two.
+    // the same accessors Settings → Appearance and Settings → Notifications call, so there is one
+    // persistence path per value and not two.
     //
-    // Registered here rather than in client-core because this app is what contributes those pages
-    // (./pageContributions.tsx): a host with no Appearance page has nothing for an Appearance command
-    // to agree with.
+    // Registered here rather than in client-core because this app is what contributes those pages: a
+    // host with no Appearance page has nothing for an Appearance command to agree with.
     const settings = registerCommands([...appearanceCommands(queryClient), ...notificationCommands(queryClient)])
     onCleanup(() => {
       settings.dispose()
@@ -360,10 +358,8 @@ export default function App() {
   })
 
   onMount(() => {
-    // The one archive producer left on the client, and it produces nothing of its own: it asks the
-    // node, which is where every plugin now declares what it has to say about archiving a task
-    // (node-core/server/pluginHost/taskChecks.ts). The docker, changes and terminal warnings that used to
-    // be registered here and in the docker client bundle all arrive through this.
+    // The client's only archive producer, and it produces nothing of its own: it asks the node, which
+    // is where every plugin declares what it has to say about archiving a task.
     //
     // Mapped rather than passed through because a node concern carries no callback: the cleanup the
     // owner ticks is a route the node runs at the right point in the archive, and the id below is
@@ -413,22 +409,18 @@ export default function App() {
   })
 
   // The sound channel. Every unseen notice the gate lets through, whatever raised it. The workflow and
-  // system channels are the shared runtime's (client-core/host/clientRuntime.ts).
+  // system channels are the shared runtime's.
   onMount(() => onCleanup(initSoundNotices()))
 
   // Which plugins the node this shell is showing runs.
   //
-  // Not `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
-  // mounts App inside a `<Show keyed>` on the active node, so a switch disposes this component and
-  // builds a new one: the fresh effect records the new node and defers, the dying one is disposed
-  // during Solid's pure pass before user effects flush, and `applyNodePlugins` ran exactly once per
-  // window, at boot, from index.tsx. Every node after the first kept the previous node's
-  // contributions, so a plugin disabled on node B still had its pane, source, poller and settings
-  // page. The comment claiming "for the second one onwards" was precisely backwards.
+  // Not `on(activeNodeId, …, { defer: true })`, which never fires. index.tsx mounts App inside a
+  // `<Show keyed>` on the active node, so a switch disposes this component and builds a new one: the
+  // fresh effect records the new node and defers, and the dying one is disposed during Solid's pure
+  // pass before user effects flush. A plain effect reading the signal runs once on mount, which is once
+  // per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node whose list
+  // it has already applied.
   //
-  // A plain effect reading the signal is right because of that remount: it runs once on mount, which
-  // is once per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node
-  // whose list it has already applied.
   // Re-reads on the node's connection state as well as its identity, which is what makes it a retry.
   // The boot attempt in index.tsx starts before the local node is up and can fail against nothing
   // listening; `applyNodePlugins` leaves itself unapplied when the node did not answer, so this runs
@@ -447,7 +439,7 @@ export default function App() {
   // can never be the thing that fails a boot or repeats every launch.
   //
   // Gated on `nodeReady()`, because a read that fails counts as "do not warn": asked at mount, before
-  // the local node was adopted, the warning never ran at all.
+  // the local node is adopted, the warning would never run.
   createEffect(() => {
     const nodeId = activeNodeId()
     if (!nodeId || !nodeReady()) return
@@ -513,16 +505,13 @@ export default function App() {
   })
 
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
-  // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
+  // (`createTaskDeepLink`).
   createTaskDeepLink({
     taskId: () => (startup.restored() ? activeTaskId() : null),
     search: () => location.query,
     navigate,
   })
 
-  // Active workspace is derived from the current project. The active node's list, because the route
-  // carries no node, so the workspace the shell is showing is whichever one the active node has for
-  // this repo.
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
   // TaskView registers callbacks with the keymap, whose layer can still be evaluated while Solid is
   // disposing the view. Keep the last row available for that teardown tick after an archive removes
@@ -531,26 +520,29 @@ export default function App() {
   // refetch changes task metadata without changing which task is open.
   const taskForView = createMemo<Task | null>((previous) => activeTask() ?? previous ?? null)
   // Which project the shell is "in". The generic task route (`/t/:taskId`) carries no projectId, so
-  // without the task fallback the workspace and project pickers went blank the moment you opened a
-  // task, and the per-workspace view memory below never saw a workspace change.
+  // without the task fallback the workspace and project pickers go blank the moment you open a task,
+  // and the per-workspace view memory below never sees a workspace change.
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
   // Links on a project's own surfaces preview against the project. A task's panes claim their links
-  // first, with the task's scope (features/tasks/TaskPaneHost.tsx).
+  // first, with the task's scope.
   const sourceLinkPreviews = createLinkPreviewBoundary(() => {
     const projectId = contextProjectId()
     return projectId ? { projectId } : {}
   })
+  // Active workspace is derived from the current project, from the active node's list: the route
+  // carries no node, so the workspace on screen is whichever one the active node has for this repo.
+  //
   // A memo, and one that holds its last answer, for two reasons that both belong to the transition
   // effect below.
   //
-  // `on` re-fires on identity, not on value, so keying it on a plain derivation re-planned the whole
+  // `on` re-fires on identity, not on value, so keying it on a plain derivation would re-plan the whole
   // workspace change on every tasks, projects or params tick.
   //
   // And the derivation reports nothing for a beat in ordinary use: while the workspaces query is
   // cold, and between a task path and its task row landing. `on` would record that nothing as the
-  // workspace we were leaving, and the guard below then dropped the next real switch, which is one
-  // way the last view fails to come back. Holding the last known workspace also stops the topbar
-  // pickers and the rail's scope blinking through the same gap.
+  // workspace we were leaving, and the guard below would then drop the next real switch, so the last
+  // view would fail to come back. Holding the last known workspace also stops the topbar pickers and
+  // the rail's scope blinking through the same gap.
   const activeWorkspace = createMemo<Workspace | null>(
     (previous) => workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null,
   )
@@ -762,8 +754,8 @@ export default function App() {
 
   // The project picker appears where choosing a project changes something: a source that declared
   // itself project-scoped. A task's project cannot change, so the task view names it in the
-  // breadcrumb instead. On Home the picker used to sit there looking like navigation and move nothing
-  // but the breadcrumb.
+  // breadcrumb instead. Elsewhere, such as Home, the picker would look like navigation and move
+  // nothing but the breadcrumb.
   //
   // Through `sourceIsProjectScoped` rather than a local check, so a palette command that switches
   // project can ask the same question and the two can never disagree.
@@ -855,7 +847,7 @@ export default function App() {
 
   // The source on screen, when it has something to draw. A source that contributed neither a component
   // nor regions is a rail row and nothing else, and the Switch's empty state below is the honest
-  // answer for it — which is what asking for `?.component` used to get us before `regions` existed.
+  // answer for it.
   const drawnSource = () => {
     const source = sourceRegistry.get(selectedSource() ?? '')
     return source && (source.component || source.regions) ? source : undefined
@@ -941,12 +933,11 @@ export default function App() {
               </Switch>
             </Show>
             {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
-          from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
+          from the dispatcher because the keybindings registry is deliberately `.ts` and may not
           hold markup. */}
             <CheatSheet />
-            {/* A referenced item from another provider, opened by any surface that renders content
-          (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
-          Before this, the only place in the app that could open one was github's PR conversation. */}
+            {/* A referenced item from another provider, opened by any surface that renders content.
+          Mounted at the shell because the state is the shell's. */}
             <RefPanelHost />
             <LinkPreviewHost />
             {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
@@ -1012,10 +1003,10 @@ export default function App() {
             </Show>
             {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
             <WillConfirmationHost />
-            {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
-          shell still owns the per-task `terminalOpen` flag, which the tab rail and topbar badge read
-          too, and passes it through slotContext; it no longer knows what fills the drawer. Order
-          matters: this host sits before the overlay host, so a dialog still paints above the drawer. */}
+            {/* The terminal drawer arrives as a contribution from the terminal plugin. The shell owns
+          the per-task `terminalOpen` flag, which the tab rail and topbar badge read too, and passes it
+          through slotContext; it doesn't know what fills the drawer. Order matters: this host sits
+          before the overlay host, so a dialog still paints above the drawer. */}
             <SlotHost slot="drawer" context={slotContext()} />
             <SlotHost slot="overlay" context={slotContext()} />
           </div>

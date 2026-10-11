@@ -18,8 +18,8 @@ import type { PullFile } from '../../../shared/api'
 import { mapLimited } from '../../mapLimited'
 import type { PatchBlobStore } from './prMirror'
 
-// GitHub's diffs as documents (docs/github-integration/mirror.md § Diff documents). Everything here is keyed
-// by the patch's own digest, the same `sha256:<hex>` its body is stored under, so it serves a pull
+// GitHub's diffs as documents (docs/github-integration/mirror.md § Diff documents). Everything here is
+// keyed by the patch's own digest, the same `sha256:<hex>` its body is stored under, so it serves a pull
 // request and a compare preview alike and can never hand one revision's rows to another.
 //
 // A patch is cut into segments once, when it is mirrored, and its segment descriptors are stored

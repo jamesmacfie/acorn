@@ -2,9 +2,9 @@ import { createRoot, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 
-// The Changes model's side of a revision conflict (./changesModel.tsx § conflicted): a segment asked
-// for against a digest the node no longer describes reads the document again, once, and the viewer
-// draws the new revision. The node's refusal is covered in ../server/routes/localGit.test.ts.
+// The Changes model's side of a revision conflict (`conflicted` in the model): a segment asked for
+// against a digest the node no longer describes reads the document again, once, and the viewer draws
+// the new revision. The node's refusal is covered by the local Git route tests.
 
 const projects = vi.hoisted(() => ({ data: undefined as unknown }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => projects, useQueryClient: () => ({}) }))

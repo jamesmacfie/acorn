@@ -37,7 +37,7 @@ const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modif
   deletions: null,
 })
 
-// What tells the viewer which patches a poll moved (DiffSource.contentKey).
+// What tells the node which patches a poll moved, as the per-file key of a document request.
 describe('patchKey', () => {
   const keyed = { ...c('a.ts', false), additions: 2, deletions: 1, contentKey: '100644 100644 abc 33188 12 1.5 1.5' }
 
@@ -156,7 +156,7 @@ describe('pickSelected', () => {
 
 describe('stackFor', () => {
   it('stacks one staging area, so no path appears twice', () => {
-    // src/both.ts is staged and then edited again, so it is in both groups.
+    // both.ts is staged and then edited again, so it is in both groups.
     const groups = groupChanges([c('src/both.ts', true), c('src/both.ts', false), c('src/only-dirty.ts', false)])
     const staged = stackFor(groups, groups.staged[0])
     const unstaged = stackFor(groups, groups.unstaged[0])
@@ -202,7 +202,7 @@ describe('documentFile', () => {
   })
 })
 
-// The view menu's three choices, as pure functions over the rows phase 0 produces. Everything below
+// The view menu's three choices, as pure functions over the rows `groupChanges` produces. Everything below
 // is a table test because everything below is a table: the pane holds no state for any of it, and the
 // only reactive thing in the tree view is which folders the reader has closed.
 
@@ -356,15 +356,14 @@ describe('viewNodes', () => {
   })
 })
 
-// The annotation point this pane opens on its diff lines (docs/plugins/cooperative-extension-points.md § Cooperative extension
-// points). The fields have to be the ones the shared viewer mints per row, in that order, or a
-// contributor's marks look up under a string nothing ever wrote and draw nothing — silently, because
-// an unmatched contribution is silent by design.
+// The annotation point this pane opens on its diff lines
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The fields have to be
+// the ones the shared viewer mints per row, in that order, or a contributor's marks look up under a
+// string nothing ever wrote and draw nothing, silently.
 //
 // Written out rather than compared against `DIFF_ANNOTATION_FIELDS`: that constant lives beside the
-// viewer in client-core, and importing across the plugin boundary to check a three-string list would be
-// the coupling this seam exists to avoid. The pairing is held from the other end too, in client-core's
-// annotationKey.test.ts.
+// viewer in client-core, and importing across the plugin boundary would be the coupling this seam
+// exists to avoid. Client-core's `annotationKey` tests hold the pairing from the other end.
 describe('the diff-line annotation point', () => {
   it("is keyed by the three fields the viewer mints, in the viewer's order", () => {
     expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side'])
@@ -457,7 +456,7 @@ describe('remoteReason', () => {
 })
 
 describe('generateReason', () => {
-  // Matched on the envelope\'s `code`, because `ApiError` is not on the plugin surface.
+  // Matched on the envelope's `code`, because `ApiError` is not on the plugin surface.
   it('turns the two provider codes into a next step', () => {
     expect(generateReason({ code: 'provider_needs_auth', message: 'provider_needs_auth' })).toContain(
       'Reconnect it in Settings',

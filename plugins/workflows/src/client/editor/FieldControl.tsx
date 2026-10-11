@@ -9,14 +9,9 @@ import { createWorkflowApi } from '../workflowsClient'
 // (docs/workflows/step-kinds.md § Contributed step kinds).
 //
 // The host draws it, which is the whole point of describing a form as data: a plugin contributes a
-// step kind and its inputs appear on both hosts with no component of its own. `prompt` is not here —
-// it is a textarea with reference chips and lives in ./PromptField.tsx.
+// step kind and its inputs appear on both hosts with no component of its own. `prompt` is not here:
+// it is a textarea with reference chips, drawn by `PromptField`.
 
-/** A select whose choices come from the contributing plugin's own route.
- *
- *  Two guards, and both matter. The route must sit inside that plugin's namespace, because a
- *  description is data a node sent and a route outside it would let one plugin read another's; and a
- *  placeholder the editor cannot fill means no fetch at all, because half a path is not a path. */
 /** Whether every required field shows its error, touched or not. The editor turns it on when Publish
  *  or Run asks whether the workflow is ready; before that, an empty box on a new step is not a
  *  mistake yet. The footer still lists what is missing either way. */
@@ -32,6 +27,11 @@ export function useRequiredError(empty: () => boolean): { error: () => string | 
   }
 }
 
+/** The route a select's choices come from: the contributing plugin's own, or nothing.
+ *
+ *  Two guards, and both matter. The route must sit inside that plugin's namespace, because a
+ *  description is data a node sent and a route outside it would let one plugin read another's; and a
+ *  placeholder the editor cannot fill means no fetch at all, because half a path is not a path. */
 export function fieldOptionsRoute(
   route: string,
   pluginId: string | null,

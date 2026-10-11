@@ -60,7 +60,7 @@ export const putSchema = z.strictObject({
 // A plain object rather than a strict one, because both halves are parsed out of the same payload and
 // each would otherwise reject the other's keys. Nothing reads the raw payload after this, so
 // stripping an unknown key is as safe as refusing it and lets a newer renderer add a field without
-// wedging an older main.
+// wedging an older helper.
 export const decisionSchema = z.object({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -76,8 +76,8 @@ export const decisionSchema = z.object({
 // @acorn/protocol/plugin/contract.ts.
 //
 // Parsed separately, because a node running a newer manifest schema than this shell can produce a
-// grant this schema refuses. With one combined schema the whole handler threw, so neither accept nor
-// reject could be recorded and the prompt re-queued on every boot.
+// grant this schema refuses. With one combined schema the whole handler would throw, so neither accept
+// nor reject could be recorded and the prompt would re-queue on every boot.
 export const disclosureSchema = z.object({
   declaration: z.string().min(1).max(1_000_000),
   permissions: pluginPermissionsSchema,
@@ -113,7 +113,7 @@ export const disclosureSchema = z.object({
     .default([]) as z.ZodType<PluginNavigationDestinationGrant[]>,
   // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
   // disclosure with no such field, and refusing it would put a decision beyond recording, which is
-  // the re-queueing loop this schema was split up to escape.
+  // the re-queueing loop the split exists to prevent.
   extensions: z.array(pluginExtensionGrantSchema).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
   // Defaulted for the same reason `extensions` is.
   schedules: z

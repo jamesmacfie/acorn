@@ -16,12 +16,11 @@ import { emptyLocalStatus } from '../../shared/changes/api'
 // The branch bar in jsdom, which is the tier that can answer what a press does. The pure half — which
 // verb is next, what the counts read, what a refusal turns into — is in model.test.ts next door.
 //
-// The model is a stand-in, for the reason phase 0's list test gives: `createChangesModel` fetches over
-// HTTP and subscribes to the task poll, and neither is what a button is about.
+// The model is a stand-in, for the reason the list test gives: `createChangesModel` fetches over HTTP
+// and subscribes to the task poll, and neither is what a button is about.
 
 // The one thing the slot under the bar reads that needs a shell behind it: the reader's arbitration
-// preference. Nothing else in this file touches the query layer, because the model is a stand-in
-// (plugins/agents/src/client/composer/AttachmentSlot.test.tsx set this shape).
+// preference. Nothing else in this file touches the query layer, because the model is a stand-in.
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 const remote = vi.fn()
@@ -163,8 +162,7 @@ describe('the remote menu', () => {
     expect(remote).toHaveBeenCalledWith('rebase')
   })
 
-  // Armed rather than behind a dialog: the armed label is the prompt on every host, and a dialog was
-  // refused by the programme's decisions table.
+  // Armed rather than behind a dialog: the armed label is the prompt on every host.
   it('makes force push ask twice', () => {
     draw({ upstream: 'origin/main', ahead: 1, behind: 0 })
     const force = openMenu().find((item) => item.textContent?.trim() === 'Force push')!
@@ -217,8 +215,9 @@ describe('the operation banner', () => {
   })
 })
 
-// The room another plugin has under the bar (docs/plugins/cooperative-extension-points.md § Cooperative extension points). What
-// belongs here is this owner's half: the point draws nothing on its own, and a contributor is handed
+// The room another plugin has under the bar
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). What belongs here is
+// this owner's half: the point draws nothing on its own, and a contributor is handed
 // the five facts the bar reads and no markup. Who wins a contested slot is `Slot`'s business and
 // client-core tests it.
 
@@ -262,7 +261,7 @@ describe('the push-actions slot', () => {
     point()
     draw({ upstream: 'origin/main', ahead: 1, behind: 0 })
     // The bar and its two buttons, and no third element after the toolbar: an unfilled point has no
-    // wrapper, so the footer is the height it was before the slot existed.
+    // wrapper, so the footer keeps its own height.
     expect(host.textContent).not.toContain('Open pull request')
     expect(host.querySelector('.ui-toolbar')?.nextElementSibling).toBeNull()
   })

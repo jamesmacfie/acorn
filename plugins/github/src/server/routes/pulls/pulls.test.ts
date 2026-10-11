@@ -68,7 +68,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     vi.clearAllMocks()
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
-    // The GitHub token comes from a stored integration row now, not from the caller's identity.
+    // The GitHub token comes from a stored integration row, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     const now = Date.now()
     await core.db
@@ -144,7 +144,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     )
 
     const [task] = await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1'))
-    expect(task.pullNumber).toBe(42) // Flow B: task inherited the freshly-opened PR
+    expect(task.pullNumber).toBe(42) // the task inherited the freshly-opened PR
 
     const [sync] = await plugin.db
       .select()

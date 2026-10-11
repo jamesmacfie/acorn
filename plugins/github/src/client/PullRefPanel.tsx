@@ -16,8 +16,8 @@ import { parsePullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
 // GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
-// (docs/github-integration/tasks-and-references.md § Content links). It shows less than the full pane and offers the pane
-// as the next step, rather than being a smaller copy of a whole review.
+// (docs/github-integration/tasks-and-references.md § Content links). It shows less than the full pane
+// and offers the pane as the next step, rather than being a smaller copy of a whole review.
 //
 // A tree in the box the host draws. The backdrop, the drawer, the title and the dismiss affordance
 // are `RefPanelBox`, the same box a loaded plugin's panel is wrapped in.
@@ -26,8 +26,8 @@ const STATE_WORD: Record<string, string> = { open: 'Open', closed: 'Closed', mer
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
-  // `owner/repo#number`, parsed by the module that also spells it (../shared/pullRef.ts), so this
-  // panel, the source row, and the URL recogniser name the same thing.
+  // `owner/repo#number`, parsed by the module that also spells it, so this panel, the source row, and
+  // the URL recogniser name the same thing.
   const parts = createMemo(() => parsePullRef(props.target.displayId))
 
   const detail = createQuery(() => {

@@ -23,10 +23,8 @@ import { EDITOR_FILE_KEY, EDITOR_FILE_POINT, MAX_EDITOR_FILE_MARKS } from '../co
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
-// the dirty derivation and the save paths are the shipped code.
-//
-// This is the tier the Monaco pane never had: the swap-and-swap-back behaviour was only ever checked
-// by hand, and it is exactly the behaviour an engine change could break quietly.
+// the dirty derivation and the save paths are the shipped code. The swap-and-swap-back behaviour is
+// exactly what an engine change could break quietly.
 
 // jsdom does no layout, so two things the real browser provides are simply absent: a Range cannot
 // report rectangles (CodeMirror measures selections) and an element cannot scroll itself into view
@@ -56,7 +54,7 @@ const lineMarkers = vi.fn(async (_taskId: string, _path: string, revision: strin
     { kind: 'uncommitted' as const, ranges: [{ from: 1, to: 1 }] },
   ],
 }))
-// The checkout path, which the pane now reads through the query cache. A test that wants to see what
+// The checkout path, which the pane reads through the query cache. A test that wants to see what
 // the pane does *while* that request is outstanding replaces this with a promise it holds open.
 let root: () => Promise<string | null> = async () => '/worktree'
 // Only the API is stubbed; the query key and the freshness window are the shipped ones, because what
@@ -1605,9 +1603,8 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(host.textContent).toContain('exited with status 3'))
   })
 
-  // The waterfall the pane used to make a reader sit through: the checkout path, then the mount that
-  // path gated, then the file. The file the reader left open does not depend on the path, so it goes
-  // out beside it (docs/editor/editor-pane.md § One round trip to text).
+  // The file the reader left open does not depend on the checkout path, so it goes out beside that
+  // request rather than after it (docs/editor/editor-pane.md § One round trip to text).
   it('reads the remembered file while the checkout path is still in flight', async () => {
     editorOpen(taskId, 'a.ts', false)
     let releaseRoot!: (path: string) => void
@@ -1617,7 +1614,7 @@ describe('the editor pane', () => {
       })
 
     const { host } = mount()
-    // The read is issued while the root request is still open — the assertion the old order failed.
+    // The read is issued while the root request is still open.
     await vi.waitFor(() => expect(read).toHaveBeenCalledWith(taskId, 'a.ts'))
     releaseRoot('/worktree')
 
@@ -1668,7 +1665,7 @@ describe('the editor pane', () => {
     expect(rootCalls).not.toHaveBeenCalled()
   })
 
-  // The per-file documents belong to the task, not to the pane's mount (client-core paneModels.ts).
+  // The per-file documents belong to the task, not to the pane's mount (client-core's `paneModel`).
   it("keeps a file's text and undo history when the pane is closed and reopened in the same task", async () => {
     const first = mount()
     const view = await editor(first.host)

@@ -258,7 +258,7 @@ describe('installing a device bundle', () => {
   })
 })
 
-// The invariant the whole phase rests on: the hash in a node's listing is a claim, and a compromised
+// The invariant the cache rests on: the hash in a node's listing is a claim, and a compromised
 // node can put anything there. Only bytes this process hashed itself may be stored or acknowledged.
 describe('trust binds to bytes, not to the listing', () => {
   it('refuses bytes that do not match the hash the node advertised, and stores nothing', async () => {
@@ -339,8 +339,8 @@ describe('eviction', () => {
   })
 })
 
-// Five bundled plugins used to mean five bundle writes and five fsynced index rewrites per launch, for
-// bytes that last changed at an app update. See docs/security/plugin-bundles.md § Third-party plugin bundles.
+// Without the early return, every bundled plugin costs a bundle write and an fsynced index rewrite per launch, for
+// bytes that only change at an app update. See docs/security/plugin-bundles.md § Third-party plugin bundles.
 describe('caching the application own bundles', () => {
   // Nanoseconds, not milliseconds: two writes inside one millisecond would compare equal and the test
   // would pass for the wrong reason.

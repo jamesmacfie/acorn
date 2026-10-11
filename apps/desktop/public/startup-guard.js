@@ -4,9 +4,8 @@
 //
 // A deferred classic script, named in index.html ahead of the module script. Deferred scripts and
 // module scripts run in document order once parsing finishes, so these listeners are in place before
-// any app module evaluates. Deferred rather than parser-blocking because a parser-blocking script
-// stalled the window's start by up to 2.6 s whenever the automation driver (`pnpm dev:agent`) polled
-// the page during the load.
+// any app module evaluates. A parser-blocking script would stall the window's start whenever the
+// automation driver (`pnpm dev:agent`) polls the page during the load.
 //
 // It is a file in public/, not inline markup, because the renderer's policy is `script-src 'self'`
 // (src-tauri/src/app_scheme.rs). It is not a module, because a module entry that dynamic-imports the
@@ -19,12 +18,11 @@
 // readiness check. Probe that entry and retry the page a few times, with visible progress; a real
 // transform error still reaches the failure screen.
 //
-// It does not listen for `unhandledrejection`, which the module guard before it did. Every failure
-// above reaches `error` in both WebKit and Chromium, and a promise nobody awaited does not stop the
-// app from starting. One such promise is known: tauri-plugin-notification's injected script asks for
-// `is_permission_granted`, which the capability file does not grant. It usually rejects before any
-// page script runs, but not always, and a guard listening for it has drawn this screen with that
-// message in place of the real error.
+// It does not listen for `unhandledrejection`. Every failure above reaches `error` in both WebKit and
+// Chromium, and a promise nobody awaited does not stop the app from starting. One such promise is
+// known: tauri-plugin-notification's injected script asks for `is_permission_granted`, which the
+// capability file does not grant. It usually rejects before any page script runs, but not always, and
+// a guard listening for it would draw this screen with that message in place of the real error.
 {
   const RETRY_KEY = 'acorn:renderer-startup-retries'
   const MAX_RETRIES = 4

@@ -37,9 +37,9 @@ const githubAccount = (integrations: IntegrationsResponse | undefined) =>
 // both open the folder picker on the spot; there is no third "defer" action
 // (docs/github-integration.md § Importing projects).
 //
-// Not the `wizard` layout the plan named. This is one screen, and the one place it appears in a
-// wizard is first-run onboarding, where it is already a step inside onboarding's own; a second
-// wizard here would be one nested in the other.
+// Not the `wizard` layout. This is one screen, and the one place it appears in a wizard is first-run
+// onboarding, where it is already a step inside onboarding's own; a second wizard here would be one
+// nested in the other.
 export default function GithubImporter(props: ProjectImporterProps) {
   const queryClient = useQueryClient()
   const integrations = createQuery(() => integrationsOptions(true))

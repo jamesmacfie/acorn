@@ -1,7 +1,7 @@
 // Editor session state: open-file tabs per task (ephemeral preview slot, dirty flags, active
 // file), persisted to the 'editor_open_files' pref so relaunch restores the tabs (see
 // docs/state-ownership/scope-rules.md § Scope rules for why open files live in Node prefs). Dirty flags reset on reload
-// since content itself is not persisted. Pure list ops plus a thin signal store, like tasks.ts.
+// since content itself is not persisted. Pure list ops plus a thin signal store.
 import { createSignal } from 'solid-js'
 import { onScopeEvicted, openPane } from '@acorn/plugin-api/client'
 

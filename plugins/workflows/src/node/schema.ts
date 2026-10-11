@@ -4,7 +4,6 @@
 // The two ids that point elsewhere, `task_id` into core's `tasks` and `agent_session_id` into
 // plugins/agents' session table, are plain IDs rather than foreign keys, dereferenced through
 // CoreServices.tasks and the agents capability.
-//
 import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
@@ -17,7 +16,7 @@ export const workflowRuns = sqliteTable(
     taskId: text('task_id').notNull(), // → core tasks.id (plain ID, not a foreign key)
     name: text('name').notNull(),
     status: text('status').notNull(), // running | gated | cancelling | done | failed | safety-rail | cancelled
-    posture: text('posture').notNull().default('gated'), // gated (default) | autonomous (14 §posture)
+    posture: text('posture').notNull().default('gated'), // gated (default) | autonomous
     trigger: text('trigger').notNull().default('manual'),
     defJson: text('def_json').notNull(), // the WorkflowDef this run executes (frozen at start)
     // The resolved root and child definitions captured by executable preflight. Kept separate from
@@ -70,10 +69,10 @@ export const workflowSteps = sqliteTable(
     // The completion condition's state for an agent step with a goal: progress while it runs, the
     // final summary after. Host metadata, kept apart from the output so no binding can read it.
     goalJson: text('goal_json'),
-    sessionId: text('session_id'), // for --resume (open in terminal, 15 P2)
+    sessionId: text('session_id'), // for --resume (open in terminal)
     agentSessionId: text('agent_session_id'), // → plugins/agents' session id (plain ID across databases)
     costUsd: real('cost_usd'),
-    iteration: integer('iteration').notNull().default(0), // loop bound bookkeeping (14 §loop)
+    iteration: integer('iteration').notNull().default(0), // loop bound bookkeeping
     parentStepId: text('parent_step_id'), // child-dispatch lineage
     error: text('error'),
     createdAt: integer('created_at').notNull(),

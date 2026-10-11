@@ -1,9 +1,9 @@
 // "Start workflow…" on a Rollbar error, a Linear issue or a GitHub pull request: what the row menu
 // asks for, and what the item fills in (docs/workflows/starting-runs.md § Starting a run).
 //
-// A `.ts` module of its own, beside ./editor/startRequest.ts and for its reason: the prefill rule is
-// the half worth testing and a Solid component on the path makes it unloadable in a node-environment
-// test (docs/plugin-authoring/testing.md § Testing). The box it opens is ./StartFromItemHost.tsx.
+// A `.ts` module of its own, for the same reason as `startRequest`: the prefill rule is the half worth
+// testing, and a Solid component on the path makes it unloadable in a node-environment test
+// (docs/plugin-authoring/testing.md § Testing). The box it opens is `StartFromItemHost`.
 import { createSignal } from 'solid-js'
 import type { ItemRowTarget } from '@acorn/plugin-api/client'
 import type { DataRecord } from '@acorn/protocol/dataSources.ts'
@@ -23,12 +23,10 @@ export function prefillFromRecord(record: DataRecord): Record<string, DataValue>
  *
  * By name rather than by declaration order or by a mapping each integration writes, so a definition
  * that says `inputs = [{ name = "issue" }]` works from every tracker and a new one gets the rule for
- * free. Two groups: `issue`, `item` and `context` get the title and the body one blank line apart,
- * and `link` or `url` gets somewhere to read it. Every other name is left for the person, because
- * guessing at `focus` or `depth` from an error title puts words in a prompt nobody chose.
- *
- * The names are exact. A definition that spells one `Issue` fills it in itself, which is the same
- * bargain `${inputs.<name>}` already strikes.
+ * free. `issue`, `item` and `context` get the title and the body one blank line apart, and `link` or
+ * `url` gets somewhere to read it. Every other name is left for the person, because guessing at
+ * `focus` or `depth` from an error title puts words in a prompt nobody chose. The names are exact: a
+ * definition that spells one `Issue` fills it in itself.
  */
 export function prefillFromItem(item: { title?: string; body?: string; link?: string }): Record<string, string> {
   const both = [item.title, item.body].filter((part) => part?.trim()).join('\n\n')

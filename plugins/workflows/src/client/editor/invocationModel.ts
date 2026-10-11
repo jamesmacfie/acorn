@@ -1,4 +1,4 @@
-// The review dialog's state, apart from its drawing (./InvocationDialog.tsx).
+// The review dialog's state, apart from its drawing (`InvocationDialog`).
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowInvocationApproval, WorkflowInvocationReview } from '../../shared/workflowInvocation'
 

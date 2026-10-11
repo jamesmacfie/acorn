@@ -76,9 +76,9 @@ type Hole<C, K extends keyof C | string> = Omit<C, K>
  *  and both sides are widened here before they are compared. */
 type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 
-// The host's `NodePluginContext` IS the loaded tier's shape now — the compiled-only members live on
-// `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
-// one exception, and not a tier one: its big facets are compared one at a time below.
+// The host's `NodePluginContext` IS the loaded tier's shape — the compiled-only members live on
+// `CompiledNodePluginContext` beside it — so there is no tier to subtract here. `core` is the one
+// exception, and not a tier one: its big facets are compared one at a time below.
 type LoadedContext = Omit<NodePluginContext, 'core'> & {
   core: WidenNumbers<
     Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>
@@ -219,7 +219,7 @@ it('leaves most of the surface compared, not substituted', () => {
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
   expect(HOLES.context).toHaveLength(4)
   expect(Object.values(HOLES).flat()).toHaveLength(6)
-  // Thirteen of the context's sixteen members are compared in full, `core` facet by facet above, and
+  // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
     'name',

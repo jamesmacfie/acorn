@@ -1,9 +1,9 @@
 // The client half of the test seam: how a plugin's client-side tests reach the host.
 //
-// A sibling of ./index.ts rather than more exports on it. ./index.ts re-exports the node host, so
+// A sibling of ../testkit.ts rather than more exports on it. ../testkit.ts re-exports the node host, so
 // the arch suite classifies it as node code, and a client import from there would cross the one
-// boundary this repo does not let anything cross (tools/arch/boundaries.test.ts § side). This file
-// is classified as client for the same reason ./client/index.ts is.
+// boundary this repo does not let anything cross (`side` in tools/arch/boundaries.test.ts). The arch
+// suite classifies this file as client by its name.
 //
 // Same two rules as its sibling: node-environment safe (no `.tsx`, nothing that touches `window`,
 // since a barrel evaluates every module on it and plugin vitest configs are bare node), and test

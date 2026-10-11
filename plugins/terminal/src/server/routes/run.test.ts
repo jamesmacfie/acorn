@@ -6,7 +6,7 @@ import { harness, setRunBridge, type RunBridge } from '@acorn/plugin-api/testkit
 import type { Env } from '@acorn/plugin-api/testkit'
 
 // The client's run surface reuses the harness RunBridge routes. This proves the client-facing
-// verbs (targets/start/stop/status plus the new default-url) and auth/503.
+// verbs (targets/start/stop/status/default-url) and auth/503.
 
 const req = (url: string, method = 'GET') => new Request(`http://acorn.test${url}`, { method })
 

@@ -57,9 +57,9 @@ export type WorkflowDefsBridge = {
   remove(id: string): Promise<{ ok: boolean }>
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
   // Writes a whole definition from a description or edits the current one through the picked backend
-  // (docs/workflows/ai-authoring.md § Generating and editing with AI). `error` is a reply nothing could be read out of, which is the
-  // one failure with no definition to apply. A provider failure throws ProviderOperationError,
-  // because its status is the one the caller has to see.
+  // (docs/workflows/ai-authoring.md § Generating and editing with AI). `error` is a reply nothing could
+  // be read out of, which is the one failure with no definition to apply. A provider failure throws
+  // ProviderOperationError, because its status is the one the caller has to see.
   generate(input: WorkflowGenerateRequest & { userId: string }): Promise<WorkflowGenerateResult | { error: string }>
   author?(
     input: AuthoringTurnRequest & { userId: string; principal: Principal; signal: AbortSignal },

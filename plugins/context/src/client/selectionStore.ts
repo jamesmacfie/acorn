@@ -1,5 +1,6 @@
 // Manifest section selection (docs/agent-tools.md), persisted per task as a scoped state slice
-// (context.section-selection). Mirrors editorState.ts: pure signal store + a no-clobber hydrate, plus the persisted-state descriptor.
+// (context.section-selection): a pure signal store with a no-clobber hydrate, plus the persisted-state
+// descriptor.
 // The store holds only tasks the user has actually touched; the pane falls back to
 // selectionFromContext(ctx) for untouched tasks, so a section's defaultIncluded still drives the
 // initial view but a curated set is never silently flipped by a later default change.
@@ -35,15 +36,14 @@ export function evictContextSelection(taskId: string): void {
 export { contextSelections as contextSelectionsByTask }
 
 // Everything this module holds is keyed by a node-minted id, so it must not survive a node switch.
-// The persistence pass reads these maps and writes each scope under the active node's storage key,
-// which carried one node's state into another's namespace (client-core's tasks/tasks.ts states the
-// case in full).
+// The persistence pass reads these maps and writes each scope under the active node's storage key, so
+// keeping them would carry one node's state into another's namespace.
 export function clearContextSelections(): void {
   setContextSelections({})
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// clears it are one edit apart (client-core's `onScopeEvicted` states the full argument).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictContextSelection(e.taskId)
   else if (e.scope === 'node-switched') clearContextSelections()

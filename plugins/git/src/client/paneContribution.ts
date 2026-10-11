@@ -28,7 +28,7 @@ export const gitPaneContribution: PaneLayoutContribution<GitTaskPaneModel> = {
   requires: { plugin: 'git' },
   when: gitAvailable,
   layout: 'list-detail',
-  // Held once per task by the host (client-core registries/paneModels.ts). The Changes model is built
+  // Held once per task by the host (`paneModel` in client-core). The Changes model is built
   // with the pane, so its selection and commit draft survive a tab switch, but it only polls Git while
   // its tab is the one on screen.
   model: (task, pane) => {

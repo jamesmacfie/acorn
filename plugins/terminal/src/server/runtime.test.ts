@@ -62,8 +62,8 @@ describe('RuntimeService over real processes', () => {
         return { ok: false, reason: e instanceof Error ? e.message : 'failed' }
       }
     },
-    // Required by RuntimeDeps rather than optional, which is the point: a deps object that omitted the
-    // gate used to compile, and a cloned repository's committed command then ran with no review.
+    // Required by RuntimeDeps rather than optional, which is the point: a deps object that omits the
+    // gate does not compile, so a cloned repository's committed command cannot run with no review.
     authorizeRepoConfig: async () => {},
   }
 

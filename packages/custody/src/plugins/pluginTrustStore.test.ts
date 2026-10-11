@@ -301,8 +301,8 @@ describe('custody', () => {
   })
 
   it('keeps the readable acknowledgements when one row cannot be parsed', () => {
-    // The whole file used to be parsed as a unit, so one row written by a newer build condemned every
-    // row beside it, and the empty result became the cache, so the next write erased them.
+    // Parsing the whole file as a unit would let one row written by a newer build condemn every row
+    // beside it, and the empty result would become the cache, so the next write would erase them.
     const good = ack({ hash: HASH_A })
     const alsoGood = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(

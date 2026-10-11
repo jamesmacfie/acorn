@@ -86,9 +86,8 @@ export type WorkflowStepDef = {
   id?: string
   name: string
   kind?: string
-  // The steps this one waits on, by name. Absent means the step declared before it; an empty list
-  // means a root. Edges are derived from this and never stored, so a file written before the graph
-  // existed still runs as the chain it always was.
+  // The steps this one waits on. Absent means the step declared before it; an empty list means a
+  // root. Edges are derived from this and never stored, so a file with no `after` keys runs as a chain.
   after?: string[]
   // Agent kinds only. 'worktree' gives the step a child task with a checkout of its own; 'shared'
   // runs it on the run's task beside its siblings.
@@ -251,7 +250,7 @@ export type StepFieldType =
 export type StepFieldOption = { value: string; label: string; description?: string }
 
 export type StepField = {
-  /** The key inside `with`, or the step's own field for a built-in. ../shared/stepFields.ts says which. */
+  /** The key inside `with`, or the step's own field for a built-in. `FIELD_HOME` says which. */
   id: string
   label: string
   type: StepFieldType

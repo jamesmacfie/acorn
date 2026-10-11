@@ -3,13 +3,12 @@
 // callers map errors via linearError on the fetch Response. Linear has one endpoint: POST /graphql.
 
 // Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
-// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so a fetch
-// that outlasts it reads to the user as "your machine is down" rather than "this API is slow". Eight
-// seconds did exactly that: the client always gave up first, so the "this provider is unavailable"
-// answer below could never reach anyone. Four, which is what core's own provider routes allow
-// themselves against the same deadline (node-core server/routes/nodeProviders.ts).
-// ponytail: per-request, not per-route. A route that loops over several connections can still add up
-// past the client's 5s; give it a shared budget if anyone hits that with enough workspaces.
+// (client-core's node fan-out) and then draws "unavailable" over the whole node, so a fetch that
+// outlasts it reads to the user as "your machine is down" rather than "this API is slow", and the
+// "this provider is unavailable" answer below never reaches anyone. Four seconds is what core's own
+// provider routes allow themselves against the same deadline (node-core's nodeProviders routes).
+// Per-request, not per-route: a route that loops over several connections can still add up past the
+// client's 5s. Give it a shared budget if anyone hits that with enough workspaces.
 const REQUEST_TIMEOUT_MS = 4_000
 
 const LINEAR_GRAPHQL = 'https://api.linear.app/graphql'
@@ -57,15 +56,14 @@ export type LinearProjectNode = { id: string; name: string }
 export const TEAMS_QUERY = `query { teams(first: 250) { nodes { id name } } }`
 
 // How a team is spelled in a `workspace_external_projects` row. Core stores an external id opaquely,
-// so the prefix is this plugin's business alone. An id without it is a project id, which is what
-// every row written before teams were offered holds, so old rows keep their meaning.
+// so the prefix is this plugin's business alone. An id without it is a project id.
 const TEAM_PREFIX = 'team:'
 export const linearTeamScopeId = (teamId: string): string => `${TEAM_PREFIX}${teamId}`
 
 // The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote
 // default. `description` is the issue's own prose, capped before it reaches a row: a workflow
-// started from a row menu puts the title and this in its `issue` input, and the alternative was a
-// second call per issue at the moment somebody opened a menu (docs/workflows/starting-runs.md § Starting a run).
+// started from a row menu puts the title and this in its `issue` input, rather than making a second
+// call per issue at the moment somebody opens a menu (docs/workflows/starting-runs.md § Starting a run).
 // `labels` has an explicit page size because Linear multiplies a nested list's cost by it (default
 // 50) and rejects a query over 10,000 points. At 50 labels, 250 issues is about 17,000 points; at 10
 // it is about 4,600. The detail pane reads its own labels, so a row never needs more.
@@ -127,8 +125,8 @@ export const projectIssuesFilter = (mappedIds: string[]): Record<string, unknown
  *
  * Provider-side rather than a filter over a fetched page, because the mapping half is a filter Linear
  * supports — `project: { id: { in: … } }` is the one the rail already sends — so the narrowing can ride
- * along with it. Filtering locally would have meant asking for the first 250 active issues and
- * searching those, which cannot find the 251st and moves more bytes to find fewer rows.
+ * along with it. Filtering locally would mean asking for the first 250 active issues and searching
+ * those, which cannot find the 251st and moves more bytes to find fewer rows.
  * The request count is the same either way, and it goes through the same per-connection scheduler and
  * budget the rail does, so no rate-limit policy changes hands.
  *

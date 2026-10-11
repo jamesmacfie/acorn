@@ -503,8 +503,7 @@ export default function FileTree(props: {
   }
 
   // The visible rows, flat. A tree is a flat collection with a depth on each row, which is what lets
-  // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop: the recursive
-  // component this replaced had a `<ul>` per directory and no keyboard at all.
+  // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop.
   type TreeItem = { key: string; label: string; depth: number; dir: boolean }
   let previousItems = new Map<string, TreeItem>()
   const items = createMemo<TreeItem[]>(() => {

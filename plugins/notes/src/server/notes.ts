@@ -10,7 +10,7 @@ import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@aco
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 // Canonical wire shapes live in @acorn/protocol/notes.ts, imported by the client too. Re-exported
-// here so main-side callers keep one import point.
+// here so node-side callers have one import point.
 export type { Note, NoteAuthor, NoteKind, NoteSummary } from '@acorn/protocol/notes.ts'
 
 // The frontmatter block of a note file: Note minus slug/body.

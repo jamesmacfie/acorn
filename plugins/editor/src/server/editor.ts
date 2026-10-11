@@ -228,8 +228,8 @@ export const editorBridge = (
         // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
         // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
         // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
-        // (docs/plugins/events.md § What is not an event). A save from another client used to move nothing on this one —
-        // its tree, its dirty markers and its git status all went stale until something else pinged
+        // (docs/plugins/events.md § What is not an event). Without it, a save from another client moves nothing
+        // on this one: its tree, its dirty markers and its git status go stale until something else pings
         // (docs/plugins/events.md § Hearing a core event).
         await editorWorktreeChanged(core, root, taskId, changed)
         const revision = revisionOf(Buffer.from(text, 'utf8'))

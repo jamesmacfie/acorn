@@ -9,7 +9,7 @@ import { createCommitState, DRAFT_PREFIX, type CommitDeps } from './commitState'
 // thing (plugins/vitest.shared.ts).
 //
 // Every dependency is a stub. What is real is the draft, the three options, the mode, and what a
-// commit does to all four; ../server/routes/localGit.test.ts has the git end.
+// commit does to all four; the local Git route tests have the git end.
 
 const change = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({
   path,

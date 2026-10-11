@@ -91,8 +91,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     workspaces.data?.find((entry) => entry.projects.some((project) => project.id === props.projectId))?.id ?? ''
 
   const draft = () => store.draft()
-  // What the graph's positions are filed under. The same key `layoutPrefs.ts` keeps across a rename,
-  // and an empty string for a draft that has no row yet, which reads and writes nothing.
+  // What the graph's positions are filed under: the definition's key, or an empty string for a draft
+  // that has no row yet, which reads and writes nothing.
   const layoutId = () => {
     const ref = store.ref()
     return ref ? defRefKey(ref) : ''
@@ -181,8 +181,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     }
   })
 
-  // The node's answer, plus the same required-field question asked here so Save greys out as a box is
-  // emptied rather than after the validate debounce (./draft.ts § missingRequiredFields).
+  // The node's answer, plus the same required-field question asked here so the footer names an emptied
+  // box at once rather than after the validate debounce (`missingRequiredFields`).
   const describeFor = (kind: string) =>
     store.catalog()?.kinds.find((entry) => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
   // Both ask the same required-field question, so the node's answer for a field this side already
@@ -193,7 +193,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     return [...missing(), ...store.problems().filter((problem) => !named.has(problem.toLowerCase()))]
   }
   // A required field stays quiet until it is touched, or until Publish or Run asks whether the
-  // workflow is ready (./FieldControl.tsx § RevealFieldErrors).
+  // workflow is ready (`RevealFieldErrors`).
   const [revealErrors, setRevealErrors] = createSignal(false)
   const runnableDefinition = () => (store.ref()?.source === 'database' ? store.publishedDef() : draft().def)
   const missingRunKind = () =>
@@ -201,9 +201,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const missingDraftKind = () =>
     draft().def.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
 
-  // A draft saves whether or not it validates, the way the store takes one (docs/workflows.md
-  // § Database definitions). Greying Save out while a workflow is half-built is how you lose it on
-  // the way to the next screen. The footer says what is wrong, and Run is what refuses.
+  // A draft saves whether or not it validates, the way the store takes one
+  // (docs/workflows/definitions.md § Database definitions). Greying Save out while a workflow is half-built
+  // is how you lose it on the way to the next screen. The footer says what is wrong, and Run is what refuses.
   const canSave = () => !store.readOnly() && store.dirty() && !store.busy()
 
   const save = async (): Promise<void> => {
@@ -212,10 +212,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   }
 
   // What the owner can generate with: a stored key, or an agent CLI installed on this machine. The
-  // AI authoring button is drawn only when there is one, on the rule
-  // ../../../changes/src/client/GenerateButton.tsx sets out: a control whose only message is "connect
-  // a provider first" is a control in the way of the four beside it, and Settings is where
-  // connections are made. A node that cannot answer counts as none.
+  // AI authoring button is drawn only when there is one, on the rule the commit toolbar's
+  // `GenerateButton` sets out: a control whose only message is "connect a provider first" is a control
+  // in the way of the four beside it, and Settings is where connections are made. A node that cannot
+  // answer counts as none.
   const [backends] = createResource(async () => workflowApi.modelBackends().catch(() => []))
   // A project whose workspace is not known counts the same way. The route requires a `workspaceId`
   // and answers 400 without one, which reads as the model having failed rather than as a list that
@@ -223,9 +223,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const canGenerate = () => !store.readOnly() && !!workspaceId() && (backends()?.length ?? 0) > 0
   const [authoringOpen, setAuthoringOpen] = createSignal(false)
   const [invocationOpen, setInvocationOpen] = createSignal(false)
-  // A row loaded from the node is saved even when its graph is empty. `dirty` also covers a future
-  // editor-owned draft before it has a row: once there is work to preserve, authoring can propose an
-  // edit without saving or publishing it.
+  // The model's proposal, merged with whatever the reader changed while it worked and checked by the
+  // node before it lands. It lands as one undo entry and is neither saved nor published here.
   const applyProposal = async (
     proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>,
   ): Promise<string | undefined> => {
@@ -248,9 +247,6 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     toast("AI's changes applied. Undo puts your version back.")
     return undefined
   }
-
-  // Two steps, because saving to the repository is a decision about where this definition lives from
-  // now on (docs/workflows/authoring.md § Authoring). The modal asks it; the terminal draws the same one.
 
   const copyToDatabase = async (): Promise<void> => {
     const id = await store.copyToDatabase(workspaceId())
@@ -346,9 +342,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const runDisabled = () => (isDatabase() && !store.publishedRevision()) || !!missingRunKind()
 
   // One bar: where you are and what this definition is on the left, what you can do to it on the
-  // right. The tab strip under it is only the choice of view. The actions used to sit in the tab
-  // strip as nine buttons of four different weights, which pushed the tabs into a corner and left
-  // Delete one unconfirmed press from the rest.
+  // right. The tab strip under it is only the choice of view.
   //
   // Three actions stay on the bar because they are the loop: edit, publish, run. Save is there too,
   // though the draft autosaves, because a reader who wants it written now should not have to wait.
@@ -375,8 +369,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           {SAVE_BADGE[store.saveState()].word}
         </Badge>
       </Show>
-      {/* Where a run starts from. This badge replaced a warning strip that sat over every new draft
-          saying the same thing; an unpublished draft is a normal state, not a problem. */}
+      {/* Where a run starts from. A badge rather than a warning, because an unpublished draft is a
+          normal state, not a problem. */}
       <Show when={isDatabase() && !store.loading()}>
         <Badge
           tip={
@@ -538,9 +532,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   return (
     // `grow`, because this stack is the pane: the header and the footer are pinned strips and the
     // region between them is the split, which needs a height of its own before anything in it can
-    // scroll. Without it the stack was as tall as whatever the inspector held, so the node list ran
-    // off the bottom of the window with nothing to scroll, and the graph and the JSON box got
-    // whatever height the list's rows happened to give them.
+    // scroll. Without it the stack is as tall as whatever the inspector holds, so the node list runs
+    // off the bottom of the window with nothing to scroll.
     <RevealFieldErrors.Provider value={revealErrors}>
       <Stack gap="none" grow>
         {header}
@@ -691,7 +684,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           {(address) => (
             <>
               {/* A dialog, not a strip over the editor: the conversation is a side trip from the draft, and
-            drawn inline it pushed the outline half off the screen. It keeps its thread on the device,
+            drawn inline it pushes the outline half off the screen. It keeps its thread on the device,
             so closing it and opening it again picks up where it was. */}
               <Modal title={`Edit ${draft().def.name} with AI`} size="lg" onDismiss={() => setAuthoringOpen(false)}>
                 <AuthoringConversation
@@ -814,8 +807,6 @@ const SAVE_BADGE: Record<SaveState, { word: string; tone?: 'warn' | 'danger'; ti
 const asText = (value: unknown): string =>
   value === undefined ? 'Not set' : typeof value === 'string' ? value : JSON.stringify(value)
 
-/** The step a merge conflict sits in, by name, or the definition field it touches. Merge paths name
- *  a step as `/steps/@{id}` (../../shared/workflowMerge.ts). */
 /** "Approve the release › prompt" for a proposal's `/steps/<id>/prompt`. The step is looked up in the
  *  draft, then in the proposal, which holds a step the change adds. */
 const changeSubject = (
@@ -828,6 +819,8 @@ const changeSubject = (
   return [name, ...rest].join(' › ')
 }
 
+/** The step a merge conflict sits in, by name, or the definition field it touches. `mergeWorkflow`
+ *  names a step as `/steps/@{id}`. */
 const conflictSubject = (path: string, def: { steps: readonly { id?: string; name: string }[] }): string => {
   const id = /^\/steps\/@([^/]+)/.exec(path)?.[1]
   if (id) return def.steps.find((step) => step.id === id)?.name ?? id

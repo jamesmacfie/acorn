@@ -10,10 +10,8 @@ import { splitJobLog } from './splitJobLog'
 // failed ones open, each step's log sliced from the one job-log fetch that fires when the first step
 // opens.
 //
-// A `Modal` rather than the hand-drawn right-hand drawer it used to be. Accepted difference: the
-// step logs are the kit's `Log` and no longer carry ANSI colour, because a log is text and the kit
-// draws text in one place. Everything else — lazy fetch, one request for every step, failed steps
-// open — is unchanged.
+// The step logs are the kit's `Log` and carry no ANSI colour, because a log is text and the kit draws
+// text in one place.
 export default function ChecksPanel(props: {
   owner: string
   repo: string

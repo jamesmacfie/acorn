@@ -7,10 +7,9 @@ import type { WorkflowCatalog, WorkflowStepDef } from '../../shared/workflowCont
 // that harness advertises, where it runs, and what it does with its upstreams
 // (docs/workflows/authoring.md § Authoring).
 //
-// They are not in any kind's `describe`, on purpose. A plugin contributing a kind that runs an agent
-// should not have to restate the model list, and the model list is not the plugin's to state: each
-// provider advertises its own options and the editor reads them from
-// `GET /v1/p/agents/providers`, the same list the agent pane offers.
+// They are not in any kind's `describe`, because the model list is not a contributing plugin's to
+// state. Each provider advertises its own options, and the editor reads the same list the agent pane
+// offers.
 
 const OPTION_ORDER: Record<string, number> = { model: 0, reasoning: 1, mode: 2, permission: 3, other: 4 }
 
@@ -57,7 +56,7 @@ export default function AgentNodeForm(props: {
         />
       </Field>
 
-      {/* Model and effort choices come from a connected session, rather than a static model list. */}
+      {/* One select per option the chosen harness advertises, such as model and effort. */}
       <For each={options()}>
         {(option) => (
           <Field label={option.label} group>

@@ -177,7 +177,7 @@ describe('the two kind spellings', () => {
 
 describe('the kind list comes from the catalog', () => {
   // The point of generating this section: a plugin that adds a kind gets it into the prompt without
-  // anybody editing generate.ts.
+  // anybody editing the prompt text.
   it('carries a kind nobody wrote into the prompt, with its with keys', () => {
     const extra = {
       id: 'deploy:ship',

@@ -9,9 +9,9 @@ import { basename, resolve } from 'node:path'
 // Source modules that are dynamically imported but still load before the first draw, keyed as the
 // manifest keys them. Every other dynamic import is a lazy surface and stays out of the count. A module
 // listed here that has no chunk of its own is skipped: index.html loads src/client/index.tsx directly,
-// so today it is part of the entry chunk, and the entry is counted anyway. It stays listed because an
-// entry module that dynamic-imports the app is the shape that blinded the budget once, and that import
-// is startup whatever syntax loads it.
+// so it is part of the entry chunk, and the entry is counted anyway. It stays listed because an entry
+// module that dynamic-imports the app can blind the budget, and that import is startup whatever syntax
+// loads it.
 const STARTUP_IMPORTS = ['src/client/index.tsx']
 
 // The compiled roster. ../src/client/activate.ts imports it after the first frame, and the workspace

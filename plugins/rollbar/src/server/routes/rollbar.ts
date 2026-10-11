@@ -88,13 +88,13 @@ const allFailed = (response: RollbarItemsResponse, connectionCount: number): boo
 // token hint in provider.ts), so the mapping is the whole filter. A link may narrow itself to one
 // project in the workspace, in which case only that project's rail keeps it.
 //
-// No project scope means no rows, not every row: falling back to all connections showed one
+// No project scope means no rows, not every row: falling back to all connections would show one
 // workspace's errors in every other workspace. Linear's rail closes the same way.
 //
 // The project id is a parameter rather than read off the request, because two callers spell it
 // differently and neither spelling is this function's business: the rail source asks with `?project=`
 // and the palette's search with `?projectId=`, which is the name the command host derives and sends
-// (client-core/host/chrome/chromeCommands.ts § commandRouteScope). Both are the host's word for the
+// (`commandRouteScope` in client-core). Both are the host's word for the
 // routed project; neither is anything a manifest or a response chose.
 async function scopedConnections(c: Context<AppEnv>, projectId: string | undefined, projects?: RollbarProjectScope) {
   if (!projectId || !projects) return []

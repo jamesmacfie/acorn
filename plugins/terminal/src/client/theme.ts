@@ -2,12 +2,12 @@ import type { ITheme } from '@xterm/xterm'
 import { getHighlighter, token } from '@acorn/plugin-api/client'
 
 // Re-exported for convenience inside this plugin. The generic appearance readers live in
-// core/client/ui/appearance.ts so other plugins reach them without a plugin→plugin import.
+// @acorn/plugin-api/client so other plugins reach them without a plugin→plugin import.
 export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/plugin-api/client'
 
 // xterm renders to its own canvas and ignores CSS, so it needs an explicit theme object. Rather
 // than hand-maintaining palettes, the theme is derived from the app's two existing sources:
-//  - chrome (background/foreground/cursor/selection) reads the CSS tokens (tokens-layout.css) at
+//  - chrome (background/foreground/cursor/selection) reads the CSS theme tokens at
 //    call time, so the terminal matches whatever theme the chrome is currently showing;
 //  - the 16-colour ANSI palette comes from the same VS Code theme JSON Shiki highlights diffs
 //    with (github-light/dark ship `terminal.ansi*` colours), so terminal output and diff syntax

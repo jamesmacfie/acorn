@@ -28,8 +28,8 @@ import { notesSelectionFor, rememberNotesSelection } from './notesPaneState'
 // not go with it.
 //
 // The host holds it. `model` on the pane contribution builds this once per task inside its own
-// reactive root and hands it to every region (client-core registries/paneModels.ts, docs/panes/layout.md §
-// Layout model). This file used to keep that root map itself, and so did changes, agents and context.
+// reactive root and hands it to every region (client-core's `paneModel`, docs/panes/layout.md §
+// Layout model).
 
 export type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
 export type NotesModel = ReturnType<typeof createNotesModel>
@@ -126,8 +126,8 @@ export function createNotesModel(taskId: string, projectId: string | null) {
   }
   const selectedIncluded = () => selectedSummary()?.included ?? true
 
-  // Autosave: debounce while typing, flush on blur and before we switch away. save() reads
-  // Each save captures the selected document owner. Flush again after held reads before replacing it.
+  // Autosave: debounce while typing, flush on blur and before we switch away. Each save captures the
+  // selected document owner. Flush again after held reads before replacing it.
   const scheduleSave = debounce(() => void save(), 1500)
   const scheduleTitle = debounce(() => void saveTitle(), 800)
   onCleanup(() => {

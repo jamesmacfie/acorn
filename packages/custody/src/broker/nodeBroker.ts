@@ -33,7 +33,7 @@ const log = createLogger('broker')
 
 // The connection broker. See docs/shell.md, "Connection broker", for what it owns per node. It has
 // no shell binding, so it can be unit-tested against a real TLS server.
-// `apps/desktop/src/shell/helperServer.ts` exposes it to the renderer.
+// The desktop helper's `startHelperServer` exposes it to the renderer.
 //
 // It must not live in @acorn/client-core. The boundary test classifies that package as client-side,
 // so a node:https import there would fail the client/node split rule and drag Node builtins into the
@@ -58,7 +58,7 @@ const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
 export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 const MAX_NODE_HTTP_SOCKETS = 4
 
-// A node plus the material only main may hold: the bearer, and the certificate to pin against.
+// A node plus the material only the helper may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
 
 export type BrokerEvents = {
@@ -77,7 +77,7 @@ type Connection = {
   agent: HttpAgent | HttpsAgent
   ws: WebSocket | null
   // Frames the renderer sent before the socket was open. Kept here as well as in the renderer's own
-  // outbox, because a reconnect happens inside main and the renderer never learns of it.
+  // outbox, because a reconnect happens inside the helper and the renderer never learns of it.
   viewers: EventViewers
   state: NodeConnectionState
   error: NodeStatus['error']
@@ -141,8 +141,8 @@ export class NodeBroker {
   }
 
   // The version gate runs here rather than at pairing, because pairing checks once and a node
-  // upgrades afterward. A node that drifted past this client used to keep connecting and fail later
-  // as an `undefined` deep inside a component.
+  // upgrades afterward. Without it, a node that drifted past this client would keep connecting and
+  // fail later as an `undefined` deep inside a component.
   //
   // It runs before the socket opens. A client that cannot speak the protocol should not open a
   // WebSocket and start interpreting frames on it.
@@ -213,7 +213,7 @@ export class NodeBroker {
   }
 
   list(): NodeRecord[] {
-    // Never leak the token out of main, even to the renderer's own projection.
+    // Never leak the token out of the helper, even to the renderer's own projection.
     return [...this.connections.values()].map(({ node: { token: _token, ...record } }) => record)
   }
 
@@ -306,7 +306,7 @@ export class NodeBroker {
     const url = new URL(WS_PATH, connection.node.endpoint)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     // The bearer rides the upgrade request's headers, which a browser cannot set. One reason the
-    // socket belongs to main rather than the renderer.
+    // socket belongs to the helper rather than the renderer.
     const ws = new WebSocket(url, {
       headers: {
         authorization: `Bearer ${connection.node.token}`,
@@ -362,7 +362,7 @@ export class NodeBroker {
   //
   // `terminate()` rather than `close()`. `close()` starts a closing handshake, which waits for a
   // reply from a peer already concluded to be not replying: the socket sits closing and the node
-  // still reads `online`, which is the bug this exists to fix, one state further along.
+  // still reads `online`.
   // `terminate()` destroys it, which fires `'close'` and reaches the reconnect machinery.
   private startHeartbeat(connection: Connection, ws: WebSocket): void {
     this.stopHeartbeat(connection)
@@ -509,10 +509,10 @@ export class NodeBroker {
   // 401 with `unauthenticated`. See server/middleware/requireUser.ts, where a revoked token resolves
   // to no principal.
   //
-  // Reading the status alone was wrong in the direction that matters. Route-level failures reuse both
+  // Reading the status alone is wrong in the direction that matters. Route-level failures reuse both
   // codes for a different credential: `provider_not_connected` is the 403 a fresh node answers for an
   // unconnected GitHub integration, and `linear_reauth` and `provider_needs_auth` are 401s about a
-  // third-party token. The loopback Host guard also 403s. Any of them marked a healthy node
+  // third-party token. The loopback Host guard also 403s. Any of them would mark a healthy node
   // `revoked`, which the fleet UI renders as a security event and which stops the WebSocket being
   // retried.
   private noteHttpResult(connection: Connection, response: NodeFetchResponse): void {

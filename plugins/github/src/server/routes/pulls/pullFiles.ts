@@ -96,13 +96,13 @@ const handleFilesRead = async (
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
-// path/status/+/−/sha/patch in one call, richer than the GraphQL composite, which dropped files).
-// Mirror logic is shared with the batch route, see prMirror.ts.
+// path/status/+/−/sha/patch in one call, which the GraphQL composite does not). Mirror logic is
+// shared with the batch route (`mirrorFiles`).
 //
 // GET answers with PullFilesResponse: the files in provider order and whether that is all of them.
 // `?path=` narrows it to one file. GET `/diff` answers with the same files as a segmented document
-// (PullDiffResponse) for the diff viewer, whose segments come from ./diffDocument.ts. There is no
-// batch patch read any more: the viewer reads segments, never whole patches.
+// (PullDiffResponse) for the diff viewer, which reads segments through the diff document routes and
+// never whole patches.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>

@@ -19,10 +19,10 @@ import { githubToken } from '../../githubToken'
 import { syncState } from '../../../node/schema'
 
 // PR detail: the composite GraphQL read (docs/github-integration.md), the primary read for the
-// PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so
-// freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the
-// cache. The mirror logic is shared with the batch route, see prMirror.ts. Files live in
-// pr_files, owned by /files.
+// PR screen: PR + reviews + comments + checks, with every connection walked to its end. GraphQL has
+// no ETag, so freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are
+// the cache. The mirror logic is shared with the batch route (`mirrorPr`). Files live in pr_files,
+// owned by /files.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullDetail = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>

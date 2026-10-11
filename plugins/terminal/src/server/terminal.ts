@@ -96,14 +96,14 @@ const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
 
-// What this engine needs from core, now that it can't read core's tables: resolve a taskId to a row and
+// What this engine needs from core, since it can't read core's tables: resolve a taskId to a row and
 // to the cwd its commands run in, and read the project's setup script. `proc` and
 // `projects.assertConfigTrusted` are for the run-target service built over this engine (runChannel.ts).
 export type TerminalCoreServices = Pick<CompiledCoreServices, 'tasks' | 'projects' | 'proc' | 'git' | 'taskScripts'>
 
 // This engine is a process singleton by construction (one PTY table, one idle watch, one session map
 // per node), so its database handle and core services live in module state rather than being threaded
-// through fourteen signatures. init() installs them and dispose() removes them, so a second
+// through every signature. init() installs them and dispose() removes them, so a second
 // startServiceRuntime in one process replaces the first boot's handle instead of stacking a second
 // engine beside it.
 //
@@ -146,13 +146,10 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
   void agentSender.send(sessionId, text, submit)
 }
 
-// Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability
-// (contract/sessions.ts). A two-method object rather than a reach into the TerminalBridge, because
-// the bridge is the route layer's dependency: it gets nulled on dispose, and a capability consumer
-// resolving it would be reading this plugin's HTTP wiring.
-//
-// Its one consumer is plugins/agents' terminal handoff, the only cross-plugin caller that needs to
-// start a PTY. It shares the bridge's list and create implementations, and not the other six.
+// Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability. A
+// two-method object rather than a reach into the TerminalBridge, because the bridge is the route layer's
+// dependency: it gets nulled on dispose, and a capability consumer resolving it would be reading this
+// plugin's HTTP wiring. It shares the bridge's list and create implementations.
 //
 // Named `sessionControl`, not `terminalSessions`, because that name is already the Drizzle table
 // this module imports, and shadowing it would silently rebind every query below.
@@ -301,9 +298,8 @@ function emit(s: Session, msg: ServerMsg) {
   s.display.publish(msg)
 }
 
-// Buffer PTY output. The raw ring feeds transcript-tail analysis and, since phase 6 of the
-// performance programme, rebuilds the display emulator whenever a client attaches; the live wire frame
-// is coalesced onto the next tick.
+// Buffer PTY output. The raw ring feeds transcript-tail analysis and rebuilds the display emulator
+// whenever a client attaches; the live wire frame is coalesced onto the next tick.
 function queueOutput(s: Session, data: string) {
   s.ring.push(data)
   s.display.write(data) // a no-op unless an attach is restoring: there is no emulator to feed
@@ -531,8 +527,8 @@ function startIdleWatch() {
         s.sawIdle = true
         // An idle session showing an input prompt in its tail is blocked, not done.
         s.meta.agentState = matchBlockedPrompt(s.ring.tail(4000)) ? 'blocked' : 'idle'
-        agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
-        // The OS toast lives in the client now, focus-gated with cooldown and dedup there.
+        agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge
+        // The client owns the OS toast, with its focus gate, cooldown and dedup.
         statusBroadcast()
         worktreeSettled(s)
       }
@@ -928,7 +924,7 @@ export type TerminalChannelDeps = {
   // Mutating surfaces that read the sessions map await it.
   reconciled: Promise<void>
   // "The session roster moved": created, exited, or flipped between working and idle. Machine rate on
-  // the working edge, which is why it says only that (@acorn/protocol/nodeEvents.ts).
+  // the working edge, which is why it says only that (nodeEvents in @acorn/protocol).
   status?: () => void
   // "Something under this task's worktree may have changed." Fired on the human-rate edges only — a
   // command going quiet, a session exiting, a setup script finishing — because those are the moments a
@@ -999,7 +995,7 @@ export function registerTerminalChannel(
   // script run whichever surface created the worktree.
   //
   // It takes the task id rather than the row, because it is reached through core's `core:worktree-created`
-  // hook now and a hook payload is scalars (docs/plugins/hooks.md § Hooks). Loading the row here costs one
+  // hook and a hook payload is scalars (docs/plugins/hooks.md § Hooks). Loading the row here costs one
   // read on a path that is about to spawn a shell.
   const worktreeCreated = async (taskId: string, cwd: string): Promise<void> => {
     assertOwner(engine)
@@ -1074,10 +1070,10 @@ export function registerTerminalChannel(
     },
   }
 
-  // The PTY half of archive (@acorn/node-core/server/routes/projects/worktree.ts owns the route and the
-  // orchestration). These four are the only parts of tearing a task down that need a pseudo-terminal:
-  // the running-session guard, killing this task's sessions, dropping their rows, and streaming teardown
-  // output into a "Teardown" tab. An unfilled slot answers 503.
+  // The PTY half of archive (node-core's worktree routes own the route and the orchestration). These four are
+  // the only parts of tearing a task down that need a pseudo-terminal: the running-session guard, killing
+  // this task's sessions, dropping their rows, and streaming teardown output into a "Teardown" tab. An
+  // unfilled slot answers 503.
   const taskSessions: TaskSessionsBridge = {
     // The reconcile gate the route awaits before the running-session guard.
     ready: () => deps.reconciled,
@@ -1161,8 +1157,8 @@ export function registerTerminalChannel(
     },
   }
 
-  // Seeding PR and ticket notes on task creation is core's route now, but the composition root injects
-  // the notes store here, so this hands core the hook rather than moving the dependency.
+  // Core's task-create route calls this to seed the task's PR and ticket notes. The notes seeder is a
+  // dependency of this engine, so the engine hands core the hook.
   const taskCreated: TaskCreatedHook = async (taskId) => {
     assertOwner(engine)
     const task = await engine.core.tasks.load(taskId)
@@ -1171,11 +1167,11 @@ export function registerTerminalChannel(
   }
 
   // The stream half. The terminal engine's PTY input, output, attach and detach ride the one
-  // authenticated WebSocket (server/transport/wsHub.ts) instead of per-session IPC channels. The hub routes client
+  // authenticated WebSocket (the node's WS hub) instead of per-session IPC channels. The hub routes client
   // frames here and hands each attachment a sink to fan output to.
   deps.streams?.({
     // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries to
-    // attach to or type into another task's pseudo-terminal (server/transport/wsHub.ts § mayDriveStream).
+    // attach to or type into another task's pseudo-terminal (`mayDriveStream` in the WS hub).
     streamTaskId: (id) =>
       engine.token === engineToken && sessions.get(id)?.admitted && !sessions.get(id)!.retired
         ? sessions.get(id)!.meta.taskId
@@ -1192,8 +1188,8 @@ export function registerTerminalChannel(
       if (engine.token !== engineToken) return
       const s = sessions.get(id)
       if (!s?.admitted || s.retired) return
-      // A viewer that sent its size gets a snapshot drawn at that size. It used to post a resize and
-      // wait for the answer before attaching, one more round trip before a returning terminal drew.
+      // A viewer that sent its size gets a snapshot drawn at that size, with no separate resize round trip
+      // before a returning terminal draws.
       if (size) resizeSession(s, size.cols, size.rows)
       flushOutput(s)
       // The ring is what an attach rebuilds the screen from, and it is read only when there is no
@@ -1207,8 +1203,8 @@ export function registerTerminalChannel(
     // Backpressure, at the producer. The hub calls this when a client's socket has buffered past its
     // mark; `pause()` stops node-pty reading the pseudo-terminal, which lets the kernel's pipe fill and
     // the program writing into it block, which is what "slow down" means to a build
-    // (docs/terminal/activity.md § Backpressure). The alternative the hub used to take was throwing frames away,
-    // which the client could only recover from by reconnecting and re-attaching every session.
+    // (docs/terminal/activity.md § Backpressure). Dropping frames instead would leave the client to recover by
+    // reconnecting and re-attaching every session.
     //
     // A pause is not visible to the session's state: the idle watch reads `lastActivityAt`, and a paused
     // PTY simply stops advancing it, which is indistinguishable from a quiet program and equally true.

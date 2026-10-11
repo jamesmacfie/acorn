@@ -1,5 +1,5 @@
-// The memory pane's route builders (docs/notes-and-memory.md), moved verbatim out of
-// @acorn/protocol/api.ts so this plugin owns the shape of its own namespace.
+// The memory pane's route builders (docs/notes-and-memory.md). This plugin owns the shape of its own
+// namespace.
 
 export const memoryListRoute = (projectId?: string, scope?: 'project' | 'private') =>
   `/v1/p/memory/memory${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}${scope ? `${projectId ? '&' : '?'}scope=${scope}` : ''}`

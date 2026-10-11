@@ -44,12 +44,9 @@ import { hasRenderableBody, reviewAction, threadComments, type ConversationEntry
 // One turn of a pull request's conversation, as a `Card` in a `Timeline`. Four kinds: a comment, a
 // review summary, a commit, and a review thread pinned to a file.
 //
-// Accepted difference from the hand-drawn version this replaces: every turn is the kit's card rather
-// than four bespoke boxes, so a commit and a comment now share their padding and their rule.
-//
 // A turn's byline is drawn at once and its body when the turn comes near the viewport (`near`, from
 // the kit's Timeline.Turn). GitHub's rendered HTML, with its images, and a thread's quoted code are
-// the expensive parts, and a pull request with hundreds of threads used to build every one on open.
+// the expensive parts, and building every one on open is slow for a pull with hundreds of threads.
 
 /** Where a body goes until its turn comes near. Words rather than a blank, so a card is never empty. */
 const NOT_DRAWN = 'Shown when you scroll to it.'
@@ -331,8 +328,8 @@ export function PrConversation(props: {
     }
   })
   // The diff's document says which segment holds each thread's line, so a thread's snippet reads one
-  // segment rather than a parsed patch (docs/github-integration/surfaces.md § Conversation). Only asked for
-  // when some thread has a line to quote.
+  // segment rather than a parsed patch (docs/github-integration/surfaces.md § Conversation). Only asked
+  // for when some thread has a line to quote.
   const anchored = createMemo(() =>
     entries().some((entry) => entry.kind === 'thread' && reviewThreadLocation(entry.thread) != null),
   )

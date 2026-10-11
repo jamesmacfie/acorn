@@ -1,4 +1,4 @@
-// The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
+// The terminal plugin's agent tools: the run_* tools, as the `tools` contribution point
 // (docs/plugins/data-ownership.md § Tool projection).
 //
 // They live here, beside the RuntimeService this plugin's init builds, because that service closes

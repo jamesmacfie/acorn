@@ -5,9 +5,8 @@ import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/plugin-a
 import { githubContentLinkContributions, makeContentLinkHandler } from './contentLinks'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
 
-// Only github's own recognisers are asserted here. Linear's recogniser moved to plugins/linear with
-// its contribution; a github test importing linear's client would cross the plugin boundary the arch
-// suite refuses.
+// Only github's own recognisers are asserted here. A github test importing linear's client would
+// cross the plugin boundary the arch suite refuses.
 let dispose: (() => void)[] = []
 beforeAll(() => {
   dispose = githubContentLinkContributions.map((c) => contentLinkRegistry.register(c).dispose)
@@ -16,8 +15,9 @@ afterAll(() => dispose.forEach((d) => d()))
 
 describe('parseInAppTarget', () => {
   it('recognises GitHub PR links (ignoring trailing path)', () => {
-    // `item`/`providerId` make the reference panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and
-    // the UI kit). The spelling matches the pulls collection's row id.
+    // `item`/`providerId` make the reference panel reachable
+    // (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit). The spelling
+    // matches the pulls collection's row id.
     expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files')).toEqual({
       kind: 'pr',
       providerId: 'github',
@@ -28,8 +28,8 @@ describe('parseInAppTarget', () => {
     })
   })
   it('recognises bare GitHub repo links but not deep paths or profiles', () => {
-    // No provider on this one: docs/github-integration/tasks-and-references.md § Content links explains why a repo has no
-    // reference panel.
+    // No provider on this one: docs/github-integration/tasks-and-references.md § Content links
+    // explains why a repo has no reference panel.
     expect(parseInAppTarget('https://github.com/runn/acorn')).toEqual({
       kind: 'repo',
       providerId: undefined,
@@ -69,8 +69,8 @@ const hrefAnchor = (href: string) => ({ getAttribute: (name: string) => (name ==
 const project = (id: string, owner: string, name: string) => ({ id, github: { owner, name } }) as unknown as Project
 
 // These tests go through `allProjects`, like the code does, instead of a stub resolver. A stub that
-// echoed back the same owner/repo the test wrote would agree with itself whatever the casing, which
-// is how the case-insensitivity bug below survived earlier versions of this suite.
+// echoed back the same owner/repo the test wrote would agree with itself whatever the casing, and
+// would miss the case-insensitivity bug below.
 describe('project-keyed content navigation', () => {
   afterEach(() => {
     setProjectsLookup(() => [])
@@ -195,8 +195,8 @@ describe('openInAppUrl over github rows', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  // Real casing, not an invented spelling: docs/github-integration/tasks-and-references.md § Content links covers why the
-  // comparison must be case-insensitive.
+  // Real casing, not an invented spelling. Why the comparison must be case-insensitive:
+  // docs/github-integration/tasks-and-references.md § Content links.
   it('matches owner and repo case-insensitively, as GitHub does', () => {
     setProjectsLookup(() => [project('proj-runn', 'runn-fast', 'runn')])
     const navigate = vi.fn()

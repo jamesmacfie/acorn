@@ -15,7 +15,7 @@ import { notesApi, requestNoteOpen } from './notesClient'
 // **One search over three lists.** A reader looking for "the deploy runbook" does not know whether
 // they filed it against this task, this workspace or globally, and the pane draws all three in one
 // column anyway (./NotesPane.tsx). The three lists load once when the frame opens and are filtered
-// here (client-core/host/registries/commands/localSearch.ts).
+// here (client-core's `localSearch`).
 //
 // **Ids are scope-qualified, and that is load-bearing.** A slug is unique inside a scope and nowhere
 // else, so `deploy` can exist as a task note and a global one at the same time. `task:deploy` and

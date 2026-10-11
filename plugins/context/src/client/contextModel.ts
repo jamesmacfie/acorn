@@ -24,8 +24,8 @@ import { bumpContextRevision } from './contextRevision'
 // three components the host mounts rather than one component with everything in scope. They share the
 // inventory, the selection, the expanded rows and the sync state, and the host holds that: `model` on
 // the pane contribution builds this once per task inside its own reactive root, for the same reason
-// notes' does — a region the host unmounts must not take the fetch with it (client-core
-// registries/paneModels.ts).
+// notes' does — a region the host unmounts must not take the fetch with it (client-core's
+// `paneModel`).
 
 /** The id the section's `Rows` is registered under, so `reveal` and the pane agree on one name. */
 export const collectionId = (sectionId: string): string => `context.${sectionId}`

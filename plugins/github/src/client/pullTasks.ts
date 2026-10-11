@@ -42,8 +42,8 @@ export const activeTaskForPull = (tasks: readonly Task[], projectId: string, pul
 // connection in the list. A link may name this project or the whole workspace, so both count.
 //
 // Two mapped Linears, or none, still yields null and the task is created without the link. That is
-// the same outcome as before and the honest one: a link pointing at the wrong workspace resolves to
-// an issue that isn't the one in the PR.
+// the honest outcome: a link pointing at the wrong workspace resolves to an issue that isn't the one
+// in the PR.
 export async function linearConnectionForProject(
   queryClient: QueryClient,
   projectId: string,

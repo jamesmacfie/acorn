@@ -68,8 +68,8 @@ export function disposeDockerStore(): void {
 }
 
 // ── Task and container summaries: rail and footer badges, pane gating, archive concern ────────────
-// Polled like taskStatus.ts, because containers can change without docker events reaching us after a
-// reconnect, plus the docker:changed edge for immediacy.
+// Polled, because containers can change without docker events reaching us after a reconnect, plus the
+// docker:changed edge for immediacy.
 const [taskSummaries, setTaskSummaries] = createSignal<Record<string, DockerTaskSummary>>({})
 
 export const dockerTaskSummary = (taskId: string): DockerTaskSummary | undefined => taskSummaries()[taskId]

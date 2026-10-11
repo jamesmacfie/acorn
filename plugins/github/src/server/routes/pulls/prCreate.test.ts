@@ -16,7 +16,7 @@ vi.mock('../../githubApi', async (importOriginal) => {
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
 // Two handles, for two different tables in two different files, which is the shape every github route
-// test has now:
+// test has:
 //   `plugin.db` is this plugin's migrated github.sqlite, which the router is a factory over. None of
 //     the paths asserted below reach it, each returning before the sync-state bust, but it's a real
 //     migrated handle rather than a stub so the router can't silently stop touching it unnoticed.

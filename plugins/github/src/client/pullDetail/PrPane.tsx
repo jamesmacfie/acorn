@@ -13,21 +13,19 @@ import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 
-// The PR pane: one pull request, drawn the way the GitHub browse surface draws one — the navigator
-// column beside the diff (../GithubBrowse.tsx). Browse reaches the same pair through its own pull
-// list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
+// The PR pane: one pull request, drawn the way the GitHub browse surface draws one, the navigator
+// column beside the diff. Browse reaches the same pair through its own pull list; a task already
+// knows which pull it is about, so the list is a strip of related pulls instead.
 //
 // A `single` layout holding one kit node, not the host's `list-detail`: the halves are one surface
-// with a shared model rather than two regions, and `Sections` is the node that arranges them — folds
-// beside the diff on a desktop, a strip of tabs in a terminal
-// (client-core/kit/components/layout/Sections.tsx). It is what makes this look like browse rather
-// than like a second design, because browse draws the same node from the same list.
+// with a shared model rather than two regions, and the kit's `Sections` arranges them: folds beside
+// the diff on a desktop, a strip of tabs in a terminal. Browse draws the same node from the same list.
 //
-// A task can be about more than one pull — the one it was made from, the ones that mention it, the
-// ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
+// A task can be about more than one pull (the one it was made from, the ones that mention it, the
+// ones stacked on it), so the navigator opens with the strip that switches between them.
 //
-// The registration is next door in ./paneContribution.ts, which is what keeps this file — and the
-// pull-request model behind it — out of the renderer's first paint.
+// The registration lives in `prPaneContribution`, which keeps this file and the pull-request model
+// behind it out of the renderer's first paint.
 
 // A destination a related pull has and this pane does not. The mark on the tab says which one, and
 // the control beside the strip is how a reader takes it.
@@ -150,7 +148,7 @@ export function PrPane(props: { task: Task }) {
   })
   const onLinkClick = makeContentLinkHandler(navigate, { taskId: props.task.id })
   // A pane has no router, so the selected file is held locally and the diff column hears about it
-  // through the file-scroll event rather than through `?file=` (../changedFiles.ts).
+  // through the file-scroll event rather than through `?file=`.
   const changedFiles = useChangedFiles(
     () => {
       const pull = tabs.selected()?.pull
@@ -158,8 +156,8 @@ export function PrPane(props: { task: Task }) {
     },
     { router: false },
   )
-  // Keyed on the selected pull and whether it is read-only, for the reason ../PullDetail.tsx gives: a
-  // related pull otherwise showed the primary's threads with live Reply boxes.
+  // Keyed on the selected pull and whether it is read-only, because `DiffForPull` reads its route
+  // once: without a new mount, a related pull would show the primary's threads with live Reply boxes.
   const diffRoute = createMemo<(PullRoute & { readOnly: boolean }) | null>(
     () => {
       const scope = model()?.scope

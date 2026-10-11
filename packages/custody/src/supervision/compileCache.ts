@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Where the node service keeps V8's compiled code between launches, handed to it as
-// NODE_COMPILE_CACHE. A warm cache takes 25 to 40 ms off the node's boot. Node checks each entry
+// NODE_COMPILE_CACHE, so a warm launch skips recompiling the bundle. Node checks each entry
 // against the source it was compiled from, so a stale entry is recompiled rather than trusted, and
 // an unwritable directory turns the cache off rather than failing the boot.
 //

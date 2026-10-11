@@ -145,8 +145,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
             anchors: inlineAnchors,
             open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
             render: (row: CodeRow) => {
-              // Memoised for the reason plugins/git/src/client/changes/changesModel.tsx gives: read directly,
-              // every session update rebuilt the card and blurred its textarea.
+              // Memoised: read directly, every session update would rebuild the card and blur its textarea.
               const shown = createMemo(
                 () => {
                   const origin = inlineOrigin(row)

@@ -9,9 +9,9 @@ import type { CommitMode } from './model'
 import type { ModelPick } from '../../shared/changes/api'
 
 // The wand in jsdom, which is the tier that can answer what a press does: whether the control is
-// drawn at all, whether it arms over text somebody wrote, and which backend it spends. The pure
-// half — what a refusal reads as — is in model.test.ts, which pick wins is in client-core's
-// generatePick.test.ts, and what the node does with the request is in ../server/routes/localGit.test.ts.
+// drawn at all, whether it arms over text somebody wrote, and which backend it spends. What a refusal
+// reads as is tested beside `generateReason`, which pick wins beside `effectiveModelPick`, and what the
+// node does with the request in the local Git route tests.
 //
 // The model is a stand-in, for the reason the other two pane tests give: `createChangesModel` fetches
 // over HTTP and subscribes to the task poll, and neither is what a button is about.
@@ -105,12 +105,13 @@ describe('what a press does', () => {
     draw({ backends: [chosen] })
     wand()!.click()
     // The second argument is the backend itself, which only the failure copy reads: a signed-out CLI
-    // fails like an unreachable provider and needs a different next step (./model.ts § generateReason).
+    // fails like an unreachable provider and needs a different next step (`generateReason`).
     expect(generate).toHaveBeenCalledWith({ backendId: 'c1', modelId: 'fast' }, chosen)
   })
 
   // The text it would overwrite is the reader's, so the button asks before it replaces it. Two
-  // presses, and the label between them is the whole prompt (docs/ui-design/closed-kit.md § The closed kit).
+  // presses, and the label between them is the whole prompt
+  // (docs/ui-design/closed-kit.md § The closed kit).
   it('arms first over a message somebody wrote', () => {
     draw({ backends: [backend('c1', 'Work', ['fast'])], draft: 'feat: I wrote this' })
     wand()!.click()

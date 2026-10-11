@@ -32,16 +32,15 @@ import { formatDate, relativeTime } from './model'
 // One Linear ticket, as a tree of acorn's own components. Three tabs, Overview, Activity, and
 // Comments, all fed by one detail request.
 //
-// Nothing here draws a pixel: what used to be a header div with three classes is a `Heading`, the
-// sub-issue progress bar is a `Meter`, the related-issue buttons are `Row`s, and the comment boxes are
-// `Composer`s. The stylesheet this file needed is gone, and with it the job of keeping it in step with
-// the shell's appearance packs.
+// Nothing here draws a pixel: the header is a `Heading`, the sub-issue progress bar a `Meter`, the
+// related-issue buttons `Row`s, and the comment boxes `Composer`s, so the shell's appearance packs apply
+// with no stylesheet here to keep in step.
 //
 // Two things live outside this file. The panel chrome belongs to whoever opened the panel
 // (client-core/host/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
 // tickets sits in app.tsx beside the task read.
 
-// Icon per activity kind. Names, not typed glyphs: "○" used to mean both "assigned" and "not done".
+// Icon per activity kind. Names, not typed glyphs, so one character never stands for two kinds.
 const ACTIVITY_ICON: Record<string, string> = {
   created: 'sparkles',
   state: 'circle-dot',
@@ -128,9 +127,9 @@ export function LinearIssueView(props: LinearIssueViewProps) {
     <Card pad="sm" stripe={isReply ? 'accent' : undefined}>
       <Stack gap="row">
         {/* An `Inline`, not a `Toolbar`: a bar inside a card is inset by the card's padding and then
-            pads itself again, so the author's name sat further in than their own words and the strip
-            stood taller than the line it holds. Github's inline threads put this meta line flush with
-            the comment body, and so does this one now. */}
+            pads itself again, so the author's name would sit further in than their own words and the
+            strip would stand taller than the line it holds. Github's inline threads put this meta line
+            flush with the comment body, and so does this one. */}
         <Inline>
           <Text emphasis="strong">{entry.author ?? 'Unknown'}</Text>
           <Show when={relativeTime(entry.createdAt)}>{(age) => <Text tone="muted">{age()}</Text>}</Show>
@@ -145,9 +144,8 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             </Button>
           </Show>
         </Inline>
-        {/* The host renders and sanitises the markdown. What used to be an `innerHTML` write inside the
-            frame is now a node with a `text` prop, which is the only way a stranger's markup can reach
-            the shell's DOM at all. */}
+        {/* The host renders and sanitises the markdown. A node with a `text` prop is the only way a
+            stranger's markup can reach the shell's DOM at all. */}
         <Markdown text={entry.body} onSelect={props.onLink} onCopy={props.onCopy} />
         <Show when={repliesOf(entry.id).length}>
           <Stack gap="row">
@@ -346,8 +344,8 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   )
 }
 
-/** The parent-and-children block, with the done count as a `Meter`: the progress bar it replaces was a
- *  div whose width this plugin computed in percent, which is a pixel decision the kit now owns. */
+/** The parent-and-children block, with the done count as a `Meter`, so the bar's width is the kit's
+ *  pixel decision rather than this plugin's. */
 function SubIssues(props: {
   issue: LinearIssueDetail
   row: (related: LinearRelatedIssue, done?: boolean) => JSX.Element

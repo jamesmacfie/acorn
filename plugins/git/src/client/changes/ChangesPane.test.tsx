@@ -141,7 +141,7 @@ afterEach(() => {
 
 // Built before the render, not inside it. A JSX prop is a getter, so `model={model(changes)}` would
 // mint a new one on every read and the folded-folder signal inside it would never survive a click.
-// The host builds it once per task for the same reason (client-core registries/paneModels.ts).
+// The host builds it once per task for the same reason (`paneModel` in client-core).
 const draw = (changes: LocalChange[], chosen: Partial<ChangeView> = {}) => {
   const built = model(changes, chosen)
   disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={built} />, host))
@@ -377,7 +377,7 @@ describe('the review notes banner', () => {
 })
 
 /** The folder rows of a group. `TreeRow` is the only row drawn as a tree; the files under it are the
- *  same `Row` the flat list uses, which is the whole point of phase 0's `depth`. */
+ *  same `Row` the flat list uses, nested by its `depth`. */
 const folderRows = (title: string) => [...group(title).querySelectorAll<HTMLElement>('.ui-row[data-variant="tree"]')]
 /** What each row of a group says, badge and counts left out. */
 const rowLabels = (title: string) =>

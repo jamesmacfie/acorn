@@ -1,13 +1,12 @@
 // Which tasks have a run, so the pane can be hidden on the ones that do not.
 //
 // `when` on a pane is synchronous and is asked while the task row is drawn, so the answer has to be
-// in memory already (client-core registries/panes/panes.ts). One node-wide read fills it, the same
-// route the rail's recent-run list uses, and the node's `run-changed` frame refreshes it. The
-// interval is the backstop for a frame that arrived while another node was active.
+// in memory already. One node-wide read fills it, the same route the rail's recent-run list uses, and
+// the node's `run-changed` frame refreshes it. The interval is the backstop for a frame that arrived
+// while another node was active.
 //
-// The route answers the last hundred runs on the node, so a task whose only run has fallen off that
-// list loses its pane. That is the same window the rail and the merged run list show, and a longer
-// one would mean a count query per task.
+// The route answers the last `RUN_LIST_LIMIT` runs on the node, so a task whose only run has fallen off
+// that list loses its pane. A longer window would mean a count query per task.
 import { createSignal } from 'solid-js'
 import {
   activateTaskSignals,
@@ -50,8 +49,8 @@ export const rememberWorkflowRun = (taskId: string): void => {
 }
 
 /** Open a run in its task's Workflows pane. The shell draws what the rail source says, not the
- *  address, so navigating alone left the reader on Workflows with an empty list. These are the calls
- *  the agents center makes to open a session's run, in its order (plugins/agents center/AgentCenter.tsx). */
+ *  address, so navigating alone leaves the reader on Workflows with an empty list. These are the calls
+ *  the agents center makes to open a session's run, in its order. */
 export function openWorkflowRun(task: Task, runId: string, navigate: (path: string) => void): void {
   rememberWorkflowRun(task.id)
   activateTaskSignals(task, { pane: 'workflows' })

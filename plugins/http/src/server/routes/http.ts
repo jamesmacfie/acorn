@@ -41,7 +41,7 @@ import { MAX_CONTEXT_REQUESTS, requestOption, requestSnapshot } from '../agentCo
 import { importedRequestName, savedRequestSearchItems } from '../paletteSearch'
 
 // The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
-// wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
+// wiring bug, and saying so beats answering it from host handles this bundle should not touch.
 const { requestContext, portableFetch } = portableCarrier('http')
 
 const owner = (c: Context<AppEnv>): string => requestContext(c).userId

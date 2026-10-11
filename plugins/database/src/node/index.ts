@@ -11,8 +11,7 @@ import { databaseQuery, generateStep, queryStep } from '../server/workflowSteps'
 //
 //   ctx.storage.open()  the plugin database, with the id bound from the manifest and the DDL chain
 //                       confined to the installed package. `<dataRoot>/plugins/database.sqlite` is
-//                       still the file, since the id did not change; renaming it would orphan every
-//                       saved query on the machine.
+//                       the file; renaming the id would orphan every saved query on the machine.
 //
 //   ctx.routes.fetch()  the portable route carrier. A Hono instance cannot cross a process boundary and
 //                       a (Request) → Response function can.

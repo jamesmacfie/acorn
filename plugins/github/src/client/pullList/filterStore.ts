@@ -1,6 +1,6 @@
-// GitHub PR list filter state, kept per workspace (docs/workspaces-and-tasks.md). The open/closed tab and the
-// free-text query are remembered per workspace id and persisted to the `pr_filters` pref (App.tsx),
-// so returning to a workspace restores its last filter. Signals-only, like ../tasks/tasks.ts.
+// GitHub PR list filter state, kept per workspace (docs/workspaces-and-tasks.md). The open/closed tab
+// and the free-text query are remembered per workspace id and persisted to the `pr_filters` pref, so
+// returning to a workspace restores its last filter. Signals-only.
 import { createSignal } from 'solid-js'
 import { onScopeEvicted, parseJson, PersistedSliceKeys, type PersistedStateSlice } from '@acorn/plugin-api/client'
 
@@ -49,14 +49,13 @@ export { prFilters }
 
 // Everything this module holds is keyed by a node-minted id, so it must not survive a node switch:
 // the persistence pass reads these maps and writes each scope under the active node's storage key,
-// and a stale entry would carry one node's state into another's namespace
-// (client-core's tasks/tasks.ts states the case in full).
+// and a stale entry would carry one node's state into another's namespace.
 export function clearPrFilters(): void {
   setPrFilters({})
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in the shell, so this signal and the thing that clears it are one edit
+// apart.
 onScopeEvicted((e) => {
   if (e.scope === 'workspace') evictPrFilter(e.workspaceId)
   else if (e.scope === 'node-switched') clearPrFilters()
@@ -64,7 +63,7 @@ onScopeEvicted((e) => {
 
 // The PR list's own persisted-state descriptor: tab + text filter, per workspace. Owned here rather
 // than in core so core never has to know which features persist state (docs/plugins.md); registered
-// by this plugin's own ClientPlugin init (client/index.ts).
+// by this plugin's own ClientPlugin init.
 const parsePrFilter = (raw: unknown): PrFilter => {
   const value = parseJson(raw)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { tab: 'open', filter: '' }

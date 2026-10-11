@@ -12,7 +12,7 @@ import { type GithubEmit, NO_EMIT } from '../../events'
 // The two reads a diff document makes after its topology: a batch of segments, and a page of search
 // matches. Repository-level rather than per pull, because a segment is addressed by its patch's
 // digest and a pull request and a compare preview both store their patches the same way
-// (../mirror/prDocument.ts). Access is the repository's, resolved as the blob route resolves it.
+// (`writePatchDocument`). Access is the repository's, resolved as the blob route resolves it.
 //
 // The digest is checked to be one this plugin could have written before it becomes part of a blob
 // key, so a request cannot address any other kind of blob.

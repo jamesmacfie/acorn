@@ -15,8 +15,8 @@ describe('HTTP storage encryption', () => {
     await expect(openHttpValue('plain', false, SECRETS)).rejects.toBeInstanceOf(HttpStorageError)
   })
 
-  // The regression this package's own fixtures hid by always filling every field: a GET with no body is
-  // the default shape of a new request, and sealing "" produced a row that saved and then would not open.
+  // Fixtures that fill every field hide this: a GET with no body is the default shape of a new request,
+  // and sealing "" would produce a row that saves and then will not open.
   it('round-trips an empty field, which is what a request with no body has', async () => {
     const stored = await protectHttpValue('', SECRETS)
     expect(stored).toBe('')

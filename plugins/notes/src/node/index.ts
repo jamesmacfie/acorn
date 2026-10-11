@@ -31,10 +31,9 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
     // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)
-    // The `notes` context section. This closure is the whole body of what
-    // apps/node/src/wiring/contextSectionsWiring.ts held on this plugin's behalf (the three-scope walk,
-    // the empty-note skip and the workspace-note compatibility filter), moved to the plugin that owns
-    // the files. Core keeps the section's budget and compact formatter.
+    // The `notes` context section: the three-scope walk, the empty-note skip and the workspace-note
+    // compatibility filter, here because this plugin owns the files. Core keeps the section's budget and
+    // compact formatter.
     ctx.contextSections.register(
       notesSection(async (taskId) => {
         const workspaceId = await ctx.core.tasks.workspaceIdOrNull(taskId)

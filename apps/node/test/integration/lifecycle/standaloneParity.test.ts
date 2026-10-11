@@ -46,8 +46,8 @@ describe.each(Object.entries(hosts))('a %s Node booted through bootNode', (_host
     rmSync(dataDir, { recursive: true, force: true })
   })
 
-  // The standalone drain once skipped the task script close, so a setup attempt pending at SIGTERM
-  // read as interrupted by `restart` on the next boot. The second boot here is that next boot, and
+  // If the standalone drain skips the task script close, a setup attempt pending at SIGTERM reads
+  // as interrupted by `restart` on the next boot. The second boot here is that next boot, and
   // taking the data root lock at all proves the first one released it.
   it('records a pending setup attempt as interrupted by shutdown, and releases the data root', async () => {
     const first = await bootNode({ ...options, root: openDataRoot(dataDir) })
@@ -120,14 +120,14 @@ describe('plugin-state parity', () => {
   it('unions the file with the start-config override, and the file alone when there is none', () => {
     const store = { get: () => ['github'], set: () => {} }
     // The supervised root: a start config may pin a list without writing one (`dev:node`, an integration
-    // harness). Reporting only the file made restartRequired permanently true.
+    // harness). Reporting only the file would make restartRequired permanently true.
     expect(effectiveDisabled(store, ['rollbar']).call(null).sort()).toEqual(['github', 'rollbar'])
     // The standalone root: nothing hands a service-managed node a list, so the file is the whole answer.
     expect(effectiveDisabled(store)()).toEqual(['github'])
   })
 
   it('reconciles bundled packages only when a bundled root is configured', () => {
-    // Both roots now call the same reporter, so the account of what reconciliation did cannot exist
+    // Both roots call the same reporter, so the account of what reconciliation did cannot exist
     // on one root only. What still differs is the input: the supervised root always has application
     // resources, while a standalone node's bundled root comes from the environment and is unset on
     // every service-managed node, the documented "there is nothing to reconcile from" case
@@ -161,13 +161,13 @@ describe('plugin-state parity', () => {
   })
 
   it('names a package frozen by an ownership row even with no bundled root to refuse an update from', () => {
-    // The `preserved` list can only report a package it declined to replace this boot, so a
-    // standalone node, which has nothing to replace it with, used to say nothing at all while a
+    // The `preserved` list can only report a package it declined to replace this boot, so on its
+    // own a standalone node, which has nothing to replace it with, would say nothing at all while a
     // `build:plugin` output outlived every later build. The row itself is the fact, so it is read
     // directly.
     //
     // Read off `console.error`, not `console.log`: every line the node writes goes to stderr
-    // through the logger now, because stdout is a wire (docs/telemetry/logging.md § Logging).
+    // through the logger, because stdout is a wire (docs/telemetry/logging.md § Logging).
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
     const lines: string[] = []
     const write = console.error

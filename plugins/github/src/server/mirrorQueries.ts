@@ -161,8 +161,8 @@ export async function taskReviewFeedback(
   const pull = await mirroredTaskPull(db, core, userId, taskId)
   if (!pull) return null
   // Spelled out per table rather than through a generic `owns(table)` helper: the three columns are
-  // the same but their Drizzle types are not, and the helper only typechecked with a cast that threw
-  // away the column check it was there to keep.
+  // the same but their Drizzle types are not, and the helper only typechecks with a cast that throws
+  // away the column check it is there to keep.
   const [reviewRows, threadRows, commentRows] = await Promise.all([
     db
       .select()
@@ -221,11 +221,8 @@ export async function taskReviewFeedback(
 /**
  * Three values, all load-bearing. '' means every check passed. Text is the rendered failure list that
  * becomes the fix prompt. Null means there is nothing to check, which the ci-loop step treats as a
- * hard failure rather than success, so `!userId` and no rows both return null: an unmirrored repo
- * must not be mistaken for a green one.
- *
- * The task lookup goes through CoreServices because tasks are core-owned. Cross-plugin references
- * stay plain ids, validated by the owning service when dereferenced.
+ * hard failure rather than success, so every null from `taskChecks` passes through: an unmirrored
+ * repo must not be mistaken for a green one.
  */
 export async function failingChecksFor(
   db: PluginDatabase,
@@ -240,9 +237,8 @@ export async function failingChecksFor(
 }
 
 /**
- * Row counts for core's boot-time storage log (server/storage/footprint.ts), which cannot see these
- * tables. The two mirror parents plus this plugin's freshness table, so the log line reports the same
- * facts it always did.
+ * Row counts for core's boot-time storage log (`logStorageFootprint`), which cannot see these tables:
+ * the two mirror parents plus this plugin's freshness table.
  */
 export async function mirrorFootprint(db: PluginDatabase): Promise<Record<string, number>> {
   const [repoRows, pullRows, syncRows] = await Promise.all([

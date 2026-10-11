@@ -167,16 +167,15 @@ export class ServiceHost {
 
   // SIGTERM, then SIGKILL if it is ignored. The service installs its own SIGTERM handler to drain
   // cleanly, so the polite signal is the one that matters. A wedged child holding the data root's
-  // exclusive lock blocks the next launch, though, and a signal with no follow-up once left a probe
-  // alive as an orphan for four days.
+  // exclusive lock blocks the next launch, though, and a signal with no follow-up can leave it alive as
+  // an orphan indefinitely.
   //
   // Awaited, and the escalation timer is not unref'd. Both matter, and for the same reason: this
-  // process must not exit while the service is still alive. It used to, every time. The caller's
-  // shutdown runs `process.exit` as soon as this resolves, an unref'd timer does not hold the event
-  // loop open, and `process.exit` does not wait for one anyway, so the SIGKILL was guaranteed never
-  // to be sent on the path that needed it most. A service that ignored SIGTERM was then orphaned
-  // holding the data root's lock, and the next launch refused to start until somebody killed a pid
-  // by hand.
+  // process must not exit while the service is still alive. The caller's shutdown runs `process.exit`
+  // as soon as this resolves, an unref'd timer does not hold the event loop open, and `process.exit`
+  // does not wait for one anyway, so otherwise the SIGKILL would never be sent on the path that needs it
+  // most. A service that ignored SIGTERM would be orphaned holding the data root's lock, and the next
+  // launch would refuse to start until somebody killed a pid by hand.
   private terminate(child: ChildProcess): Promise<void> {
     if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
     return new Promise<void>((resolve) => {

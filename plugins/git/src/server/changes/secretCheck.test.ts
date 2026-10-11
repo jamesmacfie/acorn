@@ -19,7 +19,7 @@ let enabled: boolean
 let allowed: Set<string>
 let admitted: Array<{ operation: string; destination: string; report: SecretCheckReport }>
 
-// The gate's own rules are core's tests (packages/node-core/src/server/secretChecks/gate.test.ts).
+// The gate's own rules are covered by core's gate tests.
 // This one refuses what the real gate refuses and allows a digest the test names.
 const gate: SecretPublicationGate = {
   enabled: async () => enabled,

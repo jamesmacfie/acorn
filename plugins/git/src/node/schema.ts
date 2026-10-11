@@ -1,10 +1,11 @@
-// The git plugin's own tables: the Changes tab's review notes. See docs/data-layer/plugin-databases.md § Plugin databases.
+// The git plugin's own tables: the Changes tab's review notes.
+// See docs/data-layer/plugin-databases.md § Plugin databases.
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // Inline review notes on uncommitted changes. Anchored to (path, side, line range) with the
 // snippet captured, so a note survives the lines moving. When editor or browser annotations
 // arrive, generalize the anchor (nullable anchorJson) instead of adding a second store. sentAt is
-// stamped on delivery and cleared on edit (orca's pattern).
+// stamped on delivery and cleared on edit.
 export const reviewNotes = sqliteTable('review_notes', {
   id: text('id').primaryKey(),
   taskId: text('task_id').notNull(), // → core tasks.id (plain ID, not a foreign key)

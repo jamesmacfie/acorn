@@ -1,8 +1,6 @@
 // The four notes_* agent tools (docs/notes-and-memory.md § Notes covers what they do and the
-// provenance they stamp). They moved here from apps/node/src/wiring/agentToolsWiring.ts once two
-// blockers cleared: the NotesStore instance is this plugin's own now (published as `notes.store`,
-// where plugins/memory built it before), and CoreServices gained the `tasks.workspaceId` seam the
-// workspace scope needs to resolve a task's membership.
+// provenance they stamp). They run over this plugin's own NotesStore (published as `notes.store`),
+// and the workspace scope resolves a task's membership through CoreServices `tasks.workspaceId`.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'

@@ -10,7 +10,7 @@ import {
 } from './definition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
-// The graph rules `after` brought with it (docs/workflows/execution.md § Execution model). The parser is tested
+// The graph rules for `after` (docs/workflows/execution.md § Execution model). The parser is tested
 // in apps/node/test/integration/plugins/workflowFiles.test.ts and the runner beside it.
 
 const catalog: WorkflowValidationCatalog = {
@@ -47,7 +47,7 @@ describe('a draft in progress', () => {
     )
   })
   // The editor creates a definition with no steps and draws what this reports in its footer. Storing
-  // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
+  // it is fine; `WorkflowRunner.start` is what refuses to run it.
   it('reports a definition with no steps rather than being a shape the store refuses', () => {
     expect(
       check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] }),

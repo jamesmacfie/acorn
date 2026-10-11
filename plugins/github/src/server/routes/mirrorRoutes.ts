@@ -15,7 +15,7 @@ import { pullsBatch } from './pulls/pullsBatch'
 import { repoLabels } from './repos/repoLabels'
 import { repos } from './repos/repos'
 
-// Everything under /v1/p/github/repos, built on the first request to it (node/index.ts registers it
+// Everything under /v1/p/github/repos, built on the first request to it (the node entry registers it
 // with lazyRouter). Several of these routers declare overlapping paths (/:owner/:repo/pulls/:number/...),
 // so this order is the order Hono matches them. Reshuffling it changes which handler wins.
 export const mirrorRoutes = (store: PluginDatabase, core: CoreServices, emit: GithubEmit) =>
@@ -23,7 +23,7 @@ export const mirrorRoutes = (store: PluginDatabase, core: CoreServices, emit: Gi
     .route('/', repos(store, emit))
     .route('/', repoLabels(store, emit))
     // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
-    // local-first task on that branch (Flow B). `tasks` is core's table, so that write goes through
+    // local-first task on that branch. `tasks` is core's table, so that write goes through
     // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
     .route('/', pulls(store, core, emit))
     .route('/', pullDetail(store, emit))

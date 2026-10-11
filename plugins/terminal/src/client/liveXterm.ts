@@ -46,7 +46,7 @@ export type LiveXterm = HeldTerminal & {
 }
 
 // How many terminals keep a WebGL renderer. A WebKit page gets 16 live WebGL contexts and loses the
-// oldest past that, and every terminal a reader has opened is now alive at once. The ones shown most
+// oldest past that, and every terminal a reader has opened is alive at once. The ones shown most
 // recently keep theirs, so going back to the terminal you just left draws with no new context; the
 // rest fall back to the DOM renderer while nobody looks at them and take a context again on the way
 // back. Four covers flipping between a couple of tasks with a couple of tabs each.
@@ -159,11 +159,9 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
 
   let pendingOutput = 0
   // The fitted size rides on the attach. The node sizes the PTY and its screen before it serializes
-  // the snapshot, so the snapshot and later TUI redraws share this renderer's width. This used to be
-  // a resize request, with the attach sent only once it answered, and on a task switch that request
-  // queued behind every other one. A node older than the size field ignores it and reports the old
-  // size in `ready`, so a mismatch there still posts the resize. A reconnect re-attaches and lands
-  // here again.
+  // the snapshot, so the snapshot and later TUI redraws share this renderer's width. A node older than
+  // the size field ignores it and reports the old size in `ready`, so a mismatch there still posts the
+  // resize. A reconnect re-attaches and lands here again.
   //
   // The attachment lasts as long as the xterm, drawn or not, so output keeps being parsed into it
   // while the reader is on another task. What that costs is the parse and nothing else: xterm's render

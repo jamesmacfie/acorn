@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { HOST } from '@acorn/client-core/kit/tokens'
 
-// `HOST` is supplied per host package at build time now (client-core kit/tokens/support.ts): the
+// `HOST` is supplied per host package at build time (client-core kit/tokens/support.ts): the
 // desktop's Vite config defines it as `dom` and apps/tui's as `tui`, and `Only` and `Fallback` are
 // what read it. Making it configurable made it possible to get wrong, so this is the desktop's half
 // of the pin. It asserts the fallback rather than the define — a build here that says anything but

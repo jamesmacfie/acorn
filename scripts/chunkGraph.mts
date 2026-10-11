@@ -72,7 +72,7 @@ export function describeChunks(
       imports: output.imports,
       dynamicImports: [...dynamicImports],
       requires: [...requires].sort(),
-      // A virtual module such as `\0rolldown/runtime.js` keeps its own name.
+      // A virtual module, such as rolldown's runtime, keeps its own name without the `\0` prefix.
       modules: Object.keys(output.modules).map((id) =>
         id.startsWith('\0') ? id.slice(1) : relative(repo, id.replace(/\?.*$/, '')),
       ),

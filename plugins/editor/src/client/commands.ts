@@ -17,20 +17,16 @@ import { collapseEditorTreeDirectories, editorTreeCollectionId, captureEditorTre
 import { findInFolder } from './search/searchState'
 import { focusedPane } from '@acorn/plugin-api/client'
 
-// ⌘P, and the two commands that were already here.
+// ⌘P quick-open, and the editor's other palette commands.
 //
-// Quick-open was an overlay of its own until 2026-09-03: a component in the shell's `overlay` slot
-// running `createOverlayPalette`, with its own query, its own cursor, its own keybinding and its own
-// list. It is a `search` command now, so the chord opens the one palette at this frame
-// (client-core/host/registries/commands/presenter.ts) and the session owns the typing, the ordering,
-// the cursor and the abort. Nothing about what it finds or what picking one does has changed — and
-// the terminal client gains it, because it draws the same session and never drew that overlay
-// (docs/tui/plugin-losses.md § What a plugin loses here).
+// Quick-open is a `search` command, so the chord opens the one palette at this frame and the session
+// owns the typing, the ordering, the cursor and the abort. The terminal client draws the same session,
+// so it gets quick-open too.
 //
 // **Why this ranks its own rows rather than using `localSearch`.** The adapter scores a row's title
 // and subtitle separately, and a file row is a filename and its directory drawn as two things. A query
-// like `client/App` spans the join, so scoring the halves would lose a match the overlay found. The
-// whole path is what is scored here, exactly as before; the halves are only how the row reads.
+// like `client/App` spans the join, so scoring the halves would lose the match. The whole path is
+// what is scored here; the halves are only how the row reads.
 
 const MAX_ROWS = 100 // Keep the list bounded on a repository with thousands of files.
 
@@ -67,7 +63,7 @@ const files = (context: CommandExecutionContext): Promise<readonly string[]> => 
 
 /** Filename first, then the directory that holds it: the name is what somebody typed and the path is
  *  how they tell two of them apart. The renderer draws `subtitle` muted after the label, on both
- *  hosts, which is what the overlay's own row did by hand. */
+ *  hosts. */
 const fileItem = (path: string): CommandSearchItem => {
   const slash = path.lastIndexOf('/')
   return {
@@ -170,7 +166,7 @@ export const editorCommands: readonly ContributedCommand[] = [
               .sort((a, b) => b.score - a.score || a.at - b.at)
               .map((row) => row.path)
       // Every query character in order, contiguous runs and word starts scoring higher, ties keeping
-      // the repository's own order — the scorer and the ordering the overlay used.
+      // the repository's own order.
       return [...new Set(ranked)].slice(0, MAX_ROWS).map((path) => {
         const item = fileItem(path)
         fileItems.set(item, context)

@@ -17,12 +17,12 @@ import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 // that handshake and argv is world-readable on every platform this ships to.
 //
 // The command reader is installed before the handshake is read, because Rust can send `stop` while
-// the node is still booting. A helper that installed its reader after `service.start` resolved
-// dropped that line and was killed for not quitting.
+// the node is still booting. A reader installed after `service.start` resolves drops that line, and
+// Rust kills the helper for not quitting.
 //
 // The ready line means "this process is listening", not "the node is up". The node's boot runs behind
 // it and reports itself through the `node-status` pushes below, which is what lets the window open on
-// a persisted cache instead of on a 400 ms node boot (docs/shell/process.md § The shell process).
+// a persisted cache instead of waiting for the node to boot (docs/shell/process.md § The shell process).
 
 // Every line Rust is meant to read carries this key. Everything else on stdout is a log.
 const TAG = 'acorn-helper'

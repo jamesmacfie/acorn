@@ -1,6 +1,6 @@
 // Which editor the pane's file view mounts. One device preference (`editor_mode`), read from the
 // prefs query and written through savePref — the device-prefs pattern, where localStorage is written
-// before the query cache (packages/client-core/src/features/settings/savePref.ts).
+// before the query cache.
 //
 // Graphical is the default and stays it: terminal mode is for a person who already lives in vim.
 import type { QueryClient } from '@tanstack/solid-query'

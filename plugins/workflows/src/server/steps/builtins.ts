@@ -95,8 +95,8 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       {
         handler: stepKinds[kind],
         validate: BUILTIN_STEP_VALIDATORS[kind],
-        // The same `describe` a contributed kind carries, from the table in ../../shared/stepFields.ts.
-        // The editor draws a built-in and a contribution the same way.
+        // The same `describe` a contributed kind carries, so the editor draws a built-in and a
+        // contribution the same way.
         describe: BUILTIN_STEP_DESCRIPTIONS[kind],
       },
     ]),
@@ -106,12 +106,11 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   return { stepKinds: kinds, policies }
 
   // What any step that runs an agent actually sends: its own prompt, then every incoming edge's
-  // output, then the task context block that carries the handoff trail (docs/workflows/agent-steps.md § What an
-  // agent step sees). The outputs and the task context travel as context items, not as prompt text,
-  // so the model reads them as information and the transcript shows only the prompt. Shared by all
-  // four agent-running kinds, because the editor offers the Upstream output control on all four and
-  // each one used to answer it differently: until 2026-09-09 only `agent` read `upstream` at all, so
-  // a `decide` step set to Append silently saw none of the analysis it was asked to decide on.
+  // output, then the task context block that carries the handoff trail
+  // (docs/workflows/agent-steps.md § What an agent step sees). The outputs and the task context travel
+  // as context items, not as prompt text, so the model reads them as information and the transcript
+  // shows only the prompt. Every agent-running kind shares it, because the editor offers the Upstream
+  // output control on all of them.
   //
   // 'template' means the prompt places `${steps.x.output}` itself and 'none' means it stands alone.
   // The context block rides along in every mode, because that is separate from the graph's edges.

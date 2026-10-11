@@ -1,4 +1,4 @@
-// Why a GitHub read failed, in a person's words, by the code server/githubApi.ts and the data handlers
+// Why a GitHub read failed, in a person's words, by the code `ghError` and the data handlers
 // return. The pull list says these, and so does the pull requests data source through its failure's
 // `reason`, so a panel and the list give the same answer for the same cause.
 

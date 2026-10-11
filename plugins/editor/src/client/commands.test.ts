@@ -21,10 +21,9 @@ import { editorCommands } from './commands'
 import { admitGraphicalEditor } from './editorAdmission'
 import { registerEditorTreeFolders } from './editorTreeState'
 
-// ⌘P, after it stopped being an overlay of its own. What is pinned is what the overlay's own test
-// would have pinned if it had had one: the ranking is over the whole path, the row splits it for
-// display only, the listing happens once per session, and picking a row shows the pane and opens an
-// ephemeral tab.
+// ⌘P quick-open. What is pinned: the ranking is over the whole path, the row splits it for display
+// only, the listing happens once per session, and picking a row shows the pane and opens an ephemeral
+// tab.
 
 const goTo = editorCommands.find((command) => command.id === 'editor.files.open') as SearchCommand
 const goToLine = editorCommands.find((command) => command.id === 'editor.navigation.go-to-line') as SearchCommand

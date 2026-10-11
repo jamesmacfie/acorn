@@ -1,8 +1,5 @@
-// The test seam for this package (docs/architecture/packages.md § Package boundaries).
-//
-//   apps/node/test/integration/workflowFiles.test.ts    loadWorkflowFiles
-//   apps/node/test/integration/plugins/workflowRunner.test.ts  the runner and its schema tables
-//   apps/node/test/integration/plugins/workflowTasks.test.ts   the complete saved-child fixture
+// The test seam for this package (docs/architecture/packages.md § Package boundaries). The node app's
+// plugin integration tests reach the file loader, the runner, and its schema tables through it.
 export { loadWorkflowFiles } from '../server/definitions/files'
 export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/runs/runner'
 export { inlinePrompt } from '../server/runs/deps'

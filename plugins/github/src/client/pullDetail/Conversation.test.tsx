@@ -7,9 +7,10 @@ import type { PullDetail, Thread } from '../../shared/api'
 import { buildConversationEntries, type ConversationEntry } from './model'
 import type { PrModel } from './prModel'
 
-// A pull request's conversation opens without building every turn's body (docs/github-integration.md
-// § Conversation): each turn keeps its element by `kind:id` key, draws GitHub's HTML once it comes
-// near the viewport, and quotes a thread's code from the one diff segment that holds its line.
+// A pull request's conversation opens without building every turn's body
+// (docs/github-integration/surfaces.md § Conversation): each turn keeps its element by `kind:id` key,
+// draws GitHub's HTML once it comes near the viewport, and quotes a thread's code from the one diff
+// segment that holds its line.
 
 const segment = { rows: 10, bands: 10, gaps: 0, columns: 20, lines: [1, 10, 1, 10] as [number, number, number, number] }
 const document: DiffDocumentFile[] = ['a.ts', 'b.ts', 'c.ts'].map((path) => ({

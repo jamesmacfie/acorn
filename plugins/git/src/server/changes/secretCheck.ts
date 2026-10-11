@@ -1,6 +1,6 @@
 // Secret checks for the two Git operations Changes publishes through (docs/security/secret-publication.md
 // § Git). Git selection lives here; the detector and the gate are core's (@acorn/plugin-api/node).
-// ../localGit.ts loads this module only while blocking is on, or for a check the owner asked for.
+// `localGitBridge` loads this module only while blocking is on, or for a check the owner asked for.
 //
 // Both checks read Git objects, never the disk: a commit takes the index, and a push takes whatever
 // HEAD reaches that the remote does not have. Neither throws. A failure is an unscanned entry, so an
@@ -229,8 +229,8 @@ export async function commitTree(root: string, options: CommitOptions): Promise<
 export const headOf = (root: string) => optional(root, ['rev-parse', '--verify', '-q', 'HEAD'])
 
 /** Check the blobs the commit adds over its parent: HEAD, or HEAD's parent for an amend, so an amend
- *  covers the whole final tree it records. */
-/** `recorded` re-checks a commit Git already made: its tree, and the HEAD it was made on. */
+ *  covers the whole final tree it records. `recorded` re-checks a commit Git already made: its tree,
+ *  and the HEAD it was made on. */
 export async function commitSecretCheck(
   root: string,
   branch: string,

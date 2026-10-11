@@ -7,12 +7,9 @@ import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runn
 import { inlinePrompt } from './deps'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
-// When a step's row learns which managed session it is running in.
-//
-// It used to be the completion patch, which meant `runForSession` answered nothing for the whole time
-// somebody might want to look: the Agent pane's "Workflow: …" chip appeared only once the step was
-// over, and a reader watching a step work had no way from the session back to the run. The session id
-// now rides along on the forwarded events, and the row takes the first one it sees.
+// When a step's row learns which managed session it is running in. The session id rides along on the
+// forwarded events and the row takes the first one it sees, so `runForSession` answers while the step
+// works and the Agent pane's "Workflow: …" chip shows during the step, not after it.
 
 const noExtensions: WorkflowExtensions = { handlers: <T>(_point: ExtensionPointId<T>) => [] }
 
@@ -120,8 +117,8 @@ describe('which harness a step runs on', () => {
       )
 
       // Not `undefined`. The managed path reads this to find a driver, and answers "no driver" for a
-      // profile it cannot name — which used to send every default-harness step to a bare CLI process
-      // with no session and no transcript.
+      // profile it cannot name, which would send every default-harness step to a bare CLI process with
+      // no session and no transcript.
       await vi.waitFor(() => expect(asked).toEqual([DEFAULT_PROFILE_ID]))
     } finally {
       profile()
@@ -241,10 +238,8 @@ describe('a step running in a managed session', () => {
 })
 
 describe('what a step that runs an agent is given', () => {
-  // Every kind that runs an agent honours the step's Upstream output setting, not just `agent`.
-  // `decide` used to send its prompt alone: the editor showed it the Append control, defaulted to
-  // Append, and the runner threw the upstream output away, so a step asked to judge an analysis was
-  // handed nothing to judge.
+  // Every kind that runs an agent honours the step's Upstream output setting, not just `agent`, so a
+  // `decide` step asked to judge an analysis is handed the analysis.
   it('appends the upstream output to a decide step', async () => {
     const testDb = makeTestPluginDb('workflows')
     const profile = agentProfileRegistry.register({

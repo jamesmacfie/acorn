@@ -15,8 +15,8 @@ export const workflowStartService = (
   reconciled: Promise<void>,
 ): WorkflowStartService => {
   const core = ctx.core
-  // Scope construction lives beside definition resolution, so routes, child dispatch, and the
-  // later scheduler adapter cannot disagree about which workspace, project, or checkout applies.
+  // Scope construction lives beside definition resolution, so routes, child dispatch, and schedules
+  // cannot disagree about which workspace, project, or checkout applies.
   const taskScope = (taskId: string) => workflowTaskResolutionScope(core, taskId, homedir())
   return new WorkflowStartService(
     store,

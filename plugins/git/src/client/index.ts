@@ -54,17 +54,16 @@ export const gitClientPlugin: ClientPlugin = {
 /** The Changes tab's client half: what it draws on the rail, the preference it keeps, its palette row,
  *  the two points it hosts, and how its file tool calls read in an agent transcript. */
 function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
-  // A dot on each task row and on the pane's rail button for which way the uncommitted lines lean
-  // (./changes/railMarker.ts).
+  // A dot on each task row and on the pane's rail button for which way the uncommitted lines lean.
   ctx.railMarkers.register(changesRailMarkerContribution)
   // How the list is drawn: one device preference, so it survives a relaunch and stays on this
-  // machine (./changes/changesPrefs.ts, docs/state-ownership/scope-rules.md § Scope rules).
+  // machine (docs/state-ownership/scope-rules.md § Scope rules).
   ctx.persistedStateSlices.register(changeViewSlice)
   // A row that says what the tab is for, beside core's generic `Show pane: Git`. Somebody reaching for
   // the palette types "diff" or "staged", not "pane" (docs/command-palette-and-shortcuts.md). Staging,
   // committing and review notes stay in the tab, where the diff and the selected files are visible.
   // The three remote verbs do have palette rows, registered per task from the tab's model and gated
-  // on the pane having focus (./changes/commands.ts): a fetch needs nothing selected and nothing typed.
+  // on the pane having focus: a fetch needs nothing selected and nothing typed.
   ctx.commands.register({
     id: 'changes.open',
     title: 'Open Changes',
@@ -81,7 +80,7 @@ function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
   // What another plugin may say about a line of the Changes diff: coverage, a lint result, a blame
   // note. Keyed by file, line and side, which is what the viewer already knows about a row
   // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The node-side
-  // `git:before-commit` and `git:before-push` hooks are declared in ../server/changes/registerChanges.ts.
+  // `git:before-commit` and `git:before-push` hooks are declared by the node-side `registerChanges`.
   ctx.extensionPoints.register({
     id: 'diff-line',
     label: 'Changes diff line',
@@ -89,10 +88,10 @@ function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
     key: [...DIFF_LINE_KEY],
     max: 4,
   })
-  // What somebody else may do once this branch is on its remote, drawn under the branch bar
-  // (./changes/RemoteBar.tsx). The GitHub plugin's "Open pull request" is the first filler, and this
-  // plugin does not learn what a pull request is to draw it: the point hands over the branch, the
-  // upstream and the two ids, and the contributor writes every word.
+  // What somebody else may do once this branch is on its remote, drawn under the branch bar. The
+  // GitHub plugin's "Open pull request" is one filler, and this plugin does not learn what a pull
+  // request is to draw it: the point hands over the branch, the upstream and the two ids, and the
+  // contributor writes every word.
   //
   // A `remote` point rather than a `rows` one, because the verb is "go to a route of mine with a
   // parameter from the props", which is code, and a kit tree is the cheapest code that runs in

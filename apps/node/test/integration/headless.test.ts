@@ -12,7 +12,7 @@ const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../__fixtur
 
 describe('argv templates (docs/workflows.md — flags verified against installed CLIs)', () => {
   // `auto`, not `dontAsk`: `dontAsk` denies anything outside a `permissions.allow` rule and acorn
-  // writes none, so a headless step listed every tool acorn projects and was refused all of them
+  // writes none, so a headless step would list every tool acorn projects and be refused all of them
   // (the profile's own comment has the whole reasoning).
   it('claude-code: -p stream-json with permission pre-approval, model, inline schema, resume', () => {
     const argv = buildHeadlessArgv('claude-code', 'claude', {

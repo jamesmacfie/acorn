@@ -95,7 +95,7 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       await announceNotes(db, taskId, emit)
       return c.json(rowToNote(row))
     })
-    // Edit clears sentAt, so an edited note counts as unsent again (orca's pattern).
+    // Edit clears sentAt, so an edited note counts as unsent again.
     .patch('/:id/review-notes/:noteId', async (c) => {
       const parsed = editBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')

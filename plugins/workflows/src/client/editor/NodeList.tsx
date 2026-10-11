@@ -10,11 +10,9 @@ import { branchLabel, stepSummary } from './outlineModel'
 // The list column: the definition, its inputs, and the graph in reading order.
 //
 // One list, not two, because the inspector's subject is whatever is selected here and the definition's
-// own fields need a row to be selected from. A row indents only where the graph forks
-// (./graphOrder.ts), and a node waiting on more than one step says how many. This list stays beside
-// the graph view rather than being replaced by it: it is the one place the definition's own rows can
-// be selected from (./GraphView.tsx). Moving and deleting the selected step live in the inspector's
-// header, beside the step they act on.
+// own fields need a row to be selected from. That is also why it stays beside the graph view rather
+// than being replaced by it. A row indents only where the graph forks, and a node waiting on more than
+// one step says how many. Moving and deleting the selected step live in the inspector's header.
 
 const kindIcon = (kind: string, catalog: WorkflowCatalog | undefined): string | undefined =>
   catalog?.kinds.find((entry) => entry.id === kind)?.describe?.icon ?? BUILTIN_STEP_DESCRIPTIONS[kind]?.icon
@@ -76,8 +74,7 @@ export default function NodeList(props: {
     props.onSelect({ kind: 'node', name: key.slice('node:'.length) })
   }
 
-  // Grouped by what a step is for, then one group per plugin, each sorted by label: the list used to
-  // run in plugin-then-id order, which read as no order at all.
+  // The Add menu, grouped by what a step is for, then one group per plugin, each sorted by label.
   const groups = createMemo(() => {
     const kinds = props.catalog?.kinds ?? []
     const item = (kind: (typeof kinds)[number]): AddItem => ({

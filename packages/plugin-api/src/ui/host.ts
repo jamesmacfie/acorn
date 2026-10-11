@@ -15,20 +15,20 @@ export type { IconPickerProps } from '@acorn/client-core/kit/components/inputs'
 // bar is are the shell's own geography, and its height is a pixel the drag handle produced, which is
 // exactly what a kit node's props may not be (docs/ui-design/closed-kit.md § The closed kit).
 export { Drawer } from '@acorn/client-core/kit/components/overlays'
-// The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
+// The palette chrome. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
 export { PaletteSurface } from '@acorn/client-core/host/palette/PaletteSurface.tsx'
 // The box a reference panel is drawn in: backdrop, drawer, title, dismiss. Host-only, and the host's
-// on purpose — a panel is a tree and the overlay around it is chrome every provider was redrawing.
+// on purpose — a panel is a tree and the overlay around it is chrome every provider would redraw.
 export { default as RefPanelBox } from '@acorn/client-core/host/components/RefPanelBox.tsx'
 // HTML a provider already rendered (GitHub's `bodyHTML`), in the host's markdown skin, with the
 // bare-reference pass and link handling the host owns. Not a kit node: the pass is a registry
 // function, and `ui/` may not import one.
 export { default as ProviderHtml } from '@acorn/client-core/host/components/ProviderHtml.tsx'
 // The shared "promote this row to a task" modal, with an optional feature action above its tabs.
-// Host-only and the host's on purpose: it reads the routed
-// project, the task list and the source's registered `promotion`, and a plugin opening it supplies
-// the item and what to do with the task, never the mechanics.
+// Host-only and the host's on purpose: it reads the routed project, the task list and the source's
+// registered `promotion`, and a plugin opening it supplies the item and what to do with the task,
+// never the mechanics.
 export { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
 // The host's own "find or create a task for this reference" control, for a first-party reference

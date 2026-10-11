@@ -9,13 +9,13 @@ import { BrowserDiagnostics } from './diagnostics'
 // to us, and `Accessibility.getFullAXTree` plus ./axTree.ts produce those. Playwright covers launching,
 // waiting, screenshots, and console capture.
 //
-// The bundle ships no browser: bundles are hash-addressed and a Chromium is 150 MB per platform. This
-// drives an installed Chrome, and says so when there is not one.
+// The bundle ships no browser: bundles are hash-addressed, and a Chromium per platform would dwarf
+// them. This drives an installed Chrome, and says so when there is not one.
 
 // How many task browsing contexts stay alive. Each carries its own cookies and storage, and a
 // long-running node works through a lot of tasks.
 //
-// ponytail: the oldest closes when a new one is needed, because nothing tells this plugin a task was
+// The oldest closes when a new one is needed, because nothing tells this plugin a task was
 // archived. If a task-lifecycle signal ever reaches a plugin, close on that and delete the cap.
 const MAX_SESSIONS = 8
 

@@ -4,10 +4,8 @@ import { aggregateRows, shapeRows } from './shaping'
 
 // The panel's measure: the one number a stat shows, as a function of the source pages.
 //
-// Its own module because two callers need the same answer: the renderer composes these four steps as
-// memos (client-core/features/dashboards/data.ts § createPanelData) and the node's measure sampler composes
-// them once per pass with no reactivity in sight. Written twice, they would drift, and a stored
-// history is only honest if it means what the number on screen means (docs/dashboards/sampling.md §
+// A stored history is only honest if it means what the number on screen means, so anything that
+// samples a measure has to compute it the same way the stat does (docs/dashboards/sampling.md §
 // Sampling and retention).
 //
 // The four steps, in order and nothing else: map the sources into one schema, union their rows,

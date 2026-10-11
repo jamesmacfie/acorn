@@ -6,9 +6,8 @@ import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { RollbarPane } from './app'
 
 // The pane, driven the way the sandbox drives it: through `solidTree` into a remote root, with the
-// mutations it emits as the only evidence. What this pins is the failure path, which until now only the
-// running app could reach: a detail fetch that fails must draw the titled failure state, not strip the
-// loading text and leave an empty box behind.
+// mutations it emits as the only evidence. What this pins is the failure path: a detail fetch that
+// fails must draw the titled failure state, not strip the loading text and leave an empty box behind.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 

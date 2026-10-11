@@ -11,7 +11,7 @@ import type { CaptureMetadata } from '../contract/captures'
 // How many captures one task keeps. A screenshot is a few hundred kilobytes and an agent in a loop
 // takes a lot of them.
 //
-// ponytail: newest-N per task, swept on write, because a write is the only moment the count changes.
+// Newest-N per task, swept on write, because a write is the only moment the count changes.
 // If retention ever needs to be a policy, an age or a byte ceiling or an owner setting, it belongs
 // beside the other data-retention settings.
 const KEEP_PER_TASK = 20

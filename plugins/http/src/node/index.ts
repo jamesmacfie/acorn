@@ -27,7 +27,7 @@ export const httpPlugin = (): NodePlugin => ({
       ctx,
       async (taskIds) => (await db.delete(httpRequests).where(inArray(httpRequests.taskId, [...taskIds]))).changes,
     )
-    // The `http:request` workflow step (./workflowStep.ts). Contributed rather than granted: workflows
+    // The `http:request` workflow step (../server/workflowStep.ts). Contributed rather than granted: workflows
     // opens the point and any plugin may fill it, so this needs no special case in that package.
     //
     // Nothing happens on a node with workflows disabled — the point is never opened, so the entry is

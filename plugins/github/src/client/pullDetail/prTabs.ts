@@ -116,10 +116,9 @@ function build(task: Task) {
     consumePaneIntent(event.taskId, event.paneId)
     selectItem(event.intent.item)
   })
-  // `head:changed` for this task, not the old content-free `term:status` ping. Two pull-request keys
-  // were being invalidated on every terminal idle-to-working edge, on every connected client.
-  // What actually moves a pull is a commit landing in the task's worktree, which is what this event
-  // names.
+  // `head:changed` for this task: what moves a pull is a commit landing in the task's worktree, which
+  // is what this event names. A terminal status ping would invalidate two pull-request keys on every
+  // idle-to-working edge, on every connected client.
   const offStatus = clientEvents.on('head:changed', (event) => {
     if (event.taskId !== task.id) return
     void queryClient.invalidateQueries({ queryKey: taskPullsKey(task.id) })

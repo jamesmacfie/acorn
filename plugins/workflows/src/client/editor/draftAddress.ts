@@ -29,7 +29,7 @@ export function parseDefRef(item: string | undefined): DefRef | null {
   if (!item) return null
   // Decoded here, because Solid Router hands a path parameter back exactly as it sits in the address
   // and `workflowsSurfacePath` encodes the separator. Reading `db%3Aabc` as a definition nobody can
-  // name is how the whole editor once opened read-only.
+  // name opens the whole editor read-only.
   const match = /^(db|repo|user):(.+)$/.exec(decodeItem(item))
   if (!match) return null
   return { source: match[1] === 'db' ? 'database' : (match[1] as 'repo' | 'user'), id: match[2] }

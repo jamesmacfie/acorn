@@ -7,7 +7,7 @@
 // or `c.get('principal')`, which a loaded bundle's Hono stack never sets. The bridge is a closure
 // argument, so a fake is injectable without a global registry.
 //
-// SQL-injection posture is main/database.ts's: docs/database.md § SQL safety.
+// SQL-injection posture: docs/database.md § SQL safety.
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -44,7 +44,7 @@ import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../ag
 import { databaseQuery } from '../workflowSteps'
 
 // The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
-// wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
+// wiring bug, and saying so beats answering it from host handles this bundle should not touch.
 const { requestContext, portableFetch } = portableCarrier('database')
 
 const owner = (c: Context<AppEnv>): string => requestContext(c).userId
@@ -395,7 +395,7 @@ export const databaseRoutes = (
       // default model — the selection the modal opens on — and generates with no examples. Backends
       // arrive connections-first, so this keeps spending the key the owner configured and reaches for an
       // installed CLI only when there is no key at all. Choosing any of the three remains the modal's
-      // job, unchanged.
+      // job.
       //
       // The write comes before the answer, and that ordering is the contract: the success action opens
       // the Database pane, whose editor GETs the scratch route on mount, so answering first would race

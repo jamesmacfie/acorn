@@ -8,7 +8,7 @@ import type { Env } from '@acorn/plugin-api/testkit'
 
 // Route-test convention for a bridge-backed domain: fake the bridge (no real ripgrep),
 // mount the router, and exercise auth + body validation + the bridge-unavailable 503. The rg
-// parsing itself is unit-tested in main/search.test.ts.
+// parsing itself is unit-tested in ../search.test.ts.
 
 const jsonReq = (url: string, method: string, body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

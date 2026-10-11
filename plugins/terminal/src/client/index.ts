@@ -35,7 +35,7 @@ export const terminalClientPlugin: ClientPlugin = {
       actions: ['interrupt'],
     })
     // The task's run targets, layout recipes and live terminals, as three searches under one group
-    // (./commands.ts). A `paletteRows` source until 2026-09-03.
+    // (./commands.ts).
     for (const contribution of terminalCommands) ctx.commands.register(contribution)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({

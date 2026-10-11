@@ -1,10 +1,9 @@
 // Builds the RuntimeService over the session engine's glue. Run targets are exposed as the harness
-// RunBridge over HTTP (server/routes/plugins/harness.ts), replacing the old run:* IPC channels, and as the
-// `terminal.runTargets` capability for the agent-tool and workflow projections
-// (contract/runTargets.ts). The service stays dependency-injected so it's unit-testable under plain
-// Node.
+// RunBridge over HTTP (node-core's harness routes), and as the `terminal.runTargets` capability for the
+// agent-tool and workflow projections (contract/runTargets.ts). The service stays dependency-injected so
+// it's unit-testable under plain Node.
 //
-// Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
+// Its two DB-shaped needs are CoreServices calls, because this plugin has no handle to core's
 // database: `taskRunConfig` (the layered run-target config, docs/workspaces-and-tasks/project-config.md § The layers) and
 // the executable-config trust gate (docs/terminal/run-targets.md § Trust and execution).
 import { buildSessionEnv, type CoreServices, type PluginHookRegistry, type RunTarget } from '@acorn/plugin-api/node'
@@ -52,7 +51,7 @@ export function createRuntimeService(
           : null,
     })
     // CoreServices.proc: bounded output and a process-group kill. A stop/url script routinely leaves
-    // a grandchild behind, and the previous execFile only killed the direct child on timeout.
+    // a grandchild behind, and a plain execFile kills only the direct child on timeout.
     const result = await core.proc.runProcess({ file: '/bin/sh', args: ['-c', script], cwd, env, timeoutMs: 15_000 })
     if (result.spawnError) return { ok: false, reason: result.spawnError }
     if (result.timedOut) return { ok: false, reason: 'script timed out' }
@@ -63,8 +62,8 @@ export function createRuntimeService(
     loadTargets: (taskId) => core.tasks.runConfig(taskId),
     startSession: glue.startSession,
     // A plain property, not a spread. A spread bypasses the excess-property check, so a rename on
-    // either side of this seam would compile and the hook would simply stop running — which is how
-    // `terminal:before-run-target` could be declared in the trust prompt and never called.
+    // either side of this seam would compile and `terminal:before-run-target` would be declared in the
+    // trust prompt and never called.
     hooks,
     isRunning: glue.isRunning,
     onExit: glue.onExit,

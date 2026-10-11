@@ -403,8 +403,7 @@ export default function EditorPane(props: { task: Task }) {
                 ariaLabel="Editor sidebar"
               />
               {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results.
-                  `TabPanel` owns the hidden-but-mounted half, which this pane used to spell as an
-                  inline `display: none` beside six hand-written tab attributes. */}
+                  `TabPanel` owns the hidden-but-mounted half. */}
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
@@ -429,8 +428,7 @@ export default function EditorPane(props: { task: Task }) {
             </>
           }
         >
-          {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
-              button was mouse-only, and there were no arrow keys. */}
+          {/* DocumentTabs owns the dirty dot, a keyboard-reachable close button, and arrow keys. */}
           <DocumentTabs
             level="pane"
             idPrefix="editor"

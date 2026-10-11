@@ -253,8 +253,8 @@ export class WorkflowRunner {
     assertValidWorkflow(def, this.validationCatalog())
   }
 
-  /** One sweep of every registered trigger. Clocked by the node's scheduler, not by a client
-   *  (plugins/workflows/src/node/index.ts), so a due trigger fires on a node nobody is looking at. */
+  /** One sweep of every registered trigger. Clocked by the node's scheduler through the schedules
+   *  activation, not by a client, so a due trigger fires on a node nobody is looking at. */
   async pollTriggers(): Promise<{ started: number; errors: string[] }> {
     let started = 0
     const errors: string[] = []

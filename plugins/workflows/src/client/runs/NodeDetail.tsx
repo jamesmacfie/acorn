@@ -64,21 +64,21 @@ import { RunRecords } from './RunRecords'
 import { stepBodyProps } from './stepBodyProps'
 
 // The run pane's `detail` region: what one step is doing, and the controls that are legal for the
-// state it is in (docs/workflows/routes-and-ui.md § Routes and UI). The controls sit in the step's header bar for
-// every kind, so Retry on a failed command is beside its name rather than under its output. A gate's
-// Approve and Reject are the exception: they answer the gate, so they sit under what they approve.
+// state it is in (docs/workflows/routes-and-ui.md § Routes and UI). The controls sit in the step's
+// header bar for every kind, so Retry on a failed command is beside its name rather than under its
+// output. A gate's Approve and Reject are the exception: they answer the gate, so they sit under what
+// they approve.
 //
-// An agent node draws the conversation itself, through the capability plugins/agents publishes
-// (@acorn/plugin-agents/contract/conversation.ts): the same transcript, queue and composer the Agent
-// pane draws, because reading what a step is saying should not mean leaving the run. Every other kind
-// answers "what is it doing" the way it always has, and the plugin that runs a kind may draw that
-// answer through `workflows:step-body` (../../contract/stepBody.ts). The header, the controls, the
-// alerts and the gate's answer stay here whoever draws it.
+// An agent node draws the conversation itself, through the `AGENTS_CONVERSATION` capability: the
+// same transcript, queue and composer the Agent pane draws, because reading what a step is saying
+// should not mean leaving the run. For every other kind, the plugin that runs it may draw the body
+// through `workflows:step-body`. The header, the controls, the alerts and the gate's answer stay here
+// whoever draws it.
 //
 // Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
 // sizes against the region, so that branch is a fragment; a `Stack` around it, or a row of buttons
-// after it, and the composer ends up below the fold with the pane's own scroll broken (client-core
-// infra/styles/shell.css, docs/panes/layout.md § Layout model).
+// after it, and the composer ends up below the fold with the pane's own scroll broken
+// (docs/panes/layout.md § Layout model).
 
 const readJson = <T,>(raw: string | null | undefined): T | null => {
   if (!raw) return null
@@ -149,8 +149,8 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // Deleting a task). Said so, rather than leaving the line out.
   const childTaskDeleted = () => !!inputs()?.childTaskId && !!deletedTasks.data?.includes(inputs()!.childTaskId!)
 
-  // Every unrecognised event, as JSON. The vocabulary in ../../shared/stepEvents.ts is what the
-  // bodies below draw; anything else a kind sends is still worth keeping where somebody can read it.
+  // Every unrecognised event, as JSON. `WorkflowStepEventBody` is what the bodies below draw; anything
+  // else a kind sends is still worth keeping where somebody can read it.
   const otherEvents = createMemo(() => {
     const current = step()
     if (!current) return []
@@ -162,7 +162,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
 
   const openAgentPane = (sessionId: string): void => {
     // The seam, not the agents plugin's own function: `plugin:select` on the agents pane is what its
-    // own intent listener turns into "open this session" (plugins/agents sessions/managedSelection.ts).
+    // own intent listener turns into "open this session".
     openPane(props.task.id, 'agents', { kind: 'plugin:select', item: sessionId })
   }
 
@@ -219,7 +219,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   }
 
   // Resolved per call, never captured: a node with the agents plugin disabled answers `undefined` and
-  // this pane keeps the summary it always drew (docs/plugins/collaboration.md § Collaboration rules).
+  // this pane draws its own summary (docs/plugins/collaboration.md § Collaboration rules).
   const conversation = createMemo(() => clientCapability(AGENTS_CONVERSATION)?.Conversation)
   const drawsConversation = createMemo(() => shape() === 'agent' && !!conversation())
 
@@ -260,9 +260,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           </Button>
         )}
       </Show>
-      {/* A step whose harness session was captured but that never became a managed session.
-          The agents sidebar used to offer this and no longer does; the row still carries the
-          command, and the node has already refused one whose session id is not a plain token. */}
+      {/* A step whose harness session was captured but that never became a managed session. The row
+          carries the command, and the node has already refused one whose session id is not a plain
+          token. */}
       <Show when={!current().agentSessionId && current().resumeCommand}>
         {(command) => (
           <Button
@@ -351,9 +351,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     </Show>
   )
 
-  // The step's result, which the plugin that runs its kind may draw instead (../../contract/stepBody.ts).
+  // The step's result, which the plugin that runs its kind may draw instead.
   // Every built-in body stays as the default, so nobody matching, a tie, a failed tree, or a disabled
-  // plugin all draw what this pane always drew. A map's records are relationships, so they stay here.
+  // plugin all draw this pane's own body. A map's records are relationships, so they stay here.
   //
   // `revision` counts this memo's runs: each one is a change to what the provider sees.
   let revision = 0
@@ -466,7 +466,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           fallback={
             <>
               {/* A fragment, so the bar is the region's own child. The region caps its children at the
-                  reading width and lets only a bar reach the edges. Inside the Stack, this one stopped short. */}
+                  reading width and lets only a bar reach the edges, so inside a Stack it stops short. */}
               <Toolbar ariaLabel="Workflow step">
                 <Icon
                   name={stepGlyph(current().status)}
@@ -595,8 +595,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           </Fold>
 
           {/* The step's own id, not just the session's: a running step has no `agentSessionId` on its
-              row yet, and the agents client can find the session from the step
-              (@acorn/plugin-agents/contract/conversation.ts). */}
+              row yet, and the agents client can find the session from the step. */}
           <Dynamic
             component={conversation()!}
             sessionId={current().agentSessionId ?? undefined}

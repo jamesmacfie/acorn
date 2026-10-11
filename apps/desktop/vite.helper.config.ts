@@ -5,7 +5,7 @@ import { thirdPartyNotices } from '../node/thirdPartyNotices'
 
 // The desktop helper process, bundled because @acorn/* packages ship TypeScript source and Node
 // cannot import them out of node_modules. Its third-party dependencies are bundled too, by the node
-// service's own rule, because loading them file by file was most of the helper's time before its
+// service's own rule, because loading them file by file would dominate the helper's time before its
 // ready line (apps/node/externals.ts).
 
 export default defineConfig({

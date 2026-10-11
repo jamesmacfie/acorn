@@ -253,10 +253,9 @@ export const createLinearRoutes = (
   emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {},
 ) =>
   new Hono<AppEnv>()
-    // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). No shell
-    // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
-    // form, and as the one place a test covers the active-only filter and the branch-suggestion
-    // passthrough.
+    // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). The rail
+    // builds its mapped rows from the same query; this is the single-connection form, and the one place
+    // a test covers the active-only filter and the branch-suggestion passthrough.
     //
     // Enumerating a connection's projects is a provider contribution the host calls, so there is no
     // `/projects` route here (docs/integrations/project-sources.md § Project sources).

@@ -4,8 +4,8 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 //
 // Pure, and deliberately so. Every rule that makes the editor pleasant — a rename that rewrites its
 // own references, a delete that never bridges, a connect that refuses a cycle — is a function from a
-// draft to a draft, testable without a component. The store beside this one owns the undo window, the
-// server calls and the reactivity (./draftStore.ts).
+// draft to a draft, testable without a component. `createDraftStore` owns the undo window, the server
+// calls and the reactivity.
 //
 // Drafts are immutable. An operation returns a new object or the one it was given, which is what makes
 // undo an array of drafts and lets the kit's `Rows` reconcile instead of remounting.
@@ -83,8 +83,7 @@ export const select = (draft: WorkflowDraft, selection: DraftSelection): Workflo
  * the kind's id.
  *
  * Never inserted between two nodes: a node the editor added takes one edge from the node that was
- * selected and nothing downstream moves. That is proliferate's rule and it is why adding a step never
- * changes what an existing step waits on.
+ * selected and nothing downstream moves, so adding a step never changes what an existing step waits on.
  */
 export function addNode(draft: WorkflowDraft, kind: string, base?: string): WorkflowDraft {
   const name = uniqueStepName(draft.def, base ?? kind.replace(/^.*:/, ''))
@@ -129,8 +128,8 @@ export function removeNode(draft: WorkflowDraft, name: string): WorkflowDraft {
 }
 
 /** Move one declaration without changing the graph it describes. `after` is made explicit first,
- *  because declaration order is the legacy shorthand for a missing edge list. Stable step IDs keep
- *  bindings, branches, and graph positions attached to the same step. */
+ *  because an omitted `after` means the step declared before it, so a move would rewire it. Stable step
+ *  IDs keep bindings, branches, and graph positions attached to the same step. */
 export function moveNode(draft: WorkflowDraft, name: string, direction: -1 | 1): WorkflowDraft {
   const from = draft.def.steps.findIndex((step) => stepIdentity(step) === name)
   const to = from + direction
@@ -180,7 +179,7 @@ export function disconnect(draft: WorkflowDraft, from: string, to: string): Work
   return patchStep(draft, to, (step) => ({ ...step, after: [...after] }))
 }
 
-/** One field's value, on the step or in `with`, as ../../shared/stepFields.ts says. An empty value
+/** One field's value, on the step or in `with`, as `fieldHome` says. An empty value
  *  removes the key: "not set" and "set to nothing" are the same state in a definition. */
 export function setField(
   draft: WorkflowDraft,
@@ -269,8 +268,8 @@ export const toJson = (def: WorkflowDef): string => `${JSON.stringify(def, null,
  * Which required fields are still empty, in the editor's own words.
  *
  * The node applies `required` too, before it calls a kind's validator, and the footer shows what it
- * says. This is the same question asked here so Save goes grey as the box is emptied rather than four
- * hundred milliseconds later, and so the answer exists before a node has ever been asked.
+ * says. This is the same question asked here so the footer names an emptied box at once rather than
+ * after the validate debounce, and so the answer exists before a node has ever been asked.
  */
 export function missingRequiredFields(
   def: WorkflowDef,

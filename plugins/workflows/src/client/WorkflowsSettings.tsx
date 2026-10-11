@@ -7,7 +7,7 @@ import { Alert, Button, EmptyState, SettingRow, SettingsSection, Stack } from '@
 // active task's worktree loads, from `.acorn/workflows/*.toml` and ~/.acorn, plus any parse errors,
 // so a malformed file surfaces instead of vanishing. Task-scoped through activeTaskId, like
 // McpSettings. Launching a workflow happens in the command palette (⌘K). One section, matching the
-// one `./index.ts` declares for search; each definition is a row whose label is the workflow.
+// one the plugin's settings page declares for search.
 export default function WorkflowsSettings() {
   const taskId = () => activeTaskId()
 

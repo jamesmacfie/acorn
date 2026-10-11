@@ -43,7 +43,7 @@ describe('ansiPalette', () => {
 })
 
 // isAppDark judges the theme from the live --bg token; verify the classifier against the actual
-// --bg of every theme in tokens-layout.css light/dark families.
+// --bg of every light and dark theme.
 describe('isDarkColor', () => {
   it('classifies the app themes correctly by their --bg', () => {
     for (const bg of ['#ffffff', '#fdf6e3', '#eff1f5']) expect(isDarkColor(bg), bg).toBe(false) // light, solarized-light, catppuccin-latte

@@ -116,7 +116,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
     // Cached for a few minutes. The node answers by running `which` for tmux and every agent profile,
-    // about 18 ms of its loop, and the drawer remounts on every return to a task that has it open. The
+    // which blocks its loop, and the drawer remounts on every return to a task that has it open. The
     // list changes when a harness lands on PATH, which nothing reports, so a short stale time is the
     // refresh.
     try {
@@ -348,8 +348,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   }
 
   // Launch a profile; the node resolves project path/worktree from taskId
-  // (docs/workspaces-and-tasks.md § Task). Context comes from the task, not the URL; the worktree is
-  // created lazily in main.
+  // (docs/workspaces-and-tasks.md § Task). Context comes from the task, not the URL; the node creates
+  // the worktree lazily.
   async function startProfile(profileId: string) {
     setError(null)
     const w = ws()
@@ -383,9 +383,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       <Show when={!maximized()}>
         <SplitHandle axis="y" drag={drawerDrag} />
       </Show>
-      {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
-          the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
-          same element at the same height as the editor's file tab bar. */}
+      {/* DocumentTabs owns the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's
+          header is the same element at the same height as the editor's file tab bar. */}
       <DocumentTabs
         level="pane"
         idPrefix="terminal"
@@ -414,9 +413,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
         ]}
         actions={
           <>
-            {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
-                click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
-                roles. Menu brings all of it. */}
+            {/* Menu brings click-away, Escape, menu roles, and a portal so no overflow ancestor
+                clips it. */}
             <Menu
               ariaLabel="New session"
               trigger={({ toggle, open }) => (
@@ -502,13 +500,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       {/* The session draws its own `Rectangle kind="pty"` (./TerminalSurface.tsx): a terminal is the
           rectangle, and an empty drawer has no pixels for one to hold.
 
-          Every open session gets a surface and all but one is hidden. This used to mount the active
-          tab alone, keyed on its id, so each switch threw away an xterm and its WebGL context, asked
-          the node to serialize a thousand-line framebuffer, shipped it as one frame and parsed it into
-          a fresh emulator — for the most common thing anyone does in this drawer.
-          A hidden xterm stays attached and stays
-          current, so a switch is a repaint. What it costs is one xterm per open tab, which is what a
-          terminal application spends.
+          Every open session gets a surface and all but one is hidden. A hidden xterm stays attached
+          and stays current, so a switch is a repaint rather than a new xterm, a new WebGL context and
+          a serialized framebuffer from the node. What it costs is one xterm per open tab, which is
+          what a terminal application spends.
 
           `<For>` over the ids rather than over the sessions, and rather than `<Index>`. The sessions
           are replaced wholesale on every roster refresh, so `<For>` over them would rebuild every row

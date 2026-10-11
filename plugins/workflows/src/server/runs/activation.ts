@@ -100,8 +100,8 @@ export const createWorkflowExecution = (
       telemetry: ctx.telemetry,
       runStep: async (taskId, def, opts) => {
         // `opts.profileId`, never `def.profileId`: the runner has already resolved "the workflow
-        // default" and both paths below have to name the same harness. Reading the def here is what
-        // made a step with no harness named run as a bare process with no session, because
+        // default" and both paths below have to name the same harness. Reading the def here would run a
+        // step with no harness named as a bare process with no session, because
         // `managedProviderForProfile(undefined)` answers null and the managed path returns before it
         // creates anything.
         //
@@ -139,8 +139,7 @@ export const createWorkflowExecution = (
               : `Step '${def.name}' has a completion condition, and agent sessions are unavailable. Enable the Agents plugin to run it.`,
           )
         }
-        // The headless fallback, which now means what it says: a profile with no managed driver, or
-        // a node with agents disabled. It used to catch a blank harness as well.
+        // The headless fallback: a profile with no managed driver, or a node with agents disabled.
         const task = await core.tasks.load(taskId)
         const { cwd } = task ? await core.tasks.resolveCwd(task, undefined) : { cwd: homedir() }
         const project = task?.projectId ? await core.projects.byId(task.projectId) : null

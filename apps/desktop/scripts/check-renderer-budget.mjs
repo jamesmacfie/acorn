@@ -5,17 +5,16 @@ import { readRendererGraph } from './renderer-graph.mjs'
 // The startup budget for a built renderer, run against the bytes the bundler will pick up: every script
 // and stylesheet a cold window loads before it draws.
 //
-// Two checks, because a byte total alone is not enough. Between 2026-08-31 and 2026-09-02 the total
-// drifted from 1,317,605 B to 1,329,679 B on 31 unrelated commits while staying red, so nobody read it;
-// and a budget that only counts bytes lets the next heavy chunk in as long as something else shrank.
-// The denylist is a name test: a chunk called `shiki` in a startup list is wrong whatever it weighs.
+// Two checks, because a byte total alone is not enough: a budget that only counts bytes lets the next
+// heavy chunk in as long as something else shrank. The denylist is a name test: a chunk called `shiki`
+// in a startup list is wrong whatever it weighs.
 //
 //   node scripts/check-renderer-budget.mjs [--dir <built client dir>]
 //
 // The graph comes from Vite's manifest and the source modules in each chunk, read by
-// ./renderer-graph.mjs. The built index.html is not enough on its own: on 2026-09-24 its entry became a
-// small guard that loads the app with one dynamic import, the HTML named a single 9.6 KB script, and
-// this check passed on that while the window loaded 870 KB.
+// ./renderer-graph.mjs. The built index.html is not enough on its own: when its entry is a small guard
+// that loads the app with one dynamic import, the HTML names a single small script while the window
+// loads the whole graph.
 //
 // docs/frontend/startup-budget.md § Startup budget owns the contract. The terminal client's analogue is
 // apps/tui/scripts/check-startup-graph.mjs, which holds the first group of the same denylist for its
@@ -25,34 +24,18 @@ const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist/client') : args[dirFlag + 1])
 
-// `scripts` is the measured startup figure plus about 5%. 703,911 B on 2026-10-09, after the loaded
-// plugins' frame, chrome and worker hosts and the promotion modal moved behind their first use
-// (docs/testing/selective-renderer-loading-2026-10-09.md). The measurement before was 808,886 B, over
-// the 775,000 B ceiling below.
-// Before that, 726,109 B on 2026-10-02, after the compiled
-// plugin roster moved behind the first paint. Core registration stays eager and workspace restore
-// waits for the roster. The previous measurement was 862,188 B on 2026-10-01, after the security
-// changes to frame request ownership and tree validation. Those checks run before plugin content is
-// drawn. The previous 861,000 B ceiling used the 819,628 B measurement from 2026-09-29. It was 776,000 B
-// from 738,695 B measured on 2026-09-25, after unused kit components stopped riding along
-// (vite.config.ts). The growth since is mostly the plugin worker and frame hosts, which
-// host/plugins/distribution.ts loads at boot. It went unseen because CI failed earlier steps for the
-// whole stretch. Before that, 1,250,000 B from 2026-08-31 left 390 KB of slack and let 226 KB of drift
-// through without a word. A change that needs more raises it in the same commit and says why in the
-// commit message.
+// `scripts` and `roster` are the figures this script prints plus about 5%. Slack much larger than that
+// lets drift through unnoticed. A change that needs more raises the limit in the same commit and says
+// why in the commit message.
 //
 // `floor` is a lower bound, not a target. A startup set that small means the check is reading the
-// wrong graph, which is how it went blind in September, so it fails the build rather than passes it.
+// wrong graph, so it fails the build rather than passes it.
 //
 // `roster` is the compiled roster's scripts beyond startup, which the workspace restore waits for. A
 // dynamic import moves code off the first frame, but restore still waits on whatever the roster
-// imports, so a cut that only moves startup code into the roster saves nothing. 219,353 B on 2026-10-09,
-// down from 242,405 B, plus about 5%. Later that day, merging main added the Git plugin's pane model,
-// source, and commands, and the changes, workflows, and agents launch wiring: 232,231 B, plus about 5%.
-// Pane models are synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
+// imports, so a cut that only moves startup code into the roster saves nothing. Pane models are
+// synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
 const limits = {
-  // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown, under a 775,000 B
-  // ceiling. Their shared validation, tile, and authenticated image resource are core chrome.
   scripts: 740_000,
   roster: 244_000,
   styles: 200_000,
@@ -70,22 +53,19 @@ const limits = {
 // merges into a startup chunk named after something else, so a chunk-name test alone never sees it.
 //
 // A chunk's name is the name of one module in it, so a name here can move when the graph changes: the
-// pull-request model was `prModel` until phase 1 made the PR pane's contribution lazy, after which
-// rolldown gave the same modules a chunk called `prSections`. Both are listed. A prefix that no
-// longer names any chunk is not an error — see `inBuild` below — so a stale one is harmless, and
-// leaving it in is what catches the module coming back under its old name.
+// same pull-request modules can land in a chunk called `prModel` or `prSections`, so both are listed.
+// A prefix that names no chunk is not an error (see `inBuild` below), so a stale one is harmless, and
+// leaving it in catches the module coming back under its old name.
 //
 // The second group is plugin code a registration needs only when it draws: the memory section and
-// the workflow editor's draft modules, the GitHub importer and the
-// preview pane. Each was on the renderer's startup graph through a plugin's client entry until
-// 2026-09-25. The terminal client's graph was not checked for them, so only this list has them.
+// the workflow editor's draft modules, the GitHub importer and the preview pane. The terminal
+// client's graph doesn't check for them, so only this list has them.
 //
-// The third group is the loaded-plugin host and the promotion modal, which load on first use since
-// 2026-10-09: the worker host, the chrome registration and its data, and the modal. Frame
-// registration imports `chromeData`, so that name stands for it too.
+// The third group is the loaded-plugin host and the promotion modal, which load on first use: the
+// worker host, the chrome registration and its data, and the modal. Frame registration imports
+// `chromeData`, so that name stands for it too.
 //
 // The whole list applies to the roster as well as to startup, because the restore waits on both.
-// `stepFields` was in the roster through the workflow run model until 2026-10-09.
 const DENYLIST = [
   'shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes',
   'MemoryAddForm', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
@@ -97,9 +77,8 @@ const DENYLIST = [
 // no longer fetched at startup, the build fails until the prefix is deleted from here. That is what
 // makes a fix stick rather than quietly regress a month later.
 //
-// Empty since phase 1 of the performance programme, which was the phase that owed the three it held —
-// `shiki`, `DiffPane` and `prModel`. Nothing on the denylist is fetched at startup any more, so a
-// name that reappears fails the build outright and this list should stay empty.
+// Nothing on the denylist is fetched at startup, so a name that reappears fails the build outright and
+// this list should stay empty.
 const KNOWN = []
 
 const graph = await readRendererGraph(clientDir)

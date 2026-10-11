@@ -4,16 +4,17 @@
 // Off this surface, and staying off:
 //   ctx.events.streams()/channel(), PTY and WS-channel ownership. Exactly one plugin may own those,
 //     so they are terminal-plugin infrastructure handed in through ctx, not API.
-//   main/wsHub, main/notify. Plugins broadcast through ctx, and a ratchet keeps it that way.
+//   server/transport/wsHub, server/notify. Plugins broadcast through ctx, and a boundary test keeps it
+//     that way.
 //   server/db. A plugin owns its own SQLite file; core's tables are not its business.
 //   createCoreServices, createTaskService, testkit/*. Test scaffolding has its own entrypoint,
 //     @acorn/plugin-api/testkit. A test gets a real context from makeTestNodeContext rather than
-//     constructing core's services itself, which is why the factories are still not here.
+//     constructing core's services itself.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
 // `PluginHook*` are named here for the same reason `TaskConcern` below is: a plugin that opens a hook
 // passes `ctx.hooks` into the module that runs it, and a parameter needs a type to name
-// (server/pluginHost/hooks.ts, docs/plugins/hooks.md § Hooks).
+// (docs/plugins/hooks.md § Hooks).
 export type {
   NodePlugin,
   CompiledPluginBroadcast,
@@ -27,13 +28,12 @@ export type {
 } from '@acorn/node-core/server/pluginHost'
 export type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
-// an inline literal, and a function needs a return type to name (server/pluginHost/taskChecks.ts).
+// an inline literal, and a function needs a return type to name.
 export type { TaskConcern } from '@acorn/node-core/server/pluginHost'
-// What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
+// What `ctx.search.register` takes and what its `search` answers with.
 export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost'
 export type { SearchHit } from '@acorn/protocol/search.ts'
-// The hook and daily catch-up a plugin that stores task data purges deleted tasks from
-// (server/pluginHost/deletedTaskPurge.ts).
+// The hook and daily catch-up a plugin that stores task data purges deleted tasks from.
 export { registerDeletedTaskPurge } from '@acorn/node-core/server/pluginHost'
 // The major this host speaks to loaded plugins. Exported here for compiled callers, but the private
 // facade's snapshot does not govern when this number changes.
@@ -95,7 +95,7 @@ export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // `Env`, core's runtime bindings, is not here. A loaded plugin may inherit only environment names
 // declared in its manifest; host bindings never enter its RPC context. Where it needs a store, it
-// states the methods it calls (plugins/github/src/server/routes/prMirror.ts § PatchBlobStore).
+// states the methods it calls, as github's `PatchBlobStore` does.
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The objects arrive on `ctx.telemetry`, `ctx.log` and `ctx.core.telemetry`; the types are here
@@ -103,23 +103,17 @@ export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // (docs/telemetry.md, docs/plugin-authoring/telemetry.md § Telemetry and logging). `TelemetrySink` is what a
 // plugin holding the `telemetry` token writes.
 export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-core/server/telemetry'
-// The one value in this block, for a compiled plugin's module-level code with no `ctx` in reach: a
-// PTY engine, a route factory, a driver. Pass your own plugin id as the owner and the tag you
-// already had in the string you were prefixing, so `[github] pruned 3 rows` keeps reading the same
-// and gains an owner. A loaded plugin uses `ctx.log`, which binds the id for it.
-//
-// `describeError` beside it because a logger takes scalars: it turns a caught `unknown` into a name
-// and a scrubbed one-line message, which is what goes in the line.
+// For a compiled plugin's module-level code with no `ctx` in reach: a PTY engine, a route factory, a
+// driver. Pass your own plugin id as the owner. A loaded plugin uses `ctx.log`, which binds the id for
+// it. `describeError` is beside it because a logger takes scalars: it turns a caught `unknown` into a
+// name and a scrubbed one-line message.
 export { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 export type { Logger } from '@acorn/node-core/server/telemetry'
 // The rule from docs/telemetry/model.md § What never leaves the machine, as a function, for the one
 // plugin shape that needs it: a sink, which is the last thing a record passes through before the
 // network. Core scrubs at the ingest door, so a sink is re-checking rather than cleaning, and a
-// span name or a metric name is the part core takes on trust as a pattern.
-//
-// Exported rather than copied because there are already two copies of these token patterns in this
-// repository and the header of each says a change belongs in both. A third, inside a plugin whose
-// whole job is egress, is the copy that would rot unnoticed.
+// span name or a metric name is the part core takes on trust as a pattern. A sink imports this
+// rather than copying the token patterns, so a change to them reaches it.
 export { scrub } from '@acorn/node-core/server/telemetry'
 export type { TelemetryService } from '@acorn/node-core/server/core'
 export type { TelemetryAttrs, TelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'

@@ -49,8 +49,8 @@ export type NodeComposition = {
 // A fresh install's empty directory gets exactly the static list. Anything extra arrived through the
 // installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
-  // The changes plugin became part of git on 2026-10-11. Its review notes move with it, before any
-  // plugin opens a database.
+  // An older data root can hold a `changes` database. The git plugin owns those review notes, so they
+  // move to git's database before any plugin opens one.
   if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git'))
     pluginLog.info('moved the changes plugin database to git')
   const builtins = nodePlugins(dataDir, deps)

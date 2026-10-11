@@ -24,7 +24,7 @@ import { readGolden, writeGolden } from './golden'
 
 const REGISTRIES = {
   panes: paneRegistry,
-  // The command graph, from 2026-09-03. A plugin's commands are the one contribution kind that can
+  // The command graph. A plugin's commands are the one contribution kind that can
   // hold each other: a group and the searches under it are registered together, and a disable has to
   // take the whole subtree, not the parent and a set of orphans
   // (docs/plugins/commands.md § Command kinds).
@@ -33,7 +33,7 @@ const REGISTRIES = {
   settingsPages: settingsRegistry,
   slots: uiSlotRegistry,
   // Both halves of the cooperative seam, so a plugin's point and a plugin's contribution to somebody
-  // else's both have to come back after a disable (registries/extensionPoints.ts).
+  // else's both have to come back after a disable.
   extensionPoints: extensionPointRegistry,
   extensions: extensionRegistry,
   refPanels: refPanelRegistry,
@@ -110,18 +110,12 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 
 // The complete contribution set, plus what each optional plugin owns: the entries that must vanish
 // when it is disabled and, by omission, the ones that must not. A golden list in
-// `clientPluginDisable.snapshot.json` now, derived by the loop below and regenerated with the one
-// command in ./golden.ts.
+// `clientPluginDisable.snapshot.json`, derived by the loop below and regenerated with the one command
+// in ./golden.ts.
 //
 // `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the
-// parity assertion for the compiled graph. Loaded packages are covered through their manifest adapters
-// and do not belong in this static ownership ledger. `refPanels` held exactly one compiled entry, none,
-// when this was written, and the note here said that a compiled panel reappearing would be a real
-// change. It did: `github-pull` is github's own pull-request panel, so a PR link clicked inside
-// someone else's content can be glanced at instead of leaving the app. Linear's panel is still absent
-// from this ledger and still correct, because linear is a loaded package and its panel reaches the
-// registry through the manifest adapter in client-core/host/frames/register.ts rather than through
-// a compiled roster line.
+// parity assertion for the compiled graph. Loaded packages, such as linear and its ref panel, reach
+// the registries through their manifest adapters and do not belong in this static ownership ledger.
 //
 // Derived, but not therefore toothless: a snapshot you can regenerate looks like one you can launder a
 // regression past. What regeneration cannot hide:
@@ -163,7 +157,7 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    // Down one per plugin that ships loaded instead of compiled: linear, then http, then database.
+    // Plugins that ship loaded instead of compiled (linear, http, database) are not in this roster.
     expect(NAMES.length).toBeGreaterThanOrEqual(12)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(8)
@@ -194,7 +188,7 @@ describe('disabling a client plugin', () => {
   it('re-activation is idempotent rather than a duplicate-id throw', () => {
     // The registries throw on a duplicate id, so this is the property that makes the whole cycle
     // possible, and the reason the host disposes a plugin's prior contributions before re-registering.
-    // The same inputs twice is now a pass the host skips; the disable cases below are the re-runs.
+    // The same inputs twice is a pass the host skips; the disable cases below are the re-runs.
     expect(() => activate()).not.toThrow()
     expect(snapshot()).toEqual(FULL)
   })

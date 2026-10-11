@@ -1,14 +1,14 @@
 // Bounded background warm-up: after the open PR list loads, batch-fetch the first visible PRs'
 // detail + file summaries and seed their caches so likely navigation has an instant first paint.
-// The previous unbounded warm-up scaled network, SQLite reads, JSON parsing, memory and IndexedDB
-// writes with every open PR in a repo. Remaining rows are warmed on hover/focus instead.
+// Warming every open PR would scale network, SQLite reads, JSON parsing, memory and IndexedDB writes
+// with the size of the repo, so the remaining rows are warmed on hover/focus instead.
 // Patch bodies stay intent-driven in DiffForPull. Open only; closed PRs stay on-demand.
 import type { QueryClient } from '@tanstack/solid-query'
 import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../shared/api'
 import { pullsOptions } from './queries'
 import { writeJson } from '@acorn/plugin-api/client'
 
-const CHUNK = 5 // PRs per batch request (one GitHub GraphQL round-trip server-side)
+const CHUNK = 5 // PRs per batch request
 const CONCURRENCY = 2 // batch requests in flight at once
 export const INITIAL_PREFETCH_LIMIT = 5
 const ROW_PREFETCH_DELAY_MS = 80

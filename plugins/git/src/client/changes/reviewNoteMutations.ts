@@ -1,5 +1,3 @@
-// The review-note writes, beside the routes they drive (../shared/api.ts). Core's task writes stay in
-// @acorn/client-core/features/tasks/taskMutations.ts.
 import { postJson, writeJson } from '@acorn/plugin-api/client'
 import {
   reviewNoteRoute,
@@ -9,7 +7,7 @@ import {
   type ReviewNoteSeed,
 } from '../../shared/changes/api'
 
-// Task-scoped local review notes; never sent to GitHub until the review is submitted.
+// Task-scoped local review notes. They go to the task's agent, never to GitHub.
 export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) =>
   postJson<ReviewNote>(reviewNotesRoute(taskId), seed)
 export const editReviewNote = (taskId: string, noteId: string, body: string) =>

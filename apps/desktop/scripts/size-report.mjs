@@ -98,7 +98,7 @@ async function rendererStartup(clientDir) {
   const size = (files) => [...files].reduce((sum, file) => sum + statSync(join(clientDir, file)).size, 0)
   const scripts = [...graph.startupFiles].filter((file) => !file.endsWith('.css'))
   const styles = [...graph.startupFiles].filter((file) => file.endsWith('.css'))
-  // The compiled roster, imported by ./src/client/activate.ts after the first frame.
+  // The compiled roster, which the client's `startClientPlugins` imports after the first frame.
   return { scripts: size(scripts), styles: size(styles), registration: graph.rosterFiles && size(graph.rosterFiles) }
 }
 

@@ -30,7 +30,7 @@ import { MAX_EDITOR_FILE_READ_BYTES } from '../../contract/files'
 
 // Editor reads and writes inside the worktree, so this runs against a real one and exercises the
 // filesystem-containment contract end to end: path traversal, symlink escape, missing worktree.
-// Confinement lives in taskWorktree.resolveInRoot.
+// Confinement is CoreServices `fs.resolveInRoot`.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

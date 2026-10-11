@@ -1,14 +1,11 @@
-// Where the canvas draws each node, per device (docs/state-ownership/scope-rules.md § Particular decisions).
+// Where the canvas draws each node, per device (docs/workflows/editor-details.md § Where positions live).
 //
-// Positions are not in the definition, and that is a decision rather than an omission: a definition
-// saved to a repository is read on machines with different screens, and a committed x/y is noise in
-// every diff (docs/workflows/authoring.md § Authoring). They live under `plugin:workflows:layout:<defId>` in
-// device storage instead, which is the one guarded accessor for a per-device scrap and is a no-op on
-// a host with nowhere to keep one (client-core kit/lib/state/deviceStorage.ts).
+// Positions are not in the definition: a definition saved to a repository is read on machines with
+// different screens, and a committed x/y is noise in every diff. They live in device storage, which is
+// a no-op on a host with nowhere to keep one.
 //
-// The graph view reads and writes these (./editor/GraphView.tsx), 400 ms after a drag stops. The two
-// operations that are easy to forget are here rather than there: a rename has to carry the position
-// with the node, and deleting a definition has to take its layout with it.
+// The operations that are easy to forget are here rather than in the graph view: a renamed node keeps
+// its position, and a deleted definition takes its layout with it.
 import { clearLocal, readLocal, writeLocal } from '@acorn/plugin-api/client'
 
 export type NodePosition = { x: number; y: number }
@@ -53,7 +50,7 @@ export function renameInLayout(defId: string, from: string, to: string): void {
   writeLayout(defId, { ...rest, [to]: moved })
 }
 
-/** A deleted definition takes its layout with it, and so does a deleted node. */
+/** A deleted definition takes its layout with it. `forgetNodeInLayout` does the same for a node. */
 export function forgetLayout(defId: string): void {
   clearLocal(layoutKey(defId))
 }

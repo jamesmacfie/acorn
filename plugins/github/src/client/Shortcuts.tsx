@@ -8,11 +8,9 @@ import { githubCommands } from './commands'
 // Where this plugin's router-scoped commands get mounted, and the chords that reach them. One instance,
 // in the shell's overlay slot, drawing nothing.
 //
-// It drew a file finder until 2026-09-03. That overlay is a `search` command on the shared palette
-// session now, and what a command does is `./commands.ts`; what is left here is the router, the
-// changed-file query and the keyboard. PullList still owns j/k (next/prev PR); those keys are untouched.
-// The `?` shortcut opens Settings → Shortcuts rather than a local help overlay, so the reference lives
-// in one place.
+// What a command does is `githubCommands`; this holds the router, the changed-file query and the
+// keyboard. The `?` shortcut opens Settings → Shortcuts rather than a local help overlay, so the
+// reference lives in one place.
 
 export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()

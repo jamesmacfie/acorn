@@ -71,7 +71,7 @@ export function createEditorDocumentPool(api: EditorApi, taskId: string): Editor
   return pool
 }
 
-/** Phase 02 file actions join an admitted save and stop every follow-up path, including retirement. */
+/** File actions join an admitted save and stop every follow-up path, including retirement. */
 export async function suspendEditorFile(pool: EditorPool, path: string): Promise<() => void> {
   if (pool.externalEditors.has(path)) throw new Error('Close $EDITOR before changing this file.')
   const entry = pool.files.get(path)

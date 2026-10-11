@@ -79,17 +79,17 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 ]
 
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
-// docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact equality now instead of
-// a representative `some()` check per contribution. The segment doubling is visible here too
+// docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact
+// equality rather than a representative `some()` check per contribution. The segment doubling is visible here too
 // (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
 // under its plugin namespace, e.g. `/v1/p/memory/memory`.
 //
 // Duplicates are kept rather than deduped. A route with its own middleware lists once per handler,
 // and collapsing them would stop the list noticing a gate like requireDevice disappearing.
 //
-// What's not in here, and would be a real change if it appeared: any route from a loaded package.
-// Linear's and http's routes left when those plugins did; a loaded plugin's routes reach the mount
-// table through the loader's fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
+// What's not in here, and would be a real change if it appeared: any route from a loaded package,
+// such as linear's or http's. A loaded plugin's routes reach the mount table through the loader's
+// fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
 // doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
 // drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
 const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
@@ -141,8 +141,7 @@ describe('assembled routes', () => {
     expect(
       ((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error,
     ).toMatchObject({ code: 'bad_number' })
-    // A path the mirror doesn't serve falls through to the app's 404, as it did when the routers were
-    // mounted at boot.
+    // A path the mirror doesn't serve falls through to the app's 404.
     expect((await call('/v1/p/github/repos/acme/web/nothing-here', 'Bearer d')).status).toBe(404)
   })
 
@@ -151,7 +150,7 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    // One left: github is the only provider still compiled in. linear, openai and anthropic all come
+    // One: github is the only compiled provider. linear, openai and anthropic all come
     // from loaded packages, and this suite assembles the compiled list only, so their absence is the
     // assertion; any of them appearing would mean something in the binary had started registering a
     // provider again.

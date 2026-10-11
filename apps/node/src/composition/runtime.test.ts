@@ -84,7 +84,7 @@ describe('supervised service runtime', () => {
     })
   }
 
-  // No ACORN_PORT: the service picks its own port now. Pinning one here would test a configuration the
+  // No ACORN_PORT: the service picks its own port. Pinning one here would test a configuration the
   // app never uses.
   const seedEnv = (): void => {
     delete process.env.ACORN_PORT
@@ -108,8 +108,8 @@ describe('supervised service runtime', () => {
     })
 
     try {
-      // The endpoint AND the pin are reported, not assumed: the parent no longer computes an origin
-      // before the child exists, which is what lets two nodes coexist on one machine.
+      // The endpoint AND the pin are reported, not assumed: the parent does not compute an origin before
+      // the child exists, which is what lets two nodes coexist on one machine.
       expect(runtime.started.endpoint.origin).toBe(`https://127.0.0.1:${runtime.started.endpoint.port}`)
       expect(runtime.started.nodeId).toMatch(/^[0-9a-f-]{36}$/)
       expect(runtime.started.deviceToken).toMatch(/^acorn_dt_/)
@@ -118,7 +118,7 @@ describe('supervised service runtime', () => {
 
       // The pre-auth route, over a connection validated against the reported certificate. The node
       // serves no web assets (docs/architecture-overview.md § Runtime topology), so there is no SPA
-      // shell to fetch any more.
+      // shell to fetch.
       expect(await get(runtime.started, '/v1/node')).toBe(200)
 
       // The pin, end to end: a client that checks the fingerprint the service reported gets through.
@@ -136,8 +136,8 @@ describe('supervised service runtime', () => {
     expect(states.at(-1)).toBe('stopped')
   }, 20_000)
 
-  // Two nodes on one machine is ordinary now (docs/architecture-overview.md § Runtime topology), and
-  // the old pinned port made it impossible.
+  // Two nodes on one machine is ordinary (docs/architecture-overview.md § Runtime topology), and a
+  // pinned port would make it impossible.
   it('binds a different port, and a different identity, per data root', async () => {
     seedEnv()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-service-a-'))

@@ -259,8 +259,8 @@ describe('loading rollbar from disk', () => {
       })
 
       // And the whole point: what the owner is told. The route is parse, call, respond over this
-      // (docs/plugins/loaded-plugins.md § Loaded plugins covers why a load failure used to read as a permanently
-      // stuck Restart banner).
+      // (docs/plugins/loaded-plugins.md § Loaded plugins covers why a load failure must not read as a
+      // permanently stuck Restart banner).
       const state = pluginState(
         await buildPluginStateBridge({
           dataDir: broken,
@@ -286,8 +286,8 @@ describe('loading rollbar from disk', () => {
   })
 
   it('lets a newer bundled package replace what build:plugin wrote, without touching a user install', () => {
-    // The script marked what it wrote (`.acorn-dev-build`), the whole fix: docs/plugins/loaded-plugins.md § Loaded
-    // plugins covers what happened before it existed.
+    // The script marked what it wrote (`.acorn-dev-build`): docs/plugins/loaded-plugins.md § Loaded
+    // plugins covers why that marker matters.
     const built = pluginDir(dataRoot, 'rollbar')
     expect(existsSync(join(built, DEV_BUILD_MARKER))).toBe(true)
 

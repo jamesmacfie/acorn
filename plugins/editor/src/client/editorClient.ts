@@ -1,7 +1,5 @@
-// Reads/writes files on the active task's worktree. Was the `window.acorn.editor` preload bridge;
-// now loopback HTTP routes, so the editor works in a plain browser (dev:node) too. The
-// accessor shape is unchanged so consumers keep their null-tolerant call sites; it just never
-// returns null now that the surface is server-backed.
+// Reads/writes files on the active task's worktree through the node's HTTP routes, so the editor works
+// in a plain browser (dev:node) too.
 import {
   editorFilesRoute,
   editorIgnoredRoute,

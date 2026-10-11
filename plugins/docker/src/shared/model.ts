@@ -28,7 +28,7 @@ export type DockerContainerSummary = {
   composeWorkingDir: string | null
   labels: Record<string, string>
   // The compose working_dir no longer exists on disk, meaning the worktree behind this stack is
-  // gone (the stale-cleanup signal). Computed main-side; absent when there is no working_dir label.
+  // gone (the stale-cleanup signal). Computed on the node; absent when there is no working_dir label.
   workingDirMissing?: boolean
 }
 
@@ -118,7 +118,7 @@ export type DockerProjectMatcher = {
   effective: DockerMatcherKeys
 }
 
-// Route helpers (loopback HTTP; mounted at /v1/p/docker in app/server/routes.ts).
+// Route helpers (loopback HTTP; mounted at /v1/p/docker).
 export const dockerInfoRoute = (): string => '/v1/p/docker/info'
 export const dockerContainersRoute = (): string => '/v1/p/docker/containers'
 export const dockerContainerInspectRoute = (ref: string): string =>

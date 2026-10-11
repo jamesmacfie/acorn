@@ -20,9 +20,8 @@ function installBridge(): Bridge {
   const statusHandlers: ((status: NodeStatus) => void)[] = []
   const acorn = {
     desktop: true,
-    // `nodeFetch` is the "there is a broker" discriminator in client-core's platform seam
-    // (packages/client-core/src/infra/platform/index.ts), so a fake that pushes frames has to answer
-    // requests too, even though this suite never sends one.
+    // `nodeFetch` is the "there is a broker" discriminator in client-core's platform seam, so a fake
+    // that pushes frames has to answer requests too, even though this suite never sends one.
     nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {

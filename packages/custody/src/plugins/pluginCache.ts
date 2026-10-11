@@ -23,11 +23,11 @@ const log = createLogger('plugins')
 // The content-addressed store of plugin client bundles a node handed over. See docs/security.md,
 // "Third-party plugin bundles", for why the hash is trusted and the claim is not.
 //
-// Only main writes here and only main knows the paths. Nothing on this class hands a filesystem path
+// Only the helper writes here and only the helper knows the paths. Nothing on this class hands a filesystem path
 // to the renderer, which names bundles by hash and nothing else.
 //
 // See docs/future/remote.md: a browser client does the same job with IndexedDB. The renderer reaches
-// this through one narrow module, client-core/host/plugins/host.ts, so the interface is the portable part
+// this through one narrow module in client-core's plugin host, so the interface is the portable part
 // rather than the storage.
 
 const CACHE_DIR = `${ACORN_BASELINE}-plugin-cache`
@@ -97,7 +97,7 @@ export class PluginCache {
   }
 
   /** Cache client code read from this app's packaged resources. Unlike putFromNode there is no remote
-   * hash claim to verify, so the content hash computed here is the identity main trusts. */
+   * hash claim to verify, so the content hash computed here is the identity the helper trusts. */
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
     const result = this.putBundledBatch([{ pluginId, version, read: () => bytes }])[0]!
     if ('error' in result) throw result.error
@@ -142,7 +142,7 @@ export class PluginCache {
     return results
   }
 
-  // Main-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
+  // Helper-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
   path(hash: string): string | null {
     return this.has(hash) ? join(this.dir, `${hash}.js`) : null
   }

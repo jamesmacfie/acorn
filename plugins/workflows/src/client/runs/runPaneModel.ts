@@ -2,8 +2,8 @@
 // tail of each node, and the four things a person can do to a run
 // (docs/workflows/routes-and-ui.md § Routes and UI).
 //
-// Built once per task in the host's own root (client-core registries/panes/paneModels.ts), so the
-// three socket subscriptions below are opened once for the pane and not once per region.
+// Built once per task in the host's own root, so the socket subscriptions below are opened once for
+// the pane and not once per region.
 import { createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
 import {
   clientEvents,
@@ -30,8 +30,8 @@ import { workflowRefreshQueue } from '../refreshQueue'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
-/** The selected run keeps 200 non-stream events per step and 4,000 output characters. A command that prints a
- *  megabyte is still a step whose tail you want to read; the whole stream is on the row. */
+/** How much of the selected run each step keeps: non-stream events, and output characters. A command
+ *  that prints a megabyte is still a step whose tail you want to read; the whole stream is on the row. */
 const EVENT_CAP = 200
 const TAIL_CHARS = 4000
 
@@ -180,8 +180,8 @@ export function createRunPaneModel(task: Task) {
   })
 
   // The run's frozen definition is what says which step waits on which, so the pane's indentation is
-  // the editor's: one `graphOrder`, two lists (../editor/graphOrder.ts). A dispatched child is a row
-  // under the step that spawned it, which the definition cannot know.
+  // the editor's: one `graphOrder`, two lists. A dispatched child is a row under the step that spawned
+  // it, which the definition cannot know.
   const nodes = createMemo<RunNode[]>(() => {
     const rows = steps()
     const def = parseDef(selectedRun()?.defJson)
@@ -338,8 +338,8 @@ export function createRunPaneModel(task: Task) {
     selectRun,
     selectStep: (stepId: string) => setSelectedStepId(stepId),
     /** The catalog's label for a contributed kind: "Run a command" for `terminal:command`. A view falls
-     *  back to `kindLabel` in ./runDisplay.ts, the built-in table, which stays out of this model so
-     *  registering the pane doesn't load every step kind's fields. */
+     *  back to `kindLabel`, the built-in table, which stays out of this model so registering the pane
+     *  doesn't load every step kind's fields. */
     contributedKindLabel: (kind: string): string | undefined =>
       catalog()?.kinds.find((entry) => entry.id === kind)?.describe?.label,
     now,

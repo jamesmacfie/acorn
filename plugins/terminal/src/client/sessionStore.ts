@@ -80,8 +80,8 @@ export function initSessions(): () => void {
   // Once per node, when that node can answer, rather than at activation. Activation runs once, before
   // the window has heard from any node, so a read fired then can meet a node that is still starting,
   // and nothing would ask again until a session changed. The agent roster primes the same way
-  // (plugins/agents/src/client/sessions/managedStore.ts § activateManagedAgentNotifications). No node id
-  // at all is a renderer served by the node itself, which has no status to wait for, so it reads at once.
+  // (the agents plugin's `activateManagedAgentNotifications`). No node id at all is a renderer served by
+  // the node itself, which has no status to wait for, so it reads at once.
   let primed: string | null | undefined
   const stopPrime = createRoot((dispose) => {
     createEffect(() => {
@@ -99,8 +99,8 @@ export function initSessions(): () => void {
   const scope = onScopeEvicted((event) => {
     if (event.scope === 'task') activeByTask.delete(event.taskId)
     // No read here. The prime effect above reads the new node once it can answer. A read at the
-    // switch itself went out before that: at launch, when the remembered node had gone, it asked the
-    // local node before the broker had adopted it.
+    // switch itself goes out too early: at launch, when the remembered node has gone, it asks the
+    // local node before the broker has adopted it.
     if (event.scope === 'node-switched') clearSessions()
   })
   return () => {

@@ -45,7 +45,7 @@ export async function probeNode(
   const payload: unknown = JSON.parse(body)
   const parsedInfo = nodeInfoSchema.safeParse(payload)
   if (!parsedInfo.success) {
-    // Two very different failures wore one message here. `nodeInfoSchema` is additive-forever, so a
+    // Two very different failures land here. `nodeInfoSchema` is additive-forever, so a
     // newer node still parses, but a future major that reshaped this response would not, and telling
     // its owner "this is not an acorn node" sends them to check the URL instead of the version.
     //

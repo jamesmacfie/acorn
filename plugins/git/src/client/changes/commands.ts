@@ -5,11 +5,10 @@ import { GIT_PANE } from '../gitPane'
 // verbs as palette rows.
 //
 // Data rather than registration calls, so the ids, the scope and the chords are a table test and the
-// model is the only thing that owns their lifetime (./changesModel.tsx). Neither chord is handled in
-// the pane: a pane that installed a key handler of its own would reach neither Settings → Shortcuts
-// nor the cheat sheet, and could not be rebound
-// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). Both are scoped to the
-// Git pane, the id the host writes into `focusedPane` (../gitPane.ts).
+// model is the only thing that owns their lifetime. Neither chord is handled in the pane: a pane that
+// installed a key handler of its own would reach neither Settings → Shortcuts nor the cheat sheet, and
+// could not be rebound (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
+// Both are scoped to `GIT_PANE`, the id the host writes into `focusedPane`.
 
 export const COMMIT_COMMAND = 'changes.commit'
 export const AMEND_COMMAND = 'changes.amend'
@@ -73,8 +72,8 @@ export const changesCommands = (run: {
  *
  * `meta+enter` is the `commit` chord in the closed intent set, which is why it reads as the obvious
  * one. `meta+alt+enter` is not the `meta+shift+enter` that Zed uses, because core spent that chord on
- * `core.surface.toggle-maximize` (apps/desktop TaskView) and two bindings on one chord means one of
- * them registers nothing at all.
+ * `core.surface.toggle-maximize` and two bindings on one chord means one of them registers nothing
+ * at all.
  *
  * `active` is the field's own focus rather than the pane's. A pane is wider than its editor, and
  * `meta+enter` inside the diff column's comment box is that box's business.

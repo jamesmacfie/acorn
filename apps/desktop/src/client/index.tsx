@@ -36,8 +36,8 @@ window.addEventListener('pagehide', stopResponsiveness, { once: true })
 const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
 window.addEventListener('pagehide', stopPageFacts, { once: true })
 
-// The two failures nothing in the app catches. Before this the renderer had neither handler, so an
-// error thrown outside a component's boundary was a line in a devtools console nobody had open.
+// The two failures nothing in the app catches. Without these handlers, an error thrown outside a
+// component's boundary is a line in a devtools console nobody has open.
 //
 // Fatal and unhandled, with the stack, which is the one place a client record carries one: an
 // uncaught error with no stack is not worth sending anywhere (docs/telemetry/model.md § What never leaves
@@ -109,7 +109,7 @@ void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins 
 //
 // `cancelRefetch: false` leaves a request that is already out alone. The shell's own queries wait on
 // `nodeReady()`, which turns true on this same status, so they can already be fetching when this runs.
-// Cancelling them cost a cancelled request and a duplicate for each one that had cached data.
+// Cancelling them costs a cancelled request and a duplicate for each one that had cached data.
 createRoot(() => {
   createEffect(() => {
     const nodeId = activeNodeId()

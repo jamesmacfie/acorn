@@ -27,8 +27,7 @@ describe('Rollbar loaded routes', () => {
     // The host's request context, with canned answers only for the two provider calls that would
     // otherwise reach Rollbar's API. `withConnections` and `items` are not stubbed: they stay the
     // real runtime, so if this route starts reading the item store directly, the host's own
-    // ownership check fails the test. An earlier version of this file stubbed them with a `throw`,
-    // which only asserted what the file itself had written.
+    // ownership check fails the test.
     const context = await makeTestRequestContext({
       plugin: 'rollbar',
       principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
@@ -50,8 +49,7 @@ describe('Rollbar loaded routes', () => {
   })
 
   // A link may name a single project rather than the whole workspace, and then the routed project has
-  // to match it. Without this, two repositories in one workspace show each other's errors, which is
-  // the thing that made the mapping look broken.
+  // to match it. Without this, two repositories in one workspace show each other's errors.
   it('keeps only the links the routed project is in scope for', async () => {
     const fetch = createRollbarFetch({
       byId: async (id) => ({ id, workspaceId: 'workspace-1' }) as never,
@@ -85,7 +83,7 @@ describe('Rollbar loaded routes', () => {
   })
 
   // The counterpart to the intersection above: no `?project=` means no scope to intersect with, and a
-  // rail that fell back to every connection put one workspace's errors in front of every other
+  // rail that fell back to every connection would put one workspace's errors in front of every other
   // workspace.
   it('returns no rail rows without a project scope', async () => {
     const fetch = createRollbarFetch({

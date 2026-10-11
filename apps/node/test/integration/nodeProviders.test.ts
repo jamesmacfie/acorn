@@ -22,9 +22,9 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 // The node-provider seam end to end, against the reference provider loaded off disk
 // (docs/plugins/node-providers.md § Node providers).
 //
-// Loaded, not imported. The acceptance criterion for the whole phase is that the first-party cloud
-// plugin will be a loaded plugin built only from published seams, and the way to know that is true is
-// to make the reference provider one and drive it through the real routes. So this builds the package,
+// Loaded, not imported. The first-party cloud plugin is meant to be a loaded plugin built only from
+// published seams, and the way to know that holds is to make the reference provider one and drive it
+// through the real routes. So this builds the package,
 // loads it the way boot does, and asks `/v1/core/nodes` the way a client does.
 //
 // The single most important assertion here is negative: the list route does not carry the device token

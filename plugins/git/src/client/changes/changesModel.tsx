@@ -69,15 +69,9 @@ import { GIT_PANE } from '../gitPane'
 import { createCommitState } from './commitState'
 
 // Everything the Changes tab knows, held once per task and read by all four of its regions
-// (docs/diff-rendering.md, docs/panes/layout.md § Layout model).
-//
-// The pane is a `list-detail` layout, so the header, the file list, the commit bar and the diff are
-// four components the host mounts rather than one closure. They share a resource, a selection, a diff
-// source and an armed-confirm, and the host holds that: `model` on the pane contribution builds this
-// once per task inside its own reactive root (client-core registries/paneModels.ts).
-//
-// A `.tsx` file even though it is the model: `DiffSource.lineExtra` is a component the source hands
-// the viewer, and the source is the thing being shared.
+// (docs/panes/layout.md § Layout model). The header, file list, commit bar and diff are separate
+// components the host mounts, and `model` on the pane contribution builds this once per task in its
+// own reactive root. It is a `.tsx` file because `DiffSource.lineExtra` is a component.
 
 // One viewer per task pane, so the scope's route key is a constant rather than a coordinate.
 const CHANGES_ROUTE_KEY = 'changes'
@@ -104,8 +98,8 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   }
 
   // One read behind the whole panel: the changes, the branch, its upstream, how far each way, and
-  // whether a merge or rebase is mid-flight (docs/diff-rendering/changes-pane.md § One status read). The list draws the
-  // changes, the branch bar draws the rest.
+  // whether a merge or rebase is mid-flight (docs/diff-rendering/changes-pane.md § One status read).
+  // The list draws the changes, the branch bar draws the rest.
   const [status, { refetch }] = createResource(
     // Archive keeps the pane mounted so it can report teardown failures. Stop asking for Git state
     // during that interval: the node is removing this worktree, and a status read has no stable tree
@@ -159,7 +153,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const stageable = createMemo(() => stageableRows(groups()))
 
   // List or tree, the sort, and the grouping: one device preference, so the shape survives a relaunch
-  // and does not follow the reader to another machine (./changesPrefs.ts).
+  // and does not follow the reader to another machine.
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const view = createMemo(() => readChangeView(prefs.data))
@@ -205,7 +199,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     return (notes() ?? []).filter((n) => n.path === r.path && n.side === a.side && n.endLine === a.line)
   }
 
-  // The stacked file set: one staging area at a time (./model.ts § stackFor).
+  // The stacked file set: one staging area at a time.
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
   const [dependencies] = createResource(
@@ -225,10 +219,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     async ({ scope }) => localGitApi.dependencies(task.id, scope),
   )
 
-  // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts and keys
-  // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
-  // only the files whose key did (../server/localDocument.ts). The answer carries the request it was
-  // for, so the topology is always the node's view of one moment rather than a mix of two.
+  // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts
+  // and keys every file's patch; it is asked again whenever the stack or any file's status key moves,
+  // and diffs only the files whose key did (`localDocument` on the node). The answer carries the
+  // request it was for, so the topology is always the node's view of one moment rather than a mix of two.
   // At most the node's document limit. A stack past it, such as an unignored build folder, draws the
   // rest as files with no diff rather than having the whole document refused.
   const documentRequest = createMemo(
@@ -419,7 +413,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       },
     },
     // Drawn in the same shape another plugin's marks are, which is what the host puts under a line
-    // (plugins/annotations/AnnotationMarks.tsx): a state, the text, and who it belongs to. What a
+    // (`AnnotationMarks` in client-core): a state, the text, and who it belongs to. What a
     // review note has and a mark does not is a verb, because this one is the reader's own. The viewer
     // measures the segment it sits in, so a note added, edited or deleted resizes its row.
     lineExtra: {
@@ -470,14 +464,9 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     await refetch()
   }
 
-  // Which backends the wand may spend — a stored key, or an agent CLI installed on this machine — ids
-  // and labels only: the key stays on the node and is resolved inside `core.models.generateText`
-  // (../server/routes/localGit.ts).
-  //
-  // Read once per task rather than on a poll. A connection is added in Settings and a CLI is installed
-  // in a terminal, both of which are a trip out of the pane and back, and this model is rebuilt when
-  // the pane is. An empty list is also what hides the button, so the pane draws no wand until the read
-  // returns, which is the right way round.
+  // Which backends the wand may spend: ids and labels only, because the key stays on the node. Read
+  // once per task rather than on a poll, since adding a connection or installing a CLI means leaving
+  // the pane. An empty list hides the button, so no wand shows until the read returns.
   const [modelBackends] = createResource(
     () => (project()?.vcs === 'git' ? task.id : undefined),
     async (id) => await localGitApi.modelBackends(id).catch(() => []),
@@ -485,7 +474,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   )
   // The shared "Generate with" default, resolved against what is actually available. The same pick
   // the workflow generator opens on, so a reader who chose an installed CLI here does not choose it
-  // again there (client-core features/settings/models/generatePick.ts).
+  // again there (`readGeneratePick` in client-core).
   //
   // The list is read only once it has arrived. This memo runs while the model is built, which happens
   // inside the header region, and reading a resource that is still loading holds that region back.
@@ -494,7 +483,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     effectiveModelPick(modelBackends.loading ? [] : modelBackends(), readGeneratePick(prefs.data)),
   )
 
-  // The commit editor: the message, the three options, and the two verbs (./commitState.ts). Built
+  // The commit editor: the message, the three options, and the two verbs. Built
   // here so it lives as long as the pane's model rather than as long as the footer, which the host
   // unmounts whenever the pane is showing the diff instead of the list.
   const editor = createCommitState({
@@ -510,7 +499,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   })
 
   // The commit pair, the three remote palette rows, and the two chords, all registered for as long
-  // as this model lives (./commands.ts). The model outlives every region of the pane and is disposed
+  // as this model lives. The model outlives every region of the pane and is disposed
   // before the next task's is built, so the registry never sees a duplicate id.
   const commands = registerCommands(
     changesCommands({
@@ -530,10 +519,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
 
   // The bar's four verbs, behind one busy flag. One flag rather than four: they all talk to the same
   // remote, none of them is safe to start while another is running, and the bar has one place to
-  // show pending anyway (./RemoteBar.tsx).
+  // show pending anyway.
   //
   // Every reason goes to the alert rather than into the header, because git's refusals are multi-line
-  // and because `remoteReason` turns the ones it recognises into a next step to press (./model.ts).
+  // and because `remoteReason` turns the ones it recognises into a next step to press.
   const [remoteBusy, setRemoteBusy] = createSignal(false)
   const forceObservation = () => ({ nodeId: activeNodeId(), branch: status().branch, upstreamId: status().upstreamId })
   const runRemote = (action: RemoteAction, observed = forceObservation()) => {
@@ -621,7 +610,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     expanded: (key: string) => !closedFolders().has(key),
     /** Open or close one folder, answering whether anything moved. `false` hands the key back to the
      *  tier below, which is how Right on a file row still crosses a column in the terminal
-     *  (client-core kit/keys/collectionIntents.ts). */
+     *  (`createCollectionIntents` in client-core). */
     foldFolder: (key: string, expand: boolean): boolean => {
       if (!isFolderKey(key)) return false
       const held = closedFolders()
@@ -653,7 +642,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
      *  show it and none of the four is safe to start while another runs. */
     remoteBusy,
     /** Run one remote verb: the bar's primary button, its menu, and the banner's Abort all come
-     *  through here (./RemoteBar.tsx). */
+     *  through here. */
     remote,
     forceObservation,
     /** The backends the wand may offer. Empty hides it: there is nothing to press. */
