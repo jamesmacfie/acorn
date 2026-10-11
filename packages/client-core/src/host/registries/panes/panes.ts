@@ -144,11 +144,10 @@ export type PaneModelContext = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
 export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 
-// There is no `keepAlive` here either, and there was: the field promised the host would keep a pane's
-// DOM across a task switch, exactly one pane set it, and nothing ever read it. What keeps a pane cheap
-// to leave and come back to is ./paneModels.ts within a task and the query cache across tasks, warmed
-// by `prefetch` above. A hidden element tree per task is the memory shape this codebase already
-// declined for the agent transcript (docs/managed-agents/transcript.md), so it is not coming back as a pane field.
+// There is no `keepAlive` here. What keeps a pane cheap to leave and come back to is ./paneModels.ts
+// within a task and the query cache across tasks, warmed by `prefetch` above. A hidden element tree per
+// task is the memory shape this codebase declined for the agent transcript
+// (docs/managed-agents/transcript.md).
 //
 // There is no per-pane `freshness` hook here (docs/panes/contributions.md § Contributions has the reason).
 //
@@ -194,9 +193,8 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   // with its own components and this registry is the one place that decided otherwise
   // (../../layouts/table.ts).
   //
-  // Behind `lazy` for the reason plugins/frames/register.ts states: this module is imported by
-  // bare-Node test suites, and the repo's vitest configs have no Solid transform, so a static import
-  // of a `.tsx` file would make it unimportable there. The `??` short-circuits, so a host that
+  // Behind `lazy` because this module is imported by bare-Node test suites with no Solid transform,
+  // where a static import of a `.tsx` file would make it unimportable. The `??` short-circuits, so a host that
   // supplied a table never reaches for the DOM one at all.
   const Draw = lazy(async () => ({
     default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout],
@@ -232,18 +230,16 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
-        // renders as an empty string, which drew the region's rectangle empty until the module
-        // landed. The boundary draws the host's labelled placeholder instead. One boundary per region
-        // rather than one per pane, so a slow region does not blank the ones beside it. It used to be
-        // here for a harder reason, a cell host that refused a bare string outright; that rule went
-        // with the terminal rewrite (apps/tui/src/tree/renderer.ts).
+        // renders as an empty string, which would draw the region's rectangle empty until the module
+        // lands. The boundary draws the host's labelled placeholder instead. One boundary per region
+        // rather than one per pane, so a slow region does not blank the ones beside it.
         //
         // The boundary covers the module arriving and nothing after it. Everything under a region
         // shares it, and `@tanstack/solid-query` suspends whatever boundary is above it whenever
-        // `.data` is read on an empty cache, so a query that starts once the region is already on
-        // screen used to take the region back out of the document for the length of its fetch. The
-        // solid-js patch is what stops that: a boundary that has drawn never swaps back to its
-        // fallback, and patches/README.md holds the reasoning.
+        // `.data` is read on an empty cache, so without the solid-js patch a query that starts once the
+        // region is on screen would take the region back out of the document for the length of its
+        // fetch. With it, a boundary that has drawn never swaps back to its fallback; patches/README.md
+        // holds the reasoning.
         regions[name] = () => {
           // Opened here, where the host asks for the region, and ended when the region's content
           // mounts. A region that suspends is the case worth measuring: everything between those two
@@ -335,7 +331,7 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
       pane.prefetch(task, queryClient)
     } catch (error) {
       // A pane that throws on the way to warming a cache must not take the rail's pointer handler
-      // with it. Nothing is missing afterwards; the pane fetches on mount as it always did.
+      // with it. Nothing is missing afterwards; the pane fetches on mount.
       log.error(`'${pane.id}' failed to prefetch`, error, { 'pane.id': pane.id })
     }
   }

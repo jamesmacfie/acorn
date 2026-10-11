@@ -2,7 +2,7 @@ import type { NoticeKindContribution } from '../../host/registries/rail/notices'
 
 export const noticeKindContributions: NoticeKindContribution[] = [
   // No PTY-only kinds. A terminal agent and a managed agent reach the same three `agent-*` kinds
-  // through the same adapter (features/notifications/attention.ts), so they read the same way here.
+  // through the same adapter, so they read the same way here.
   { id: 'error', glyph: 'x', severity: 'danger', toast: true },
   { id: 'gate', glyph: 'ban', severity: 'warn', toast: true },
   // The workflow mark rather than a check, so a finished run never reads as one agent finishing a turn.
@@ -16,10 +16,6 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   // Approval-mediated install). `toast: true` because it's a question waiting on the owner, and unlike
   // the plugin-authored `plugin` kind below, its title is written by acorn and names no agent text.
   { id: 'plugin-request', glyph: 'puzzle', severity: 'warn', toast: true },
-  // Agents proposed something for a project to remember (docs/notes-and-memory.md § Memory). `info`
-  // and the memory mark rather than the `gate` kind it used to borrow: nothing is blocked on this, and
-  // a ban glyph in warn tone read as a failure. It matches the tone of the attention row for the same
-  // proposals, which is the row beside it in the bell.
   { id: 'agent-completed', glyph: 'circle-dot', severity: 'info', toast: true },
   { id: 'agent-needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
   { id: 'agent-error', glyph: 'triangle-alert', severity: 'danger', toast: true },

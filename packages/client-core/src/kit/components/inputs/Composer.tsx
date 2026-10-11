@@ -6,8 +6,7 @@ import { Toolbar } from '../layout/Toolbar'
 import { Button } from './Button'
 import { Textarea } from './Textarea'
 
-// The comment box: textarea, submit, error line, and the Cmd+Enter chord, which github documented only
-// inside a placeholder string.
+// The comment box: textarea, submit, error line, and the Cmd+Enter chord.
 //
 // `mentions` decides which textarea renders. The mention data sources are host-side, so a frame leaves
 // the prop unset and gets a plain Textarea. Making that a prop rather than a runtime check keeps the
@@ -66,7 +65,7 @@ export function Composer(props: {
 
   return (
     // The composer owns its keys while focused, except for `commit`: Cmd+Enter on macOS and
-    // Ctrl+Enter elsewhere, which is one row of ../keys/keymap.ts rather than a chord spelled here.
+    // Ctrl+Enter elsewhere, which is one row of `intentKeys` rather than a chord spelled here.
     <div class="ui-composer" ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}>
       <Show
         when={props.mentions}

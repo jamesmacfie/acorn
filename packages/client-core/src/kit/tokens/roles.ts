@@ -84,10 +84,9 @@ const tone: Mapping<Tone> = {
   },
   tui: {
     neutral: { said: 'default', slot: 'default' },
-    // A slot rather than the `dim` attribute, and that is the light-terminal bug's second half. Dim
-    // is not "a quieter colour" to an emulator, it is "blend this toward the background": on a dark
-    // terminal that reads as grey and on a light one it reads as white on white, which is what a
-    // pull request's description looked like. Slot 8 is the palette's own grey, so the colour still
+    // A slot rather than the `dim` attribute. Dim is not "a quieter colour" to an emulator, it is
+    // "blend this toward the background": on a dark terminal that reads as grey and on a light one it
+    // reads as white on white. Slot 8 is the palette's own grey, so the colour still
     // comes from the theme the person chose (apps/tui/src/appearance.ts).
     muted: { said: 'the palette grey, per theme', slot: 'muted' },
     accent: { said: 'the palette accent, per theme', slot: 'accent' },

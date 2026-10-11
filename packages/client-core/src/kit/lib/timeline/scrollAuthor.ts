@@ -24,8 +24,8 @@
  *
  * Input arms a gesture and the next scroll event spends it, which is right when the input scrolls.
  * Plenty of it does not: a click to put the caret in a card, a drag to select a line, a key the list
- * ignores. That arm then sat there, and whatever moved the view next (a clamp, a card re-rendering
- * shorter, the browser putting something on screen) was written down as the place the reader chose.
+ * ignores. Left armed, whatever moves the view next (a clamp, a card re-rendering shorter, the browser
+ * putting something on screen) would be written down as the place the reader chose.
  *
  * A scroll caused by input arrives within a frame or two. A second is long enough to cover a slow one
  * and short enough that a click the reader has forgotten about cannot claim the next move.

@@ -95,8 +95,8 @@ function RailSources() {
   )
 }
 
-// The exclusive-slot picker (registries/exclusiveSlots.ts, docs/plugins/replacing-core-surfaces.md § Replacing a core
-// surface). Hides when nobody has offered a replacement.
+// The exclusive-slot picker (docs/plugins/replacing-core-surfaces.md § Replacing a core surface). Hides
+// when nobody has offered a replacement.
 function ReplacedSurfaces() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))

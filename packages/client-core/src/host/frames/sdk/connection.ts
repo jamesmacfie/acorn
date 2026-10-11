@@ -52,7 +52,7 @@ function handshake(): Promise<AcornBridge> {
 /**
  * Register this bundle's tree renderers and wait for the host to mount them.
  *
- * Keyed by entry name rather than the single callback the design sketched, because one worker serves
+ * Keyed by entry name rather than a single callback, because one worker serves
  * every tree its bundle contributes (a tool card per call, a section per tray) and the host has to say
  * which. The manifest's `contributions.extensions[].remote` names a key here; a name with no key is a
  * placeholder and a roster row, not a crash.

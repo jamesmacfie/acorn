@@ -81,7 +81,7 @@ it('resolves row ids and tab stops with linear work on mount and refresh', () =>
 
 it('takes its registration back out when its id has moved on by the time it is disposed', () => {
   // A task-scoped id reads the task through props, and a task switch hands those props the next task
-  // before it disposes the old view. The stale entry used to stay registered, holding the old view.
+  // before it disposes the old view. A stale entry left registered would hold the old view.
   const [task, setTask] = createSignal('a')
   const dispose = createRoot((dispose) => {
     createCollection({ id: () => `list.${task()}`, items: () => [{ key: 'x', label: 'x' }], role: 'listbox' })

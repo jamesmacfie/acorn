@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js'
 
 /* Table: real <table> semantics, token styling, and a horizontal-scroll wrapper. No column defs,
-   no sorting, no virtualization; a consumer that needs sorting can grow a `Table.SortHeader`.
+   no sorting, no virtualization.
 
    Not for the virtualized grids (.diff-row, .dbgrid-row), which are measured geometry, the same
    reason Row excludes them. */

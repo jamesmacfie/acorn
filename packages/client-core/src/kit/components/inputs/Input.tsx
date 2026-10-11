@@ -15,7 +15,7 @@ export type InputProps = ControlOwn & {
   max?: string | number
   step?: string | number
   /** The value as it is typed. An input is host-owned: what comes back is the text, never an event.
-   *  Not one of the kit's eleven events, and deliberately: a remote tree cannot bind a per-keystroke
+   *  Not one of the kit's events, and deliberately: a remote tree cannot bind a per-keystroke
    *  callback, because every keystroke would be a message hop. */
   onInput?: (value: string) => void
   /** The committed value: blur, or Enter. `onChange` rather than `onCommit` because commit IS what

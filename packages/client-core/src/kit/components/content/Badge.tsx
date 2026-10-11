@@ -2,7 +2,7 @@ import { createUniqueId, Show, type JSX } from 'solid-js'
 import type { Size, Tone } from '../../tokens/tokens'
 
 /* Badge. See docs/ui-design.md for `shape`. `dashed` exists for the Database example-picker's
-   "add" chip, the one non-solid border in the codebase.
+   "add" chip.
 
    A badge with a `tip` is a tab stop, the way a `Text` with one is, so a keyboard can open it. Its
    word stays its name and the tip describes it, because a badge's word ("failed") is the part a

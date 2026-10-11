@@ -15,12 +15,10 @@ import type { FenceScope } from '../markdownFences/fenceViewers'
 //
 // This component is the only thing standing between a stranger's code and the shell's DOM. What it is
 // not is the rules: the store, the pre-flight check and the mutation apply are ./treeState.ts, which
-// the terminal host draws from too (docs/tui.md). One set of rules,
-// two shells.
+// the terminal host draws from too (docs/tui.md). One set of rules, two shells.
 //
 // Focus, selection, scroll memory and ARIA are not implemented here and never will be. The nodes this
-// mounts are the kit's own components, so they arrive with everything phase 2 gave them. That is the
-// whole reason the remote root came after focus rather than before it.
+// mounts are the kit's own components, so they arrive with all of that already.
 
 /** What a mounted tree talks to its sandbox through. One per slot; the worker host supplies it. */
 export type TreeTransport = {

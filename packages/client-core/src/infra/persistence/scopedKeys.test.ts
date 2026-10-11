@@ -3,7 +3,7 @@ import { setActiveNode } from '../node/activeNode'
 import { scopeIdFromStorageKey, storageKeyFor } from './persistedState'
 
 // docs/state-ownership/scope-rules.md § Scope rules: task and workspace ids are node-minted UUIDs, and two nodes may
-// hold the same one, so a bare task id in a storage key was the collision that rule forbids.
+// hold the same one, so a bare task id in a storage key is the collision that rule forbids.
 // `storageKeyFor` and `scopeIdFromStorageKey` are the only places a nodeId enters or leaves a key,
 // so these are the only cases needed.
 
@@ -52,8 +52,7 @@ describe('scopeIdFromStorageKey', () => {
 
   it('handles a scope id that itself contains a slash', () => {
     // A pane scope is a composite, so this is not hypothetical. Encoding the pair as one string
-    // would make `<node>/<scope>` indistinguishable from a scope id with a slash in it, which is
-    // exactly the bug an existing startupRestore case caught.
+    // would make `<node>/<scope>` indistinguishable from a scope id with a slash in it.
     setActiveNode('node-a')
     const key = storageKeyFor(taskSlice, 'task-1/pane-2')
     expect(key).toBe('core:task-layouts:node-a/task-1%2Fpane-2')

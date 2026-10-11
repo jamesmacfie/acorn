@@ -8,9 +8,8 @@ import {
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
 import { _resetPluginDistribution, _seedDevicePluginDistribution, _seedPluginDistribution } from './distribution'
 
-// The questions that used to be answered twice, once in each register module. Both callers are plain
-// `.ts` and have their own suites now (chrome/register.test.ts, frames/register.test.ts); this one
-// pins the shared answer they both start from.
+// The shared answer both registration passes start from. Each pass has its own suite
+// (chrome/chromeRegister.test.ts, frames/register.test.ts).
 
 const HASH = 'a'.repeat(64)
 const HASH_B = 'b'.repeat(64)
@@ -37,8 +36,8 @@ const row = (
   state: 'active',
   installed: {
     version: '1.0.0',
-    // The real constant, not '1': the literal made every fixture here a candidate this shell could not
-    // speak the day PLUGIN_API_MAJOR moved, and the failure looked like a bug in resolution.
+    // The real constant, not '1': a literal makes every fixture here a candidate this shell can't speak
+    // once PLUGIN_API_MAJOR moves, and the failure looks like a bug in resolution.
     apiVersion: PLUGIN_API_MAJOR,
     permissions: {
       api: [],
@@ -117,7 +116,7 @@ describe('eligiblePlugins', () => {
   })
 
   it('never marks a package with no client half as trusted, but withholds nothing from it', () => {
-    // Two answers, not one, and collapsing them is what let a bundle-less manifest mount a webview.
+    // Two answers, not one, because collapsing them lets a bundle-less manifest mount a webview.
     // `trusted` is "may this device execute this plugin's code", and the answer for a package with no
     // code is no. A webview surface is not host-drawn, so `trusted: true` here would mount external
     // web content behind a prompt that can never fire (the trust queue only holds bundles).
@@ -248,7 +247,7 @@ describe('eligiblePlugins', () => {
 
 describe('isTaskPane', () => {
   // The `openPane` allowlist (which pane ids a sandboxed frame may ask the host to open) is built
-  // from this predicate on both sides of the frames/chrome split. It was copy-paste until now.
+  // from this predicate on both sides of the frames/chrome split.
   it('counts task panes and webviews, and nothing else', () => {
     expect(isTaskPane({ target: 'pane' })).toBe(true)
     expect(isTaskPane({ target: 'pane', scope: 'task' })).toBe(true)

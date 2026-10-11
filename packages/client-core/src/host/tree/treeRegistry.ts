@@ -1,12 +1,10 @@
 // What one remote contribution is, once the chrome pass has bound it.
 //
-// Phase 3 had a registry here, keyed by a hard-coded target, because there was one place a tree could
-// be drawn. There is no separate registry any more: a remote contribution is an ordinary entry in
-// `registries/extensionPoints.ts` beside every other kind, and `./arbitration.ts` decides which of
-// them fills a `Slot`. What is left is the shape `RemoteTree` mounts, which is the four things the
-// worker needs and nothing else.
+// A remote contribution is an ordinary entry in `extensionRegistry` beside every other kind, and
+// `resolveSlot` decides which of them fills a `Slot`. This is the shape `RemoteTree` mounts: the four
+// things the worker needs and nothing else.
 export type RemoteContribution = {
-  /** The namespaced contribution id (../contributionIds.ts). */
+  /** The namespaced contribution id (`pluginExtensionId`). */
   id: string
   pluginId: string
   /** The bundle this device accepted. The worker runs these bytes and no others. */

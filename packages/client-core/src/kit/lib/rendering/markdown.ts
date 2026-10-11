@@ -1,8 +1,7 @@
 // Markdown source to sanitized HTML: the string half of the design system's Markdown surface, beside
-// ui/Markdown.tsx (the component that renders it) and `.ui-markdown` (the styles it targets). It moved
-// here from integrations/, where it started as Linear's ticket-body renderer, once core owned the
-// surface. Zero imports of its own, which is what lets ui/ hold it and a sandboxed frame call it
-// without pulling the shell across.
+// the kit's `Markdown` component (which renders it) and `.ui-markdown` (the styles it targets). Zero
+// imports of its own, which is what lets the kit hold it and a sandboxed frame call it without
+// pulling the shell across.
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c])
 
@@ -42,11 +41,10 @@ export type MarkdownOptions = {
 // survive escaping and subsequent Markdown transforms can't mutate them.
 //
 // The input decides what is in it, so "real text never contains this" is a wish rather than a fact.
-// A source that spelled the sentinel itself used to forge an index into the `codes` and `images`
-// arrays and reach an entry that was never put there, and the restore then read `.alt` or `.replace`
-// off undefined and threw. renderMarkdown strips the character on the way in, once, which kills the
-// class rather than the two probes that found it: after the strip there is no way to write a sentinel
-// that inline() did not write itself.
+// A source that spells the sentinel itself could forge an index into the `codes` and `images` arrays
+// and reach an entry that was never put there, and the restore would read `.alt` or `.replace` off
+// undefined and throw. renderMarkdown strips the character on the way in, once, which kills the whole
+// class: after the strip there is no way to write a sentinel that inline() did not write itself.
 const S = '\uE000'
 
 // Inline pass on raw text: protect code spans and images, escape, then apply links / bold / italic.

@@ -65,7 +65,7 @@ const log = createLogger('diff')
 //
 // The list is of segments, not rows. The source's topology lays out every file and segment exactly
 // before any row exists; the segment loader fetches the rows of the segments near the reader and
-// nothing else, paints them plain, and colours them after (./segmentLoader.ts). A row object exists
+// nothing else, paints them plain, and colours them after (`createSegmentLoader`). A row object exists
 // only for a segment that is on screen or about to be.
 //
 // Everything specific to a provider arrives through DiffSource, so this component names no product:
@@ -97,8 +97,7 @@ export function DiffPane(props: {
    */
   annotations?: string
 }) {
-  // First, so its cleanup runs after every other one here and its final reading sees them done
-  // (./diffHealth.ts).
+  // First, so its cleanup runs after every other one here and its final reading sees them done.
   const health = createDiffHealth()
   onCleanup(health.dispose)
   const queryClient = useQueryClient()
@@ -278,7 +277,7 @@ export function DiffPane(props: {
     ]
   }
 
-  // The dynamic blocks: threads, and whatever a line draws under itself (./diffLayout.ts).
+  // The dynamic blocks: threads, and whatever a line draws under itself.
   const openComposer = createMemo(() => lineComposer()?.key ?? null)
   const blockInputs: DiffBlockInputs = {
     extra: lineExtraPrint,

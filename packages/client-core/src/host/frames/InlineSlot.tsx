@@ -40,8 +40,8 @@ export function InlineSlot(props: {
   })
 
   // How many the owner's own ceiling left out. Read here for the same reason `Slot` reads it: each
-  // occupant of a rectangle point is a whole iframe, so `max` is a real limit and a point past it was
-  // dropping contributors with nothing on screen to say so.
+  // occupant of a rectangle point is a whole iframe, so `max` is a real limit, and without the count a
+  // point past it would drop contributors with nothing on screen to say so.
   const overflow = () => (resolved()?.why === 'match' ? resolved()!.overflow : 0)
 
   const occupants = createMemo(() => {

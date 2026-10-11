@@ -6,7 +6,7 @@ const tall = { scrollTop: 40, scrollHeight: 4000, clientHeight: 100 }
 const foot = { scrollTop: 3900, scrollHeight: 4000, clientHeight: 100 }
 
 describe('placeAfterScroll', () => {
-  // The five rules the follow decision has always had, now answered with a place instead of a flag.
+  // The five rules of the follow decision, answered with a place rather than a flag.
   it('goes live when a gesture lands at the foot', () => {
     expect(placeAfterScroll({ place: turn('a', 0), gesture: true, geometry: foot, anchor: () => null })).toEqual(LIVE)
   })

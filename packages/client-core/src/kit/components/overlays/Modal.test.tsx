@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Button } from '../primitives'
 import { Modal } from './Modal'
 
-// Where focus goes when a dialog opens and closes. Before this, a dialog without `autoFocus` left
-// focus on the button behind the scrim, so the next Tab walked the page and a screen reader heard
-// nothing about the dialog.
+// Where focus goes when a dialog opens and closes. A dialog that leaves focus on the button behind the
+// scrim lets the next Tab walk the page, and a screen reader hears nothing about the dialog.
 
 let dispose: (() => void) | undefined
 let host: HTMLElement

@@ -55,7 +55,7 @@ import { clearAnnotations } from '../annotations/annotations'
 const log = createLogger('plugin-chrome')
 
 // Turning accepted manifests into native shell contributions: the descriptor half of what
-// plugins/frames/register.ts does for rectangles (docs/plugins.md).
+// frames/register.ts does for rectangles (docs/plugins.md).
 //
 // Same shape as that file: one module-level map of per-plugin disposables, a dispose-then-register pass
 // so a re-run replaces a plugin's whole contribution set rather than reconciling it, and a per-surface
@@ -140,7 +140,7 @@ function registerChrome(
   const disposables: Disposable[] = []
   // Every registration below goes through this rather than calling `registry.register` directly, so
   // the plugin id lands in each registry's owner side-map and the seams that build a telemetry
-  // record can name whose contribution it was (kit/lib/state/registry.ts § the owner side-map). A
+  // record can name whose contribution it was (the owner side-map in kit/lib/state/registry.ts). A
   // descriptor cannot state an owner and this is the pass that knows one, which is the same rule
   // `stampCommandOwner` follows for a command's parent.
   const own = <T extends { id: string }>(
@@ -176,8 +176,8 @@ function registerChrome(
 
   const frames = contributions.frames ?? []
   const surfaceIds = new Set(frames.map((surface) => surface.id))
-  // Classified once, in ../contributions.ts, because plugins/frames/register.ts feeds the same
-  // `openPane` allowlist from the same declaration.
+  // Classified once, by `declaredSurfaces`, because the frames pass feeds the same `openPane` allowlist
+  // from the same declaration.
   const surfaces = declaredSurfaces(contributions)
   const taskPanes = surfaces.panes
   const refPanels = new Set(frames.filter((surface) => surface.target === 'refPanel').map((surface) => surface.id))
@@ -306,11 +306,9 @@ function registerChrome(
         ...(descriptor.statusAnnotations ? { statusAnnotations: true } : {}),
         ...(defaultPane ? { defaultPane } : {}),
         when: () => pluginEnabledOnNode(chromeNode(), pluginId),
-        // The rail list, from whichever host is drawing. The DOM's is the fallback, and it now hands over
-        // two halves rather than one opaque surface, so `SourceSurface` composes the same `ListDetail`
-        // split every other browse source already had (../registries/sources/SourceSurface.tsx). A cell
-        // host supplies its own and gets a list instead of a reconciler refusing a `<main>`
-        // (./sourcePanel.ts), which is the shape this follows.
+        // The rail list, from whichever host is drawing (./sourcePanel.ts). The DOM's is the fallback and
+        // hands over two halves, so `SourceSurface` composes the same `ListDetail` split every other
+        // browse source has. A cell host supplies its own.
         ...(descriptor.tree
           ? remoteSourcePanel(pluginId, hash, descriptor)
           : (suppliedSourcePanel()?.({ pluginId, descriptor }) ?? {
@@ -323,12 +321,11 @@ function registerChrome(
         // an integration can use the row click for detail navigation and a separate host-drawn "+Task"
         // affordance for promotion.
         promotion: descriptorPromotion(pluginId),
-        // Still no `routes` on the source contribution, and that's a placement decision rather than a
-        // deferral. `SourceRouteContribution` takes a bare pattern, so a manifest claiming one could claim
-        // core's `/p/:projectId` and take over project navigation for the whole shell. The host-minted
-        // prefix that fixes that arrived with `contributions.routes`, but a manifest route belongs to the
-        // surface it addresses rather than to a rail list, so it's registered next to that surface's
-        // component (registries/projectSurfaces.ts).
+        // No `routes` on the source contribution, and that's a placement decision. `SourceRouteContribution`
+        // takes a bare pattern, so a manifest claiming one could claim core's `/p/:projectId` and take over
+        // project navigation for the whole shell. A manifest route goes through `contributions.routes`
+        // with a host-minted prefix, and belongs to the surface it addresses rather than to a rail list,
+        // so it's registered next to that surface's component (`projectSurfaceRegistry`).
       }),
     )
   }
@@ -392,7 +389,7 @@ function registerChrome(
     )
   }
 
-  // ── Cooperative cross-plugin extension (registries/extensionPoints.ts) ──────────────────────────
+  // ── Cooperative cross-plugin extension ──────────────────────────────────────────────────────────
   //
   // Both halves ride this pass rather than the frames pass, and both are gated on the same
   // `hasWithheldCode` question every other descriptor is, because both are descriptors: a point is a
@@ -436,7 +433,7 @@ function registerChrome(
 
   for (const descriptor of contributions.extensions ?? []) {
     // The two carriers that run this plugin's own bytes register in the frames pass instead, where the
-    // accepted bundle hash and the trust answer are both in scope (plugins/frames/register.ts).
+    // accepted bundle hash and the trust answer are both in scope (frames/register.ts).
     if (descriptor.remote !== undefined || descriptor.frame !== undefined) continue
     // A disclosed node point is filled on the node. Its only client half is the trust prompt's line.
     if (Object.hasOwn(DISCLOSED_NODE_POINTS, descriptor.point)) continue
@@ -472,7 +469,7 @@ function registerChrome(
         fetch: async (nodeId, signal): Promise<AttentionItem[]> => {
           if (!pluginEnabledOnNode(nodeId, pluginId)) return []
           const items = await readAttention(pluginId, descriptor.items, nodeId, signal)
-          // Namespaced with the contribution id, as registries/attention.ts requires: the id is the row key
+          // Namespaced with the contribution id, as registries/rail/attention.ts requires: the id is the row key
           // across refetches, and two plugins reporting `stuck` must not collide in one merged list.
           return items.map((item) => ({ ...item, id: `${descriptor.id}:${item.id}`, target: pluginAttentionTarget }))
         },
@@ -526,7 +523,7 @@ function registerChrome(
   for (const descriptor of contributions.themes ?? []) {
     // A theme is a descriptor in the strictest sense: not merely data the host renders, but data the
     // host can't render as anything except colour, because the only thing it becomes is a block of
-    // `--token: <colour>` declarations the host composed (./themes.ts). So it rides this pass's gate
+    // `--token: <colour>` declarations the host composed (./chromeThemes.ts). So it rides this pass's gate
     // unchanged.
     //
     // Withholding themes from a refused package is a judgement rather than a necessity, since nothing in

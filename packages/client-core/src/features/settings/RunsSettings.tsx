@@ -12,7 +12,7 @@ import './settings.css'
 // Settings → Run history, per node and following the settings header's node switcher
 // (@acorn/protocol/runs.ts): everything on this machine that started, is taking time, and will end —
 // whoever owns it. A workflow run and an agent session are the same kind of thing to the person paying
-// for them, and until now they were in two databases with no surface that could show both.
+// for them, even though they live in two databases.
 //
 // There is no table behind this. Each plugin declares a route that lists its own runs and core merges
 // the answers, so this page adds no migration and no ownership: a plugin that goes away takes its rows

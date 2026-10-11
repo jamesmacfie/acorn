@@ -22,12 +22,12 @@ import { galleryCards, providerAsks, type GalleryCard } from './connections'
 // Nothing here names a provider, so a plugin that registers one gets a card with no change here.
 //
 // A provider at its `maxConnections` stays in the gallery, marked as connected, and its card opens the
-// connection. Hiding it left the reader looking for a provider that was already there.
+// connection. Hiding it would leave the reader looking for a provider that is already there.
 //
 // The steps are what the descriptor asks for. Typed fields are a form with Connect and Cancel, and
 // anything typed counts as unsaved. A device-flow provider shows the code to enter at the provider, and
 // a code that is still waiting counts as unsaved too, because leaving stops the polling that would
-// finish it. The fields, the write and the pacing live in ../../integrations/, because first-run
+// finish it. The fields, the write and the pacing live in the integrations feature, because first-run
 // onboarding connects a provider the same way.
 
 export type AddConnectionProps = {

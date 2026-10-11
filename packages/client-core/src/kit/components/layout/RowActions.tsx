@@ -3,8 +3,7 @@ import { IconButton } from '../inputs/IconButton'
 import { Menu, type MenuContext } from '../overlays/Menu'
 
 // The per-row overflow menu: an ellipsis button that stays out of sight until you hover the row,
-// focus something inside it, select it, or open the menu itself. Lifted out of the agent session
-// sidebar, which had it as bespoke markup and a bespoke stylesheet rule.
+// focus something inside it, select it, or open the menu itself.
 //
 // It carries its own reveal rather than leaning on Row's `reveal`, because a row's trailing slot
 // usually holds a badge or a status as well, and those are meant to stay visible. The reveal rides a

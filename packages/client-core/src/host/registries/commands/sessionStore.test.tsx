@@ -116,9 +116,8 @@ const ids = (session: CommandSession): string[] => session.rows().map((row) => r
 
 describe('the empty root', () => {
   it('lists the top level in the order its owners declared, and nothing else', async () => {
-    // Every row here comes from the command registry, and that is the assertion. There was a second
-    // way into this list until 2026-09-03 — a row provider the host handed the session — and its
-    // rows sorted ahead of the commands by a number nobody could see
+    // Every row here comes from the command registry, and that is the assertion: a second way into this
+    // list would sort its rows against the commands by a number nobody can see
     // (docs/command-palette-and-shortcuts.md).
     register(leaf('cmd.archive', { title: 'Archive task', order: 20 }))
     register(leaf('cmd.new', { title: 'New task', order: 10 }))

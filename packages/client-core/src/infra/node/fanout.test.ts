@@ -294,7 +294,7 @@ describe('onFleetInvalidation', () => {
 })
 
 // `createFleetQuery` itself cannot run here (see `cachedFleet`'s comment), so the ladder it drives is
-// asserted as the pure function it was split out into.
+// asserted through its pure function.
 describe('retryDelayMs', () => {
   it('waits longer each time, then gives up rather than polling', () => {
     expect(retryDelayMs(0, 1)).toBe(2_000)

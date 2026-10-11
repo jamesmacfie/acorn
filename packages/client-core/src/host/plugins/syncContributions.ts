@@ -29,11 +29,10 @@ const run = ({ frames, chrome }: Passes): void =>
 
 /**
  * Both registration passes, in order. They must always run as a pair, since the frames pass draws the
- * rectangles and the chrome pass registers the commands and rail rows that open them, and that pairing
- * used to exist only as a comment beside two call sites.
+ * rectangles and the chrome pass registers the commands and rail rows that open them.
  *
  * Resolves once this node's loaded contributions are registered, which is what a deep link to a loaded
- * route waits for (./reload.ts `preparePluginContributionsForNode`). Once the hosts have loaded, the pass
+ * route waits for (`preparePluginContributionsForNode`). Once the hosts have loaded, the pass
  * runs synchronously, so a commit that withdraws a plugin takes its surfaces down in the same tick. Before
  * then nothing is registered, so there is nothing to withdraw.
  *

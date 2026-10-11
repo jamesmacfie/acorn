@@ -10,9 +10,8 @@ import type { Disposable } from '../../kit/lib/state/registry'
 // not obvious: the node comes first.
 //
 // `activateTaskSignals` and the route both resolve against whichever node is active, so activating a
-// task that lives on another machine without switching first addresses the wrong one. That order was
-// a comment inside a row provider until 2026-09-03 and is now a comment inside a search command; this
-// is the test that makes it a fact.
+// task that lives on another machine without switching first addresses the wrong one. This test
+// pins that order.
 //
 // The router is answered rather than mounted, the same way the rail's own test does it, and the fleet
 // is answered too: what is under test is the command's decisions, not the fan-out beneath it.

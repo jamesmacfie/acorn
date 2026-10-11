@@ -45,8 +45,7 @@ vi.mock('../plugins/contributions', () => ({
       pluginId: 'markup',
       installed: {
         permissions: { api: [], events: [] },
-        // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read. The
-        // fixture used to spell it bare, which is why the mismatch below shipped.
+        // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read.
         contributions: { frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup' }] },
       },
     },
@@ -202,9 +201,8 @@ describe('opening a companion overlay', () => {
     })
   })
 
-  // The regression this pair exists for. WebKit does not focus a button when it is clicked, which is
-  // the platform the desktop shell runs on, so a focus-only gate meant a tree could never open its
-  // companion overlay from a click at all.
+  // The case this pair exists for. WebKit does not focus a button when it is clicked, and the desktop
+  // shell runs on WebKit, so a focus-only gate would never let a click open a companion overlay.
   it('refuses a synthetic press that never received a trusted gesture', async () => {
     mount()
     document.body.focus()
@@ -234,7 +232,7 @@ describe('opening a companion overlay', () => {
     await asked
   })
 
-  // The other half of the same bug: the device rewrites a frame id outside the plugin's namespace and
+  // The other half of the overlay grant: the device rewrites a frame id outside the plugin's namespace and
   // rewrites the manifest's reference with it, but not the name the running tree passes.
   it('takes the name the plugin\u2019s own manifest spelled, not the one the device rewrote it to', async () => {
     mount()

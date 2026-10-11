@@ -14,11 +14,8 @@ import './home.css'
 // The core home is provider-neutral. It is the stable landing source when no optional integration
 // is connected; provider plugins contribute their own browse sources beside it.
 //
-// It is a dashboard and nothing else. It used to open with the workspace's active tasks above the
-// panels, on every visit, for everyone: a list on the screen whether or not it was being read, and
-// the one thing a person could not take off their own home page. Tasks are now a shared Node-owned
-// source, so anyone who wants them publishes and places a dashboard, and the default is a surface
-// with nothing on it but what its owner put there.
+// It is a dashboard and nothing else, so everything on it is something its owner put there. Tasks are
+// a shared Node-owned source: anyone who wants them on Home publishes and places a dashboard.
 export default function Home() {
   // Dashboards (docs/dashboards/placements.md § Placements): a tab is a placement scope, so all Home owns is
   // which one the grid is pointed at — and which workspace's set of them it is choosing from, since

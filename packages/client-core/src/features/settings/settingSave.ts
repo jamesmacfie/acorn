@@ -8,7 +8,7 @@ import { latestSignal } from '../../kit/lib/state/latestSignal'
 //
 // These hold the state; `SettingRow` draws it, from `savedAt` and `error`. A form of fields that only
 // make sense together is the one thing that does not save this way: it has Save and Cancel, and
-// ./unsavedChanges.ts asks before anyone leaves it.
+// `useUnsavedChanges` asks before anyone leaves it.
 
 export type SettingSave = {
   /** When the last write landed, for `SettingRow`'s `savedAt`. */
@@ -16,7 +16,7 @@ export type SettingSave = {
   /** Why the last write failed, for `SettingRow`'s `error`. Cleared when the next one starts. */
   error: Accessor<string | undefined>
   /** Run one write. A write that resolves `false` failed; one that throws failed with its message.
-   *  A pref written inside it throws rather than posting a notice (./savePref.ts), so the failure is
+   *  A pref written inside it throws rather than posting a notice (`withFailuresThrown`), so the failure is
    *  said once, on the row. Resolves `false` on a failure, so a switch handed this promise as its
    *  `onChange` result shows the stored value again rather than staying flipped (kit Checkbox). */
   run: (write: () => Promise<unknown>) => Promise<boolean>

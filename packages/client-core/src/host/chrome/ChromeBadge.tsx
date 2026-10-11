@@ -11,8 +11,8 @@ import { chromeDeps, chromeKey, readBadge } from './chromeData'
 // from the plugin's node half rather than from plugin UI code.
 //
 // `null` from the route hides it entirely, which is how a badge with nothing to say disappears without
-// a second route to ask whether to draw one. `docker-footer-badge` renders nothing when its summary is
-// absent for the same reason; this is that pattern, generalised.
+// a second route to ask whether to draw one, the same way `docker-footer-badge` renders nothing when its
+// summary is absent.
 
 export type ChromeBadgeProps = { pluginId: string; descriptor: PluginSlotDescriptor }
 

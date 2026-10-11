@@ -3,7 +3,7 @@ import { createContext, onCleanup, useContext, type Accessor } from 'solid-js'
 // A settings form with Save and Cancel holds changes nothing has written yet: a custom agent, a
 // credential, an MCP server, a new schedule. Leaving settings, or its page, would drop them without a
 // word. So a form says whether it holds any, and the settings view asks before any way off the page:
-// another page, Back to acorn, Escape, the palette, or a deep link (./SettingsView.tsx § leave).
+// another page, Back to acorn, Escape, the palette, or a deep link.
 //
 // A context rather than a registry, so a form outside settings, such as the same editor opened from a
 // pane, registers with nothing and costs nothing.

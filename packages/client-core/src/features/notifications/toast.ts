@@ -1,15 +1,11 @@
 import { createSignal } from 'solid-js'
 
-// Transient, self-dismissing feedback. There was no toast system at all, and the workarounds were
-// the clearest evidence one was missing: three plugins invented text-channel toasts (notes' "saved
-// ·" in its toolbar, context's "Sent." span, memory's success-and-failure-through-one-muted-span),
-// while the frame bridge already promised `bridge.ui.toast` and quietly routed it into the
-// notification bell, so a frame saying "Copied to the clipboard" left a permanent inbox entry.
+// Transient, self-dismissing feedback.
 //
-// In notifications/ rather than ui/: a module-level signal store is shell state, and the ui/
-// purity rule in tools/arch/boundaries.test.ts rightly keeps it out.
+// Here rather than in the kit: a module-level signal store is shell state, and the kit's purity rule
+// keeps it out.
 //
-// The state lives here and the component in ToastHost.tsx, because `@acorn/plugin-api/client`
+// The state lives here and the component in `ToastHost`, because `@acorn/plugin-api/client`
 // re-exports `toast()` and that barrel may not reach a .tsx module: one Solid component on it
 // makes the whole entrypoint unloadable from a plugin's node-environment tests.
 //

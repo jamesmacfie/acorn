@@ -14,8 +14,8 @@
 // most of its rows, so roving focus cannot be DOM focus: the arrows move a `selected` index the
 // caller owns and scroll it into view, which is the ratatui shape the design named. The intents and
 // the single tab stop are the same as every other collection's, and that is the part the role
-// promises; where the place is kept is not. See docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and
-// typing.
+// promises; where the place is kept is not. See
+// docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
 //
 // `conditional` is the honest answer for the several nodes that are a stop only when they were given
 // something to do: a `Card` with an `onPress`, a `Chip` with an `onRemove`, a `Fold`'s header.
@@ -85,8 +85,7 @@ export const NODE_FOCUS = {
   Markdown: 'none',
   // A scroller of text, not a collection. Its lines are not tab stops and never were: what is
   // focusable inside a diff is the per-line comment control and the toolbar, each an ordinary stop of
-  // its own, and finding a line is a command (`search`) rather than roving. Marked `collection` until
-  // phase 10, which made the table say what the code does.
+  // its own, and finding a line is a command (`search`) rather than roving.
   DiffPane: 'none',
   DiffLine: 'none',
   FileHead: 'none',
@@ -118,8 +117,7 @@ export const NODE_FOCUS = {
   // `Table`'s answer, for `Table`'s reason: every cell of a row is already a stop — a Checkbox, two
   // Inputs, a remove Button — so there is nothing for a rove to reach that Tab does not. Roving here
   // would also be nearly inert, because the cell a reader is in is almost always an Input and the bare
-  // arrow keys are held off typing targets by design (../../keys/keymap.ts § BARE_KEYS). Phase 2
-  // deviation 4 owed this "when something asks", and nothing has.
+  // arrow keys are held off typing targets by design (`BARE_KEYS`).
   KeyValueEditor: 'none',
   FindBar: 'stop',
   Field: 'none',

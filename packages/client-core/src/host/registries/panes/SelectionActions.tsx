@@ -122,7 +122,7 @@ function SelectionMenuRows(props: {
   const rows = () => contextMenuItems('content.selection', props.target)
   return (
     <>
-      {/* The platform's menu this replaced had Copy, so this one keeps it. */}
+      {/* This replaces the platform's menu, which has Copy, so this one keeps it. */}
       <Menu.Item context={props.context} onSelect={() => void navigator.clipboard?.writeText(props.target.text)}>
         Copy
       </Menu.Item>

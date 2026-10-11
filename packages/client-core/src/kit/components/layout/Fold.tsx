@@ -1,14 +1,11 @@
 import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 
-// A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
-// with its own localStorage closure across three different mechanisms, two of them missing
-// `aria-expanded`. See docs/ui-design/closed-kit.md § The closed kit for why it uses native `<details>` and has
-// no accordion mode.
+// A titled disclosure section. See docs/ui-design/closed-kit.md § The closed kit for why it uses
+// native `<details>` and has no accordion mode.
 
-// Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx has for draft
-// state, and is why this is a component rather than a caller responsibility: the eight github sites each
-// hand-wrote the same closure, and the one that mattered, the fold you left open, was the one people got
-// wrong.
+// Reading and writing one localStorage key is the same carve-out the diff rows have for draft state,
+// and is why this is a component rather than a caller responsibility: remembering the fold you left
+// open is the part a caller gets wrong.
 const readOpen = (key: string | undefined, fallback: boolean): boolean => {
   if (!key) return fallback
   try {

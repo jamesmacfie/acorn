@@ -6,8 +6,8 @@ import { IconButton } from '../inputs/IconButton'
 /* CodeBlock: the mono sunken block. Syntax highlighting stays out; callers that highlight pass
    tokenized children. Terminal colour is the exception, behind `ansi`, because every caller showing
    a command's output would otherwise parse escape codes for itself. A code textarea is
-   `Textarea mono` instead. Logs that stream keep their own scroll-follow logic, because this is the
-   box, not the tail. */
+   `Textarea mono` instead, and output that streams is a `Log`, because this is the box, not the
+   tail. */
 export function CodeBlock(props: {
   /** `true` copies the rendered text; a string copies that instead. */
   copy?: boolean | string

@@ -33,8 +33,8 @@ const safeColumnId = (value: string): string =>
     .slice(0, 100) || crypto.randomUUID()
 
 /** The columns a panel starts with from its first source: one per field with a display role (title,
- *  status, assignee, url, updated), or the first six fields when the source declares no roles. Every
- *  field made a column buried the few that matter under dozens of IDs. */
+ *  status, assignee, url, updated), or the first six fields when the source declares no roles. Making
+ *  every field a column would bury the few that matter under dozens of IDs. */
 export function defaultPlanColumns(sourceId: string, fields: ReturnType<typeof dashboardFields>): PanelPlan['columns'] {
   const roled = fields.filter((field) => field.role)
   return (roled.length ? roled : fields.slice(0, 6)).map((field) =>

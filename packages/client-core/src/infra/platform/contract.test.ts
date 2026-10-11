@@ -99,7 +99,7 @@ describe('the platform seam contract', () => {
     expect(seamProblems([])).toEqual([])
   })
 
-  // The shape a phase-2 Tauri shell ships in: no preview panes, no plugin webviews.
+  // A shell that ships without preview panes or plugin webviews, which is a supported shape.
   it('holds for a host without the webview groups', () => {
     const { preview: _preview, webview: _webview, ...host } = fullHost()
     install(host)

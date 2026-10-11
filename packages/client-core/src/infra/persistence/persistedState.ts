@@ -55,11 +55,9 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 // each slice's own binding speaking in bare resource ids.
 //
 // Both the node id and the scope id are percent-encoded, so the `/` between them is the only
-// unescaped slash in the key. A node id arrives from `GET /v1/node` unchecked, so writing it raw
-// would let a node reporting `a/b` produce a key this parser could never split correctly, and an
-// empty node id would produce an unqualified key that let one node read another node's layouts.
-// Encoding the scope id too keeps the split unambiguous, since a pane scope id can itself contain
-// a slash.
+// unescaped slash in the key. A node id arrives from `GET /v1/node` unchecked: written raw, a node
+// reporting `a/b` would produce a key that cannot be split, and an empty node id an unqualified key
+// that lets one node read another node's layouts. A pane scope id can itself contain a slash.
 export const storageKeyFor = (
   slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>,
   scopeId: string,

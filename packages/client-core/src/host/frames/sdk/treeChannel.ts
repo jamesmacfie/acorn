@@ -191,8 +191,8 @@ export function runTreeChannel(
       return
     }
     const slot: MountedSlot = {
-      // Measured here, on the sandbox's own thread, and declared on the message. The host used to
-      // stringify every batch again to check it against the cap, on the thread that also has to draw
+      // Measured here, on the sandbox's own thread, and declared on the message, so the host need not
+      // stringify every batch again on the thread that also has to draw
       // (docs/plugins/tree-contract.md § The tree contract).
       //
       // Spelled out rather than imported from @acorn/protocol/tree/messages.ts, which is the same three
@@ -204,8 +204,8 @@ export function runTreeChannel(
         try {
           bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength
         } catch {
-          // A cycle or a BigInt somewhere in the props. Post it without a measurement and let the host
-          // fail the same way it did before this field existed.
+          // A cycle or a BigInt somewhere in the props. Post it without a measurement and let the host's
+          // own check fail it.
         }
         port.postMessage(bytes === null ? message : { ...message, bytes })
       }),

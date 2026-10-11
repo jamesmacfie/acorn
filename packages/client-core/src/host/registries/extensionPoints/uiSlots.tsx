@@ -12,8 +12,7 @@ import {
 } from './slots'
 
 // The two slot hosts over the one registry. The registry and its contribution types live in
-// ./slots.ts, JSX-free, and are re-exported here so `registries/uiSlots.tsx` stays the one import path
-// callers already use.
+// ./slots.ts, JSX-free, and are re-exported here so this stays the one import path callers use.
 export { uiSlotRegistry } from './slots'
 export type {
   ShellSlotContribution,

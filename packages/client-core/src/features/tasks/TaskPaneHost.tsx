@@ -41,7 +41,7 @@ registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.v
 export default function TaskPaneHost(props: {
   task: Task
   extraButtons?: JSX.Element
-  // Absent for an archived task's preview, which has nothing left to close (features/archive).
+  // Absent for an archived task's preview, which has nothing left to close.
   onCloseTask?: () => void
   closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
@@ -183,8 +183,8 @@ export default function TaskPaneHost(props: {
     )
       setPaneMenu(null)
   })
-  // `core:pane`, for the buttons this switcher draws (../../host/annotations/statusAnnotations.ts). A
-  // task change re-asks with the new task's keys, and a closed task drops its marks on unmount.
+  // `core:pane`, for the buttons this switcher draws (`requestPaneAnnotations`). A task change re-asks
+  // with the new task's keys, and a closed task drops its marks on unmount.
   let annotatedTaskId = props.task.id
   createEffect(() => {
     annotatedTaskId = props.task.id
@@ -218,8 +218,7 @@ export default function TaskPaneHost(props: {
   })
 
   // Hidden while everything is fine, so a healthy node adds no noise to a pane header. One value
-  // for the whole task view, because it reports the node's state rather than a per-pane query
-  // (registries/panes.ts).
+  // for the whole task view, because it reports the node's state rather than a per-pane query.
   const nodeFreshness = (): Freshness => freshnessOf(nodeState(activeNodeId() ?? ''))
 
   const weightFor = (pane: PaneId) => layout().weights?.[pane] ?? 1
@@ -277,7 +276,7 @@ export default function TaskPaneHost(props: {
           {(pane, index) => {
             // One opening per pane per mount. The host remounts this list for each task, so opening
             // a task opens its panes again. A pane drawn from a layout closes its proxy record when
-            // its first region mounts (registries/panes/panes.ts); any other pane closes it here.
+            // its first region mounts; any other pane closes it here.
             onCleanup(
               openFeature(pane.id, paneRegistry.ownerOf(pane.id) ?? 'core', {
                 kind: 'pane',

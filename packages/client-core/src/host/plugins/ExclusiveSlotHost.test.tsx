@@ -15,9 +15,8 @@ vi.mock('../../features/notifications/notifications', () => ({ pushNotice: vi.fn
 vi.mock('../../features/tasks/tasks', () => ({ activeTaskId: () => null }))
 
 // The one site where a plugin draws in place of a core surface, and the one site that guarantees core
-// gets it back. The arbitration rule itself is unit-tested next door in `exclusiveSlots.test.ts`;
-// what only a render can show is the third way back — the surface throws and core returns — which the
-// live-QA checklist has been carrying as a manual step.
+// gets it back. The arbitration rule itself is unit-tested with `exclusiveSlotRegistry`; what only a
+// render can show is the third way back: the surface throws and core returns.
 
 // `prefs` is the whole query surface this host uses: one preference holding the arbitration map.
 const prefs = vi.hoisted(() => ({ value: undefined as string | undefined }))

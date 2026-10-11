@@ -1,8 +1,7 @@
 import { createEffect, For, Show, on, type JSX } from 'solid-js'
 import { retainScroll } from '../../lib/layout/retainScroll'
 
-/* Log: a monospace tail. docker wrote this as a `<pre>` with its own follow logic and its own find
-   bar, and it is the shape every streaming output takes.
+/* Log: a monospace tail, the shape every streaming output takes.
 
    Not CodeBlock, which is a fixed excerpt: this one grows at the bottom and has somewhere to be.
    Not a Rectangle either — the lines are text, and a terminal draws them better than the DOM does.

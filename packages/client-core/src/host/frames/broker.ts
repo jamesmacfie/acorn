@@ -6,11 +6,9 @@
 // is why this module has no ambient reads at all.
 //
 // Effects arrive as `services` rather than being imported. This module is the security choke point and
-// has to be exhaustively tested, and client-core's suite runs in plain Node with no DOM
-// (packages/client-core/vitest.config.ts says so). Importing the notification ring, the prefs writer and
-// the query client here would make the one module that most needs testing the one that cannot be.
-// PluginFrame.tsx supplies the real implementations; the tests supply spies. One implementation, but the
-// seam pays for itself.
+// has to be exhaustively tested in a plain-Node suite with no DOM. Importing the notification ring, the
+// prefs writer and the query client here would make the one module that most needs testing the one that
+// cannot be. PluginFrame.tsx supplies the real implementations; the tests supply spies.
 import type {
   PluginBridgeAppearance,
   PluginBridgeEvent,
@@ -307,8 +305,8 @@ export function createFrameBridge(input: {
     }
     const decision = allowApi(binding, method, path)
     if (!decision.allowed) {
-      // Never reaches services.fetch. The e2e suite asserts exactly this by spying at the broker: a denied
-      // path must not produce a request, not merely a discarded response.
+      // Never reaches services.fetch. The broker suite asserts exactly this by spying at the broker: a
+      // denied path must not produce a request, not merely a discarded response.
       reply(denied(id, decision.reason))
       return
     }

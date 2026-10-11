@@ -21,7 +21,7 @@ export default function Icon(props: {
 }) {
   const mark = () => (props.name.startsWith(BRAND) ? brandMarkRegistry.get(props.name.slice(BRAND.length)) : undefined)
   // The brand colour reaches CSS as a custom property rather than as a token per provider, because
-  // core cannot know a third party's hex (ui/brandMarks.ts states the argument). Set here so a caller
+  // core cannot know a third party's hex (the kit's brand marks state the argument). Set here so a caller
   // asking for `tone="brand"` never has to hand the mark's colour to a style attribute itself.
   const style = () => {
     const colour = props.tone === 'brand' ? mark()?.color : undefined

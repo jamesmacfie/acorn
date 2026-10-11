@@ -9,15 +9,14 @@ import { retainScroll } from '../../lib/layout/retainScroll'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
-// `Row` has always been "an item in a collection" (docs/ui-design/closed-kit.md § The closed kit), and until now the
-// collection was whatever `<div>` the pane happened to wrap it in — which is why arrow keys worked in
-// three lists and nowhere else. This is that container, and it is the only thing a pane has to write
-// to get arrows, Home, End, the page keys, type-ahead, `aria-activedescendant` and a selection that
-// survives a refetch. The pane writes no key handling at all.
+// `Row` is "an item in a collection" (docs/ui-design/closed-kit.md § The closed kit), and this is the
+// collection. It is the only thing a pane has to write to get arrows, Home, End, the page keys,
+// type-ahead, `aria-activedescendant` and a selection that survives a refetch. The pane writes no key
+// handling at all.
 //
 // Items are data rather than children, because the collection needs the keys before the rows are
 // drawn: roving focus, type-ahead and the stored place are all keyed by the item's own key, not by
-// its position. See ../keys/collection.ts.
+// its position. See `createCollection`.
 //
 // At 80×24: the rows on successive lines, the active one marked.
 
@@ -39,7 +38,7 @@ export function Rows<T extends CollectionItem>(props: {
    * The list a pane writes does not change: the same `items`, the same body. What changes is that the
    * body is called for the rows in view and is handed each one's placement to pass to `Row`. Roving
    * focus still walks the whole list, because the keys are the collection's and the scroller is asked
-   * to reach a row before it is focused (../keys/collection.ts § scrollToKey).
+   * to reach a row before it is focused (`scrollToKey`).
    */
   virtual?: boolean
   /** Virtual rows in a collapsed sidebar are square with the surrounding icon rails. */
@@ -134,7 +133,7 @@ export function Rows<T extends CollectionItem>(props: {
   const [scrollOffset, setScrollOffset] = createSignal(0)
   // Row height comes from --row-h-virt so a style pack's density reaches the list. The virtualizer
   // writes its answer back as an inline height, which beats any stylesheet rule, so a number read from
-  // the token is the only way density is real here (./metrics.ts).
+  // the token is the only way density is real here (`rowHeight`).
   const measuredRowHeight = () => (props.rowHeight === 'rail' ? railRowHeight() : rowHeight())
   const [rowH, setRowH] = createSignal(measuredRowHeight())
   virt = createVirtualizer({

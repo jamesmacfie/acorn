@@ -174,7 +174,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
         <Show when={failed()}>
           <Alert tone="warn">Could not open the plugin page.</Alert>
         </Show>
-        {/* Was a literal ◐ glyph with no accessible name. */}
+        {/* A labelled spinner, so the loading state has an accessible name. */}
         <Show when={loading()}>
           <Spinner label="Loading page" />
         </Show>

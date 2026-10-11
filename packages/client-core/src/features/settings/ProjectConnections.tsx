@@ -10,7 +10,7 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 
 // The services a workspace or a project follows: which provider projects show up in its rail, from each
 // connection that lists projects. The same map a connection's page draws, from the other side
-// (./ConnectionProjectMap.tsx), so every page reads and writes the same rows. Each connection links to
+// (`ConnectionProjectMap`), so every page reads and writes the same rows. Each connection links to
 // its own page, where it is renamed, signed in again, or disconnected.
 
 function FollowedServices(props: {

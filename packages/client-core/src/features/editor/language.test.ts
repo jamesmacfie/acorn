@@ -9,9 +9,8 @@ import { languageFor, languageForPath, MAX_HIGHLIGHT_CHARACTERS, shouldHighlight
 // here once.
 //
 // And, since the entries import their grammar rather than holding it, one more thing has to be true:
-// no grammar is reachable statically. That is the property the whole split was for — the editor's
-// chunk used to be 954,915 bytes because this module imported all seventeen up front, so a pane that
-// opens one file downloaded every language the app knows.
+// no grammar is reachable statically, or a pane that opens one file downloads every language the app
+// knows.
 
 /** Every grammar package the map can reach, from the source rather than from a list kept beside it. */
 const SOURCE = readFileSync(new URL('./language.ts', import.meta.url), 'utf8')

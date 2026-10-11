@@ -1,14 +1,12 @@
-// The grammar vocabulary, split out of shiki.ts because two bundles need it and only one may have an
-// engine in it: highlighter.worker.ts loads grammars under Oniguruma, shiki.ts loads them under the
-// JavaScript engine, and a worker importing shiki.ts would drag the second engine across the boundary
-// the worker exists to create.
+// The grammar vocabulary, in its own module because two bundles need it and each may carry only one
+// engine: highlighter.worker.ts loads grammars under Oniguruma, shiki.ts loads them under the JavaScript
+// engine, and a worker importing shiki.ts would drag the second engine across the boundary the worker
+// exists to create.
 import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
 
 // Fine-grained: only the grammars named here can ever be bundled, because the bundled `shiki` entry
 // pulls a chunk for every grammar in existence. These load lazily (see loadGrammar), so naming one costs
-// nothing until a file of that language is rendered. That's what makes the list cheap to extend, and why
-// scss, less, xml, ruby, ini and toml are on it: each was in the vocabulary, mapped to `text`, and
-// rendered plain only because of the eager-load cost that used to apply to all of them at once.
+// nothing until a file of that language is rendered, which makes the list cheap to extend.
 export const LANGS: Record<string, () => Promise<unknown>> = {
   typescript: () => import('shiki/langs/typescript.mjs'),
   tsx: () => import('shiki/langs/tsx.mjs'),

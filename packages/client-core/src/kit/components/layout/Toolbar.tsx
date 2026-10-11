@@ -46,7 +46,6 @@ export function Toolbar(props: ToolbarProps) {
   )
 }
 
-/** flex:1 filler, in place of the `margin-left: auto` idiom. */
 /** The gap that pushes what follows to the far end of the bar. A name of its own as well as
  *  `Toolbar.Spacer`, because a remote tree names one type per node and has nowhere to put the dot. */
 export const ToolbarSpacer = () => <span class="ui-toolbar-spacer" />

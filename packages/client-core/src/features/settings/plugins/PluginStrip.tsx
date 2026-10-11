@@ -21,10 +21,9 @@ import './plugins.css'
 // shows: off, waiting for approval, failed, and offline.
 //
 // The caller draws it outside the plugin's content, as an earlier sibling of the box the content sits
-// in, so nothing the plugin draws can sit over it or stand in for it (../SettingsView.tsx).
+// in, so nothing the plugin draws can sit over it or stand in for it.
 //
-// A plugin's page reads the active node (../../../host/frames/register.ts § frameNode), so the strip
-// describes the plugin there too.
+// A plugin's page reads the active node (`frameNode`), so the strip describes the plugin there too.
 
 export function PluginStrip(props: {
   pluginId: string

@@ -54,12 +54,9 @@ const archivedOn = (at: number): string =>
 // the selected task with a way to restore it (docs/workspaces-and-tasks/archive.md § Restoring a task)
 // or delete it for good (§ Deleting a task).
 //
-// The page uses the search seam; it does not own it. The same providers can back a search across
-// active tasks, which is `archived=0` on the same route.
-//
-// The preview is the ordinary pane host on the archived task. Only panes that opt into stored-history
-// reads appear in its layout and switcher (registries/panes.ts § readsArchived). The task never enters
-// the task rail, because it is selected here rather than activated.
+// The page uses the search seam; it does not own it. The preview is the ordinary pane host on the
+// archived task, so only panes whose contribution sets `readsArchived` appear in it. The task never
+// enters the task rail, because it is selected here rather than activated.
 export default function ArchivePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()

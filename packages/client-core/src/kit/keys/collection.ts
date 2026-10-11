@@ -3,15 +3,15 @@
 // Every roving-focus list in the kit is this: `Rows`, `TreeRow` runs, `Tabs`, `Menu`, `ChipRow`,
 // `SegmentedControl`, `Timeline`, `Grid`. They differ in what they draw and in nothing else, which is
 // why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once
-// rather than eight times (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 //
 // The rules about the *list* — what wraps, where the first press lands, which of select and activate
-// picks — moved to `collectionIntents.ts` in terminal phase 2, so the terminal host keeps them
-// exactly rather than nearly. What is left here is the DOM's share: `focus()`, `scrollIntoView`, the
-// `aria-*` attributes and the roving `tabindex`.
+// picks — live in `collectionIntents.ts`, so the terminal host keeps them exactly rather than nearly.
+// This is the DOM's share: `focus()`, `scrollIntoView`, the `aria-*` attributes and the roving
+// `tabindex`.
 //
 // A collection is one tab stop with roving focus inside, the React Aria and Kobalte shape. `active`
-// and `selected` live in `collectionState.ts` keyed by the item's own key, so a list rebuilt from a
+// and `selected` live in `collectionState` keyed by the item's own key, so a list rebuilt from a
 // fresh response keeps its place and its selection.
 //
 // The node handles intents and never reads a key. Anything it does not handle returns false and
@@ -165,8 +165,8 @@ export function createCollection(options: CollectionOptions): Collection {
   // collection that is no longer on screen.
   // The id is read once, here. Read again in the cleanup it can already name the next owner's
   // collection: a task-scoped id reads the task through props, and by the time a task switch disposes
-  // the old view those props answer with the new task. The old entry then stayed in `live`, and its
-  // `reveal` held the whole detached view, until that task was opened again.
+  // the old view those props answer with the new task. The old entry would then stay in `live`, its
+  // `reveal` holding the whole detached view, until that task was opened again.
   const id = options.id()
   onCleanup(registerCollectionReveal(id, reveal))
 

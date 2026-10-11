@@ -303,10 +303,9 @@ describe('the system channel', () => {
     expect(shown.map((r) => r.body)).toEqual(['Review & trust', undefined])
   })
 
-  // `toast` is the kind's own answer, and it went unread for as long as it existed: three kinds
-  // declared `false` with a comment saying why and banner-ed anyway. It is load-bearing now, because a
-  // loaded plugin's notice is forced to the `plugin` kind precisely so third-party code cannot put
-  // text on the owner's desktop (node-core server/pluginHost/context.ts).
+  // `toast` is the kind's own answer, and it is load-bearing: a loaded plugin's notice is forced to the
+  // `plugin` kind precisely so third-party code cannot put text on the owner's desktop (node-core
+  // server/pluginHost/context.ts).
   it('obeys the kind, so a bell-only kind never reaches the desktop', () => {
     const drop = registerNoticeSink(systemSink)
     deliverNotice({ taskId: 't1', kind: 'disk-unencrypted', title: 'This disk is not encrypted', at: 1 }, context)
@@ -358,9 +357,8 @@ describe('workflow notices', () => {
   })
 })
 
-// The seam this channel grew for: any plugin can raise a row and say where it goes. The memory
-// proposal gate is why — it borrowed workflows' notice channel, which could only name a run, so its
-// row swallowed every click (docs/notifications/rows-and-targets.md § What a row points at).
+// Any plugin can raise a row and say where it goes (docs/notifications/rows-and-targets.md § What a row
+// points at).
 describe('a plugin notice', () => {
   const frame = (over: Partial<WorkflowNotice>): WorkflowNotice => ({ title: 'something happened', ...over })
 

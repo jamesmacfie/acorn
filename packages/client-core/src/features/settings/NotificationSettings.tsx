@@ -31,8 +31,8 @@ export default function NotificationSettings() {
   const prefs = createQuery(() => prefsOptions(true))
   const settings = () => parseNotificationSettings(prefs.data?.[PrefKeys.notifications])
 
-  // Both through the shared merge (../notifications/settings.ts), which is the same one the palette's
-  // setting commands write with: six booleans in one key means an unmerged write turns five of them off.
+  // Both through the shared merge, which is the same one the palette's setting commands write with: six
+  // booleans in one key means an unmerged write turns the other five back on.
   // Each switch has its own save state, so a failed write is reported beside the switch that moved.
   const save = (row: SettingSave, patch: Partial<Settings>) =>
     row.run(() => saveNotificationSettings(qc, settings(), patch))

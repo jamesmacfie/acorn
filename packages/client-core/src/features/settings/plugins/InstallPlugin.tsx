@@ -11,8 +11,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 // Install…: one flow for both places a plugin can live (docs/plugins/activation.md § Installing). The
 // person names the source once and says where it goes. A node runs the package's server code in its own
 // isolated realm and offers its interface to this device, which asks for trust before any of it runs. This
-// device alone can hold a client-only package, which also asks for trust. Each target stores exactly what
-// its own form stored before, through the same call.
+// device alone can hold a client-only package, which also asks for trust.
 //
 // No browse-and-discover list, because anything acorn could offer there would be unreviewed
 // (docs/extensibility.md § Some decisions that look like gaps).

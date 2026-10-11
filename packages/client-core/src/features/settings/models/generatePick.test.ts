@@ -3,9 +3,8 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { effectiveModelPick, readGeneratePick } from './generatePick'
 
-// The shared "Generate with" default: which pick wins, and what a value this build cannot read counts
-// as. These invariants came from the commit wand, which was the only surface that remembered a pick
-// before every Generate control shared one.
+// The shared "Generate with" default: which pick wins, and what a value this build cannot read
+// counts as.
 
 const at = (
   id: string,
@@ -76,8 +75,8 @@ describe('effectiveModelPick', () => {
     expect(effectiveModelPick([at('c1', [])], null)).toEqual({ backendId: 'c1', modelId: '' })
   })
 
-  // The machine this whole programme is for: `claude` on PATH and no key connected. There is no
-  // connection to fall back to, so the first backend is a harness and the wand appears anyway.
+  // The common machine: `claude` on PATH and no key connected. There is no connection to fall back to, so the
+  // first backend is a harness and the wand appears anyway.
   it('resolves over a list that is nothing but installed CLIs', () => {
     const harnesses = [
       at('harness:claude-code', ['sonnet', 'opus'], 'sonnet', 'harness'),

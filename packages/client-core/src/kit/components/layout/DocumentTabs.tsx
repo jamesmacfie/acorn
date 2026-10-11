@@ -33,7 +33,7 @@ const MAX_TAB_MARK_GLYPHS = 3
 // `${idPrefix}-tab-${id}` convention), so the two read as siblings.
 //
 // The close buttons are separate focusables inside each tab, which lets a keyboard user reach them
-// at all; the terminal's close control used to be mouse-only.
+// at all.
 export function DocumentTabs(props: {
   tabs: readonly DocTabDef[]
   active: string

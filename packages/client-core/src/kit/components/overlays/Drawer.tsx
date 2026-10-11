@@ -5,8 +5,7 @@ import type { JSX } from 'solid-js'
 // (docs/ui-design/overlays.md § Chrome and overlays).
 //
 // It exists because a drawer is a `drawer` slot rather than a pane, so no host layout owns its outer
-// box — and until phase 9 of the layout programme that box was the terminal plugin's own stylesheet.
-// Where the rails are, how tall the top bar is and which z-layer a drawer sits on are the shell's
+// box. Where the rails are, how tall the top bar is and which z-layer a drawer sits on are the shell's
 // facts, not a plugin's, and a plugin that writes them down is one shell change away from being wrong.
 //
 // Not a modal. Nothing behind it goes inert, there is no backdrop and Escape does not dismiss it: the

@@ -15,12 +15,11 @@ import type { DocumentSurfaceProps } from './documentSurface'
 // things only a render can show: that a `remote` region is given the same document accessor a `frame`
 // region gets, and that the selection which opened the pane reaches it.
 //
-// Both were missing, and both are the reason the Database pane's palette rows work at all. `document`
-// is how `bridge.document.write` reaches the editor beside the tree — without it the broker refuses
-// the verb, because its absence IS the permission check (./broker.ts). The retained pane intent is how
-// a tree mounting for the first time learns which row opened it; a frame region has always consumed it
-// into `context.item` (./PluginFrame.tsx) and a tree never did, so a command that opened a closed pane
-// arrived with no selection at all.
+// Both are why the Database pane's palette rows work. `document` is how `bridge.document.write`
+// reaches the editor beside the tree; without it the broker refuses the verb, because its absence IS
+// the permission check (./broker.ts). The retained pane intent is how a tree mounting for the first time
+// learns which row opened it, consumed into `context.item` as a frame region does (./PluginFrame.tsx);
+// without it a command that opened a closed pane arrives with no selection at all.
 
 const remoteProps: { document?: unknown; scope?: () => unknown; openingItem?: string }[] = []
 const editorOrigins: string[] = []

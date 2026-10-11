@@ -10,15 +10,14 @@ import { IconButton } from '../inputs/IconButton'
 // don't use it.
 //
 // A trap: it holds Tab inside while it is open and hands focus back to whatever opened it when it
-// goes (../keys/trap.ts). Before that, dismissing left the body focused and the next Tab started
-// again from the top of the page.
+// goes (`restoreFocusOnCleanup`), so dismissing does not leave the body focused and the next Tab
+// starting again from the top of the page.
 //
 // It portals, like every other overlay in the kit. `.pane` sets `contain: layout paint`
 // (infra/styles/shell.css), which makes the pane a containing block for `position: fixed`, so a
-// modal rendered inline inside a pane got a backdrop the size of that pane and clipped by its
-// `overflow: auto` rather than one over the window. The ref-based focus trap and dismissal are
-// unaffected by the move, and a loaded plugin's overlay is inside an iframe, so it stays boxed
-// either way (host/frames/PluginRefPanel.tsx).
+// modal rendered inline inside a pane would get a backdrop the size of that pane, clipped by its
+// `overflow: auto`, rather than one over the window. A loaded plugin's overlay is inside an iframe,
+// so it stays boxed either way (host/frames/PluginRefPanel.tsx).
 //
 // Focus moves inside on open, so the next Tab stays in the dialog and a screen reader hears it. With
 // no `autoFocus`, it goes to the first control in the body. An `alertdialog` starts on its first

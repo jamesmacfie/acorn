@@ -12,8 +12,8 @@ import type { SegmentLoader } from './segmentLoader'
 //
 // The document's size comes from its topology, the mounted counts from the items in the layout's
 // range, the work owed from the segment loader, whose queue is only ever what the reader can see and
-// what is near it, and the measurement and correction counts from the layout (./diffLayout.ts). The
-// queue distance is in segments from the items on screen.
+// what is near it, and the measurement and correction counts from the layout. The queue distance is
+// in segments from the items on screen.
 
 export type DiffHealthInputs = {
   topology: () => DiffDocumentTopology | undefined
@@ -152,7 +152,7 @@ export function createDiffHealth() {
       measurement: geometry.measurement,
       correction: geometry.correction,
       // The node's segment cache as a whole, which this pane shares with every other diff on the node,
-      // and this pane's own hits and misses since mount (./segmentCache.ts).
+      // and this pane's own hits and misses since mount.
       resident: {
         documents: stats.cache.documents,
         segments: stats.cache.segments,

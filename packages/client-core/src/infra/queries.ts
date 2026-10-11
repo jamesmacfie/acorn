@@ -96,12 +96,11 @@ export const deletedTasksOptions = (enabled: boolean) => ({
 })
 
 // One task's run targets, for the run buttons in the task's pane switcher. A visit draws the cached
-// list in the same frame as the panes, so the buttons no longer arrive late and push the switcher
-// down, and asks the node again once the shell's 30-second stale time has passed. `run:changed`
-// refreshes one task's entry (node/watchNodeEvents.ts) and `project:changed` every entry
-// (projects/watchProjectChanges.ts). Nothing reports a hand edit to `.acorn/config.toml`, so the stale
-// time and window focus are what pick one up. A configuration the node cannot read answers with no
-// buttons, as the task view always did.
+// list in the same frame as the panes, so the buttons do not arrive late and push the switcher down,
+// and asks the node again once the shell's stale time has passed. `run:changed` refreshes one task's
+// entry (node/watchNodeEvents.ts) and `project:changed` every entry (projects/watchProjectChanges.ts).
+// Nothing reports a hand edit to `.acorn/config.toml`, so the stale time and window focus are what
+// pick one up. A configuration the node cannot read answers with no buttons.
 export const runTargetsKey = ['run-targets'] as const
 export const runTargetsOptions = (taskId: string, enabled: boolean) => ({
   queryKey: [...runTargetsKey, taskId] as const,
@@ -141,8 +140,7 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
 // (settings/ConnectionProjectMap.tsx). Per connection, so a provider that is down shows its
 // own error row and its siblings still list.
 //
-// No staleTime and no retry. A picker's list is a claim about the provider now (the surface this
-// replaced had to reach past a five-minute cache by hand to get that), and a connection that
+// No staleTime and no retry. A picker's list is a claim about the provider now, and a connection that
 // failed should say so at once with a Retry button rather than after three silent attempts.
 export const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
 export const integrationProjectsOptions = (connectionId: string, enabled: boolean) => ({

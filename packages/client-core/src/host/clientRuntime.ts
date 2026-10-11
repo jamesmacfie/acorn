@@ -52,7 +52,7 @@ export async function startClientRuntime(host: ClientRuntimeHost): Promise<() =>
     watchNodeEvents(),
     // Workflow notices arrive over `/v1/events` from the node itself, not from the terminal plugin,
     // so a node without a terminal still raises them. The system channel is an OS banner on the
-    // desktop and an escape sequence in a terminal (infra/platform/index.ts § showNotification).
+    // desktop and an escape sequence in a terminal (`showNotification` in infra/platform).
     initWorkflowNotices(),
     initSystemNotices(),
     clientScheduleRegistry.register(taskStatusScheduleContribution).dispose,
@@ -74,7 +74,7 @@ export async function startClientRuntime(host: ClientRuntimeHost): Promise<() =>
 }
 
 // Each schedule runs once when it starts, then waits for its interval or an event. Started before the
-// node could answer, the first run failed and left task statuses empty for up to 10 s and workflow run
+// node can answer, that first run fails and leaves task statuses empty for up to 10 s and workflow run
 // counts for up to 2 min. Started once and kept, because the startup gate can briefly hold again while
 // Settings → Nodes re-reads the fleet, and `startClientSchedules` already follows node switches.
 function startSchedulesWhenNodeReady(): () => void {

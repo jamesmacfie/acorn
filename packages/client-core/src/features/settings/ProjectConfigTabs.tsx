@@ -20,7 +20,7 @@ import { createSettingSave, createTextSetting } from './settingSave'
 
 // The project-level config of one folder project (docs/workspaces-and-tasks/project-config.md § The project row),
 // split over the project page's tabs. Reads and writes the project row through the project bridge, on
-// the settings save model (./settingSave.ts): selects save when they change, text saves on blur or Enter.
+// the settings save model (`createSettingSave`): selects save when they change, text saves on blur or Enter.
 //
 // A value the checkout's committed `.acorn/config.toml` sets wins over the row, so its row says so, goes
 // read-only, and shows the file's value above the one this machine holds. The node says which values
@@ -87,7 +87,7 @@ export function SetupTab(props: { store: ProjectConfigStore }) {
   const trigger = (): SetupTrigger => config(props.store)?.setupScriptTrigger ?? 'terminal'
   const triggerSave = createSettingSave()
   // The repo's `dev` run target replaces the one the dev script makes, restart command and all
-  // (server/runConfig.ts § loadRepoConfig).
+  // (`loadRepoConfig`).
   const repoDev = () => repo(props.store)?.runTargets.find((target) => target.id === 'dev')
   return (
     <>

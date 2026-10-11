@@ -2,9 +2,8 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
 
-// A plugin with no client half never had a bundle to ask about, so before input approval it never
-// asked anything. These pin that it now asks before its derived sources read anyone's data, and that
-// Accept approves exactly the list it showed.
+// A plugin with no client half has no bundle to ask about. These pin that it still asks before its
+// derived sources read anyone's data, and that Accept approves exactly the list it showed.
 vi.mock('../plugins/host', () => ({
   recordPluginTrust: vi.fn(),
   pluginHostAvailable: () => true,

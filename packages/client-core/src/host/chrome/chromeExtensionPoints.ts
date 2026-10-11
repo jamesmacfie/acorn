@@ -73,8 +73,8 @@ export function pluginExtensionPoint(
   if (kind === 'annotation' && !descriptor.key) {
     throw new Error(`annotation point '${descriptor.id}' does not say what its items are keyed by`)
   }
-  // Which surface each mount names is checked where it is drawn: register.ts reads mounts only off the
-  // owner's own surfaces, so a point cannot reach another plugin's view.
+  // Which surface each mount names is checked where it is drawn: the frame registration pass reads mounts
+  // only off the owner's own surfaces, so a point cannot reach another plugin's view.
   if (descriptor.mounts && kind !== 'remote') {
     throw new Error(
       `extension point '${descriptor.id}' is a '${kind}' point, and only a remote point mounts in a detail region`,
@@ -137,7 +137,7 @@ export function pluginExtension(
   }
   if (descriptor.items !== undefined) {
     // Confines the contribution to the contributor's own namespace (docs/plugins/cooperative-extension-points.md § Cooperative
-    // extension points; chrome/data.ts for why a roster row is re-checked here at all).
+    // extension points). A roster row is bytes a node sent, so it is checked again here.
     if (!ownsRoute(pluginId, descriptor.items)) {
       throw new Error(`extension '${descriptor.id}' reads '${descriptor.items}', which is not ${pluginId}'s`)
     }

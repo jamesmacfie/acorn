@@ -2,8 +2,7 @@
 // because that map is a type with no runtime form, and because most of it should not be reachable
 // anyway: `presentation:*` are the shell's own intents.
 //
-// Two families live here, and the split is the point (settled 2026-08-28, before the first addition
-// made it unsettleable — docs/plugins/events.md § Hearing a core event):
+// Two families live here, and the split is the point (docs/plugins/events.md § Hearing a core event):
 //
 //   `runtime:*`        the shell talking to itself, about this window. Mostly "something you were
 //                      displaying is gone or moved" — a deletion and invalidation list — plus
@@ -46,7 +45,7 @@ export const SUBSCRIBABLE_CHANNELS = [
 export type SubscribableChannel = (typeof SUBSCRIBABLE_CHANNELS)[number]
 
 // The copy, plus how the trust prompt draws it. Severity travels with the grant from here rather than
-// being reconstructed from the sentence downstream (plugins/permissions.ts).
+// being reconstructed from the sentence downstream (trust/permissions.ts).
 const CHANNEL_DESCRIPTIONS = {
   'runtime:task-archived': { text: 'Receive task archive events', icon: 'radio' },
   'runtime:workspace-removed': { text: 'Receive scope removal events', icon: 'radio' },
@@ -81,8 +80,8 @@ export const isSubscribable = (channel: string): channel is SubscribableChannel 
 // the wire (node-core/server/pluginHost/context.ts § on), so a manifest naming one of these is asking for
 // its node half to hear a core event, not for its frame to subscribe to anything.
 //
-// `tasks:changed`, `connection:changed` and the four after them are in both lists, which is what a node-emitted fact looks
-// like: the same name, the same sentence, one grant, and either half of the plugin may take it up.
+// Every `<noun>:changed` channel in the frame list is in both lists, which is what a node-emitted fact
+// looks like: the same name, the same sentence, one grant, and either half of the plugin may take it up.
 // `plugins:changed` is not in the frame list because a frame has no roster to reconcile. That is the
 // shell's job, and it does it whether or not a plugin asked. The two below are node-only for a
 // different reason each: a session roster moving is machine-rate, and a frame that wanted the dirty
@@ -99,7 +98,7 @@ export const describeChannel = (channel: string, ownerId?: string): GrantDescrip
   if (isSubscribable(channel)) return CHANNEL_DESCRIPTIONS[channel]
   if (isNodeEventChannel(channel)) return NODE_EVENT_DESCRIPTIONS[channel]
   // One host-owned sentence rather than one per verb. The verb is manifest text, and every sentence the
-  // trust prompt draws under "Enforced" has to be copy the host owns (plugins/permissions.ts says why),
+  // trust prompt draws under "Enforced" has to be copy the host owns (trust/permissions.ts says why),
   // so it does not get interpolated in however well-formed it parsed.
   //
   // Another plugin's channel gets the same treatment at the producer grain

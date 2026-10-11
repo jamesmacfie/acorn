@@ -18,7 +18,7 @@ export default function ListView(props: PanelViewProps) {
   const status = () => props.fields.find((field) => field.role === 'status' && field.type === 'enum' && !field.hidden)
   // Everything the panel projects except the ones the row already draws in their own slots: the
   // lead, the status chip, and the source, whose slot is the provenance badge below. A `source`
-  // field is an ordinary projected field now (mapping.ts § PANEL_SOURCE_FIELD_ID), so without this
+  // field is an ordinary projected field (`PANEL_SOURCE_FIELD_ID`), so without this
   // it would print beside the badge that already says it.
   const meta = () =>
     props.fields.filter(

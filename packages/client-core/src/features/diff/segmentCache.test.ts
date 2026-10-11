@@ -11,8 +11,8 @@ import {
   segmentCacheFor,
 } from './segmentCache'
 
-// The node's weighted segment cache on its own (./segmentCache.ts): what it keeps, what it lets go,
-// and in which order. The pane wiring is covered in DiffPane.test.tsx.
+// The node's weighted segment cache on its own: what it keeps, what it lets go, and in which order. The pane
+// wiring is covered in DiffPane.test.tsx.
 
 const code = (raw: string): CodeRow => ({
   kind: 'insert',

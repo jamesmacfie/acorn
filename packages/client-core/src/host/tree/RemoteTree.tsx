@@ -110,10 +110,10 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   let container: HTMLDivElement | undefined
   // When a person last acted inside this tree, as the proof that `openOverlay` is answering a gesture.
   //
-  // `document.activeElement` was the original proof and is not enough on its own. WebKit does not move
+  // `document.activeElement` is not enough on its own. WebKit does not move
   // focus to a button when it is clicked — that is the platform behaviour behind macOS's "Keyboard
   // navigation" setting, and the shell runs in a WKWebView — so a click on a kit `Button` leaves focus
-  // on `<body>` and a tree could never open its companion overlay from a click at all. The same
+  // on `<body>`, and a focus check alone would never let a click open a companion overlay. The same
   // record answers whether an owner action came from a person (./hostRequests.ts).
   const gestures = createGestureClock()
   let unwatchGestures = (): void => {}
@@ -203,8 +203,8 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     // Qualified first, because the two sides are not spelled the same. A frame id outside the plugin's
     // namespace is rewritten to `<pluginId>.<id>` when the device reads the roster row, and the
     // manifest's reference to it is rewritten with it (../plugins/contributionIds.ts) — but the string
-    // a running tree passes is the one its author wrote in the manifest, and nothing rewrites that. So a
-    // plugin declaring `editor` and asking for `editor` was refused for naming its own overlay.
+    // a running tree passes is the one its author wrote in the manifest, and nothing rewrites that.
+    // Unqualified, a plugin declaring `editor` and asking for `editor` is refused for its own overlay.
     //
     // The descriptor's own reference is qualified too, and the overlay opens under that reference as
     // written. The extension and frame registries are both built from the Node's roster row, which

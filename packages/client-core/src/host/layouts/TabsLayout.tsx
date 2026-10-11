@@ -30,7 +30,7 @@ export function Tabs(props: LayoutProps) {
 
   // `⌘1`..`⌘9` inside this pane, as a focus-within layer above the global one that switches tasks.
   // Priority is what decides that, not how local the layer is: the engine sorts on priority and then
-  // on registration order (keys/install.ts § three tiers).
+  // on registration order (the layer tiers in keys/install.ts).
   // Deferred to `onMount` for the reason `bindIntents` is: a ref fires while the element is still
   // detached, and the keymap refuses a target that is not in the document.
   const bindChords = (element: HTMLElement) =>

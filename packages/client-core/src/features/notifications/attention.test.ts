@@ -48,7 +48,7 @@ describe('edgesBetween: three of the twenty-five pairs are news', () => {
     expect(from(snap('working'), snap('error'))[0].title).toBe('claude failed')
   })
 
-  // A ten-step run used to raise ten "finished" rows. The workflows plugin sends `run-done` for the
+  // A ten-step run must not raise ten "finished" rows. The workflows plugin sends `run-done` for the
   // run, which is the one notice the owner asked for.
   it('a finished turn is only news for an interactive or PTY session', () => {
     expect(from(snap('working', { notifyOnFinish: false }), snap('finished', { notifyOnFinish: false }))).toEqual([])

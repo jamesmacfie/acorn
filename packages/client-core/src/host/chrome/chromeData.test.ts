@@ -189,9 +189,9 @@ describe('annotation response budget', () => {
 
 // The chrome half of the `term:status` split, from the frame to the revision a descriptor read watches.
 //
-// The amplifier this pins closed: `term:status` used to be one content-free ping that a terminal
-// emitted on every idle-to-working edge, and the chrome sweep answered it by refetching every plugin's
-// rail rows, badges and collections on every connected client.
+// The amplifier this pins closed: a content-free ping on every terminal's idle-to-working edge would
+// make the chrome sweep refetch every plugin's rail rows, badges and collections on every connected
+// client.
 describe('chrome freshness hears only what names it', () => {
   const emit: ((nodeId: string, frame: unknown) => void)[] = []
 

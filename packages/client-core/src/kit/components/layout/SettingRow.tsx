@@ -47,8 +47,8 @@ export type SettingRowProps = {
    every input, select and button inside it inert without the row reaching into its child.
 
    The save state sits on the title line, after the label and its help mark: the changed dot, the
-   scope chip, then **Saved** or **Reset** in one spot. The control column holds the control and nothing else, so the
-   control never moves or narrows while a save lands.
+   scope chip, then **Saved** or **Reset** in one spot. The control column holds the control and
+   nothing else, so the control never moves or narrows while a save lands.
 
    At 80×24: one line, the label then the control; `stacked` puts the control on the next line. The
    description and the help in grey under it, **Saved** in green or the error in red after it. A

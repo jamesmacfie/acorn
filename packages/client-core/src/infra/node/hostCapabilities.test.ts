@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hasHostCapability } from './hostCapabilities'
 
-// The three questions `requires` can ask, answered against a host object. The seam arm is the point
+// The questions `requires` can ask, answered against a host object. The seam arm is the point
 // of the file: a pane gated on a seam group has to disappear on a shell that ships without it, which
 // is a supported product state (../platform/contract.ts pins the no-preview shape).
 
@@ -68,8 +68,8 @@ describe('hasHostCapability', () => {
   })
 
   it('{ seam } asks the platform seam, so a shell without preview views never offers the pane', () => {
-    // A desktop shell that installed everything but the preview group. `'desktop'` would have said
-    // yes here, which is the gate this replaced.
+    // A desktop shell that installed everything but the preview group. `'desktop'` says yes here, so it
+    // cannot gate the pane.
     host({ desktop: true, platform: 'darwin' })
     expect(hasHostCapability({ seam: 'preview' })).toBe(false)
     expect(hasHostCapability('desktop')).toBe(true)

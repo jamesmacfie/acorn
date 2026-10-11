@@ -48,8 +48,8 @@ describe('ring cap + read state + pref round-trip', () => {
 })
 
 // A notice belongs to whichever node produced the frame or session list behind it. Without the stamp,
-// switching nodes showed node A's "claude finished" rows in node B's bell, pointing at tasks the user
-// can't reach from there, with a rail badge counting them against node B's task ids.
+// switching nodes would show node A's "claude finished" rows in node B's bell, pointing at tasks the
+// user can't reach from there, with a rail badge counting them against node B's task ids.
 describe('notices are scoped to the node that raised them', () => {
   beforeEach(() => _resetNotices())
   afterEach(() => setActiveNode(null))

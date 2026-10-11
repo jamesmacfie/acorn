@@ -9,7 +9,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const PERSISTED_SNAPSHOT_MAX_AGE_MS = 7 * DAY_MS
 
 // How long one entry is carried from snapshot to snapshot without being refetched. It matches the
-// QueryClient's `gcTime` (infra/node/fleet.ts), so an entry nobody has looked at for a day leaves
+// QueryClient's `gcTime` (see `clientFor`), so an entry nobody has looked at for a day leaves
 // memory and the snapshot together. A restored week-old entry is drawn once and then dropped at the
 // next write unless its screen refetched it.
 export const PERSISTED_QUERY_MAX_AGE_MS = DAY_MS

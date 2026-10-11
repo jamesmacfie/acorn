@@ -18,7 +18,7 @@ import { pluginLabel } from '../../host/plugins/pluginLabel'
 // for it (docs/data-layer/backup-and-retention.md § What the node reports, docs/caching.md § Renderer query cache).
 //
 // Core draws its own numbers. A plugin that holds memory or disk on the node draws its own section
-// through CORE_STORAGE_POINT, so core never calls a plugin's route. Agents is the one that does today.
+// through CORE_STORAGE_POINT, so core never calls a plugin's route.
 //
 // Per node, following the settings header's node switcher: every read below names `props.nodeId`, and
 // the device's saved cache is the one kept for that node. `null` is the window's own node.

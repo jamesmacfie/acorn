@@ -5,7 +5,7 @@
 //
 // Both owners use it: the document surface with its region's own routes, and Editor with the
 // file-language provider the Node resolved. The terminal draws neither and asks through explicit
-// commands with the same checks (host/registries/panes/documentServices.ts).
+// commands with the same checks.
 import { StateEffect, type Extension } from '@codemirror/state'
 import { EditorView, ViewPlugin, hoverTooltip, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'

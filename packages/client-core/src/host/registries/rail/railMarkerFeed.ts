@@ -1,8 +1,8 @@
 // The compiled-plugin feeder for rail status markers (docs/plugins/menus-and-markers.md § Rail markers). A plugin
 // publishes marker data next to the state that owns it; the host draws the pixels.
 //
-// JSX-free by design, like ./slots.ts: registries/plugin.ts imports this, and that file has to stay
-// importable in the Node-only client-core suite (docs/frontend/registries.md § Registries and plugins).
+// JSX-free by design: the client plugin registry (extensionPoints/plugin.ts) imports this, and that file
+// has to stay importable in the Node-only client-core suite (docs/frontend/registries.md § Registries and plugins).
 import { clampMarkerPriority, type RailMarker } from '../../../features/tabs/railMarkers'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -27,18 +27,13 @@ export type RailMarkerContribution = {
 
 export const railMarkerRegistry = new Registry<RailMarkerContribution>('rail-marker')
 
-/**
- * Every contributed marker for one control, qualified and clamped, ready for resolveRailMarkers.
- * One failing contribution is isolated: a plugin's broken getter must not blank the whole rail.
- */
 /** The contributions in draw order, sorted once per registry change.
  *
- *  `markersFor` is called per row per render — every task in the rail, on every redraw of it — and it
- *  used to copy and `localeCompare`-sort the whole registry each time. The registry is a signal, so
- *  the sorted list is cached against the array it was sorted from: reading `entries()` keeps the
- *  caller reactive, and the identity check keeps the sort to once per register or unregister.
- *  A `createMemo` would say the same thing, and this file is imported by `registries/plugin.ts` and
- *  has no root to own one. */
+ *  `markersFor` is called per row per render — every task in the rail, on every redraw of it — so
+ *  copying and sorting the whole registry each time is too much. The registry is a signal, so the
+ *  sorted list is cached against the array it was sorted from: reading `entries()` keeps the caller
+ *  reactive, and the identity check keeps the sort to once per register or unregister. A `createMemo`
+ *  would say the same thing, but this module has no root to own one. */
 let sortedFrom: readonly RailMarkerContribution[] | null = null
 let sorted: RailMarkerContribution[] = []
 
@@ -50,6 +45,10 @@ const inOrder = (): readonly RailMarkerContribution[] => {
   return sorted
 }
 
+/**
+ * Every contributed marker for one control, qualified and clamped, ready for resolveRailMarkers.
+ * One failing contribution is isolated: a plugin's broken getter must not blank the whole rail.
+ */
 export function markersFor(target: RailMarkerTarget): RailMarker[] {
   const contributions = inOrder()
   const markers: RailMarker[] = []

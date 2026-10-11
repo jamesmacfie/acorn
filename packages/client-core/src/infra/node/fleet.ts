@@ -130,11 +130,10 @@ function subscribeStatuses(): void {
   subscribed = true
   transport.onStatus((status) => {
     setStatuses((current) => ({ ...current, [status.nodeId]: status }))
-    // A status for a node this list has never heard of. It used to be impossible: membership was read
-    // after the local node had been adopted. The window now opens first, so on a first-ever launch the
-    // list is empty and the local node's first status is the only news that it exists
-    // (docs/frontend/data-and-startup.md § Startup readiness). Re-reading costs the helper one
-    // file read.
+    // A status for a node this list has never heard of. The window opens before the local node is
+    // adopted, so on a first-ever launch the list is empty and the local node's first status is the
+    // only news that it exists (docs/frontend/data-and-startup.md § Startup readiness). Re-reading
+    // costs the helper one file read.
     if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
     chased.add(status.nodeId)
     void refreshFleet().catch((error: unknown) => log.warn('could not re-read membership', error))
@@ -185,9 +184,9 @@ function trackRetirement(nodeId: string, retry: () => Promise<void>): Retirement
 
 export const cacheKeyFor = (nodeId: string): string => `${CACHE_KEY_PREFIX}${nodeId}`
 
-// Where a cache partition is written. IndexedDB is the default because the two hosts that had one
-// were both browsers; a host without one installs its own before the first cache is built, which is
-// what the terminal client does with a directory of files (apps/tui/src/node/cache.ts). Three
+// Where a cache partition is written. IndexedDB is the default because the browser hosts have it; a
+// host without one installs its own before the first cache is built, which is what the terminal client
+// does with a directory of files (apps/tui/src/node/cache.ts). Three
 // operations match the public persister contract. Each partition captures this adapter once.
 let cacheStorage: CacheStorage = { getItem: (key) => get<string>(key), setItem: set, removeItem: del }
 
@@ -257,7 +256,7 @@ export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NO
 
 // Forget everything this client cached for a node. The payoff of the per-node partition: one place a
 // node's data lives, so eviction is this function alone, unlike `runtime:task-archived`, which fans
-// out to ten state owners.
+// out to every state owner.
 //
 // The in-memory client and the IndexedDB key are independent tiers, so dropping only the key leaves a
 // live cache that re-persists itself on the next write.

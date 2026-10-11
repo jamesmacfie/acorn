@@ -1,8 +1,8 @@
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 
 // Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect. See
-// docs/ui-design/interaction.md § Menus and right-click for why this exists, what it leaves to focus.ts and the
-// call site, and why the portal matters.
+// docs/ui-design/interaction.md § Menus and right-click for why this exists, what it leaves to the
+// focus trap and the call site, and why the portal matters.
 
 export type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
 

@@ -16,7 +16,7 @@ import { createTimelineWindow, TIMELINE_PAGE } from '../../lib/timeline/timeline
 // jsdom has no layout, so the geometry is a model: turn heights, a viewport, and a `scrollTop` that
 // CLAMPS the way a browser does. That clamp is the whole point of the harness. Without it a test can
 // set `scrollTop` to an offset the list is too short to reach and assert it stuck, which is the one
-// thing a browser will not do and the reason this bug went two rounds without a failing test.
+// thing a browser will not do.
 
 let dispose: (() => void) | undefined
 let host: HTMLElement
@@ -233,8 +233,8 @@ describe('Timeline', () => {
   it('keeps a scroll the reader makes in the frame after a pin', () => {
     // The race. The newest card grows and the timeline pins the view to it, which marks the next scroll
     // event as its own. The reader scrolls up before the frame that clears the mark, so their move and
-    // the pin's echo arrive as one scroll event. That event used to be dropped as ours, and the next
-    // growth pinned the reader back to the bottom.
+    // the pin's echo arrive as one scroll event. Dropping that event as ours would let the next growth
+    // pin the reader back to the bottom.
     const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
     const view = mount(turns)
     heights.set('e', 160)
@@ -348,10 +348,9 @@ describe('Timeline', () => {
   })
 
   it('does not let settling redefine which turn the reader chose', () => {
-    // The one that got through. A list too short to bring the anchor all the way up settles against the
-    // clamp, and the old code then re-measured and adopted whatever was under the viewport — a turn or
-    // two earlier. Every resize did it again, so the place walked up the list and the reader ended at
-    // the top, a beat after landing in the right spot.
+    // A list too short to bring the anchor all the way up settles against the clamp. Re-measuring and
+    // adopting whatever is under the viewport there picks a turn or two earlier, and every resize does
+    // it again, so the place walks up the list and the reader ends at the top.
     const [turns] = createSignal(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
     const view = mount(turns, 200)
     reader(scroller()!, 1300)
@@ -365,9 +364,9 @@ describe('Timeline', () => {
   })
 
   it('does not read a rebuilt pane restoring its own focus as the reader scrolling', () => {
-    // A pane that comes back puts focus somewhere, and focus used to arm the next scroll event as the
-    // reader's. The scroll that followed was the restore's own, measured while the list was still at
-    // the top, so the top became the reader's place and stayed there.
+    // A pane that comes back puts focus somewhere. If that focus armed the next scroll event as the
+    // reader's, the restore's own scroll, measured while the list is still at the top, would make the
+    // top the reader's place.
     const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
     const view = mount(turns)
     reader(scroller()!, 200)
@@ -410,10 +409,9 @@ describe('Timeline', () => {
   })
 
   it('does not hand a move nobody made to a reader who clicked a card a while ago', () => {
-    // A click arms a gesture and nothing spends it, because a click scrolls nothing. The arm used to
-    // sit there until something else moved the view, and that move was then written down as the place
-    // the reader chose — so it survived the correction that would otherwise have undone it, and the
-    // caller stored it. Enough of them in a row and the place walks to the top and stays there.
+    // A click arms a gesture and nothing spends it, because a click scrolls nothing. Left armed, the
+    // next move of the view would be written down as the place the reader chose, survive the correction
+    // that would otherwise undo it, and be stored by the caller.
     const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
     const view = mount(turns)
     reader(scroller()!, 200)

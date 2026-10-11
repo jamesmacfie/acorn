@@ -72,7 +72,7 @@ import { connectionPageOf, openConnectionPage } from './connections/connections'
 import { featureUsable } from '../../infra/telemetry/featureOpening'
 import './settings.css'
 
-// Settings as a place: a full-window layer with a rail of nine groups on the left and one page on the
+// Settings as a place: a full-window layer with a rail of groups on the left and one page on the
 // right (docs/frontend/settings.md § Settings).
 //
 // A layer and not a route. The shell mounts it over the workspace, which stays mounted underneath, so a
@@ -282,7 +282,7 @@ export default function SettingsView(props: {
 
   // Every way off a page comes through here: another page, Back to acorn, Escape, the palette and a
   // deep link. A form holding unsaved changes asks its question in this one place rather than in each
-  // of them (./unsavedChanges.ts).
+  // of them (`createUnsavedChanges`).
   const unsaved = createUnsavedChanges()
   const leave = (then: () => void) => {
     // A text field saves on blur, and a field removed from the document never blurs. Blurring it first
@@ -346,7 +346,7 @@ export default function SettingsView(props: {
     )
 
   // Which workspaces show their projects in the rail. Only while expanded, so a node with thirty
-  // projects is still a short rail (the brief's open decision 2). Opening a workspace's page or one of
+  // projects is still a short rail. Opening a workspace's page or one of
   // its projects expands it; the row's chevron and the arrow keys expand and collapse it.
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set())
   const setOpen = (workspaceId: string, open: boolean) =>
@@ -414,8 +414,8 @@ export default function SettingsView(props: {
       ]
     }),
   )
-  // Search reads declarations only (../../host/registries/shell/settingsSearch.ts), plus the names of the
-  // things settings holds a page for. Each name lands on the page that holds it today.
+  // Search reads declarations only (`buildSettingsIndex`), plus the names of the things settings holds a page
+  // for. Each name lands on the page that holds it today.
   const searchObjects = createMemo((): SettingsSearchObject[] => {
     const pageFor = (id: string) => railPages().find((page) => page.id === id)
     const on = (
@@ -536,7 +536,7 @@ export default function SettingsView(props: {
     },
   }
 
-  // A page's own detail, such as one custom agent open from the list (./settingsDetail.ts). The header
+  // A page's own detail, such as one custom agent open from the list (`createDetailRequest`). The header
   // names it and goes back to the page's list.
   const details = createSettingsDetails()
   const detail = () => (current() ? details.current() : undefined)
@@ -585,7 +585,7 @@ export default function SettingsView(props: {
   })
 
   // The plugin that contributed the page on screen, if one did. Its strip is drawn by this view, above
-  // and outside the box the page's own content sits in (./plugins/PluginStrip.tsx).
+  // and outside the box the page's own content sits in (`PluginStrip`).
   const pluginOwner = () => {
     const page = current()?.page
     return page ? settingsRegistry.ownerOf(page.id) : undefined
@@ -720,7 +720,7 @@ export default function SettingsView(props: {
       ref={root}
       class="settings-view"
       // Focusable, so a confirmation that closes over a page whose button went away can hand the focus
-      // back to the layer and Escape and ⌘[ still work (../../host/registries/shell/willPhase.tsx).
+      // back to the layer and Escape and ⌘[ still work (`confirmAction`).
       tabindex="-1"
       role="dialog"
       aria-modal="true"

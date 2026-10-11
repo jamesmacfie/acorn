@@ -8,14 +8,12 @@ import { panelDotTone, rowPress, type PanelViewProps } from './props'
 import RowControls from './RowControls'
 
 // The board view. Kanban is not a component, it is group-by over a field with finite values
-// (docs/dashboards/views.md § Views are derived, not chosen from a menu), so there is almost nothing here.
-// The columns come out of `boardColumns`, the order within a column is whatever the panel's sort
-// already produced, and the rows are whatever its filters already kept. There is no per-column sort
-// and no per-column filter in this file because there is nothing left for them to do.
+// (docs/dashboards/views.md § Views are derived, not chosen from a menu). The columns come out of
+// `boardColumns`, and the order and membership within a column are whatever the panel's sort and
+// filters already produced, so there is no per-column sort or filter.
 //
-// Cards draw their fields with the same `Cell` the list and the table use. A second rendering path
-// for "a field, on a card" is how a datetime ends up as an age in one view and a raw number in
-// another.
+// Cards draw their fields with the same `Cell` the list and the table use, so a datetime can't read
+// as an age in one view and a raw number in another.
 
 export default function BoardView(props: PanelViewProps) {
   const [dragged, setDragged] = createSignal<string>()

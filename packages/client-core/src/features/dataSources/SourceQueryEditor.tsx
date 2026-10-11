@@ -585,7 +585,7 @@ export default function SourceQueryEditor(props: {
     const connection = integrations.data?.integrations.find((entry) => entry.id === id)
     return connection && (connection.name ?? connection.label)
   }
-  /** A failure in the words the panel uses (../dashboards/sourceErrors.ts), naming the input at fault. */
+  /** A failure in the words the panel uses, naming the input at fault. */
   const errorMessage = (error: unknown): string => {
     const failure = failureFromError(error)
     if (!failure) return error instanceof Error ? error.message : 'The source could not be read.'

@@ -168,7 +168,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
 
   // The third gate. A provider that enumerates projects only earns a rail row where the workspace
   // follows one of its projects; a Rollbar connection is one Rollbar project, so an unlinked
-  // workspace used to see the linked workspace's errors.
+  // workspace would otherwise see the linked workspace's errors.
   describe('the workspace mapping gate', () => {
     const provider = (id: string, supportsProjects?: boolean): PublicIntegrationProvider => ({
       id,

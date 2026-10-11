@@ -2,12 +2,11 @@
 //
 // Virtualized lists cannot get their row height from CSS. @tanstack/solid-virtual needs the height
 // as a number to compute the scroll range, and it writes the result back as an inline style, which
-// beats any stylesheet rule. So `.pr-row { height: var(--row-h) }` is dead weight: PullList
-// hardcoded 36 and applied `height: ${vi.size}px` inline, meaning a style pack could change
-// --row-h and the PR list would not move at all.
+// beats any stylesheet rule. So `.pr-row { height: var(--row-h) }` is dead weight, and a list that
+// hardcodes its row height ignores a style pack that changes --row-h.
 //
-// These read the token instead, so density is real in the two densest surfaces in the app rather
-// than a font swap that lies about itself.
+// These read the token instead, so density is real in the densest surfaces in the app rather than a
+// font swap that lies about itself.
 
 /** Resolve a length token to a number of pixels, falling back if it is unset or non-numeric. */
 export const cssPx = (name: string, fallback: number): number => {

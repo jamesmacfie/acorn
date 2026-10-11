@@ -79,7 +79,7 @@ export const {
  * Loose on purpose. The host validates every prop against the wire schema before it reaches a
  * component (@acorn/protocol/tree/props.ts), so a narrow type here would be a second, drifting copy
  * of a rule that is already enforced where it matters. What it does buy is the shape of the value: a
- * function survives only under one of the kit's twelve event names, and `class`, `style` and the rest
+ * function survives only under one of the kit's event names, and `class`, `style` and the rest
  * of the DOM escape hatches are dropped before they cross.
  */
 export type KitNodeProps = Record<string, unknown> & { children?: unknown }
@@ -118,7 +118,7 @@ export const Slot = kitNode(CHROME_SLOT_NODE)
 
 // Destructured rather than written out one `export const` at a time, so the list cannot drift from
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
-// missing here is caught by ./remoteSolid.test.ts.
+// missing here is caught by ./remoteSolid.test.tsx.
 export const {
   Stack,
   Inline,
@@ -215,7 +215,7 @@ export function solidTree<P extends Record<string, unknown>>(
     // `host` beside `bridge`, and for the same reason: both are stable for this mount's life and
     // neither is data the owner sent. Without it the two things a tree may ask its host for — call an
     // owner action, open its companion overlay — would be unreachable from a Solid component, which is
-    // how every loaded plugin acorn ships is written (./sdk.ts § TreeMount.host).
+    // how every loaded plugin acorn ships is written (`TreeMount.host`).
     //
     // Same object on every reconcile, so the store's diff sees no change and a redraw does not
     // invalidate a handler mid-await.

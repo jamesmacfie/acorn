@@ -14,7 +14,7 @@ import './extension-points.css'
 // `Row`, `Badge`, `SectionHeader` and `Icon` are the same primitives the descriptor rail list uses, so a
 // contributed section is pixel-identical to a first-party one under every appearance pack.
 //
-// The decisions are all in registries/extensionPoints.ts, which is JSX-free and has a test: which point
+// The decisions are all in `extensionDeliveries`, which is JSX-free and has a test: which point
 // resolves, whether either side is running, the ordering. This file is a `<For>` over the answer.
 
 function ExtensionGroup(props: { contribution: ExtensionContribution }) {

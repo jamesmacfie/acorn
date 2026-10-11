@@ -41,8 +41,8 @@ afterEach(() => {
   setActiveNode(null)
 })
 
-// A throw while drawing a reply used to stall every later update in the dialog: it stayed on its
-// first status line with the prompt still in the box, and the caught error never appeared.
+// A throw while drawing a reply must not stall every later update in the dialog, leaving it on its
+// first status line with the prompt still in the box and the caught error never shown.
 it('reports a reply it cannot draw instead of freezing', async () => {
   const reply = {
     state: 'proposal',

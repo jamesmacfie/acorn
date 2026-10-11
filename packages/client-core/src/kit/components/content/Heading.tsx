@@ -10,8 +10,7 @@ export type HeadingProps = {
   children: JSX.Element
 }
 
-/* Heading: an eyebrow over a title. The pattern linear, rollbar, github and docker each drew with
-   two divs and a pair of classes.
+/* Heading: an eyebrow over a title.
 
    `level` is the document level, not a size: the kit picks the type from the level so a pane cannot
    pick an h3 because it liked the smaller text.

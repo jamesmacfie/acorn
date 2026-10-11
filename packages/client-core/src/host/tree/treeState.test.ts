@@ -152,8 +152,8 @@ describe('a batch costs its own ops, not the tree', () => {
     }
 
     expect(Object.keys(state.nodes)).toHaveLength(size - 4_000)
-    // The pre-flight builds its child index with one scan of the projected tree. The old path
-    // scanned the whole projected map for every remove, visiting millions of entries here.
+    // The pre-flight builds its child index with one scan of the projected tree. Scanning the whole
+    // projected map for every remove would visit millions of entries here.
     expect(mapVisits).toBeLessThan(size * 4)
   })
 })

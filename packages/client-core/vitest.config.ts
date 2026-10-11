@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config'
 
 // Two projects, because they need different environments and only one of them can compile JSX.
 //
-//   logic  the suite that was here before: `.test.ts` in bare Node, no DOM, no Solid transform. A
-//          green run here still proves nothing about the UI, which is why the second project exists.
+//   logic  `.test.ts` in bare Node, no DOM, no Solid transform. A green run here proves nothing
+//          about the UI.
 //   hosts  `.test.tsx` under jsdom with vite-plugin-solid, for the contribution hosts. It renders
 //          host machinery — ordering, capability gating, arbitration, the error boundaries — not
 //          pixels. What only a person looking at the running app can check is still on

@@ -11,10 +11,10 @@ import type { TreeTransport } from './TreeHost'
 // The half of the remote tree host that is arithmetic rather than drawing: the store, the pre-flight
 // check, the mutation apply, and the coalescer that feeds them (docs/plugins/tree-contract.md § The tree contract).
 //
-// Split out of TreeHost.tsx when the terminal grew a tree host of its own
-// (docs/tui.md). There are two hosts and one set of rules: a batch
-// is checked whole, applied whole, and only then rendered, and nothing a message carries becomes a
-// class, a style, a URL or a function. Two copies of that would be two copies of a security decision.
+// Shared by the DOM's `TreeHost` and the terminal's tree host (docs/tui.md). Two hosts and one set of
+// rules: a batch is checked whole, applied whole, and only then rendered, and nothing a message carries
+// becomes a class, a style, a URL or a function. Two copies of that would be two copies of a security
+// decision.
 //
 // No JSX, so this is also the half a bare-Node suite can reach.
 
@@ -171,10 +171,9 @@ export function createTreeState(input: TreeStateInput) {
           if (!projected.has(op.id)) return `remove of an unknown node ${op.id}`
           // With its subtree: a later op addressing a removed descendant is the sandbox and the host
           // disagreeing, which is what this whole pass exists to catch. Walked down through the child
-          // index, so this costs the subtree. It used to scan every live node and walk its ancestors
-          // for each `remove`, which was a second of blocked main thread for a batch that emptied a
-          // 4,500-node tree — and it missed a grandchild whose parent the same loop had already
-          // deleted, because the walk up stopped at the hole.
+          // index, so this costs the subtree. Walking up from every live node instead blocks the main
+          // thread on a large tree, and misses a grandchild whose parent was already deleted, because
+          // the walk up stops at the hole.
           unlink(op.id)
           const doomed = [op.id]
           while (doomed.length) {
@@ -215,9 +214,9 @@ export function createTreeState(input: TreeStateInput) {
     const problem = acceptable(ops)
     if (problem) return refuse(`dropped a whole batch: ${problem}`)
     // Every child list the batch touches, as a plain array edited in place and written to the store
-    // once at the end. Copying the store's array for each insert and remove made a batch quadratic in
-    // the siblings, and every element read went through the store's proxy. Clearing a 4,000-row list
-    // took over a second. The edits still run in op order, so the lists come out the same.
+    // once at the end. Copying the store's array for each insert and remove makes a batch quadratic in
+    // the siblings, and every element read goes through the store's proxy. The edits still run in op
+    // order, so the lists come out the same.
     const lists = new Map<string | null, string[]>()
     const childrenOf = (id: string | null): string[] => {
       let list = lists.get(id)

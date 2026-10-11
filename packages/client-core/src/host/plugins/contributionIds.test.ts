@@ -18,8 +18,8 @@ const contributions = (partial: Partial<PluginContributions>): PluginContributio
 
 describe('qualifiedContributionId', () => {
   it('leaves every shape the first-party packages already use', () => {
-    // The reason this rule cost nothing to introduce: no id that has ever shipped moves, so no saved
-    // layout moves either. If one of these ever started failing, someone would need a migration.
+    // No first-party id moves, so no saved layout moves either. If one of these starts failing, someone
+    // needs a migration.
     for (const [pluginId, id] of [
       ['database', 'database'],
       ['http', 'http'],
@@ -66,7 +66,7 @@ describe('namespaceContributions', () => {
   })
 
   it('returns the same object when nothing needs binding', () => {
-    // The common case today, and it has to stay free: five packages ship and none of them moves.
+    // The common case, and it has to stay free: no first-party package's ids move.
     const input = contributions({
       frames: [{ id: 'ntfy', target: 'pane', label: 'Ntfy' }],
     } as unknown as Partial<PluginContributions>)

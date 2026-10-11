@@ -1,13 +1,12 @@
 // The editor's look, defined once and shared by both instances (docs/editor.md § The shared surface).
 //
-// CodeMirror, like Monaco before it and like xterm, does not read our CSS custom properties: it
-// builds its own stylesheet from a JS object. So the chrome colours are read out of the live app
-// tokens (tokens-theme.css) and handed over, the same recipe terminal/theme.ts uses. Syntax colours
-// come from a highlight style rather than a colour list, because CodeMirror colours by Lezer tag.
+// CodeMirror, like xterm, does not read our CSS custom properties: it builds its own stylesheet from a
+// JS object. So the chrome colours are read out of the live app tokens and handed over, the same recipe
+// the terminal plugin's theme uses. Syntax colours come from a highlight style rather than a colour
+// list, because CodeMirror colours by Lezer tag.
 //
-// The theme is per view, not global the way Monaco's named themes were. A compartment is what makes
-// it swappable in place, and one compartment instance serves every view: it is a key, and each
-// editor state stores its own contents under it.
+// The theme is per view. A compartment makes it swappable in place, and one compartment instance
+// serves every view: it is a key, and each editor state stores its own contents under it.
 import { Compartment, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
@@ -17,12 +16,10 @@ import { isAppDark, token, watchAppearance } from '../../kit/tokens/appearance'
 const appearance = new Compartment()
 
 // Syntax colours, one role per line, in the GitHub palette shiki already paints diffs and markdown
-// fences with (infra/highlight/shiki.ts). Sharing the palette is the point: the same file used to
-// come out one colour in a diff and another in the editor, because nothing connected the two.
+// fences with, so a file comes out the same colour in a diff and in the editor.
 //
 // These are a fixed light/dark pair rather than app tokens, for the same reason the shiki side is:
-// the twelve themes declare 21 chrome colours between them and none of them says what a string
-// literal looks like.
+// the themes declare only chrome colours, and none of them says what a string literal looks like.
 type Palette = {
   comment: string
   keyword: string
@@ -111,19 +108,15 @@ function currentTheme(): Extension {
         '&': { color: token('--text'), backgroundColor: token('--bg'), fontSize: token('--fs-sm') },
         '.cm-content': { caretColor: token('--text'), fontFamily: token('--font-mono') },
         '.cm-cursor, .cm-dropCursor': { borderLeftColor: token('--text') },
-        // Selecting inside one line used to show nothing at all, and the four rules below are why.
-        //
         // CodeMirror draws the selection as rectangles in a layer under `.cm-content`, so an opaque
         // background on a line paints straight over it. The line a selection sits on is the line the
-        // cursor is on, so `.cm-activeLine` hid every selection that fitted inside one line, while a
-        // selection across several lines showed on all but its last and looked fine. The current line
-        // has nothing to say while text is selected, so it stands down for as long as the selection
-        // layer has anything in it, and keeps its full-strength colour the rest of the time.
+        // cursor is on, so an opaque `.cm-activeLine` hides every selection that fits inside one line.
+        // The current line stands down for as long as the selection layer has anything in it, and keeps
+        // its full-strength colour the rest of the time.
         //
-        // The selection itself takes the accent rather than another step on the grey ramp, and
-        // `.cm-selectionMatch` — the other copies of the selected word, which only ever appear for a
-        // one-line selection — takes a weaker version of the same colour, so the two read as one
-        // idea. Its stock colour is a lime green that belongs to no theme here.
+        // The selection takes the accent, and `.cm-selectionMatch` (the other copies of the selected
+        // word) takes a weaker version of the same colour, so the two read as one idea. Its stock
+        // colour is a lime green that belongs to no theme here.
         //
         // The focused selection spells its selector out because CodeMirror's base theme names the
         // whole path for that one, and a shorter selector loses to it on specificity no matter which
@@ -160,10 +153,9 @@ function currentTheme(): Extension {
       },
       { dark },
     ),
-    // Not `fallback: true`, and that is the whole fix for an editor that drew no colour. The fallback
-    // facet keeps one value, the first, and `basicSetup` registers CodeMirror's own light default
-    // ahead of this extension — so for as long as both were fallbacks, every file in every theme was
-    // painted by a style built for a white page, underlines and all.
+    // Not `fallback: true`. The fallback facet keeps one value, the first, and `basicSetup` registers
+    // CodeMirror's own light default ahead of this extension, so as a fallback this would never apply
+    // and every file in every theme would be painted by a style built for a white page.
     syntaxHighlighting(dark ? DARK_SYNTAX : LIGHT_SYNTAX),
   ]
 }
@@ -185,9 +177,8 @@ export const refreshEditorTheme = (view: EditorView): void => {
 /**
  * Keep a view's theme in step with the app's, and hand back an unsubscribe.
  *
- * `editorTheme()` above is the initial apply, so unlike the Monaco pair this one has no way to be
- * half-wired: a view built without the extension has no compartment to reconfigure and a view built
- * with it is already themed.
+ * `editorTheme()` above is the initial apply, so this one has no way to be half-wired: a view built without
+ * the extension has no compartment to reconfigure and a view built with it is already themed.
  */
 export function watchEditorTheme(view: EditorView): () => void {
   return watchAppearance(() => refreshEditorTheme(view))

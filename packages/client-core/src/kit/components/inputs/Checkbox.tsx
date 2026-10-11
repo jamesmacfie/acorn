@@ -47,7 +47,7 @@ export function Checkbox(props: {
       checked={props.checked}
       disabled={props.disabled}
       data-tip={props.label ? undefined : props.title}
-      // The tip used to be the browser's `title`, which doubled as the name of a bare box.
+      // A `data-tip` rather than the browser's `title`, which would double as the name of a bare box.
       aria-label={props.ariaLabel ?? (props.label || field ? undefined : props.title)}
       aria-describedby={field?.describedBy()}
       role={props.switch ? 'switch' : undefined}

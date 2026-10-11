@@ -4,9 +4,8 @@
 // and teaches the icon. Pure; callers resolve the reactive inputs.
 //
 // "An agent is working here" is not in this list. That belongs to the agents plugin, which knows about
-// both managed sessions and terminal harnesses, and it publishes it through the same marker registry
-// (plugins/agents/src/client/railMarkerContribution.ts). Uncommitted changes are not here either: the
-// git plugin publishes its added/removed dot (plugins/git/src/client/changes/railMarker.ts).
+// both managed sessions and terminal harnesses, and it publishes it through the same marker registry.
+// Uncommitted changes are not here either: the git plugin publishes its added/removed dot.
 //
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
@@ -42,8 +41,8 @@ export function railStatusMarkers({
   pinned,
 }: RailStatusInputs): RailMarker[] {
   const markers: RailMarker[] = []
-  // Teardown owns the slot under the task's glyph on its own. It used to blank every other marker
-  // while it ran; now anything it outranks stays in the tooltip rather than vanishing.
+  // Teardown owns the slot under the task's glyph on its own. Anything it outranks stays in the
+  // tooltip rather than vanishing.
   if (archiving)
     markers.push({
       id: 'archiving',

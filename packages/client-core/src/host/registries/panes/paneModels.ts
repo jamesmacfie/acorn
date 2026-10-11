@@ -2,9 +2,8 @@
 //
 // A layout's regions are separate components the host mounts side by side, so anything two of them
 // share has to outlive both of them: collapsing a library unmounts the list, and the note being
-// edited must not go with it. Four compiled panes each grew the same module-level `createRoot` map to
-// solve that — notes, changes, agents and context — which is the admission rule's own test for a
-// seam ("two or more plugins need it"). This is that map, once.
+// edited must not go with it. Several panes need that (notes, changes, agents and context), so the
+// module-level `createRoot` map lives here once rather than in each of them.
 //
 // `createRoot` rather than a plain object because a model owns resources and effects, and their owner
 // has to be one the host's mounting and unmounting cannot take away. No detached owner is passed, and

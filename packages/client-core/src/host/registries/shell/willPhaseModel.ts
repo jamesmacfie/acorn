@@ -55,7 +55,6 @@ const BUDGET_MS: Record<WillEventKind, number> = {
 const handlers = new Map<WillEventKind, RegisteredHandler[]>()
 
 /**
-/**
  * A client-side concern producer.
  *
  * Not the plugin seam (docs/plugins/task-checks.md § Task checks, the `registerWillHandler` paragraph). A plugin
@@ -120,11 +119,11 @@ export async function collectConcerns<K extends WillEventKind>(
 }
 
 /**
-/**
  * One row per (feature, id) (docs/plugins/task-checks.md § Task checks, the `registerWillHandler` paragraph).
  *
- * Belt to the disposal braces, not a substitute. A handler registered twice showed two identical rows
- * sharing one checkbox, because the state map is keyed on `id`, and confirming ran the teardown twice.
+ * Belt to the disposal braces, not a substitute. A handler registered twice would show two identical
+ * rows sharing one checkbox, because the state map is keyed on `id`, and confirming would run the
+ * teardown twice.
  */
 const dedupe = (concerns: readonly Concern[]): Concern[] => {
   const seen = new Set<string>()

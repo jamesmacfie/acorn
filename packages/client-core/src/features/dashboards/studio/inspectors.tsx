@@ -358,7 +358,7 @@ export function SourceInspector(props: InspectorProps) {
 }
 
 /** The picker for a source the plan doesn't have yet. The source joins the plan when one is picked:
- *  a placeholder source made the preview report it unavailable before anything was chosen. */
+ *  a placeholder source would make the preview report it unavailable before anything was chosen. */
 export function NewSourceInspector(props: {
   workspaceId: string
   onPick: (reference: QueryReference) => void

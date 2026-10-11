@@ -58,8 +58,7 @@ describe('the kit support matrix', () => {
   })
 
   // A level is a promise to an author reading this file: `reduced` means "drawn, with named things
-  // missing". Named is the load-bearing word, and until the terminal host existed nothing made
-  // anybody write the names down.
+  // missing". Named is the load-bearing word.
   it('says what every reduced node loses, and only those', () => {
     const rows = Object.entries(NODE_SUPPORT) as [string, { dom: string; tui: string; loss?: string }][]
     const silent = rows.filter(([, row]) => row.tui === 'reduced' && !row.loss?.trim()).map(([node]) => node)

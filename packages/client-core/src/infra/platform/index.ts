@@ -124,8 +124,8 @@ export type CliInstaller = {
   install(): Promise<CliInstallState>
 }
 
-// The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
-// rest of the product on this probe was the original mistake (`capabilities.ts`).
+// The native folder dialog. Its own group rather than part of `DesktopExtras`, so a gate on it hides
+// only what needs the dialog, not the rest of the product (see `HostRequirement`).
 export type FolderPicker = { pick(): Promise<string | null> }
 
 // Choosing files to attach, and saving one to disk. Unlike the folder dialog these are not
@@ -499,7 +499,7 @@ export const saveFile = async (request: SaveRequest): Promise<boolean> => {
 export const notifyHost = (): Notify | null => acornGlobal()?.notify ?? null
 
 // The page's own notifications, held until they close. A `Notification` whose only reference is the
-// browser's can be collected with its click handler still unfired, which is the bug orca hit.
+// browser's can be collected with its click handler still unfired.
 const shownNotifications = new Map<string, Notification>()
 // Subscribers to the fallback's clicks. A host that installs the group answers `onNoticeActivated`
 // itself, so this set stays empty there.

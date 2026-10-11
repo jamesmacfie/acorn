@@ -8,8 +8,8 @@ import './tabrail.css'
 
 /* The square icon control both rails are made of: the workspace rail down the left and the task
    pane switcher down the right. Deliberately not a Button. A rail control hovers by changing its
-   icon and background only, while `.ui-btn:hover` also moves `border-color`, which lit up the
-   control's own dividers on the right-hand rail and made the two sides look unrelated.
+   icon and background only, while `.ui-btn:hover` also moves `border-color`, which would light up
+   the control's own dividers on the right-hand rail.
 
    It is presentation only. It takes a glyph, a state, and already-resolved status markers; it never
    reads task state, asks a registry anything, or knows which rail it is in. See
@@ -53,8 +53,8 @@ export function RailTab(props: RailTabProps) {
   ])
   const tipLabel = () => (own.busy && own.busyLabel ? own.busyLabel : own.label)
   // Holds its value while the markers say the same thing. Contributors build fresh marker objects on
-  // every read, and `For` below keys on identity, so each re-render rebuilt every marker element. A
-  // spinning marker restarted its turn each time, which was 25 times a second while an agent streamed.
+  // every read, and `For` below keys on identity, so each re-render would rebuild every marker element
+  // and restart a spinning marker's turn, many times a second while an agent streams.
   const resolved = createMemo(() => resolveRailMarkers(own.markers ?? []), undefined, { equals: sameRailMarkers })
   const legend = () => resolved().legend
   const describedBy = createUniqueId()

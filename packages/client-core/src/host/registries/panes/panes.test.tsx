@@ -74,10 +74,9 @@ describe('a pane that declares a layout', () => {
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
     // `lazy` on the layout module, so the first paint is empty and the regions arrive once the
-    // dynamic import settles. The budget is two seconds rather than a quarter of one: this used to
-    // fail intermittently in a full `pnpm test`, where a cold dynamic import competes with every other
-    // project's workers, and never on its own. A generous ceiling on a condition poll costs nothing
-    // when it is met on the first try.
+    // dynamic import settles. The budget is two seconds rather than a quarter of one: in a full
+    // `pnpm test` a cold dynamic import competes with every other project's workers. A generous
+    // ceiling on a condition poll costs nothing when it is met on the first try.
     for (let tries = 0; tries < 400 && !host.querySelector('[data-region]'); tries++) {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
@@ -184,14 +183,13 @@ describe('the model a pane’s regions share', () => {
   })
 })
 
-// A region draws under a `Suspense` of its own, and that boundary exists for exactly one thing: a
-// `lazy()` region renders as an empty string until its module lands, which the cell host refuses
-// (./panes.ts). Everything else under it shares the boundary, and `@tanstack/solid-query` suspends
-// whenever `.data` is read on an empty cache. So a query that only starts once the region has drawn —
-// a pull request's conflicts, the Linear issues found in its body — used to take the whole region out
-// of the document again for the length of its fetch. The reader watched a rendered diff vanish, and
-// the virtualized scroller inside it came back detached and at the top with no event to say so
-// (docs/diff-rendering.md).
+// A region draws under a `Suspense` of its own, and that boundary exists for one thing: a `lazy()`
+// region renders as an empty string until its module lands (./panes.ts). Everything else under it
+// shares the boundary, and `@tanstack/solid-query` suspends whenever `.data` is read on an empty cache.
+// So a query that only starts once the region has drawn — a pull request's conflicts, the Linear issues
+// found in its body — would take the whole region out of the document again for the length of its
+// fetch: a rendered diff vanishes, and the virtualized scroller inside it comes back detached and at
+// the top with no event to say so (docs/diff-rendering.md).
 //
 // Held by the solid-js patch rather than by anything here: a boundary that has drawn never swaps back
 // to its fallback (patches/README.md). This is the test for it.

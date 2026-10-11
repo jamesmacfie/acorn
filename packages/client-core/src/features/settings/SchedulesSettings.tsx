@@ -187,7 +187,7 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
     act(row.key, () => sendJson(scheduleRunNowRoute(row.key), { method: 'POST', nodeId: nodeId() ?? undefined }))
 
   // Through the shell's one confirmation, which says the run history goes too: the node deletes it with
-  // the schedule (node-core/server/schedules/scheduler.ts § remove).
+  // the schedule (the scheduler's `remove`).
   const remove = async (row: ScheduleRow) => {
     const confirmed = await confirmAction({
       title: `Delete ${row.name}`,

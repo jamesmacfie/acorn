@@ -21,7 +21,7 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 // grouped by the plugin that contributed it or by its tier. A tier switch and the per-tool switches
 // persist as one prefs slice. Turning a tier or tool off removes it from every projection (MCP
 // tools/list and a direct harness call); the manifest re-reads these on each fetch. The sections match
-// the ones ./corePages.ts declares for search.
+// the ones `CORE_SETTINGS_PAGES` declares for search.
 type ToolPerms = ToolPermissions
 
 const TIERS: { risk: ToolRisk; label: string; blurb: string; help?: string }[] = [
@@ -41,7 +41,7 @@ const TIERS: { risk: ToolRisk; label: string; blurb: string; help?: string }[] =
 
 /** A tool's description is written for the model. The row shows its first sentence and puts the rest
  *  behind the help mark. The split wants a capital after the period, so "url?" or "e.g." mid-sentence
- *  does not end it. A person-facing summary on the tool itself is the real fix (deferred). */
+ *  does not end it. A person-facing summary on the tool itself would be the real fix. */
 export function splitToolDescription(text: string): { summary: string; rest: string } {
   const end = /\.\s+(?=[A-Z])/.exec(text)
   if (!end) return { summary: text.trim(), rest: '' }
@@ -76,8 +76,8 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
     }
   })
 
-  // Same fallback the node applies (node-core/server/agentTools/registry.ts § isToolPermitted), so an
-  // untouched execute tier draws as off here and is denied there rather than the two disagreeing.
+  // Same fallback the node applies (`isToolPermitted`), so an untouched execute tier draws as off here and is
+  // denied there rather than the two disagreeing.
   const tierOn = (risk: ToolRisk) => (risk === 'read' ? true : (perms().tiers?.[risk] ?? TOOL_TIER_DEFAULTS[risk]))
   const toolOn = (t: AgentToolCatalogEntry) => perms().tools?.[t.name] ?? tierOn(t.risk)
 

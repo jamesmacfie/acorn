@@ -476,7 +476,7 @@ describe('cooperative extension points', () => {
   //
   // The interesting one is the hook. It registers here like the rest so the developer view can list it
   // beside them, and it delivers nowhere, because the chain runs on the node and this registry has no
-  // part in it (../../registries/extensionPoints.ts § carrierFits).
+  // part in it (`carrierFits`).
   it('registers all five kinds from one plugin, and delivers the four that draw', () => {
     const SINK: Partial<PluginContributions> = {
       frames: [{ target: 'pane', id: 'sink', label: 'Sink', glyph: 'puzzle', order: 800, formFactor: ['desktop'] }],

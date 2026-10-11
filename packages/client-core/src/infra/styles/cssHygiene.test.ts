@@ -28,8 +28,8 @@ describe('no phantom tokens', () => {
       '--rb', // and a terminal background, on an `ansi` CodeBlock's runs
       '--state-color',
       '--label-color', // inline per-element props carrying live Linear API colours
-      '--chip-color', // Chip's `color` prop — the shared successor to the two above
-      // A brand's own colour and what sits on it, from brandStyle() in ui/brandMarks.ts. Third-party
+      '--chip-color', // Chip's `color` prop
+      // A brand's own colour and what sits on it, from brandStyle(). Third-party
       // identity rather than a design decision, which is why it comes from the mark and not a token.
       '--brand',
       '--brand-on',
@@ -41,7 +41,7 @@ describe('no phantom tokens', () => {
       // project rather than a design decision (tabs/RailTab.tsx).
       '--rail-accent',
       '--diff-cols',
-      // The kit's space role, written inline from ui/kit/roles.ts. Always a var() into a style
+      // The kit's space role, written inline through roleVar(). Always a var() into a style
       // token, so it carries a role rather than a value (docs/ui-design/closed-kit.md § The closed kit).
       '--kit-gap',
       '--dash-cell',
@@ -100,7 +100,7 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/z-index:(?!\s*(?:var\(|calc\())[^;]+;/g)).toBe(0)
   })
 
-  // Zero since the rail's 8px and 9px micro-type moved to --fs-2xs.
+  // Every font size is a token.
   it('literal font-size', () => {
     expect(count(/font-size:\s*\d/g)).toBe(0)
   })
@@ -127,7 +127,7 @@ describe('literal ratchets (these may only go down)', () => {
   })
 
   // Pixel values left inside spacing declarations. Everything on the --space-* scale is a token,
-  // so whatever remains is off-scale. Snapping them retroactively would shift about 85 paddings by
+  // so whatever remains is off-scale. Snapping them retroactively would shift dozens of paddings by
   // 1px; do it while authoring a pack that moves the density anyway.
   it('off-scale spacing values', () => {
     const decls =
@@ -146,9 +146,8 @@ describe('literal ratchets (these may only go down)', () => {
 // might expand to anything, but it is invalid once substituted with a family alone. An
 // invalid-at-computed-value-time declaration takes the property's unset value instead of the
 // previous declaration, and every `font` longhand inherits, so the element lands on the browser's
-// default serif. That rendered the whole Database pane in Times New Roman, invisible in review and
-// to tsc. Use `font-family` when the value is a family; legitimate uses carry a size, as in
-// `font: var(--fs-sm) var(--font-mono)`.
+// default serif, which neither review nor tsc catches. Use `font-family` when the value is a family;
+// legitimate uses carry a size, as in `font: var(--fs-sm) var(--font-mono)`.
 it('never puts a bare token in the font shorthand', () => {
   // One var() and then the semicolon. A legitimate `font: var(--fs-sm) var(--font-mono)` has a
   // second token after the first var() closes, so it does not match; the inner value bans
@@ -187,10 +186,10 @@ describe('the plugin-frame stylesheet is self-contained', () => {
 
 describe('no token defined from a token an element sets on itself', () => {
   it('never writes var(--l) or var(--r) into another custom property', () => {
-    // `--syntax-fg: var(--l)` on `:root`, flipped to `var(--r)` by every dark block, is how the diff
-    // and the Markdown fences lost their colour: a custom property has its var() references
+    // `--syntax-fg: var(--l)` on `:root`, flipped to `var(--r)` by every dark block, draws the diff
+    // and the Markdown fences without colour: a custom property has its var() references
     // substituted where it is declared, and `--l` and `--r` exist only on the Shiki token spans, so
-    // the whole indirection computed to nothing. A rule that wants a side has to say
+    // the whole indirection computes to nothing. A rule that wants a side has to say
     // `light-dark(var(--l), var(--r))` on the span itself.
     const written = withoutComments(corpus).match(/--[a-z0-9-]+:[^;}]*var\(--[lr]\b/g) ?? []
     expect(written).toEqual([])

@@ -23,7 +23,7 @@ type Sink<N> = {
   text(value: string): N
 }
 
-// The shape of changes' agent tool card, which is the card this phase exists to prove.
+// The shape of changes' agent tool card, drawn by both paths.
 const toolCard = <N,>(sink: Sink<N>, press: () => void): N =>
   sink.node('Fold', { label: 'Edit src/app.ts', open: true, onOpenChange: () => {} }, [
     sink.node('Stack', { gap: 'row' }, [

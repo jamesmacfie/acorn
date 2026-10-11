@@ -27,8 +27,8 @@ export function availableSources(integrations: Integration[] | undefined, scope?
         (!capability || i.capabilities[capability] === 'available'),
     )
   // A provider that enumerates projects (`supportsProjects`) shows its items per linked project, so
-  // its rail row is only worth drawing once the active workspace links one. Connected but unlinked
-  // used to draw a row whose surface either sat empty or, worse, listed another workspace's items.
+  // its rail row is only worth drawing once the active workspace links one. A connected but unlinked
+  // row would sit empty or, worse, list another workspace's items.
   //
   // Both queries have to have answered: mid-load, `linked` is undefined and no source is hidden, so
   // the rail doesn't flicker a row away and back on every workspace switch.

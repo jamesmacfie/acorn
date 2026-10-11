@@ -6,7 +6,7 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
 
 // Settings → Audit log (docs/security/audit.md § Audit): the security-relevant actions one node recorded,
-// newest first. Split out of Security and backup, whose other half is about the disk and the archive.
+// newest first.
 //
 // Per node, following the settings header's node switcher. Rolling two nodes' trails into one list
 // would put two independent `at` sequences in one column and imply an ordering nothing guarantees.
@@ -41,7 +41,7 @@ const ACTION_LABELS: Record<string, string> = {
 }
 
 // A device is named by what it was called when it paired, which `device.paired` records in its
-// details. A device whose pairing is not in the rows read so far is "a device": its raw id told the
+// details. A device whose pairing is not in the rows read so far is "a device": its raw id tells the
 // owner nothing. Naming a revoked device whose pairing has aged out needs the node to keep its name.
 type DeviceNames = ReadonlyMap<string, string>
 

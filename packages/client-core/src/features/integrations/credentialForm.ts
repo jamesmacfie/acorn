@@ -6,17 +6,15 @@ import { connectIntegration, rotateIntegration } from './integrationClient'
 // The typed-credential half of connecting a provider: the fields a descriptor declares, what has been
 // entered, whether that is enough to submit, and the write.
 //
-// A shared module for the same reason `./deviceFlow.ts` is one. The Add connection gallery and the
-// first-run wizard both add a key, and the parts worth getting right are not the input elements. They
-// are which fields are required, what a rejected credential reads as, and that a rotation is a PUT to
-// one connection while an addition is a POST to the provider. Those were inline in
-// the old Integrations settings page, tangled with the provider chips and the device-flow branch,
-// so the wizard had no way to reach them.
+// Shared because the Add connection gallery and the first-run wizard both add a key, and the parts
+// worth getting right are not the input elements. They are which fields are required, what a rejected
+// credential reads as, and that a rotation is a PUT to one connection while an addition is a POST to
+// the provider.
 //
 // Free of JSX, and of any element, so both hosts can draw it. The wizard renders in the terminal
-// client as well as on the desktop (apps/tui/src/roster.ts), and a component built out of
-// `<label class="…">` would render there as a placeholder. What crosses is the state and the write;
-// each surface draws its own fields out of kit nodes.
+// client as well as on the desktop, and a component built out of `<label class="…">` would render
+// there as a placeholder. What crosses is the state and the write; each surface draws its own fields
+// out of kit nodes.
 
 export type CredentialFormController = {
   /** What to draw, straight off the descriptor, so nothing provider-specific is written down. */

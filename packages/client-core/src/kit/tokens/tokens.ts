@@ -18,7 +18,7 @@ export const tone = ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'] as co
  *
  *  `match` is the odd one: it means "this run is what you searched for", and it is the only value
  *  that is about a run inside a line rather than about the line. It is here because two surfaces
- *  highlight a hit — the diff's find bar and the editor's find-in-files — and both used to reach for
+ *  highlight a hit — the diff's find bar and the editor's find-in-files — and neither may reach for
  *  the host class `.ui-find-mark` directly, which a plugin is not allowed to spell. */
 export const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'] as const
 

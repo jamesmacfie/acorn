@@ -7,8 +7,7 @@ import { describe, expect, it } from 'vitest'
 //
 // Anything reachable on hover has to be reachable by focus. The idiom in these stylesheets is a
 // reveal: the control sits at `opacity: 0` or `visibility: hidden` and a `:hover` rule brings it back.
-// Five hand-rolled versions of that were hover-only before the kit had one, so the × on a chip and
-// the actions on a row were unreachable without a mouse.
+// A hover-only reveal leaves the × on a chip and the actions on a row unreachable without a mouse.
 //
 // Read as text rather than rendered, because jsdom computes no styles and this is a property of the
 // stylesheet rather than of any one render: the next stylesheet that adds a reveal has to answer the

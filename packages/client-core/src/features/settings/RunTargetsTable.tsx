@@ -19,17 +19,16 @@ import { Toolbar } from '../../kit/components/layout/Toolbar'
 import { createSettingSave } from './settingSave'
 import { useUnsavedChanges } from './unsavedChanges'
 
-// A project's run targets (docs/workflows/routes-and-ui.md § Routes and UI) as a table, where they used to be a JSON
-// array typed into a box. The stored value has not changed: the `runTargets` column is still that JSON
-// array, written whole through the run-targets route, which checks it again.
+// A project's run targets (docs/workflows/routes-and-ui.md § Routes and UI) as a table. The stored value is
+// the `runTargets` column, a JSON array written whole through the run-targets route, which checks it again.
 //
 // One target's fields only make sense together, a name with its command, so adding or editing one is a
 // small form with Save and Cancel under the table. Removing one writes at once.
 //
-// A target the checkout's `.acorn/config.toml` declares replaces this machine's target with the same
-// name (server/runConfig.ts § loadRepoConfig). The repo's are listed first and read-only, and a
-// machine target they replace says so and cannot be edited, since editing it would change nothing
-// while the repo declares it. Its row stays, because it applies again if the repo stops.
+// A target the checkout's `.acorn/config.toml` declares replaces this machine's target with the same name
+// (`loadRepoConfig`). The repo's are listed first and read-only, and a machine target they replace says so
+// and cannot be edited, since editing it would change nothing while the repo declares it. Its row stays,
+// because it applies again if the repo stops.
 
 /** Where a repo-set value comes from, as a row names it. */
 export const REPO_CONFIG_FILE = '.acorn/config.toml'

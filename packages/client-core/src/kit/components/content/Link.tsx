@@ -6,9 +6,9 @@ import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 /* Link: a run of words inside a sentence that acts.
 
    `Text` is presentational and stays that way, `Button` is a control with button geometry that sits
-   wrong on a text baseline, and `Chip` is a boxed token rather than words. So a pane with a
-   clickable ref inside a title had nothing to reach for and wrote a raw `<a>` with a private class
-   (docs/ui-design/closed-kit.md § The closed kit). This is the word for it.
+   wrong on a text baseline, and `Chip` is a boxed token rather than words. A clickable ref inside a
+   title uses this rather than a raw `<a>` with a private class
+   (docs/ui-design/closed-kit.md § The closed kit).
 
    Two shapes, and the prop that is set decides which. With `href` it is a real anchor, so
    middle-click, "open in new tab" and "copy link address" all work; `onPress` beside it takes the

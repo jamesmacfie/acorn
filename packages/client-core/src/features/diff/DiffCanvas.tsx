@@ -27,7 +27,7 @@ import { threadBlockId, type DiffRangeItem } from './diffLayout'
 import type { DiffItem, SegmentRef } from './documentView'
 import type { SegmentStatus } from './segmentLoader'
 
-/** What the canvas needs from the geometry (./diffLayout.ts). */
+/** What the canvas needs from the geometry (`createDiffLayout`). */
 type CanvasLayout = {
   range: Accessor<readonly DiffRangeItem[]>
   attachCanvas: (element: HTMLElement) => void
@@ -54,7 +54,7 @@ export type DiffRowContext = {
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   openLine?: (row: CodeRow) => void
   askAgent?: (row: CodeRow) => void
-  /** The dynamic block a code row or a split band carries now, or null for none (./diffLayout.ts). */
+  /** The dynamic block a code row or a split band carries now, or null for none. */
   lineBlock: (row: CodeRow, itemKey: string) => string | null
   bandBlock: (left: CodeRow | null, right: CodeRow | null, itemKey: string) => string | null
   observeBlock: CanvasLayout['observeBlock']
@@ -186,7 +186,7 @@ export function DiffCanvas(props: {
   )
 
   // The reader's own input, so a scroll that follows it is told apart from this pane's corrections.
-  // The canvas height is the layout's to set, not a style binding here (./diffLayout.ts says why).
+  // The canvas height is the layout's to set, not a style binding here (`createDiffLayout` says why).
   const input = () => props.layout.input()
   return (
     <Show

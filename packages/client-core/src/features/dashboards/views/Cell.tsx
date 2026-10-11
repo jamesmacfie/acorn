@@ -68,7 +68,7 @@ export default function Cell(props: {
             // The row around this one has its own declared action, and a link click isn't that click.
             // The href stays the real external URL, which is what a middle-click, a copy-link and a
             // modified click should all give. Only a plain left click is taken, and only when the URL
-            // names something acorn has a surface for (registries/contentLinks.ts § openInAppUrl).
+            // names something acorn has a surface for (`openInAppUrl`).
             onClick={(event) => {
               event.stopPropagation()
               if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return

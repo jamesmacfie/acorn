@@ -25,11 +25,9 @@ import {
 // The command contract, as the two things everything else builds on: what the palette shows, and what
 // running one does.
 //
-// The first half is characterization, written before the shared session existed so that the session
-// could be held to it. It is: `./sessionStore.test.tsx` asserts the same order over real rows, and neither
-// host composes a list of its own any more. What stays here is the registry's own half — which
-// commands are discoverable, when a dynamic title is read, and that a palette row and a shortcut
-// reach one registration by the same id.
+// `./sessionStore.test.tsx` asserts the palette's order over real rows. What stays here is the
+// registry's own half — which commands are discoverable, when a dynamic title is read, and that a palette row and a
+// shortcut reach one registration by the same id.
 
 const held: Disposable[] = []
 const register = (command: CommandContribution): CommandContribution => {
@@ -125,9 +123,8 @@ describe('executing a command', () => {
   })
 
   it('keeps a zero-argument callback working and hands a detached context to one that wants it', async () => {
-    // The compatibility case the whole union exists to preserve: every registration in the repo was
-    // written as `run: () => …`, and a function that ignores its argument is still assignable to one
-    // that is handed a context.
+    // Most registrations are written as `run: () => …`, and a function that ignores its argument is
+    // still assignable to one that is handed a context.
     const legacy = vi.fn(() => {})
     register(leaf('cmd.legacy', { run: legacy }))
     await executeCommand('cmd.legacy')

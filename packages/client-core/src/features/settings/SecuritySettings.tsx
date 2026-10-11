@@ -14,8 +14,7 @@ import SecretPublicationSection from './SecretPublicationSection'
 import './settings.css'
 
 // Settings → Security and backup (docs/security/audit.md § Filesystem and backup): whether the node's disk is encrypted,
-// and an archive of its databases. The audit trail that used to share this page is Settings → Audit log
-// (./AuditLogSettings.tsx).
+// and an archive of its databases. The audit trail is Settings → Audit log.
 //
 // Per node, following the settings header's node switcher: "is the disk encrypted" isn't a property a
 // fleet has.

@@ -14,8 +14,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 // The counterpart to `tree/Slot.test.tsx`, and the same division: the arbitration rule is tested next
 // door in `arbitration.test.ts`, and what a render adds is what a person would see. What is particular
 // to this kind is that every occupant is a whole iframe, so the owner's ceiling is a real limit and a
-// point past it has to say so rather than dropping contributors in silence — which is what it did
-// until phase 10.
+// point past it has to say so rather than dropping contributors in silence.
 //
 // The other half is the gate. An occupant draws only if its own plugin is running here, its bytes are
 // trusted on this device, and the surface it named is really an `inline` one. Those are three separate
@@ -114,8 +113,7 @@ describe('InlineSlot', () => {
     contributor('markdown')
     contributor('csv')
     contributor('images')
-    // One iframe drawn, and the other two disclosed as a count. A rectangle point past its ceiling
-    // used to draw the first and say nothing at all about the rest.
+    // One iframe drawn, and the other two disclosed as a count.
     //
     // `csv` is the one drawn because equal orders break on contribution id, which is what makes the
     // answer independent of the sequence the three plugins happened to register in.

@@ -8,7 +8,7 @@ import { segmentCaches } from './segmentCaches'
 //
 // One cache per query client, which is one per node: the same partition, and the same lifetime, as
 // everything else the renderer holds for a node. A pane mounts, reads from it and writes to it, and
-// leaves it behind when it unmounts. Removing the node clears it (infra/node/fleet.ts § dropNode).
+// leaves it behind when it unmounts. Removing the node clears it (`dropNode`).
 // Nothing here is ever written to disk.
 //
 // An entry is one segment of one file: its plain rows, and its coloured rows once colour arrives.

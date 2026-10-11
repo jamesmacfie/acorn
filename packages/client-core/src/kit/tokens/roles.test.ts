@@ -7,7 +7,7 @@ import { ROLE_ENUMS, type RoleName } from './tokens'
 // checked. The DOM column must name a token the appearance contract already declares, or a pack
 // could never move it. See docs/ui-design/tokens.md § Token axes.
 //
-// The terminal column is checked twice over, because it says two things now: a sentence, which is
+// The terminal column is checked twice over, because it says two things: a sentence, which is
 // the documentation, and the cells a component is handed. `ignored` is an answer in both — the
 // sentence says so and `roleCell` hands back nothing — and the pair has to agree, or a role would
 // read as ignored in the docs and paint something on screen.

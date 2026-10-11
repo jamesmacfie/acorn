@@ -3,9 +3,8 @@ import type { PluginApprovalRequest } from '@acorn/protocol/api.ts'
 import { describePluginRequest, describePluginSource, pluginRequestOutcomeMessage } from './approval'
 
 // The two sentences that cross the boundary in opposite directions: what the owner is shown about a
-// request an agent raised, and what the agent is told once they answer. The dialog that draws them is a
-// `.tsx` and therefore untestable here (docs/testing/layers.md § Client core), which is exactly why they live in a plain
-// module.
+// request an agent raised, and what the agent is told once they answer. They live in a plain module so
+// this bare-Node suite can test them without the dialog (docs/testing/layers.md § Client core).
 
 const request = (over: Partial<PluginApprovalRequest> = {}): PluginApprovalRequest => ({
   requestId: 'r1',

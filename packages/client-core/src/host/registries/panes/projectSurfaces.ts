@@ -10,7 +10,7 @@ export type ProjectSurfaceContribution = {
   // The frame surface id, as the manifest declared it. Un-namespaced like every contribution id, so a
   // duplicate is the expected failure and the caller reports it rather than the registry replacing.
   id: string
-  // The Router pattern, host-minted from the plugin id (registries/corePaths.ts). Confined when the
+  // The Router pattern, host-minted from the plugin id (commands/corePaths.ts). Confined when the
   // node parses the manifest and again on the device, because a roster row is bytes a node sent.
   path: string
   // Which `:param` of `path` carries the selected item. The host matches and supplies the value, so
@@ -28,7 +28,6 @@ export const projectSurfaceRoutes = (): ProjectSurfaceContribution[] =>
   [...projectSurfaceRegistry.entries()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
 /**
-/**
  * The concrete URL for one item inside a project-scoped surface, or null when nothing on this device
  * registered that surface: a plugin not installed here, or a bundle this device declined.
  *
@@ -43,7 +42,6 @@ export function projectSurfacePath(surface: string, projectId: string, item: str
     .replace(`:${entry.item}`, encodeURIComponent(item))
 }
 
-/**
 /**
  * The inverse, and it has to be explicit. Solid Router hands a matched param back as it appears in
  * the URL, so the encoding `projectSurfacePath` applied comes off here rather than reaching the frame

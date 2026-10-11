@@ -13,14 +13,11 @@ import { openPluginOverlay } from '../../frames/overlays'
 // manifest declaration, the three destinations and who picks between them are in
 // docs/plugins/client-half.md § Loaded plugins: the client half.
 //
-// The registry and this type used to live in plugins/github/src/client/contentLinks.ts, together with
-// the recogniser for linear's URLs, so a third provider could not participate in link resolution
-// without a change to github. The registry is core's now, and each provider contributes the patterns it
-// can recognise from its own plugin.
+// The registry is core's, and each provider contributes the patterns it can recognise from its own
+// plugin, so a new provider takes part in link resolution without a change to any other plugin.
 //
-// The target type is open. It was `linear | pr | repo`, a closed union, so even after moving the
-// registry a new provider could not express what it had found. `kind` is a plugin-owned string and the
-// rest of the target belongs to whoever produced it. The handler that consumes one narrows on `kind`,
+// The target type is open: `kind` is a plugin-owned string and the rest of the target belongs to
+// whoever produced it. The handler that consumes one narrows on `kind`,
 // and an unrecognised kind is simply not handled, the same shape the WS envelope uses
 // (@acorn/protocol/ws.ts).
 export type InAppTarget = { kind: string } & Record<string, unknown>
@@ -38,9 +35,9 @@ export type ContentLinkContribution = {
   // link: the ladder below looks the panel up by provider, never by a panel id a recogniser named.
   //
   // Bound to the registering plugin, on both tiers and by the host in both cases. A first-party plugin
-  // going through `ctx.contentLinks` hits registries/plugin.ts, `declaredProvider`, which throws when a
-  // plugin names a provider that is not its own. A manifest-declared recogniser never states it at all,
-  // and plugins/chrome/register.ts stamps the plugin id. Optional, because a recogniser can legitimately
+  // going through `ctx.contentLinks` hits `declaredProvider` in the client plugin registry, which throws
+  // when a plugin names a provider that is not its own. A manifest-declared recogniser never states it
+  // at all, and the chrome pass stamps the plugin id. Optional, because a recogniser can legitimately
   // have no items of its own to show: github recognises PR and repo URLs and has no reference panel.
   providerId?: string
   parse: (href: string) => InAppTarget | null
@@ -117,13 +114,12 @@ export function inAppPathFor(href: string): string | null {
 // ── Extraction: every plugin's recognised URLs out of a body of text ──────────────────────────────
 //
 // The other half of recognition. `parseInAppTarget` answers "what is this href", which is what a click
-// needs. A surface rendering someone else's prose needs "what does this text reference at all", for
-// plugins/github's PR body and list, and in principle notes and agent transcripts. That question used to
-// be answered by importing `scanLinearRefs` from @acorn/plugin-linear/contract, a cross-plugin import
-// that stops working the day either side is a loaded package and that could only ever find Linear.
+// needs. A surface rendering someone else's prose needs "what does this text reference at all", as
+// github's PR body and list do. `scanContentRefs` answers that for every plugin's recognisers, so no
+// surface needs a cross-plugin import that breaks once either side is a loaded package.
 //
 // It scans for candidates and hands each to the registry rather than compiling the declared patterns
-// into a matcher of its own. Three reasons, and the third decided it:
+// into a matcher of its own. Three reasons:
 //   - a `ContentLinkContribution` carries a `parse` function, not a pattern. First-party recognisers
 //     (github's own PR and repo regexes) declare no pattern at all, so a pattern-compiling scanner
 //     would be structurally blind to them;
@@ -181,10 +177,9 @@ export function scanContentRefs(texts: (string | null | undefined)[]): ContentRe
 
 // ── Bare tokens: `CRA-404` with no URL around it ──────────────────────────────────────────────────
 //
-// Everything above needs a URL, and people do not write URLs: a PR title says `CRA-404`. github used to
-// own the machinery that made those clickable, learning the prefixes from Linear refs it had already
-// found in the same body. The trick was right and the ownership was wrong, since it only ever worked for
-// Linear and it lived in the plugin that consumes the reference rather than in the host.
+// Everything above needs a URL, and people do not write URLs: a PR title says `CRA-404`. The host makes
+// those clickable by learning the prefixes from URL refs it has already found in the same body, for
+// every provider.
 //
 // The safety argument is the learning step, and it is why there is no manifest field here. A bare token
 // is ambiguous, since `ABC-123` could be anyone's, so nothing licenses one except a ref of the same
@@ -266,9 +261,8 @@ export function linkifyRefs(root: HTMLElement, prefixes: ReadonlyMap<string, str
   }
 }
 
-// Declarative recognisers carry the pane and selected item in their host-created target. Existing
-// first-party targets do not, so this is additive and an unknown target still falls through to the
-// browser.
+// Declarative recognisers carry the pane and selected item in their host-created target. First-party
+// targets may not, and an unknown target still falls through to the browser.
 //
 // No active task means no pane to open, and this returns false. That is not a dead end: the same
 // (pane, item) pair is addressable as `/t/:taskId?pane=…&item=…` (tasks/taskDeepLink.ts), so a caller
@@ -289,13 +283,13 @@ export function openPluginContentTarget(target: InAppTarget, taskId: string | nu
   if (!pane) return false
   // Registered is not the same as available. A plugin pane's `when` is its per-node presence gate, so a
   // plugin installed but stopped on this task's node has a registered contribution and nothing to
-  // render, and returning true there claimed the click, called `preventDefault`, and showed nothing.
+  // render, and returning true there would claim the click, call `preventDefault`, and show nothing.
   // Refusing is not a dead end: the caller's next rung, or the real URL, is still there.
   //
   // The task comes from the lookup rather than `activeTaskId()`, because a content link can name a task
   // that is not the active one and evaluating another task's predicate is worse than not evaluating it.
-  // An unknown task leaves `when` unevaluated, which is the pre-existing behaviour: the list may simply
-  // not have loaded, and refusing every pane in that window would be a new failure rather than a fix.
+  // An unknown task leaves `when` unevaluated: the list may simply not have loaded, and refusing every
+  // pane in that window would be a failure of its own.
   if (!paneAvailable(pane, taskById(taskId))) return false
   openPane(taskId, target.pane, { kind: 'plugin:select', item: target.item })
   return true
@@ -311,9 +305,9 @@ function openRefPanelTarget(target: InAppTarget): boolean {
   return !!providerId && !!displayId && openRefPanel({ providerId, displayId })
 }
 
-// Every place a recognised link can land, named. It used to be a boolean, and a boolean is why
-// `preventDefault` was easy to get wrong: plugins/github's handler called it once at the end, so every
-// early `return` added on the way silently became "let the browser have it". Naming the outcomes makes
+// Every place a recognised link can land, named. With a boolean, `preventDefault` is easy to get wrong:
+// a handler that calls it once at the end silently turns every early `return` into "let the browser
+// have it". Naming the outcomes makes
 // the fall-through the one value a caller has to mention, instead of the default of any branch that
 // forgets.
 export type ContentLinkOutcome = 'route' | 'refPanel' | 'pane' | 'overlay' | 'external'
@@ -349,9 +343,8 @@ function openRouteTarget(path: string | null | undefined, presentation: ContentL
   return true
 }
 
-// Pane, then panel, then route, for a surface that states no preference. This is the order the first two
-// have always resolved in, and the route joins the end rather than the front: a caller that did not ask
-// to be moved should not be moved. Every surface that wants otherwise says so.
+// Pane, then panel, then route, for a surface that states no preference. The route comes last rather
+// than first: a caller that did not ask to be moved should not be moved. Every surface that wants otherwise says so.
 const DEFAULT_ORDER = ['pane', 'refPanel', 'route', 'overlay'] as const
 
 // The general ladder: what the host can do with a recognised target, in the order the surface asked for.
@@ -438,10 +431,9 @@ export function availableContentPresentations(
 // plain https URL, such as a dashboard row's `openUrl`, a `link` cell or a chrome badge, asks this first
 // and only opens the browser on a false.
 //
-// This is the general seam, and it exists because the first version of it was not. That one asked only
-// about `path`, which is github's rung, so a Linear ticket on the same dashboard still left the app even
-// though Linear already had a reference panel registered and a recogniser pointing at it. A provider
-// declares what it has, a route, a panel or a pane, and this decides.
+// It asks about every destination, not only `path`: a Linear ticket on a dashboard opens Linear's
+// reference panel rather than leaving the app. A provider declares what it has, a route, a panel or a
+// pane, and this decides.
 export function openInAppUrl(href: string, destination: ContentLinkPresentation = {}): boolean {
   const claim = claimFor(href)
   if (!claim) return false
@@ -473,9 +465,7 @@ export function handlePluginContentLinkClick(event: MouseEvent, presentation: Co
     clientEvents.emit('presentation:open-link', { href })
     return true
   }
-  // The full ladder, routes included, which is what let plugins/github delete its own copy of the route
-  // rung: it used to call this first and then re-parse the href to resolve owner and name to a project
-  // itself, purely because this stopped at two destinations.
+  // The full ladder, routes included.
   //
   // An unrecognised URL, and a recognised one with nowhere in-app to go, are the same answer: the anchor
   // keeps its default and the real URL opens. For the second case that is the point, as the

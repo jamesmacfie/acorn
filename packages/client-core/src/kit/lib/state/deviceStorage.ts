@@ -2,15 +2,12 @@
 //
 // One accessor, because the guard has to be written once. Every caller here is remembering a
 // convenience, and a host may have nowhere to remember it: the terminal client runs client-core under
-// Node, where `localStorage` is a flagged builtin and undefined without `--localstorage-file`. Four
-// call sites reached for it unguarded and the throw took the whole pane down — the PR pane's comment
-// box, the agents composer, the create-PR form and every `Fold` with a `persistKey`
-// (docs/tui.md).
+// Node, where `localStorage` is a flagged builtin and undefined without `--localstorage-file`. A call
+// site that reaches for it unguarded throws and takes the whole pane down (docs/tui.md).
 //
 // A private browsing window, a browser set to block site data, and a sandboxed frame all throw on
-// access rather than returning undefined, which is why the probe is in a `try`. The same shape
-// `infra/persistence/devicePrefs.ts` already used for the same reason; this is the one every other
-// caller shares.
+// access rather than returning undefined, which is why the probe is in a `try`. The device prefs
+// store guards the same way for the same reason; this is the one every other caller shares.
 //
 // Nothing here belongs to the node. What is written is this device's alone and is never read back by
 // anything but the surface that wrote it (docs/state-ownership.md).

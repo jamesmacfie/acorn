@@ -8,8 +8,8 @@ import { failuresThrown, savePref, setPref } from './savePref'
 // The one telemetry switch, as a reader and a writer (docs/telemetry/model.md § The switch).
 //
 // Two places read it, so it is a function rather than an inline `prefs?.[key] === '1'` in each: the
-// Settings page draws it, and `App.tsx` turns the client's emitter on and off with it. The same rule
-// `./appearancePrefs.ts` states, that a setting a person can change from two places has one accessor.
+// Settings page draws it, and each host's `App` turns the client's emitter on and off with it. A
+// setting read or changed from two places has one accessor.
 //
 // A node preference and not a device one. The collector runs on the node and re-reads this row every
 // five seconds, so turning it off in one window stops every client paired with that node, which is
@@ -19,7 +19,7 @@ import { failuresThrown, savePref, setPref } from './savePref'
 export const telemetryOn = (prefs: Record<string, string> | undefined): boolean => prefs?.[PrefKeys.telemetry] === '1'
 
 /** Write the switch on one node. The active node's row goes through the shared writer, so the cache
- *  every reader shares moves with it, `App.tsx`'s emitter included. Another node's row is written to
+ *  every reader shares moves with it, each host's emitter included. Another node's row is written to
  *  that node directly, since nothing in this window reads it but the page that asked. */
 export async function saveTelemetryOn(qc: QueryClient, on: boolean, nodeId: string | null): Promise<boolean> {
   const value = on ? '1' : '0'

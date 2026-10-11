@@ -2,10 +2,8 @@
 // rule and the same contract: core routes by the token before the first ':' and never looks inside a
 // payload.
 //
-// It exists because the client half of the stream was closed in core. `wsClient.ts` held a flat if/else
-// over thirteen channel names, each branch hardwired to a module-level subscriber set in the same file,
-// plus a reconnect loop that built `docker:${kind}:attach` strings itself and a test reset that
-// enumerated every subscriber set by name. A plugin with a new stream had to edit all four.
+// It exists so a plugin with a new stream registers a prefix here instead of editing the socket
+// client.
 //
 // A duplicate prefix throws rather than replacing, like Registry: silently overwriting would make
 // client-plugin registration order observable, and a dropped stream looks like a backend problem for a

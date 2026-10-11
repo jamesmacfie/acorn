@@ -50,8 +50,8 @@ const log = createLogger('plugin-chrome')
 // (docs/security/plugin-bundles.md § Third-party plugin bundles; docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 
 // Re-spelled rather than imported: the namespace is node-core's (server/routes/registry.ts) and
-// @acorn/protocol may not name a plugin route, so the client holds its own copy. See
-// plugins/frames/scopes.ts.
+// @acorn/protocol may not name a plugin route, so the client holds its own copy, as the frame scope
+// table in frames/scopes.ts does.
 const PLUGIN_NAMESPACE = '/v1/p/'
 
 /** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
@@ -123,8 +123,8 @@ let interval: ReturnType<typeof setInterval> | null = null
 /** Start (or restart) the freshness wiring for the descriptors currently registered. `refreshSeconds`
  * is the smallest polling fallback any of them declared, or undefined when none did. */
 export function watchChrome(refreshSeconds: number | undefined): void {
-  // The plugin id, forwarded. This was the one caller that passed nothing, so every ping refetched
-  // every plugin's descriptor routes. Core's own pings still carry no id, which still means everyone's.
+  // The plugin id, forwarded, so a plugin's own ping refetches only that plugin's descriptor routes.
+  // Core's own pings carry no id, which means everyone's.
   unsubscribe ??= wsOnStatus((pluginId) => bumpChrome(pluginId))
   unsubscribePush ??= onPluginPush(bumpChrome)
   if (interval) clearInterval(interval)
@@ -196,7 +196,7 @@ const railLink = (value: unknown): NonNullable<NonNullable<PluginRailItem['task'
   return link
 }
 
-// Empty strings stay: `fields` is positional (protocol/api.ts § PluginRailItem), so an empty cell
+// Empty strings stay: `fields` is positional (`PluginRailItem`), so an empty cell
 // holds its column.
 const fieldList = (value: unknown): string[] | undefined =>
   Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string') ? value : undefined
@@ -733,7 +733,7 @@ export async function resolveRefs(
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {
   const body = await read<PluginNodeStatValue>(pluginId, path, nodeId, signal)
   // A stat that is not a number is hidden the same way a failed fetch is. Fleet home already treats
-  // `0` as "nothing to report" (registries/nodeStats.ts).
+  // `0` as "nothing to report" (`formatNodeStat`).
   if (!Number.isFinite(body?.value)) {
     drop(pluginId, 'stat', body)
     return 0

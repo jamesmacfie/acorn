@@ -14,9 +14,8 @@ export type SectionHeaderProps = {
 /* SectionHeader. `level` is the role, not the size: 'pane' is the sticky pane header, 'group' a
    list grouping, 'sub' an inline subheading. */
 export function SectionHeader(props: SectionHeaderProps) {
-  // Emits the existing `.section-header` class rather than a parallel `.ui-*` one: it is already a
-  // single shared rule at 18 sites, so a pack can reach it. What this adds is the count and
-  // actions slots.
+  // Emits the `.section-header` class rather than a parallel `.ui-*` one: it is a single shared rule,
+  // so a pack can reach it. What this adds is the count and actions slots.
   // Read once, for the reason on RowParts.
   const actions = children(() => props.actions)
   const label = children(() => props.children)

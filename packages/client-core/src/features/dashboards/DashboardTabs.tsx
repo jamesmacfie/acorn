@@ -7,18 +7,14 @@ import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
 import { revealActiveTab, trackTabOverflow } from '../../kit/components/layout/tabScroll'
 
-// The Home tab bar (docs/dashboards.md § Persistence). It draws one workspace's list of names and
-// calls three functions; a tab's content is the ordinary `home/<tabId>/<workspaceId>` placement the
-// grid beside it renders, so there is nothing here about panels at all.
+// The Home tab bar (docs/dashboards.md § Persistence). It draws one workspace's list of names; a tab's
+// content is the ordinary `home/<tabId>/<workspaceId>` placement the grid beside it renders.
 //
-// This is not the kit's `Tabs.tsx`, which is the one judgement call in the file. A tab here carries an
-// inline rename input and an overflow trigger, and neither can live inside a `<button role="tab">`
-// without nesting interactive elements. Growing the shared strip a JSX label and a trailing slot for
-// one consumer buys a worse primitive; the roving/arrow behaviour it would have supplied is
-// `createListNavigation`, the same three lines either way.
+// This is not the kit's `Tabs`. A tab here carries an inline rename input and an overflow trigger, and
+// neither can live inside a `<button role="tab">` without nesting interactive elements.
 //
 // The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
-// when there are several (`SectionHeader`, kit/components/layout/SectionHeader.tsx).
+// when there are several (`SectionHeader`).
 
 const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'j'])
 const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'k'])
@@ -75,7 +71,7 @@ export default function DashboardTabs(props: {
     focusTab(id)
   }
 
-  // Roving arrows over the strip, written here rather than taken from `keys/collection.ts`, which is
+  // Roving arrows over the strip, written here rather than taken from the kit's collection keys, which is
   // what every other collection in the app uses. The strip holds an inline rename `Input`, and an
   // intent layer binds Left and Right unconditionally, so a person renaming a tab would lose the
   // caret keys to tab movement. `isTypingTarget` is the whole difference, and it is three lines.

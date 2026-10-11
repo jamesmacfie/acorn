@@ -2,8 +2,8 @@
 // tokens are read this way and why renaming one fails silently.
 //
 // This is a core concern, not a terminal one: it lives here so the editor, database, and github
-// plugins can use it without importing across plugin boundaries (core/boundaries.test.ts treats
-// plugin-to-plugin coupling as a shrinking baseline).
+// plugins can use it without importing across plugin boundaries, which tools/arch/boundaries.test.ts
+// polices.
 
 /** Resolved value of a custom property on `<html>`, trimmed. */
 export const token = (name: string): string => getComputedStyle(document.documentElement).getPropertyValue(name).trim()

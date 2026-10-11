@@ -4,22 +4,18 @@ import { onCleanup } from 'solid-js'
 import type { PtyIo } from '../../kit/lib/pty'
 
 // The DOM host's answer to "fill this `pty` rectangle": an xterm on the element the rectangle drew,
-// bound to the channel the caller described (../../kit/lib/pty.ts).
+// bound to the channel the caller described (`PtyIo`).
 //
 // Here rather than in `kit/` because it carries xterm and a stylesheet, and the kit may import neither
 // (docs/frontend/registries.md § Registries and plugins). Reached by a plugin through `@acorn/plugin-api/ui`,
 // which is where every other host-owned rule on the compiled surface already is.
 //
-// It exists because three plugins were each doing this — the editor's `$EDITOR` window and docker's
-// exec panel, both throwaway, and the terminal drawer's own surface, which is not throwaway and keeps
-// its own copy for the options it needs. The two throwaway ones are now one function, and the same
-// function has a sibling in the terminal client that draws in cells instead
-// (apps/tui/src/kit/pty.ts). That is what let the editor handoff and docker exec cross to a host with
-// no browser in it (docs/terminal/client.md § Client).
+// The editor's `$EDITOR` window and docker's exec panel use it; the terminal drawer keeps its own copy
+// for the options it needs. The terminal client has a sibling that draws in cells instead, which lets
+// those two cross to a host with no browser in it (docs/terminal/client.md § Client).
 //
-// xterm arrives through a dynamic import, which is what the two callers used to get from `lazy()`
-// around their own components: it reads `self` at module scope, so a static import here would put it
-// in the eager graph of every consumer of this barrel and take the desktop's own boot tests down.
+// xterm arrives through a dynamic import: it reads `self` at module scope, so a static import here would
+// put it in the eager graph of every consumer of this barrel and take the desktop's own boot tests down.
 
 /** Attach the caller's PTY to the element a `pty` rectangle handed over. Call it from `mount`. */
 export function attachPty(handle: unknown, io: PtyIo): void {

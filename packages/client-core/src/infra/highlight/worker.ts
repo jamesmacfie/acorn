@@ -1,7 +1,7 @@
 import { measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 // The main-thread half of the highlight worker: one worker, lazily spawned, requests matched to
 // replies by id. See docs/diff-rendering/loading.md § Syntax highlighting for why every caller sends a
-// whole document (for a diff, one side of one hunk: kit/diff/diffModel.ts § enrichDiffRows) rather
+// whole document (for a diff, one side of one hunk: see `enrichDiffRows`) rather
 // than a line.
 import { getHighlighter } from './shiki'
 import { langFor } from './langs'
@@ -33,8 +33,8 @@ const owner = createDocumentWorker<HighlightRequest, HighlightResponse, Highligh
 /**
  * Tokenize on the main thread. The fallback, not the path: it uses the JavaScript regex engine (the
  * only one the document's CSP permits) and tokenizes line by line, so multi-line constructs colour
- * wrong here. That is the behaviour this whole module replaces, kept as the floor so a CSP or build
- * regression degrades instead of rendering everything grey.
+ * wrong here. It is the floor, so a CSP or build regression degrades instead of rendering everything
+ * grey.
  */
 async function onMainThread(path: string, code: string): Promise<HighlightLines> {
   const lang = langFor(path)

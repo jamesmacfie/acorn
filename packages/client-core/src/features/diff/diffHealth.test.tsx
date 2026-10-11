@@ -11,9 +11,9 @@ import {
 import { largeDiffFiles, largeDiffSource, largeDiffSummary, type LargeDiffFile } from '../../testkit/largeDiff'
 import { installDiffLayout } from './layout.helper'
 
-// The diff's health reading against the real pane and the generated fixture (./diffHealth.ts). jsdom
-// has no layout, so the scroller is given a height and every other element a row's, which is enough
-// for the virtualizer to mount a window of rows; coverage by rect is the real window's to check.
+// The diff's health reading against the real pane and the generated fixture. jsdom has no layout, so the
+// scroller is given a height and every other element a row's, which is enough for the virtualizer to mount a
+// window of rows; coverage by rect is the real window's to check.
 
 vi.mock('../../infra/highlight/worker', () => {
   const tokenizeDocument = async (_path: string, code: string) =>

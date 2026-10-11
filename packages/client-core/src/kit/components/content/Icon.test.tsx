@@ -42,8 +42,8 @@ describe('Icon', () => {
   })
 
   it('leaves a name Lucide has never heard of as text', async () => {
-    // Load-bearing, not a nicety: Lucide has no brand icons, so provider marks and about 120 inline
-    // glyph literals across plugins/ resolve this way on purpose.
+    // Load-bearing, not a nicety: Lucide has no brand icons, so provider marks and many inline glyph
+    // literals across plugins/ resolve this way on purpose.
     await loadIconNodes()
     const { host, dispose } = draw('⚡')
     expect(host.querySelector('svg')).toBeNull()

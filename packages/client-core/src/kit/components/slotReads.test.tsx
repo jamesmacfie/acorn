@@ -7,7 +7,7 @@ import { Composer } from './inputs/Composer'
 import MentionTextarea from './inputs/MentionTextarea'
 
 // A slot that a Show tests and then inserts is two reads of a prop getter, and each read runs the
-// caller's JSX, so the mark was built twice and the unused copy stayed alive. Each case counts the
+// caller's JSX, so the mark would be built twice and the unused copy stay alive. Each case counts the
 // builds against what is on screen. Row, Button, and Fold have the same check in ./layout/Fold.test.tsx.
 
 let built = 0

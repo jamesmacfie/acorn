@@ -10,10 +10,10 @@ import { largeDiffFiles, largeDiffSource } from '../../testkit/largeDiff'
 import { installDiffLayout, type DiffLayoutModel } from './layout.helper'
 import type { DiffSource } from './source'
 
-// The reader's place through dynamic-block resizes (./diffLayout.ts), against the real pane and the
-// generated fixture. The geometry is ./layout.helper.ts's model: a 600px viewport whose scrollTop
-// clamps, blocks as tall as the test says, and a ResizeObserver that reports when the test says the
-// browser would. Momentum, fractional pixels and paint are the real window's to check.
+// The reader's place through dynamic-block resizes, against the real pane and the generated fixture. The
+// geometry is ./layout.helper.ts's model: a 600px viewport whose scrollTop clamps, blocks as tall as the test
+// says, and a ResizeObserver that reports when the test says the browser would. Momentum, fractional pixels
+// and paint are the real window's to check.
 
 vi.mock('../../infra/highlight/worker', () => {
   const tokenizeDocument = async (_path: string, code: string) =>

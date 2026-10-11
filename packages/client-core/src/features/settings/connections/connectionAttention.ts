@@ -4,10 +4,9 @@ import { readJson } from '../../../infra/node/apiClient'
 import type { AttentionItem, AttentionSourceContribution } from '../../../host/registries/rail/attention'
 import { connectionPageOf, connectionStatusText } from './connections'
 
-// A connection whose provider refused its credential, in the notification bell and as the dot beside
-// Services or AI models in the settings rail (../SettingsView.tsx § waiting). A state rather than a
-// notice: the connection stays refused until someone replaces the key or signs in again, so a
-// dismissed row coming back on the next fetch is right.
+// A connection whose provider refused its credential, in the notification bell and as the dot beside Services
+// or AI models in the settings rail. A state rather than a notice: the connection stays refused until someone
+// replaces the key or signs in again, so a dismissed row coming back on the next fetch is right.
 //
 // Core's rather than each provider plugin's, because `needs-auth` is core's status on core's rows, and
 // one source covers a provider a plugin adds later.

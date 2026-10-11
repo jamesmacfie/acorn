@@ -4,8 +4,8 @@
 // plugin document region, and Editor's files.
 //
 // A document region names its own routes and never asks this registry. Editor's files have no plugin
-// of their own, so they ask by language: `contributions.documentServices`, registered by
-// host/chrome/chromeRegister.ts.
+// of their own, so they ask by language: `contributions.documentServices`, registered by the chrome
+// pass.
 import {
   DIAGNOSTIC_SEVERITIES,
   MAX_DIAGNOSTICS,

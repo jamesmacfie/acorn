@@ -63,7 +63,7 @@ export const createNode = (type: string): RemoteNode => ({
 
 // Solid's universal renderer hands a number in a list of children straight to `createTextNode`, so
 // `{status} {statusText}` arrives here as 200, " ", "OK". The wire carries text runs as strings, and
-// the host used to draw the 200 as nothing.
+// the host draws a bare number as nothing.
 const textOf = (value: string | number): string => (typeof value === 'number' ? String(value) : value)
 
 export const createText = (value: string | number): RemoteNode => {

@@ -25,8 +25,7 @@ export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
    been dragged to.
 
    One node for both sidebars. The kit's `ListDetail` below and the host's `list-detail` layout
-   (host/layouts/ListDetail.tsx) draw the same edge, and while they each wrote their own the two
-   buttons drifted: one grew a border and the other never had one. */
+   (host/layouts/ListDetail.tsx) draw the same edge, so the two buttons cannot drift apart. */
 export function CollapseEdge(props: {
   collapsed: boolean
   onToggle: () => void
@@ -200,8 +199,8 @@ export function ListDetail(props: {
    unreachable from a sandbox and the split has to be expressible as children
    (docs/plugins/tree-contract.md § The tree contract).
 
-   `split` on ListDetail is what turns the grid on in that form, because the parent can no longer tell
-   from `list` whether there are two columns.
+   `split` on ListDetail is what turns the grid on in that form, because the parent cannot tell from
+   `list` whether there are two columns.
 
    At 80×24: as ListDetail. */
 export function ListColumn(props: {

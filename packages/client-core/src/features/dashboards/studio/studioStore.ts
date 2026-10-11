@@ -9,8 +9,7 @@ import { moveAuthoringConversation } from '../../dataSources/authoringStorage'
 
 // The panel studio's state: the plan, the selected part, undo and redo, the Node draft, and autosave
 // (docs/dashboards/mapping-and-editor.md § The generated editor). The undo model is the Workflows
-// editor's (plugins/workflows/src/client/editor/draftStore.ts), copied rather than imported, because
-// client-core can't import a plugin.
+// editor's draft store, copied rather than imported, because client-core can't import a plugin.
 
 const AUTOSAVE_MS = 750
 /** How long typing coalesces into one undo step: a word is one undo, a pause makes a boundary. */

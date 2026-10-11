@@ -10,7 +10,7 @@ import { activeToasts, dismissToast } from '../../features/notifications/toast'
 import { setActiveNode } from './activeNode'
 import { registerWsChannel } from './wsChannels'
 
-// The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the
+// The renderer does not own a socket, so this fakes the broker rather than a WebSocket: the
 // thing under test is the subscription bookkeeping and the reconnect behaviour, not a transport.
 
 type Bridge = {
@@ -157,7 +157,7 @@ describe('wsClient', () => {
     expect(notices).toEqual(['repo-config-trust'])
   })
 
-  // The old content-free `term:status` ping is split in two, and what is left of it names a plugin id.
+  // `term:status` names the plugin whose chrome moved, or nothing when core itself pinged.
   it('hands a status subscriber the plugin id the frame named, and nothing when it named none', () => {
     const named: (string | undefined)[] = []
     client.wsOnStatus((pluginId) => named.push(pluginId))

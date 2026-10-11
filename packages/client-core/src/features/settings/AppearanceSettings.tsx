@@ -30,10 +30,8 @@ import { createWorkspaceWords } from '../workspaces/words'
 // Theme additionally has a follow-the-OS mode with one pick per mode; style has no OS signal, so it
 // is a single value.
 //
-// The reads, the writes and the two lists are `./appearancePrefs.ts`, not this file: the same five
-// choices are also palette commands, and a setting with two persistence paths is a setting that starts
-// disagreeing with itself. What is left here is the arrangement. The file those choices are written
-// to has its own page under Advanced (./DeviceConfigSettings.tsx).
+// The reads, the writes and the two lists live in appearancePrefs, not here, because the same five
+// choices are also palette commands. What is left here is the arrangement.
 export default function AppearanceSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))

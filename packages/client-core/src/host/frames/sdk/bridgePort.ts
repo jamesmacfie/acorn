@@ -100,8 +100,8 @@ export function attach(
       const chord = eventChord(event)
       if (!chord || claimed.has(chord)) return
       // Copy, cut, paste, undo and select-all belong to the browser, not the shell: there's no host
-      // binding to resolve, and cancelling them is what stopped a selection inside a frame from ever
-      // reaching the clipboard. A frame that genuinely wants one claims it, handled above.
+      // binding to resolve, and cancelling them stops a selection inside a frame from ever reaching the
+      // clipboard. A frame that genuinely wants one claims it, handled above.
       if (isBrowserEditingChord(chord)) return
       // Don't cancel a browser behaviour for a value the host's chord grammar will reject. Space is the
       // important case: eventChord can describe it, but it isn't a bindable acorn chord.

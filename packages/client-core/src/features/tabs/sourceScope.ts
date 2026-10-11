@@ -16,8 +16,8 @@ export function createSourceScope(
   // The same projects query the rail already holds, so this adds no request.
   const projects = createQuery(() => projectsOptions(enabled()))
   // A memo, so readers hear about it only when the answer changes. The workspace id is derived from
-  // the task list, and a bare getter made every task edit rebuild the rail's sources and remount its
-  // task rows.
+  // the task list, and a bare getter would make every task edit rebuild the rail's sources and
+  // remount its task rows.
   const gitProject = createMemo((): boolean | undefined => {
     const id = workspaceId()
     if (!id || !projects.data) return undefined

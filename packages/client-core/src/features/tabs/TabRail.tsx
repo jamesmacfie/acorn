@@ -182,21 +182,20 @@ export default function TabRail() {
   const taskDepths = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row.depth])))
   const workflowGroups = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row])))
 
-  // What other plugins know about the rows on screen (`core:task`, ../tasks/taskAnnotations.ts). One
-  // request per contributor for the whole list, re-asked when the list changes and not when the rail
-  // merely re-renders. The answers arrive as rail markers through `markersFor` below, so nothing here
-  // reads them.
+  // What other plugins know about the rows on screen (`core:task`). One request per contributor for the whole
+  // list, re-asked when the list changes and not when the rail merely re-renders. The answers arrive as rail
+  // markers through `markersFor` below, so nothing here reads them.
   createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
 
   // Every source that can open, then the ones this device draws an icon for. The palette opens the
-  // rest (./railVisibility.ts), so a hidden source is still one click away from somewhere.
+  // rest, so a hidden source is still one click away from somewhere.
   const openableSources = () =>
     applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
   const sources = () => {
     const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
     return openableSources().filter((source) => shownInRail(source.id, visibility))
   }
-  // `core:source`, for the icons drawn and the routed project (../../host/annotations/statusAnnotations.ts).
+  // `core:source`, for the icons drawn and the routed project (`requestSourceAnnotations`).
   // Only sources whose owner consented are asked about, and the marks come back through `markersFor`.
   createEffect(() =>
     requestSourceAnnotations(
@@ -285,10 +284,10 @@ export default function TabRail() {
   const taskById = (id: string) => (query.data ?? []).find((task) => task.id === id)
 
   onMount(() => {
-    // Every row here can draw an icon the owner picked, which is any of Lucide's 1,756 rather than the
-    // 87 the chrome spells for itself, and only the eager 87 are in the startup chunk. Asked for as
-    // soon as the rail exists, so a picked icon is drawn rather than briefly spelled
-    // (kit/tokens/iconNodes.ts). Not awaited: the rail draws its rows either way.
+    // Every row here can draw an icon the owner picked, which is any Lucide icon rather than the few
+    // the chrome spells for itself, and only those few are in the startup chunk. Asked for as soon as
+    // the rail exists, so a picked icon is drawn rather than briefly spelled. Not awaited: the rail
+    // draws its rows either way.
     void loadIconNodes()
     // Core's own row actions, registered rather than written inline (docs/plugins/menus-and-markers.md § Context
     // menus).
@@ -435,15 +434,15 @@ export default function TabRail() {
   async function archive(w: Task, action: string, applyChecks: string[] = []) {
     if (isArchiving(w.id)) return
     // Wrapped so the row keeps a spinner for the whole teardown, the same one the task pane's
-    // close button shows (tasks/archiveLifecycle.ts).
+    // close button shows (`isArchiving`).
     await withArchiving(w.id, () => archiveInner(w, action, applyChecks))
   }
 
   async function archiveInner(w: Task, action: string, applyChecks: string[]) {
     let archivedTaskIds = [w.id]
     if (hasHostCapability({ plugin: 'terminal' })) {
-      // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
-      // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
+      // `force`, matching the task pane's own archive. With no options, a dirty worktree comes back
+      // "uncommitted changes, confirm to discard" after the owner has already confirmed that on the
       // danger row.
       const res = await archiveOrDeleteTask(w.id, action, { guarded: true, force: true, applyChecks })
       archivedTaskIds = res.archivedTaskIds ?? (res.ok ? [w.id] : [])
@@ -484,8 +483,8 @@ export default function TabRail() {
     <div class="tabrail-list">
       <For each={visibleTasks()}>
         {(w) => {
-          // CI checks are provider-owned data. The shared rail no longer reaches through a
-          // repository source seam; the GitHub PR pane remains the authoritative check surface.
+          // CI checks are provider-owned data, so the shared rail draws none; the GitHub PR pane is the
+          // check surface.
           const scripts = createTaskScripts(() => w.id)
           const checks = () => []
           const st = () => taskStatus(w.id)
@@ -519,11 +518,11 @@ export default function TabRail() {
               data-dragging={railDrag.dragId() === w.id || undefined}
               data-drop-position={railDrag.dropTarget()?.id === w.id ? railDrag.dropTarget()?.position : undefined}
               style={{ '--task-depth': String(taskDepths().get(w.id) ?? 0) }}
-              // Warm the panes this task can show, once the pointer has settled on the row
-              // (registries/panes/panes.ts). The tasks themselves are already cached; what is cold is
-              // each pane's own first read, and a task switch disposes the whole task scope, so
-              // nothing else is holding it. The code of the panes it opens with loads too. Keyboard
-              // focus resting on the row is the same intent as the pointer resting on it.
+              // Warm the panes this task can show, once the pointer has settled on the row. The tasks
+              // themselves are already cached; what is cold is each pane's own first read, and a task switch
+              // disposes the whole task scope, so nothing else is holding it. The code of the panes it opens
+              // with loads too. Keyboard focus resting on the row is the same intent as the pointer resting
+              // on it.
               onPointerEnter={() => warmTask(w)}
               onPointerLeave={cancelPrefetch}
               onFocusIn={() => warmTask(w)}

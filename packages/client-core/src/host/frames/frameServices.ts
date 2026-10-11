@@ -19,17 +19,14 @@ import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('commands')
 
-// The fourteen host effects a plugin frame's bridge is allowed to cause (docs/plugins.md).
+// The host effects a plugin frame's bridge is allowed to cause (docs/plugins.md).
 //
-// The other side of the seam `broker.ts` opened. That module took `FrameServices` as a parameter
-// specifically so the message-checking half could be tested in bare Node, at the cost of relocating
-// every implementation into PluginFrame.tsx, where the repo's node-environment suites cannot follow it.
-// So the seam moved the untestable surface rather than shrinking it, and the implementations are the
-// half that reads prefs by hand, decides where a link goes, and pins which node a call reaches.
-//
-// They live here instead. PluginFrame.tsx keeps the component shell: the iframe, the port handshake, the
-// lifecycle. This file is a plain function of the frame's props, so a test supplies a props literal and
-// a fake query client and asserts on what each verb actually does.
+// The other side of the seam `broker.ts` opens: the broker takes `FrameServices` as a parameter so its
+// message-checking half can be tested in bare Node, and the implementations live here, not in
+// PluginFrame.tsx, so they can be too. They are the half that reads prefs by hand, decides where a link
+// goes, and pins which node a call reaches. PluginFrame.tsx keeps the component shell: the iframe, the
+// port handshake, the lifecycle. This file is a plain function of the frame's props, so a test supplies
+// a props literal and a fake query client and asserts on what each verb actually does.
 
 export type PluginFrameProps = {
   // What the host resolved: which plugin, which surface, which bundle, and what it is looking at.
@@ -83,7 +80,6 @@ export type FrameServiceHost = {
 }
 
 /**
-/**
  * Build one frame's services. Rebuilt per frame rather than shared: every closure below reads this
  * frame's binding, which is what pins its node and forbids the importer verbs on a pane.
  */
@@ -104,10 +100,8 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       })
       return result
     },
-    // The byte path (docs/plugins/frames.md § Binary bridge calls). Almost nothing new: the transport under
-    // `sendRawBytes` has carried a `Uint8Array` body all the way from the broker since it was written,
-    // and the only reason a frame could not reach it was that the line above hard-codes JSON in both
-    // directions. So this is a second door onto existing transport, not new transport.
+    // The byte path (docs/plugins/frames.md § Binary bridge calls): a second door onto the transport
+    // above. `sendRawBytes` carries a `Uint8Array` body, where `fetch` hard-codes JSON in both directions.
     fetchBytes: async (method, path, body, signal) => {
       const result = await sendRawBytes(path, {
         method,
@@ -155,9 +149,8 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       }
     },
     stateSet: async (key, value) => void (await saveJsonPref(qc, key, value)),
-    // Into the shared transient stack, not the notification inbox. `bridge.ui.toast('Copied to the
-    // clipboard')` used to leave a permanent bell entry; the frames and the shell now share one stack
-    // and one look, which is what the API always claimed.
+    // Into the shared transient stack, not the notification inbox, so `bridge.ui.toast('Copied to the
+    // clipboard')` leaves no permanent bell entry and frames and the shell share one stack and one look.
     toast: (title, detail) => toast(detail ? `${title} — ${detail}` : title),
     copy: (text) => (host.copy ? host.copy(text) : void navigator.clipboard.writeText(text)),
     openPane: (paneId) => {
@@ -169,7 +162,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       const taskId = props.binding.taskId
       if (taskId) openTarget(taskId, target)
     },
-    // The same activate-then-navigate every task link in the shell runs (host/chrome/actions.ts).
+    // The same activate-then-navigate every task link in the shell runs (`goToTask` in chrome/actions.ts).
     //
     // The lookup is the active node's task cache, so a surface bound to another node gets
     // `not_found` rather than a node switch. Switch first, as the attention inbox does, if a plugin

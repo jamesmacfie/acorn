@@ -1,6 +1,6 @@
 // Rail selection state. The task list is a TanStack query (tasksOptions); this module tracks what
 // the rail has selected, a Source browse view or an active task, plus each task's pane layout.
-// Signals-only, like ../terminal/sessions.ts. The terminal drawer and topbar key off activeTaskId.
+// Signals-only. The terminal drawer and topbar key off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
@@ -51,9 +51,8 @@ export function setSelectedSource(source: string | null): void {
 }
 
 // Per-workspace memory of the last view, a rail source or a task, so switching workspaces returns
-// you to what you were looking at. Persisted by the `core.workspace-views` slice
-// (infra/persistence/stateSlices.ts), so it also survives a relaunch. Both clients reopen on the
-// `last_workspace` pref and read what to show from here.
+// you to what you were looking at. Persisted by the `core.workspace-views` slice, so it also survives
+// a relaunch. Both clients reopen on the `last_workspace` pref and read what to show from here.
 //
 // A signal rather than a Map because the persistence pass reads it, and keyed by bare workspace id
 // with the node added at write time by `storageKeyFor` — the same shape as `taskLayouts` below, and
@@ -86,7 +85,7 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
 // Per-task pane layout (docs/panes.md): a left-to-right row of open panes. All transitions go
 // through the pure reducer (applyLayoutAction) via dispatchLayout, the single-writer rule.
-// Persisted to the `task_layouts` preference (App.tsx); the value is migrated on hydrate and
+// Persisted to the `task_layouts` preference; the value is migrated on hydrate and
 // scoped per task.
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
@@ -209,8 +208,8 @@ export function toggleFocusedPaneMax(taskId: string): void {
   setMaximizedPane(taskId, maximizedPane(taskId) === pane ? null : pane)
 }
 
-// Lifecycle eviction is called by the event-bus subscriber in persistence/scopedEviction.ts.
-// T3 layout removal also causes the descriptor persister to write a scoped tombstone.
+// Called by the `onScopeEvicted` listener at the foot of this file. Dropping the task's layout also
+// makes the slice persister write a tombstone for that scope.
 export function evictTaskState(taskId: string): void {
   setTaskLayouts((current) => {
     if (!(taskId in current)) return current
@@ -262,8 +261,8 @@ export function clearNodeScopedTaskState(): void {
   setMaximizedPanes({})
 }
 
-// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
-// it are one edit apart (registries/scopeEviction.ts).
+// Registered here rather than in a central evictor list, so this signal and the thing that clears it
+// are one edit apart.
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictTaskState(e.taskId)
   else if (e.scope === 'workspace') evictWorkspaceView(e.workspaceId)

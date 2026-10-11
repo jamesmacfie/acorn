@@ -6,15 +6,13 @@ import type { PaletteView } from './overlay'
 // mounted first to get the chrome styled.
 import './palette.css'
 
-// The palette markup, deduped. Four surfaces rendered the same backdrop, dialog, input, list and empty
-// structure, wiring the same seven handlers from createOverlayPalette by hand, and github's file finder
-// had its own `.finder-*` class vocabulary for the same thing.
+// The markup every overlay palette shares: backdrop, dialog, input, list and empty state.
 //
-// Beside the hook rather than in ui/, because it imports the view's type and the ui/ purity rule
-// carves out `palette/model.ts` only. Behaviour stays behind the view; this is the chrome.
+// Beside the hook rather than in the kit, because it imports the view's type and the kit may import
+// nothing outside itself. Behaviour stays behind the view; this is the chrome.
 //
 // Each caller keeps its own row body: the palettes render label and hint, while the file finders render
-// dir and name. A shared row shape would grow a slot per caller, which is the markup it's replacing.
+// dir and name. A shared row shape would grow a slot per caller.
 //
 // Deliberately not absorbing Picker (anchored, filtered, non-modal) or Modal. The three-way distinction
 // is argued in Modal.tsx and dismissable.ts.
@@ -100,8 +98,8 @@ export function PaletteSurface<T>(props: {
     })
   })
 
-  // Read once, for the reason on the kit's RowParts (kit/components/layout/Row.tsx): testing a slot and
-  // then inserting it ran the caller's JSX twice.
+  // Read once, for the reason on the kit's `RowParts`: testing a slot and then inserting it runs the
+  // caller's JSX twice.
   const status = children(() => props.status)
   const footer = children(() => props.footer)
 

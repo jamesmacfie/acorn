@@ -1,13 +1,12 @@
 import type { Project } from '../../infra/queries'
 
-// The project list, from module-level code. Same shape and reason as tasks/taskLookup.ts, which states
-// the argument in full: `projectsOptions` is a TanStack query and `useQueryClient` is a hook, so a click
-// handler registered at plugin init can't reach either.
+// The project list, from module-level code. Same shape and reason as `taskById`: `projectsOptions` is a
+// TanStack query and `useQueryClient` is a hook, so a click handler registered at plugin init can't
+// reach either.
 //
-// Read by content-link path resolvers, which answer "does this external URL name something acorn already
-// tracks" and need the whole list rather than one id: a github.com URL identifies a repo by owner and
-// name, and only the project rows know which of them acorn has. Not reactive, for the reason taskLookup
-// gives.
+// Read by content-link path resolvers, which need the whole list rather than one id: a github.com URL
+// identifies a repo by owner and name, and only the project rows know which of them acorn has. Not
+// reactive, for the reason `taskById` gives.
 let read: () => readonly Project[] = () => []
 
 /** Called once by the composition root, before anything can click. */

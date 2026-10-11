@@ -74,7 +74,7 @@ export type ClientPluginContext = {
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
-  // or just a task id (registries/slots.ts).
+  // or just a task id (./slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
   // A place in this plugin's own tree that another plugin may fill (docs/plugins/cooperative-extension-points.md § Cooperative
   // extension points). The compiled half of the manifest's `extensionPoints`; the host mints
@@ -82,26 +82,25 @@ export type ClientPluginContext = {
   extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
   // What this plugin brings to somebody else's point. The compiled half of the manifest's
   // `extensions`, and the only carrier available here is a component: a loaded plugin ships bytes for a
-  // worker, and a compiled one is already in this process (registries/extensionPoints.ts).
+  // worker, and a compiled one is already in this process (./extensionPoints.ts).
   extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
   agentContexts: ClientContributionPoint<AgentContextContribution>
   // One number on a Fleet home node card (docs/frontend/registries.md § Registries and plugins;
-  // registries/nodeStats.ts).
+  // rail/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
   // Rows for the attention inbox: states on a node that need the owner, fetched per node
-  // (docs/frontend/shell-state.md § Shell state; registries/attention.ts).
+  // (docs/frontend/shell-state.md § Shell state; rail/attention.ts).
   attentionSources: ClientContributionPoint<AttentionSourceContribution>
   // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design/icons.md §
   // Icons).
   brandMarks: ClientContributionPoint<BrandMark>
-  // A recogniser that turns an external URL into an in-app destination (registries/contentLinks.ts).
+  // A recogniser that turns an external URL into an in-app destination (panes/contentLinks.ts).
   contentLinks: ClientContributionPoint<ContentLinkContribution>
   // The escape hatch, and the line it sits on: a registry the HOST owns gets a named member above; a
   // registry another PLUGIN published has no member to give it, and goes through here. Same ownership
   // check and same recorded disposable either way, so the only difference is who declared the
-  // registry. Both of core's own targets got names on 2026-08-27; before that the line was drawn
-  // nowhere and every contribution count that read this file was two short.
+  // registry.
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
 }
 
@@ -113,15 +112,15 @@ export type CompiledClientPluginContext = ClientPluginContext & {
   // complete records and the registration is disposed with its other contributions.
   sessionSources: { register(source: SessionSource): void }
   // The same word the node uses for the same idea, and deliberately not the same shape
-  // (registries/schedules.ts).
+  // (shell/schedules.ts).
   schedules: ClientContributionPoint<ClientScheduleContribution>
   integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
   // Status markers drawn on a rail control by the host, published from the state that owns them
-  // (registries/railMarkers.ts). Data only; a marker has no click verb.
+  // (rail/railMarkerFeed.ts). Data only; a marker has no click verb.
   railMarkers: ClientContributionPoint<RailMarkerContribution>
   persistedStateSlices: ClientContributionPoint<PersistedStateSlice<unknown>>
   // Plugin-to-plugin functions, the same four methods as the node's `ctx.capabilities`
-  // (../clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
+  // (infra/node/clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
   // hit "already provided".
   //
   // Not the platform gate. That is `requires` on a contribution, answered by hostCapabilities.ts.
@@ -170,8 +169,8 @@ const contributed = new Map<string, Disposable[]>()
 
 // The inputs of the last pass and what it returned. The shell calls the host once at boot with nothing
 // disabled and again when the node answers, and that answer is almost always "nothing disabled" as
-// well. Re-running for it took every contribution back, notified every registry twice and ran every
-// `activate` a second time, which primed the agent roster twice per launch.
+// well. Re-running for it would take every contribution back, notify every registry twice and run every
+// `activate` a second time, priming the agent roster twice per launch.
 let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null =
   null
 
@@ -198,7 +197,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
   // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
   // contributed an entry and the seams that build a telemetry record can name it
-  // (kit/lib/state/registry.ts § the owner side-map).
+  // (the owner side-map in kit/lib/state/registry.ts).
   const own = <T extends { id: string }>(registry: {
     register: (entry: T, owner?: string) => Disposable
   }): ClientContributionPoint<T> => ({
@@ -237,7 +236,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // nothing to look at until they are stamped. The id is the host's to mint.
   // Neither goes through `own`. Both arrive without the field the host stamps, and the point's id is
   // qualified here rather than declared, which is the same rule the manifest path follows
-  // (plugins/chrome/extensionPoints.ts).
+  // (chrome/chromeExtensionPoints.ts).
   const ownExtensionPoint: ClientContributionPoint<CompiledExtensionPoint> = {
     register: (entry) => {
       record(
@@ -372,8 +371,8 @@ export function initClientPlugins(
 
   // One update for the whole roster. A second apply takes each plugin's contributions back and
   // registers them again, and without the batch an effect could run in between and find a source,
-  // pane or command missing. The shell's "is the selected source still on offer" check did exactly
-  // that, and reset every relaunch on a plugin source to Home.
+  // pane or command missing. The shell's "is the selected source still on offer" check is one such
+  // effect, and it would reset every relaunch on a plugin source to Home.
   batch(() => {
     for (const plugin of plugins) {
       // Take back whatever this plugin registered on a previous activation, before it registers again.

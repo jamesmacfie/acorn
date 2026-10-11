@@ -8,10 +8,10 @@ import { keybindingRegistry } from '../registries/commands/keybindings'
 // returning the shared signals/handlers, not a framework.
 
 /**
- * What `PaletteSurface.tsx` draws, and the least it needs to draw it.
+ * What `PaletteSurface` draws, and the least it needs to draw it.
  *
  * Two things satisfy it. `createOverlayPalette` below, which owns its own query and cursor, is what
- * the file finders and the workspace picker still use. The command palette's is a view over the
+ * the file finders and the workspace picker use. The command palette's is a view over the
  * shared session instead (./paletteView.ts), because the query and the cursor there belong to a frame
  * and a pop has to restore them — which is not something a hook holding two signals can do.
  */
@@ -45,7 +45,7 @@ let activeClose: (() => void) | null = null
  * The host half of an overlay: which element had focus before it opened, who gets it back, and which
  * overlay is the open one.
  *
- * Split out of `createOverlayPalette` so the command palette's view can have it without also taking
+ * Separate from `createOverlayPalette` so the command palette's view can have it without also taking
  * the query and cursor signals it does not want. There is one implementation of "give the keyboard
  * back" in the app and this is it; a second would be a second set of the rules below, which are all
  * about a case somebody hit.

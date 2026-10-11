@@ -12,26 +12,18 @@ import { nodePlugins } from './nodePlugins'
 // source's `requiresProvider` asks whether a connected integration grants an operation. Three
 // questions, three names.
 //
-// Three kinds of question, and they are not the same one:
+// The requirements themselves ask different questions:
 //
 // - `'desktop'`        is a desktop shell hosting this renderer. True platform gating, for surfaces
 //                      that need something only a shell can do (a native folder dialog). A closed
 //                      question with one answer, so it stays a bare word.
 // - `{ plugin: id }`   does the node run that plugin. Answered by the node's plugin roster, because
 //                      the terminal drawer, agents, run targets and workflows are ordinary `/v1` plus
-//                      WebSocket surfaces that work from any client.
+//                      WebSocket surfaces that work from any client. Core names no plugin.
+// - `{ loadedPlugin }` is that plugin enabled on the active node.
 // - `{ seam: group }`  did this host install that group of the platform seam. Answered by the seam's
 //                      own probe (../platform/contract.ts), so the question the rail asks and the
 //                      object the surface calls are the same one.
-//
-// Those two were one probe until 2026-08-15, and it was the wrong one: `terminal` meant "the preload
-// exposes a native folder picker", so the whole terminal, agents and workflows block was hidden from
-// anything that wasn't Electron, and stayed visible on a desktop whose node had terminal turned off.
-//
-// The plugin half was then a second closed word, `terminal`, which hardcoded one plugin's name into
-// core: a contribution could not say "needs docker" or "needs workflows", and could not require two
-// things (2026-08-27 extensibility review, finding 8). `disabledNodePlugins()` already answers the
-// question for any id, so the requirement now carries the id and core names no plugin.
 //
 // Reach for `'desktop'` sparingly. It is right for a surface that is about the shell itself, and
 // wrong both for anything whose implementation is an HTTP route and for anything a shell can ship
@@ -43,8 +35,7 @@ export type HostRequirement = 'desktop' | { plugin: string } | { loadedPlugin: s
 // filters before drawing takes it, because the question is the host's and the answer is the same
 // everywhere. `when` is the other gate and is deliberately not uniform — it is the contribution's own
 // predicate over whatever context that draw site has, so it exists where the host has a context to hand
-// it and is absent where there is none (a client schedule, a settings page). Reading three different
-// gate combinations off six registries and trying to derive the rule was the 2026-08-27 finding.
+// it and is absent where there is none (a client schedule, a settings page).
 //
 // An array means all of them. `'none'` is kept as a spelling of "no requirement" so a contribution can
 // say so out loud where omitting the field would read as an oversight.

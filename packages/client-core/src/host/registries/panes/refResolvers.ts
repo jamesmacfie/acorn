@@ -7,7 +7,7 @@ import { Registry } from '../../../kit/lib/state/registry'
 //
 // The entry holds a closure rather than a route, exactly as `AgentContextContribution` does and for
 // the same reason: which node to ask, whether the plugin is running there, and the confinement
-// re-check are all the registering host's business (plugins/chrome/register.ts binds them), and a
+// re-check are all the registering host's business (the chrome pass binds them), and a
 // consumer that knew about routes could address one the plugin never declared.
 export type RefResolverContribution = {
   id: string

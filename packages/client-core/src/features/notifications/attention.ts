@@ -33,7 +33,7 @@ export function edgesBetween(prev: Map<string, Snapshot>, next: Snapshot[]): Edg
     if (s.state === 'blocked') out.push(edge('agent-needs-input', `${s.title} needs you`))
     else if (s.state === 'error') out.push(edge('agent-error', `${s.title} failed`))
     // A workflow or automation turn is one step of a run, and the workflows plugin already sends
-    // `run-done` for the run. Ten steps used to mean ten "finished" rows.
+    // `run-done` for the run, so ten steps must not mean ten "finished" rows.
     else if (s.state === 'finished' && before.state === 'working' && s.notifyOnFinish)
       out.push(edge('agent-completed', `${s.title} finished`))
   }

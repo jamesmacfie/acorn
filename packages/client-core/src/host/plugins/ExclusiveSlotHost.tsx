@@ -18,7 +18,7 @@ import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import { ExclusiveSlotFailureContext } from './ExclusiveSlotFailure'
 
 // The one site where a plugin draws in place of a core surface, and the one site that guarantees core
-// gets it back (registries/exclusiveSlots.ts holds the arbitration rule).
+// gets it back (`exclusiveSlotRegistry` holds the arbitration rule).
 //
 // Every path selects a registered provider. The fallback is the registered core component, so an
 // absent, disabled, untrusted, or failed offer does not need a second rendering mechanism.

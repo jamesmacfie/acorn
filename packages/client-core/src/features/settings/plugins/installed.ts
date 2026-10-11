@@ -95,7 +95,7 @@ const sourceKind = (source: string): string =>
 
 // Manage plugin on a plugin's own settings page, and a tool's owner on Tools and permissions, open that
 // plugin's page under Installed. The page is a detail of the Installed list rather than a page of its own,
-// so the link travels as a detail request (../settingsDetail.ts).
+// so the link travels as a detail request (`createDetailRequest`).
 export const INSTALLED_PAGE = 'plugins'
 const requests = createDetailRequest<{ id: string; kind?: InstalledPlugin['kind']; tab?: 'logs' }>()
 /** The plugin page waiting to open, taken so it opens once. */

@@ -6,16 +6,14 @@ import { renderBlocks, type MarkdownFenceAdapter, type MarkdownOptions } from '.
 import { watchAppearance } from '../../tokens/appearance'
 import CopyButton from '../inputs/CopyButton'
 
-// Markdown source to rendered DOM: the sanitizing pass in kit/lib/rendering/markdown.ts, then a Shiki
-// grammar per fence, a diagram for each closed ```mermaid fence (kit/lib/rendering/mermaid.ts), and a
-// copy button on each one. Everything a call site would otherwise repeat.
+// Markdown source to rendered DOM: the sanitizing pass in `renderBlocks`, then a Shiki grammar per
+// fence, a diagram for each closed ```mermaid fence, and a copy button on each one. Everything a call
+// site would otherwise repeat.
 //
-// It renders block by block. A streaming agent message arrives about 25 times a second and grows at
-// the end, and this component used to answer each of those by replacing the whole subtree: every
-// paragraph re-parsed, every copy button disposed and re-mounted, every code fence re-tokenized. A
-// message with three fences re-highlighted three blocks 25 times a second while its fourth paragraph
-// streamed. Now `renderBlocks` gives each block a key over its own source, this holds the element it
-// rendered for each key, and only the trailing open block is replaced.
+// It renders block by block. A streaming agent message arrives many times a second and grows at the
+// end, and replacing the whole subtree each time would re-parse every paragraph, re-mount every copy
+// button and re-tokenize every fence. So `renderBlocks` gives each block a key over its own source,
+// this holds the element it rendered for each key, and only the trailing open block is replaced.
 //
 // The `.ui-markdown` class stays available on its own for the call sites that have HTML already,
 // either from a provider that renders its own (GitHub hands back `bodyHTML`) or because they need a
@@ -71,13 +69,11 @@ export default function Markdown(props: {
    * browser's own navigation is cancelled.
    *
    * The only event on this node, and the only one it needs: the link's destination is the whole
-   * question. There used to be an `onClick` beside it handing over the DOM event, which a remote tree
-   * cannot receive and a terminal host does not have; its two callers wanted `openInAppUrl(href)` and
-   * the browser on a false, which is what the return value is for. Removed when the terminal host
-   * started drawing this node (docs/tui.md).
+   * question. A DOM event would be no use here, because a remote tree cannot receive one and a
+   * terminal host does not have one.
    */
   onSelect?: (href: string) => boolean | void
-  /** A host's viewer for each closed fence (kit/lib/rendering/markdown.ts § MarkdownFenceAdapter).
+  /** A host's viewer for each closed fence (`MarkdownFenceAdapter`).
    *  Pass one value for the life of this node: its state is the content owner's. */
   fences?: MarkdownFenceAdapter<JSX.Element>
 }) {
@@ -133,7 +129,7 @@ export default function Markdown(props: {
           continue
         }
         // Every branch of the parser emits exactly one top-level element, so a block is one child of the
-        // root and needs no wrapper of its own — the DOM and the stylesheet see what they always did.
+        // root and needs no wrapper of its own.
         const holder = document.createElement('div')
         holder.innerHTML = html
         const el = holder.firstElementChild

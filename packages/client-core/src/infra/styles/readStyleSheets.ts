@@ -11,7 +11,6 @@ export type StyleSheetFile = { path: string; name: string; text: string }
 /** Drop CSS comments. Prose mentions selectors and values; scanners must not count them. */
 export const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '')
 
-/**
 /** Nearest ancestor holding pnpm-workspace.yaml, so the helper works from every package. */
 export function workspaceRoot(): string {
   let dir = fileURLToPath(new URL('.', import.meta.url))
@@ -38,7 +37,7 @@ export function readAxisSheets(): StyleSheetFile[] {
     .map((name) => ({ path: join(dir, name), name, text: readFileSync(join(dir, name), 'utf8') }))
 }
 
-/** The per-style packs, `styles/style-<id>.css`. Empty until the first pack lands. */
+/** The per-style packs, `styles/style-<id>.css`. */
 export function readStylePacks(): StyleSheetFile[] {
   const dir = fileURLToPath(new URL('.', import.meta.url))
   return readdirSync(dir)
@@ -56,7 +55,6 @@ function walk(dir: string): StyleSheetFile[] {
   return out
 }
 
-/**
 /**
  * Custom properties declared, not merely referenced, by each `:root…` block, keyed by the block's
  * selector. A hand-rolled scanner rather than a CSS parser dependency: the axis files are flat

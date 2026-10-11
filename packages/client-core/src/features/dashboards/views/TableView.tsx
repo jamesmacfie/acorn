@@ -11,9 +11,8 @@ import RowControls, { openRowMenu } from './RowControls'
 // clickable by mouse is a table half the app can't use.
 //
 // No source column is hardcoded here. Provenance is an ordinary panel-local field on a mapped
-// multi-source panel (mapping.ts § PANEL_SOURCE_FIELD_ID), so it arrives through `fields` like every
-// other column: projectable, hideable, reorderable and filterable, none of which the special case
-// allowed.
+// multi-source panel (`PANEL_SOURCE_FIELD_ID`), so it arrives through `fields` like every other column:
+// projectable, hideable, reorderable and filterable.
 
 export default function TableView(props: PanelViewProps) {
   const fields = () => props.fields.filter((field) => !field.hidden)

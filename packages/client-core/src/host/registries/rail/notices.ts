@@ -17,7 +17,7 @@ export const noticeKindRegistry = new Registry<NoticeKindContribution>('notice-k
 
 /** The `plugin` kind is the fallback rather than `undefined`, because every caller needs an answer and
  *  the honest one for a kind nobody registered is "some plugin raised this": a puzzle piece, `info`
- *  tone, and no desktop banner. Unresolved, the bell drew an unlabelled circle in warn tone, which
+ *  tone, and no desktop banner. Unresolved, the bell would draw an unlabelled circle in warn tone, which
  *  says "something is wrong" about a row that might be a nudge.
  *
  *  A second lookup rather than recursion, so a host that has registered no kinds at all — a test, a

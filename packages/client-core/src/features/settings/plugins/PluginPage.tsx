@@ -68,9 +68,8 @@ import { SkillsSection } from './SkillsSection'
 import './plugins.css'
 
 // One plugin's page under Settings > Plugins > Installed (docs/plugins/activation.md § What the owner
-// sees). What used to be crammed into one row of the list, spread over three tabs: whether it is on and
-// what it adds (its settings pages among them), what it may do and what this device decided about it,
-// and which version runs.
+// sees), in three tabs: whether it is on and what it adds (its settings pages among them), what it may
+// do and what this device decided about it, and which version runs.
 // Uninstalling sits in the danger zone under them, where the shell's one confirmation names what goes.
 
 // Registered with the page, like `core:storage` is with its page: the point exists where it is drawn.

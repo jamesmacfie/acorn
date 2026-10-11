@@ -6,10 +6,9 @@
 // A place is therefore a turn and how far into it the viewport starts, which survives all of that, or
 // it is the live end of the list, which has no offset to be wrong about.
 //
-// One value rather than a flag beside an offset. Those were two representations of one fact, kept in
-// agreement by hand at seven call sites, and every defect found in this code was the two disagreeing.
-// It also means following is a value rather than an absence: the old code said "following" by deleting
-// the saved offset, so every path that pinned erased a place.
+// One value rather than a flag beside an offset, because two representations of one fact kept in
+// agreement by hand drift apart. It also means following is a value rather than an absence: saying
+// "following" by deleting a saved offset would make every path that pins erase a place.
 
 export type ReadingPlace =
   /** Glued to the newest turn, and pulled along as the list grows. */
@@ -78,7 +77,7 @@ export function placeAfterScroll(state: {
  * out at worst, which is a place. A list too short to hold that position is not a near miss: it is a
  * different list, so the reader is treated as arriving fresh and sent to the live end, which is where
  * a first visit goes. The one thing this never does is leave them at the top, which is the answer a
- * pixel offset gave whenever the list came back shorter than the number.
+ * pixel offset gives whenever the list comes back shorter than the number.
  */
 export function resolveAnchor(
   place: Extract<ReadingPlace, { at: 'turn' }>,

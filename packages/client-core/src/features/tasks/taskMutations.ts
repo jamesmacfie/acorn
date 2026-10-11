@@ -1,10 +1,6 @@
 // Task writes (docs/workspaces-and-tasks.md). Core owns tasks: they are the workspace's unit of
 // work, not a GitHub concept, and every route helper below lives in protocol. Callers invalidate
 // tasksKey after.
-//
-// The review-note writes that used to sit alongside these moved to
-// plugins/git/src/client/changes/reviewNoteMutations.ts: they are the Changes tab's, and keeping them
-// here meant core held that plugin's routes.
 import { postJson, writeJson } from '../../infra/node/apiClient'
 import {
   type Task,

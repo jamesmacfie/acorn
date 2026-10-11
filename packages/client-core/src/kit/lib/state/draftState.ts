@@ -1,12 +1,11 @@
 // Persist in-progress comment/reply drafts in localStorage so they survive navigation and reloads,
 // you can leave a PR mid-comment and pick it up later. Per-device, synchronous seed, no server
-// round-trip: same rationale as rememberOpen in the github plugin's PullDetail. Drafts clear on
-// successful submit because composers set their text to '' afterward, which removes the stored key
-// here.
+// round-trip: the same rationale as `Fold`'s `persistKey`. Drafts clear on successful submit because
+// composers set their text to '' afterward, which removes the stored key here.
 //
-// Here rather than in the github plugin because the shared diff viewer's line/thread composers
-// (ui/diff/DiffRows.tsx) bind to it, and client-core may not import a plugin. The `comment-draft:`
-// key prefix is unchanged, so existing drafts survive the move.
+// Here rather than in the github plugin because the shared diff viewer's line and thread composers
+// bind to it, and client-core may not import a plugin. Changing the `comment-draft:` key prefix
+// would lose every stored draft.
 import { createEffect, on, type Accessor } from 'solid-js'
 import { readLocal, writeLocal } from './deviceStorage'
 

@@ -138,7 +138,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   const count = (which: InstalledFilter) =>
     listed().filter((entry) => matchesFilter(which, entry.plugin, entry.status)).length
 
-  // Manage plugin, from a plugin's strip or a tool's owner, lands here (./installed.ts § openPluginPage).
+  // Manage plugin, from a plugin's strip or a tool's owner, lands here (`openPluginPage`).
   createEffect(() => {
     const asked = takePluginRequest()
     if (!asked) return

@@ -8,9 +8,8 @@ import type { CodeRow } from '../../kit/diff/diffModel'
  * mints its lookup from. `side` is the row's own kind rather than the view mode: a contributor marking
  * "line 42 as it will be" means the new side whether the reader is in split or unified.
  *
- * Its own JSX-free module so both halves of the contract can be held against each other in a test: the
- * owner declares the field names on its point (`changes:diff-line`, `github:diff-line`) and this mints
- * the values, and a key whose fields drifted from the declaration would silently match nothing.
+ * A JSX-free module so a test can hold the field names the owners declare (`changes:diff-line`,
+ * `github:diff-line`) against the values minted here. A key whose fields drift matches nothing, silently.
  */
 export const DIFF_ANNOTATION_FIELDS = ['file', 'line', 'side'] as const
 

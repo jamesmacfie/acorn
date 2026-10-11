@@ -15,7 +15,7 @@ import { createSegmentLoader } from './segmentLoader'
 // thread in a pull request's conversation (docs/github-integration/surfaces.md § Conversation).
 //
 // Read from the one segment that holds the line, through the same loader and node cache the diff
-// viewer uses (./segmentLoader.ts, ./segmentCache.ts), so a segment the reader has already seen in the
+// viewer uses (`createSegmentLoader`, `segmentCacheFor`), so a segment the reader has already seen in the
 // diff costs nothing and a snippet read here is there when they open it. Nothing parses a whole patch:
 // the document's descriptors say which segment holds a line before any segment is read.
 //

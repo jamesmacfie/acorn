@@ -13,7 +13,7 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 // the same reason for being its own file: ./register.ts must stay importable from a bare-Node suite.
 //
 // Nothing here decides when it appears. An overlay has no click site of its own: what opens one is the
-// `openOverlay` verb (plugins/chrome/actions.ts) or a remote tree asking for its companion overlay
+// `openOverlay` verb (chrome/actions.ts) or a remote tree asking for its companion overlay
 // (../tree/RemoteTree.tsx). Both arrive here as an invocation on ./overlays.ts.
 
 export type PluginOverlayProps = {

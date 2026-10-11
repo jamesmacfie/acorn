@@ -14,13 +14,12 @@ import type { WorkspaceView } from '../../features/workspaces/workspaceViewTrans
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
 
-// Core-owned persisted state only: the task layout (core owns panes), notices (core owns the
-// notification centre) and the dashboard model (core owns panels). Feature-owned slices live next
-// to the store they bind, the dashboards one does, and is re-exported here rather than redeclared
-// so the composition root keeps registering one list. See
-// plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts;
-// each plugin registers its own through `ctx.persistedStateSlices` in its client/index.ts. The
-// composition root registers only these and the direct preference slices (app/client/activate.ts).
+// Core-owned persisted state only: the task layout (core owns panes), the workspace view, notices
+// (core owns the notification centre) and the dashboard model (core owns panels). Feature-owned
+// slices live next to the store they bind, as the dashboards ones do, and are listed here rather than
+// redeclared so the composition root keeps registering one list. Each plugin registers its own
+// through `ctx.persistedStateSlices`. The composition root registers only these and the direct
+// preference slices (apps/desktop/src/client/activate.ts).
 
 const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
   id: 'core.task-layouts',
@@ -115,7 +114,7 @@ export const workspaceHistorySlice: PersistedStateSlice<WorkspaceHistory> = {
 // above is: the terminal has no `localStorage`.
 export const lastWorkspaceSlice = (hydrate: (workspaceId: string) => void): PersistedStateSlice<string> => {
   // Written back until a workspace is open. The pass can write before the client has settled on one,
-  // and a boot that fails in that gap flushes its pending writes as it is torn down, which used to
+  // and a boot that fails in that gap flushes its pending writes as it is torn down, which would
   // save an empty value over the right one.
   let saved = ''
   return {

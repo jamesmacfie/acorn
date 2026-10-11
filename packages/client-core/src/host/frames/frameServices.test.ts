@@ -11,9 +11,7 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-// The host ladder, as one call now. It used to be `parseInAppTarget` then `openContentTarget`, and the
-// frame side had to hold the target in between; `openInAppUrl` owns the whole question, including the
-// route rung this surface previously had no way to reach.
+// The host ladder, as one call: `openInAppUrl` owns the whole question, including the route rung.
 const openInAppUrl = vi.fn((..._args: unknown[]) => false)
 
 vi.mock('../registries/panes/contentLinks', () => ({
@@ -50,9 +48,8 @@ const { createFrameServices } = await import('./frameServices')
 // The host half of the frame bridge (docs/plugins.md).
 //
 // broker.test.ts pins what the checker refuses; this pins what the host then actually does with a call
-// that got through. The two halves used to sit on opposite sides of a `.tsx` boundary, so only one of
-// them could be tested. The effects are the half that pins a node, hand-parses the prefs cache and
-// decides where a link goes.
+// that got through. The effects are the half that pins a node, hand-parses the prefs cache and decides
+// where a link goes.
 
 const binding = (over: Partial<FrameBinding> = {}): FrameBinding => ({
   pluginId: 'board',

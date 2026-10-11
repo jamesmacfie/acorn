@@ -22,8 +22,8 @@ export type SourceFailureText = { message: string; fix?: SourceFix }
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 /** Words a person can read: not empty, not the code itself, not a bare HTTP status, and not another
- *  code such as `github_unavailable`. The same rule as the GitHub plugin's `readFailure`
- *  (plugins/github/src/client/actionErrors.ts), which core can't import. */
+ *  code such as `github_unavailable`. The same rule as the GitHub plugin's `readFailure`,
+ *  which core can't import. */
 const readable = (detail: string | undefined, code: string): string | undefined => {
   const text = detail?.trim()
   if (!text || text === code || /^\d{3}$/.test(text) || /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(text)) return undefined

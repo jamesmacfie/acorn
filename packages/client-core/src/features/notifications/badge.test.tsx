@@ -26,7 +26,7 @@ afterEach(() => {
 
 // The writes are outside the root because Solid flushes queued effects when `createRoot` returns,
 // not part-way through its body. Each case asserts before disposing, since disposal is itself a
-// write now.
+// write.
 it('draws the pill on the icon and clears it at zero', () => {
   install(true)
   const [pill, setPill] = createSignal(0)

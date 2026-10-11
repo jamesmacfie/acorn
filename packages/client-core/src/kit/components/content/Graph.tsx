@@ -19,19 +19,17 @@ import {
  * The kit's canvas. It is here rather than in the plugin that wanted it because plugin client code
  * may not emit raw DOM or SVG: a picture drawn in a plugin is a picture the terminal host cannot
  * draw, and the premise of the kit is that both hosts draw the same tree
- * (docs/ui-design/closed-kit.md § The closed kit). Two surfaces asked for it, the workflows editor and the
- * workflows run pane, and both projections were written before it landed, which is the admission
- * rule.
+ * (docs/ui-design/closed-kit.md § The closed kit).
  *
- * The geometry is ../../lib/layout/graphLayout.ts and none of it is here: that owns where a card sits, this
- * owns pan, zoom, the pointer gestures and the ARIA.
+ * The geometry is `layoutGraph` and none of it is here: that owns where a card sits, this owns pan,
+ * zoom, the pointer gestures and the ARIA.
  *
  * A card is a real button inside a listbox, so the graph reads as a list to a screen reader and to
  * the keyboard: one tab stop, the arrows walk the cards, type-ahead finds one by name. The wires are
  * one SVG underneath, `aria-hidden`, because a curve says nothing that the card at each end does not
  * say better.
  *
- * Three of its handlers are outside the kit's eleven events — `onConnect`, `onDisconnect` and
+ * Three of its handlers are outside the kit's event set — `onConnect`, `onDisconnect` and
  * `onMove` — so they work in the shell and are dropped on the way to a sandbox. That is the answer
  * `onInput` already gets, and the honest one here: a remote tree draws the picture and selects a
  * card, and authoring an edge is a compiled pane's affordance.

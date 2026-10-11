@@ -33,7 +33,7 @@ export function mountFrame(
   root.id = 'root'
   document.body.append(root)
 
-  // Every frame wants it and every frame forgot it: a frame has its own document, so the shell's
+  // Every frame needs it: a frame has its own document, so the shell's
   // delegated tooltip singleton can't see it and each `data-tip` in here is otherwise inert.
   mountFrameTips(document)
 
@@ -61,11 +61,10 @@ export function mountFrame(
  * text in and markup out, while this needs the bridge, and /ui is a barrel of Solid components a
  * non-Solid frame must be able to skip entirely.
  *
- * Modified clicks are taken too, unlike the shell's equivalent
- * (client-core/host/registries/panes/contentLinks.ts). In the shell a cmd-click is the reader asking for a browser
- * tab, so the anchor's default is preserved. In a frame there's no default to preserve, because the
- * sandbox swallows it, so treating a cmd-click as a plain click is the difference between working and
- * dead.
+ * Modified clicks are taken too, unlike the shell's equivalent (`handlePluginContentLinkClick`). In the shell a
+ * cmd-click is the reader asking for a browser tab, so the anchor's default is preserved. In a frame there's no default
+ * to preserve, because the sandbox swallows it, so treating a cmd-click as a plain click is the difference between
+ * working and dead.
  *
  * A non-https href is left alone. `mailto:` is the honest casualty: `renderMarkdown` allows it, the
  * bridge verb doesn't, and a frame can't open a mail client any more than it can open a tab.

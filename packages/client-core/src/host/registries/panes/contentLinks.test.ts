@@ -21,7 +21,7 @@ import { setTaskLookup } from '../../../features/tasks/taskLookup'
 import { selectedSource, setSelectedSource } from '../../../features/tasks/tasks'
 import type { Task } from '../../../infra/queries'
 
-// A target's pane has to be registered (registries/contentLinks.ts § openPluginContentTarget), so the
+// A target's pane has to be registered (`openPluginContentTarget`), so the
 // suite registers one before asserting on it.
 let pane: Disposable
 beforeEach(() => {
@@ -71,7 +71,7 @@ describe('declarative content-link resolution', () => {
 
 describe('the provider stamp on a parsed target', () => {
   // `providerId` decides which plugin's reference panel a link opens, so it is the registry's to
-  // write and never the recogniser's (registries/contentLinks.ts § claimFor).
+  // write and never the recogniser's (`claimFor`).
   it('stamps the contributing plugin, overwriting whatever the recogniser claimed', () => {
     const board = contentLinkRegistry.register({
       id: 'board.card',
@@ -193,7 +193,7 @@ describe('bare tokens licensed by a prefix witnessed in the same surface', () =>
   })
 
   it('leaves everything plain when nothing was witnessed', () => {
-    // The cold-start case (registries/contentLinks.ts § "Bare tokens"): with no confirmed ref in the
+    // The cold-start case (the "Bare tokens" section of ./contentLinks.ts): with no confirmed ref in the
     // surface, `ENG-404` is a token no provider has claimed, so it stays text.
     expect(splitRefTokens('Closes ENG-404', learnRefPrefixes([]))).toEqual([{ text: 'Closes ENG-404' }])
   })
@@ -261,7 +261,7 @@ describe('the host ladder', () => {
   it('refuses a panel for a provider this device has none for, and says so', () => {
     // The other half of the ownership check: a target may name any provider, and only a provider with
     // a registered panel gets one. A panel may only be registered under its own plugin's name
-    // (registries/plugin.ts § declaredProvider), so naming a stranger here can never produce one.
+    // (`declaredProvider` in the client plugin registry), so naming a stranger here can never produce one.
     const stranger = { kind: 'board.card', providerId: 'not-installed', item: 'ENG-42' }
     expect(openContentTarget(stranger, { taskId: 'task-1', prefer: 'refPanel' })).toBe('external')
     expect(activeRefPanel()).toBeNull()
@@ -494,7 +494,7 @@ describe('the host ladder', () => {
 
   it('reports external when neither rung can take the target', () => {
     // The deliberate browser fall-through, as a named outcome rather than a boolean
-    // (registries/contentLinks.ts § ContentLinkOutcome). A boolean lets `preventDefault` reach branches
+    // (`ContentLinkOutcome`). A boolean lets `preventDefault` reach branches
     // that handled nothing.
     expect(openContentTarget({ kind: 'github.pull-request', owner: 'runn', repo: 'acorn' }, { taskId: 'task-1' })).toBe(
       'external',

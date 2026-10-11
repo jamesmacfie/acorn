@@ -9,12 +9,9 @@ import { uiSlotRegistry } from './slots'
 import { settingsRegistry } from '../shell/settings'
 import { contextMenuItems } from '../panes/contextMenus'
 
-// The client half of packages/node-core/src/server/pluginHost/host.test.ts. Registration itself is
-// verified end to end by the e2e suite (S1 asserts the rail's four Source labels in order, S3 the
-// nine pane labels a local task offers), because vitest here runs in a bare Node environment with no
-// Solid transform and the plugin entrypoints import .tsx components. What vitest can reach is the
-// host's rules: declaration order, ownership, duplicate names, enable/disable, and re-activation, and
-// those are exactly what the e2e suite cannot isolate.
+// The client half of packages/node-core/src/server/pluginHost/host.test.ts. This suite runs in bare
+// Node with no Solid transform, and the plugin entrypoints import .tsx components, so what it pins is
+// the host's rules: declaration order, ownership, duplicate names, enable/disable, and re-activation.
 
 const pane = (id: string, extra: Partial<PaneContribution> = {}): PaneContribution => ({
   id,
@@ -136,9 +133,9 @@ describe('the client plugin host', () => {
     clear('first', 'second')
   })
 
-  // `activate` is the phase two plugins needed and did not have (docs/plugins/client-authoring-and-the-ui-kit.md § "Client authoring
-  // and the UI kit"): plugins/http enumerated `localStorage` and plugins/agents issued a `fetch`,
-  // both inside a synchronous `init` that documents itself as registration-only.
+  // `activate` is the side-effect phase (docs/plugins/client-authoring-and-the-ui-kit.md § "Client authoring
+  // and the UI kit"): reading `localStorage` or issuing a `fetch` belongs there, not in a synchronous
+  // `init` that documents itself as registration-only.
   it('runs activate after EVERY init, in declaration order, and never for a disabled plugin', () => {
     const log: string[] = []
     const plugins: ClientPlugin[] = [
@@ -355,7 +352,7 @@ describe('the client plugin host', () => {
   })
 
   // The shell runs the host at boot and again when the node answers, and the answer is usually the
-  // same. A second pass over the same inputs used to take everything back, register it again and run
+  // same. A second pass over the same inputs would take everything back, register it again and run
   // every `activate` twice, which is two roster reads per launch from the agents plugin alone.
   it('runs a pass once for the same inputs, and again when one changes', () => {
     const counts = { init: 0, activate: 0, stopped: 0 }

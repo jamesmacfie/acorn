@@ -23,7 +23,7 @@ import './projects.css'
 
 // Settings → Overview: every project on the node in one table, grouped under the workspace it belongs
 // to, because the grouping is what is being arranged. Selecting rows opens a bar for moving, hiding and
-// colouring several at once (./ProjectTable.tsx), and a row opens its project's own page for
+// colouring several at once (`ProjectTable`), and a row opens its project's own page for
 // everything else. Adding projects and workspaces starts here.
 //
 // Git and GitHub are facets on the row, not prerequisites: a plain folder and a path-less import are

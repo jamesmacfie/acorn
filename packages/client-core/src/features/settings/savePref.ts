@@ -13,8 +13,8 @@ import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSigna
 
 const log = createLogger('prefs')
 
-// The active node, which is apiClient's default target, not a home node. What survives in this store
-// after the device migration all describes one node's resources: a task's pane layout, its open files,
+// The active node, which is apiClient's default target, not a home node. What this store holds
+// describes one node's resources: a task's pane layout, its open files,
 // a repo's PR filters, what the agent running there may do. State follows the resource it describes
 // (docs/state-ownership/scope-rules.md § Scope rules), so there's no home node to pick.
 export const setPref = async (key: string, value: string, nodeId: string | null = activeNodeId()) =>
@@ -85,14 +85,13 @@ export async function savePref(
       )
     return false
   }
-  // A device pref never reaches a node (persistence/devicePrefs.ts): it's a property of this
-  // installation, and `localStorage.setItem` can't fail in a way a retry would fix.
+  // A device pref never reaches a node: it's a property of this installation, and `localStorage.setItem`
+  // can't fail in a way a retry would fix.
   //
   // localStorage first, cache second. `prefsOptions.select` is `mergePrefs(raw, readDevicePrefs())` and
   // device wins, so a cache write landing first recomputes `select` against the old device value and
   // throws the new one away. Silently, because structural sharing then sees an unchanged result and
-  // notifies nobody. That's why picking a theme used to do nothing until an unrelated pref write
-  // happened to re-run `select`.
+  // notifies nobody, so picking a theme would do nothing until an unrelated pref write re-ran `select`.
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))

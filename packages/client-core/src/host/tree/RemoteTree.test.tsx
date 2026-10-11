@@ -4,14 +4,13 @@ import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 
 // What a tree is told when it connects.
 //
-// One question, and it is the one a `frame` region has always answered and a tree never did: which row
-// opened this pane. A selection made while the pane is already mounted arrives as a `select` message,
-// which the component's own effect and event listener already handled. A selection that OPENED the
-// pane cannot, because the event fires before the pane exists — so `openPane` retains the intent and
-// the region consumes it at connect into `context.item` (../frames/PluginFrame.tsx does the same).
+// One question, the one a `frame` region answers too: which row opened this pane. A selection made while the pane is
+// already mounted arrives as a `select` message, which the component's own effect and event listener handle. A
+// selection that OPENED the pane cannot, because the event fires before the pane exists — so `openPane` retains the
+// intent and the region consumes it at connect into `context.item` (../frames/PluginFrame.tsx does the same).
 //
-// Without it a palette search whose `onSelect` opens a pane worked only when the pane was already
-// open, which is the half of the time nobody would report as a bug.
+// Without it, a palette search whose `onSelect` opens a pane works only when the pane is already open,
+// which is the half of the time nobody would report as a bug.
 
 const contexts: PluginFrameContext[] = []
 let port: MessagePort | null = null

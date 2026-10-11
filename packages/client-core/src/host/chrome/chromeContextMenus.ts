@@ -1,5 +1,5 @@
 // Turns `contributions.contextMenus` (@acorn/protocol/plugin/contract.ts) into a registry contribution.
-// Same posture as ./themes.ts and for the same reason: the node already refused a bad descriptor at
+// Same posture as ./chromeThemes.ts and for the same reason: the node already refused a bad descriptor at
 // parse time, but a roster row is bytes a node sent, so the location and every `when` key are checked
 // again immediately before registration; a failure throws and costs the plugin this one row, not its
 // whole manifest (the caller runs inside the chrome pass's per-contribution try/catch).
@@ -37,9 +37,6 @@ export type PluginContextMenuBinding = {
   panes?: ReadonlySet<string>
 }
 
-/**
- * One validated row. Throws with a reason if the descriptor is unusable on this device.
- *
 /**
  * One validated row. Throws with a reason if the descriptor is unusable on this device.
  *

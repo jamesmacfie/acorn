@@ -13,7 +13,7 @@ import { nodes } from './fleet'
 // Core-owned rather than plugin-contributed, because the plugin that failed is not running to speak
 // for itself and the state belongs to the node.
 //
-// An attention item rather than a notice (registries/attention.ts), because this is a state. The
+// An attention item rather than a notice, because this is a state. The
 // plugin stays broken across refetches until the owner disables it or fixes it, so a dismissed row
 // coming back is correct.
 //

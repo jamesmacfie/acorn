@@ -7,11 +7,11 @@
 // cleanups have run, and keeps it as the kind's `retired` entry. That reading is how a teardown check
 // proves observers and scheduled frames went back to zero without waiting on garbage collection.
 //
-// Numbers and one boolean, nothing else. The template below is the whole schema: `sanitize` copies
-// only the fields it names and only when they are finite numbers (or the boolean), so a reader that
-// returned a path, a line of code or a session id would lose it here rather than leak it. Diffs and
-// transcripts hold proprietary source and conversation, which is why this is structural rather than
-// a convention.
+// Numbers and one boolean, nothing else. The template below is the whole schema:
+// `sanitizeSurfaceHealth` copies only the fields it names and only when they are finite numbers (or
+// the boolean), so a reader that returned a path, a line of code or a session id would lose it here
+// rather than leak it. Diffs and transcripts hold proprietary source and conversation, which is why
+// this is structural rather than a convention.
 //
 // In `kit/` rather than in the telemetry folder, because the Timeline registers here and `kit/` may
 // not import the emitter (./contributionErrors.ts says why). The emitter installs a handler the same
@@ -22,7 +22,7 @@
 export type SurfaceKind = 'diff' | 'timeline'
 
 /** Every field a surface can report. Grouped by the question each answers; a field a surface has no
- *  concept of yet stays zero, which is what later phases report into. */
+ *  concept of stays zero. */
 export type SurfaceHealth = {
   /** The document as a whole. `ready` is the source-owned structure being complete. */
   topology: {

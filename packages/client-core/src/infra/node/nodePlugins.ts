@@ -203,7 +203,7 @@ export function clearNodePlugins(): void {
 }
 
 // Registered here rather than in the shell's evictor file, so this signal and the thing that clears
-// it are one edit apart (registries/scopeEviction.ts has the argument).
+// it are one edit apart (see `onScopeEvicted`).
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') clearNodePlugins()
 })

@@ -5,9 +5,9 @@ import { _resetCollectionState } from './collectionState'
 // The rules about a list, with no host under them.
 //
 // This file is shared: both hosts read it for what wraps, where the first press lands, which of
-// select and activate picks, and what the page keys move by (docs/tui/scrolling.md § Collections). It had no
-// test of its own, and the one that was owed is about what a handler *returns* — because that is what
-// decides whether the key stops here or carries on to the next layer
+// select and activate picks, and what the page keys move by (docs/tui/scrolling.md § Collections).
+// The test that matters is about what a handler *returns*, because that decides whether the key stops
+// here or carries on to the next layer
 // (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 //
 // The host's own share is two functions, so a test supplies two: `land`, which would put focus on an
@@ -47,8 +47,8 @@ describe('expand and collapse say whether the row folded', () => {
   })
 
   it('claims the key when the handler returns nothing, so a caller that has not opted in is unchanged', () => {
-    // `?? true`, which is the whole compatibility story: every DOM tree in the app returns `void`
-    // today and keeps the behaviour it has. A caller opts into the honest answer by returning one.
+    // `?? true`: a DOM tree whose handler returns `void` keeps claiming the key. A caller opts into the
+    // honest answer by returning one.
     const keys = tree(() => undefined)
     expect(keys.handle('expand')).toBe(true)
     expect(keys.handle('collapse')).toBe(true)
@@ -61,8 +61,7 @@ describe('expand and collapse say whether the row folded', () => {
   })
 
   it('hands the key back when the collection has no fold at all', () => {
-    // A plain list, which is most of them. Nothing here changes: with no handler there was never
-    // anything to claim.
+    // A plain list, which is most of them. With no handler there is nothing to claim.
     const keys = tree()
     expect(keys.handle('expand')).toBe(false)
     expect(keys.handle('collapse')).toBe(false)
@@ -88,13 +87,10 @@ describe('expand and collapse say whether the row folded', () => {
 
 describe('a page key stops at the end of the list', () => {
   // Clamped, where the arrows above it wrap. Modulo a list shorter than a page is a key that lies:
-  // in a three-row list PageDown moved one row, and in a list of exactly `PAGE` rows it moved
+  // in a three-row list PageDown moves one row, and in a list of exactly `PAGE` rows it moves
   // nowhere, which a reader cannot tell from a dead key. Returning `false` at the edge is the other
   // half of it, because it hands the key to the tier below, where a scrolling viewport does what the
-  // reader asked for (docs/tui/scrolling.md § Scrolling viewports).
-  //
-  // The desktop gets this too, and that is intended: PageDown on the last row of a desktop list now
-  // stops instead of wrapping round to the first.
+  // reader asked for (docs/tui/scrolling.md § Scrolling viewports). The desktop gets this too.
   const rows = (count: number) => Array.from({ length: count }, (_, index) => ({ key: `row-${index}` }))
 
   const list = (count: number) =>

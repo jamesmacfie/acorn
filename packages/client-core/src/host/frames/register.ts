@@ -61,19 +61,19 @@ const log = createLogger('plugins')
 // This file registers ordinary contributions, pre-bound to the plugin, surface and bundle. What draws
 // inside one is the surface's own declaration: a `remote` region is a tree of the host's own components
 // emitted by the plugin's worker, a `document` region is the host's editor, and a `frame` region is a
-// PluginFrame, the plugin's bundle in a sandboxed iframe. The phase doc sketched a
-// `kind: 'component' | 'frame'` union on each contribution type instead, which would put a branch in
-// every consumer to express one thing: which component renders. The registries and their consumers are
-// untouched, and pane ids keep working as the persisted layout keys they are.
+// PluginFrame, the plugin's bundle in a sandboxed iframe. A `kind: 'component' | 'frame'` union on each
+// contribution type would put a branch in every consumer to express one thing: which component renders.
+// This way the registries and their consumers are untouched, and pane ids keep working as the persisted
+// layout keys they are.
 //
 // A pane, a reference panel and a settings page have to name a layout, so what fills them is always a
 // declaration rather than a default. The three surfaces the host wraps entirely — an overlay, an
 // importer, a coreSlot — do not: each is a rectangle by construction, with no arrangement to name and
 // no second region, so a layout key there would have one legal value.
 //
-// The importer is the one surface where the doc's reasoning still bites: a frame can't be handed
-// callbacks. It doesn't need to be. The host passes `onClose` and `onImported` into PluginFrame, which
-// turns them into bridge verbs, and the shell keeps the modal chrome and the post-import refresh.
+// A frame can't be handed callbacks, which matters for the importer. The host passes `onClose` and
+// `onImported` into PluginFrame, which turns them into bridge verbs, and the shell keeps the modal
+// chrome and the post-import refresh.
 //
 // Two gates decide whether a surface is registered at all:
 //
@@ -83,10 +83,10 @@ const log = createLogger('plugins')
 //   bound      every id, provider and surface comes from the manifest as the host read it. Plugin code
 //              can't register a shell contribution at all; only a manifest can.
 //
-// `.ts`, not `.tsx`, and that shapes everything below. The repo's vitest configs run in bare Node with
-// no Solid transform, so a module that reaches a JSX file can't be imported by a test at all, and this
-// module holds the nine registration decisions. So every component below is behind `lazy`, and the two
-// surfaces needing real host markup are their own components rather than JSX here.
+// `.ts`, not `.tsx`, and that shapes everything below. This module holds the registration decisions and
+// has to stay importable from a bare-Node suite with no Solid transform, where a module that reaches a
+// JSX file can't be imported at all. So every component below is behind `lazy`, and the two surfaces
+// needing real host markup are their own components rather than JSX here.
 
 const PluginFrame = lazy(() => import('./PluginFrame'))
 const PluginWebview = lazy(() => import('./PluginWebview'))
@@ -173,7 +173,7 @@ export const frameBindingFor = (
 })
 
 // Registered per plugin and torn down as a unit: a re-run replaces a plugin's whole contribution set
-// rather than reconciling it, the way the client plugin host does (registries/plugin.ts).
+// rather than reconciling it.
 function registerSurfaces(
   pluginId: string,
   hash: string,
@@ -204,9 +204,8 @@ function registerSurfaces(
       // third-party plugin can collide with a first-party pane. One bad surface is skipped and the rest
       // of the plugin still works.
       //
-      // Recorded as well as logged: on its own the warn was invisible, so the author saw a pane that
-      // didn't exist and nothing to explain it. This also reaches the attention inbox through
-      // node/pluginFailures.ts.
+      // Recorded as well as logged, because a warning alone leaves the author a missing pane and nothing
+      // to explain it. The record reaches the attention inbox (`pluginFailureAttention`).
       log.warn(`${pluginId} could not contribute ${surface.target} '${surface.id}'`, error, { 'plugin.id': pluginId })
       recordSurfaceFailure(pluginId, surface.id, error)
     }
@@ -239,8 +238,8 @@ function registerSurfaces(
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
   // Every registration in this function goes through `own`, so the plugin id reaches each registry's
   // owner side-map and the seams that build a telemetry record can name whose rectangle it was
-  // (kit/lib/state/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
-  // and for the same reason: this is the pass that knows the owner, and a manifest cannot state one.
+  // (the owner side-map in kit/lib/state/registry.ts). The chrome pass does the same, and for the same
+  // reason: this is the pass that knows the owner, and a manifest cannot state one.
   const own = <T extends { id: string }>(
     registry: { register(entry: T, owner?: string): Disposable },
     entry: T,
@@ -417,7 +416,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         })()
 
         // Project scope lands in its own registry: the surface is drawn beside its plugin's rail list, with
-        // no task to hand it and no layout key to persist (registries/projectSurfaces.ts says why the two
+        // no task to hand it and no layout key to persist (`projectSurfaceRegistry` says why the two
         // aren't one registry). The manifest guarantees both a route and a source that navigates to it, but
         // it reached this device as a roster row, so the confinement is re-applied here.
         if (surface.scope === 'project') {
@@ -548,7 +547,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         }
       }
     case 'coreSlot': {
-      // The exclusive slot: an offer to draw one of core's own surfaces (registries/exclusiveSlots.ts).
+      // The exclusive slot: an offer to draw one of core's own surfaces (`exclusiveSlotRegistry`).
       //
       // Registering seizes nothing. This lands in a registry whose read step is `resolveExclusiveSlot`,
       // which answers "core" for everything except the one plugin the user picked in settings. Three
@@ -676,7 +675,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // contribution. The host draws the box, as it does for the reference panel above.
       //
       // Nothing here decides when it appears. An overlay has no click site of its own: the only thing
-      // that opens one is the `openOverlay` verb (plugins/chrome/actions.ts), and the manifest refuses an
+      // that opens one is the `openOverlay` verb (chrome/actions.ts), and the manifest refuses an
       // overlay that no action opens.
       const open = (): boolean => pluginOverlayOpen(pluginId, surface.id)
       const closeId = `plugin.${pluginId}.overlay-close.${surface.id}`

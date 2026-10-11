@@ -11,7 +11,7 @@ import type { PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 export type PanelViewProps = {
   view: PanelView
   /** The definition's id, for the one view that reads something keyed by it: a stat's history trend
-   *  is a series the node stores per panel (dashboards/history.ts). Optional because nothing else
+   *  is a series the node stores per panel (`createMeasureHistory`). Optional because nothing else
    *  needs it, and a view that draws only what it was handed stays testable. */
   panelId?: string
   schema: DashboardDisplaySchema
@@ -22,8 +22,8 @@ export type PanelViewProps = {
    *  in the view for the same reason the filters do, so it arrives the same way. */
   groupBy?: string
   /** Draw each row's source. True only where the panel unions more than one source: a badge that
-   *  says "github" on every row of a github panel is furniture. No wire change was needed for it:
-   *  rows already carry the host's `pluginId` stamp (views/Provenance.tsx). */
+   *  says "github" on every row of a github panel is furniture. Rows already carry the host's
+   *  `pluginId` stamp (`Provenance`), so this needs nothing from the wire. */
   provenance?: boolean
   /** The source's plural in lower case ("tasks"), for the stat's count. "items" when absent. */
   plural?: string

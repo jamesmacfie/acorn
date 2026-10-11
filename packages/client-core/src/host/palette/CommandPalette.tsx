@@ -15,14 +15,9 @@ import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
 import { focusedCollectionTarget } from '../../kit/keys/collection'
 
-// ⌘K, as a renderer over the shared session.
-//
-// This component used to be the palette: it fetched every `paletteRows` source, composed them with
-// the registry's actions and the task and workspace lists, filtered them, kept a row-to-source map
-// and invoked the pick. All of that is `host/registries/commands/sessionStore.ts` now, and the terminal
-// runs on the same object (apps/tui/src/chrome/Palette.tsx). What is left here is what only this host
-// can answer: which identity a session captures, which nodes a fleet search may ask, and the dialog
-// it draws the rows in.
+// ⌘K, as a renderer over the shared palette session (`createCommandSession`), which the terminal's
+// palette runs on too. This file holds what only this host can answer: which identity a session
+// captures, which nodes a fleet search may ask, and the dialog it draws the rows in.
 
 export default function CommandPalette() {
   const params = useParams()
@@ -31,7 +26,7 @@ export default function CommandPalette() {
 
   const context = (): CommandExecutionContext => {
     // The rail's own test for "a task is on screen". `activeTaskId` stays set when you leave a task
-    // for a source, and the palette then aimed task commands at a task you could not see, and hid that
+    // for a source, so reading it alone aims task commands at a task you can't see and hides that
     // task from Go to task.
     const taskId = selectedSource() ? null : activeTaskId()
     // A task route carries no project parameter. Commands still run in the task's project, matching

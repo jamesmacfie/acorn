@@ -4,7 +4,7 @@ import type { Disposable } from '../../../kit/lib/state/registry'
 import type { UiSlotContext, UiSlotContribution } from './slots'
 import { SlotHost, TaskSlotHost, uiSlotRegistry } from './uiSlots'
 
-// The first tests in this repo that render a component. The suite next door is bare Node with no
+// The slot hosts, rendered. The suite next door is bare Node with no
 // Solid transform, so nothing it asserts says whether a contribution reaches the screen
 // (docs/testing/layers.md § Test layers).
 //

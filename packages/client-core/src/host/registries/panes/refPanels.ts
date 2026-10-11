@@ -12,8 +12,8 @@ export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> &
 
 // Named `target`, never `ref`. Solid rewrites a component's `ref` prop into a callback
 // (docs/architecture/packages.md § Two renderer traps), so a props member named
-// `ref` cannot carry data across a JSX call site. This shipped once as a blank panel title with every
-// guard on the way in holding. `tools/arch/boundaries.test.ts` holds the line for this directory.
+// `ref` cannot carry data across a JSX call site, and nothing on the way in catches it.
+// `tools/arch/boundaries.test.ts` holds the line for this directory.
 export type RefPanelProps = {
   target: RefPanelTarget
   onClose: () => void
@@ -29,11 +29,11 @@ export type RefPanelProps = {
 export type RefPanelContribution = {
   id: string
   // The provider whose items this panel renders. Bound to the registering plugin's own name by the
-  // client plugin host (registries/plugin.ts § declaredProvider), so a plugin cannot claim another's
+  // client plugin host (`declaredProvider`), so a plugin cannot claim another's
   // items.
   providerId: string
   // The platform question, the same field every host-filtered contribution takes
-  // (../hostCapabilities.ts).
+  // (infra/node/hostCapabilities.ts).
   requires?: HostCapabilityRequirement
   // Per-node presence, the same predicate the pane registry takes. A panel whose plugin is stopped on
   // the node being looked at is not a destination. Without the gate the click is claimed anyway and
@@ -63,7 +63,7 @@ const [openRef, setOpenRef] = createSignal<RefPanelTarget | null>(null)
 export const activeRefPanel = openRef
 
 // Show a ref, or refuse (docs/panes.md § Not a pane: the reference panel). A false return leaves the
-// caller its next rung (registries/contentLinks.ts) or the browser URL, so this reports rather than
+// caller its next rung (`openContentTarget`) or the browser URL, so this reports rather than
 // throws.
 export function openRefPanel(ref: RefPanelTarget): boolean {
   if (!ref.providerId || !ref.displayId || !refPanelFor(ref.providerId)) return false

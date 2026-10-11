@@ -17,7 +17,7 @@ import {
 // The document as the viewer scrolls it: one item per file header, per segment, and per slice of an
 // expanded gap, built from the topology alone (docs/diff-rendering/loading.md § Parsing and highlighting). No row exists here.
 // A segment item's code rows have an exact height from its counts before its rows load, and a
-// segment's inline threads are known from their line numbers, so ./diffLayout.ts can reserve for them
+// segment's inline threads are known from their line numbers, so `createDiffLayout` can reserve for them
 // and the scrollbar and every file's offset are right from the first frame.
 
 /** One segment of one file, and the key its content is cached and requested under. */
@@ -140,7 +140,7 @@ export function createDocumentView(props: {
   })
 
   /** An item's code rows, headers and gaps: exact, because none of them wraps. Threads and whatever a
-   *  line draws under itself are dynamic blocks on top of this (./diffLayout.ts). */
+   *  line draws under itself are dynamic blocks on top of this (`createDiffLayout`). */
   const fixedHeight = (item: DiffItem, mode: ViewMode): number => {
     if (item.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
     if (item.kind === 'nodiff') return DIFF_GAP_ROW_HEIGHT

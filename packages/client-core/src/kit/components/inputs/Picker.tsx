@@ -13,9 +13,9 @@ import type { Size } from '../../tokens/tokens'
 // ordering (pinned-first projects, substring branches, and so on). Shared by project pickers and
 // the create-PR branch selectors so they look and behave identically. Esc / outside-click close it.
 //
-// Anchoring, dismissal and reflow come from ui/anchor.ts; see docs/ui-design/interaction.md § Menus and
-// right-click for why (this file was the extraction's starting point) and for the portal/fixed
-// positioning it relies on. Picker keeps only the filter/list semantics.
+// Anchoring, dismissal and reflow come from `createAnchoredPopover`; see
+// docs/ui-design/interaction.md § Menus and right-click for why and for the portal/fixed positioning it
+// relies on. Picker keeps only the filter/list semantics.
 //
 // Two ways to fill it, and which one a caller uses is decided by where the caller runs. `results` and
 // its companions are callbacks: the caller owns filtering and ordering, which is what a pinned-first

@@ -9,8 +9,8 @@ import { ConnectionsPage } from './ConnectionsPage'
 import { connectionRowText, connectionStatusLabel, connectionTone, SERVICES_PAGE } from './connections'
 
 // Settings > Connections > Services: every connection on this node except the model keys, which AI
-// models lists (./connections.ts). A connection that needs its owner is listed first, and the rail draws
-// a dot beside this page for it (./connectionAttention.ts).
+// models lists (`connectionPageOf`). A connection that needs its owner is listed first, and the rail draws
+// a dot beside this page for it (`connectionAttention`).
 
 export default function ServicesSettings(props: { context: SettingsPageContext }) {
   return (

@@ -164,7 +164,7 @@ export function ProjectTable(props: {
                 <Index each={order.projectsFor(group())}>
                   {(project, index) => (
                     // The whole row opens the project. The row leaves a press on its checkbox, its folder
-                    // button, or its chevron to that control (Table.tsx § inCellControl).
+                    // button, or its chevron to that control (`Table`'s `inCellControl`).
                     <TableRow onPress={() => props.openProject(project().id)}>
                       <TableCell>
                         <Show when={group().workspaceId}>

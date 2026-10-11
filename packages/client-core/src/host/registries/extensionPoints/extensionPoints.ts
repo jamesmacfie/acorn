@@ -2,7 +2,7 @@
 // only thing that carries anything between them (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // No JSX import here (docs/frontend/registries.md § Registries and plugins). The host that draws these
-// deliveries is `plugins/chrome/ExtensionPointHost.tsx`.
+// deliveries is `ExtensionPointHost`.
 import {
   parseExtensionPointRef,
   takesPluginExtensions,
@@ -53,7 +53,7 @@ export type ExtensionPointContribution = {
    *  (docs/plugins/detail-regions.md). Shown on the developer view. */
   mounts?: readonly { surface: string; region: DetailRegion }[]
   /** The platform question, the same field every host-filtered contribution takes
-   *  (../hostCapabilities.ts). */
+   *  (infra/node/hostCapabilities.ts). */
   requires?: HostCapabilityRequirement
   /** Is the owning plugin running on the node being looked at? A point whose owner is not there has no
    *  surface on screen, so it has nothing to deliver into. */
@@ -97,7 +97,7 @@ export type ExtensionContribution = {
   component?: Component<any>
   /** `frame`: the id of the `inline` surface this places. */
   frame?: string
-  /** As on the point above (../hostCapabilities.ts). */
+  /** As on the point above (infra/node/hostCapabilities.ts). */
   requires?: HostCapabilityRequirement
   when?: () => boolean
   /** `items` only. */

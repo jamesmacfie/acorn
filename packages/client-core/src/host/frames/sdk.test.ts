@@ -222,8 +222,8 @@ describe('frame key forwarding', () => {
     const modified = press()
     const claimed = press({ code: 'KeyF', key: 'f' })
     // Wait for the two chords that should arrive rather than sleeping a fixed 5ms. Posting is async,
-    // and on a loaded machine nothing had flushed by the time the assertions ran, so every one of
-    // them read an empty list. Once these two are in, the presses before them have had their turn.
+    // and on a loaded machine a fixed sleep can end before anything flushes. Once these two are in,
+    // the presses before them have had their turn.
     await vi.waitFor(() => {
       expect(sent).toContainEqual({ kind: 'keydown', chord: 'j' })
       expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+k' })
@@ -274,7 +274,7 @@ describe('frame key forwarding', () => {
     const selectAll = press({ code: 'KeyA', key: 'a' })
     await new Promise((resolve) => setTimeout(resolve, 5))
 
-    // Cancelling these is what made Cmd+C in a plugin's table do nothing at all.
+    // Cancelling these makes Cmd+C in a plugin's table do nothing at all.
     expect(copy).not.toHaveBeenCalled()
     expect(paste).not.toHaveBeenCalled()
     expect(selectAll).not.toHaveBeenCalled()

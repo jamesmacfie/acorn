@@ -64,7 +64,7 @@ describe('task pane session state', () => {
 })
 
 // The memory behind "switching workspaces returns me to what I was looking at", and behind reopening
-// there after a restart: one store, one slice over it (../../infra/persistence/stateSlices.ts).
+// there after a restart: one store, one slice over it.
 describe('per-workspace view memory', () => {
   it('remembers a view per workspace and forgets one workspace at a time', () => {
     rememberWorkspaceView('ws-a', { source: 'github' })

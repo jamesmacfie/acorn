@@ -3,9 +3,8 @@ import * as api from '@acorn/protocol/api.ts'
 import * as workspaceAppearance from '@acorn/protocol/workspaceAppearance.ts'
 import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scopes'
 
-// The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
-// phase doc calls out by name (docs/plugins.md
-// checklist); the sweep is what makes a new core route fail the build until someone decides whether a
+// The exhaustive sweep is the point of this file. Everything else here is a spot check on a case worth
+// naming; the sweep is what makes a new core route fail the build until someone decides whether a
 // sandboxed plugin frame may reach it.
 
 const ID = 'x'

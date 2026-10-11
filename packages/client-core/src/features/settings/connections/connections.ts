@@ -106,7 +106,7 @@ export function galleryCards(
     })
 }
 
-// A connection page and the gallery are details of a list page (../settingsDetail.ts), not pages of
+// A connection page and the gallery are details of a list page (`createDetailRequest`), not pages of
 // their own, so a link from elsewhere in settings travels as a detail request. It names its page,
 // because the page on screen may be the other one of the two.
 export type ConnectionRequest = { kind: 'connection'; id: string } | { kind: 'add' }

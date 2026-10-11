@@ -19,8 +19,8 @@ import type { LayoutProps } from './regions'
 //
 // The body takes focus on open and on every step change, so a screen reader reads the new step.
 // It also takes it back whenever a change inside it drops focus to the page, because the button
-// pressed there has just unmounted. Before this a keyboard user started again from the top. The
-// second watch covers a detour that shares its step's place, such as onboarding's GitHub screen.
+// pressed there has just unmounted; otherwise a keyboard user starts again from the top. The second
+// watch covers a detour that shares its step's place, such as onboarding's GitHub screen.
 //
 // Narrow and terminal: unchanged.
 export function Wizard(props: LayoutProps) {

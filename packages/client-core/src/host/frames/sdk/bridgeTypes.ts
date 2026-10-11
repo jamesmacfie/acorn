@@ -19,10 +19,8 @@ export class AcornBridgeError extends Error {
   }
 }
 
-// Five verbs, matching `PluginBridgeApiRequest.method` exactly. `put` was missing until a frame needed
-// one: the protocol and the broker both carried PUT from the start and only this facade didn't, so a
-// plugin whose routes take a full-replacement body had no way to call them. A method absent here is a
-// method no plugin can reach, however permissive the table underneath.
+// Five verbs, matching `PluginBridgeApiRequest.method` exactly. A method absent here is a method no
+// plugin can reach, however permissive the table underneath.
 export type AcornBridgeApi = {
   get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
   post<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>

@@ -30,12 +30,10 @@ export const THEMES = (): [string, string][] => themeContributions().map((theme)
  *
  * So the read falls back and the write is left alone. Nothing here clears the pref: "the owning
  * plugin is gone" and "the node is having a bad minute" arrive at this function as exactly the same
- * absence, and a pref erased on the second one cannot be recovered when the node comes back. A user
- * who sees Light for a minute and their own theme afterwards has lost nothing; a user whose choice
- * was deleted has to go and find it again.
+ * absence, and a pref erased on the second one cannot be recovered when the node comes back.
  *
- * Reactive: it reads the registry signal, so the effect in persistence/appStartup.ts that calls it
- * re-runs when the chrome pass registers or disposes a plugin theme.
+ * Reactive: it reads the registry signal, so the startup effect that calls it re-runs when the chrome
+ * pass registers or disposes a plugin theme.
  */
 export const resolveTheme = (id: string | undefined, fallback: string): string =>
   id && themeRegistry.get(id) ? id : fallback

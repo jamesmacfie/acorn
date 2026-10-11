@@ -41,8 +41,8 @@ const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = aw
 
 // The frame host pass (docs/plugins/frames.md § Frame contribution kind).
 //
-// The sibling of chrome/register.test.ts, and it exists because this module stopped being a `.tsx`
-// file. What is pinned is the pass's contract rather than the rectangles: which registry each target
+// The sibling of chrome/chromeRegister.test.ts. What is pinned is the pass's contract rather than the
+// rectangles: which registry each target
 // lands in, the trust gate (stronger than chrome's), the routes it re-confines on arrival, per-node
 // presence, and dispose-then-register.
 
@@ -247,7 +247,7 @@ describe('syncFrameContributions', () => {
   })
 
   it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
-    // The exclusive slot (registries/exclusiveSlots.ts owns the arbitration and its own test). What this
+    // The exclusive slot (`exclusiveSlotRegistry` owns the arbitration and its own test). What this
     // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a
     // replacement never appears in the pane switcher, and registering it changes nothing on screen.
     seedTrusted(

@@ -72,7 +72,7 @@ describe('selectFleetWorkspace', () => {
   })
 
   it('does nothing for an empty workspace, and does not switch nodes either', () => {
-    // An empty workspace has nowhere to go, same as the single-node picker always did. Switching the node
+    // An empty workspace has nowhere to go, same as in the single-node picker. Switching the node
     // anyway would leave the owner looking at another machine for no reason.
     const observed: string[] = []
     selectFleetWorkspace(entry('b', 'Node B', workspace('ws-3', 'Empty')), (path) => observed.push(path))

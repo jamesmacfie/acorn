@@ -100,8 +100,8 @@ describe('request cancellation and encoding', () => {
 describe('mutations against an unreachable node', () => {
   it.each(['offline', 'revoked'] as const)('fails fast without attempting the request (%s)', async (state) => {
     await ready(state)
-    // Fail here rather than waiting for the broker's 30s request timeout. Main already holds the socket, so
-    // it already knows; without this the user watched a spinner and then read "connect ECONNREFUSED".
+    // Fail here rather than waiting out the broker's request timeout. Main already holds the socket, so it
+    // already knows the node is unreachable.
     const error = await writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).code).toBe('node_offline')

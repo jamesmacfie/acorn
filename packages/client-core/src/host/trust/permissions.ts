@@ -188,9 +188,9 @@ export const uiPermissionLines = (permissions: NodePluginPermissions, pluginId?:
   })
   const events = permissions.events.flatMap((channel) => {
     // No shape guard first: `describeChannel` already answers "nothing this build can describe" with
-    // undefined, and it now covers the node-side catalogue as well as the frame one. A guard that knew
-    // only about frames sent an enforced node grant to the "ignored" line, which is a lie about what the
-    // owner is consenting to.
+    // undefined, for the node-side catalogue as well as the frame one. A guard that knew only about
+    // frames would send an enforced node grant to the "ignored" line, a lie about what the owner is
+    // consenting to.
     const description = describeChannel(channel, pluginId)
     return description ? [line(channel, description)] : []
   })

@@ -12,14 +12,13 @@ export const PrefKeys = {
   // no OS signal to follow and nobody wants square panes by day and rounded by night.
   style: 'style',
   devicePluginsDisabled: 'device_plugins_disabled',
-  // Retired, and read by nothing. The desktop used to reopen from these three, which disagreed with
-  // each other (docs/state-ownership.md). Still listed as device keys so a leftover in `localStorage`
-  // stays there instead of being drained to the node.
+  // Read by nothing. Still listed as device keys so a leftover in `localStorage` stays there instead
+  // of being drained to the node.
   lastTask: 'last_task',
   lastPath: 'last_path',
   lastSource: 'last_source',
   // Which workspace was showing when a client was last closed, so both reopen on it
-  // (infra/persistence/stateSlices.ts). The node's, not the device's: the terminal has no
+  // (`lastWorkspaceSlice`). The node's, not the device's: the terminal has no
   // `localStorage`, so a device key would be written nowhere and read back as nothing.
   lastWorkspace: 'last_workspace',
   // The two-workspace shortcut's pair. Both hosts persist it through the same app-scoped Node
@@ -46,7 +45,7 @@ export const PrefKeys = {
   onboarded: 'onboarded',
   agentToolPermissions: AGENT_TOOLS_PERMS_PREF_KEY,
   // How a tool call's disclosure starts out in an agent transcript, and the reader's last toggle when
-  // the setting is `sticky` (plugins/agents/src/client/toolFoldPrefs.ts). A JSON `{ mode, last }` in
+  // the setting is `sticky` (plugins/agents/src/client/sessions/toolFoldPrefs.ts). A JSON `{ mode, last }` in
   // one key, because the remembered toggle is only meaningful next to the mode that reads it.
   //
   // The device's, like `theme` and `diffView`. It describes how this screen draws a transcript, not
@@ -62,14 +61,11 @@ export const PrefKeys = {
   changesView: 'changes_view',
   // Which backend every Generate control in the app spends, and which model on it
   // (features/settings/models/generatePick.ts). A JSON `{ backendId, modelId }` in one key, like
-  // `changes_view` above, because the model is only meaningful beside the backend that serves it.
+  // `changes_view` above, because the model is only meaningful beside the backend that serves it. One
+  // key for every dialog, so a pick made in one is what the next opens on.
   //
-  // One key for all of them rather than one per dialog: with agent CLIs in the list beside API keys,
-  // re-picking in every dialog is the common case, so a pick made in one is what the next opens on.
-  //
-  // The device's, and this one is not a preference about drawing: the backends a node offers are the
-  // same everywhere, but which of them you want to spend is yours, and it should not follow you to a
-  // machine where you were working on somebody else's budget.
+  // The device's: the backends a node offers are the same everywhere, but which of them you want to
+  // spend is yours, and it should not follow you to a machine where you work on somebody else's budget.
   generatePick: 'models.generatePick',
   // Which editor the editor pane's file view mounts: the graphical one, or `$EDITOR` in a throwaway
   // PTY (plugins/editor/src/client/editorPrefs.ts). The device's, like `theme`: it names a program
@@ -96,14 +92,14 @@ export const PrefKeys = {
   // warning and should get it.
   diskWarningAcked: 'disk_warning_acked',
   // Which plugin, if any, the owner picked to draw each designated core surface
-  // (registries/exclusiveSlots.ts). A JSON `{ slot: pluginId }` map in one key, like
+  // (host/registries/extensionPoints/exclusiveSlots.ts). A JSON `{ slot: pluginId }` map in one key, like
   // `disk_warning_acked`, because a key per slot would need a registration and an eviction rule.
   //
   // The device's, like `theme` and `style`. The plugin behind the choice may not be installed on the
   // other machine paired with the same node.
   exclusiveSlots: 'exclusive_slots',
   // Which plugin, if any, the owner picked to fill each `replace` slot when two matched the same key
-  // (plugins/tree/arbitration.ts). The same one-key-holds-all shape as `exclusive_slots` above and for
+  // (host/tree/arbitration.ts). The same one-key-holds-all shape as `exclusive_slots` above and for
   // the same reason, and the device's for the same reason too: the plugin behind a pick may not be
   // installed on the other machine paired with this node.
   remoteSlots: 'remote_slots',

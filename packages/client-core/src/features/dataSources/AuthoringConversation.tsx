@@ -335,8 +335,8 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       Send
     </Button>
   )
-  // The model waits behind the sparkle beside Send, as it does for a commit message
-  // (plugins/git/src/client/changes/GenerateButton.tsx), so the request is the only thing in the way.
+  // The model waits behind the sparkle beside Send, as it does for a commit message, so the request is the
+  // only thing in the way.
   const modelPicker = () => (
     <Show when={backends().length}>
       <ModelPickerPopover

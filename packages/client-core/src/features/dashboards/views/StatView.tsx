@@ -38,7 +38,7 @@ export default function StatView(props: PanelViewProps) {
   const text = () => {
     const answer = value()
     // An em dash, not 0: "nothing to aggregate" and "the total is zero" are different, and only one
-    // of them is a fact about the data (node/FleetHome.tsx makes the same distinction).
+    // of them is a fact about the data (`FleetHome` makes the same distinction).
     if (answer === null) return '—'
     return measureText(answer)
   }

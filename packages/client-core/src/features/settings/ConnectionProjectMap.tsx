@@ -118,8 +118,8 @@ export default function ConnectionProjectMap(props: {
         } catch (cause) {
           // Every row here is drawn from the server's answer, so a failed write leaves the list where
           // it was; all this has to do is say why nothing moved. Read the status rather than blaming
-          // the connection for everything: "check the connection" sent someone hunting a credential
-          // problem when the node had simply not restarted into the schema the write needed.
+          // the connection for everything: "check the connection" sends someone hunting a credential
+          // problem when the node has simply not restarted into the schema the write needs.
           const status = Number((cause as Error).message.match(/(\d{3})$/)?.[1])
           throw new Error(
             status === 403
@@ -129,7 +129,7 @@ export default function ConnectionProjectMap(props: {
         }
         await queryClient.invalidateQueries({ queryKey: integrationMappingsKey(props.connection.id) })
         // The rail decides whether to draw this provider's source from the workspace-side read of the
-        // same rows (tabs/sources.ts), so that key has to go too, for every workspace at once.
+        // same rows (`createSourceScope`), so that key has to go too, for every workspace at once.
         await queryClient.invalidateQueries({ queryKey: ['workspace-external-projects'] })
       })
     } finally {

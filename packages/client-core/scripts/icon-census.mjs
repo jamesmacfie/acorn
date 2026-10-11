@@ -2,25 +2,20 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Which Lucide icons the renderer draws without waiting, written down by a script so the list cannot
-// rot.
+// Which Lucide icons the renderer draws without waiting. A script writes the list so it can't rot.
 //
-// `Icon` resolves a name against a map at render time, so a bundler cannot see which of Lucide's 1,756
-// icons are reachable and puts all 706 KB of geometry in a startup chunk. Dropping the unreachable ones
-// is not on the table: a person can assign any icon to a task and a plugin manifest can name any one,
-// and both choices are persisted.
+// `Icon` resolves a name against a map at render time, so a bundler can't see which icons are reachable
+// and would put all of Lucide's geometry in a startup chunk. None can be dropped: a person can assign any
+// icon to a task, a plugin manifest can name any one, and both choices are persisted.
 //
-// So the set is split. The names that appear as literals in this tree are the ones the chrome draws on
-// the first frame, and they are written to iconNodes.eager.json, which the Icon chunk carries. Everything
-// else arrives behind a dynamic import, which is what IconPicker and the task rail await.
-//
-// Run it two ways:
+// So the names that appear as literals in this tree, which the chrome draws on the first frame, go to
+// iconNodes.eager.json, which the Icon chunk carries. Everything else arrives behind a dynamic import.
 //
 //   node scripts/icon-census.mjs           rewrite iconNodes.eager.json from the tree
 //   node scripts/icon-census.mjs --check   fail if the tree names an icon the file does not carry
 //
-// The check runs in this package's `lint`, so a new literal icon cannot ship in the lazy half by
-// accident and flash as its own name for a frame.
+// The check runs in this package's `lint`, so a new literal icon can't ship in the lazy half by accident
+// and flash as its own name for a frame.
 
 const CLIENT_CORE = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REPO = resolve(CLIENT_CORE, '../..')

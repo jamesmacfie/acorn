@@ -33,7 +33,7 @@ export function samplePageFacts(activeClient: () => QueryClient): void {
   if (!telemetryEnabled() || document.visibilityState !== 'visible') return
   try {
     gauge('ui.page.elements', document.getElementsByTagName('*').length)
-    // The kit's timeline marks each drawn turn with this class (kit/components/content/Timeline.tsx).
+    // The kit's `Timeline` marks each drawn turn with this class.
     // Most of them are agent transcript turns.
     gauge('ui.page.timeline_turns', document.getElementsByClassName('ui-timeline-turn').length)
     const client = activeClient()

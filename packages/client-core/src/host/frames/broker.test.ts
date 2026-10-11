@@ -875,7 +875,7 @@ describe('byte requests', () => {
 })
 
 // An overlay a remote tree opened answers the tree that opened it. Everything else that can call
-// `close()` still gets the old no-result behaviour.
+// `close()` still closes with no result.
 describe('closing with a result', () => {
   it('lets an overlay pass one', async () => {
     const h = withBridge({ target: 'overlay' })

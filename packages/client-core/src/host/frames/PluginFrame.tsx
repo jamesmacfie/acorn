@@ -60,8 +60,8 @@ export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
   const [misbehaving, setMisbehaving] = createSignal<string | null>(null)
   // The frame took the port and never said a word: a bundle that threw at module scope, or one that was
-  // never a frame bundle. Until this existed the surface was a blank rectangle and the only evidence was
-  // a console error inside an iframe nobody opens devtools on.
+  // never a frame bundle. Without this the surface is a blank rectangle and the only evidence is a
+  // console error inside an iframe nobody opens devtools on.
   const [silent, setSilent] = createSignal(false)
 
   // The iframe element, for the broker's `frameHasFocus` gate on `openUrl`: a click or keypress
@@ -72,9 +72,8 @@ export default function PluginFrame(props: PluginFrameProps) {
   // while a component is being set up, and the services are a plain function on purpose.
   const navigate = useNavigate()
 
-  // The bridge's fourteen effects, built from this frame's props (./frameServices.ts). Kept out of
-  // this file so they can be unit-tested: the repo's client suites run in bare Node with no Solid
-  // transform, so nothing in a `.tsx` file can be reached by one.
+  // The bridge's effects, built from this frame's props (./frameServices.ts). Kept out of this file so a
+  // bare-Node suite with no Solid transform can unit-test them.
   const services = () =>
     createFrameServices(props, {
       qc,

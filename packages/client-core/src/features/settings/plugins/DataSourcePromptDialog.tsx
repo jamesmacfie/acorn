@@ -9,7 +9,7 @@ import { Text } from '../../../kit/components/content/Text'
 type Picked = { source: string; name: string }
 
 /** The two questions behind "Build a data source from your connections": what one row is, and which
- *  of the node's sources it reads. The answers become the agent prompt in ./PluginsSettings.tsx. */
+ *  of the node's sources it reads. The answers become the agent prompt in `PluginsSettings`. */
 export function DataSourcePromptDialog(props: {
   nodeId: string
   onDismiss: () => void

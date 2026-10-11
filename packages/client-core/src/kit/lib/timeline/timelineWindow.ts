@@ -2,9 +2,9 @@
 // for (docs/managed-agents/transcript.md § The window).
 //
 // A fixed logical window, not a virtualizer. It counts turns and never measures one, so nothing here
-// can feed back into layout the way the transcript's old virtualizer did
-// (../../components/content/Timeline.tsx says what that broke). The caller draws `keys()` and hands the Timeline `hidden()`;
-// the Timeline keeps the reader's place by identity while the window changes under it.
+// can feed back into layout the way a virtualizer does (the `Timeline` header says how). The caller
+// draws `keys()` and hands the Timeline `hidden()`; the Timeline keeps the reader's place by identity
+// while the window changes under it.
 //
 // The window is held by its oldest drawn key. A streamed turn joins the window rather than sliding it,
 // so an arriving event never removes a card. The only things that make it smaller are `reset`, for a
@@ -18,9 +18,7 @@ import { createMemo, createSignal, untrack, type Accessor } from 'solid-js'
  *
  * A followed Timeline trims back to this once it draws twice as many, so a transcript left following
  * a live session stays under the 400 mounted turns the large-surface flow allows
- * (apps/desktop/scripts/agent/flow.mjs § MOUNTED_CEILING). Chosen from card construction in jsdom:
- * the canonical 7,012-event session built 3,387 cards in about 840 ms, 0.25 ms a card, so a page is
- * about 50 ms there. No real-window timing was available to refine it.
+ * (apps/desktop/scripts/agent/flow.mjs § MOUNTED_CEILING).
  */
 export const TIMELINE_PAGE = 200
 

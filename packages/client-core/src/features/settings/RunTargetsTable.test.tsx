@@ -3,9 +3,9 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RunTargetsTable } from './RunTargetsTable'
 
-// Run targets used to be a JSON array typed into a box. The table must write back the same array: a
-// key it does not show survives an edit, one default stays one default, and a target the repo
-// declares cannot be edited from here.
+// The stored value is a JSON array, and the table must write back the same array: a key it does not
+// show survives an edit, one default stays one default, and a target the repo declares cannot be
+// edited from here.
 
 let host: HTMLElement
 let dispose: (() => void) | undefined

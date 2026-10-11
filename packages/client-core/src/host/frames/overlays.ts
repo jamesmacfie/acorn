@@ -7,16 +7,14 @@ import { createSignal } from 'solid-js'
 // tell which Escape dismissed. Opening a second one replaces the first, the same way the shell's own
 // palettes behave.
 //
-// Kept out of the registries folder and JSX-free deliberately: the verb that opens an overlay lives in
-// plugins/chrome/actions.ts and the surface that renders one in plugins/frames/register.ts, and both
-// have unit tests that run in a bare Node environment with no Solid transform (registries/slots.ts
-// states the same split).
+// Kept out of the registries folder and JSX-free deliberately: the verb that opens an overlay
+// (chrome/actions.ts) and the surface that renders one (frames/register.ts) both have unit tests that
+// run in bare Node with no Solid transform.
 //
-// An invocation rather than a pair of ids, because an overlay is now two things at once. A manifest
-// command opens one with nothing to say and nothing to hear back, which is what the ⌘P file palette has
-// always been. A remote tree opens its own companion overlay with an input and waits for a result
-// (docs/plugins/remote-points.md § Companion overlays). Both are the same record; the second simply fills the two
-// fields the first leaves empty.
+// An invocation rather than a pair of ids, because an overlay is two things at once. A manifest command opens
+// one with nothing to say and nothing to hear back, like the ⌘P file palette. A remote tree opens its own
+// companion overlay with an input and waits for a result (docs/plugins/remote-points.md § Companion
+// overlays). Both are the same record; the second simply fills the two fields the first leaves empty.
 
 /** One opening of one overlay. `id` is what keys the iframe, so reopening the same surface builds a
  *  fresh document rather than inheriting whatever the last one had drawn. */

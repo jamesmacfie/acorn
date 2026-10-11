@@ -1,10 +1,8 @@
 // What a caller filling a `pty` rectangle says, and what it never says.
 //
-// A `Rectangle` promises that the host draws the box and what is inside it. For `pty` the DOM kept
-// half of that promise: it handed over an element and three plugins each built their own xterm on it,
-// with their own theme, their own fit and their own resize observer. A terminal host has no element to
-// hand over, so the promise had to be kept properly — and the shape below is what was left once the
-// emulator moved to the host: a channel to open, bytes in, bytes out, and a size.
+// A `Rectangle` promises that the host draws the box and what is inside it. A terminal host has no
+// element to hand over, so for `pty` the host owns the emulator, theme, fit and resize, and the shape
+// below is all a caller says: a channel to open, bytes in, bytes out, and a size.
 //
 // Types only, and no imports, so a node-environment test and a tree bundle can both name them
 // (docs/ui-design/closed-kit.md § The closed kit, docs/terminal/client.md § Client).

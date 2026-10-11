@@ -127,8 +127,8 @@ export function WillConfirmationHost() {
       const ticked = checks()[concern.id] ?? concern.checkbox?.checked ?? false
       if (confirmed && concern.checkbox && ticked) checked.push(concern.id)
       // Contained, because this loop is between the owner clicking and the caller finding out. One
-      // handler throwing used to skip the resolve below, leaving the archive promise pending forever:
-      // the dialog closed and nothing happened, with no error anyone would connect to it.
+      // handler throwing would skip the resolve below, leaving the archive promise pending forever:
+      // the dialog closes and nothing happens, with no error anyone would connect to it.
       try {
         concern.onDecision?.(confirmed, ticked)
       } catch (error) {

@@ -14,8 +14,6 @@ import { keymap } from '../../kit/keys/keymapHost'
 // has focus, so a chord a pane shadows shows the pane's meaning, and one whose command is
 // unavailable does not show at all. A list built from the registry would say what is registered,
 // which is not the question anyone is asking with a cheat sheet open.
-//
-// Textual draws the same data as a footer strip; a terminal host would read this function too.
 
 type Line = { display: string; group: string; desc: string }
 type Group = { name: string; lines: Line[] }
@@ -84,8 +82,8 @@ export function CheatSheet() {
                   <For each={group.lines}>
                     {(line) => (
                       // What it does first and the key at the end, as a menu shows them. With the key
-                      // first, each section's table sized its own key column and the descriptions
-                      // started at a different edge in every section.
+                      // first, each section's table sizes its own key column and the descriptions
+                      // start at a different edge in every section.
                       <TableRow>
                         <TableCell>{line.desc}</TableCell>
                         <TableCell align="end">

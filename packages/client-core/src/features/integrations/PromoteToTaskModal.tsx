@@ -113,8 +113,8 @@ export function PromoteToTaskModal(props: {
   })
 
   // The branch the task is actually made on. A name the provider seeded is used verbatim: a pull
-  // request's head branch already exists on the remote, and slugging it away gave the task a local
-  // branch that could never be pushed to that pull request ('npm_and_yarn' became 'npm-and-yarn').
+  // request's head branch already exists on the remote, and slugging it would give the task a local
+  // branch that can never be pushed to that pull request ('npm_and_yarn' would become 'npm-and-yarn').
   // With no provider seed, the title supplies the same prefixed, de-duplicated default as the rail's
   // local-task dialog. Only what a person types in the branch field is slugged. Either way an
   // unusable name leaves the button disabled.

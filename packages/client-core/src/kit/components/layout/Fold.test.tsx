@@ -58,7 +58,7 @@ it('mounts an initially open section immediately', () => {
 })
 
 // A slot a Show tests and then inserts is two reads of a prop getter, and each read runs the caller's
-// JSX. Every mark in a transcript's tool cards and file rows was built twice that way.
+// JSX, so every mark in a transcript's tool cards and file rows would be built twice.
 it('builds each slot once, in a fold header and a row', () => {
   const host = document.createElement('div')
   let built = 0

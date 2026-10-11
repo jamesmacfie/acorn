@@ -35,14 +35,12 @@ import {
 import './dashboards.css'
 
 // One placement: the grid of panels a person put somewhere and the gestures that arrange it.
-// `PanelGridItem` owns each panel's render/chrome boundary; this owns only the shared arrangement.
+// `PanelGridItem` owns each panel's render/chrome boundary; this owns only the shared arrangement and
+// its measurement, and commits only what the pure layout functions answer.
 // See docs/dashboards/placements.md § Placements and § The grid.
 //
-// It takes a scope rather than assuming home, because `panelsAt` and `layoutAt` already do. A task
-// pane or a plugin-reserved region is this component with a different scope.
-//
-// Cell collision arithmetic is in `layout.ts`, and `panelGridGeometry.ts` projects the resolved cells
-// back to pixels. This orchestrator owns measurement and commits only the pure functions' answers.
+// It takes a scope rather than assuming home: a task pane or a plugin-reserved region is this component
+// with a different scope.
 
 /** Below this the cells are too small to mean anything, so the grid collapses to one column. */
 const MIN_CELL_PX = 44
@@ -118,7 +116,7 @@ export default function PanelGrid(props: {
   //
   // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the
   // overlay agree to the pixel whatever a style pack sets, and nothing here joins the
-  // JS-reads-a-token list (ui/tokenAxes.ts, `BRIDGE_TOKENS`).
+  // JS-reads-a-token list (`BRIDGE_TOKENS`).
   const measure = () => {
     const el = gridEl
     if (!el) return
@@ -132,7 +130,7 @@ export default function PanelGrid(props: {
   }
 
   // Observed from the grid's own ref, not from mount: an empty placement draws no grid, so a mount-time
-  // observer never attached and the first panel published there kept the starting cell size.
+  // observer would never attach and the first panel published there would keep the starting cell size.
   let observer: ResizeObserver | undefined
   onCleanup(() => observer?.disconnect())
   const attachGrid = (element: HTMLDivElement) => {
@@ -306,8 +304,8 @@ export default function PanelGrid(props: {
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
   // Move up and move down are reinterpreted onto geometry as a swap toward the neighbour in reading
-  // order (docs/dashboards/placements.md § The grid). On a one-column window they behave as they did before
-  // geometry existed.
+  // order (docs/dashboards/placements.md § The grid). On a one-column window that is a move up or down
+  // the list.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
     const current = committed()

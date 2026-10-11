@@ -1,4 +1,4 @@
-// MCP config inspector (docs/mcp.md § Configuration) over loopback HTTP: was `window.acorn.mcp`. Reads
+// MCP config inspector (docs/mcp.md § Configuration) over loopback HTTP. Reads
 // the known candidate files in a project's folder and the home directory, parsed and secret-masked on
 // the node.
 import { projectMcpRoute, projectMcpStarterRoute, type ProjectMcpFile } from '@acorn/protocol/api.ts'

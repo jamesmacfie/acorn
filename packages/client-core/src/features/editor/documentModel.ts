@@ -94,8 +94,8 @@ export function clearDocumentViewStates(): void {
   viewStates.clear()
 }
 
-// Registered beside the signal it clears (registries/scopeEviction.ts). View state does not clear
-// on a node switch, because it is keyed by node, so switching back restores where the reader was.
+// Registered beside the signal it clears. View state does not clear on a node switch, because it is keyed by
+// node, so switching back restores where the reader was.
 onScopeEvicted((eviction) => {
   if (eviction.scope === 'task') evictDocumentViewStates(eviction.taskId)
   else if (eviction.scope === 'workspace') evictDocumentViewStates(eviction.workspaceId)

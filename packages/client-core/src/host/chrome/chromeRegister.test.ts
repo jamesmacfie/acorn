@@ -827,14 +827,12 @@ describe('syncChromeContributions', () => {
     expect(ids().commands).toEqual(['plugin.board.run'])
   })
 
-  // The fixture the phase asks for: a loaded plugin's setting, driven through the real registration
-  // pass rather than through a hand-built contribution
-  // (docs/plugins/commands.md § Command kinds).
+  // A loaded plugin's setting, driven through the real registration pass rather than through a
+  // hand-built contribution (docs/plugins/commands.md § Command kinds).
   //
   // Two non-secret choices, because that is what a setting command may be: a bounded, visible choice
-  // with its current value shown. Deliberately a fixture and not a real plugin's setting — none of the
-  // four adopting plugins has a two-choice preference, and inventing one to be covered would be a
-  // product decision made by a test.
+  // with its current value shown. A fixture rather than a real plugin's setting, because inventing a
+  // preference for a real plugin just to cover it would be a product decision made by a test.
   describe('a loaded plugin’s setting, end to end', () => {
     const declared: Partial<PluginContributions> = {
       commands: [

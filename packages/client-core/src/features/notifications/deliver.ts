@@ -5,8 +5,8 @@
 // reach anybody. An edge you watched happen — window focused, its task on screen — still lands in
 // the bell, already read, and fires no channel: the history is complete and the pill does not move.
 //
-// Channels beyond the bell row are sinks. Phase 1 registers none; sound, the system notification and
-// the terminal's OSC sequences each add one.
+// Channels beyond the bell row are sinks (`registerNoticeSink`): sound, the system notification and the
+// terminal's OSC sequences each add one.
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { noticeKindContribution } from '../../host/registries/rail/notices'
 import { pluginRowTarget } from '../../host/plugins/rowTargets'
@@ -173,7 +173,7 @@ export function pushManagedAgentNotice(input: {
  *  2. The `runId` shorthand, for a node built before `target` existed. A client and the node it talks
  *     to are separately installed, so a remote node can be older than the window in front of you.
  *  3. The raising plugin's own surface, for the loaded tier, which is not allowed to name a target
- *     (host/plugins/rowTargets.ts).
+ *     (`pluginRowTarget`).
  *
  *  Core's own notices — the trust prompt, the install request — name no plugin and no target. They
  *  carry an `action` instead, which the bell answers by opening a dialog rather than navigating. */
@@ -209,7 +209,7 @@ export function initWorkflowNotices(): () => void {
 
 /** The system channel: an OS banner for every unseen notice the settings allow, through the
  *  platform seam's `notify` group where a shell installed one and the page's own `Notification`
- *  otherwise (infra/platform/index.ts).
+ *  otherwise.
  *
  *  The body is the notice's `detail` and nothing else. A title is already free of prompt text,
  *  responses, filenames and paths (`pushManagedAgentNotice`), and the notification centre keeps what
@@ -222,10 +222,8 @@ export function initSystemNotices(): () => void {
 /** Exported for the test. Sinks only ever see an unseen notice, so the seen rule is already kept. */
 export function systemSink(notice: Notice): void {
   if (!readNotificationSettings().system) return
-  // `toast` is the kind's own answer to "may this reach the desktop", and until now nothing read it:
-  // every kind declared one, three of them declared `false` with a comment saying why, and the banner
-  // fired anyway. So `background-error` and `disk-unencrypted` stop banner-ing, which is what those
-  // comments always said they did — a standing condition and a swallowed error belong in the bell.
+  // `toast` is the kind's own answer to "may this reach the desktop". `background-error` and
+  // `disk-unencrypted` declare `false`: a swallowed error and a standing condition belong in the bell.
   //
   // An unregistered kind resolves to `plugin`, which is `false`. That is the safe default and the one
   // the tier rule leans on: a loaded plugin's notice is forced to that kind precisely so third-party

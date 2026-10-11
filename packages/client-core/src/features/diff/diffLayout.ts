@@ -20,7 +20,7 @@ import type { DiffItem } from './documentView'
 //
 // Code rows have exact heights from the topology; the dynamic blocks between and under them (threads,
 // and whatever a line draws under itself: a review note, another plugin's marks, an open composer)
-// are measured. The two live apart, in ../../kit/diff/layoutIndex.ts, so a thread that grows moves the
+// are measured. The two live apart, in `createDiffLayoutIndex`, so a thread that grows moves the
 // items below it without the geometry recomputing anything per item.
 //
 // This module is the reactive part: it builds the index for the projection on screen, derives each
@@ -303,7 +303,7 @@ export function createDiffLayout(props: {
 
   const rebuild = (projection: Projection, items: readonly DiffItem[], mode: ViewMode) => {
     // Only within one projection. A change of projection swaps the scroller, and restoring a place
-    // across it is the scroll restoration's decision (./scrollRestoration.ts).
+    // across it is the scroll restoration's decision (`createDiffScrollRestoration`).
     const element = builtMode === mode ? props.scrollEl() : undefined
     const place = element && projection.items.length ? capture(projection, element.scrollTop) : null
     const keys = new Map<string, number>()

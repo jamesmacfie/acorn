@@ -256,8 +256,8 @@ describe('the update diff', () => {
   })
 
   it('marks nothing when only the wording moved', () => {
-    // The case this record shape exists for. With the sentence as the diff key, a copy edit re-prompted
-    // every owner of every installed plugin. Same grants, different sentence, nothing new.
+    // The case this record shape exists for. With the sentence as the diff key, a copy edit would
+    // re-prompt every owner of every installed plugin. Same grants, different sentence, nothing new.
     const same = permissions({
       api: ['core.tasks:read'],
       node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'], sockets: false },
@@ -281,7 +281,7 @@ describe('the update diff', () => {
   })
 
   it('carries severity with the grant instead of guessing it from the sentence', () => {
-    // The other half of the same idea. Prefix-matching copy against a table rendered any grant whose
+    // The other half of the same idea. Prefix-matching copy against a table would render any grant whose
     // sentence missed the table as harmless.
     const risky = permissions({
       api: ['core.projects:read'],

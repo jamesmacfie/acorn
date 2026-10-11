@@ -1,6 +1,6 @@
 import { Spinner } from '../../kit/components/content/Spinner'
 
-/** The desktop's region placeholder (./table.ts § setRegionPlaceholder): the kit spinner and the
+/** The desktop's region placeholder (`setRegionPlaceholder`): the kit spinner and the
  *  pane's name, centred in the region. The spinner carries the words for a screen reader. */
 export function RegionLoading(props: { label: string }) {
   return (

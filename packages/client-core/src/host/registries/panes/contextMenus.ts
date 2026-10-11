@@ -19,7 +19,6 @@ const log = createLogger('context-menu')
 export type { ContextMenuLocation }
 
 /**
-/**
  * What is under the cursor, as the host describes it. Every fact is a flat scalar on purpose: a
  * declared `when` is a map of literals compared against these fields, so a nested value would be a
  * fact no manifest could name.

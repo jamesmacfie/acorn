@@ -2,7 +2,7 @@ import { createEffect, createSignal, onCleanup, type Accessor } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { Task, Workspace } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
-// Also the module that seeds the built-in twelve into the theme registry, which is what makes
+// Also the module that seeds the built-in themes into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
 import { resolveTheme } from '../../features/settings/builtInThemes'
 import { resolveStyle } from '../../features/settings/uiStyles'
@@ -11,7 +11,7 @@ import { persistedStateRegistry, type PersistedStateSlice } from './persistedSta
 import { lastWorkspaceSlice, workspaceHistorySlice } from './stateSlices'
 import { createStartupRestore } from './startupRestore'
 
-// Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
+// Every read goes through `resolveTheme`, which falls back to the built-in
 // default when the stored id names a theme that is not registered right now: a plugin theme whose
 // package is disabled, gone, or on a node this window cannot reach. It reads the theme registry, so
 // this function is reactive: the effect below re-runs and the plugin's theme reappears the moment the
@@ -72,7 +72,7 @@ export function createAppStartupRestore(options: AppStartupOptions): {
   onCleanup(() => disposeTheme())
 
   // Held for App.tsx rather than acted on here. Opening a workspace can open a task, and a task opened
-  // before the pane layouts land in the last phase gets a default layout that the saved one then
+  // before the pane layouts restore in the `panes` phase gets a default layout that the saved one then
   // declines to overwrite.
   const [lastWorkspaceId, setLastWorkspaceId] = createSignal('')
   const shellSlices = [

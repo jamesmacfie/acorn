@@ -1,25 +1,19 @@
-// The client's telemetry emitter: the same five record kinds and the same verbs as the node's
-// collector, and one thing the node does not have, a trace that spans an interaction.
+// The client's telemetry emitter: the same record kinds and verbs as the node's collector, plus a
+// trace that spans an interaction. docs/telemetry.md owns the model and
+// docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
 //
-// docs/telemetry.md owns the model and docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
-// Three shape decisions belong here.
+// **The verbs match the node's, argument for argument,** owner first, as the node collector's do. The
+// terminal client reuses this file and changes only the poster, so a second copy would be two
+// vocabularies for one record model. The desktop helper is a Node process and uses the node's collector.
 //
-// **The verbs match the node's, argument for argument.** `measure`, `recordDuration`, `startSpan`
-// and the four emits all take the owner first, exactly as `node-core/server/telemetry/collector.ts`
-// does. The terminal client reuses this file and changes only the poster, so a second copy of the
-// verbs would be two vocabularies for one record model. The desktop helper reuses the node's
-// collector instead, because it is a Node process that already depends on node-core and cannot
-// reach a package that draws (docs/shell/node-child.md § What the helper reports).
-//
-// **There is no scrubber here.** A browser cannot know this machine's home directory or its data
-// root, which are the two prefixes worth collapsing, so the node re-scrubs every posted record at
-// the door (`ingestTelemetry`). One scrubber, in the process that knows the paths.
+// **There is no scrubber here.** A browser cannot know this machine's home directory or its data root,
+// which are the two prefixes worth collapsing, so the node re-scrubs every posted record at the door
+// (`ingestTelemetry`).
 //
 // **The interaction trace is a module variable, not an async context.** A command or a page change
 // opens one; every request `apiClient.send()` makes while it is open hangs under it, so the node's
 // `http.request` span is a child of the click that caused it. Work that continues after the span
-// ends gets no parent. That is a known imprecision, and it is written down rather than fixed with
-// an async-context polyfill the renderer does not have.
+// ends gets no parent, because the renderer has no async context to carry one.
 //
 // Nothing here can fail the thing it measures. Every verb is wrapped and every verb starts with one
 // boolean read.
@@ -233,7 +227,7 @@ export const currentTraceparent = (): string | undefined =>
 /**
  * Open a span and make it the parent of everything the renderer does until it ends.
  *
- * Two seams call this: `executeCommand` and the page-change wrapper. A second interaction opening
+ * Core opens one from `executeCommand` and the page-change wrapper. A second interaction opening
  * over the first replaces it, which is what a person clicking twice looks like, and ending an
  * interaction that is no longer the current one leaves the current one alone.
  */
@@ -297,12 +291,11 @@ let spansOnTimeline = false
  * Also write every span to this page's performance timeline, as a `performance.measure` named
  * `acorn:<span name>` with the attributes as its `detail`.
  *
- * The local reader for span durations. Sinks are the only other one, and the one shipped posts to
- * Sentry, so without this a developer timing a task switch had no way to see `nav.change` or
- * `pane.region` on their own machine. The devtools performance panel draws these, and a script reads
- * them with `performance.getEntriesByType('measure')`. The desktop turns it on with the `acorn.perf`
- * switch (`apps/desktop/src/client/boot.ts`). Nothing clears the entries, which is fine for a switch a
- * developer flips for a session and is why it is not on by default.
+ * The local reader for span durations: the shipped sink posts to Sentry, so this is how a developer
+ * sees `nav.change` or `pane.region` on their own machine. The devtools performance panel draws these,
+ * and a script reads them with `performance.getEntriesByType('measure')`. The desktop turns it on with
+ * the `acorn.perf` switch (`apps/desktop/src/client/boot.ts`). Nothing clears the entries, which is
+ * fine for a switch a developer flips for a session and is why it is not on by default.
  */
 export function setSpansOnTimeline(on: boolean): void {
   spansOnTimeline = on
@@ -733,9 +726,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
   })
   state.runtime = options.runtime
   state.post = options.post
-  // A contribution that throws while rendering, reported through the seam `kit/` has for it
-  // (kit/lib/telemetry/contributionErrors.ts). Installed here rather than imported there, because `kit/` may
-  // not import this module and a plugin's UI bundle re-exports `kit/`.
+  // A contribution that throws while rendering, reported through the seam `kit/` has for it.
+  // Installed here rather than imported there, because `kit/` may not import this module and a
+  // plugin's UI bundle re-exports `kit/`.
   setContributionErrorHandler(({ contributionId, owner, error }) => {
     emitError(owner ?? 'core', {
       name: error instanceof Error ? error.name || 'Error' : 'Error',
@@ -745,9 +738,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       attrs: { seam: 'contribution.render', 'contribution.id': contributionId },
     })
   })
-  // Where a followed timeline put the reader, through the seam `kit/` has for it
-  // (kit/lib/telemetry/scrollPlace.ts). An event rather than a log: it is a fact worth counting and correlating,
-  // and it rides along as a breadcrumb on any error raised near it.
+  // Where a followed timeline put the reader, through the seam `kit/` has for it. An event rather than
+  // a log: it is a fact worth counting and correlating, and it rides along as a breadcrumb on any
+  // error raised near it.
   setScrollPlaceHandler((place) => {
     emitEvent('core', 'ui.scroll.place', {
       cause: place.cause,
@@ -759,10 +752,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       following: place.following,
     })
   })
-  // What a large diff or timeline said about itself when it became ready and when it went away
-  // (kit/lib/telemetry/surfaceHealth.ts). A fixed handful of its numbers, as samples, so the label set stays one
-  // row per surface kind and checkpoint. The full snapshot is a local read
-  // (./surfaceHealth.ts), not a telemetry record.
+  // What a large diff or timeline said about itself when it became ready and when it went away. A
+  // fixed handful of its numbers, as samples, so the label set stays one row per surface kind and
+  // checkpoint. The full snapshot is a local read (./surfaceHealth.ts), not a telemetry record.
   setSurfaceHealthHandler((entry, checkpoint) => {
     for (const [seam, value, unit] of surfaceSamples(entry)) {
       recordSample('core', seam, value, unit, { surface: entry.kind, checkpoint })

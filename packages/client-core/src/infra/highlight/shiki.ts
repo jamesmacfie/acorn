@@ -30,17 +30,13 @@ export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
   return hl
 }
 
-// A fence's highlighted html, keyed by its language and its exact text.
-//
-// The transcript re-renders a streaming message about 25 times a second, and a message can hold
-// several code fences. Block-level reuse in kit Markdown.tsx already stops an unchanged fence from
-// being re-tokenized while the message is on screen; this catches the rest — the same fence coming
-// back after a scroll, a view switch or a remount, and the same snippet appearing twice.
+// A fence's highlighted html, keyed by its language and its exact text. Block reuse in the kit
+// `Markdown` already stops an unchanged fence from being re-tokenized while a streaming message is on
+// screen; this catches the rest: the same fence coming back after a scroll, a view switch or a
+// remount, and the same snippet appearing twice.
 //
 // Exact keys rather than a hash, because a hash collision would show a reader the wrong code. The
-// ceiling that buys is memory, so the window is small and a fence over 16 KB is not kept at all: the
-// cache is a window over what is on screen, not a record. If a surface ever needs a bigger one, hash
-// the text and accept the collision risk, or move the store off the module.
+// price is memory, so the window is small and a fence over 16 KB is not kept at all.
 const HTML_CACHE_ENTRIES = 200
 const HTML_CACHE_MAX_BYTES = 16 * 1024
 const htmlCache = new Map<string, string>()
@@ -54,8 +50,7 @@ const htmlFlights = new Map<string, HtmlFlight>()
  * Each token carries both colours as --l/--r and the stylesheet picks a side with light-dark(), the
  * same way diff rows do (styles/primitives.css § Markdown, docs/ui-design/tokens.md § Token axes). Shiki's
  * own dual-theme default instead writes the light colour into `color` and the dark one into a
- * --shiki-dark no stylesheet here reads, so under a dark theme every fence drew github-light on a
- * white background.
+ * --shiki-dark no stylesheet here reads, so a dark theme would draw every fence in github-light.
  */
 export function highlightToHtml(code: string, lang: string, isLive: () => boolean = () => true): Promise<string> {
   const key = `${lang}\u0000${code}`

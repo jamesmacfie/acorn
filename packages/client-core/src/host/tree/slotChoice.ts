@@ -9,8 +9,8 @@ import { slotChoiceFor, slotChoices } from './arbitration'
  *
  * The preferences query is created the first time that question is asked, not when the slot mounts.
  * Only a tie reads the pick, and a tie needs two plugins matching the same key, which is rare. A
- * transcript draws a slot for every tool card, so a query per slot was one query observer, store and
- * `select` pass per card, 452 of them on one long session, all to answer a question nobody asked.
+ * transcript draws a slot for every tool card, so a query per slot would cost a query observer, store
+ * and `select` pass per card, hundreds on a long session, to answer a question nobody asked.
  *
  * Created under the owner of the slot that asked, so it is disposed with that slot.
  */

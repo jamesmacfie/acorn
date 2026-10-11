@@ -2,9 +2,9 @@
 // docs/diff-rendering/loading.md § Syntax highlighting for why neither side of the worker boundary may
 // pull the other's graph across.
 //
-// The token shape is structural rather than an import of ui/diff/model.ts's `Tok`. They are the
-// same three fields and stay assignable; what is not wanted is a highlight module that only
-// compiles because a diff module exists.
+// The token shape is structural rather than an import of the diff model's `Tok`. They are the same
+// three fields and stay assignable; what is not wanted is a highlight module that only compiles
+// because a diff module exists.
 
 /** One highlighted run: its text, and the colour it takes under each of the two bundled themes. */
 export type HighlightTok = { content: string; light: string; dark: string }

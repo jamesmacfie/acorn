@@ -66,8 +66,8 @@ it('restores a retained panel offset when remote props and content arrive after 
 })
 
 // A remote tree's props are validated one at a time and a bad one is dropped, so a node can be asked
-// to draw without a prop its type says is required. Throwing here unmounts the region the tree is in,
-// which is how one plugin's malformed `tabs` list took out both halves of the API panel.
+// to draw without a prop its type says is required. Throwing here would unmount the region the tree
+// is in.
 it('draws an empty strip when the tabs list never arrived', () => {
   const host = document.createElement('div')
   const dispose = render(

@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   writeJson: vi.fn(),
   pushBackgroundError: vi.fn(),
 }))
-// savePref owns the pref write itself now, so stub the transport rather than a sibling module.
+// savePref owns the pref write itself, so stub the transport.
 vi.mock('../../infra/node/apiClient', () => ({ writeJson: mocks.writeJson }))
 vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 
@@ -74,9 +74,8 @@ describe('savePref', () => {
 
   it('writes a DEVICE pref locally and never reaches a node', async () => {
     // The point of the tier: `theme` is a property of this installation, `localStorage.setItem`
-    // cannot fail in a way a retry would fix, and the optimistic-write-and-roll-back dance above
-    // exists for a network round trip that no longer happens. The cache write still happens, because
-    // that is what every reactive reader sees.
+    // cannot fail in a way a retry would fix, and there is no network round trip to roll back. The
+    // cache write still happens, because that is what every reactive reader sees.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { theme: 'light' })
@@ -92,8 +91,8 @@ describe('savePref', () => {
   it('has the DEVICE value in localStorage before the cache notifies', async () => {
     // Readers see prefs through `prefsOptions.select` = mergePrefs(raw, readDevicePrefs()), where
     // device wins. So the cache write must land after localStorage, or select recomputes against the
-    // old device value and discards the new one: that is how a theme or style change used to appear
-    // to do nothing until an unrelated pref write re-ran select seconds later.
+    // old device value and discards the new one, and a theme or style change appears to do nothing
+    // until an unrelated pref write re-runs select.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { style: 'terminal' })

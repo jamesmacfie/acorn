@@ -14,7 +14,7 @@ export { parsePanelDefinition }
 
 /** `(surface, ownerId, workspaceId?)`. All three surfaces are drawn: `home` (a tab per `ownerId`,
  *  per workspace), `pane`, and `plugin-region`, a rail source's side panel or a plugin pane's aside
- *  owned as `<pluginId>:<somethingId>` (dashboards/region.ts). */
+ *  owned as `<pluginId>:<somethingId>`. */
 export type PlacementSurface = 'home' | 'pane' | 'plugin-region'
 
 export type PlacementScope = {
@@ -78,8 +78,8 @@ export const emptyDashboards = (): DashboardState => ({ version: 1, panels: {}, 
 
 // The geometry codec (docs/dashboards.md § Persistence): a malformed rect is dropped rather than
 // repaired, a placed panel with no rect is auto-placed at render (layout.ts § firstFit), and an
-// entry naming a panel not placed in that scope is retained unread. No version bump: the change is
-// additive and still parses under the old parser.
+// entry naming a panel not placed in that scope is retained unread. No version bump: the key is
+// additive, so an older parser still reads everything else.
 
 const parseRect = (raw: unknown): Rect | undefined => {
   if (!isRecord(raw)) return undefined
@@ -321,12 +321,10 @@ export const removeHomeTab = (tabId: string, workspaceId?: string): void =>
 
 /** Move a board composed while no workspace was known into the workspace Home is next opened in.
  *
- *  Home draws with no workspace at `/` with no project routed, and before the workspace mapping
- *  loads (workspaces/activeWorkspaceId.ts). A board composed then is keyed by the bare `home` and
- *  `home/<tab>`. This re-keys them to `home//<ws>` and `home/<tab>/<ws>` and stamps the matching
- *  names, whichever workspace the person opens Home in next. There is no honest better guess: the
- *  board named no workspace, so any other choice would be as arbitrary and would leave the panels
- *  invisible until they found them.
+ *  Home draws with no workspace at `/` with no project routed, and before the workspace mapping loads. A
+ *  board composed then is keyed by the bare `home` and `home/<tab>`. This re-keys them to `home//<ws>` and
+ *  `home/<tab>/<ws>` and stamps the matching names, whichever workspace the person opens Home in next. The
+ *  board named no workspace, so any choice is arbitrary, and this one keeps the panels visible.
  *
  *  Never overwrites: a key the workspace already has means the board it would land on is somebody's
  *  own, so the unscoped one stays where it is rather than replacing it. Returns the same state when

@@ -5,8 +5,7 @@ import { createSignal, type Accessor } from 'solid-js'
 // comes back finds its posture where it left it.
 //
 // Session-only, and deliberately: it is a reading posture rather than a preference, and persisting one
-// needs a scope, an eviction rule and a prefs key that nobody has asked for. That is exactly what the
-// splitter in the composed database pane did, and this generalises it rather than changing it.
+// needs a scope, an eviction rule and a prefs key that nobody has asked for.
 //
 // Module-level, like the registries, so two panes with the same id in two tasks share a value. They
 // share the pane id everywhere else too, including the persisted task layout.

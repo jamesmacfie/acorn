@@ -67,7 +67,7 @@ describe('token axes are complete', () => {
 
   it('declares every primitive palette token in every named theme block', () => {
     // docs/ui-design/tokens.md § Token axes covers why derived and series tokens are excluded here. The
-    // split is data now rather than a list written out in this file (ui/tokenAxes.ts), because a
+    // split is data in the token-axes module rather than a list in this file, because a
     // plugin-contributed theme is validated against the same primitives.
     const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS, ...SERIES_TOKENS])
     const primitives = [...theme].filter((t) => !derived.has(t))

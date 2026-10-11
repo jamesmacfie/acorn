@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ListDetail } from './primitives'
 
 // The list arrives in a prop, and a prop is a getter: every read re-runs the JSX the caller wrote
-// there. ListDetail read it three times, so the column was built three times over and the copies
-// fought over the same nodes. Docker's rail source drew an empty column
-// (docs/ui-design/two-column-panes.md § Two-column panes).
+// there. Reading it more than once builds the column several times over, the copies fight over the
+// same nodes, and the column draws empty (docs/ui-design/two-column-panes.md § Two-column panes).
 
 let host: HTMLElement
 beforeEach(() => {

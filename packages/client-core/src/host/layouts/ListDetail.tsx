@@ -13,7 +13,7 @@ import type { LayoutProps } from './regions'
 // `list-detail`: a list beside a detail, with the host drawing the divider and the drag handle.
 //
 // Regions: `list`, `detail`, and optionally `list-header` and `list-footer`, which pin above and below
-// the list's own scroll. Two focus groups from phase 2, `list` and `detail`.
+// the list's own scroll. Two focus groups, `list` and `detail`.
 //
 // Hiding `list` drops the whole column, its header and footer with it, and the detail takes the width.
 // That is what a pane collapsing its library asks for, and it is the same move the narrow projection
@@ -22,8 +22,8 @@ import type { LayoutProps } from './regions'
 // Collapsing is the other answer to the same question, and the column survives it: it narrows to the
 // width of the icon rails and each row keeps one mark. Every pane that names this layout gets the
 // control, with no field on the contribution, because a pane that names `list-detail` is a sidebar by
-// definition. The kit node has to be told (kit/components/layout/ListDetail.tsx) since it also
-// draws splits that are two halves of one document.
+// definition. The kit's `ListDetail` node has to be told, since it also draws splits that are two
+// halves of one document.
 //
 // The regions are left alone while collapsed. A pane's `list-header` is the pane's own, so whether it
 // becomes one icon or nothing at all is a question only the pane can answer, and it answers it by
@@ -49,9 +49,9 @@ export function ListDetail(props: LayoutProps) {
   // from the last drag's start.
   let dragStart: number | null = null
   // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
-  // window is not what its list is allowed to fill, and no layout may read the window's width
-  // (shell.css § Layouts, docs/ui-design/closed-kit.md § What the kit and layouts must never do, "never do these" item 12). Before
-  // the element is measurable there is no ceiling to apply; the floor still holds.
+  // window is not what its list is allowed to fill, and no layout may read the window's width (the pane
+  // layouts block in shell.css, and docs/ui-design/closed-kit.md § What the kit and layouts must never
+  // do, item 12). Before the element is measurable there is no ceiling to apply; the floor still holds.
   const ceiling = () => {
     const extent = root?.offsetWidth ?? 0
     return extent > 0 ? extent * MAX_LIST_FRACTION : Number.POSITIVE_INFINITY

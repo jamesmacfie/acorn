@@ -660,8 +660,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
         patchFrame({ status: outcome.status ?? '' })
       })
       .catch((error: unknown) => {
-        // An error keeps the frame open with the message on it. Before this the palette closed first
-        // and set the message afterwards, into a surface nobody could see any more.
+        // An error keeps the frame open with the message on it. Closing first and setting the message
+        // afterwards would put it into a surface nobody can see.
         setPending(false)
         patchFrame({ status: messageOf(error) })
       })

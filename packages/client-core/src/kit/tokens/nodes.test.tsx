@@ -14,7 +14,7 @@ import { Stack } from '../components/layout/Stack'
 import { Timeline } from '../components/content/Timeline'
 import { Chip } from '../components/primitives'
 
-// The ten nodes the kit gained, plus the two host wrappers. What a render adds over the matrix and
+// The nodes below, plus the two host wrappers. What a render adds over the matrix and
 // role tests is the part those cannot see: that a role prop reaches the DOM as a token reference
 // rather than a value, and that the two wrappers answer for the host this build draws to.
 

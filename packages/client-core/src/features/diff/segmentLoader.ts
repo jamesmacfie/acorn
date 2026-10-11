@@ -22,7 +22,7 @@ import { latestSignal } from '../../kit/lib/state/latestSignal'
 // follow in a second queue with the same demand, and replace the rows under the same index when they
 // land.
 //
-// The rows themselves live in the node's segment cache (./segmentCache.ts), not here, so a segment
+// The rows themselves live in the node's segment cache (`segmentCacheFor`), not here, so a segment
 // read by an earlier pane is drawn without asking the source again. This loader holds what it is
 // showing, near, or loading, so none of it is evicted from under the pane, and lets go on unmount.
 

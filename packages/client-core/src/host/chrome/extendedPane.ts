@@ -1,11 +1,9 @@
-// Which component this host wraps a plugin pane's reserved regions in.
+// Which component this host wraps a plugin pane's reserved regions in (docs/tui/host-switch.md § The host
+// switch).
 //
-// The fourth seam of this shape, after `layouts/table.ts`, `tree/table.ts` and `chrome/sourcePanel.ts`,
-// and it is here for the same reason all three are: `frames/register.ts` turns a manifest into
-// contributions for every host, and it named `chrome/ChromeExtendedPane.tsx` directly. That component is DOM
-// all the way down — `<div class="extended-pane">`, `<aside>`, a `PanelGrid` sized in pixels — so a
-// loaded plugin's pane that reserved a footer or an aside handed the cell reconciler a `div` and it
-// refused (docs/tui/host-switch.md § The host switch).
+// The same seam as `layouts/table.ts`, `tree/table.ts` and ./sourcePanel.ts. The frame registration pass
+// builds contributions for every host, and `ChromeExtendedPane` is DOM all the way down, which the
+// terminal's cell reconciler refuses. So each host supplies its own component.
 //
 // Types and one pure rule only, so a bare-Node suite can import the frame registration pass without a Solid transform.
 // The components themselves stay behind the caller's `lazy`.

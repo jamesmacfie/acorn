@@ -26,8 +26,7 @@ export function createMeasureHistory(
   panelId: Accessor<string | undefined>,
   enabled: Accessor<boolean>,
 ): Accessor<MeasureSample[]> {
-  // Captured at creation, as `createPanelData` does: a node switch remounts this tree rather than
-  // mutating it underneath.
+  // Captured at creation: a node switch remounts this tree rather than mutating it underneath.
   const nodeId = activeNodeId() ?? ''
 
   const query = createQuery(() => ({

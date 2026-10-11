@@ -7,7 +7,7 @@ import { taskPath } from '../../host/registries/commands/corePaths'
 // Deep-linking into a task's panes.
 //
 // A task's URL stays `/t/:taskId`. The panes are a row with focus and maximise state persisted per
-// task (tasks/tasks.ts), and a URL that owned that would be enormous or wrong the moment the owner
+// task (`taskLayouts`), and a URL that owned that would be enormous or wrong the moment the owner
 // moved a pane. What is worth an address is what `PaneIntent` already models: open this pane,
 // select this item.
 //
@@ -15,8 +15,8 @@ import { taskPath } from '../../host/registries/commands/corePaths'
 // and are consumed once, then stripped. Left in, the URL would keep asserting a pane the owner has
 // navigated away from.
 //
-// This gives `openPluginContentTarget` (registries/contentLinks.ts) an address. Every pane plugin
-// gets it without contributing a route.
+// This gives `openPluginContentTarget` an address. Every pane plugin gets it without contributing a
+// route.
 
 export const TASK_PANE_PARAM = 'pane'
 export const TASK_ITEM_PARAM = 'item'

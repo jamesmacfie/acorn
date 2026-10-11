@@ -59,8 +59,8 @@ export function openNoticeTarget(notice: Notice): void {
   if (notice.target) openTarget(notice.taskId, notice.target)
 }
 
-// The same dispatch for an attention item, which carries the identical target shape but is not a
-// Notice (registries/attention.ts). Exported so the inbox does not repeat the handler-table lookup.
+// The same dispatch for an `AttentionItem`, which carries the identical target shape but is not a
+// Notice. Exported so the inbox does not repeat the handler-table lookup.
 export function openTarget(taskId: string, target: NoticeTarget): void {
   targetHandlers.get(target.kind)?.(taskId, target)
 }

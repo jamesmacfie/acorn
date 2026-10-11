@@ -16,10 +16,9 @@ export type TabDef = {
 
 // Reusable tab strip. Renders only the tablist and drives the active id; the panels are the
 // caller's. Panel ids are `${idPrefix}-panel-${id}` and tab ids `${idPrefix}-tab-${id}` so callers
-// can wire aria-labelledby back. Extracted from the Rollbar item panel; also used by the create-task
-// modal and by the `tabs` layout.
+// can wire aria-labelledby back.
 //
-// A collection, so the arrows, Home, End and type-ahead come from ../keys/collection.ts rather than
+// A collection, so the arrows, Home, End and type-ahead come from `createCollection` rather than
 // from a key handler here. Selection follows focus, which is what a tab strip means.
 export function Tabs(props: {
   tabs: readonly TabDef[]
@@ -102,9 +101,8 @@ export function Tabs(props: {
   )
 }
 
-/** The panel half. Six attributes that have to agree with the strip's ids, hand-written twice in the
- *  rollbar frame before this existed. `hidden` rather than unmounting, so a panel keeps its scroll
- *  position and its in-flight state across a tab switch.
+/** The panel half: six attributes that have to agree with the strip's ids. `hidden` rather than
+ *  unmounting, so a panel keeps its scroll position and its in-flight state across a tab switch.
  *
  *  A name of its own as well as `Tabs.Panel`, because a remote tree names one type per node and has
  *  nowhere to put the dot. */

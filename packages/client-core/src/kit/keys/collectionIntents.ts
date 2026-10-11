@@ -1,10 +1,9 @@
 // What every collection does with an intent, with nothing about how it draws.
 //
-// Split out of `collection.ts` in terminal phase 2. The arrows, Home, End, the page keys, wrapping,
-// where the first press lands, and which of `select` and `activate` picks are all rules about a list
-// rather than about a document, and a second host had to keep them exactly
-// (docs/tui/scrolling.md § Collections). What stayed behind in `collection.ts`
-// is the DOM half: `focus()`, `scrollIntoView`, the `aria-*` and `tabindex` getters.
+// The arrows, Home, End, the page keys, wrapping, where the first press lands, and which of `select`
+// and `activate` picks are all rules about a list rather than about a document, and both hosts keep
+// them exactly (docs/tui/scrolling.md § Collections). `collection.ts` holds the DOM half: `focus()`,
+// `scrollIntoView`, the `aria-*` and `tabindex` getters.
 //
 // The host supplies two things and nothing else: `land`, which puts focus on an item, and `onItem`,
 // which says whether the item itself holds focus rather than a control inside it. Everything else —
@@ -51,8 +50,7 @@ export type CollectionIntentOptions = {
   onActivate?: (key: string) => void
   /** Left and right on a row of this collection. Returning `false` says the row did not fold — a
    *  leaf, or a directory that was already in the state asked for — and lets the key bubble to the
-   *  tier below, which on the terminal moves one column. Returning nothing keeps the old behaviour,
-   *  where the collection claimed the key either way, so no caller changes until it opts in
+   *  tier below, which on the terminal moves one column. Returning nothing claims the key either way
    *  (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). */
   onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
@@ -121,15 +119,14 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
   /** A page key: as far as `PAGE` allows without leaving the list, and `false` once it is there.
    *
    *  Clamped rather than wrapped, unlike the arrows above. Modulo a list shorter than a page is a
-   *  key that lies: PageDown in a three-row list moved one row, and in a ten-row list it moved
+   *  key that lies: PageDown in a three-row list moves one row, and in a ten-row list it moves
    *  nowhere at all, which a reader cannot tell from a dead key. Returning `false` at the edge is
    *  the other half of it. The key then carries on to the tier below, where a scrolling viewport
    *  moves the page the reader asked for, which is the sentence the footer promises: arrows move,
    *  page keys scroll (docs/tui/scrolling.md § Scrolling viewports).
    *
-   *  This is shared, so the desktop gets it too. PageDown on the last row of a desktop list now
-   *  stops instead of wrapping round to the first, and that is intended: a page key is how a reader
-   *  travels, and travelling past the end back to the start is how a reader loses their place. */
+   *  The desktop gets this too: a page key is how a reader travels, and travelling past the end back
+   *  to the start is how a reader loses their place. */
   const page = (delta: number): boolean => {
     const list = enabled()
     if (!list.length) return false

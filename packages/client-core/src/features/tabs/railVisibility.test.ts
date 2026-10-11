@@ -15,9 +15,8 @@ import {
   shownInRail,
 } from './railVisibility'
 
-// Presentation over availability (./railVisibility.ts): the user's switch beats the source's default,
-// core's own sources are never hideable, and hiding the source on screen is the one thing that
-// changes the selection.
+// Presentation over availability: the user's switch beats the source's default, core's own sources
+// are never hideable, and hiding the source on screen is the one thing that changes the selection.
 describe('rail visibility', () => {
   const disposables: { dispose(): void }[] = []
   beforeAll(() => {

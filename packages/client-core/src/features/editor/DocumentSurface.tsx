@@ -53,30 +53,23 @@ const log = createLogger('document-surface')
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/editor.md.
 //
-// This is the whole point of the design, so it is worth being blunt about what is where. The plugin
-// declared a language id and two routes and that is all it declared. Everything else on this screen, the
-// editor instance, the theme, the dirty document, the autosave debounce, cmd+S, the
-// flush-before-unmount, the view state and its eviction, is the host's, which is why a plugin cannot get
-// any of it wrong. It also never sees a byte of the editor: a frame that bundled its own would be
-// megabytes and would run without language services, because a plugin origin serves one file.
-//
-// Three of the things this file's first release deliberately left out have since arrived with their
-// consumer, the database pane, and they are the parts worth knowing about:
+// The plugin declares a language id and two routes, nothing else. The editor instance, the theme, the
+// dirty document, the autosave debounce, cmd+S, the flush-before-unmount, the view state and its
+// eviction are the host's, so a plugin can't get any of them wrong. A frame that bundled its own editor
+// would be megabytes and would run without language services, because a plugin origin serves one file.
 //
 //   - `onHandle` hands the composed pane's frame region a read, write and flush view of this document.
-//     The splitter itself is the layout's, not this component's; this one still just fills whatever
-//     rectangle it was given.
+//     The splitter is the layout's; this component fills whatever rectangle it is given.
 //   - Surface actions. A chord like cmd+Enter is pressed with focus inside this editor, where the
 //     plugin's iframe has no keyboard at all, so the host resolves it and posts the command across. The
-//     document is flushed first, and that ordering is a contract rather than an implementation detail:
-//     without it every plugin independently rediscovers "it ran the previous version of my query".
-//   - Completions, as a plain POST to a route the plugin declared. The host stays a dumb proxy: it never
-//     learns the language, which is what lets the same mechanism serve SQL, GraphQL and YAML.
+//     document is flushed first, and that order is a contract: without it the plugin runs the previous
+//     version of the person's query.
+//   - Completions, as a plain POST to a route the plugin declared. The host never learns the language,
+//     so the same mechanism serves SQL, GraphQL and YAML.
 //
-// The editor is imported here at module scope and not in the frame registry, which is the file that
-// registers this pane: that one is evaluated on every shell boot, so it reaches this module through
-// `lazy()` instead. The grammars arrive when a document pane first opens, which is the only moment they
-// are needed, and a shell that never opens one never loads them.
+// The editor is imported here at module scope, not in the frame registry that registers this pane: that
+// one is evaluated on every shell boot, so it reaches this module through `lazy()`, and a shell that
+// never opens a document pane never loads the grammars.
 
 export type DocumentSurfaceProps = {
   pluginId: string
@@ -124,11 +117,10 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
   const address = [nodeId, props.scope.taskId ? 'task' : 'project', scope, uri, readPath, writePath]
   // A language id the manifest parser already checked, re-checked because the manifest reached this
-  // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
+  // device as a roster row, which is bytes a node sent.
   //
-  // Started here and awaited beside the document's text below, because the grammar is a download of
-  // its own (./language.ts fetches one per language). Kicked off at mount so it is in flight while the
-  // read route answers, and the two land together.
+  // Started at mount and awaited beside the document's text below, because the grammar is a download
+  // of its own, so it is in flight while the read route answers and the two land together.
   // `.catch` rather than a rejection the load block has to handle: a grammar that will not download
   // means no highlighting, and no highlighting beats no document.
   const language = measure(props.pluginId, 'editor.language.load', () =>
@@ -229,8 +221,8 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   }
 
   // The plugin's items, offered for this view only. CodeMirror's completion sources hang off the state
-  // rather than off a global per-language registry, so unlike Monaco there is nothing here that a second
-  // document pane in the same language could be offered by mistake.
+  // rather than off a global per-language registry, so a second document pane in the same language
+  // can't be offered them by mistake.
   type CompletionSource = (context: CompletionContext) => Promise<CompletionResult | null>
   const completions = (): CompletionSource | null => {
     const declared = props.region.completions
@@ -393,7 +385,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         ...(writePath
           ? [
               // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same
-              // semantics the editor pane has, now owned once instead of per plugin.
+              // semantics the editor pane has, owned once rather than per plugin.
               EditorView.updateListener.of((update) => {
                 if (update.docChanged && !disposed && custody) {
                   custody.state = update.state
@@ -469,7 +461,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
 
   return (
     // Not `.pane`: this section's only mount point is a host layout region, which is already inside a `.pane`,
-    // so carrying the class too drew a second border, radius, shadow and background inside the first, and
+    // so carrying the class too would draw a second border, radius, shadow and background inside the first, and
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
       <Show when={error()}>

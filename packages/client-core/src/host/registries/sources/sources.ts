@@ -47,7 +47,7 @@ export type SourceContribution<Item = unknown> = {
   glyph: string
   label: string
   // The platform question, the same field every host-filtered contribution takes: does this renderer
-  // have a desktop shell, does this node run terminals (../hostCapabilities.ts).
+  // have a desktop shell, does this node run terminals (infra/node/hostCapabilities.ts).
   requires?: HostCapabilityRequirement
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
   // Core's Fleet home is the one user of it (docs/frontend/registries.md § Registries and plugins).
@@ -62,19 +62,17 @@ export type SourceContribution<Item = unknown> = {
   /**
    * The surface as a list beside a detail, for a host that draws the two halves in different places.
    *
-   * A source has always been one opaque component, and on the desktop that is fine: it draws its own
-   * `ListDetail` and the shell hands it the whole width. A terminal shell puts the list in a panel of
+   * On the desktop a source can be one opaque component: it draws its own `ListDetail` and the shell
+   * hands it the whole width. A terminal shell puts the list in a panel of
    * its own down the left and the detail in the main panel, and it cannot reach inside a component to
    * separate them — the `split` form of `ListDetail` takes both columns as `children`, so even the
    * kit node does not know which of its children is which.
    *
-   * So a source says it, in the same shape a pane already declares: `list-detail` with a `list` and a
+   * So a source says it, in the same shape a pane declares: `list-detail` with a `list` and a
    * `detail` (@acorn/protocol/paneLayouts.ts). Both hosts read the same field and each draws it where
-   * it draws such things; the desktop's rendering is the `ListDetail` the source used to write by
-   * hand (./SourceSurface.tsx).
+   * it draws such things; the desktop's rendering is `SourceSurface`.
    *
-   * Optional, and a source without it keeps every previous behaviour: `component` fills the surface
-   * and a terminal's list panel stays empty.
+   * Optional: without it, `component` fills the surface and a terminal's list panel stays empty.
    *
    * `scroll` asks for the padded, scrolling detail column (`DetailColumn scroll`). A detail that is a
    * plain run of content needs it; one that draws its own split or scroller fills the column instead.
@@ -91,11 +89,11 @@ export type SourceContribution<Item = unknown> = {
   defaultPane?: string
   // A third question again: given the integration behind `providerId` is connected, does it grant this
   // capability? Not `requires`, which asks about the platform, and not a plugin-to-plugin capability
-  // either — the three used to share a word (docs/plugins/collaboration.md § Collaboration rules).
+  // either (docs/plugins/collaboration.md § Collaboration rules).
   requiresProvider?: ProviderCapabilityName
   // Does this surface read the routed project? Opt in, because most sources don't, and a source that
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
-  // for sources that declare it, so Home no longer offers a control that changes nothing there.
+  // for sources that declare it, so Home doesn't offer a control that changes nothing there.
   projectScoped?: boolean
   /** Identity for this source's sidebar layout and reading place. */
   viewKey?: (projectId: string | undefined) => string

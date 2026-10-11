@@ -60,7 +60,7 @@ describe('per-node cache partitioning', () => {
   it('does not collide when two nodes hold the same resource UUID', () => {
     // Two nodes may coincidentally hold the same UUID; that must never collide in the client
     // (docs/architecture/fleet.md § Client state and fleet behavior). This is why the partition is
-    // a QueryClient per node rather than a nodeId prefix on 34 query-option factories.
+    // a QueryClient per node rather than a nodeId prefix on every query-option factory.
     const sharedId = 'f6a1c0de-0000-4000-8000-000000000000'
     const key = ['task', sharedId]
     clientFor('node-a').client.setQueryData(key, { title: 'from A' })
@@ -125,8 +125,8 @@ describe('selectActiveNode', () => {
 
   it('moves the cache id on every switch, which is what remounts the shell and every plugin frame with it', () => {
     // Load-bearing well beyond the query cache. A plugin frame pins its node when the frame mounts
-    // (plugins/frames/register.ts) and holds it as a plain string for the life of that mount, which is
-    // only safe because a switch cannot leave a frame mounted: index.tsx keys the provider, and the
+    // (`frameNode` in the frames host) and holds it as a plain string for the life of that mount, which
+    // is only safe because a switch cannot leave a frame mounted: index.tsx keys the provider, and the
     // whole shell under it, on this value. If a switch ever stopped moving the cache id, every open
     // frame would go on addressing the node it was born on and its fetches would land on the wrong
     // node or none.

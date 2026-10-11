@@ -16,7 +16,7 @@ import { saveJsonPref } from '../savePref'
 // you want to spend is yours, and it should not follow you to a machine where you were working on
 // somebody else's budget (docs/state-ownership/scope-rules.md § Scope rules). Written through `saveJsonPref`, so
 // `localStorage` is written before the query cache — the other way round, `mergePrefs` recomputes
-// against the old device value and drops the new one, silently (../savePref.ts).
+// against the old device value and drops the new one, silently.
 
 /** Which backend, and which of its models. Written whole: a model id belongs to one backend, so the
  *  two are only meaningful together. `modelId` is `''` for a backend that declares no catalog, which
@@ -26,12 +26,7 @@ export type ModelPick = { backendId: string; modelId: string }
 /** The remembered pick, or `null` when there is none this build can read.
  *
  *  `null` is the same answer as "never picked", which is what `effectiveModelPick` below wants: it
- *  falls back to the first available backend either way.
- *
- *  The commit wand once remembered its own pick under a key of its own, and that key is not
- *  migrated. So on a device holding one, the first dialog opened starts on `backends[0]`, and the
- *  pick made there is remembered for every dialog. That is the reasoning the fallback below applies
- *  to a pick whose backend has gone: a device preference is a stale note, not a decision. */
+ *  falls back to the first available backend either way. */
 export function readGeneratePick(prefs: Record<string, string> | undefined): ModelPick | null {
   const value = parseJson(prefs?.[PrefKeys.generatePick])
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null

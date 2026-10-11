@@ -10,7 +10,7 @@ import {
 import { createDiffSnippets, type DiffSnippets } from './diffSnippets'
 import { residentKey, segmentCacheFor } from './segmentCache'
 
-// A review thread's quoted lines, read from the one segment that holds its line (./diffSnippets.ts).
+// A review thread's quoted lines, read from the one segment that holds its line.
 // What is under test is what gets loaded: only the segments a card asked for, never a whole patch,
 // and nothing at all for a file the document does not hold.
 

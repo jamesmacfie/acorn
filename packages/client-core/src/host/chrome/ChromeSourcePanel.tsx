@@ -33,18 +33,11 @@ const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'da
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
 // (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
-// Two components rather than one, registered as the `regions` half of `SourceContribution`
-// (../registries/sources/sources.ts). This used to be a single component drawing `<main class="panes">`
-// with a `.pane pane-left` and a `.pane pane-right`, which meant Linear, Rollbar and HTTP were the
-// only browse sources not on `ListDetail`: two inset cards with a gap where GitHub and Workflows had
-// one surface and a divider, no resize handle, and no collapse. The comment on the detail half below
-// already called this "master/detail like every other Source browse" — the markup was the thing that
-// disagreed.
-//
-// Splitting it costs nothing, because the two halves never shared state. Which row is selected is the
-// URL (`decodeProjectSurfaceItem` below), which is why a row click, a pasted link and the back button
-// are one thing here. The terminal host already supplied two halves for these sources
-// (apps/tui/src/plugins/SourcePanel.tsx); this is the desktop catching up.
+// Two components, registered as the `regions` half of `SourceContribution`, so a descriptor source
+// draws on `ListDetail` like every other browse source: one surface, a divider, a resize handle and
+// collapse. The two halves share no state. Which row is selected is the URL
+// (`decodeProjectSurfaceItem` below), which is why a row click, a pasted link and the back button are
+// one thing here.
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
@@ -90,7 +83,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const params = useParams()
   const queryClient = useQueryClient()
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
-  // sits under, which remounts it. Same reasoning as plugins/frames/register.ts.
+  // sits under, which remounts it. Frames capture their node the same way (`mountedFrameNode`).
   const nodeId = activeNodeId() ?? ''
   const collapsed = sidebarCollapsed(props.descriptor.id)
 

@@ -96,7 +96,7 @@ export function createRailVisibility() {
 }
 
 /** The command id docker, agents and github already use for "open my source". The palette's
- *  generated opener stands aside for it (host/palette/sourceOpeners.ts). */
+ *  generated opener stands aside for it. */
 export const pluginOpenerId = (sourceId: string): string => `source.${sourceId}.open`
 
 /** Which openable sources get a generated palette opener: the ones the rail is not drawing, less any

@@ -10,8 +10,6 @@ import { nodeState } from './fleet'
 // (docs/architecture/node-api.md § The platform seam), which owns the endpoint, the pinned
 // certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.
-//
-// readJson, writeJson and postJson keep the signatures their call sites use.
 
 // Typed error for non-OK API responses. It carries the HTTP status so consumers branch structurally,
 // such as the node-state machine's 401 handling, instead of pattern-matching message text.
@@ -160,13 +158,11 @@ async function deliver(
   const nodeId = options.nodeId === undefined ? activeNodeId() : options.nodeId
 
   if (!transport || !nodeId) {
-    // A host that HAS a broker but no node picked yet. That used to be unreachable, because the window
-    // opened after the fleet had answered; it now happens for the first moments of a launch with
-    // nothing remembered (docs/frontend/data-and-startup.md § Startup readiness), and a module-level prime can
-    // land here. Falling through to the same-origin branch below would fetch a node route off the
-    // shell's own scheme handler, which refuses those on purpose and answers with a message about the
-    // API being the helper — true, and misleading about what actually went wrong. Retryable, because
-    // it is about to stop being true.
+    // A host that HAS a broker but no node picked yet: the first moments of a launch with nothing
+    // remembered (docs/frontend/data-and-startup.md § Startup readiness), where a module-level prime can
+    // land. Falling through to the same-origin branch below would fetch a node route off the shell's
+    // own scheme handler, which refuses those with a message that misleads about what went wrong.
+    // Retryable, because it is about to stop being true.
     if (transport)
       throw new ApiError('acorn has not picked a node to talk to yet.', 0, 'no_active_node', { retryable: true })
 
@@ -190,9 +186,8 @@ async function deliver(
   // Mutations fail fast and keep the user's input as a draft, with no replay queue
   // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
-  // Fail fast rather than wait for a TCP timeout, because main already knows the node is unreachable.
-  // Without the check a submit spins for the broker's 30s request timeout and then reports
-  // ECONNREFUSED. A read is still worth attempting: the broker may reconnect between the status update
+  // Fail fast rather than wait out the broker's request timeout, because main already knows the node is
+  // unreachable. A read is still worth attempting: the broker may reconnect between the status update
   // and the request, and a failed read costs a stale badge.
   //
   // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where writes still work, and

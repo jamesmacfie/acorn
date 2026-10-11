@@ -4,12 +4,10 @@ import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protoco
 import { ownsRoute } from '../chrome/chromeData'
 
 // Which declared layouts the host draws, and whether the routes inside them are ones this device will
-// fetch (docs/panes/layout.md § Layout model, docs/panes/layout.md § Layout model).
+// fetch (docs/panes/layout.md § Layout model).
 //
 // A plain module rather than lines inside register.ts, because the decision below is the trust gate for
-// a whole class of surface and deserves to be named and tested as one. It was extracted when
-// register.tsx could not be imported by a test at all; that file is now `.ts` and has its own suite,
-// which makes this a choice about naming rather than a workaround, and the choice still holds.
+// a whole class of surface and deserves to be named and tested as one.
 
 /** The regions of one pane, after the client has re-checked every name and every route. */
 export type ResolvedPaneLayout = {
@@ -42,7 +40,7 @@ export const isHostOwnedSurface = (surface: PluginFrameSurface): boolean =>
  *
  * Throws when it declares one the host may not serve. The node checked all of this when it parsed the
  * manifest, but the manifest reached this device as a roster row, which is bytes a node sent, so the
- * checks are repeated here for the reason chrome/data.ts states at length. Throwing rather than
+ * checks are repeated here. Throwing rather than
  * returning null is what puts the surface through register.ts's per-surface catch: one bad surface is
  * skipped and logged, and the rest of the plugin still works.
  */
@@ -56,7 +54,7 @@ export function paneLayoutFor(pluginId: string, surface: PluginFrameSurface): Re
     if (region === 'frame') continue
     // A remote region names an entry in the bundle, not a route. Nothing to confine: the name is a key
     // of the object the plugin passed to `mountTree`, and a key with no renderer behind it draws the
-    // labelled placeholder rather than reaching anything (plugins/tree/TreeHost.tsx).
+    // labelled placeholder rather than reaching anything (`TreeHost`).
     if (region.kind === 'remote') continue
     if (!ownsRoute(pluginId, region.read))
       throw new Error(`document read route '${region.read}' is outside ${pluginId}'s namespace`)

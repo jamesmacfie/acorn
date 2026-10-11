@@ -5,9 +5,8 @@ import { Rectangle } from './Rectangle'
 // The box the kit owns and something else fills with pixels (docs/ui-design/closed-kit.md § The closed kit).
 //
 // What is worth a test is not the box, it is the way out of it. A PTY and a webview both swallow Tab,
-// so without a contract a reader who lands in one is stuck there — which is what the two hand-rolled
-// terminal hosts did before this node existed. One stop from outside, Enter hands the keys over,
-// Escape takes them back.
+// so without a contract a reader who lands in one is stuck there. One stop from outside, Enter hands
+// the keys over, Escape takes them back.
 
 let host: HTMLDivElement | undefined
 let dispose: (() => void) | undefined
@@ -55,7 +54,7 @@ describe('Rectangle', () => {
     box.focus()
     press(box, 'Enter')
     expect(document.activeElement).toBe(inner)
-    // No longer a stop of its own: the reader is inside, and Tab is the surface's now.
+    // Not a stop of its own while the reader is inside: Tab belongs to the surface.
     expect(box.getAttribute('tabindex')).toBe('-1')
   })
 

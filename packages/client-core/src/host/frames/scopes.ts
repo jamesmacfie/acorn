@@ -6,11 +6,10 @@
 // "what can a third-party plugin do to my machine" is decided here, and the table is deliberately an
 // allowlist of (path shape, method) pairs rather than a prefix match.
 //
-// Why not `core.tasks:read ⇒ /v1/core/tasks*`, which is what the phase doc sketches: that glob also
-// matches `/v1/core/tasks/:id/preview-url`, which runs the project's preview script, and the same shape
-// over `/v1/core/projects*` would match `GET /v1/core/projects/:id/mcp`, which hands out the commands a
-// project's agents run. Neither belongs to a plugin. The star was the wrong granularity; every rule below names its
-// path.
+// Why not `core.tasks:read ⇒ /v1/core/tasks*`: that glob also matches `/v1/core/tasks/:id/preview-url`,
+// which runs the project's preview script, and the same shape over `/v1/core/projects*` would match
+// `GET /v1/core/projects/:id/mcp`, which hands out the commands a project's agents run. Neither belongs
+// to a plugin. A star is the wrong granularity, so every rule below names its path.
 //
 // Three groups, and the difference between the last two is intent rather than effect:
 //
@@ -435,9 +434,8 @@ export const GRANTABLE_SCOPES: readonly string[] = [
 // and the icon live here, beside the grant, rather than being guessed back from the sentence: this
 // table is the only place that knows how serious `core.projects:read` is.
 //
-// The copy is free to change. It used to be the update-diff key: a rewording marked the line as newly
-// requested for every owner of every installed plugin. The scope name is the key now
-// (plugins/permissions.ts).
+// The copy is free to change: the update diff keys on the scope name, not the sentence
+// (trust/permissions.ts).
 const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'core.projects:config': {
     text: 'Read every project’s build, dev and database scripts',

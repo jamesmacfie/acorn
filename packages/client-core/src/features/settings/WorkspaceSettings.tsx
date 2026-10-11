@@ -33,13 +33,12 @@ import { WorkspaceConnections } from './ProjectConnections'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { WorkspaceIconEditor } from '../workspaces/WorkspaceIconEditor'
 
-// Settings → a workspace's own page: its name, its projects, and deleting it. Each project's config is
-// on the project's page, one click from the table (./ProjectSettings.tsx), because it describes one
-// codebase rather than the group (docs/workspaces-and-tasks/project-config.md § The project row).
+// Settings → a workspace's own page: its name, its projects, and deleting it. Each project's config is on the
+// project's page, one click from the table, because it describes one codebase rather than the group
+// (docs/workspaces-and-tasks/project-config.md § The project row).
 //
-// Which provider projects a workspace follows is in its Connections section: the same map each
-// connection's page draws, from this workspace's side (./ProjectConnections.tsx). One project's own
-// links are on its Connections tab.
+// Which provider projects a workspace follows is in its Connections section: the same map each connection's
+// page draws, from this workspace's side. One project's own links are on its Connections tab.
 //
 // The Default workspace is where a deleted workspace's projects land, so it can be neither renamed nor
 // deleted, here or anywhere else in settings.

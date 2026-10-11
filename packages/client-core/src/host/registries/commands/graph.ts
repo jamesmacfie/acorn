@@ -69,12 +69,8 @@ export type CommandGraph = {
    */
   search(query: string): readonly CommandNode[]
   /**
-   * The same search, with the scores it ranked on.
-   *
-   * The palette's root holds more than commands while the compatibility rows are still around, and
-   * those rows are scored by the same `fuzzyScore`. A caller merging the two lists needs one number
-   * per row or it cannot interleave them, and would have to fall back to showing commands as a block
-   * — which is not what the flat list does today (./session.ts § the root projection).
+   * The same search, with the scores it ranked on, for a caller that filters the hits itself, as the
+   * palette session's group rows do.
    */
   ranked(query: string): readonly CommandNodeHit[]
 }

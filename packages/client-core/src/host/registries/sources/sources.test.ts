@@ -170,10 +170,8 @@ describe('taskTracksRef', () => {
 })
 
 describe('the pane a task first opens on', () => {
-  // Core used to make this choice itself, by name: "a PR-less task with a Linear link starts on
-  // 'linear', everything else on 'pr'". The two claims below are what replaced that sentence, and the
-  // order between them is the part worth pinning — a PR-backed task whose body cites a ticket has to
-  // land on the pull request, not on the ticket.
+  // Two claims decide, and the order between them is the part worth pinning: a PR-backed task whose
+  // body cites a ticket has to land on the pull request, not on the ticket.
   const withLinks = (links: { providerId: string; identifier: string }[], pullNumber?: number) =>
     ({ id: 'task-1', links: links.map((l) => ({ ...l, connectionId: 'c1' })), pullNumber }) as unknown as Task
 

@@ -6,8 +6,8 @@ import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../
 import { createArmedConfirm } from '../../lib/controls/confirm'
 import Icon from '../content/Icon'
 
-// A dropdown menu: Popover plus menu semantics. See docs/ui-design/interaction.md § Menus and right-click for
-// why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
+// A dropdown menu: Popover plus menu semantics. See docs/ui-design/interaction.md § Menus and right-click
+// for how ContextMenu below reuses the same surface.
 
 export type MenuContext = { close: () => void; register: (element: HTMLElement | undefined) => void }
 
@@ -21,16 +21,16 @@ const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
  *  while the popover is open, which keeps the item list from growing a copy of every item on each
  *  re-open.
  *
- *  A DOM collection (../keys/collection.ts): the items are the caller's JSX, so the host cannot key
+ *  A DOM collection (`createDomCollection`): the items are the caller's JSX, so the host cannot key
  *  them, but it can read them out of the DOM when a key arrives. The `register` callback stays on the
- *  context because `Menu.Item` is a public shape, and it now records nothing. */
+ *  context because `Menu.Item` is a public shape, and it records nothing. */
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
   children: (context: MenuContext) => JSX.Element
 }) {
-  // See docs/ui-design/interaction.md § Menus and right-click for why this focuses the first item on mount, and
-  // ../keys/trap.ts for the restore that goes with a trap.
+  // See docs/ui-design/interaction.md § Menus and right-click for why this focuses the first item on
+  // mount, and `restoreFocusOnCleanup` for the restore that goes with a trap.
   const collection = createDomCollection({ selector: '.ui-menu-item', focusOnMount: true })
   restoreFocusOnCleanup()
 

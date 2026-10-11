@@ -97,10 +97,8 @@ describe('pluginFailureAttention', () => {
     recordSurfaceFailure('ntfy', 'board', new Error('second'))
     const all = await items()
     // One row, keyed by plugin and surface, carrying the latest reason. Its timestamp moves, because
-    // recordSurfaceFailure re-stamps on every record and says why in surfaceFailures.ts. This used to
-    // assert the stamp held at `first`, which only passed when both records landed in the same
-    // millisecond. Keeping the first sighting is a behaviour change with an argument on both sides,
-    // not a stabilization fix.
+    // recordSurfaceFailure re-stamps on every record and says why. Asserting it holds at `first` only
+    // passes when both records land in the same millisecond.
     expect(all).toHaveLength(1)
     expect(all[0]).toMatchObject({ detail: 'second' })
     expect(all[0]!.at).toBeGreaterThanOrEqual(first)

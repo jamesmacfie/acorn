@@ -66,10 +66,9 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // function because the two are the same act: the banner is the row, drawn by the OS.
   const openNotice = (notice: Notice) => {
     markRead(notice.id)
-    // Not gated on the task before, which is what made a node-level notice do nothing: a plugin whose
-    // connection expired, or a memory proposal whose task is archived, carries no task, and selecting
-    // `''` moved nowhere and then let the target run against whatever was on screen. The attention row
-    // below has had this guard all along.
+    // A task is selected only when there is one. A node-level notice (a plugin whose connection
+    // expired, a proposal whose task is archived) carries no task, and selecting `''` would move
+    // nowhere and then let the target run against whatever is on screen.
     if (notice.taskId) props.onSelectTask(notice.taskId)
     if (notice.action === 'review-config') openRepoConfigTrust(notice.taskId)
     if (notice.action === 'review-plugin-request') openPluginApproval(notice.taskId)
@@ -94,9 +93,8 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   const prefs = createQuery(() => prefsOptions(true))
   trackBadge(pill, () => parseNotificationSettings(prefs.data?.[PrefKeys.notifications]).badge)
 
-  // Popover for the chrome only: the portal, the anchoring, outside-click and the Escape this
-  // never had. The content stays as it is: an inbox with two sections and dismissable rows is not
-  // a list of menu items, so it is not a Menu.
+  // Popover for the chrome only: the portal, the anchoring, outside-click and Escape. The content stays as it
+  // is: an inbox with two sections and dismissable rows is not a list of menu items, so it is not a Menu.
   return (
     <Popover
       role="dialog"
@@ -132,18 +130,17 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       class="notify-row unread"
                       onClick={() => {
                         close()
-                        // The node first, then the task: navigation resolves against the active
-                        // node, so selecting a task on another node before switching would look up
-                        // an id that is not there (and might collide with a local one).
-                        // Node, then where in it, then the target. The order is the whole point: a
-                        // path resolves against the active node, and a target that selects a
-                        // project-scoped surface has to land after the project it reads is routed.
+                        // Node, then where in it, then the target. Navigation resolves against the
+                        // active node, so selecting a task on another node before switching would
+                        // look up an id that is not there (and might collide with a local one), and
+                        // a target that selects a project-scoped surface has to land after the
+                        // project it reads is routed.
                         if (row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
                         if (row.item.taskId) props.onSelectTask(row.item.taskId)
                         else if (row.item.projectId) navigate(projectPath(row.item.projectId))
                         // Not gated on the task. An item may be about the node rather than a task —
                         // a plugin that failed to start, a memory proposal whose task is archived —
-                        // and requiring a task here is what left those rows doing nothing at all.
+                        // and requiring a task here would leave those rows doing nothing at all.
                         openTarget(row.item.taskId ?? '', row.item.target)
                       }}
                     >

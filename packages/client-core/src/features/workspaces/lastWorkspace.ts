@@ -6,8 +6,8 @@
 // current id too lets an explicit desktop URL count as a new visit after a restart.
 //
 // Ids and nothing else. The Last workspace command looks an id up when it needs one, against the fleet
-// on the desktop (host/registries/commands/navigationCommands.ts), so a workspace whose node has come
-// back is found again rather than remembered against a node id that was right at the time.
+// on the desktop, so a workspace whose node has come back is found again rather than remembered against
+// a node id that was right at the time.
 
 import { createSignal } from 'solid-js'
 

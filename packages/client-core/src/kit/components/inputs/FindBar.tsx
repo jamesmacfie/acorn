@@ -4,16 +4,15 @@ import { Toolbar } from '../layout/Toolbar'
 import { formatChord } from '../../lib/rendering/formatChord'
 import { Input } from './Input'
 
-// The in-content search strip. Three surfaces had one and all three disagreed on the keyboard
-// contract; this owns it so they finally agree:
+// The in-content search strip. It owns the keyboard contract so every surface agrees:
 //
 //   Enter        next match
 //   Shift+Enter  previous match
 //   Escape       close
 //
-// Matching and highlighting stay entirely at the call site; the bar is chrome. What it also
-// standardises is the highlight class: `.ui-find-mark` (plus `[data-current]`) replaces three
-// separate vocabularies, and callers put it on their own <mark> elements.
+// Matching and highlighting stay entirely at the call site; the bar is chrome. It also owns the
+// highlight class: `.ui-find-mark` (plus `[data-current]`), which callers put on their own <mark>
+// elements.
 /** "3/17", "17 matches" when the selection is on none of them, "1000+" when counting stopped. */
 function findCountText(count: { current: number; total: number; more?: boolean }): string {
   if (!count.total) return 'No matches'

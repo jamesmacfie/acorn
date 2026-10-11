@@ -9,7 +9,7 @@ import { ToggleButton } from '../../kit/components/inputs/ToggleButton'
 import Icon from '../../kit/components/content/Icon'
 import { Toolbar } from '../../kit/components/layout/Toolbar'
 
-// The editor's find panel as kit controls. It draws what ./search.ts reads out of CodeMirror and hands
+// The editor's find panel as kit controls. It draws what `editorSearch` reads out of CodeMirror and hands
 // every action back to it; nothing here holds a query of its own.
 
 /** CodeMirror's search state, read out for display. */

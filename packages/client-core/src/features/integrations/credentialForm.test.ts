@@ -40,8 +40,7 @@ describe('createCredentialForm error copy', () => {
     )
   })
 
-  // The reason this file exists. Anything outside the one known code used to read as one sentence
-  // with nothing in it to look up.
+  // Anything outside the one known code reads as one sentence, so it has to carry something to look up.
   it('carries the code and the request id for every other failure', async () => {
     const failure = new ApiError('provider_unavailable', 502, 'provider_unavailable', { requestId: 'r7-123' })
     expect(await submitWith(failure)).toBe('Could not connect this provider. (provider_unavailable · r7-123)')

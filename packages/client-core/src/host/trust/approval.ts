@@ -1,9 +1,8 @@
 import { createSignal } from 'solid-js'
 import type { PluginApprovalRequest, PluginInstallSource } from '@acorn/protocol/api.ts'
 
-// The open/close signal for the plugin-approval dialog, split out of the component for the reason
-// configTrust.ts gives: the repo's client suites run in bare Node with no Solid transform, so anything in
-// a `.tsx` file is structurally untestable, and the opener is reached from the notification bell.
+// The open/close signal for the plugin-approval dialog, in a plain module so a bare-Node suite with no
+// Solid transform can reach it, and so the notification bell can open the dialog without importing it.
 //
 // It carries a task id and nothing else. The requests themselves are read from the node's device-only
 // roster route when the dialog opens, never from the notification frame. A notice is a ping, and what the
@@ -22,7 +21,7 @@ export function closePluginApproval(): void {
 }
 
 /** One line naming where a package would come from. The node has its own copy of this for the settings
- * row (server/plugins/installer.ts `describeSource`); this one runs on a source nothing has fetched yet. */
+ * row (`describeSource` in node-core); this one runs on a source nothing has fetched yet. */
 export const describePluginSource = (source: PluginInstallSource | undefined): string =>
   !source
     ? ''

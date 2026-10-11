@@ -10,7 +10,7 @@ import {
 } from '../kit/diff/diffModel'
 import { LARGE_SURFACE_PROFILES, largeDiffFiles, largeDiffSummary } from './largeDiff'
 
-// The fixture every large-surface measurement is taken against. Later phases compare numbers across
+// The fixture every large-surface measurement is taken against. Measurements are compared across
 // commits, so the files a seed produces must not drift silently: the small profile's digest is pinned,
 // and a deliberate change to the generator updates it here.
 

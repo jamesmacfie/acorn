@@ -1,9 +1,8 @@
 // Focus traps: the Tab containment a `Modal` or an open `Menu` needs, plus the restore that goes
 // with it.
 //
-// The containment half was `ui/focus.ts`'s `trapOverlayFocus` and moves here unchanged; the restore
-// is new. An overlay that traps focus and then drops it on the body leaves the next Tab starting at
-// the top of the page, which is the bug every one of these grew separately
+// The containment is `trapTab` and the restore is `restoreFocusOnCleanup`. An overlay that traps
+// focus and then drops it on the body leaves the next Tab starting at the top of the page
 // (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing: focus returns to the
 // opener on dismiss).
 

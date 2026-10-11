@@ -8,9 +8,9 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-// The toast is the part a clicker sees, and the one thing that must keep working now that the palette
-// reads the answer instead: `activeToasts` is a signal a test would have to render to read, so the
-// function is captured here.
+// The toast is the part a clicker sees, and it must keep firing even though the palette reads the
+// answer: `activeToasts` is a signal a test would have to render to read, so the function is captured
+// here.
 const toasted: string[] = []
 vi.mock('../../features/notifications/toast', async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -26,8 +26,8 @@ const { setTaskLookup } = await import('../../features/tasks/taskLookup')
 type Task = import('../../infra/queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 
-// The two verbs that decide where a rail row's detail appears, which is the one thing the descriptor tier
-// could not previously express. They are disjoint by manifest rule, and this pins the runtime half of that:
+// The two verbs that decide where a rail row's detail appears. They are disjoint by manifest rule, and
+// this pins the runtime half of that:
 // `openPane` still refuses without a task, `navigate` never needs one.
 
 const item = { id: 'conn-1:ENG-42', title: 'Fix the thing' }
@@ -210,8 +210,8 @@ describe('navigate', () => {
   })
 })
 
-// The answer, added on 2026-09-03 so a command can be awaited: every click site still discards the
-// promise and still gets its toast, and the palette gets a result it can keep its frame open with
+// The answer, so a command can be awaited: every click site still discards the promise and still gets
+// its toast, and the palette gets a result it can keep its frame open with
 // (docs/plugins/commands.md § Command kinds).
 describe('the answer a verb gives back', () => {
   it('waits for the node before saying an action worked', async () => {
@@ -249,7 +249,7 @@ describe('the answer a verb gives back', () => {
       },
     )
     expect(result).toEqual({ ok: false, message: 'action failed: a query is already running' })
-    // The old click sites read nothing and are unchanged: this is still how they report it.
+    // Click sites that read nothing still report through the toast.
     expect(toasted).toEqual(['database: action failed'])
   })
 

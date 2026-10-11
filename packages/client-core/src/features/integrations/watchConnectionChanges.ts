@@ -2,7 +2,7 @@
 //
 // Status writers and connection deletion announce the row's current state. Several status changes are
 // not the owner clicking anything: a credential that stopped being readable demotes itself to
-// `needs-auth` mid-request. Until this existed, a client found out by refetching on suspicion.
+// `needs-auth` mid-request, and a client has no other way to hear it.
 //
 // The frame carries the new status or says the row was deleted, and this still refetches. The list route
 // resolves capabilities and the synthesized GitHub row on top of the stored one, so patching a status
@@ -25,7 +25,7 @@ export function watchConnectionChanges(): () => void {
     // this belongs to it, and no other node has a mounted query to refetch.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: integrationsKey })
     // The bell's row and the settings rail's dot for a refused credential are a fan-out, which hears
-    // an invalidation of its own key and nothing else (../../infra/node/fanout.ts).
+    // an invalidation of its own key and nothing else.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: ['attention', CONNECTION_ATTENTION_ID] })
     void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId(), {
       connectionId: event.integrationId,

@@ -19,9 +19,8 @@ import { runtimeIdentityForRow } from './runtimeIdentity'
 import { decisionKey } from './distributionModel'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
-// passes need before either can draw anything (docs/plugins/distribution.md § One shared eligibility and trust
-// check for why this used to be duplicated between frames/register.ts and chrome/register.ts, and what
-// broke when the two copies drifted).
+// passes need before either can draw anything (docs/plugins/distribution.md § One shared eligibility
+// and trust check).
 
 export type EligiblePlugin = {
   pluginId: string

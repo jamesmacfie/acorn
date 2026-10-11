@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { Field, Input, Select, type InputProps, type SelectProps } from '../../kit/components/primitives'
 
 /** A Select or Input with its caption showing. The kit control uses `label` only as its accessible
- *  name, so without a Field round each one the editor read as a row of bare values. */
+ *  name, so without a Field round each one the editor would read as a row of bare values. */
 export const LabeledSelect = (props: SelectProps & { label: string; hint?: string }) => (
   <Field label={props.label} hint={props.hint}>
     <Select size="sm" {...props} />

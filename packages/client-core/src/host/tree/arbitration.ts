@@ -81,10 +81,9 @@ export function resolveSlot(
  * The stored arbitration, read out of the one preference that holds all of it.
  *
  * `{ '<owner>:<point>|<key>': pluginId }`, one key per point-and-selector-value, because "who draws a
- * PNG attachment" and "who draws a CSV one" are two decisions. A point with no key stores under the
- * point alone. Same one-preference-holds-all shape the exclusive slots use
- * (registries/exclusiveSlots.ts), and the same failure rule: anything unparseable reads as nothing
- * chosen, which is the owner's default.
+ * PNG attachment" and "who draws a CSV one" are two decisions. A point with no key stores under the point alone. Same
+ * one-preference-holds-all shape the exclusive slots use, and the same failure rule: anything unparseable reads as
+ * nothing chosen, which is the owner's default.
  */
 export const slotChoiceKey = (pointId: string, key: string | undefined): string =>
   key === undefined ? pointId : `${pointId}|${key}`

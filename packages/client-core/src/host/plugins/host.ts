@@ -11,11 +11,10 @@ import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 // (docs/plugins.md).
 //
 // Every other module in the client reaches the bundle cache and the trust store through this one
-// file, never through the platform seam's `pluginCustody()` directly. That is the whole design: today it fronts
-// the desktop helper's content-addressed store, and a future web client (docs/future/remote.md) fronts
-// IndexedDB plus server-side per-user acknowledgements. The interface is the part that has to stay
-// portable; the storage behind it is not, and letting the host object leak through client code would
-// make the storage the contract by accident. `src/platform/` generalised this rule to the whole seam.
+// file, never through the platform seam's `pluginCustody()` directly. It fronts the desktop helper's
+// content-addressed store, and a web client (docs/future/remote.md) would front IndexedDB plus
+// server-side per-user acknowledgements. The interface has to stay portable; letting the host object
+// leak through client code would make the storage the contract by accident.
 //
 // Absent means "no host for third-party plugins here": a browser build, or a test. Every caller
 // treats that as "nothing installed", never as an error.

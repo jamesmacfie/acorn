@@ -161,7 +161,7 @@ export const SEAM_GROUPS = Object.keys(GROUPS) as SeamGroup[]
 
 // Does this host implement the group. The same object that answers "can I draw this" answers "should
 // I offer it", so a `requires: { seam: … }` gate and the surface behind it can never disagree
-// (infra/node/hostCapabilities.ts). Boot-static today, because a host installs its bridge once.
+// (`hasHostCapability`). Boot-static today, because a host installs its bridge once.
 export const seamPresent = (group: SeamGroup): boolean => GROUPS[group].resolve() !== null
 
 // Every problem with the host installed on `window`, given the groups it claims to implement. Empty

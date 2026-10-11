@@ -18,17 +18,14 @@ import { createWorkspaceWords } from '../workspaces/words'
 // state, counts, last-refresh, and the two actions that matter from here.
 //
 // It is a rail source rather than a route, registered by core with `order: 0` and
-// `when: () => nodes().length > 1`. Two consequences worth stating:
+// `when: () => nodes().length > 1`, so with only the bundled local node the rail button does not exist.
 //
-//   - With only the bundled local node the rail button does not exist at all, so "first-run never
-//     mentions nodes" is structural rather than a paragraph in a component nobody reaches.
-//   - Every number on a card comes through `createFleetQuery`, so a node that is down contributes an
-//     "unavailable" line and its neighbours still render (docs/architecture/fleet.md § Client
-//     state and fleet behavior).
+// Every number on a card comes through `createFleetQuery`, so a node that is down contributes an
+// "unavailable" line and its neighbours still render (docs/architecture/fleet.md § Client
+// state and fleet behavior).
 //
 // The card holds no per-node settings. Rename, unpair, revoke and the identity-change hard stop live
-// in Settings → Nodes, which already does all four properly; duplicating them here would mean two
-// places to keep in step on a screen whose job is an overview.
+// in Settings → Nodes.
 export default function FleetHome() {
   const words = createWorkspaceWords()
   // The task list under `tasksKey`, counted in the component, not a count fetched under that key.

@@ -467,8 +467,8 @@ describe('task lineage in the core rail fallback', () => {
 
 describe('a row whose markers are read again', () => {
   // A contributor builds fresh marker objects on every read, and the agents plugin's rail marker is
-  // read again on every event a streaming agent sends. Rebuilding the elements each time restarted a
-  // spinning marker's turn 25 times a second.
+  // read again on every event a streaming agent sends. Rebuilding the elements each time would restart a
+  // spinning marker's turn on every event.
   it('keeps the marker elements while the markers say the same thing', () => {
     const [tick, setTick] = createSignal(0)
     const [label, setLabel] = createSignal('1 agent working')
@@ -507,7 +507,7 @@ describe('a row whose markers are read again', () => {
 })
 
 describe('source status marks', () => {
-  // `core:source` (host/annotations/statusAnnotations.ts): a consenting source's icon takes other
+  // `core:source` (`requestSourceAnnotations`): a consenting source's icon takes other
   // plugins' marks, and every rail — core's or a replacement — draws the same data.
   const deploysSource = (count: number) => {
     registered.push(

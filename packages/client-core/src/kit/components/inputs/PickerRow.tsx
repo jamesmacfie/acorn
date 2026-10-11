@@ -1,9 +1,8 @@
 import { Show, type JSX } from 'solid-js'
 
 // One row of a filtered list: a name over its description, with the description free to be a
-// sentence. Extracted from Picker so a list that is not driven by Picker's trigger button can still
-// be the same row — the agent composer's mention dropdown opens from a sigil typed in a textarea,
-// not from a button, and had drifted into a cramped single line of its own.
+// sentence. Its own component so a list that is not driven by Picker's trigger button draws the same
+// row: the agent composer's mention dropdown opens from a sigil typed in a textarea, not a button.
 //
 // The <li> is the component's, the <ul class="repo-picker-list"> is the caller's, because the two
 // callers differ on what wraps the list.

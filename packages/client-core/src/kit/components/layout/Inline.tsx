@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js'
 import { roleVar } from '../../tokens/roles'
 import type { Space } from '../../tokens/tokens'
 
-/* Inline: children side by side. Stack's sibling, and the other half of what a raw `div` was doing.
+/* Inline: children side by side. Stack's sibling, for what would otherwise be a raw `div`.
 
    Not Toolbar, which is a bar with a role and a border; this is grouping and nothing else.
 

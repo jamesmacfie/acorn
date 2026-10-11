@@ -17,9 +17,8 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined 
 // are real rather than intended.
 
 // All three `requires` shapes, answered from a table the tests below set: the bare word, `{ plugin }`
-// and `{ seam }`. The predicate itself has a unit test of its own
-// (infra/node/hostCapabilities.test.ts); this stub only has to be honest about the shapes, which it
-// was not while it took a string and read `{ plugin: 'terminal' }` as `undefined`.
+// and `{ seam }`. The predicate itself has a unit test of its own; this stub only has to be honest
+// about the shapes.
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true, preview: true }))
 vi.mock('../../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | { plugin?: string; seam?: string } = 'none') =>
@@ -182,7 +181,7 @@ describe('TaskPaneHost', () => {
 
   it('says so when the layout has nothing left to draw', () => {
     // The seam gate, which is what the browser preview asks: a shell without preview views never
-    // offers the pane (plugins/preview/src/client/paneContribution.ts).
+    // offers the pane.
     capabilities.preview = false
     pane({ id: 'preview', order: 0, requires: { seam: 'preview' } })
     layout.panes = ['preview']

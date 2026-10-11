@@ -43,8 +43,7 @@ const KIND_HELP: Record<string, string> = {
   hook: 'a turn other plugins take before this one acts',
 }
 
-/** The registries' phrases start lowercase, because they used to run on from the id. On a line of
- *  their own they read as sentences. */
+/** The registries' phrases start lowercase. On a line of their own they read as sentences. */
 const sentence = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
 
 export default function ExtensionPointsDev() {

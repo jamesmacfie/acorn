@@ -10,9 +10,8 @@ import type { SegmentRef } from './documentView'
 import { createSegmentCache, residentKey } from './segmentCache'
 import { createSegmentLoader } from './segmentLoader'
 
-// The loader's claim on the node cache (./segmentLoader.ts): what it holds, and that every way a
-// request or a pane ends lets go. The cache here has no room at all, so what stays resident is
-// exactly what some pane holds.
+// The loader's claim on the node cache: what it holds, and that every way a request or a pane ends lets go.
+// The cache here has no room at all, so what stays resident is exactly what some pane holds.
 
 const file: DiffDocumentFile = {
   path: 'a.ts',

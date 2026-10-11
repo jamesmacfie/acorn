@@ -10,8 +10,8 @@ import type { DocumentHandle } from './documentModel'
 
 // The two things this surface does that nothing else does: it asks a plugin for completions and it
 // resolves a host chord that the shell's window dispatcher cannot see, because focus is inside a
-// typing target. Both are behaviour, not rendering, and both would have gone unnoticed under an
-// engine change.
+// typing target. Both are behaviour, not rendering, so an engine change could break either without
+// anything looking wrong.
 
 // jsdom does no layout, so a Range cannot report rectangles and CodeMirror measures selections.
 Element.prototype.scrollIntoView ??= () => {}
@@ -246,8 +246,8 @@ describe('the host-owned document surface', () => {
     const plugin = options.find((option) => option.label === 'user_id')
     expect(plugin?.detail).toBe('integer')
     // The two malformed rows are dropped rather than believed, because route output is bytes a node
-    // sent. Only the good one survives, and it sits beside the SQL grammar's own keywords — two
-    // sources on one document, which is the arrangement Monaco's per-language registry could not have.
+    // sent. Only the good one survives, and it sits beside the SQL grammar's own keywords: two
+    // sources on one document.
     expect(options.filter((option) => option.label === 'user_id')).toHaveLength(1)
     expect(options.some((option) => option.detail === undefined && option.label === '42')).toBe(false)
     // The route was told where the cursor is, in one-based line and column.

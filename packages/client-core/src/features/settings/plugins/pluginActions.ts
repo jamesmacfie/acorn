@@ -19,7 +19,7 @@ import { nextDisabledList } from './pluginToggle'
 // device plugin. Each writes where the plugin is kept today and nowhere else.
 
 /** On or off at the node's next start. The route takes the whole disabled list, so it is recomputed from
- *  the rows the caller is looking at (./pluginToggle.ts). */
+ *  the rows the caller is looking at (`nextDisabledList`). */
 export const setNodePluginEnabled = (
   rows: readonly NodePluginRow[],
   id: string,

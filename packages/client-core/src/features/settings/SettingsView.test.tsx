@@ -153,7 +153,7 @@ beforeEach(() => {
         component: (props) => <p data-page="plugins">reads {props.context.scope.nodeId}</p>,
       }),
     ),
-    // What a loaded plugin's settings frame registers when its manifest names none of the new fields.
+    // What a loaded plugin's settings frame registers when its manifest leaves the placement fields out.
     settingsRegistry.register(page('board-settings', { label: 'Board', group: 'general', requires: undefined })),
   )
 })
@@ -570,7 +570,7 @@ describe('SettingsView', () => {
       ],
       integrations: [{ id: 'c-1', providerId: 'linear', label: 'Linear · Acme', status: 'needs-auth' }],
     }
-    // What ./connections/connectionAttention.ts reports for it.
+    // What `connectionAttention` reports for it.
     mocks.attention = [
       {
         nodeId: 'node-a',

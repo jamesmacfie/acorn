@@ -155,10 +155,9 @@ export function registerKeybindings(bindings: readonly KeybindingContribution[])
 
 export function KeybindingDispatcher(props: { prefs: KeybindingPrefs; taskActive: boolean; focusedPane?: string }) {
   const resolved = createMemo(() => resolveKeybindings(keybindingRegistry.entries(), props.prefs))
-  // The shell's one keyboard listener, and it is not one of ours any more: `keys/install.ts` puts
-  // `@opentui/keymap` on the document root and registers these bindings as a layer over the command
-  // registry. What used to be a `scopeActive` check inside a keydown handler is a matcher on each
-  // binding; everything else — the layers, the command catalog, the shadowing diagnostics — is the
+  // The shell's one keyboard listener is `@opentui/keymap`: `installKeymap` puts it on the document root
+  // and registers these bindings as a layer over the command registry. A binding's scope is a matcher
+  // on that binding; everything else — the layers, the command catalog, the shadowing diagnostics — is the
   // engine's. See docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
   onMount(() => {
     installKeymap(document.documentElement, {

@@ -14,7 +14,7 @@ import { PaletteSurface } from './PaletteSurface'
 
 // The desktop half of the palette, over the shared session.
 //
-// The transitions themselves are `../registries/commands/sessionStore.test.tsx` and are not repeated here.
+// The transitions themselves are tested with `createCommandSession` and are not repeated here.
 // What this file asks is the part only a DOM can answer: does the dialog say what it is to a screen
 // reader, does the field name the row the arrows are on, does the keyboard reach the same operations,
 // and does focus come back to where it was — on the final close, and not on the way back up.
@@ -443,7 +443,7 @@ describe('the interactive frames', () => {
 
 describe('the surface', () => {
   it('builds its status and footer once', () => {
-    // Testing a slot and then inserting it ran the caller's JSX twice (kit/components/slotReads.test.tsx).
+    // Testing a slot and then inserting it runs the caller's JSX twice (kit/components/slotReads.test.tsx).
     let built = 0
     const Mark = () => {
       built++

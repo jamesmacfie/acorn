@@ -1,7 +1,7 @@
 // Byte/token size formatting shared by any pane that shows a context budget.
 //
 // Sizes are bytes end-to-end (budgets are byte-based; no tokenizer exists). ~tokens = bytes/4,
-// marked "~". Lives in core/client/lib rather than a feature folder because both the context pane
+// marked "~". Lives in the kit rather than a feature folder because both the context pane
 // and the notes pane render the same size text. A plugin importing another plugin's model just to
 // format a byte count is the coupling this seam exists to avoid.
 export const bytesOf = (s: string): number => new TextEncoder().encode(s).byteLength

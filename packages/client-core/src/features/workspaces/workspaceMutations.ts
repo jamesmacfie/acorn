@@ -70,7 +70,7 @@ export const patchProject = (id: string, patch: ProjectPatch) =>
     (res) => `project ${res.status}`,
   )
 export const detectProject = (id: string) => postJson<{ project: Project }>(projectDetectRoute(id))
-// Takes the project's tasks with it (server/projectDeletion.ts). Folders and worktrees on disk are untouched.
+// Takes the project's tasks with it. Folders and worktrees on disk are untouched.
 export const deleteProject = (id: string) =>
   writeJson<{ ok: true }>(projectRoute(id), { method: 'DELETE' }, (res) => `project ${res.status}`)
 export const setProjectWorkspace = (id: string, workspaceId: string) => patchProject(id, { workspaceId })

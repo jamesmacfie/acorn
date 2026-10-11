@@ -390,11 +390,11 @@ const extensionPoints: SearchDeclaration = {
   ],
 }
 
-// Core's settings pages, placed in the rail's nine groups (docs/frontend/settings.md § Settings). Ids are
+// Core's settings pages, placed in the rail's groups (docs/frontend/settings.md § Settings). Ids are
 // stable because callers deep-link by them: `openSettings('shortcuts')`, a notice target's page id,
 // the palette's rows. `order` counts within a group.
 //
-// The seven pages that name their node through `context.scope.nodeId` declare `followsNodeSwitcher`, so
+// The pages that name their node through `context.scope.nodeId` declare `followsNodeSwitcher`, so
 // the header's switcher is theirs. Every other node page reads the active node through the ambient API
 // client, and its header says so.
 export const CORE_SETTINGS_PAGES = [
@@ -597,7 +597,7 @@ export const CORE_SETTINGS_PAGES = [
     followsNodeSwitcher: true,
   },
   // What plugins put in this device's chrome: every rail source's icon, and the core surfaces a plugin
-  // may draw instead, which used to sit at the foot of the plugin list.
+  // may draw instead.
   {
     id: 'rail-surfaces',
     ...railSurfaces,

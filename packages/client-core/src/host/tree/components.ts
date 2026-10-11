@@ -9,10 +9,9 @@
 // makes "one component API, two render paths" true rather than aspirational.
 //
 // An entry is a component or a loader (./kitEntry.ts). The heavy names are loaders, because this
-// module is preloaded on every cold window — `RemoteTree` is ./Slot.tsx's fallback branch — and one
-// static import of `DiffPane` used to put the diff viewer and the syntax highlighter in the first
-// paint. Nothing under `features/` is reached statically from here any more, which is the property
-// `components.test.ts` holds.
+// module is preloaded on every cold window (`RemoteTree` is `Slot`'s fallback branch), and one static
+// import of `DiffPane` would put the diff viewer and the syntax highlighter in the first paint. Nothing
+// under `features/` is reached statically from here, which is the property `components.test.tsx` holds.
 import type { AnyKitComponent, KitEntry, KitTable } from './kitEntry'
 import {
   Alert,
@@ -86,10 +85,10 @@ import { Only } from '../../kit/components/layout/Only'
 import { Fallback } from '../../kit/components/content/Fallback'
 import { Rectangle } from '../../kit/components/content/Rectangle'
 
-// The eight loaders, and why each one is not a component.
+// The nine loaders, and why each one is not a component.
 //
 //   - `DiffPane` reaches ../../features/diff and, through it, the syntax highlighter.
-//   - The four diff rows share `kit/diff/DiffRows.tsx` with it, so leaving one eager keeps the chunk.
+//   - The five diff rows share `kit/diff/DiffRows.tsx` with it, so leaving one eager keeps the chunk.
 //   - `Markdown` fetches a grammar per fence at render time and is the surface a streaming transcript
 //     re-renders; keeping it out of this table's chunk keeps the parser out of the first paint.
 //   - `Timeline` carries the follow-scroll machinery.

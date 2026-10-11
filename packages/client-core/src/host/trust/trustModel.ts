@@ -41,13 +41,12 @@ import type { NodePluginRow, PluginInputGrant } from '@acorn/protocol/api.ts'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
-// A plain module rather than two memos inside the dialog, for the reason frames/layouts.ts gives:
-// the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
-// structurally untestable, and the two things here are the ones worth pinning. The tier split is a
-// security claim (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the client broker and
-// isolated Node worker hold; `Declared` describes plugin-authored scheduled/check behavior, and the
-// three lists may never be merged. And `decide` is
-// where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
+// A plain module rather than two memos inside the dialog, so a bare-Node suite with no Solid transform
+// can pin the two things worth pinning. The tier split is a security claim
+// (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the
+// client broker and isolated Node worker hold; `Declared` describes plugin-authored scheduled/check
+// behavior, and the three lists may never be merged. And `decide` records a remembered answer, so only
+// a deliberate choice may reach it.
 
 export type TierKey = 'reads' | 'provides' | 'enforced' | 'declared' | 'web'
 
@@ -69,12 +68,11 @@ export type TrustLine = PermissionLine & {
 export type TrustTier = { key: TierKey; lines: TrustLine[] }
 
 /**
-/**
  * Every declared line, decorated with the tier that owns it and, on an update, whether the version
  * the owner last approved had it.
  *
  * The diff runs over the grant key, never the sentence, so a copy edit is a copy edit rather than a
- * fleet-wide "asks for more" (plugins/permissions.ts).
+ * fleet-wide "asks for more" (./permissions.ts).
  */
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
   const installed = request?.row.installed
@@ -168,10 +166,9 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
 }
 
 /**
-/**
  * Record an answer, accepted or rejected, and let the shell catch up.
  *
- * Both answers are remembered (@acorn/custody/plugins/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
+ * Both answers are remembered (the custody trust store keeps a rejection so a turned-away plugin does
  * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
  * and records nothing. See the dialog's `dismiss`.
  */
@@ -192,21 +189,13 @@ export async function recordTrustDecision(
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),
     navigationDestinations: navigationDestinationGrants(installed.contributions),
-    // Recorded as well as shown, for the reason the key claims are: the update prompt's "what is new"
-    // mark is a set difference against what the owner last approved, and a grant that is not stored can
-    // never read as newly requested. A plugin that starts reaching into a different package between
-    // versions is exactly the change that must not slide past unremarked.
+    // These grants are recorded as well as shown: the update prompt's "what is new" mark is a set
+    // difference against what the owner last approved, so a grant that is not stored can never read as
+    // newly requested. A package that starts reaching into another package, running itself every five
+    // minutes, or running a different binary must not slide past the update prompt unremarked.
     extensions: extensionGrants(request.row.name, installed.contributions),
-    // Recorded for the same reason as the other contribution grants: an unrecorded grant can never read as newly
-    // requested, and "this package now runs itself every five minutes" is exactly the change that must
-    // not slide past the update prompt unremarked.
     schedules: scheduleGrants(installed.contributions),
-    // Recorded for the same reason. "This package now stops my containers when I
-    // archive" is exactly the change the update prompt has to be able to mark as new.
     taskChecks: taskCheckGrants(installed.contributions),
-    // Recorded for the same reason, and it is the sharpest case of it: "this package
-    // now asks acorn to run a different binary" is precisely the change that must not slide past the
-    // update prompt unremarked, and an unrecorded grant can never read as newly requested.
     harnesses: harnessGrants(installed.contributions),
     agentTools: agentToolGrants(installed.contributions),
     contextSections: contextSectionGrants(installed.contributions),

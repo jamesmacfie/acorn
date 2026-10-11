@@ -51,7 +51,7 @@ export function createDismissable(opts: {
       }
       if (event.key !== 'Escape' || event.defaultPrevented) return
       // A select or menu with focus in it closes first. It listens on `window`, so this listener runs
-      // before it, and without the check one press closed the list and the overlay.
+      // before it, and without the check one press would close the list and the overlay.
       if (focusInAnchoredSurface()) return
       if (escapeStack.filter((e) => e.live()).at(-1) !== entry) return
       event.preventDefault()

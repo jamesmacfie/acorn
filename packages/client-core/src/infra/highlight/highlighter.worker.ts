@@ -2,8 +2,8 @@
 // docs/diff-rendering/loading.md § Syntax highlighting for why it needs to be a worker (the WASM engine
 // versus the renderer's CSP) and why it takes a whole document rather than a line.
 //
-// `shiki/wasm` has to stay the inlined build: it is 622 KB of base64 inside the module, which is
-// what lets this worker's policy keep `connect-src 'none'`. A non-inlined build fetches the
+// `shiki/wasm` has to stay the inlined build: it carries the WASM as base64 inside the module, which
+// is what lets this worker's policy keep `connect-src 'none'`. A non-inlined build fetches the
 // .wasm at runtime and would need a network permission this worker is better off without.
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'

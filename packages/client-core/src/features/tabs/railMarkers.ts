@@ -1,5 +1,5 @@
 // Rail status markers: the pure half. A marker is a small non-interactive status icon drawn around
-// the outside edge of a rail control (see RailTab.tsx). This module owns validation, deterministic
+// the outside edge of a rail control (`RailTab`). This module owns validation, deterministic
 // ordering, and which corner each marker ends up in. It imports neither Solid nor a registry, so it
 // stays testable in the Node-only client-core suite.
 //
@@ -90,7 +90,7 @@ export function resolveRailMarkers(markers: readonly RailMarker[]): ResolvedRail
 
 /** Whether two resolutions draw the same markers and legend. Every field a marker draws or says is
  *  compared, and nothing else, so a control can keep the elements it has when a re-render changed
- *  nothing (RailTab.tsx). */
+ *  nothing (`RailTab`). */
 export function sameRailMarkers(a: ResolvedRailMarkers, b: ResolvedRailMarkers): boolean {
   return (
     a.placed.length === b.placed.length &&

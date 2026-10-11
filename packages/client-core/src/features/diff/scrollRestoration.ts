@@ -15,10 +15,10 @@ type DiffScrollRestorationOptions = {
 // Where the reader was in this diff, kept for the session and put back when they return
 // (docs/diff-rendering/review.md § Review threads and state).
 //
-// The place is an identity, not a pixel offset (./diffLayout.ts): the item the viewport started in and
-// how far into its code rows, or the thread it started in and how far into that. The layout is exact
-// from the topology, so a place is put back as soon as the topology and the scroller both exist, and
-// the corrections that follow as threads are measured keep it there.
+// The place is an identity, not a pixel offset: the item the viewport started in and how far into its code
+// rows, or the thread it started in and how far into that. The layout is exact from the topology, so a place
+// is put back as soon as the topology and the scroller both exist, and the corrections that follow as threads
+// are measured keep it there.
 export function createDiffScrollRestoration(options: DiffScrollRestorationOptions) {
   let publishFrame = 0
   let pending: DiffScrollState | null = null
