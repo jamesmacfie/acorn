@@ -63,6 +63,8 @@ The scan has explicit bounds and failure behavior:
   can exceed the directory limit. An ignored `.claude` folder is still scanned, and so is an
   ignored instruction file such as `CLAUDE.local.md` in a folder that is scanned. Claude Code still
   reads instructions in an ignored folder when it works there, so this review doesn't cover them.
+  That includes a file an agent writes into an ignored folder during one turn for a later turn to
+  load. A tracked file keeps its folder in the scan, so committed instructions are always reviewed.
   Outside a Git repository, nothing is ignored.
 
 The switches are the `checkInstructionFiles` and `reviewChangedInstructions` fields of the
