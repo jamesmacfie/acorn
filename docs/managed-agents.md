@@ -32,47 +32,29 @@ pricing formula lives in `@acorn/protocol/usageCost.ts` and is shared with the `
 
 These pages cover sessions:
 
-<a id="http-control-authority"></a>
-<a id="standing-memory"></a>
-<a id="session-model"></a>
-
 - [Sessions](./managed-agents/sessions.md): HTTP control authority, standing memory, the session
   model, roster reads, and titles.
-
-<a id="bounded-waits"></a>
-<a id="cross-plugin-lifecycle"></a>
-<a id="what-a-session-reports"></a>
 
 - [Session events and waits](./managed-agents/session-events.md): the wait route, lifecycle events,
   and telemetry.
 - [New-session defaults](./managed-agents/defaults.md): remembered options, inline chats, spawned
   agents, and the Settings page.
 
-<a id="from-the-command-palette"></a>
-
 - [From the command palette](./managed-agents/palette.md): the agents plugin's palette rows.
 
 These pages cover harnesses and the work agents do:
-
-<a id="harnesses"></a>
 
 - [Harnesses](./managed-agents/harnesses.md): the two driver tiers, contributed harnesses, one-shot
   modes, and what the ACP driver declares.
 - [Providers and plan usage](./managed-agents/providers.md): installed and signed-in harnesses, and
   usage bars.
 
-<a id="app-access-approval"></a>
-
 - [App-access approval](./managed-agents/app-access.md): Computer Use consent for Codex.
-
-<a id="permission-policy"></a>
 
 - [Permission policy](./managed-agents/permission-policy.md): `agents:before-permission`, a plugin's
   refusal of a harness permission request, and what it can't see.
 - [Harness bridges](./managed-agents/loop-hooks.md): `agents:before-tool` and `agents:after-tool` on
   every tool call Claude Code makes, the bridge program, and why Codex has none.
-
-<a id="session-messages"></a>
 
 - [Session messages](./managed-agents/session-messages.md): `agents:session-messenger`, a plugin's
   attributed note on a session, with its limits and idempotency.
@@ -87,34 +69,18 @@ These pages cover harnesses and the work agents do:
   changing an advertised option from another plugin, named in the transcript, and `agents.toolCaller`,
   the signed session behind another plugin's agent tool call.
 
-<a id="provider-native-subagents"></a>
-
 - [Subagents](./managed-agents/subagents.md): provider-native subagents.
 
-<a id="managed-delegation"></a>
-<a id="reports-back-to-the-owner"></a>
-
 - [Managed delegation](./managed-agents/delegation.md): child sessions and their reports.
-
-<a id="custom-agents"></a>
-<a id="from-a-plugin"></a>
 
 - [Custom agents](./managed-agents/custom-agents.md): saved starts for a session.
 - [Skills](./managed-agents/skills.md): a plugin's named procedures, approved on the Node and delivered
   at every start and resume, natively to Claude Code and Codex and as an index to other harnesses.
 
-<a id="web-activity"></a>
-<a id="file-changes"></a>
-
 - [Web activity and file changes](./managed-agents/activity.md): structured web and diff events.
-
-<a id="context-files-and-attachments"></a>
-<a id="draft-attachments-and-replacing-one"></a>
 
 - [Context, files, and attachments](./managed-agents/attachments.md): attachments, artifacts, and the
   draft attachment seam.
-
-<a id="operations-and-failure"></a>
 
 - [Operations](./managed-agents/operations.md): the turn queue, plan limits, process lifecycle, idle
   stop, and shutdown.
@@ -123,8 +89,6 @@ These pages cover harnesses and the work agents do:
   the same tool call.
 
 These pages cover the client:
-
-<a id="client-surfaces"></a>
 
 - [Client surfaces](./managed-agents/client-surfaces.md): reads and drafts, the Agent pane, Agent
   Center, and retired sessions.

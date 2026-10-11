@@ -27,8 +27,8 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
 - `node-pty` is the only native module, and `apps/node/externals.ts` lists the packages installed
   beside the bundle.
 - A standalone Node has no bundled loaded plugins unless `ACORN_BUNDLED_PLUGINS_DIR` names a folder.
-- [The bundle design](../../bundle.md#docker-2026-08-22) records the container requirements and release
-  dependencies. No Dockerfile exists for acorn.
+- [The bundle design](../../bundle.md#build-the-container-image) records the container requirements
+  and release dependencies. No Dockerfile exists for acorn.
 
 ## In scope
 

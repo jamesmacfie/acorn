@@ -16,13 +16,6 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [Formatting](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, making `git blame` skip formatting commits with `blame.ignoreRevsFile`, and carrying a branch across one. |
 
-<a id="agent-driven-desktop-development"></a>
-<a id="native-control-of-a-session"></a>
-<a id="agent-driven-terminal-development"></a>
-<a id="large-surface-flow"></a>
-<a id="timing-a-cold-start"></a>
-<a id="timing-a-task-switch"></a>
-
 The agent-driven desktop and terminal sections, native control, and the large-surface flow moved to
 [agent drivers](./local-development/agent-drivers.md). Timing a cold start and timing a task switch
 moved to [profiling](./local-development/profiling.md).
@@ -130,7 +123,7 @@ package resolves the same physical copy.
 `scripts/db.mjs` finds a migration chain by its `drizzle.config.ts`. Every plugin's config is one line
 that re-exports `plugins/drizzle.shared.ts`, which maps `./src/node/schema.ts` to `./migrations`. A new
 table-owning plugin adds that one-line file, plus `migrationsModule: import.meta.url` on its
-`NodePlugin`, so the host opens and migrates its database. [Data layer](./data-layer.md#migrations)
+`NodePlugin`, so the host opens and migrates its database. [Data layer](./data-layer/migrations.md)
 covers migrations.
 
 Edit the schema in its owning package, then run:

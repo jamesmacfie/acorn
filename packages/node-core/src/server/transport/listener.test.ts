@@ -95,7 +95,7 @@ describe('the loopback TLS listener', () => {
     expect(started.endpoint.origin).toBe(`https://127.0.0.1:${started.endpoint.port}`)
     expect(started.endpoint.port).toBeGreaterThan(0)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
-    // GET /v1/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
+    // GET /v1/node is the pre-auth route a client that has never paired uses (docs/api-reference/transport.md
     // § Pairing), so it is reachable without a bearer, which makes it the right shape probe here. It
     // advertises the same fingerprint the handshake above just presented.
     const response = await probe(started, '/v1/node')

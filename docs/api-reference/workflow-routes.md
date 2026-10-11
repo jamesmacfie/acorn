@@ -96,11 +96,11 @@ Definitions stored as rows live under `/defs`, and the whole family is device-on
 | `GET /defs/model-connections` | | The backends this owner can generate with, ids and labels only. An empty list is why the editor draws no **Generate** button. |
 
 `POST /defs/generate` writes a definition from a sentence
-([authoring](../workflows/authoring.md#generating-and-editing-with-ai)). `description` is capped at 8,000
-characters by `GENERATE_MAX_DESCRIPTION_CHARS`, the constant the editor's text area reads.
-`workspaceId` says whose definitions ride along as worked examples, and `defId` names one to leave out.
-`notes` is a list of `{ code, message, step? }`, one per thing the reply named that this Node doesn't
-have. `problems` is the checker's list.
+([authoring](../workflows/ai-authoring.md#generating-and-editing-with-ai)). `description` is capped
+at 8,000 characters by `GENERATE_MAX_DESCRIPTION_CHARS`, the constant the editor's text area reads.
+`workspaceId` says whose definitions ride along as worked examples, and `defId` names one to leave
+out. `notes` is a list of `{ code, message, step? }`, one per thing the reply named that this Node
+doesn't have. `problems` is the checker's list.
 
 It answers 422 `model_answer_unusable` when nothing in the reply reads as a definition. A provider
 failure keeps the status the provider seam gave it, so `provider_not_connected` is a 404 and

@@ -1,106 +1,18 @@
-# Plugin UI extensions
+# Plugin UI extensions: open acceptance
 
-Status: all fifteen phases done, October 10, 2026. Planned October 6, 2026, from
-`0ce874a15c856db07992cc5f7650b6730c6aadaf`. Retained until the open acceptance below is complete.
+Date: October 6, 2026. Status: all fifteen phases shipped by October 10, 2026. This page holds only
+the acceptance still open. Delete the folder when the list is empty. The phase plans, the design,
+and the refused alternatives are in git history.
 
-## Where it shipped
+[Places to fill](../../contribution-kinds.md#places-to-fill) owns the shipped behavior and links
+each contract. [UI extension acceptance](../../testing/ui-extension-acceptance-2026-10-10.md) holds
+the regression commands, the host matrix, and the evidence for each open check.
 
-The reference pages own the behavior. Where this folder disagrees with them, they win:
+## Open checks
 
-- [Places to fill](../../contribution-kinds.md#places-to-fill) lists every point and menu location,
-  with its carrier, the owner's consent, and terminal support.
-- [Remote points](../../plugins/remote-points.md), [link previews](../../plugins/link-previews.md),
-  [Markdown fences](../../plugins/markdown-fences.md), [toolbar actions](../../plugins/toolbar-actions.md),
-  [detail regions](../../plugins/detail-regions.md), [rows and annotations](../../plugins/rows-and-annotations.md),
-  and [context menus](../../plugins/menus-and-markers.md#context-menus) own the contracts.
-- [An extension example](../../plugin-authoring/extension-example.md) is the tested authoring path,
-  and `plugin_authoring` lists every point from `packages/protocol/src/chrome/publicExtensionPoints.ts`.
-- [UI extension acceptance](../../testing/ui-extension-acceptance-2026-10-10.md) holds the regression
-  commands and the host matrix.
-
-## Open acceptance and deferrals
-
-These remain open, with evidence in the acceptance record:
-
-- Native child-webview overlap and focus (native overlays A1 to A16), and a trusted desktop press on a
-  toolbar action.
-- The Linear detail region in a combined session, terminal key paths for link previews, message
-  menus, and toolbar presses, and a heap-level leak check.
-
-These stay deferred. [Refused alternatives](./refused.md) records the first, and the reference pages'
-limits and the phase 00 note record the rest:
-
-- Plugin points around or inside agent-built Apps. Dynamic UI and its companion hook aren't shipped.
-- Detail regions on task panes, link previews in overlays and reference panels, and `matches`-aware
-  tie pickers on the Extension points page.
-- Published prop types for each point. Authors declare their own, as the example does.
-
-This programme adds contextual plugin UI to Acorn's desktop and terminal clients. Execute the phases
-in numerical order. [Editor file renderers](../../editor/file-renderers.md) shipped first. Each phase is a developer
-handoff with its own contracts, owners, verification, and completion criteria.
-
-## Outcome and scope
-
-Plugins can preview links, render transcript media and workflow results, add resource actions and
-detail sections, annotate files and rail icons, and supply bounded document intelligence and views.
-Reuse the five cooperative kinds and the menu system. Do not create a second plugin UI runtime.
-
-Panes, sources, settings, overlays, commands, shell replacements, composer extensions, tool cards,
-task annotations, and rail menus are supported foundations, not features to rebuild here.
-Generated interactive reports belong to [agent-built Apps](../dynamic-ui/README.md).
-Plugin contributions around or inside those apps are deferred, with a path retained in
-[refused alternatives](./refused.md).
-
-## Execution order
-
-Every phase depends on the preceding phase. Phase 00 also depends on completed Editor file viewers.
-The ordering is a delivery sequence, not a claim that every feature technically requires all earlier
-features. Implementation checkpoints are not separate public releases; phase 14 completes references.
-
-| Phase | Handoff | Status |
-| --- | --- | --- |
-| 00 | [Confirm prerequisites and contracts](./00-foundations.md) | Done |
-| 01 | [Add URL and reference previews](./01-link-previews.md) | Done |
-| 02 | [Add transcript media viewers](./02-transcript-media.md) | Done |
-| 03 | [Add workflow step renderers](./03-workflow-step-ui.md) | Done |
-| 04 | [Add file and document actions](./04-resource-actions.md) | Done |
-| 05 | [Add message and turn actions](./05-message-actions.md) | Done |
-| 06 | [Add resource detail regions](./06-detail-regions.md) | Done |
-| 07 | [Add file annotations](./07-file-annotations.md) | Done |
-| 08 | [Add selected-content actions](./08-selection-actions.md) | Done |
-| 09 | [Add document hover and diagnostics](./09-document-intelligence.md) | Done |
-| 10 | [Add Markdown fence viewers](./10-markdown-fences.md) | Done |
-| 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Done |
-| 12 | [Add source and pane status annotations](./12-rail-status.md) | Done |
-| 13 | [Verify the combined programme](./13-acceptance.md) | Done, with open acceptance items |
-| 14 | [Update documentation and authoring examples](./14-documentation.md) | Done |
-
-## How to execute a phase
-
-Read the whole handoff, its owning reference documents, and the live code before editing. Compare
-`git diff 0ce874a15c856db07992cc5f7650b6730c6aadaf -- <owner paths>` with the source facts in the handoff.
-Editor changes are expected. Adapt paths and private implementation details to the shipped owner;
-report a conflicting public contract before inventing a replacement.
-
-Use a supported Node runtime from the root `package.json`. Wait for a running task setup attempt
-before dependency-dependent work. Do not reinstall dependencies or clear persisted state as a workaround.
-Preserve unrelated working-tree edits. Do not create a branch or delegate without the user's request.
-
-Keep tests observable: provider disabled, identity changed, late response, user invoked action, and
-owner fallback. Avoid tests that merely mirror a descriptor declaration. Record commands, runtime,
-host checks, and unresolved failures in the phase's delivery evidence before marking it complete.
-
-## Architecture and decisions
-
-[Design](./design.md) records ownership, matching, data access, and lifecycle rules.
-[Refused alternatives](./refused.md) records deferrals and scope boundaries.
-Public point names in the phase files are the proposed contract; finalize them in phase 00 and keep
-them consistent across protocol, manifests, discovery, tests, and documentation.
-
-## Verify before building
-
-- Confirm the Editor replacement, toggle, revision, and confined file capability have shipped.
-- Recheck [cooperative points](../../plugins/cooperative-extension-points.md),
-  [remote points](../../plugins/remote-points.md), and [UI tiers](../../plugins/ui-tiers.md).
-- Recheck the live desktop and terminal hosts. A shared registry alone does not prove both render.
-- Keep the dynamic UI programme independent; none of these phases authorizes changing app trust.
+- [ ] Native child-webview overlap and focus, scenarios A1 to A16 in
+      [native overlays](../../testing/native-overlays.md).
+- [ ] A trusted desktop press on a toolbar action.
+- [ ] The Linear detail region in a combined session.
+- [ ] Terminal key paths for link previews, message menus, and toolbar presses.
+- [ ] A heap-level leak check.

@@ -64,24 +64,16 @@ Three loaded plugins also declare a project-scoped pane: `http-project`, `linear
 
 ## Pages
 
-<a id="layout-model"></a>
-
 [Pane layouts](./panes/layout.md) covers the two layers of layout: the task layout row and the
 switcher, then the eight named layouts inside a pane with their desktop, narrow, and terminal
 projections.
-
-<a id="the-host-owns-a-regions-inset"></a>
 
 [Pane regions](./panes/regions.md) covers what the host does inside each region: inset and padding,
 the reading width, per-pane layout state, hidden regions, splits drawn inside a region, and the
 wizard.
 
-<a id="there-is-no-keepalive"></a>
-
 [Pane models](./panes/models.md) covers the state a pane's regions share, how long it lives,
 `pane.shown()`, and why there's no `keepAlive`.
-
-<a id="contributions"></a>
 
 [Pane contributions](./panes/contributions.md) covers registering a pane, `hidden`, `collapsible`,
 `readsArchived`, availability gates, the region kinds a loaded plugin can declare, `prefetch`, rail

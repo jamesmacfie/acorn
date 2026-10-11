@@ -2,7 +2,7 @@
 // docs/ui-design/tooltips.md § Tooltips for why this is a separate, importless module.
 
 /**
- * Mounts the tooltip listener into a plugin frame's own document. See docs/ui-design.md
+ * Mounts the tooltip listener into a plugin frame's own document. See docs/ui-design/tooltips.md
  * § Tooltips for why a frame needs its own copy.
  *
  * Returns a teardown function.

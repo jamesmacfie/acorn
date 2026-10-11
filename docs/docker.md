@@ -57,7 +57,7 @@ persisted query cache. Plugin retirement disposes application refresh subscripti
 
 Two rows, registered by the plugin in `plugins/docker/src/client/commands.ts`.
 [Command palette and shortcuts](./command-palette-and-shortcuts.md) covers how the palette runs a
-search, and [command kinds](./plugins.md#command-kinds) holds the vocabulary.
+search, and [command kinds](./plugins/commands.md#command-kinds) holds the vocabulary.
 
 **Open Docker** selects the rail source. **Find a Docker resource** is one search over all four
 lists, containers, images, volumes, and networks, with a badge on each row saying which list it came

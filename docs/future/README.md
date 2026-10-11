@@ -1,6 +1,6 @@
 # Future implementation handoffs
 
-Reviewed October 9, 2026. This folder holds proposed work and acceptance that remains open.
+Reviewed October 12, 2026. This folder holds proposed work and acceptance that remains open.
 Use the linked entry page to identify the next task, its prerequisites, and its completion checks.
 Shipped contracts belong in reference pages under `docs/`; those pages win if a plan disagrees.
 
@@ -12,11 +12,11 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Phases 01 to 08 implemented by October 11, 2026. |
+| [git-client/](./git-client/README.md) | Open acceptance for the built-in Git client. | All eight phases shipped by October 11, 2026. Two terminal checks remain. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
-| [ui-extension/](./ui-extension/README.md) | Fifteen phases for contextual plugin UI after Editor file viewers. | All phases done October 10, 2026. [Places to fill](../contribution-kinds.md#places-to-fill) owns the behavior. Native overlay, trusted toolbar press, Linear region, terminal key path, and heap checks remain open. |
+| [ui-extension/](./ui-extension/README.md) | Open acceptance for contextual plugin UI. | All fifteen phases shipped by October 10, 2026. [Places to fill](../contribution-kinds.md#places-to-fill) owns the behavior. Native overlay, trusted toolbar press, Linear region, terminal key path, and heap checks remain open. |
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [cleanup/](./cleanup/README.md) | Seventeen maintainability proposals: green the gate, merge duplicated boots, remove legacy and dead code, add a formatter, and clean comments and docs. | Proposed October 11, 2026. Implementation not started. Proposal 11 needs a decision first. |
@@ -32,36 +32,35 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
-| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Implemented October 9, 2026. The page keeps the original design. |
 | [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [task-deletion.md](./task-deletion.md) | Delete a task and its plugin data from the archive dialog or the Archive page, with tombstones for plugin catch-up and **Deleted task** labels. | Implemented October 10, 2026. See the [reference](../workspaces-and-tasks/archive.md#deleting-a-task). The page keeps the original design. |
-| [workflow-agent-goals.md](./workflow-agent-goals.md) | Completion conditions for managed workflow agent steps and For each agents, with bounded continuations, persisted verdicts, and workflow-owned controls and budgets. | Implemented October 8, 2026. See the [reference](../workflows/agent-steps.md#completion-conditions). The standalone Agent pane doesn't yet show a workflow session's goal. |
-| [workflow-agent-tools.md](./workflow-agent-tools.md) | PRD for scoped workflow discovery, agent drafts, approved invocation, bounded run reads, and cancellation. | Implemented October 10, 2026. [Workflow tools](../agent-tools/workflow-tools.md) owns the behavior. Real-host acceptance is open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
 
-Editor final acceptance does not include plugin file viewers, resource actions, annotations, or Git
-merge resolution. Those plans retain their own requirements. Dashboard followups do not require
-rebuilding the studio. Node packaging and repository extraction can proceed beside plugin signing;
-discovery depends on accepted package verification. Cloud owns relay order and account identity.
+Dashboard followups do not require rebuilding the studio. Node packaging and repository extraction
+can proceed beside plugin signing; discovery depends on accepted package verification. Cloud owns
+relay order and account identity.
 
-## Completed plans removed on October 8, 2026
+## Completed plans removed
 
 These plans remain in Git history. Use their reference owners for implemented behavior:
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
-| `group-projects-later.md` | [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project). |
-| `find-in-file.md` | [Find in a file](../editor.md#find-in-a-file). |
-| `editor-files.md` | [File renderers](../editor/file-renderers.md). The renderer catalogue and the rectangle design remain in Git history. |
-| `workspace-icons.md` | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
-| `test-feedback.md` | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
-| `dashboards/` | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |
-| Six Editor phase plans | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
+| `lazy-plugin-code.md`, removed October 12, 2026 | [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use). |
+| `task-deletion.md`, removed October 12, 2026 | [Deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task). |
+| `workflow-agent-goals.md`, removed October 12, 2026 | [Completion conditions](../workflows/agent-steps.md#completion-conditions). |
+| `workflow-agent-tools.md`, removed October 12, 2026 | [Workflow tools](../agent-tools/workflow-tools.md). Open acceptance is in [workflow followups](./workflows-gaps.md#add-dedicated-agent-control-tools). |
+| `group-projects-later.md`, removed October 8, 2026 | [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project). |
+| `find-in-file.md`, removed October 8, 2026 | [Find in a file](../editor.md#find-in-a-file). |
+| `editor-files.md`, removed October 8, 2026 | [File renderers](../editor/file-renderers.md). The renderer catalogue and the rectangle design remain in Git history. |
+| `workspace-icons.md`, removed October 8, 2026 | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
+| `test-feedback.md`, removed October 8, 2026 | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
+| `dashboards/`, removed October 8, 2026 | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |
+| Six Editor phase plans, removed October 8, 2026 | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
 
 ## Retired folders
 
@@ -94,10 +93,10 @@ isolation and team policy remain proposed in [cloud isolation](./cloud/isolation
 design and research remain in Git history.
 
 `memory/` phases 1–3 were implemented on 2026-10-02, and the folder was deleted on 2026-10-03.
-[Notes and memory](../notes-and-memory.md) owns direct writes, standing context, history, Undo,
-the Memory page, and import. [Testing](../testing.md#memory-acceptance) retains the open harness
-and usage checks. The proposed fourth phase moved to [cloud team memory](./cloud/memory.md).
-The design, research, refused alternatives, and delivery records remain in Git history.
+[Notes and memory](../notes-and-memory.md) owns direct writes, standing context, history, Undo, the
+Memory page, and import. [Testing](../testing/memory.md#open-acceptance) retains the open harness
+and usage checks. The proposed fourth phase moved to [cloud team memory](./cloud/memory.md). The
+design, research, refused alternatives, and delivery records remain in Git history.
 
 `client-plugins/` shipped its five phases in 2026-09 and was deleted on 2026-09-27.
 [Plugins](../plugins.md), [security](../security.md), [frontend composition](../frontend.md),

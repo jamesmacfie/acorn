@@ -46,7 +46,7 @@ A plugin-contributed node provider vouches for a Node's fingerprint. The desktop
 endpoint and refuses a certificate whose fingerprint isn't the one vouched for. So a provider stands
 in for the owner's eyes at the pairing step and nothing else. The device token never reaches the
 renderer. The host fetches it from the Node that listed the record. See
-[node providers](../plugins.md#node-providers).
+[node providers](../plugins/node-providers.md).
 
 A provider's own connection to its control plane is an ordinary connection, held by the Node the
 plugin runs on. On a desktop install that's the local Node, so the cloud account credential sits on

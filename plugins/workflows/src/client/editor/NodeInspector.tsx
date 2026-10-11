@@ -162,7 +162,7 @@ export default function NodeInspector(props: {
   })
 
   // A fragment, so each bar is a direct child of the detail column: there it spans the column and sits
-  // on its top edge, while the form under it stops at the page measure (docs/ui-design.md
+  // on its top edge, while the form under it stops at the page measure (docs/ui-design/two-column-panes.md
   // § Two-column panes).
   return (
     <>

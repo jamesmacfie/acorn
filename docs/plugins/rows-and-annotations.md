@@ -109,7 +109,7 @@ has a complete example.
 accepted marks into rail markers: severity chooses the tone, the optional icon is resolved by the
 host, and a missing icon becomes a status dot. The desktop still has only four corners, and every mark
 stays in the ordered tooltip legend and the accessible description. The terminal uses the same
-legend ([rail controls and status markers](../ui-design.md#rail-controls-and-status-markers),
+legend ([rail controls and status markers](../ui-design/shell-hierarchy.md#rail-controls),
 [task markers](../tui/chrome.md#task-markers)).
 
 Editor's `editor:file` point works the same way for tree rows and document tabs, keyed

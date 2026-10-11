@@ -79,10 +79,11 @@ A page past 200 lines fails the length check. Split it by topic:
 2. Move each topic into its own file in that folder, named after the topic.
 3. Keep `docs/<page>.md` as the landing page, with a summary and a list of its topic pages. Source
    comments and outside links cite the landing page's path, so it stays put.
-4. For each heading that moved, leave an `<a id="old-heading-slug"></a>` anchor on the landing page
-   next to the link to its new home. Old links then still land somewhere useful.
-5. Update the source comments and doc links that cited the moved section, so they name the topic
-   page. `git grep -n "docs/<page>.md § "` finds the comments.
+4. Update the source comments and doc links that cited the moved section, so they name the topic
+   page. `git grep -n "docs/<page>.md § "` finds the comments, and `git grep -n "<page>.md#"` finds
+   the links.
+5. Leave an `<a id="old-heading-slug"></a>` anchor on the landing page only for a link in the
+   repository that you can't update. Links from outside the repository land at the top of the page.
 6. Add every new file to [docs/README.md](./README.md).
 
 Don't split by length alone. Each file holds one topic a reader would look for by name. A page that

@@ -151,7 +151,7 @@ but a device or the Node's service scope. A task-scoped token has no editor for 
 generate spends your key or your CLI login. Each offers `models.available(userId)` through a route of
 its own. Workflows asks twice: when the first definition fails the checker, the messages go back once,
 which is why its route has a longer timeout
-([generating and editing with AI](../workflows/authoring.md#generating-and-editing-with-ai)).
+([generating and editing with AI](../workflows/ai-authoring.md#generating-and-editing-with-ai)).
 
 The `acorn-advisor` plugin, kept in its own repository, is the one consumer of the grant path. It reviews completed interactive turns
 ([review input](../managed-agents/session-events.md#review-input)).

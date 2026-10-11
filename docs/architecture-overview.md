@@ -97,11 +97,6 @@ Only serializable values cross a process boundary. Product requests and streams 
 | Loaded plugin activation, `active` and `installed`, and trust | [Plugin activation](./plugins/activation.md) |
 | Remote trees and mounted bridge ownership | [Descriptors](./plugins/descriptors.md) |
 
-<a id="package-boundaries"></a>
-<a id="node-api-and-client-flow"></a>
-<a id="wire-validation"></a>
-<a id="node-provided-plugin-ui"></a>
-
 Package boundaries moved to [package boundaries](./architecture/packages.md). The Node API, client
 flow, and wire validation moved to [Node API and client flow](./architecture/node-api.md).
 
@@ -126,7 +121,7 @@ rows, settings pages, slots, context sections, attention sources, and Node stati
 Plugins come in two tiers:
 
 - **Compiled in.** They ship in the binary, run in the shell's own realm, and are trusted like the rest
-  of the app: agents, browser, changes, context, Docker, editor, GitHub, memory, notes, onboarding,
+  of the app: agents, browser, context, Docker, editor, Git, GitHub, memory, notes, onboarding,
   preview, terminal, and workflows. Agents registers the built-in Claude, Codex, and Aider profiles.
 - **Loaded.** A Node loads them from disk, installed through an owner-authenticated route and
   distributed to each paired device. They draw as host-drawn descriptors, as a tree of host components

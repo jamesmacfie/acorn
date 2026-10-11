@@ -1,5 +1,47 @@
 # 16: Docs cleanup
 
+> **Completion note, October 12, 2026.** `pnpm --filter @acorn/arch-tests test` passes, and the
+> anchor scan finds no `<a id>` anchors left in the docs. `oxlint` and the format check pass on the
+> changed source files, whose changes are comments only. The full suite wasn't run.
+>
+> What landed:
+>
+> - `docs/future/ui-extension/` and `docs/future/git-client/` keep only a `README.md`, each a short
+>   checklist of open acceptance. The phase files, the design page, and both refused-alternatives
+>   pages are deleted. UI extensions keep five open checks, the same ones the dated acceptance record
+>   lists. The Git client keeps two terminal checks from the phase 07 evidence: the terminal Changes
+>   pane read "No changes" during a conflict, and the terminal refusal-and-retry flow wasn't driven.
+> - The four implemented single-file plans and `docs/loaded-plugin-migration.md` are deleted. Two
+>   open items moved to their owners. The Agent pane not showing a workflow session's goal is now a
+>   sentence in `docs/workflows/agent-steps.md`. The open both-host acceptance for the workflow tools
+>   is in `docs/future/workflows-gaps.md`. `docs/future/README.md` lists each removed plan with its
+>   reference owner.
+> - `docs/README.md` loses the Editor, UI extension, and Git client handoff sections. The Subfolders
+>   list links `docs/future/README.md` and the two remaining checklists. The Editor completion records
+>   row moved to the testing table.
+> - `changes` is gone from the compiled plugin lists in `docs/architecture-overview.md` and
+>   `docs/first-party-plugins.md`, and from `docs/api-reference.md`, `docs/plugins/data-ownership.md`,
+>   and a plugin routes heading. The Git row in the first-party table takes over the Changes tab.
+> - All 586 anchors are gone, including the 42 that something still targeted. Those links and 15
+>   source citations now name the topic page that owns the section, and nothing needed an anchor
+>   after that. `docs/writing-docs.md` step 4 says to update links, and step 5 allows an anchor only
+>   for a link in the repository that can't be updated.
+>
+> Decisions and deviations:
+>
+> - The deferred dynamic App hook from the UI extension refused page moved into
+>   `docs/future/dynamic-ui/README.md`, since that programme owns any later App work. The other
+>   refusals are in the reference pages' limits or in git history.
+> - Phase 15 flagged `docs/plugin-authoring/the-manifest.md` as saying API major 3. Commit
+>   `4b44479d0` already set it to 5. This phase set `events-and-capabilities.md` to 5 as well, and
+>   added the browser rules removal to `docs/plugins/publishing.md` and `docs/release-notes.md`. No
+>   other doc describes browser rules.
+> - A handful of paragraphs that a link rewrite pushed past 100 columns were rewrapped. Nothing else
+>   was restyled.
+>
+> For later phases: a heading rename or a page split should update the links and citations that
+> name it. A new `<a id>` needs a link in the repository that can't change.
+
 This proposal retires plans for work that has shipped, fixes reference text that has gone stale, and
 removes redirect anchors that nothing points at.
 

@@ -34,7 +34,7 @@ export type NodeAction = {
 
 export type NodeActionRegistration = Omit<NodeAction, 'pluginId'>
 
-/** An action that declares no tier is treated as `execute`, the strongest (docs/schedules.md
+/** An action that declares no tier is treated as `execute`, the strongest (docs/schedules/user-schedules.md
  *  § `node-action`).
  *
  *  This fails in the safe direction: an undeclared tier means nobody has said what this does, and
@@ -87,7 +87,7 @@ export async function runNodeAction(
     env,
     action.pluginId,
     action.path,
-    // The params ride in the body, matching what the click site posts (docs/schedules.md
+    // The params ride in the body, matching what the click site posts (docs/schedules/user-schedules.md
     // § `node-action`): every way of firing an action looks the same to the handler, which is the
     // property that keeps a second caller from needing a second route shape.
     { method: 'POST', body: JSON.stringify(params) },

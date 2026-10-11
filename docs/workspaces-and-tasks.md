@@ -67,28 +67,18 @@ them apart.
 
 ## Pages
 
-<a id="worktrees-and-setup"></a>
-<a id="worktree-status-reads"></a>
-
 [Worktrees and setup](./workspaces-and-tasks/worktrees.md) covers how the Node creates, names, and
 revalidates a worktree, the setup script, copied files, and the coalesced `git status` reads behind
 the rail markers.
 
-<a id="restoring-a-task"></a>
-
 [Archive and restore](./workspaces-and-tasks/archive.md) covers the archive dialog, the teardown
 order, what archive keeps, and how restore rebuilds the worktree.
-
-<a id="task-creation-and-navigation"></a>
 
 [Task creation and navigation](./workspaces-and-tasks/task-creation.md) covers the **New task**
 dialog, branch naming, child tasks made by workflows and delegation, and how the rails group them.
 
 [Project configuration](./workspaces-and-tasks/project-config.md) covers the settings on the
 project row, the `.acorn/config.toml` layers, run targets, and layout recipes.
-
-<a id="durable-task-script-results"></a>
-<a id="retention-and-recovery"></a>
 
 [Task script results](./workspaces-and-tasks/task-scripts.md) covers the durable setup and
 teardown attempts that the CLI, MCP tools, desktop, and terminal client read.

@@ -10,7 +10,7 @@ Editor file access uses core's task-root guard for reads and writes. Writes refu
 before opening the file, so a missing target outside the worktree can't be created through a link
 inside it. New files under real directories in the root, and safe internal aliases, still work. For
 the path replacement limit, see
-[security controls](../security.md#process-path-and-configuration-controls).
+[security controls](../security/process-and-paths.md).
 
 ### One round trip to text
 

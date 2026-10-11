@@ -32,7 +32,7 @@ import { confirmAction } from './confirmStore'
 import { drawnElsewhere, type DrawnElsewhere } from './settingsPages'
 import { listedSettingsPages, placeFor, setSettingsPlace, settingsMissing, settingsPlace } from './settingsStore'
 
-// The terminal's Settings route: the desktop's nine groups, each group's pages, and a page (docs/tui.md
+// The terminal's Settings route: the desktop's nine groups, each group's pages, and a page (docs/tui/sources-and-settings.md
 // § Settings). The same registry the desktop's settings view reads, projected the way the desktop's
 // narrow window projects it: the list is its own screen and a page opens over it, because 80 by 24
 // has no room for a rail beside a form.

@@ -26,33 +26,17 @@ the port type and the document types are on `@acorn/plugin-api/ui/diff`.
 
 ## Pages
 
-<a id="the-document"></a>
-<a id="the-source-port"></a>
-<a id="data-flow"></a>
-
 [The diff document](./diff-rendering/document.md) covers the topology and its segments, find, the
 `DiffSource` port, and how each caller's document is built on the Node.
-
-<a id="parsing-and-highlighting"></a>
-<a id="resident-segments"></a>
 
 [Loading and highlighting](./diff-rendering/loading.md) covers the segment loader, syntax and word
 highlighting in workers, the resident segment cache, and code fences in Markdown.
 
-<a id="row-geometry"></a>
-<a id="modes"></a>
-
 [Row geometry and modes](./diff-rendering/geometry.md) covers fixed and dynamic heights, measurement,
 keeping your place, horizontal scrolling, unified and split modes, gaps, and find.
 
-<a id="review-threads-and-state"></a>
-<a id="marks-from-other-plugins"></a>
-<a id="retained-row-and-fence-work"></a>
-
 [Review threads and marks](./diff-rendering/review.md) covers inline threads, the file filter,
 remembered view state, line drafts, and marks other plugins draw under a code row.
-
-<a id="what-the-changes-panel-refuses"></a>
 
 [The Changes tab](./diff-rendering/changes-pane.md) covers `LocalStatus`, the file list, staging,
 discard, the branch bar, and what the panel refuses.

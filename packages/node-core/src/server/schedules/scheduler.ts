@@ -316,7 +316,7 @@ export class Scheduler {
   }
 
   /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the
-   *  row from the registry's current answer. Takes no tier from the caller (docs/schedules.md
+   *  row from the registry's current answer. Takes no tier from the caller (docs/schedules/user-schedules.md
    *  § Routes, `confirm`). */
   async confirm(key: string): Promise<ScheduleRow> {
     if (keyOwner(key).owner !== 'user')

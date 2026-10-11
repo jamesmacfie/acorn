@@ -5,7 +5,7 @@ what the protocol carries, and how to undo it. Read it before you build a contro
 enrollment payload.
 
 The protocol is a public interface. Anyone can write a control plane through the node-provider seam
-([node providers](./plugins.md#node-providers)), so it's versioned, its payload has a published JSON
+([node providers](./plugins/node-providers.md)), so it's versioned, its payload has a published JSON
 schema, and a test pins the two together.
 
 **Nothing here runs unless someone configured it.** With neither environment variable set, `enrollNode`

@@ -14,7 +14,7 @@ reopening a settled decision, each with what would reopen it.
   ([definitions](./definitions.md)).
 - **Positions in the definition.** A definition moves between a file, a row, and a run's frozen copy,
   and none of them cares where a card sat. Device preferences hold positions
-  ([where positions live](./authoring.md#where-positions-live)).
+  ([where positions live](./editor-details.md#where-positions-live)).
 - **JSON Schema forms, or a plugin-drawn inspector.** The host would need a schema-to-form renderer
   that works in cells, and JSON Schema can't say "fetch these options". A closed field vocabulary with
   an options route is what kinds use ([step kinds](./step-kinds.md#a-kind-describes-its-own-form)).

@@ -32,8 +32,8 @@ export const slug = (text: string): string =>
     .replace(/\s/g, '-')
 
 // Every id a link can land on in a doc. A repeated heading receives a numeric suffix. Explicit
-// `<a id="…">` anchors are included because the landing pages use them to preserve old section links
-// after moving long references into subfolders.
+// `<a id="…">` anchors are included because a split page may keep one for a link it can't update
+// (docs/writing-docs.md § Split a long page).
 export const anchors = (file: string): Set<string> => {
   const found = new Set<string>()
   const duplicates = new Map<string, number>()

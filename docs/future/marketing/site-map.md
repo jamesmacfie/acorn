@@ -95,7 +95,7 @@ is in [plugin-reference.md](./plugin-reference.md).
 
 - `docs/plugins.md` as a whole — it is the internal reference manual and design record; the
   public tree takes the authoring-facing subset only.
-- `docs/first-party-plugins.md`, `docs/loaded-plugin-migration.md`, `docs/future/` — tier audits, migration
+- `docs/first-party-plugins.md`, `docs/future/` — tier audits, migration
   records, and design notes. The public compatibility and security pages state the conclusions
   these files argue for, without the argument.
 - Anything about unshipped work. The public docs describe what loads today; roadmap talk stays

@@ -103,7 +103,7 @@ Orchestration uses the ordinary task tool routes. `GET /v1/core/tasks/:id/tools`
 principal with a signed session claim and the execute permission. A direct-child authorization
 failure looks like an unknown session and returns 404.
 
-## Terminal, changes, editor, and Docker
+## Terminal, Git, editor, and Docker
 
 | Path family | Purpose |
 | --- | --- |
@@ -154,7 +154,7 @@ accept the same scope in their body. Omission includes both applicable scopes. T
 project scope. Undo refuses later writes or outside edits. Library actions are `get`, `edit`,
 `delete`, `history`, `restore`, `changes`, `preview`, `caps`, `sources`, `import-preview`, and `import`.
 Edits, deletes, and restores carry the current hash. Import binds source and destination hashes.
-Caps range from 200 to 32,000 characters. Conflicts return 409. See [notes and memory](../notes-and-memory.md#the-memory-page-and-transcript).
+Caps range from 200 to 32,000 characters. Conflicts return 409. See [the Memory page](../notes-and-memory/memory-page.md).
 
 `/configured` lists every task with a preview, so it refuses a task token. A browser capture answers
 only its own task to a task token, and an unknown or foreign id gets the same empty 404.
@@ -174,10 +174,10 @@ These ship as loaded packages, so their routes run in the plugin's worker:
 
 ### Command palette routes
 
-A loaded plugin's `search`, `input`, and `setting` commands name a route in its own namespace, and the
-host calls it with the query and the identifiers the declared scope owns
-([plugins.md](../plugins.md#command-kinds)). The answer is untrusted display data with no field that
-can choose a route, a URL, or a verb.
+A loaded plugin's `search`, `input`, and `setting` commands name a route in its own namespace, and
+the host calls it with the query and the identifiers the declared scope owns ([command
+kinds](../plugins/commands.md#command-kinds)). The answer is untrusted display data with no field
+that can choose a route, a URL, or a verb.
 
 ```text
 GET  /v1/p/rollbar/palette/issues        ?q&projectId

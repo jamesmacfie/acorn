@@ -337,7 +337,7 @@ export default function SettingsView(props: {
 
   // A dot for whatever waits on the person. Any attention row that lands on a settings page marks that
   // page: a plugin that failed to start or waits for a decision, a loaded plugin's own rows when it has
-  // no rail source of its own, and a connection whose credential was refused (docs/notifications.md
+  // no rail source of its own, and a connection whose credential was refused (docs/notifications/rows-and-targets.md
   // § What a row points at).
   const inbox = createAttentionInbox()
   const waiting = (key: string): boolean =>

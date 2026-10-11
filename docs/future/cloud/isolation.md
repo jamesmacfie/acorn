@@ -32,8 +32,9 @@ it. [Phase 7](./phases/07-isolation.md) builds it. This does not add isolation t
 | The internet | Worker network | Yes | Egress policy, below. |
 
 Deliberate authority is unchanged: agents still get `ACORN_API_URL` and a task-scoped
-`ACORN_API_TOKEN`, and the [loopback-API gates](../../security.md#transport-and-auth) apply as they do locally.
-An agent must not reach a grant, the attempt token, or any team-level route with that token.
+`ACORN_API_TOKEN`, and the [loopback-API gates](../../security/transport-and-auth.md) apply as they
+do locally. An agent must not reach a grant, the attempt token, or any team-level route with that
+token.
 
 ## Worker execution boundary
 
@@ -111,7 +112,7 @@ Record the chosen enforcement boundary and its bypass analysis in phase 7.
 
 ## Audit export
 
-The core [audit table](../../security.md#audit) records security decisions but is not tamper-evident
+The core [audit table](../../security/audit.md) records security decisions but is not tamper-evident
 against someone controlling its file. If a team requires external audit, export those rows to its
 configured endpoint using OTLP, the OpenTelemetry Protocol. Add task-scoped tool-dispatch records
 at the common invocation boundary, with bounded metadata and no credentials, prompts, or tool bodies.

@@ -46,4 +46,4 @@ acorn plugin database query --input-file query.json --output json
 
 Memory is a compiled plugin with no CLI command descriptor. Import memories through the project's
 **Memory** rail entry in the desktop or the terminal client
-([notes and memory](../notes-and-memory.md#the-memory-page-and-transcript)).
+([notes and memory](../notes-and-memory/memory-page.md)).

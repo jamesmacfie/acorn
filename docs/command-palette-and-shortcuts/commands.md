@@ -109,7 +109,7 @@ Each plugin's list is short on purpose:
 
 Each plugin's own doc lists its share under "From the command palette". Memory's edit, history,
 restore, and import controls live on the Memory page
-([notes and memory](../notes-and-memory.md#the-memory-page-and-transcript)).
+([notes and memory](../notes-and-memory/memory-page.md)).
 
 Stopping an agent, removing a container, deleting a note, merging a pull request, and approving a
 workflow gate aren't palette commands. Each needs context and a confirmation that a short row can't

@@ -28,17 +28,6 @@ workspace links, or chosen items.
 
 ## Start here
 
-<a id="start-from-the-scaffold"></a>
-<a id="the-package"></a>
-<a id="a-complete-example"></a>
-<a id="acorn-pluginjson"></a>
-<a id="nodeindexjs"></a>
-<a id="serverroutesjs"></a>
-<a id="clientjs"></a>
-<a id="installing-a-hand-written-package"></a>
-<a id="updating-a-plugin-and-the-data-underneath-it"></a>
-<a id="what-this-profile-refuses-and-why"></a>
-
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md): create a package and check
   it.
 - [A complete example](./plugin-authoring/complete-example.md): a node half in two files and one
@@ -50,21 +39,11 @@ workspace links, or chosen items.
 
 ## The manifest
 
-<a id="requiring-another-plugin"></a>
-<a id="what-the-builder-normally-supplies-and-you-now-supply-yourself"></a>
-<a id="contributions"></a>
-<a id="add-task-annotations"></a>
-<a id="harnesses"></a>
-<a id="the-action-verbs"></a>
-
 `contentLinks` can declare a target without `match`, with a plugin-owned kind and item ID. A loaded
 manifest may name a declared task pane or overlay and list supported presentations. Compiled plugins
 register a target resolver through `ctx.contentLinks`. Sources describe target kinds and named record
 actions separately from each record's current eligibility; the `actions` source operation must answer
 for an exact record reference before a Node action runs.
-<a id="permissions"></a>
-<a id="keybindings"></a>
-<a id="cli-commands"></a>
 
 - [The manifest](./plugin-authoring/the-manifest.md): top-level keys, required plugins, and the rules
   that check fields against each other.
@@ -84,20 +63,6 @@ for an exact record reference before a Node action runs.
 - [CLI command authoring](./plugin-authoring/cli-commands.md): headless commands.
 
 ## The two halves
-
-<a id="the-node-half"></a>
-<a id="telemetry-and-logging"></a>
-<a id="when-there-is-no-ctx-in-reach"></a>
-<a id="in-tests"></a>
-<a id="the-client-half"></a>
-<a id="drawing-a-tree"></a>
-<a id="asking-the-host-for-something"></a>
-<a id="reaching-the-bridge"></a>
-<a id="telemetry-from-a-frame"></a>
-<a id="what-the-bridge-carries"></a>
-<a id="appendix-the-frame-path"></a>
-<a id="storage-and-migrations"></a>
-<a id="drawing-a-diff"></a>
 
 - [The node half](./plugin-authoring/the-node-half.md): loading, the default export, and `ctx`.
 - [Storage and migrations](./plugin-authoring/storage.md): owning tables and changing them.

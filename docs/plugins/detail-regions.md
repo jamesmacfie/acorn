@@ -81,5 +81,4 @@ Linear's `item` is the ticket identifier. Rollbar's is the rail row's `<connecti
 ## Why
 
 The host draws the region, so the owner consents in its manifest and never runs another plugin's code
-in its tree. This keeps remote composition one level deep without a nested-slot protocol. See
-[refused alternatives](../future/ui-extension/refused.md#arbitrary-nested-remote-slots).
+in its tree. This keeps remote composition one level deep without a nested-slot protocol.

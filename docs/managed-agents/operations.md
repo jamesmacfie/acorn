@@ -164,7 +164,7 @@ The next prompt resumes the conversation, Claude Code through `session/load` and
 `thread/resume`. A `failed` session's process stops too, and nothing is recorded. Delegated and
 workflow sessions get no exception: `enqueueTurn` resumes a stopped session, and a workflow gate is a
 pending request, so it keeps its session. The sweep is a timer the lifecycle owner holds, not a schedule
-([schedules](../schedules.md#what-deliberately-is-not-a-schedule)), because it sweeps a map that
+([schedules](../schedules.md#limits)), because it sweeps a map that
 exists only in this process.
 
 ## Storage and memory

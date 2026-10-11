@@ -81,7 +81,6 @@ Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would h
 is the owner's, not the shell's, so a project pane or reference panel never pushes a pane into a
 background task. The scope reaches the bridge only. What the contributor should know goes in props.
 
-<a id="link-previews"></a>
 [Link previews](./link-previews.md) has `core:link-preview`, the point for previews of HTTPS links.
 
 ## Asking the owner

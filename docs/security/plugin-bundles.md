@@ -60,16 +60,16 @@ widen it by claiming the same hash.
 a reworded sentence never prompts again. A grant's severity rides beside the key as data.
 
 Extension points follow the same rule. `extensionPoints[].kind` is a closed union of five
-([plugins.md](../plugins.md#cooperative-extension-points)), and both directions appear under
-**Enforced** with copy the host owns. A kind this build can't name is still disclosed as "reach into
-X's Y". The host mints the point's public name, the provenance on everything delivered, and the
-confinement of every route a contribution uses. A contribution that runs its own code needs this
-device to have accepted that bundle, as a pane does. Hooks change what another plugin does, so two of
-the three hook modes are drawn **high**, with the mode in the grant key. The hook chain fails open, so
-a stalled handler can't brick a push. `core:before-tool-call` is the exception: it's an approval gate
-and denies on timeout. `agents:before-permission` fails open for a different reason: a person stands
-behind it. A policy that doesn't answer in time passes the harness's request on to the person, so a
-timeout costs a few seconds and never an approval
+([cooperative extension points](../plugins/cooperative-extension-points.md)), and both directions
+appear under **Enforced** with copy the host owns. A kind this build can't name is still disclosed
+as "reach into X's Y". The host mints the point's public name, the provenance on everything
+delivered, and the confinement of every route a contribution uses. A contribution that runs its own
+code needs this device to have accepted that bundle, as a pane does. Hooks change what another
+plugin does, so two of the three hook modes are drawn **high**, with the mode in the grant key. The
+hook chain fails open, so a stalled handler can't brick a push. `core:before-tool-call` is the
+exception: it's an approval gate and denies on timeout. `agents:before-permission` fails open for a
+different reason: a person stands behind it. A policy that doesn't answer in time passes the
+harness's request on to the person, so a timeout costs a few seconds and never an approval
 ([permission policy](../managed-agents/permission-policy.md#where-it-runs)).
 
 A node-side point has no manifest form of its own, so a few that spend the person's resources are

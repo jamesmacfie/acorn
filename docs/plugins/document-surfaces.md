@@ -49,9 +49,6 @@ routes, and `documentServices` for Editor's files.
 [Composed panes](../editor/composed-panes.md) owns `document-over-frame`, the document API a frame
 uses, and surface actions.
 
-<a id="document-over-frame"></a>
-<a id="language-smarts"></a>
-
 ## Webviews
 
 A webview is a host-drawn pane backed by a shell-owned child webview:

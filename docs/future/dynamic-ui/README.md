@@ -79,9 +79,11 @@ Before changing code, read [descriptors, trees, rectangles](../../plugins/ui-tie
 [frontend](../../frontend.md), and [workspaces and tasks](../../workspaces-and-tasks.md).
 
 The UI extension programme shipped other plugins' contributions around files, messages, links, and
-detail views on October 10, 2026, and deliberately left apps out. Its
-[deferred app hooks](../ui-extension/refused.md#dynamic-app-contribution-points-in-the-first-cut)
-keep the retained path for a companion region around an app.
+detail views on October 10, 2026, and deliberately left apps out. The path it kept open is an outer
+companion region that the Apps host reserves. The region binds app identity, revision, placement,
+and task or project scope, and mounts each contributor with its own permissions. Regions inside
+generated content need an explicit declaration and a separate host-controlled mounting design. Don't
+add placeholder app points, grant arbitrary capabilities, or let generated code into chrome.
 
 ## Verify before building
 

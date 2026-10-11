@@ -6,20 +6,8 @@ it before you add anything that runs on a clock.
 
 ## Pages
 
-<a id="how-a-plugin-declares-one"></a>
-<a id="the-override-model"></a>
-<a id="lifecycle"></a>
-<a id="trust"></a>
-
 [Plugin schedules](./schedules/plugin-schedules.md) covers how a loaded or compiled plugin declares a
 schedule, the owner's overrides, the lifecycle, and the trust disclosure.
-
-<a id="targets-what-a-user-schedule-may-do"></a>
-<a id="node-action"></a>
-<a id="consent-and-the-two-ways-it-fails-closed"></a>
-<a id="workflow"></a>
-<a id="routes"></a>
-<a id="settings"></a>
 
 [User schedules](./schedules/user-schedules.md) covers target kinds, `node-action`, consent and how it
 fails closed, workflow schedules, the routes, and Settings → Schedules.
@@ -148,9 +136,6 @@ turning a trend on never creates a hidden schedule.
 
 Every run writes a row. `schedule_runs` keeps the 20 most recent per schedule, trimmed on write, so
 the table is bounded and nothing sweeps it.
-
-<a id="what-deliberately-is-not-a-schedule"></a>
-<a id="not-built-yet"></a>
 
 ## Limits
 

@@ -123,4 +123,4 @@ The optional `reportResponsiveness` platform capability sends `renderer-pulse` o
 The renderer decides consent, visibility, and focus, and supplies its current operation name, owner,
 and trace IDs. The helper keeps a watchdog per socket, removed on close. It runs outside the renderer,
 so a stuck render span isn't the only evidence of a frozen UI
-([diagnosing an unresponsive view](../telemetry.md#diagnosing-an-unresponsive-view)).
+([diagnosing an unresponsive view](../telemetry/diagnosis.md#diagnosing-an-unresponsive-view)).

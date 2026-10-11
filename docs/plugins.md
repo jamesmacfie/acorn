@@ -13,15 +13,6 @@ there are two tiers and which constraints are deliberate. Read it before widenin
 
 ## Packages and the API
 
-<a id="package-shape"></a>
-<a id="the-plugin-api"></a>
-<a id="one-vocabulary-across-the-registries"></a>
-<a id="the-two-contexts-one-per-tier"></a>
-<a id="what-is-published-and-what-acorn-promises-about-it"></a>
-<a id="the-manifest-schema"></a>
-<a id="hono-and-drizzle-cross-into-tier-1-on-purpose"></a>
-<a id="the-testkit"></a>
-
 - [Package shape](./plugins/package-shape.md): the folder layout and exports map every plugin uses.
 - [The plugin API](./plugins/plugin-api.md): the private facade, the two node context types, and the
   shared registry verbs.
@@ -30,19 +21,6 @@ there are two tiers and which constraints are deliberate. Read it before widenin
 - [Testing a plugin](./plugin-authoring/testing.md): the testkit.
 
 ## Lifecycle and distribution
-
-<a id="activation"></a>
-<a id="managing-installed-plugins"></a>
-<a id="loaded-plugins"></a>
-<a id="the-dev-loop"></a>
-<a id="reloading-one-plugin-without-a-restart"></a>
-<a id="approval-mediated-install"></a>
-<a id="what-the-owner-can-know-before-the-download"></a>
-<a id="development-mode"></a>
-<a id="teaching-the-agent"></a>
-<a id="the-client-half-of-a-loaded-plugin"></a>
-<a id="device-held-plugins"></a>
-<a id="one-shared-eligibility-and-trust-check"></a>
 
 - [Activation](./plugins/activation.md): start order, failures, what a plugin registers, and what the
   owner sees under **Settings > Plugins > Installed**. Rail icon visibility is in
@@ -60,18 +38,6 @@ there are two tiers and which constraints are deliberate. Read it before widenin
 
 ## Drawing UI
 
-<a id="frames"></a>
-<a id="binary-bridge-calls"></a>
-<a id="remote-trees"></a>
-<a id="document-surfaces"></a>
-<a id="document-over-frame"></a>
-<a id="language-smarts"></a>
-<a id="webviews"></a>
-<a id="the-tree-contract"></a>
-<a id="descriptors-for-facts-trees-for-ui-rectangles-for-pixels"></a>
-<a id="client-authoring-and-the-ui-kit"></a>
-<a id="command-kinds"></a>
-
 - [Choosing how a plugin draws](./plugins/ui-tiers.md): descriptors for facts, trees for UI,
   rectangles for pixels, and the two descriptor slots.
 - [Frames](./plugins/frames.md): the iframe path, the bridge's enforcement, and binary calls.
@@ -83,14 +49,6 @@ there are two tiers and which constraints are deliberate. Read it before widenin
 - [Commands and keybindings](./plugins/commands.md): command kinds, chords, and claimed keys.
 
 ## Descriptors
-
-<a id="descriptors"></a>
-<a id="keeping-a-descriptor-fresh"></a>
-<a id="raising-a-notification"></a>
-<a id="the-live-channel"></a>
-<a id="context-menus"></a>
-<a id="three-lists-one-menu"></a>
-<a id="rail-markers"></a>
 
 - [Descriptors](./plugins/descriptors.md): rail sources, content links, routes, and action verbs.
 
@@ -104,23 +62,6 @@ chooses the destination and keeps panel plans outside plugin frames.
 
 ## Extension points
 
-<a id="cooperative-extension-points"></a>
-<a id="five-kinds-four-rules"></a>
-<a id="rows"></a>
-<a id="annotations"></a>
-<a id="asking-the-owner"></a>
-<a id="companion-overlays"></a>
-<a id="rectangles"></a>
-<a id="arbitration-who-fills-a-box"></a>
-<a id="what-the-host-binds"></a>
-<a id="seeing-what-matched"></a>
-<a id="node-side-extension-points"></a>
-<a id="hooks"></a>
-<a id="node-providers"></a>
-<a id="the-first-party-rule"></a>
-<a id="replacing-a-core-surface"></a>
-<a id="there-is-no-uncooperative-extension"></a>
-
 - [Cooperative extension points](./plugins/cooperative-extension-points.md): the five kinds, the four
   rules, arbitration, and what the host binds.
 - [Rows and annotations](./plugins/rows-and-annotations.md), including task annotations.
@@ -133,24 +74,11 @@ chooses the destination and keeps panel plans outside plugin frames.
 
 ## Node contributions
 
-<a id="task-checks"></a>
-<a id="search-providers"></a>
-<a id="harnesses"></a>
-
 - [Task checks](./plugins/task-checks.md): what a plugin says before an archive.
 - [Search providers](./plugins/search-providers.md): grouped search across plugins.
 - [Harnesses](./plugins/harnesses.md): how the host delivers a managed agent declared as data.
 
 ## Working together
-
-<a id="forward-compatibility"></a>
-<a id="collaboration-rules"></a>
-<a id="data-ownership"></a>
-<a id="uninstalling-and-what-purged-means"></a>
-<a id="tool-projection"></a>
-<a id="adding-a-plugin-contribution"></a>
-<a id="the-files-a-contribution-touches"></a>
-<a id="the-golden-lists"></a>
 
 - [Forward compatibility](./plugins/forward-compatibility.md): what happens to input this build
   doesn't know.

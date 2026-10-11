@@ -41,7 +41,7 @@ export default function GateFormEditor(props: {
     props.onChange({ fields: form()?.fields ?? [], values: Object.keys(values).length ? values : undefined })
   }
 
-  // Form sections are subheadings with their fields under them, not folds (docs/ui-design.md
+  // Form sections are subheadings with their fields under them, not folds (docs/ui-design/shell-hierarchy.md
   // § Shell hierarchy): the form is the point of a gate, so it is never hidden.
   return (
     <Stack gap="stack">

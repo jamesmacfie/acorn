@@ -7,11 +7,11 @@
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 export { DERIVED_STYLE_TOKENS, STYLE_TOKEN_FAMILIES } from '@acorn/protocol/styleValues.ts'
 
-/** Theme self-description: the only theme tokens that are not colours. See docs/ui-design.md
+/** Theme self-description: the only theme tokens that are not colours. See docs/ui-design/tokens.md
  * § Token axes for what each one replaced and why a plugin theme cannot set them. */
 export const SELF_DESCRIPTION_TOKENS = ['--is-dark', '--color-scheme'] as const
 
-/** Declared once on `:root` as `var()` references into the palette. See docs/ui-design.md
+/** Declared once on `:root` as `var()` references into the palette. See docs/ui-design/tokens.md
  * § Token axes for why a theme block must never restate one. */
 export const DERIVED_THEME_TOKENS = [
   '--danger',
@@ -43,7 +43,7 @@ export const DERIVED_THEME_TOKENS = [
  * Three, hard cap. Series four onwards folds into `other`. */
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
 
-/** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. See docs/ui-design.md
+/** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. See docs/ui-design/appearance.md
  * § Plugin themes for why the palette half also lives in `@acorn/protocol/themeTokens.ts`. */
 export const THEME_TOKENS = [
   ...THEME_PALETTE_TOKENS,

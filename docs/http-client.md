@@ -116,9 +116,5 @@ a host allowlist isn't built. If one is, converge both onto it.
 
 ## Pages
 
-<a id="client"></a>
-<a id="shared-model-and-region-leases"></a>
-<a id="draft-recovery-and-acknowledgements"></a>
-
 [The HTTP client surfaces](./http-client/client.md) covers the three surfaces, palette rows, agent
 context capture, shared models, and draft recovery.

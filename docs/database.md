@@ -5,10 +5,11 @@ part of acorn's SQLite model. Read this page for how the Node finds and holds a 
 safety rules, and the topic pages. The plugin is in `plugins/database/`.
 
 It ships as a loaded package, declared in `plugins/database/acorn-plugin.config.mjs`. The SQL editor
-isn't the plugin's: the pane declares a `document-over-frame` layout, so the host draws the editor and
-the plugin supplies the document through two of its own routes
-([document surfaces](./plugins.md#document-surfaces)). Everything below the drag handle is the plugin's
-host-drawn tree: the table sidebar, the button bar, the result grid, the row detail, and two modals.
+isn't the plugin's: the pane declares a `document-over-frame` layout, so the host draws the editor
+and the plugin supplies the document through two of its own routes ([document
+surfaces](./plugins/document-surfaces.md#document-surfaces)). Everything below the drag handle is
+the plugin's host-drawn tree: the table sidebar, the button bar, the result grid, the row detail,
+and two modals.
 
 ## Connection resolution
 
@@ -76,13 +77,7 @@ for the descriptor contract.
 
 ## Pages
 
-<a id="database-pane"></a>
-<a id="scratch-limits-and-recovery"></a>
-
 - [The database pane](./database/pane.md): the editor, completions, generation, and scratch recovery.
-
-<a id="from-the-command-palette"></a>
-<a id="workflow-steps"></a>
 
 - [Commands and workflow steps](./database/palette-and-workflows.md): palette rows, `database:query`,
   and `database:generate`.

@@ -79,31 +79,12 @@ extension.
 
 ## Pages
 
-<a id="the-contract"></a>
-<a id="view-state"></a>
-<a id="naming"></a>
-<a id="language-smarts-completions-and-the-growth-rule"></a>
-<a id="a-code-box-that-is-not-a-document"></a>
-<a id="the-manifest-shape"></a>
-
 [The document surface](./editor/document-surface.md) covers the contract a plugin declares, what the
 host owns, view state, the language-ID vocabulary, completions and the rule for adding capabilities,
 and the embedded editor for a code box.
 
-<a id="composed-panes-decided"></a>
-<a id="communication-between-regions"></a>
-<a id="the-template-vocabulary-and-document-over-frame-concretely"></a>
-
 [Composed panes](./editor/composed-panes.md) covers `document-over-frame`, which regions the host
 draws, surface actions, and the document API on the bridge.
-
-<a id="image-previews-in-the-editor-pane"></a>
-<a id="file-tree-viewport-and-freshness"></a>
-<a id="graphical-admission"></a>
-<a id="one-round-trip-to-text"></a>
-<a id="text-loads-and-deferred-presentation"></a>
-<a id="editing-in-your-own-editor"></a>
-<a id="from-the-command-palette"></a>
 
 [The editor pane](./editor/editor-pane.md) covers the editor plugin's pane: opening files, image
 previews, the file tree, reloading on focus, editing in `$EDITOR`, and its palette commands. In
@@ -123,16 +104,9 @@ diagnostics for a language. Each gets the case-kept worktree-relative path or th
 revision, never a filesystem grant ([context menus](./plugins/menus-and-markers.md#context-menus),
 [hover and diagnostics](./editor/document-surface.md#hover-and-diagnostics)).
 
-<a id="find-in-files"></a>
-
 [Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel.
 
-<a id="line-provenance-markers"></a>
-
 [Line markers](./editor/line-markers.md) covers the bars that mark pull request and uncommitted lines.
-
-<a id="save-acknowledgements-and-recovery"></a>
-<a id="host-document-export-and-guarded-replacement"></a>
 
 [Saving and recovery](./editor/save-and-recovery.md) covers write ownership, save acknowledgements,
 dirty-text recovery, and exporting an oversized host document.
@@ -153,13 +127,6 @@ dirty-text recovery, and exporting an oversized host document.
 
 ## Why the host owns the editor
 
-<a id="the-question"></a>
-<a id="what-is-already-true"></a>
-<a id="the-constraint-that-decides-the-shape"></a>
-<a id="why-this-beats-widening-the-frame-contract"></a>
-<a id="what-this-does-not-fix"></a>
-<a id="sequence"></a>
-
 A loaded plugin's frame is one file at an `app-plugin://<hash>` origin, and its content security
 policy has no `worker-src`. In August 2026, a single-file Monaco frame measured 7.93 MiB against the
 8 MiB limit with a stub UI, and its language-service workers, 14.58 MiB, couldn't be served at all
@@ -169,8 +136,6 @@ widens nothing: the editor runs in the shell, and the plugin declares a language
 It also means one theme, one save chord, and one dirty-state model, which no plugin can get wrong.
 
 ## Why CodeMirror
-
-<a id="the-engine-is-codemirror-and-that-is-the-point"></a>
 
 Both instances moved from Monaco to CodeMirror 6 on August 31, 2026, and no plugin had to change,
 because the contract names no vendor. Monaco was 2 to 5 MB of VS Code for a feature set the two

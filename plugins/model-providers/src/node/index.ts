@@ -1,5 +1,5 @@
 // The model-providers plugin's node part. For the adapter shape, the missing generic HTTP endpoint,
-// and the connection-before-model registration order this file follows, see docs/integrations.md
+// and the connection-before-model registration order this file follows, see docs/integrations/model-providers.md
 // § Model providers.
 //
 // This ships as a loaded package. The manifest declaration is in

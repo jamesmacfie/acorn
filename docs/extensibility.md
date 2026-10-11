@@ -14,13 +14,6 @@ Two topic pages hold the rest of the reasoning:
 
 The plan for what comes next is in [where the plugin system is going](./future/ecosystem/where-this-is-going.md).
 
-<a id="data-code-and-pixels"></a>
-<a id="plugins-may-extend-each-other-and-only-by-invitation"></a>
-<a id="plugins-get-building-blocks-not-just-a-boundary"></a>
-<a id="the-node-half-is-isolated"></a>
-<a id="bundled-plugins-shipped-but-loaded"></a>
-<a id="where-this-is-going"></a>
-
 ## The goal
 
 Anyone should be able to extend acorn without forking it, and installing something from a stranger

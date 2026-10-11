@@ -58,11 +58,11 @@ Public pages are splits and distillations of internal docs, per the mapping in
 [site-map.md](./site-map.md). Internal docs stay the source of truth
 ([README.md](./README.md) § Honesty constraints the public docs inherit).
 
-## Four things stay internal
+## Three things stay internal
 
 `docs/plugins.md` as a whole, because it is the internal reference manual and design record and the
-public tree takes only the authoring-facing subset. `docs/first-party-plugins.md`,
-`docs/loaded-plugin-migration.md`, and `docs/future/`, because tier audits, migration records, and
-design notes are the argument and the public pages state only the conclusions. And anything unshipped:
-the public docs describe what loads today, and roadmap talk stays in the blog if it happens at all
-([site-map.md](./site-map.md) § What is deliberately not public).
+public tree takes only the authoring-facing subset. `docs/first-party-plugins.md` and
+`docs/future/`, because tier audits, migration records, and design notes are the argument and the
+public pages state only the conclusions. And anything unshipped: the public docs describe what loads
+today, and roadmap talk stays in the blog if it happens at all ([site-map.md](./site-map.md) § What
+is deliberately not public).

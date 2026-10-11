@@ -3,8 +3,6 @@
 This page covers starting a workflow from an integration's row, from Git history, from the
 workflows plugin's palette rows, and from an agent.
 
-<a id="starting-a-run-from-an-item"></a>
-
 ## Starting a run
 
 A Rollbar error, a Linear issue and a GitHub pull request each have **Start workflow…** in their row

@@ -100,36 +100,19 @@ tool names; a stale preference key cannot introduce a tool into the report.
 
 ## Pages
 
-<a id="github"></a>
-<a id="issuedetail"></a>
-<a id="issuecomment-and-issueimage"></a>
-
 - [Tracker and GitHub tools](./agent-tools/tracker-tools.md) covers `issue_detail`, `issue_comment`,
   `issue_image`, and the GitHub tools.
 
-<a id="loaded-manifest-carriers"></a>
-
 - [Loaded tools and context sections](./agent-tools/loaded-tools.md) covers the manifest form.
-
-<a id="managed-session-orchestration"></a>
 
 - [Managed-session orchestration](./agent-tools/orchestration.md) covers the `agent_*` tools.
 
-<a id="context-sections"></a>
-<a id="drawing-inside-a-section"></a>
-
 - [Context sections](./agent-tools/context-sections.md) covers task context assembly and the route.
-
-<a id="pluginauthoring"></a>
-<a id="pluginrequest"></a>
 
 - [Plugin tools](./agent-tools/plugin-tools.md) covers `plugin_authoring` and `plugin_request`.
 
 - [Workflow tools](./agent-tools/workflow-tools.md) covers discovery, agent drafts, the owner's
   invocation approval, and run reads, waits, and cancellation.
-
-<a id="browser-tools"></a>
-<a id="task-script-tools"></a>
 
 - [Browser and task script tools](./agent-tools/browser-and-scripts.md) covers the browser plugin and
   the setup and teardown tools.

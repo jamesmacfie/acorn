@@ -132,7 +132,7 @@ only. Task listing and cleanup work out association without those hints.
   remote-tracking ref, so a commit someone pushed since the last fetch fails the push instead of
   disappearing. The reader arms the menu item and presses it again, the lease holds, and no
   `git:before-push` handler vetoes. The payload carries `force`, so a branch-protection plugin can
-  refuse that push alone ([plugins.md](../plugins.md#hooks)).
+  refuse that push alone ([hooks](../plugins/hooks.md)).
 - The abort verb is offered only while the Node's status read says a merge or rebase is in flight, and
   which one to abort is read off the worktree rather than the request.
 

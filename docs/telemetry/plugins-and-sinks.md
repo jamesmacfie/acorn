@@ -11,9 +11,10 @@ exporter. It's part of [telemetry](../telemetry.md).
 nobody else's. The host binds the owner on every record from the plugin id, so a package can't file a
 record under another package's name any more than it can mount a route under one.
 
-Two compiled plugins do this. Workflows raises `workflow.run` and `workflow.step`
-([what a run reports](../workflows/execution.md#what-a-run-reports)), and agents raises `agent.session`, `agent.turn`, and the
-`agent.processes.*` gauges ([what a session reports](../managed-agents/session-events.md#what-a-session-reports)).
+Two compiled plugins do this. Workflows raises `workflow.run` and `workflow.step` ([what a run
+reports](../workflows/child-runs.md#what-a-run-reports)), and agents raises `agent.session`,
+`agent.turn`, and the `agent.processes.*` gauges ([what a session
+reports](../managed-agents/session-events.md#what-a-session-reports)).
 
 A plugin's client half has no `ctx.telemetry`, because a client context holds contribution points and
 nothing else. It calls `telemetryFor('<plugin id>')` from `@acorn/plugin-api/client`, the same six

@@ -103,7 +103,7 @@ export function Menu(props: {
 }
 
 /**
- * The same menu, opened at a point instead of under a trigger. See docs/ui-design.md
+ * The same menu, opened at a point instead of under a trigger. See docs/ui-design/interaction.md
  * § Menus and right-click for why visibility is the caller's state and why this is keyed on `at`.
  */
 export function ContextMenu(props: {

@@ -22,7 +22,7 @@ differ.
 An opted-in logical viewer owns its own sink. A viewer that joins after another gets its own restore
 without resetting the first, and detaching one leaves the others live. The socket's last viewer
 releases its holds. Older clients keep single-viewer attachment
-([logical event viewers](../api-reference.md#logical-event-viewers)).
+([logical event viewers](../api-reference/websocket.md#logical-event-viewers)).
 
 The terminal plugin owns the `term:<sessionId>` subscription hint. A size change updates the saved
 size through one attach control frame before the HTTP resize. Equal sizes send nothing. So broker

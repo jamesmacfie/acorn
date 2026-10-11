@@ -75,7 +75,7 @@ For how each one is built, deployed, and operated, see [services](./services.md)
 
 The account service is the grant issuer. Trusting it is the whole game for hosted Nodes, in the
 same way that trusting a control plane is the whole game for an enrolled Node today
-([security](../../security.md#the-control-plane-and-the-inversion-it-costs)). What bounds that
+([security](../../security/control-plane.md)). What bounds that
 trust:
 
 - The account service holds no device token for a hosted Node, and no path in it reads task
@@ -143,7 +143,9 @@ local tasks.
 ## Verify before building
 
 Recheck the shipped contracts named here: [Node enrollment](../../node-enrollment.md),
-[authentication](../../authentication.md), [Node providers](../../plugins/node-providers.md#node-providers),
-[plugin activation](../../plugins/activation.md), and [backup](../../data-layer.md#backup-and-import).
-Recheck the dated provider facts in [hosting and cost](./hosting-and-cost.md). Do not describe a
-proposal in this folder as shipped.
+[authentication](../../authentication.md), [Node
+providers](../../plugins/node-providers.md#node-providers), [plugin
+activation](../../plugins/activation.md), and
+[backup](../../data-layer/backup-and-retention.md#backup-and-import). Recheck the dated provider
+facts in [hosting and cost](./hosting-and-cost.md). Do not describe a proposal in this folder as
+shipped.

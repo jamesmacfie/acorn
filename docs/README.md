@@ -127,7 +127,6 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [plugin-authoring.md](./plugin-authoring.md) | Third-party authoring guide, manifest reference, and examples. |
 | [contribution-kinds.md](./contribution-kinds.md) | The table of every contribution kind and its two carriers. Test-enforced. |
 | [first-party-plugins.md](./first-party-plugins.md) | Which compiled plugins have to be first-party, and the reason for each. |
-| [loaded-plugin-migration.md](./loaded-plugin-migration.md) | A pointer only. The migration record was deleted on October 4, 2026, and lives in Git history. Its open items are in [the compiled tier](./future/compiled-tier.md). |
 
 ## Building, running, shipping
 
@@ -155,6 +154,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/ui-extension-acceptance-2026-10-10.md](./testing/ui-extension-acceptance-2026-10-10.md) | Dated UI extension acceptance: regression commands, the host matrix, the example's real-host check, and open checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes tab, large diff, transcript, and task restoration checks. |
+| [testing/editor-delivery-2026-10-08.md](./testing/editor-delivery-2026-10-08.md) | Dated Editor implementation and verification notes from the retired six phase plans. |
 | [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
 | [testing/editor-phase06-follow-up-2026-10-08.md](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected desktop/terminal checks, and measured Editor acceptance. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
@@ -325,14 +325,11 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file.
   Shipped behavior belongs in an owning doc above.
-- [Workflow agent goals](./future/workflow-agent-goals.md): the implemented requirements for completion
-  conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
-- [Workflow agent tools](./future/workflow-agent-tools.md): the implemented requirements for discovery,
-  agent-authored drafts, approved invocation, run inspection, and cancellation through dedicated tools.
+- [UI extension open acceptance](./future/ui-extension/README.md) and
+  [Git client open acceptance](./future/git-client/README.md): the checks still open after those
+  programmes shipped.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
-- [Lazy plugin routes](./future/lazy-plugin-code.md): the original design for loading a plugin
-  route's code on first use, implemented October 9, 2026.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -341,62 +338,6 @@ Each feature landing page above has topic pages in a folder of the same name:
 Keep one owning page for each contract, and add every new page to this index in the same commit.
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
-
-## Editor acceptance handoff
-
-The six implementation phases are complete. Review the combined change and finish the full test gate
-and supported-platform acceptance. Plugin UI extensions shipped separately
-([places to fill](./contribution-kinds.md#places-to-fill)).
-
-| Document | What it holds |
-| --- | --- |
-| [Editor completion records](./testing/editor-delivery-2026-10-08.md) | Dated implementation and verification notes from the retired six phase plans. |
-| [Phase six evidence](./testing/editor-phase06-2026-10-08.md) | Initial scoped-search and tree acceptance results. |
-| [Phase six followup](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected local flow, measurements, and unavailable checks. |
-
-## UI extension programme records
-
-All fifteen phases shipped by October 10, 2026. The reference pages own the behavior, starting at
-[places to fill](./contribution-kinds.md#places-to-fill). These records stay until the open acceptance
-in [UI extension acceptance](./testing/ui-extension-acceptance-2026-10-10.md) is complete.
-
-| Document | What it holds |
-| --- | --- |
-| [Programme](./future/ui-extension/README.md) | Scope, prerequisites, sequential execution, and status. |
-| [Design](./future/ui-extension/design.md) | Ownership, data flow, carriers, identity, lifetime, and compatibility. |
-| [Refused alternatives](./future/ui-extension/refused.md) | Deferrals, isolation boundaries, and a retained path for later dynamic App hooks. |
-| [Phase 00](./future/ui-extension/00-foundations.md) | Confirm the shipped Editor prerequisites and extension contracts. |
-| [Phase 01](./future/ui-extension/01-link-previews.md) | URL and reference previews with host interaction and provider UI. |
-| [Phase 02](./future/ui-extension/02-transcript-media.md) | Sent attachment/artifact viewers and a read-only media capability. |
-| [Phase 03](./future/ui-extension/03-workflow-step-ui.md) | Provider-owned workflow result bodies and retained owner controls. |
-| [Phase 04](./future/ui-extension/04-resource-actions.md) | File row and document tab menus. |
-| [Phase 05](./future/ui-extension/05-message-actions.md) | Message and completed-turn actions. |
-| [Phase 06](./future/ui-extension/06-detail-regions.md) | Outer host regions for loaded detail owners. |
-| [Phase 07](./future/ui-extension/07-file-annotations.md) | Batched file and tab annotations. |
-| [Phase 08](./future/ui-extension/08-selection-actions.md) | Explicit actions on supported content selections. |
-| [Phase 09](./future/ui-extension/09-document-intelligence.md) | Route-backed document hover and diagnostics. |
-| [Phase 10](./future/ui-extension/10-markdown-fences.md) | Completed Markdown fence viewers with source and copy retained. |
-| [Phase 11](./future/ui-extension/11-toolbar-actions.md) | Preview and Terminal toolbar UI and narrow owner actions. |
-| [Phase 12](./future/ui-extension/12-rail-status.md) | Consenting source and task-pane status annotations. |
-| [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
-| [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
-
-## Future Git client handoff
-
-These pages describe planned work, not shipped behavior. The first release ends after phase 04.
-
-| Document | What it holds |
-| --- | --- |
-| [Git client context](./future/git-client/README.md) | Product decisions, screenshot references, two surfaces, owners, data flow, mutation admission, release boundary, and verification. |
-| [Scope boundaries](./future/git-client/refused.md) | Refused alternatives, deferred functionality, and their reasons. |
-| [Phase 01](./future/git-client/01-plugin-and-worktrees.md) | Built-in plugin, repository source, task pane, worktree inventory, and cleanup. |
-| [Phase 02](./future/git-client/02-history-and-diffs.md) | Paginated history, compact graph, revision detail, and segmented diffs. |
-| [Phase 03](./future/git-client/03-stashes.md) | Stash actions, freshness checks, and coordinated checkout admission. |
-| [Phase 04](./future/git-client/04-explanations-and-first-release.md) | Explicit AI explanations, both-host first-release acceptance, and external plugin retirement. |
-| [Phase 05](./future/git-client/05-task-and-workflow-launches.md) | Pinned commit/branch launches, core task drafts, workflow inputs/retry, and attachment. |
-| [Phase 06](./future/git-client/06-refs-remotes-and-settings.md) | Refs, remotes, comparison, scoped settings, and opt-in Node fetching. |
-| [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
-| [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
 
 ## Cleanup programme
 

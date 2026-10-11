@@ -43,7 +43,7 @@ dependencies are present, and an unsupported native adapter reports an explicit 
 The Node binds its listener at the end of one chain: open the data root and take its lock, reconcile
 bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run every
 plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, and listen. Plugin
-`init` runs for every plugin at once, and so does `ready` ([activation](./plugins.md#activation)).
+`init` runs for every plugin at once, and so does `ready` ([activation](./plugins/activation.md)).
 `bootNode` returns once the Node is listening, and the tmux, worktree, workflow, and agent reconcile
 steps run after that. The supervised Node reports `ready` when they finish. The standalone Node waits
 for them before it prints its handshake, because a launcher acts on that line.

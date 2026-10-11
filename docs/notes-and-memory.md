@@ -95,8 +95,6 @@ Replacement and deletion preserve the prior file under `.history/NAME/` for priv
 Undo restores prior content, or deletes a file created by that change, and records a restore change.
 It refuses if a later logged mutation or an external edit changed the memory.
 
-<a id="the-memory-page-and-transcript"></a>
-
 [The Memory page](./notes-and-memory/memory-page.md) covers the library, editing, recent changes, what
 agents see, import, and the transcript card.
 

@@ -6,7 +6,7 @@ removes, and how agent tools reach plugin data. It's part of the [plugin referen
 ## Data ownership
 
 A table-owning plugin gets one `plugins/<name>.sqlite` file under the Node data root and owns its
-migrations. Eight plugins own one: agents, browser, changes, database, GitHub, HTTP, terminal, and
+migrations. Eight plugins own one: agents, browser, database, Git, GitHub, HTTP, terminal, and
 workflows. Core owns the shared workspace, task, integration, external-item, and security tables.
 Docker, editor, Linear, Rollbar, model providers, preview, memory, notes, and the built-in agent
 profiles use core services, provider registries, or plain files. Notes writes Markdown under

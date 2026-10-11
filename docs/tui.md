@@ -38,50 +38,23 @@ one frame at a fixed size against the fixture in `apps/tui/src/fixture.ts`, with
 
 ## Pages
 
-<a id="the-runtime-floor"></a>
-<a id="the-process-model"></a>
-<a id="attach-or-start"></a>
-<a id="remote-nodes"></a>
-<a id="where-the-tui-keeps-things"></a>
-<a id="signals-and-exit"></a>
-<a id="shell-and-broker-in-one-process"></a>
-<a id="shipping-it"></a>
-
 [Process](./tui/process.md) covers the Node runtime range, attaching to or starting a Node, remote
 Nodes, where the client keeps files, signals, and the in-process broker.
-
-<a id="booting-client-core-under-node"></a>
-<a id="the-host-switch"></a>
-<a id="the-router"></a>
 
 [The host switch](./tui/host-switch.md) covers booting client-core under Node, the platform groups,
 the build aliases that make a pane draw in cells, and the router.
 
-<a id="how-a-frame-is-drawn"></a>
-<a id="rendering"></a>
-
 [Rendering](./tui/rendering.md) covers the tree, layout, paint, and input pipeline, controls as
 stops, color, and sizes.
-
-<a id="there-is-no-floating-layer-so-a-panel-needs-somewhere-to-be-laid-out"></a>
-<a id="rectangles"></a>
-<a id="unknown-nodes-and-failed-trees"></a>
-<a id="what-the-tui-never-does"></a>
 
 [Rectangles and limits](./tui/rectangles.md) covers panels without a floating layer, each rectangle
 kind, unknown nodes, and what the client never does.
 
-<a id="chrome"></a>
-
 [Chrome](./tui/chrome.md) covers the screen, its panels, task markers, the palette, overlays, and the
 notification count and inbox.
 
-<a id="settings"></a>
-
 [Sources and settings](./tui/sources-and-settings.md) covers manifest rail sources, loaded document
 regions, and the Settings route.
-
-<a id="keys-and-focus"></a>
 
 [Keys](./tui/keys.md) covers the transcript shortcuts, the keymap adapter, and the five key groups.
 [Typing](./tui/typing.md) covers fields and the typing layer. [Focus](./tui/focus.md) covers the
@@ -91,27 +64,16 @@ window. [Dialogs and rectangles](./tui/traps.md) covers how a dialog or PTY hold
 [Footer and key trace](./tui/footer.md) covers the footer line, the cheat sheet, and
 `ACORN_TUI_KEYS_TRACE`.
 
-<a id="what-the-terminal-client-reports"></a>
-
 [Reporting and invariants](./tui/reporting.md) covers telemetry, the 11 keyboard invariants, and what
 must never happen.
-
-<a id="loaded-plugins"></a>
-<a id="client-worker-lifetime"></a>
 
 [Loaded plugins](./tui/plugins.md) covers install, the worker sandbox, worker lifetime, reserved
 regions, custody, and the trust prompt.
 
-<a id="what-a-plugin-loses-here"></a>
-
 [What a plugin loses](./tui/plugin-losses.md) covers each extension kind and host slot compared with
 the desktop.
 
-<a id="tests"></a>
-
 [Tests](./tui/tests.md) covers the harness, the boot test, and the agent driver.
-
-<a id="doors-left-open"></a>
 
 Proposals for this client, such as a loopback token mint, are in
 [the terminal review](./future/tui-review/open-doors.md).
