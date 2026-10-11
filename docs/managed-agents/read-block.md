@@ -36,7 +36,9 @@ A blocked session's shell commands, and every process they start:
   in the worktree unsandboxed for every status refresh, so a hook, an `fsmonitor` setting, or a
   submodule's config written there would run as you. Every entry is a concrete path, because on Linux
   the sandbox skips a write entry with a wildcard. A worktree created after the session starts is
-  covered only by Claude Code's own protection.
+  covered only by Claude Code's own protection, which refuses its `commondir` on macOS. A session
+  working directly in a repository's main checkout, with a plain `.git` folder, can't write that
+  folder at all, because a rename of it couldn't be stopped otherwise.
 - Reach the network through Claude Code's proxy. The Node's own address is allowed. In
   skip-permissions mode other hosts are allowed too. In other modes Claude Code decides per host, as
   its sandbox documentation describes.
@@ -56,6 +58,7 @@ start rather than running unconfined.
 - Installs that write outside the worktree, such as `pnpm install` writing to its package store.
 - Git commands that change the repository's settings or submodules, such as `git config`,
   `git push -u`, and `git submodule update`.
+- Commits from a session working in a main checkout rather than a task worktree.
 - `git push` over SSH, when the sandbox blocks the `ssh-agent` socket.
 - Any tool that writes to a folder in your home directory, such as a cache.
 

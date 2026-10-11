@@ -57,11 +57,10 @@ describe('the data root read block', () => {
         ...[own, other].flatMap((dir) => ['commondir', 'gitdir', 'config.worktree'].map((name) => join(dir, name))),
       ],
     })
-    // A checkout with a plain `.git` folder writes it as part of the worktree, so only the files git
-    // acts on are denied. Linux's sandbox skips a write entry with a wildcard.
+    // A plain `.git` folder is denied whole, because a rename of it can't be stopped otherwise. Linux's
+    // sandbox skips a write entry with a wildcard.
     const plain = gitWrites(repo)
-    expect(plain.writable).toEqual([])
-    expect(plain.writeDenied).toEqual(['config', 'config.worktree', 'hooks', 'modules', 'worktrees'].map((name) => join(repo, '.git', name)))
+    expect(plain).toEqual({ writable: [], writeDenied: [join(repo, '.git')] })
     for (const path of [...plain.writeDenied, ...gitWrites(worktree).writeDenied]) expect(path).not.toMatch(/[*?[]/)
   })
 

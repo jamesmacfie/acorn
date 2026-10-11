@@ -38,10 +38,10 @@ export function linkedGitDirs(worktree: string): { own: string; shared: string }
  *  worktree created after this start is protected only by Claude Code's own rules. */
 export function gitWrites(worktree: string): { writable: string[]; writeDenied: string[] } {
   const linked = linkedGitDirs(worktree)
-  if (!linked) {
-    const git = join(worktree, '.git')
-    return { writable: [], writeDenied: ['config', 'config.worktree', 'hooks', 'modules', 'worktrees'].map((name) => join(git, name)) }
-  }
+  // A plain `.git` folder is denied as a whole. Inside the worktree, an agent could otherwise write its
+  // `commondir` to send git to another config, or rename it and leave a `.git` file pointing anywhere,
+  // and a deny on a file inside can't stop a rename of the folder. Commits fail in such a session.
+  if (!linked) return { writable: [], writeDenied: [join(worktree, '.git')] }
   const { own, shared } = linked
   let worktrees: string[] = []
   try {
