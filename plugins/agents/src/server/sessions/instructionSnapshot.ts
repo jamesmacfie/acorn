@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { lstat, open, readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, extname, join, relative, resolve } from 'node:path'
+import { git } from '@acorn/plugin-api/node'
 type SkillFolder = { name: string; dir: string }
 
 export const INSTRUCTION_ANALYZER_VERSION = 2
@@ -19,7 +20,7 @@ const MAX_BYTES = 8 * 1024 * 1024
 const MAX_FILE_BYTES = 1_000_000
 const READ_CHUNK_BYTES = 64 * 1024
 const MAX_MS = 5_000
-export const INSTRUCTION_SCOPE = `root and nested AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md; Claude @imports (five hops); repository ${SKILLS.join(', ')} and delivered plugin skills with supporting files; excludes ${[...EXCLUDED].join(', ')} and ordinary repository symlink directories; scan limits ${MAX_FILES} files, ${MAX_DIRECTORIES} directories, ${MAX_DEPTH} levels, ${MAX_BYTES} bytes, ${MAX_FILE_BYTES} bytes per file, ${MAX_MS} ms; advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings`
+export const INSTRUCTION_SCOPE = `root and nested AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md; Claude @imports (five hops); repository ${SKILLS.join(', ')} and delivered plugin skills with supporting files; excludes ${[...EXCLUDED].join(', ')}, git-ignored folders other than .claude, and ordinary repository symlink directories; scan limits ${MAX_FILES} files, ${MAX_DIRECTORIES} directories, ${MAX_DEPTH} levels, ${MAX_BYTES} bytes, ${MAX_FILE_BYTES} bytes per file, ${MAX_MS} ms; advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings`
 
 export type InstructionFile = {
   path: string
@@ -32,6 +33,15 @@ export type InstructionFile = {
 }
 export type InstructionSnapshot = { files: InstructionFile[]; scope: string; version: number }
 export class InstructionScanIncomplete extends Error {}
+
+// Ignored folders hold clones and build output, which can run to tens of thousands of folders and
+// trip the directory limit. One git call answers for the whole tree: --directory names an ignored
+// folder without listing what is inside it. Outside a repository nothing is ignored.
+async function ignoredDirectories(root: string, signal: AbortSignal): Promise<Set<string>> {
+  const result = await git(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'], { cwd: root, signal, timeoutMs: MAX_MS })
+  if (result.code !== 0) return new Set()
+  return new Set(result.stdout.split('\0').filter((path) => path.endsWith('/')).map((path) => join(root, path.slice(0, -1))))
+}
 
 function decode(bytes: Buffer, required: boolean): string | null {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes)
@@ -51,6 +61,7 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
   // Preserve each discovered alias in the approval digest, but read one canonical file once.
   const canonicalBytes = new Map<string, Buffer>()
   const directories = new Set<string>()
+  let ignored = new Set<string>()
   let totalBytes = 0
   const check = () => {
     if (controller.signal.aborted) throw new InstructionScanIncomplete('Instruction scan did not finish. Retry the review or change the setting in Settings > Security and backup.')
@@ -153,6 +164,8 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
       if (EXCLUDED.has(entry.name)) continue
       const path = join(dir, entry.name)
       if (kind === 'repository' && SKILLS.includes(relative(root, path))) continue
+      // Claude Code loads .claude/CLAUDE.md whether or not the folder is ignored.
+      if (kind === 'repository' && ignored.has(path) && entry.name !== '.claude') continue
       if (kind === 'repository' && entry.isSymbolicLink() && !NAMES.has(entry.name)) continue
       let info
       try { info = entry.isSymbolicLink() ? await stat(path) : await lstat(path) }
@@ -176,6 +189,8 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
   }
   try {
     check()
+    try { ignored = await ignoredDirectories(root, controller.signal) }
+    catch { check() } // No git on PATH: walk everything, as outside a repository.
     await walk(root, 0, 'repository', false)
     for (const folder of SKILLS) await walk(join(root, folder), 0, 'skill', true)
     for (const skill of pluginSkills) await walk(skill.dir, 0, 'skill', true)

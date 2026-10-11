@@ -59,6 +59,11 @@ The scan has explicit bounds and failure behavior:
 - Dependency and generated trees named `.git`, `.acorn`, `.turbo`, `.venv`, `venv`,
   `__pycache__`, `node_modules`, `vendor`, `.pnpm`, `.next`, `dist`, `build`, `target`, and `coverage`
   are excluded. Repository symlink directories outside explicit skill roots are not traversed.
+- Folders that Git ignores are excluded too, because cloned repositories and build output there
+  can exceed the directory limit. An ignored `.claude` folder is still scanned, and so is an
+  ignored instruction file such as `CLAUDE.local.md` in a folder that is scanned. Claude Code still
+  reads instructions in an ignored folder when it works there, so this review doesn't cover them.
+  Outside a Git repository, nothing is ignored.
 
 The switches are the `checkInstructionFiles` and `reviewChangedInstructions` fields of the
 [agent defaults](../managed-agents/defaults.md). Only a device can edit them, open a review, or
