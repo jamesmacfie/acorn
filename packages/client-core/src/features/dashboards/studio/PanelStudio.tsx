@@ -61,21 +61,16 @@ import { describePanelSources, publishFailureMessage, publishPanelPlan } from '.
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from '../persist'
 import { regionRefusal, type PanelRegion } from '../region'
 import {
-  addColumnTo,
-  addSourceTo,
-  addStageTo,
   createSourceTracking,
   INSPECTORS,
   inspectorIntro,
-  moveStageIn,
   NewSourceInspector,
   PanelGuide,
   partKind,
-  removeSourceFrom,
-  removeStageFrom,
   SourceInspector,
   type InspectorContext,
 } from './inspectors'
+import { addColumnTo, addSourceTo, addStageTo, moveStageIn, removeSourceFrom, removeStageFrom } from './planEdits'
 import type { LaunchResult } from './PanelLauncher'
 import { createStudioStore } from './studioStore'
 import DevelopmentStrip, { DroppedRecords, type DevelopingPlugin } from './DevelopmentStrip'

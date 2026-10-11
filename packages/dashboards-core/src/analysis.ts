@@ -1,6 +1,6 @@
 import type { PanelPlan, PlanExpression } from '@acorn/protocol/dashboards.ts'
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
-import type { PlanRow } from './plan'
+import type { PairRow, PlanRow, StageRow, SummaryRow } from './plan'
 import { bucketValue, instant } from './planBuckets'
 
 type Stage = PanelPlan['stages'][number]
@@ -106,15 +106,15 @@ function measureValue(measure: Measure, rows: readonly PlanRow[]): { value: Data
   }
 }
 
-export type SummaryResult = { rows: PlanRow[]; errors: string[] }
+export type SummaryResult = { rows: SummaryRow[]; errors: string[] }
 export function summarizeRows(
   plan: PanelPlan,
   stage: Summary,
-  rows: readonly PlanRow[],
+  rows: readonly StageRow[],
   matches: (row: PlanRow, where: NonNullable<Measure['where']>) => boolean,
   incomplete = false,
 ): SummaryResult {
-  const groups = new Map<string, { by: DataValue[]; rows: PlanRow[] }>()
+  const groups = new Map<string, { by: DataValue[]; rows: StageRow[] }>()
   for (const row of rows) {
     const by = stage.by.map((group) =>
       bucketValue(row.values[group.column], group.bucket ?? 'value', plan.time.zone, plan.time.weekStart),
@@ -125,14 +125,14 @@ export function summarizeRows(
     groups.set(id, group)
   }
   if (!stage.by.length && !groups.size) groups.set('[]', { by: [], rows: [] })
-  const output: PlanRow[] = []
+  const output: SummaryRow[] = []
   const errors: string[] = []
   for (const [id, group] of groups) {
     const values: PlanRow['values'] = Object.fromEntries(
       stage.by.map((by, index) => [by.column, group.by[index] ?? null]),
     )
-    const measureRows: NonNullable<PlanRow['measureRows']> = {}
-    const partial: NonNullable<PlanRow['partial']> = {}
+    const measureRows: NonNullable<SummaryRow['measureRows']> = {}
+    const partial: NonNullable<SummaryRow['partial']> = {}
     for (const measure of stage.measures) {
       const selected = measure.where ? group.rows.filter((row) => matches(row, measure.where!)) : group.rows
       measureRows[measure.id] = selected
@@ -164,7 +164,7 @@ export function summarizeRows(
 }
 
 /** Shared final shaping after either in-memory or SQLite grouped reductions. */
-export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: PlanRow[]): PlanRow[] {
+export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: SummaryRow[]): SummaryRow[] {
   if (stage.fill && stage.by.length === 1 && stage.by[0]?.bucket && stage.by[0].bucket !== 'value' && output.length) {
     const bucket = stage.by[0]
     const byDay = new Map(output.map((row) => [String(row.values[bucket.column]), row]))
@@ -198,7 +198,7 @@ export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: PlanR
   }
   if (stage.pivot) {
     const choiceColumn = plan.columns.find((column) => column.id === stage.pivot!.column)
-    const grouped = new Map<string, PlanRow>()
+    const grouped = new Map<string, SummaryRow>()
     for (const row of output) {
       const by = stage.by.filter((item) => item.column !== stage.pivot!.column)
       const identity = key(by.map((item) => row.values[item.column]))
@@ -250,11 +250,11 @@ export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: PlanR
 
 export function expandRows(
   plan: PanelPlan,
-  rows: readonly PlanRow[],
+  rows: readonly StageRow[],
   stage: Extract<Stage, { op: 'expand' }>,
   maxRows = 25000,
-): PlanRow[] {
-  const output: PlanRow[] = []
+): StageRow[] {
+  const output: StageRow[] = []
   for (const row of rows) {
     const list = row.values[stage.column]
     if (!Array.isArray(list)) continue
@@ -296,7 +296,7 @@ export function expandRows(
 }
 
 /** Active intervals are ordered by end time; each input is visited once plus emitted pairs. */
-export function overlapRows(rows: readonly PlanRow[], stage: Extract<Stage, { op: 'overlap' }>): PlanRow[] {
+export function overlapRows(rows: readonly StageRow[], stage: Extract<Stage, { op: 'overlap' }>): PairRow[] {
   if (rows.length > 5000) throw new Error('Overlap input budget exceeded.')
   const intervals = rows
     .flatMap((row) => {
@@ -308,7 +308,7 @@ export function overlapRows(rows: readonly PlanRow[], stage: Extract<Stage, { op
     })
     .sort((a, b) => a.start - b.start)
   const active = new Map<string, typeof intervals>()
-  const output: PlanRow[] = []
+  const output: PairRow[] = []
   for (const item of intervals) {
     const bucket = (active.get(item.partition) ?? []).filter((other) => other.end > item.start)
     for (const other of bucket) {

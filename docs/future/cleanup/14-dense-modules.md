@@ -1,5 +1,55 @@
 # 14: Dense modules
 
+> **Completion note, October 12, 2026.** Four of the five modules are rewritten. `workerHost.ts`
+> waits on proposal 11, as this proposal says. No line in any of the five passes 120 characters.
+> `pnpm lint`, the arch tests, and the `@acorn/plugin-git`, `@acorn/dashboards-core`,
+> `@acorn/node-core`, and `@acorn/client-core` suites pass on Node 26.8.1, and so does `pnpm test`.
+>
+> What landed:
+>
+> - **`dependencyReview.ts`.** The formatter had already put `Resolution` and `Parsed` on several
+>   lines. An `isRecord` check replaces the ten hand-written object tests, and
+>   `assertDependencyTables` replaces the two loops that called `record(raw)[group]` four times.
+>   `recordTruncation` adds a truncation message once, so each guard names its message once.
+>   `DEPENDENCY_GROUPS`, `INSTALLED_GROUPS`, and `PYTHON_FILES` name the lists that were repeated
+>   inline. Every limit, message, and thrown error is unchanged.
+> - **`PlanRow`** keeps only what every row has: `id`, `values`, `records`, and `recordItems`. Each
+>   stage's function takes and returns its own type. `bindPanelRows` and `relatePanelRows` work on
+>   `SourceRow`, which adds the record's actions and the `source*` tracing fields. `summarizeRows`,
+>   `finishSummaryRows`, and the SQLite summary return `SummaryRow`, and `overlapRows` returns
+>   `PairRow`. `runPlanStages`, `expandRows`, `displayPlanRun`, and `DashboardRun.rows` use
+>   `StageRow`, because stages run in any order and a row between them can carry any stage's fields.
+>   Functions that read only `values` take `PlanRow`. `sortPlanRows` is generic, so it returns the
+>   type it gets. `bindPanelRows` builds the record's actions once instead of twice. The long
+>   description strings in `describePanelPlan` are split into named pieces.
+> - **`inspectors.tsx`.** Every plan edit moved to `studio/planEdits.ts`, as a function that takes
+>   the plan, or one part of it, and returns the edited copy. That covers the outline's Add menu edits
+>   that were already named, and about 40 inline handlers that rebuilt sources, relations, columns,
+>   choices, steps, sorts, groups, the view, buttons, and time settings. The inspector is 1,591 lines,
+>   down from 1,890. `planEdits.test.tsx` checks the edits with the most branches.
+> - **`service.ts`.** The formatter had already expanded the one-line methods. A private `attempt()`
+>   replaces four copies of the same query. The exit outcome is one ternary instead of two in step.
+>   `TaskScriptEvidenceService` drops a `Pick` that an `Omit` undid.
+>
+> Decisions and deviations:
+>
+> - **`workerHost.ts` is untouched.** This proposal says to rewrite it after proposal 11 settles the
+>   legacy mode. It has no line over 120 characters.
+> - **Base row plus named extensions, not one type per stage.** A filter, compute, or expand stage
+>   can follow a summary, so no stage after binding sees one fixed shape. `StageRow` names that union
+>   honestly. The extensions stay private to `plan.ts`. Only the row types are exported.
+> - **Two test files changed.** `operationForms.test.tsx` imports `addStageTo` from `planEdits`,
+>   because the function moved. The new test is a `.tsx` file, because the `logic` test project can't
+>   load the `.tsx` modules that `planEdits.ts` imports.
+> - **The agents store and the editor controller are left alone.** Phases 06 and 07 flagged them for
+>   size. This proposal's test is density, and neither packs logic into expressions. The store has one
+>   long comment line, which belongs to proposal 15. The controller has one long template string.
+> - `docs/dashboards/mapping-and-editor.md` names `planEdits.ts` beside the inspector.
+>
+> For later phases: a new studio control calls a function in `planEdits.ts` inside `change`, rather
+> than building the edited plan inline. A new plan stage returns its own row type and widens
+> `StageRow` if it adds fields.
+
 This proposal rewrites a short list of modules that are hard to read even after formatting. Each has
 logic packed into expressions, or a type that stands for several shapes.
 

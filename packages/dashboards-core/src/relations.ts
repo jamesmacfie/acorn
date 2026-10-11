@@ -1,7 +1,7 @@
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataRecord } from '@acorn/protocol/dataSources.ts'
-import type { PlanProblem, PlanRow, PlanSource } from './plan'
+import type { PlanProblem, PlanSource, SourceRow } from './plan'
 
 const scopedKey = (record: DataRecord, keys: readonly { pointer: string }[]): string | undefined => {
   const values = keys.map((key) => readDataPointer(record.data, key.pointer))
@@ -14,8 +14,8 @@ const scopedKey = (record: DataRecord, keys: readonly { pointer: string }[]): st
 export function relatePanelRows(
   plan: PanelPlan,
   sources: readonly PlanSource[],
-  initial: readonly PlanRow[],
-): { rows: PlanRow[]; problems: PlanProblem[] } {
+  initial: readonly SourceRow[],
+): { rows: SourceRow[]; problems: PlanProblem[] } {
   let rows = [...initial]
   const problems: PlanProblem[] = []
   for (const [index, relation] of (plan.relations ?? []).entries()) {

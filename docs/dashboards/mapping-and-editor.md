@@ -109,9 +109,9 @@ The outline draws `planOutline` in the sections Data, Columns, Steps, Arrange, L
 Each row shows its row count, such as "312 → 41" for a step, and a warning mark when the part has a
 problem. **Add** adds a source, a column, or a step, and disables a step the plan can't take yet with
 the reason. A row's menu moves a step, removes a source or step, or asks the AI about the part.
-Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part),
-under a line saying what the part is for (a step's is `OPERATION_HELP`). With nothing selected, the
-inspector lists a panel's parts in the order they apply. Every control has a visible caption, and
+Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part,
+edits in `studio/planEdits.ts`), under a line saying what the part is for (`OPERATION_HELP` for a
+step). With nothing selected, it lists the parts in the order they apply. Every control has a visible caption, and
 every option reads as words from `packages/dashboards-core/src/labels.ts` rather than a schema value.
 Each form shows only what applies to its part. A column shows the settings for its type only.
 **Look** lists each view with what it's for (`VIEW_HELP`), or why the plan or the region refuses it,

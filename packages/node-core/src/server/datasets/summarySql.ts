@@ -3,7 +3,7 @@ import type { DataSourceQuery, DataSourceDescription } from '@acorn/protocol/dat
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { bucketValue } from '@acorn/dashboards-core/planBuckets.ts'
 import { finishSummaryRows } from '@acorn/dashboards-core/analysis.ts'
-import type { PlanRow } from '@acorn/dashboards-core/plan.ts'
+import type { PlanRow, SummaryRow } from '@acorn/dashboards-core/plan.ts'
 import type { AppDatabase } from '../db'
 import { DatasetError, type DatasetDefinition } from './store'
 import { datasetPredicateSql, jsonPath } from './source'
@@ -147,7 +147,7 @@ function readGroups(db: AppDatabase, base: ReturnType<typeof baseSql>, stage: Su
     )
     .all(...base.params) as Record<string, DataValue | number>[]
   if (rows.length > 5000) throw new DatasetError('capacity', 'Summary has more than 5,000 groups.')
-  const result = new Map<string, PlanRow>()
+  const result = new Map<string, SummaryRow>()
   for (const record of rows) {
     const values = Object.fromEntries(stage.by.map((by, index) => [by.column, record[`g${index}`] ?? null])) as Record<
       string,
@@ -202,7 +202,7 @@ export function summarizeDataset(
   query: DataSourceQuery,
   description: DataSourceDescription,
   incomplete: boolean,
-): { rows: PlanRow[]; inputCount: number; stageIndex: number } {
+): { rows: SummaryRow[]; inputCount: number; stageIndex: number } {
   const stageIndex = plan.stages.findIndex((stage) => stage.op === 'summarize')
   if (stageIndex < 0) throw new DatasetError('invalid')
   const stage = plan.stages[stageIndex] as Summary

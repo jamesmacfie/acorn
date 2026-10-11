@@ -29,6 +29,13 @@ export class TaskScriptService {
   constructor(db: AppDatabase) {
     this.store = new TaskScriptStore(db)
   }
+  private attempt(attemptId: string) {
+    return this.store.db
+      .select()
+      .from(schema.taskScriptAttempts)
+      .where(eq(schema.taskScriptAttempts.attemptId, attemptId))
+      .get()
+  }
   status(taskId: string) {
     return this.store.status(taskId)
   }
@@ -37,11 +44,7 @@ export class TaskScriptService {
   }
   newGeneration(taskId: string) {
     for (const attemptId of this.pendingSetup.keys()) {
-      const row = this.store.db
-        .select()
-        .from(schema.taskScriptAttempts)
-        .where(eq(schema.taskScriptAttempts.attemptId, attemptId))
-        .get()
+      const row = this.attempt(attemptId)
       if (row?.taskId === taskId) this.pendingSetup.delete(attemptId)
     }
     return this.store.newGeneration(taskId)
@@ -75,11 +78,7 @@ export class TaskScriptService {
       return
     }
     if (evidence.type === 'started') {
-      const previous = this.store.db
-        .select()
-        .from(schema.taskScriptAttempts)
-        .where(eq(schema.taskScriptAttempts.attemptId, identity.attemptId))
-        .get()
+      const previous = this.attempt(identity.attemptId)
       this.store.update(identity, {
         state: 'running',
         reason: 'process_started',
@@ -89,13 +88,13 @@ export class TaskScriptService {
       })
     } else if (evidence.type === 'exit') {
       this.pendingSetup.delete(identity.attemptId)
-      const interrupted = !!evidence.signal || evidence.exitCode === null
-      this.store.update(identity, {
-        state: interrupted ? 'interrupted' : evidence.exitCode === 0 ? 'succeeded' : 'failed',
-        reason: interrupted ? 'process_lost' : evidence.exitCode === 0 ? 'exit_zero' : 'nonzero_exit',
-        exitCode: evidence.exitCode,
-        finishedAt: Date.now(),
-      })
+      const outcome =
+        evidence.signal || evidence.exitCode === null
+          ? ({ state: 'interrupted', reason: 'process_lost' } as const)
+          : evidence.exitCode === 0
+            ? ({ state: 'succeeded', reason: 'exit_zero' } as const)
+            : ({ state: 'failed', reason: 'nonzero_exit' } as const)
+      this.store.update(identity, { ...outcome, exitCode: evidence.exitCode, finishedAt: Date.now() })
     } else {
       this.pendingSetup.delete(identity.attemptId)
       this.store.update(identity, {
@@ -108,13 +107,7 @@ export class TaskScriptService {
   logs(taskId: string, raw: unknown): TaskScriptLogs {
     const input = taskScriptLogsInputSchema.parse(raw)
     const snapshot = this.select(taskId, input.phase, input.attemptId)
-    const row = snapshot.attemptId
-      ? this.store.db
-          .select()
-          .from(schema.taskScriptAttempts)
-          .where(eq(schema.taskScriptAttempts.attemptId, snapshot.attemptId))
-          .get()
-      : null
+    const row = snapshot.attemptId ? this.attempt(snapshot.attemptId) : null
     const retained = row?.output ?? ''
     const lines = retained.split('\n')
     const count = input.tailLines + (retained.endsWith('\n') ? 1 : 0)
@@ -239,11 +232,7 @@ export class TaskScriptService {
   close(): void {
     this.shutdown.abort()
     for (const attemptId of this.pendingSetup.keys()) {
-      const row = this.store.db
-        .select()
-        .from(schema.taskScriptAttempts)
-        .where(eq(schema.taskScriptAttempts.attemptId, attemptId))
-        .get()
+      const row = this.attempt(attemptId)
       if (row) this.report(row, { type: 'interrupted', reason: 'shutdown' })
     }
     this.pendingSetup.clear()
@@ -266,9 +255,9 @@ export function setupCheckoutActivity(db: AppDatabase, taskIds: readonly string[
   })
 }
 // First-party process evidence seam. Loaded plugins receive neither a ledger writer nor a DB handle.
-export type TaskScriptEvidenceService = Omit<
-  Pick<TaskScriptService, 'admitManualSetup' | 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'>,
-  'admitManualSetup'
+export type TaskScriptEvidenceService = Pick<
+  TaskScriptService,
+  'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'
 > & {
   admitManualSetup(taskId: string): Promise<TaskScriptSnapshot>
 }

@@ -12,6 +12,9 @@ const MAX_FILE = 6 * 1024 * 1024
 const MAX_TOTAL = 16 * 1024 * 1024
 const MAX_PATHS = 5_000
 const MAX_DECLARATIONS = 20_000
+const DEPENDENCY_GROUPS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
+const INSTALLED_GROUPS = ['dependencies', 'devDependencies', 'optionalDependencies']
+const PYTHON_FILES = ['requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock']
 const manifestName = (path: string) => path === 'package.json' || path.endsWith('/package.json')
 const managerFiles = [
   'pnpm-lock.yaml',
@@ -34,8 +37,9 @@ const managerFiles = [
 ]
 const relevant = (path: string) =>
   manifestName(path) || managerFiles.some((name) => path === name || path.endsWith(`/${name}`))
-const record = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+const record = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {})
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const safe = (value: unknown): string => {
   if (value && typeof value === 'object') return '[structured value]'
@@ -104,8 +108,8 @@ const yaml = (text: string): Record<string, unknown> => {
 }
 const json = (text: string): Record<string, unknown> => {
   const parsed: unknown = JSON.parse(text)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Expected JSON object')
-  return parsed as Record<string, unknown>
+  if (!isRecord(parsed)) throw new Error('Expected JSON object')
+  return parsed
 }
 
 type FileSet = Map<string, string>
@@ -144,26 +148,32 @@ const empty = (): Parsed => ({
   overrides: new Set(),
   limits: [],
 })
+const recordTruncation = (out: Parsed, message: string) => {
+  if (!out.limits.includes(message)) out.limits.push(message)
+}
 const addDirect = (out: Parsed, key: string, value: unknown) => {
   if (out.direct.size >= MAX_DECLARATIONS) {
-    if (!out.limits.includes('More than 20,000 dependency declarations; analysis was truncated.'))
-      out.limits.push('More than 20,000 dependency declarations; analysis was truncated.')
+    recordTruncation(out, 'More than 20,000 dependency declarations; analysis was truncated.')
     return
   }
   out.direct.set(key, compared(value, out.limits, key))
 }
 const addPolicy = (out: Parsed, path: string, name: string, value: unknown) => {
   if (out.policy.size >= 1_000) {
-    if (!out.limits.includes('More than 1,000 policy settings; analysis was truncated.'))
-      out.limits.push('More than 1,000 policy settings; analysis was truncated.')
+    recordTruncation(out, 'More than 1,000 policy settings; analysis was truncated.')
     return
   }
   const key = `${path}:${safe(name)}`
   const entry = compared(value, out.limits, key)
-  out.policy.set(
-    key,
-    /auth|token|password|secret|credential/i.test(name) ? { ...entry, display: '[redacted]', truncated: true } : entry,
-  )
+  const credential = /auth|token|password|secret|credential/i.test(name)
+  out.policy.set(key, credential ? { ...entry, display: '[redacted]', truncated: true } : entry)
+}
+/** Throws when a lockfile entry holds a dependency group that isn't a table. */
+const assertDependencyTables = (entry: Record<string, unknown>, message: string) => {
+  for (const group of DEPENDENCY_GROUPS) {
+    const table = entry[group]
+    if (table !== undefined && !isRecord(table)) throw new Error(message)
+  }
 }
 
 function parseFiles(files: FileSet, readLimits: string[]): Parsed {
@@ -208,10 +218,7 @@ function parseFiles(files: FileSet, readLimits: string[]): Parsed {
     out.limits.push('Yarn or Bun lockfile is unsupported.')
     return out
   }
-  if (
-    out.manager === 'unknown' &&
-    ['requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock'].some((name) => files.has(name))
-  ) {
+  if (out.manager === 'unknown' && PYTHON_FILES.some((name) => files.has(name))) {
     out.manager = 'unsupported'
     out.limits.push('Python dependency files are unsupported.')
     return out
@@ -229,18 +236,14 @@ function parseFiles(files: FileSet, readLimits: string[]): Parsed {
       out.limits.push(`${path}: nested dependency configuration is outside the root package manager review.`)
 
   for (const [path, text] of files) {
-    if (
-      ['requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock'].some(
-        (name) => path === name || path.endsWith(`/${name}`),
-      )
-    )
+    if (PYTHON_FILES.some((name) => path === name || path.endsWith(`/${name}`)))
       out.limits.push(`${path}: Python dependencies are unsupported.`)
     if (path === '.pnpmfile.cjs' || path === 'npm.config.js')
       out.limits.push(`${path} is executable configuration and was not interpreted.`)
     else if (manifestName(path)) {
       try {
         const manifest = json(text)
-        for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+        for (const group of DEPENDENCY_GROUPS) {
           for (const [name, spec] of Object.entries(record(manifest[group])))
             addDirect(out, `${path}:${group}:${name}`, spec)
         }
@@ -309,11 +312,7 @@ function parseFiles(files: FileSet, readLimits: string[]): Parsed {
         key.replace(/:(dependencies|devDependencies|optionalDependencies|peerDependencies):/, ':lock $1:'),
       )
       if (lockSpec === undefined) {
-        if (
-          !['dependencies', 'devDependencies', 'optionalDependencies'].some((other) =>
-            out.direct.has(`${path}:lock ${other}:${name}`),
-          )
-        )
+        if (!INSTALLED_GROUPS.some((other) => out.direct.has(`${path}:lock ${other}:${name}`)))
           out.limits.push(`${key}: lockfile resolution is missing.`)
       } else if (
         lockSpec.identity !== spec.identity &&
@@ -331,30 +330,22 @@ function parseNpm(out: Parsed, lock: Record<string, unknown>, lockPath: string) 
     out.limits.push('Unsupported npm lockfile version.')
     return
   }
-  if (!lock.packages || typeof lock.packages !== 'object' || Array.isArray(lock.packages))
-    throw new Error('invalid packages')
-  const packages = record(lock.packages)
-  if (!packages[''] || typeof packages[''] !== 'object' || Array.isArray(packages['']))
-    throw new Error('npm root importer missing')
+  if (!isRecord(lock.packages)) throw new Error('invalid packages')
+  const packages = lock.packages
+  if (!isRecord(packages[''])) throw new Error('npm root importer missing')
   if (Object.keys(packages).length > 10_000) throw new Error('npm packages table too large')
-  for (const [path, raw] of Object.entries(packages)) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid npm package')
-    for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'])
-      if (
-        record(raw)[group] !== undefined &&
-        (!record(raw)[group] || typeof record(raw)[group] !== 'object' || Array.isArray(record(raw)[group]))
-      )
-        throw new Error('invalid npm dependency table')
+  for (const [path, item] of Object.entries(packages)) {
+    if (!isRecord(item)) throw new Error('invalid npm package')
+    assertDependencyTables(item, 'invalid npm dependency table')
     if (!path || !path.includes('node_modules/')) {
       const manifest = path ? `${path}/package.json` : 'package.json'
       out.importers.add(manifest)
-      for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-        for (const [name, spec] of Object.entries(record(record(raw)[group])))
+      for (const group of DEPENDENCY_GROUPS) {
+        for (const [name, spec] of Object.entries(record(item[group])))
           addDirect(out, `${manifest}:lock ${group}:${name}`, spec)
       }
     }
     if (!path) continue
-    const item = record(raw)
     const name = typeof item.name === 'string' ? item.name : path.split('node_modules/').at(-1)!
     if (item.version !== undefined && typeof item.version !== 'string') throw new Error('invalid npm version')
     const rawVersion = item.version ?? 'unknown'
@@ -365,9 +356,7 @@ function parseNpm(out: Parsed, lock: Record<string, unknown>, lockPath: string) 
     const owner = path.slice(0, path.lastIndexOf('node_modules/')).replace(/\/$/, '')
     const manifest = owner ? `${owner}/package.json` : 'package.json'
     const installName = path.split('node_modules/').at(-1)!
-    const direct = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some((group) =>
-      out.direct.has(`${manifest}:lock ${group}:${installName}`),
-    )
+    const direct = DEPENDENCY_GROUPS.some((group) => out.direct.has(`${manifest}:lock ${group}:${installName}`))
     out.resolutions.set(path, {
       name,
       identity: path,
@@ -390,8 +379,7 @@ function parsePnpm(out: Parsed, lock: Record<string, unknown>) {
     return
   }
   for (const field of ['importers', 'packages', 'snapshots'])
-    if (lock[field] !== undefined && (!lock[field] || typeof lock[field] !== 'object' || Array.isArray(lock[field])))
-      throw new Error(`invalid ${field}`)
+    if (lock[field] !== undefined && !isRecord(lock[field])) throw new Error(`invalid ${field}`)
   if (!Object.keys(record(lock.importers)).length) {
     out.limits.push('pnpm importers table missing.')
     return
@@ -399,12 +387,10 @@ function parsePnpm(out: Parsed, lock: Record<string, unknown>) {
   if (Object.keys(record(lock.packages)).length + Object.keys(record(lock.snapshots)).length > 10_000)
     throw new Error('pnpm resolution table too large')
   for (const key of Object.keys(record(lock.overrides))) out.overrides.add(key)
-  for (const [key, raw] of Object.entries(record(lock.packages))) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid pnpm package')
-    const item = record(raw)
-    if (!item.resolution || typeof item.resolution !== 'object' || Array.isArray(item.resolution))
-      throw new Error('invalid pnpm resolution')
-    const resolution = record(item.resolution)
+  for (const [key, item] of Object.entries(record(lock.packages))) {
+    if (!isRecord(item)) throw new Error('invalid pnpm package')
+    const resolution = item.resolution
+    if (!isRecord(resolution)) throw new Error('invalid pnpm resolution')
     for (const field of ['tarball', 'repo', 'type', 'commit', 'hash', 'integrity'])
       if (resolution[field] !== undefined && typeof resolution[field] !== 'string')
         throw new Error('invalid pnpm resolution field')
@@ -431,15 +417,14 @@ function parsePnpm(out: Parsed, lock: Record<string, unknown>) {
   }
   // Snapshot keys preserve peer context and patched variants. A package table entry may be shared by
   // several snapshots, so keep the snapshot identity as well when it differs.
-  for (const [key, raw] of Object.entries(record(lock.snapshots))) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid pnpm snapshot')
+  for (const [key, item] of Object.entries(record(lock.snapshots))) {
+    if (!isRecord(item)) throw new Error('invalid pnpm snapshot')
     if (out.resolutions.has(key)) continue
     const base = key.replace(/\(.+$/, '')
     const parent = out.resolutions.get(base)
     if (parent)
-      out.resolutions.set(key, { ...parent, identity: key, optional: record(raw).optional === true || parent.optional })
+      out.resolutions.set(key, { ...parent, identity: key, optional: item.optional === true || parent.optional })
     else {
-      const item = record(raw)
       out.limits.push(`${key}: snapshot has no package resolution metadata.`)
       out.resolutions.set(key, {
         name: key.slice(0, key.lastIndexOf('@')),
@@ -456,23 +441,16 @@ function parsePnpm(out: Parsed, lock: Record<string, unknown>) {
       })
     }
   }
-  for (const [importer, raw] of Object.entries(record(lock.importers))) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid pnpm importer')
-    for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'])
-      if (
-        record(raw)[group] !== undefined &&
-        (!record(raw)[group] || typeof record(raw)[group] !== 'object' || Array.isArray(record(raw)[group]))
-      )
-        throw new Error('invalid pnpm importer dependencies')
-    out.importers.add(importer === '.' ? 'package.json' : `${importer}/package.json`)
-    for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-      for (const [name, entry] of Object.entries(record(record(raw)[group]))) {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry))
-          throw new Error('invalid pnpm importer dependency')
-        const item = record(entry)
+  for (const [importer, entry] of Object.entries(record(lock.importers))) {
+    if (!isRecord(entry)) throw new Error('invalid pnpm importer')
+    assertDependencyTables(entry, 'invalid pnpm importer dependencies')
+    const path = importer === '.' ? 'package.json' : `${importer}/package.json`
+    out.importers.add(path)
+    for (const group of DEPENDENCY_GROUPS) {
+      for (const [name, item] of Object.entries(record(entry[group]))) {
+        if (!isRecord(item)) throw new Error('invalid pnpm importer dependency')
         if (typeof item.specifier !== 'string' || !item.specifier || typeof item.version !== 'string' || !item.version)
           throw new Error('invalid pnpm importer specifier or version')
-        const path = importer === '.' ? 'package.json' : `${importer}/package.json`
         addDirect(out, `${path}:lock ${group}:${name}`, item.specifier)
         addDirect(out, `${path}:resolved ${group}:${name}`, item.version)
         if (/^(?:link:|workspace:)/.test(item.version)) continue
@@ -580,15 +558,10 @@ function compare(before: Parsed, after: Parsed): DependencyFinding[] {
           after: next.version,
           detail: safe(key),
         })
-      if (old.sourceIdentity !== next.sourceIdentity)
-        add({
-          path,
-          kind: 'source',
-          name,
-          before: old.source,
-          after: next.source,
-          detail: `${safe(key)}${old.source === next.source ? ': full source changed; display abbreviated or redacted' : ''}`,
-        })
+      if (old.sourceIdentity !== next.sourceIdentity) {
+        const hidden = old.source === next.source ? ': full source changed; display abbreviated or redacted' : ''
+        add({ path, kind: 'source', name, before: old.source, after: next.source, detail: `${safe(key)}${hidden}` })
+      }
       if (old.integrityIdentity !== next.integrityIdentity)
         add({ path, kind: 'integrity', name, before: old.integrity, after: next.integrity, detail: safe(key) })
       if (old.optional !== next.optional)

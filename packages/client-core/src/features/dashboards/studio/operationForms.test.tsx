@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import { availableOperations, planOutline } from '@acorn/dashboards-core/outline.ts'
 import { formPlan } from '../../../testkit/stageForms'
-import { addStageTo } from './inspectors'
+import { addStageTo } from './planEdits'
 import { operationForms } from './operationForms'
 
 // Every operation needs a form, an outline title, and an Add menu entry. The fourth part, an

@@ -61,14 +61,62 @@ import { availableContentPresentations } from '../../../host/registries/panes/co
 import EquivalenceForm from '../EquivalenceForm'
 import KeepHistory from '../KeepHistory'
 import WriteValueControls from '../WriteValueControls'
-import { bindColumnField, defaultPlanColumns, fieldColumn, unbindMissingFields } from '../dashboardEditorModel'
+import { bindColumnField } from '../dashboardEditorModel'
 import { LabeledInput, LabeledSelect } from '../fields'
 import { regionRefusal, type PanelRegion } from '../region'
 import type { FailureContext } from '../planInputs'
 import SourceFailureAlert, { openPluginSettings } from '../SourceFailureAlert'
 import { operationForms } from './operationForms'
-import { newComparison, wholeNumber, type Stage, type StageFormProps } from './stageFormParts'
-import { blankPlan, type StudioChangeOptions } from './studioStore'
+import { wholeNumber, type Stage, type StageFormProps } from './stageFormParts'
+import type { StudioChangeOptions } from './studioStore'
+import {
+  addButtonTo,
+  addChoiceTo,
+  addColumnTo,
+  addDeclaredRelationTo,
+  addFieldColumnTo,
+  addGroupTo,
+  addRelationTo,
+  addSortTo,
+  describeSourceIn,
+  editButtonIn,
+  editChoiceIn,
+  editColumnIn,
+  editGroupIn,
+  editSortIn,
+  editTimeIn,
+  editViewIn,
+  mapSourceValue,
+  moveColumnIn,
+  NEW_COLUMN,
+  pressFromChoice,
+  regroupByColumn,
+  removeButtonFrom,
+  removeChoiceFrom,
+  removeColumnFrom,
+  removeGroupFrom,
+  removeRelationFrom,
+  removeSortFrom,
+  removeStageFrom,
+  replaceStageIn,
+  retypeColumn,
+  setButtonJob,
+  setButtonOpens,
+  setButtonPresentation,
+  setChoiceRank,
+  setChoiceWriteValue,
+  setColumnHidden,
+  setColumnUnit,
+  setLimitIn,
+  setPressIn,
+  setRefreshIn,
+  setRelationUnmatched,
+  setSourceReference,
+  setSourceRole,
+  setStatAggregate,
+  swap,
+  without,
+} from './planEdits'
 
 // The studio's inspector: one form per kind of plan part, keyed by the part's kind, and one form per
 // step operation through `operationForms` (docs/dashboards/mapping-and-editor.md § The generated
@@ -127,99 +175,6 @@ const sourceLabel = (plan: PanelPlan, id: string): string =>
 /** Each source's description by source id, from what its picker last reported. */
 const sourceDescriptions = (tracking: SourceTracking): Record<string, DataSourceDescription | undefined> =>
   Object.fromEntries(Object.entries(tracking.states()).map(([id, state]) => [id, state?.description]))
-/** Drops an optional key, because the plan schema is strict and refuses `undefined` values. */
-const without = <T extends object, K extends string>(value: T, key: K): T extends unknown ? Omit<T, K> : never => {
-  const { [key]: _dropped, ...rest } = value as Record<string, unknown>
-  return rest as T extends unknown ? Omit<T, K> : never
-}
-
-// ── Plan edits the outline's Add menu shares ─────────────────────────────────────────────────────
-
-export const addSourceTo = (plan: PanelPlan, reference: QueryReference): PanelPlan => ({
-  ...plan,
-  sources: [
-    ...plan.sources,
-    { id: crypto.randomUUID(), label: `Source ${plan.sources.length + 1}`, role: 'primary', reference },
-  ],
-})
-const NEW_COLUMN = 'New column'
-export const addColumnTo = (plan: PanelPlan): PanelPlan => ({
-  ...plan,
-  columns: [...plan.columns, { id: newColumnId(plan, NEW_COLUMN), label: NEW_COLUMN, type: 'text', bind: {} }],
-})
-/** The plan with a new step for `op` at the end, or the plan unchanged when the step needs columns it
- *  lacks. Ids for the columns a step makes come from their labels. */
-export const addStageTo = (plan: PanelPlan, op: Stage['op']): PanelPlan => {
-  const columns = outputPlanColumns(plan)
-  const dates = columns.filter((column) => column.type === 'datetime')
-  const list = columns.find((column) => column.list)
-  const stage: Stage | undefined =
-    op === 'filter'
-      ? { op, where: newComparison(columns[0]) }
-      : op === 'compute'
-        ? {
-            op,
-            columns: [
-              {
-                id: newColumnId(plan, 'Calculated value'),
-                label: 'Calculated value',
-                type: 'number',
-                expression: {
-                  kind: 'column',
-                  column: columns.find((column) => column.type === 'number')?.id ?? columns[0]?.id ?? '',
-                },
-              },
-            ],
-          }
-        : op === 'summarize'
-          ? { op, by: [], measures: [{ id: newColumnId(plan, 'Count'), label: 'Count', kind: 'count' }] }
-          : op === 'expand' && list
-            ? { op, column: list.id, output: newColumnId(plan, `${list.label} item`), perRow: 100 }
-            : op === 'overlap' && dates.length >= 2
-              ? { op, start: dates[0]!.id, end: dates[1]!.id, maxPairs: 5000 }
-              : undefined
-  return stage ? { ...plan, stages: [...plan.stages, stage] } : plan
-}
-export const removeSourceFrom = (plan: PanelPlan, id: string): PanelPlan => ({
-  ...plan,
-  sources: plan.sources.filter((source) => source.id !== id),
-  relations: plan.relations?.filter((relation) => relation.from !== id && relation.to !== id),
-  columns: plan.columns.map((column) => ({ ...column, bind: without(column.bind, id) })),
-})
-export const removeColumnFrom = (plan: PanelPlan, id: string): PanelPlan => ({
-  ...plan,
-  columns: plan.columns.filter((column) => column.id !== id),
-})
-export const removeStageFrom = (plan: PanelPlan, index: number): PanelPlan => ({
-  ...plan,
-  stages: plan.stages.filter((_stage, at) => at !== index),
-})
-/** Swaps an item with its neighbour, `by` -1 for up and 1 for down. Unchanged at either end. */
-const swap = <T,>(items: readonly T[], index: number, by: -1 | 1): T[] | undefined => {
-  const target = index + by
-  if (target < 0 || target >= items.length) return undefined
-  const moved = [...items]
-  ;[moved[index], moved[target]] = [moved[target]!, moved[index]!]
-  return moved
-}
-export const moveStageIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelPlan => {
-  const stages = swap(plan.stages, index, by)
-  return stages ? { ...plan, stages } : plan
-}
-export const moveColumnIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelPlan => {
-  const columns = swap(plan.columns, index, by)
-  return columns ? { ...plan, columns } : plan
-}
-/** Drops the key when shown, so a column that was never hidden and one shown again save the same. */
-export const setColumnHidden = (plan: PanelPlan, id: string, hidden: boolean): PanelPlan => ({
-  ...plan,
-  columns: plan.columns.map((column) => {
-    if (column.id !== id) return column
-    const { hidden: _was, ...shown } = column
-    return hidden ? { ...shown, hidden: true } : shown
-  }),
-})
-
 // ── Sources ────────────────────────────────────────────────────────────────────────────────────
 
 export type SourceTracking = ReturnType<typeof createSourceTracking>
@@ -295,24 +250,10 @@ export function createSourceTracking(input: {
     // Columns bound to the old source's fields would point at fields the new source doesn't have.
     const switched = priorSource !== undefined && priorSource !== describedSource
     input.change(
-      (current) => {
-        const source = current.sources.find((entry) => entry.id === id)
-        if (!source) return current
-        const label = state.source?.name ?? source.label
-        const sources = current.sources.map((entry) => (entry.id === id ? { ...entry, label } : entry))
-        if (switched && current.sources.length > 1)
-          return { ...current, sources, columns: unbindMissingFields(current.columns, id, available) }
-        if (current.sources.length !== 1 || (current.columns.length && !switched))
-          return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
-        // A blank panel takes its first source's name, so it isn't published as "New panel".
-        return {
-          ...current,
-          sources,
-          columns: defaultPlanColumns(id, available),
-          ...(current.title === blankPlan().title ? { title: label } : {}),
-        }
+      (current) => describeSourceIn(current, id, { name: state.source?.name, switched, fields: available }),
+      {
+        derived: true,
       },
-      { derived: true },
     )
   }
   return { states, starters, report }
@@ -326,11 +267,7 @@ export function SourceInspector(props: InspectorProps) {
   const source = () => context.plan().sources.find((entry) => entry.id === id())
   const state = () => context.sources.states()[id()]
   const setReference = (reference: QueryReference | undefined): void =>
-    context.change((current) =>
-      reference
-        ? { ...current, sources: current.sources.map((entry) => (entry.id === id() ? { ...entry, reference } : entry)) }
-        : removeSourceFrom(current, id()),
-    )
+    context.change((current) => setSourceReference(current, id(), reference))
   const starterPlans = () => context.sources.starters()[id()] ?? []
   // The source's own problems and its inputs', each in plain words with its fix. Choosing an account
   // happens in the picker below, so that fix isn't repeated here.
@@ -373,12 +310,7 @@ export function SourceInspector(props: InspectorProps) {
               value={current().role}
               options={labelOptions(SOURCE_ROLE_LABELS)}
               onChange={(role) =>
-                context.change((plan) => ({
-                  ...plan,
-                  sources: plan.sources.map((entry) =>
-                    entry.id === id() ? { ...entry, role: role as typeof entry.role } : entry,
-                  ),
-                }))
+                context.change((plan) => setSourceRole(plan, id(), role as PanelPlan['sources'][number]['role']))
               }
             />
           </Show>
@@ -462,43 +394,24 @@ function RelationsInspector(props: InspectorProps) {
     to: string,
     declared: NonNullable<DataSourceDescription['relations']>[number],
   ): void => {
-    const label = declared.label
-    const output = declared.cardinality === 'one-to-many' ? newColumnId(plan(), label) : undefined
-    context.change((current) => ({
-      ...current,
-      relations: [
-        ...(current.relations ?? []),
-        {
-          id: declared.id,
-          from,
-          to,
-          kind: declared.kind,
-          cardinality: declared.cardinality,
-          keys: declared.keys,
-          unmatched: 'keep',
-          maxMatches: 5000,
-          ...(output ? { output } : {}),
-        },
-      ],
-      columns: output
-        ? [...current.columns, { id: output, label, type: 'text', list: true, bind: {} }]
-        : current.columns,
-    }))
+    const output = declared.cardinality === 'one-to-many' ? newColumnId(plan(), declared.label) : undefined
+    context.change((current) => addDeclaredRelationTo(current, { from, to, declared, output }))
   }
   return (
     <Stack gap="row">
       <EquivalenceForm
         sources={plan().sources}
         columns={plan().columns}
-        onAdd={(relation) =>
-          context.change((current) => ({ ...current, relations: [...(current.relations ?? []), relation] }))
-        }
+        onAdd={(relation) => context.change((current) => addRelationTo(current, relation))}
       />
       <For each={plan().relations ?? []}>
         {(relation, index) => (
           <Card>
             <Stack gap="row">
-              <Text>{`${sourceLabel(plan(), relation.from)} ${relation.kind.replaceAll('-', ' ')} ${sourceLabel(plan(), relation.to)}`}</Text>
+              <Text>
+                {`${sourceLabel(plan(), relation.from)} ${relation.kind.replaceAll('-', ' ')} ` +
+                  sourceLabel(plan(), relation.to)}
+              </Text>
               <LabeledSelect
                 label="Unmatched rows"
                 value={relation.unmatched}
@@ -507,23 +420,13 @@ function RelationsInspector(props: InspectorProps) {
                   { value: 'drop', label: 'Drop' },
                 ]}
                 onChange={(unmatched) =>
-                  context.change((current) => ({
-                    ...current,
-                    relations: current.relations?.map((entry, at) =>
-                      at === index() ? { ...entry, unmatched: unmatched as 'keep' | 'drop' } : entry,
-                    ),
-                  }))
+                  context.change((current) => setRelationUnmatched(current, index(), unmatched as 'keep' | 'drop'))
                 }
               />
               <Button
                 size="sm"
                 variant="bare"
-                onPress={() =>
-                  context.change((current) => ({
-                    ...current,
-                    relations: current.relations?.filter((_entry, at) => at !== index()),
-                  }))
-                }
+                onPress={() => context.change((current) => removeRelationFrom(current, index()))}
               >
                 Remove relation
               </Button>
@@ -681,13 +584,7 @@ function ColumnsInspector(props: InspectorProps) {
       context.select(`column:${plan().columns.at(-1)!.id}`)
       return
     }
-    context.change((current) => ({
-      ...current,
-      columns: [
-        ...current.columns,
-        fieldColumn(picked.source.id, picked.field, newColumnId(current, picked.field.name)),
-      ],
-    }))
+    context.change((current) => addFieldColumnTo(current, picked.source.id, picked.field))
   }
   return (
     <Stack gap="row">
@@ -734,20 +631,12 @@ function ColumnInspector(props: InspectorProps) {
   const context = props.context
   const plan = context.plan
   const states = context.sources.states
-  const column = () => plan().columns.find((entry) => `column:${entry.id}` === props.part)
+  const columnId = () => props.part.slice('column:'.length)
+  const column = () => plan().columns.find((entry) => entry.id === columnId())
   const editColumn = (update: (column: Column) => Column, options?: StudioChangeOptions): void =>
-    context.change(
-      (current) => ({
-        ...current,
-        columns: current.columns.map((entry) => (`column:${entry.id}` === props.part ? update(entry) : entry)),
-      }),
-      options,
-    )
+    context.change((current) => editColumnIn(current, columnId(), update), options)
   const editChoice = (index: number, update: (choice: Choice) => Choice, options?: StudioChangeOptions): void =>
-    editColumn(
-      (entry) => ({ ...entry, choices: entry.choices?.map((choice, at) => (at === index ? update(choice) : choice)) }),
-      options,
-    )
+    editColumn((entry) => editChoiceIn(entry, index, update), options)
   const bindColumn = (sourceId: string, pointer: string): void =>
     editColumn((entry) => {
       if (!pointer) return { ...entry, bind: without(entry.bind, sourceId) }
@@ -798,26 +687,8 @@ function ColumnInspector(props: InspectorProps) {
       : ''
   }
   const mapChoice = (sourceId: string, valueId: string, choiceId: string): void =>
-    editColumn((entry) => {
-      const binding = entry.bind[sourceId]
-      if (!binding || !('field' in binding)) return entry
-      const values = Object.fromEntries(
-        Object.entries(binding.values ?? {}).map(([id, ids]) => [id, ids.filter((value) => value !== valueId)]),
-      )
-      if (choiceId) values[choiceId] = [...(values[choiceId] ?? []), valueId]
-      return { ...entry, bind: { ...entry.bind, [sourceId]: { ...binding, values } } }
-    })
-  const setUnit = (choice: string): void =>
-    editColumn((entry) => {
-      const rest = without(entry, 'unit')
-      return choice === ''
-        ? rest
-        : choice === 'column'
-          ? { ...rest, unit: { column: plan().columns.find((other) => other.id !== entry.id)?.id ?? '' } }
-          : choice === 'currency'
-            ? { ...rest, unit: 'USD' }
-            : { ...rest, unit: choice }
-    })
+    editColumn((entry) => mapSourceValue(entry, sourceId, valueId, choiceId))
+  const setUnit = (choice: string): void => editColumn((entry) => setColumnUnit(entry, choice, plan().columns))
 
   return (
     <Show when={column()}>
@@ -860,24 +731,7 @@ function ColumnInspector(props: InspectorProps) {
             label="Type"
             value={current().type ?? 'text'}
             options={labelOptions(COLUMN_TYPE_LABELS)}
-            onChange={(type) =>
-              editColumn((entry) => {
-                // Settings for the old type don't apply to the new one, and the plan refuses some of them.
-                const rest = without(without(without(without(entry, 'unit'), 'precision'), 'choices'), 'unmatched')
-                return {
-                  ...rest,
-                  type: type as NonNullable<Column['type']>,
-                  ...(type === entry.type
-                    ? {
-                        ...(entry.unit ? { unit: entry.unit } : {}),
-                        ...(entry.precision ? { precision: entry.precision } : {}),
-                        ...(entry.choices ? { choices: entry.choices } : {}),
-                        ...(entry.unmatched ? { unmatched: entry.unmatched } : {}),
-                      }
-                    : {}),
-                }
-              })
-            }
+            onChange={(type) => editColumn((entry) => retypeColumn(entry, type as NonNullable<Column['type']>))}
           />
 
           <Show when={current().type === 'number'}>
@@ -952,18 +806,7 @@ function ColumnInspector(props: InspectorProps) {
                         label="Order"
                         type="number"
                         value={String(choice().rank ?? '')}
-                        onInput={(rank) =>
-                          editChoice(
-                            index,
-                            (value) => {
-                              const rest = without(value, 'rank')
-                              return rank.trim() && Number.isFinite(Number(rank))
-                                ? { ...rest, rank: Number(rank) }
-                                : rest
-                            },
-                            { coalesce: true },
-                          )
-                        }
+                        onInput={(rank) => editChoice(index, (value) => setChoiceRank(value, rank), { coalesce: true })}
                       />
                       <WriteValueControls
                         column={current()}
@@ -971,25 +814,14 @@ function ColumnInspector(props: InspectorProps) {
                         sources={plan().sources}
                         descriptions={sourceDescriptions(context.sources)}
                         onChange={(sourceId, value, present) =>
-                          editChoice(index, (candidate) => {
-                            const writeValues = without(candidate.writeValues ?? {}, sourceId)
-                            return {
-                              ...candidate,
-                              writeValues: present ? { ...writeValues, [sourceId]: value! } : writeValues,
-                            }
-                          })
+                          editChoice(index, (candidate) => setChoiceWriteValue(candidate, sourceId, value, present))
                         }
                       />
                       <Inline>
                         <Button
                           size="sm"
                           variant="bare"
-                          onPress={() =>
-                            editColumn((entry) => ({
-                              ...entry,
-                              choices: entry.choices?.filter((_choice, at) => at !== index),
-                            }))
-                          }
+                          onPress={() => editColumn((entry) => removeChoiceFrom(entry, index))}
                         >
                           Remove choice
                         </Button>
@@ -998,15 +830,7 @@ function ColumnInspector(props: InspectorProps) {
                   )}
                 </Index>
                 <Inline>
-                  <Button
-                    size="sm"
-                    onPress={() =>
-                      editColumn((entry) => ({
-                        ...entry,
-                        choices: [...(entry.choices ?? []), { id: crypto.randomUUID(), label: 'New choice' }],
-                      }))
-                    }
-                  >
+                  <Button size="sm" onPress={() => editColumn(addChoiceTo)}>
                     Add choice
                   </Button>
                 </Inline>
@@ -1081,10 +905,7 @@ function StageInspector(props: InspectorProps) {
   const count = () => countsByPart(plan(), context.run()?.diagnostics.stages ?? []).stages[props.part]
   const problems = () => problemsByPart(plan(), context.problems())[props.part] ?? []
   const change = (next: Stage, options?: StudioChangeOptions) =>
-    context.change(
-      (current) => ({ ...current, stages: current.stages.map((entry, at) => (at === index() ? next : entry)) }),
-      options,
-    )
+    context.change((current) => replaceStageIn(current, index(), next), options)
   // Each form takes its own operation's step. The registry is typed per operation, which `Dynamic`
   // can't follow, so the form is read here as one that takes any step.
   const form = () => operationForms[stage()!.op] as unknown as Component<StageFormProps>
@@ -1102,7 +923,9 @@ function StageInspector(props: InspectorProps) {
           />
           <Show when={count()}>
             {(counted) => (
-              <Text emphasis="muted">{`${plural(counted().input, 'row')} in · ${plural(counted().output, 'row')} out`}</Text>
+              <Text emphasis="muted">
+                {`${plural(counted().input, 'row')} in · ${plural(counted().output, 'row')} out`}
+              </Text>
             )}
           </Show>
           <For each={problems()}>{(problem) => <Alert tone="warn">{problem.message}</Alert>}</For>
@@ -1131,15 +954,9 @@ function ArrangeInspector(props: InspectorProps) {
   const columns = createMemo(() => outputPlanColumns(plan()))
   const typeOf = (id: string) => columns().find((column) => column.id === id)?.type
   const editSort = (index: number, update: (sort: Sort) => Sort) =>
-    change((current) => ({
-      ...current,
-      sort: current.sort?.map((entry, at) => (at === index ? update(entry) : entry)),
-    }))
+    change((current) => editSortIn(current, index, update))
   const editGroup = (index: number, update: (group: Group) => Group) =>
-    change((current) => ({
-      ...current,
-      group: current.group?.map((entry, at) => (at === index ? update(entry) : entry)),
-    }))
+    change((current) => editGroupIn(current, index, update))
   /** The group keys a custom order lists: stored ones first, then the column's choices and the groups
    *  the last run made at this level. A key is the raw value, so a choice shows by its label. */
   const groupKeys = (group: Group, index: number): string[] => {
@@ -1162,10 +979,7 @@ function ArrangeInspector(props: InspectorProps) {
   const moveValue = (index: number, at: number, by: -1 | 1) =>
     editGroup(index, (group) => ({ ...group, values: swap(groupKeys(group, index), at, by) ?? group.values }))
   const pickGroupColumn = (index: number, column: string) =>
-    editGroup(index, (group) => {
-      const rest = without(without(group, 'bucket'), 'values')
-      return { ...rest, column, ...(typeOf(column) === 'datetime' && group.bucket ? { bucket: group.bucket } : {}) }
-    })
+    editGroup(index, (group) => regroupByColumn(group, column, typeOf(column)))
   return (
     <Stack gap="stack">
       <Field label="Sort by" group>
@@ -1199,13 +1013,7 @@ function ArrangeInspector(props: InspectorProps) {
                   }
                 />
                 <Inline>
-                  <Button
-                    size="sm"
-                    variant="bare"
-                    onPress={() =>
-                      change((current) => ({ ...current, sort: current.sort?.filter((_entry, at) => at !== index) }))
-                    }
-                  >
+                  <Button size="sm" variant="bare" onPress={() => change((current) => removeSortFrom(current, index))}>
                     Remove
                   </Button>
                 </Inline>
@@ -1216,12 +1024,7 @@ function ArrangeInspector(props: InspectorProps) {
             <Button
               size="sm"
               disabled={(plan().sort?.length ?? 0) >= 8 || !columns().length}
-              onPress={() =>
-                change((current) => ({
-                  ...current,
-                  sort: [...(current.sort ?? []), { column: columns()[0]!.id, direction: 'desc' }],
-                }))
-              }
+              onPress={() => change((current) => addSortTo(current, columns()[0]!.id))}
             >
               Add sort
             </Button>
@@ -1286,13 +1089,7 @@ function ArrangeInspector(props: InspectorProps) {
                   </Stack>
                 </Show>
                 <Inline>
-                  <Button
-                    size="sm"
-                    variant="bare"
-                    onPress={() =>
-                      change((current) => ({ ...current, group: current.group?.filter((_entry, at) => at !== index) }))
-                    }
-                  >
+                  <Button size="sm" variant="bare" onPress={() => change((current) => removeGroupFrom(current, index))}>
                     Remove
                   </Button>
                 </Inline>
@@ -1303,9 +1100,7 @@ function ArrangeInspector(props: InspectorProps) {
             <Button
               size="sm"
               disabled={(plan().group?.length ?? 0) >= 2 || !columns().length}
-              onPress={() =>
-                change((current) => ({ ...current, group: [...(current.group ?? []), { column: columns()[0]!.id }] }))
-              }
+              onPress={() => change((current) => addGroupTo(current, columns()[0]!.id))}
             >
               Add grouping
             </Button>
@@ -1319,15 +1114,7 @@ function ArrangeInspector(props: InspectorProps) {
         min={1}
         max={5000}
         value={String(plan().limit ?? '')}
-        onInput={(raw) =>
-          change(
-            (current) => {
-              const limit = wholeNumber(raw)
-              return limit ? { ...current, limit } : without(current, 'limit')
-            },
-            { coalesce: true },
-          )
-        }
+        onInput={(raw) => change((current) => setLimitIn(current, wholeNumber(raw)), { coalesce: true })}
       />
     </Stack>
   )
@@ -1340,7 +1127,7 @@ function LookInspector(props: InspectorProps) {
     (PANEL_CAPABILITIES.views[view().kind].options as readonly string[]).includes(option)
   const columns = createMemo(() => outputPlanColumns(plan()))
   const editView = (update: (view: PanelPlan['view']) => PanelPlan['view']) =>
-    change((current) => ({ ...current, view: update(current.view) }))
+    change((current) => editViewIn(current, update))
   const setOption = <K extends 'field' | 'x' | 'series' | 'trend' | 'compare' | 'good'>(key: K, value: string) =>
     editView((current) => (value ? { ...current, [key]: value } : (without(current, key) as PanelPlan['view'])))
   const views = () =>
@@ -1400,17 +1187,7 @@ function LookInspector(props: InspectorProps) {
               label: `${AGGREGATE_LABELS[aggregate]} of a column`,
             })),
           ]}
-          onChange={(aggregate) =>
-            editView((current) =>
-              aggregate === 'count'
-                ? { ...without(current, 'field'), aggregate: 'count' }
-                : {
-                    ...current,
-                    aggregate: aggregate as NonNullable<PanelPlan['view']['aggregate']>,
-                    ...(current.field ? {} : numberColumns()[0] ? { field: numberColumns()[0]!.id } : {}),
-                  },
-            )
-          }
+          onChange={(aggregate) => editView((current) => setStatAggregate(current, aggregate, numberColumns()[0]?.id))}
         />
         <Show when={statNumber() !== 'count'}>
           <LabeledSelect
@@ -1477,21 +1254,9 @@ function LookInspector(props: InspectorProps) {
 function BehaviourInspector(props: InspectorProps) {
   const { change, plan, run } = props.context
   const editButton = (index: number, update: (button: RowButton) => RowButton, options?: StudioChangeOptions): void =>
-    change(
-      (current) => ({
-        ...current,
-        actions: {
-          ...current.actions,
-          buttons: (current.actions?.buttons ?? []).map((entry, at) => (at === index ? update(entry) : entry)),
-        },
-      }),
-      options,
-    )
+    change((current) => editButtonIn(current, index, update), options)
   const setPress = (press: NonNullable<PanelPlan['actions']>['press'] | undefined) =>
-    change((current) => ({
-      ...current,
-      actions: { buttons: current.actions?.buttons ?? [], ...(press ? { press } : {}) },
-    }))
+    change((current) => setPressIn(current, press))
   const links = () => plan().columns.filter((column) => column.type === 'link')
   const pressPresentations = createMemo(() => {
     const selected = plan().actions?.press
@@ -1515,28 +1280,13 @@ function BehaviourInspector(props: InspectorProps) {
     const press = plan().actions?.press
     return !press ? '' : press.kind === 'link' ? `link:${press.column ?? ''}` : press.kind
   }
-  const pickPress = (choice: string) =>
-    setPress(
-      !choice
-        ? undefined
-        : choice.startsWith('link:')
-          ? { kind: 'link', column: choice.slice('link:'.length), prefer: 'refPanel' }
-          : { kind: choice as 'record' | 'task', prefer: choice === 'task' ? 'pane' : 'refPanel' },
-    )
+  const pickPress = (choice: string) => setPress(pressFromChoice(choice))
   const sourceActions = () =>
     (run()?.rows ?? [])
       .flatMap((row) => row.actions ?? [])
       .filter((action, index, all) => all.findIndex((item) => item.id === action.id) === index)
   const does = (button: RowButton) => (button.kind === 'action' ? `action:${button.actionId}` : button.kind)
-  const pickDoes = (index: number, choice: string) =>
-    editButton(index, (button) => {
-      const shared = { label: button.label, ...(button.icon ? { icon: button.icon } : {}) }
-      return choice === 'open'
-        ? { ...shared, kind: 'open', reference: { kind: 'record', prefer: 'refPanel' } }
-        : choice === 'createTask'
-          ? { ...shared, kind: 'createTask' }
-          : { ...shared, kind: 'action', actionId: choice.slice('action:'.length) }
-    })
+  const pickDoes = (index: number, choice: string) => editButton(index, (button) => setButtonJob(button, choice))
   const opens = (button: Extract<RowButton, { kind: 'open' }>) =>
     button.reference.kind === 'link' ? `link:${button.reference.column ?? ''}` : button.reference.kind
   const full = () => (plan().actions?.buttons.length ?? 0) >= 3
@@ -1624,33 +1374,14 @@ function BehaviourInspector(props: InspectorProps) {
                               label: `A link from ${column.label}`,
                             })),
                           ]}
-                          onChange={(value) =>
-                            editButton(index, (entry) =>
-                              entry.kind !== 'open'
-                                ? entry
-                                : {
-                                    ...entry,
-                                    reference: value.startsWith('link:')
-                                      ? {
-                                          kind: 'link',
-                                          column: value.slice('link:'.length),
-                                          prefer: entry.reference.prefer,
-                                        }
-                                      : { kind: value as 'record' | 'task', prefer: entry.reference.prefer },
-                                  },
-                            )
-                          }
+                          onChange={(value) => editButton(index, (entry) => setButtonOpens(entry, value))}
                         />
                         <LabeledSelect
                           label="Open in"
                           value={open().reference.prefer}
                           options={presentationOptions}
                           onChange={(prefer) =>
-                            editButton(index, (entry) =>
-                              entry.kind === 'open'
-                                ? { ...entry, reference: { ...entry.reference, prefer: prefer as Presentation } }
-                                : entry,
-                            )
+                            editButton(index, (entry) => setButtonPresentation(entry, prefer as Presentation))
                           }
                         />
                       </>
@@ -1660,15 +1391,7 @@ function BehaviourInspector(props: InspectorProps) {
                     <Button
                       size="sm"
                       variant="bare"
-                      onPress={() =>
-                        change((current) => ({
-                          ...current,
-                          actions: {
-                            ...current.actions,
-                            buttons: (current.actions?.buttons ?? []).filter((_entry, at) => at !== index),
-                          },
-                        }))
-                      }
+                      onPress={() => change((current) => removeButtonFrom(current, index))}
                     >
                       Remove button
                     </Button>
@@ -1678,22 +1401,7 @@ function BehaviourInspector(props: InspectorProps) {
             )}
           </Index>
           <Inline>
-            <Button
-              size="sm"
-              disabled={full()}
-              onPress={() =>
-                change((current) => ({
-                  ...current,
-                  actions: {
-                    ...current.actions,
-                    buttons: [
-                      ...(current.actions?.buttons ?? []),
-                      { kind: 'open', label: 'Open', reference: { kind: 'record', prefer: 'refPanel' } },
-                    ],
-                  },
-                }))
-              }
-            >
+            <Button size="sm" disabled={full()} onPress={() => change(addButtonTo)}>
               Add button
             </Button>
           </Inline>
@@ -1730,17 +1438,13 @@ function SettingsInspector(props: InspectorProps) {
         label="Refresh"
         value={plan().refresh === undefined ? '' : String(plan().refresh)}
         options={refreshOptions()}
-        onChange={(value) =>
-          change((current) => (value ? { ...current, refresh: Number(value) } : without(current, 'refresh')))
-        }
+        onChange={(value) => change((current) => setRefreshIn(current, value))}
       />
       <LabeledSelect
         label="Dates show in"
         value={plan().time.mode}
         options={labelOptions(TIME_MODE_LABELS)}
-        onChange={(mode) =>
-          change((current) => ({ ...current, time: { ...current.time, mode: mode as 'fixed' | 'viewer' } }))
-        }
+        onChange={(mode) => change((current) => editTimeIn(current, { mode: mode as 'fixed' | 'viewer' }))}
       />
       {/* With each viewer's own zone, the stored zone only applies when nobody is looking, such as when
         the Node records a number's history. */}
@@ -1749,17 +1453,14 @@ function SettingsInspector(props: InspectorProps) {
         value={plan().time.zone}
         options={timezoneOptions(plan().time.zone)}
         {...(plan().time.mode === 'viewer' ? { hint: 'Used when Acorn records history in the background.' } : {})}
-        onChange={(zone) => change((current) => ({ ...current, time: { ...current.time, zone } }))}
+        onChange={(zone) => change((current) => editTimeIn(current, { zone }))}
       />
       <LabeledSelect
         label="Weeks start on"
         value={plan().time.weekStart}
         options={labelOptions(WEEK_START_LABELS)}
         onChange={(weekStart) =>
-          change((current) => ({
-            ...current,
-            time: { ...current.time, weekStart: weekStart as PanelPlan['time']['weekStart'] },
-          }))
+          change((current) => editTimeIn(current, { weekStart: weekStart as PanelPlan['time']['weekStart'] }))
         }
       />
     </Stack>

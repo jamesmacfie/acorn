@@ -11,7 +11,7 @@ function compareCells(left: DataValue | undefined, right: DataValue | undefined)
   return String(left).localeCompare(String(right))
 }
 
-export function sortPlanRows(plan: PanelPlan, rows: readonly PlanRow[]): PlanRow[] {
+export function sortPlanRows<Row extends PlanRow>(plan: PanelPlan, rows: readonly Row[]): Row[] {
   const sorted = [...rows]
   sorted.sort((left, right) => {
     for (const key of plan.sort ?? []) {

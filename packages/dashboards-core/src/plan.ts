@@ -35,32 +35,55 @@ export type PlanSource = {
   result?: DataSourceResult
 }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
+/** What every row carries, whichever stage made it. */
 export type PlanRow = {
   id: string
   values: Record<string, DataValue>
   records: DataRecord['ref'][]
   recordItems?: PlanRecordItem[]
+}
+/** What a row bound from one source record carries. Keys under `source*` are source instance IDs:
+ *  relations read and merge them, and a board move writes back through the field pair. */
+type SourceFields = {
   taskId?: string
   action?: DataRecord['action']
   actions?: DataRecord['actions']
   target?: DataRecord['target']
-  representedRows?: PlanRow[]
-  measureRows?: Record<string, PlanRow[]>
-  partial?: Record<string, string>
-  childRecords?: Record<string, DataRecord[]>
-  summaryStage?: number
-  datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>
-  correctableDatasetId?: string
   sourceRecords?: Record<string, DataRecord['ref']>
   sourceValues?: Record<string, Record<string, DataValue>>
   sourceFieldValues?: Record<string, Record<string, DataValue>>
   sourceWritableFields?: Record<string, string[]>
+  /** A one-to-many relation's matched records, by output column, for a later expand stage. */
+  childRecords?: Record<string, DataRecord[]>
+  /** Set when the row came from an agent-fed dataset, so a person can correct its value. */
+  correctableDatasetId?: string
 }
+/** What a row made from other rows carries: a summary group, or an overlapping pair. */
+type DerivedFields = {
+  /** The input rows behind this row, for a drill-down. */
+  representedRows?: StageRow[]
+}
+/** What a summarize stage adds. Keys are measure IDs. */
+type SummaryFields = DerivedFields & {
+  measureRows?: Record<string, StageRow[]>
+  partial?: Record<string, string>
+  summaryStage?: number
+  /** A SQLite summary's group key per measure, so a drill-down can read its rows from the dataset. */
+  datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>
+}
+/** A row bound from one source record, before and after relations. */
+export type SourceRow = PlanRow & SourceFields
+/** A row an overlap stage made from two input rows. */
+export type PairRow = PlanRow & DerivedFields
+/** A row a summarize stage made from one group. */
+export type SummaryRow = PlanRow & SummaryFields
+/** A row between stages. Stages run in any order, so it may carry any stage's fields. */
+export type StageRow = PlanRow & SourceFields & SummaryFields
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
 export type PlanStageCount = { path: string; input: number; output: number; meaning?: string }
 export type DashboardRun = {
   plan: PanelPlan
-  rows: PlanRow[]
+  rows: StageRow[]
   groups: PlanGroup[]
   diagnostics: {
     problems: PlanProblem[]
@@ -208,11 +231,10 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
           path,
           `${column.label} uses ${binding.field}, which ${source.label} no longer describes. Rebind this column.`,
         )
-      else if (column.type && actual !== column.type)
-        add(
-          path,
-          `${column.label} expects ${column.type}, but ${source.label} now describes ${binding.field} as ${actual}. Rebind this column.`,
-        )
+      else if (column.type && actual !== column.type) {
+        const described = `${source.label} now describes ${binding.field} as ${actual}`
+        add(path, `${column.label} expects ${column.type}, but ${described}. Rebind this column.`)
+      }
       if (binding.values) {
         const field = source.description.fields.find((candidate) => candidate.pointer === binding.field)
         const known = new Set(field?.choices?.kind === 'static' ? field.choices.values.map((choice) => choice.id) : [])
@@ -566,14 +588,29 @@ function mappedValue(column: PanelPlanColumn, source: PlanSource, record: DataRe
   return raw
 }
 
-export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): PlanRow[] {
+const recordActions = (record: DataRecord): Pick<SourceFields, 'taskId' | 'action' | 'actions' | 'target'> => ({
+  ...(record.taskId ? { taskId: record.taskId } : {}),
+  ...(record.action ? { action: record.action } : {}),
+  ...(record.actions ? { actions: record.actions } : {}),
+  ...(record.target ? { target: record.target } : {}),
+})
+
+const correctableDatasetId = (source: PlanSource): string | undefined =>
+  source.query.source.pluginId === 'core' &&
+  source.query.source.sourceId.startsWith('dataset:') &&
+  source.description.dataset?.feeder === 'agent'
+    ? source.query.source.sourceId.slice(8)
+    : undefined
+
+export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): SourceRow[] {
   return sources
     .filter((source) => plan.sources.find((entry) => entry.id === source.instanceId)?.role === 'primary')
     .flatMap((source) =>
-      (source.result?.records ?? []).map((record) => {
+      (source.result?.records ?? []).map((record): SourceRow => {
         const values = Object.fromEntries(
           plan.columns.map((column) => [column.id, mappedValue(column, source, record)]),
         )
+        const datasetId = correctableDatasetId(source)
         return {
           id: `${source.instanceId}:${record.ref.recordId}`,
           sourceRecords: { [source.instanceId]: record.ref },
@@ -589,24 +626,9 @@ export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): 
           ...(record.writableFields ? { sourceWritableFields: { [source.instanceId]: record.writableFields } } : {}),
           values,
           records: [record.ref],
-          ...(source.query.source.pluginId === 'core' &&
-          source.query.source.sourceId.startsWith('dataset:') &&
-          source.description.dataset?.feeder === 'agent'
-            ? { correctableDatasetId: source.query.source.sourceId.slice(8) }
-            : {}),
-          recordItems: [
-            {
-              ref: record.ref,
-              ...(record.taskId ? { taskId: record.taskId } : {}),
-              ...(record.action ? { action: record.action } : {}),
-              ...(record.actions ? { actions: record.actions } : {}),
-              ...(record.target ? { target: record.target } : {}),
-            },
-          ],
-          ...(record.taskId ? { taskId: record.taskId } : {}),
-          ...(record.action ? { action: record.action } : {}),
-          ...(record.actions ? { actions: record.actions } : {}),
-          ...(record.target ? { target: record.target } : {}),
+          ...(datasetId ? { correctableDatasetId: datasetId } : {}),
+          recordItems: [{ ref: record.ref, ...recordActions(record) }],
+          ...recordActions(record),
         }
       }),
     )
@@ -649,11 +671,11 @@ export function resolvePlanColumns(plan: PanelPlan, sources: readonly PlanSource
 export { relatePanelRows }
 export function runPlanStages(
   plan: PanelPlan,
-  rows: readonly PlanRow[],
+  rows: readonly StageRow[],
   evaluationTime = Date.now(),
   incomplete = false,
-): { rows: PlanRow[]; counts: PlanStageCount[]; problems: PlanProblem[] } {
-  let current = [...rows]
+): { rows: StageRow[]; counts: PlanStageCount[]; problems: PlanProblem[] } {
+  let current: StageRow[] = [...rows]
   let meaning = 'one row per source item'
   const counts: PlanStageCount[] = []
   const problems: PlanProblem[] = []
@@ -779,11 +801,21 @@ export function deriveDrilldownPlan(
 export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[] = []): string[] {
   const labels = plan.sources.map((source) => {
     const resolved = sources.find((candidate) => candidate.instanceId === source.id)
-    const scope = resolved?.query.scope
-    return `${source.label}${scope?.connectionId ? ` through account ${resolved?.accountLabel ?? scope.connectionId}` : ''}`
+    const connectionId = resolved?.query.scope?.connectionId
+    if (!connectionId) return source.label
+    return `${source.label} through account ${resolved?.accountLabel ?? connectionId}`
   })
   const label = (id: string) => columnLabel(plan, id)
   const sourceLabel = (id: string) => plan.sources.find((source) => source.id === id)?.label ?? id
+  const instanceLabel = (id: string) => sources.find((source) => source.instanceId === id)?.label ?? id
+  const relationVerb = (relation: NonNullable<PanelPlan['relations']>[number]) =>
+    relation.kind === 'equivalence'
+      ? 'Merge equivalent'
+      : relation.cardinality === 'one-to-many'
+        ? 'Attach children from'
+        : 'Look up'
+  const sortOrder = (item: NonNullable<PanelPlan['sort']>[number]) =>
+    `${label(item.column)} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`
   const press = pressTarget(plan, sources)
   const finalStage = [...plan.stages]
     .reverse()
@@ -804,13 +836,15 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
       (column.choices ?? []).flatMap((choice) =>
         Object.entries(choice.writeValues ?? {}).map(
           ([sourceId, value]) =>
-            `Dropping a ${sources.find((source) => source.instanceId === sourceId)?.label ?? sourceId} record on ${choice.label} sets ${column.label} to ${JSON.stringify(value)}.`,
+            `Dropping a ${instanceLabel(sourceId)} record on ${choice.label} ` +
+            `sets ${column.label} to ${JSON.stringify(value)}.`,
         ),
       ),
     ),
     ...(plan.relations ?? []).map(
       (relation) =>
-        `${relation.kind === 'equivalence' ? 'Merge equivalent' : relation.cardinality === 'one-to-many' ? 'Attach children from' : 'Look up'} ${sourceLabel(relation.to)} through ${relation.id}${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`,
+        `${relationVerb(relation)} ${sourceLabel(relation.to)} through ${relation.id}` +
+        `${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`,
     ),
     ...plan.stages.map((stage) =>
       stage.op === 'filter'
@@ -818,7 +852,8 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
         : stage.op === 'compute'
           ? `Compute ${stage.columns.map((column) => column.label).join(', ')}.`
           : stage.op === 'summarize'
-            ? `One row per ${stage.by.map((by) => label(by.column)).join(' and ') || 'all rows'}; measure ${stage.measures.map((measure) => measure.label).join(', ')}.`
+            ? `One row per ${stage.by.map((by) => label(by.column)).join(' and ') || 'all rows'}; ` +
+              `measure ${stage.measures.map((measure) => measure.label).join(', ')}.`
             : stage.op === 'expand'
               ? `Expand ${label(stage.column)} into one row per element.`
               : `One row per overlapping pair from ${label(stage.start)} and ${label(stage.end)}.`,
@@ -826,11 +861,7 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     ...(sources.some((source) => source.query.take && plan.stages.length)
       ? ['A source limit applies before the panel filter.']
       : []),
-    ...(plan.sort?.length
-      ? [
-          `Sort by ${plan.sort.map((item) => `${label(item.column)} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`).join(', ')}.`,
-        ]
-      : []),
+    ...(plan.sort?.length ? [`Sort by ${plan.sort.map(sortOrder).join(', ')}.`] : []),
     ...(plan.group?.length ? [`Group by ${plan.group.map((item) => label(item.column)).join(' then ')}.`] : []),
     ...(plan.limit ? [`Show at most ${plan.limit} rows after filtering and sorting.`] : []),
     ...(press ? [`Pressing a row opens ${press.subject} in ${press.place}.`] : []),
@@ -840,7 +871,7 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
 /** A renderer adapter over the Node's plan rows. The Node remains the only executor. */
 export function displayPlanRun(
   plan: PanelPlan,
-  rows: readonly PlanRow[],
+  rows: readonly StageRow[],
 ): { schema: DashboardDisplaySchema; fields: DashboardDisplayField[]; rows: DashboardDisplayRow[] } {
   const fields: DashboardDisplayField[] = outputPlanColumns(plan).map((column) => ({
     id: column.id,
