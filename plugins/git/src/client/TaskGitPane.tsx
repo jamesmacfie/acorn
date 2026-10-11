@@ -1,4 +1,4 @@
-import { createEffect, createMemo, Show } from 'solid-js'
+import { createEffect, createMemo, Show, Suspense, type ParentProps } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { activeNodeId, featureUsable, nodeReady, setSelectedSource, type Task } from '@acorn/plugin-api/client'
 import {
@@ -15,7 +15,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import type { GitTaskPaneModel } from './paneContribution'
-import { GIT_PANE, GIT_SECTIONS, isGitSection } from './gitPane'
+import { GIT_PANE, GIT_SECTIONS, isGitSection, type GitSection } from './gitPane'
 import { ChangesDiff, ChangesFooter, ChangesHeader, ChangesList } from './changes/ChangesPane'
 import { HistoryRows } from './HistoryRows'
 import { RevisionView } from './RevisionView'
@@ -55,10 +55,20 @@ export function GitPaneFooter(props: Props) {
   )
 }
 
+/** One of the tabs other than Changes, with its own loading boundary. A read that waits in the region's
+ *  boundary instead keeps the whole region on "Loading Git…" until that read ends, even after the
+ *  reader switches back to Changes. */
+function GitTab(props: ParentProps<{ model: GitTaskPaneModel; section: GitSection }>) {
+  const label = GIT_SECTIONS.find((section) => section.id === props.section)?.label.toLowerCase()
+  return (
+    <Show when={props.model.section() === props.section}>
+      <Suspense fallback={<EmptyState title={`Loading ${label}`} />}>{props.children}</Suspense>
+    </Show>
+  )
+}
+
 export function GitPaneList(props: Props) {
   const navigate = useNavigate()
-  const entries = createMemo(() => props.model.inventory.data?.worktrees ?? [])
-  const items = createMemo(() => entries().map((entry) => ({ key: entry.id, label: entry.branch ?? entry.path })))
   // The pane reports when it's usable. The Changes list does that for its own tab; these tabs draw
   // straight from their queries (docs/telemetry/renderer.md § Feature openings).
   createEffect(() => {
@@ -70,14 +80,14 @@ export function GitPaneList(props: Props) {
       fallback={<ChangesList task={props.task} model={props.model.changes} />}
     >
       <Stack gap="section">
-        <Show when={props.model.section() === 'stashes'}>
+        <GitTab model={props.model} section="stashes">
           <StashList
             projectId={props.task.projectId}
             selected={props.model.stashId()}
             onSelect={props.model.setStashId}
           />
-        </Show>
-        <Show when={props.model.section() === 'history'}>
+        </GitTab>
+        <GitTab model={props.model} section="history">
           <Show when={props.model.missingBranch()}>
             <Alert tone="warn">
               Task branch {props.task.branch} is unavailable. Showing repository history and HEAD.
@@ -101,54 +111,64 @@ export function GitPaneList(props: Props) {
             onRefresh={props.model.refreshHistory}
             task={props.task}
           />
-        </Show>
-        <Show when={props.model.section() === 'worktrees'}>
-          <SectionHeader
-            count={entries().length}
-            actions={
-              <Button size="sm" variant="ghost" onPress={() => void props.model.inventory.refetch()}>
-                Refresh
-              </Button>
-            }
-          >
-            Worktrees
-          </SectionHeader>
-          <Show when={!nodeReady()}>
-            <EmptyState title="Node unavailable">Reconnect to inspect this checkout.</EmptyState>
-          </Show>
-          <Show when={props.model.inventory.isLoading}>
-            <EmptyState title="Loading worktrees" />
-          </Show>
-          <Show when={props.model.inventory.error}>
-            <Alert tone="warn">
-              {String(props.model.inventory.error)}
-              {props.model.inventory.data ? ' Showing the last available roster.' : ''}
-            </Alert>
-          </Show>
-          <Rows
-            id={`git-task:${activeNodeId()}:${props.task.id}`}
-            ariaLabel="Task repository worktrees"
-            items={items()}
-            selected={props.model.selected()}
-            onSelect={props.model.setSelected}
-            onActivate={props.model.setSelected}
-          >
-            {(item, itemProps, selected) => (
-              <Row item={itemProps} selected={selected()} onPress={() => props.model.setSelected(item.key)}>
-                <Text>{item.label}</Text>
-                <Show
-                  when={entries()
-                    .find((entry) => entry.id === item.key)
-                    ?.owners.some((owner) => owner.id === props.task.id)}
-                >
-                  <Badge>Task checkout</Badge>
-                </Show>
-              </Row>
-            )}
-          </Rows>
-        </Show>
+        </GitTab>
+        <GitTab model={props.model} section="worktrees">
+          <WorktreeList task={props.task} model={props.model} />
+        </GitTab>
       </Stack>
     </Show>
+  )
+}
+
+function WorktreeList(props: Props) {
+  const entries = createMemo(() => props.model.inventory.data?.worktrees ?? [])
+  const items = createMemo(() => entries().map((entry) => ({ key: entry.id, label: entry.branch ?? entry.path })))
+  return (
+    <>
+      <SectionHeader
+        count={entries().length}
+        actions={
+          <Button size="sm" variant="ghost" onPress={() => void props.model.inventory.refetch()}>
+            Refresh
+          </Button>
+        }
+      >
+        Worktrees
+      </SectionHeader>
+      <Show when={!nodeReady()}>
+        <EmptyState title="Node unavailable">Reconnect to inspect this checkout.</EmptyState>
+      </Show>
+      <Show when={props.model.inventory.isLoading}>
+        <EmptyState title="Loading worktrees" />
+      </Show>
+      <Show when={props.model.inventory.error}>
+        <Alert tone="warn">
+          {String(props.model.inventory.error)}
+          {props.model.inventory.data ? ' Showing the last available roster.' : ''}
+        </Alert>
+      </Show>
+      <Rows
+        id={`git-task:${activeNodeId()}:${props.task.id}`}
+        ariaLabel="Task repository worktrees"
+        items={items()}
+        selected={props.model.selected()}
+        onSelect={props.model.setSelected}
+        onActivate={props.model.setSelected}
+      >
+        {(item, itemProps, selected) => (
+          <Row item={itemProps} selected={selected()} onPress={() => props.model.setSelected(item.key)}>
+            <Text>{item.label}</Text>
+            <Show
+              when={entries()
+                .find((entry) => entry.id === item.key)
+                ?.owners.some((owner) => owner.id === props.task.id)}
+            >
+              <Badge>Task checkout</Badge>
+            </Show>
+          </Row>
+        )}
+      </Rows>
+    </>
   )
 }
 
@@ -180,23 +200,23 @@ export function GitPaneDetail(props: Props) {
           task={props.task}
           onResolve={(path, checkout) => props.model.setConflict({ path, checkout })}
         />
-        <Show when={props.model.section() === 'history'}>
+        <GitTab model={props.model} section="history">
           <RevisionView
             projectId={props.task.projectId}
             taskId={props.task.id}
             id={props.model.commitId()}
             onCommit={props.model.setCommitId}
           />
-        </Show>
-        <Show when={props.model.section() === 'stashes'}>
+        </GitTab>
+        <GitTab model={props.model} section="stashes">
           <StashDetail
             projectId={props.task.projectId}
             task={props.task}
             selected={props.model.stashId()}
             onSelect={props.model.setStashId}
           />
-        </Show>
-        <Show when={props.model.section() === 'worktrees'}>
+        </GitTab>
+        <GitTab model={props.model} section="worktrees">
           <Stack gap="section">
             <SectionHeader>{selectedIsOwn() ? 'Task checkout' : 'Other worktree'}</SectionHeader>
             <Show when={props.model.inventory.error}>
@@ -253,7 +273,7 @@ export function GitPaneDetail(props: Props) {
               Open repository history
             </Button>
           </Stack>
-        </Show>
+        </GitTab>
       </Show>
     </>
   )

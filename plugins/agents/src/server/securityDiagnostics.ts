@@ -3,13 +3,9 @@ import { constants } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
-import { isToolWithinCeiling, parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 import type { StaticDependencyPolicy } from '@acorn/protocol/dependencyPolicy.ts'
-import type { AgentSession } from '../contract/wire.ts'
-import type { AgentProviderDescriptor } from '../contract/wire.ts'
 import type { InstructionAdmissionObservation } from './sessions/instructionAdmission'
-import { reportedLoopCoverage } from './sessions/loopHooks'
 import { redactInstructionText } from './sessions/instructionAnalysis'
 import type { AgentSessionDefaults } from '../shared/sessionDefaults'
 import type { AgentMcpServer } from '../shared/mcpServers'
@@ -26,18 +22,6 @@ const DEADLINE_MS = 4_000
 const MAX_FILE_BYTES = 32_768
 const MAX_SERVERS = 64
 const EXPIRES_MS = 5 * 60_000
-const permissionLabels: Record<string, string> = {
-  auto: 'Automatic',
-  ask: 'Ask before acting',
-  'read-only': 'Read only',
-  'workspace-write': 'Workspace access',
-  'danger-full-access': 'Full access',
-  plan: 'Plan only',
-  default: 'Default',
-  bypassPermissions: 'Skip permission prompts',
-  acceptEdits: 'Allow edits',
-  dontAsk: 'Do not ask',
-}
 const riskLabels = { read: 'Read information', write: 'Make changes', execute: 'Run commands' }
 
 function releaseAgeLabel(minutes: number | null): string {
@@ -50,35 +34,21 @@ function releaseAgeLabel(minutes: number | null): string {
 export type SecurityDiagnosticPorts = {
   core: Pick<CompiledCoreServices, 'projects' | 'tasks' | 'fs' | 'prefs' | 'agentTools' | 'pluginSecurity' | 'nodeKeys'>
   defaults(userId: string): Promise<AgentSessionDefaults>
-  session(id: string): Promise<AgentSession | null>
   managedMcp(): Promise<AgentMcpServer[]>
-  instructionObservation?(
-    projectId: string | null,
-    taskId: string | null,
-  ): Promise<InstructionAdmissionObservation | null>
-  observedProvider?(id: string): AgentProviderDescriptor | null
+  instructionObservation?(projectId: string): Promise<InstructionAdmissionObservation | null>
   /** Harness ids that can keep their agent out of the data root (docs/managed-agents/read-block.md). */
   readBlockProviders?(): string[]
   staticDependencyPolicy?(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy | undefined>
 }
 
 export async function securityScopeChoices(
-  core: Pick<CompiledCoreServices, 'projects' | 'tasks'>,
-  listSessions: () => Promise<AgentSession[]>,
+  core: Pick<CompiledCoreServices, 'projects'>,
 ): Promise<SecurityScopeChoices> {
   const projects = (await core.projects.checkouts()).slice(0, 100)
   const names = (await Promise.all(projects.map((project) => core.projects.byId(project.id)))).flatMap((project) =>
     project ? [{ id: project.id, name: project.name }] : [],
   )
-  const tasks = await core.tasks.active()
-  const taskById = new Map(tasks.map((task) => [task.id, task]))
-  const sessions = (await listSessions())
-    .filter((session) => !['stopped', 'failed', 'archived'].includes(session.runtimeState))
-    .flatMap((session) => {
-      const task = taskById.get(session.taskId)
-      return task ? [{ id: session.id, projectId: task.projectId, label: session.title || task.title }] : []
-    })
-  return { projects: names, sessions }
+  return { projects: names }
 }
 
 /** Read a fixed filename only. The core confinement seam rejects symlink escape; an already-opened
@@ -138,7 +108,6 @@ export async function collectSecurityDiagnostics(
   const checkedAt = Date.now()
   const findings: SecurityFinding[] = []
   const projectId = scope.projectId ?? null
-  const sessionId = scope.sessionId ?? null
   const add = (
     id: string,
     owner: SecurityFinding['owner'],
@@ -155,7 +124,6 @@ export async function collectSecurityDiagnostics(
       owner,
       nodeId,
       projectId,
-      sessionId,
       checkedAt,
       state,
       severity,
@@ -184,88 +152,6 @@ export async function collectSecurityDiagnostics(
     }
   }
 
-  let session: AgentSession | null = null
-  if (sessionId) {
-    try {
-      session = await bounded(() => ports.session(sessionId))
-      if (!session || session.archivedAt != null || ['stopped', 'failed', 'archived'].includes(session.runtimeState))
-        throw new Error('not running')
-      if (projectId) {
-        const task = await bounded(() => ports.core.tasks.load(session!.taskId))
-        if (!task || task.projectId !== projectId) throw new Error('different project')
-      }
-      const harness =
-        session.providerId === 'codex'
-          ? 'Codex'
-          : session.providerId === 'claude' || session.providerId === 'claude-code'
-            ? 'Claude Code'
-            : 'Contributed harness'
-      const driver = ['acp', 'codex-app-server', 'terminal'].includes(session.driverKind)
-        ? session.driverKind
-        : 'custom driver'
-      const version = /^\d{1,5}(?:\.\d{1,5}){0,3}$/.test(session.driverVersion)
-        ? session.driverVersion
-        : 'unreported version'
-      add(
-        'harness.identity',
-        'agents',
-        'observed',
-        'info',
-        'managed session',
-        `${harness} session; driver ${driver} ${version}.`,
-        'The executable version and harness filesystem or network restrictions are not recorded on this session.',
-        'Inspect the harness settings and its own configuration.',
-        { description: `You selected a running ${harness} agent. Its recorded settings are included below.` },
-      )
-      const descriptor = ports.observedProvider?.(session.providerId)
-      const coverage = descriptor?.installed ? reportedLoopCoverage(descriptor) : null
-      add(
-        'harness.loop',
-        'agents',
-        coverage ? (coverage.beforeTool === 'none' && !coverage.afterTool ? 'unsupported' : 'observed') : 'unknown',
-        'attention',
-        'last observed harness capabilities',
-        coverage
-          ? `${coverage.beforeTool === 'every' ? 'Before-tool capability covers every call' : coverage.beforeTool === 'asked' ? 'Permission capability covers requests only' : 'No before-tool capability reported'}; ${coverage.afterTool ? 'after-tool capability reported' : 'no after-tool capability reported'}.`
-          : 'No passive harness capability descriptor is available.',
-        'Reported capabilities describe bridge reach, not registered hooks, host policy, or filesystem and network confinement.',
-        'See Managed agents > Loop hooks.',
-      )
-      add(
-        'harness.restrictions',
-        'agents',
-        'unknown',
-        'attention',
-        'managed session metadata',
-        'Executable version, filesystem restrictions, and network restrictions were not recorded as passive session evidence.',
-        'A driver profile or mode name does not prove operating-system confinement.',
-        'Inspect the harness configuration and verify restrictions manually.',
-      )
-    } catch {
-      add(
-        'session.selection',
-        'agents',
-        'failed',
-        'attention',
-        'session lookup',
-        'The selected running session could not be verified.',
-        'No session settings were used.',
-        'Select a running session and check again.',
-      )
-      session = null
-    }
-  } else
-    add(
-      'harness.identity',
-      'agents',
-      'unknown',
-      'attention',
-      'no running session',
-      'Harness identity, version, restrictions, and loop coverage are unknown without a running session.',
-      'Checking installed harnesses could start configured executables.',
-      'Select a running session or inspect the harness manually.',
-    )
-
   try {
     const defaults = await bounded(() => ports.defaults(userId))
     add(
@@ -292,97 +178,22 @@ export async function collectSecurityDiagnostics(
       },
     )
     const blockers = ports.readBlockProviders?.() ?? []
-    const blocked = session ? defaults.blockDataRootReads && blockers.includes(session.providerId) : null
     add(
       'agents.read-block',
       'agents',
       'configured_only',
-      blocked === false ? 'warning' : defaults.blockDataRootReads ? 'info' : 'attention',
+      defaults.blockDataRootReads ? 'info' : 'attention',
       'agents:session-defaults:v1',
-      `Data root read block ${defaults.blockDataRootReads ? 'enabled' : 'disabled'}; harnesses that support it: ${blockers.join(', ') || 'none'}.${blocked === null ? '' : ` Selected session ${blocked ? 'starts blocked' : 'is not blocked'}.`}`,
+      `Data root read block ${defaults.blockDataRootReads ? 'enabled' : 'disabled'}; harnesses that support it: ${blockers.join(', ') || 'none'}.`,
       "Applies from each session's next start, so a session already running keeps how it started. Other harnesses can read the whole data root.",
       'Settings > Security and backup > Agent access to Acorn data.',
       {
         title: 'Agent access to Acorn data',
-        description:
-          blocked === false
-            ? "This agent can read Acorn's data folder, including other sessions' tokens and the task database."
-            : defaults.blockDataRootReads
-              ? "Agents on harnesses that support it are kept out of Acorn's data folder from their next start."
-              : "Agents can read Acorn's data folder, including other sessions' tokens and the task database.",
-        facts: [
-          { label: 'Block', value: defaults.blockDataRootReads ? 'On' : 'Off' },
-          ...(blocked === null
-            ? []
-            : [{ label: 'Selected agent', value: blocked ? 'Blocked from its next start' : 'Not blocked' }]),
-        ],
+        description: defaults.blockDataRootReads
+          ? "Agents on harnesses that support it are kept out of Acorn's data folder from their next start."
+          : "Agents can read Acorn's data folder, including other sessions' tokens and the task database.",
+        facts: [{ label: 'Block', value: defaults.blockDataRootReads ? 'On' : 'Off' }],
       },
-    )
-    const options = session?.config.configOptions
-    const permission = Array.isArray(options)
-      ? (options.find(
-          (option: unknown) =>
-            !!option && typeof option === 'object' && (option as { category?: unknown }).category === 'permission',
-        ) as { id?: unknown; currentValue?: unknown } | undefined)
-      : undefined
-    const knownProfiles = new Set([
-      'auto',
-      'ask',
-      'read-only',
-      'workspace-write',
-      'danger-full-access',
-      'plan',
-      'default',
-      'bypassPermissions',
-      'acceptEdits',
-      'dontAsk',
-    ])
-    const profile =
-      typeof permission?.currentValue === 'string' && knownProfiles.has(permission.currentValue)
-        ? permission.currentValue
-        : 'unreported or custom'
-    add(
-      'harness.permission-profile',
-      'agents',
-      permission ? 'observed' : 'unknown',
-      permission && ['danger-full-access', 'bypassPermissions'].includes(profile) ? 'warning' : 'attention',
-      permission ? 'managed session configuration' : 'session defaults',
-      permission
-        ? `Current session permission profile: ${profile}.`
-        : 'No live harness permission profile was reported.',
-      'Harness names are descriptive; they do not establish filesystem or network enforcement. Next-session defaults do not override a live session.',
-      'Inspect the session settings and harness documentation.',
-      permission
-        ? {
-            description: ['danger-full-access', 'bypassPermissions'].includes(profile)
-              ? 'This agent reports broad permissions. Review its settings before asking it to work with unfamiliar code.'
-              : 'This is the permission mode reported by the selected agent. Its own settings determine what it can do.',
-            facts: [{ label: 'Reported permission mode', value: permissionLabels[profile] ?? 'Custom or unknown' }],
-          }
-        : {},
-    )
-    const nextValues = session
-      ? (defaults.followLastSession ? defaults.last : defaults.pinned)[session.providerId]
-      : undefined
-    const nextProfile = typeof permission?.id === 'string' ? nextValues?.[permission.id] : undefined
-    add(
-      'harness.next-default',
-      'agents',
-      nextProfile ? 'configured_only' : 'unknown',
-      'info',
-      'agents:session-defaults:v1',
-      nextProfile
-        ? `Next-session permission default: ${knownProfiles.has(nextProfile) ? nextProfile : 'custom profile'}.`
-        : 'No next-session permission profile was recorded for this harness.',
-      'This default is not the current session profile.',
-      'Settings > Agents > Harnesses and defaults.',
-      nextProfile
-        ? {
-            description:
-              'This permission mode applies to agents you start later. It does not change the running agent.',
-            facts: [{ label: 'Default permission mode', value: permissionLabels[nextProfile] ?? 'Custom' }],
-          }
-        : {},
     )
   } catch {
     add(
@@ -409,9 +220,9 @@ export async function collectSecurityDiagnostics(
       'Settings > Security and backup > Review instruction files.',
     )
 
-  if (ports.instructionObservation && (projectId || session?.taskId)) {
+  if (ports.instructionObservation && projectId) {
     try {
-      const observation = await bounded(() => ports.instructionObservation!(projectId, session?.taskId ?? null))
+      const observation = await bounded(() => ports.instructionObservation!(projectId))
       add(
         'instructions.latest',
         'agents',
@@ -528,13 +339,12 @@ export async function collectSecurityDiagnostics(
         `${tier}: ${(perms.tiers?.[tier as keyof typeof TOOL_TIER_DEFAULTS] ?? defaultValue) ? 'allowed' : 'denied'}`,
     )
     const catalog = ports.core.agentTools ? (await bounded(() => ports.core.agentTools!.catalog())).slice(0, 100) : []
-    const ceiling = session ? parseToolCeiling(session.config.toolCeiling) : null
-    const grants = catalog.map((tool) => {
-      const allowed =
+    const grants = catalog.map((tool) => ({
+      name: tool.name,
+      allowed:
         perms.tools?.[tool.name] ??
-        (tool.risk === 'read' ? true : (perms.tiers?.[tool.risk] ?? TOOL_TIER_DEFAULTS[tool.risk]))
-      return { name: tool.name, allowed: allowed && isToolWithinCeiling(tool, ceiling ?? undefined) }
-    })
+        (tool.risk === 'read' ? true : (perms.tiers?.[tool.risk] ?? TOOL_TIER_DEFAULTS[tool.risk])),
+    }))
     const shown = grants.filter((grant) => /^[a-z][a-z0-9_]{0,63}$/.test(grant.name))
     add(
       'agent-tools.grants',
@@ -543,7 +353,7 @@ export async function collectSecurityDiagnostics(
       'attention',
       'agent tool preference',
       `Tiers ${tiers.join(', ')}. Effective registered tools: ${shown.map((grant) => `${grant.name} ${grant.allowed ? 'allowed' : 'denied'}`).join(', ') || 'none'}.`,
-      'Only verified catalog names are shown, up to 100. Dynamic availability is evaluated at invocation; the selected session ceiling is applied here.',
+      'Only verified catalog names are shown, up to 100. Dynamic availability is evaluated at invocation. A session tool ceiling can narrow these grants further.',
       'Settings > Tools and permissions.',
       parsed.success && ports.core.agentTools
         ? {
@@ -552,31 +362,6 @@ export async function collectSecurityDiagnostics(
               label: `Default: ${riskLabels[tier as keyof typeof riskLabels].toLowerCase()}`,
               value: (perms.tiers?.[tier as keyof typeof TOOL_TIER_DEFAULTS] ?? defaultValue) ? 'Allowed' : 'Blocked',
             })),
-          }
-        : {},
-    )
-    add(
-      'agent-tools.ceiling',
-      'agents',
-      ceiling ? 'observed' : 'unknown',
-      'attention',
-      'managed session configuration',
-      ceiling
-        ? `Current session ceiling: ${ceiling.maxRisk ?? 'no tier limit'}; ${ceiling.allow?.length ?? 0} explicitly named tools.`
-        : 'No narrower live session ceiling was recorded.',
-      'A ceiling further restricts grants; it never grants a denied tool.',
-      'Inspect the selected session or delegation settings.',
-      ceiling
-        ? {
-            description:
-              'The selected agent has additional limits on its Acorn tools. These limits can only reduce its access.',
-            facts: [
-              {
-                label: 'Highest permitted action',
-                value: ceiling.maxRisk ? riskLabels[ceiling.maxRisk] : 'No action limit recorded',
-              },
-              { label: 'Named tools in its limit', value: String(ceiling.allow?.length ?? 0) },
-            ],
           }
         : {},
     )
@@ -870,5 +655,5 @@ export async function collectSecurityDiagnostics(
     'Review Node and harness trust before running untrusted work.',
   )
   if (signal.aborted) throw new Error('cancelled')
-  return { nodeId, projectId, sessionId, checkedAt, expiresAt: checkedAt + EXPIRES_MS, findings }
+  return { nodeId, projectId, checkedAt, expiresAt: checkedAt + EXPIRES_MS, findings }
 }

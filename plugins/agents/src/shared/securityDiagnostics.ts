@@ -8,7 +8,6 @@ export type SecurityFinding = {
   owner: 'agents' | 'core' | 'project'
   nodeId: string
   projectId: string | null
-  sessionId: string | null
   checkedAt: number
   state: SecurityEvidenceState
   severity: SecuritySeverity
@@ -25,13 +24,11 @@ export type SecurityFinding = {
 export type SecurityDiagnostics = {
   nodeId: string
   projectId: string | null
-  sessionId: string | null
   checkedAt: number
   expiresAt: number
   findings: SecurityFinding[]
 }
-export type SecurityScope = { projectId?: string; sessionId?: string }
+export type SecurityScope = { projectId?: string }
 export type SecurityScopeChoices = {
   projects: Array<{ id: string; name: string }>
-  sessions: Array<{ id: string; projectId: string; label: string }>
 }

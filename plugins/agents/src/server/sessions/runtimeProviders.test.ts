@@ -61,16 +61,6 @@ describe('the providers answer', () => {
     return read
   }
 
-  it('reads passive descriptors without starting or refreshing a provider probe', async () => {
-    expect(runtime.providers.observed('fake')).toBeNull()
-    expect(driver.pending).toHaveLength(0)
-    const [observed] = await warm()
-    expect(runtime.providers.observed('fake')).toEqual(observed)
-    vi.advanceTimersByTime(60_000)
-    expect(runtime.providers.observed('fake')).toEqual(observed)
-    expect(driver.pending).toHaveLength(0)
-  })
-
   it('waits for the first probe and shares it between callers', async () => {
     const first = runtime.providers.list()
     const second = runtime.providers.list()

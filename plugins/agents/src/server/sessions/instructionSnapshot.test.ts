@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -45,6 +46,19 @@ it('discovers nested instructions, imports, linked skills and scripts while excl
   expect(snapshot.files.find((file) => file.path === '.agents/skills/deploy/SKILL.md')?.canonicalPath).toBe(
     realpathSync(join(linked, 'deploy/SKILL.md')),
   )
+})
+
+it('skips git-ignored folders but keeps ignored instruction files and an ignored .claude folder', async () => {
+  const dir = root()
+  execFileSync('git', ['init', '-q'], { cwd: dir })
+  write(join(dir, '.gitignore'), 'references/\n.claude/\nCLAUDE.local.md\n')
+  write(join(dir, 'references/clone/AGENTS.md'), 'Ignored.\n')
+  write(join(dir, 'CLAUDE.local.md'), 'Local.\n')
+  write(join(dir, '.claude/CLAUDE.md'), 'Project.\n')
+  expect((await scanInstructions(dir, [])).files.map((file) => file.path)).toEqual([
+    '.claude/CLAUDE.md',
+    'CLAUDE.local.md',
+  ])
 })
 
 it('distinguishes an absent optional file from a broken link and refuses a skill cycle', async () => {

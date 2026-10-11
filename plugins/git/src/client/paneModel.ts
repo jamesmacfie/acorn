@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on, onCleanup } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, type Accessor } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, clientEvents, consumePaneIntent, type PaneIntent, type Task } from '@acorn/plugin-api/client'
 import { worktreesKey, worktreesOptions } from './worktreeClient'
@@ -8,9 +8,8 @@ import { createHistoryModel } from './historyModel'
 import { createGitViewSignal } from './viewState'
 import { GIT_PANE, isGitSection, type GitSection } from './gitPane'
 
-export function createGitPaneModel(task: Task) {
+export function createGitPaneModel(task: Task, shown: Accessor<boolean> = () => true) {
   const queryClient = useQueryClient()
-  const inventory = createQuery(() => worktreesOptions(task.projectId))
   const state = <T>(name: string, initial: () => T) =>
     createGitViewSignal(
       () => task.projectId,
@@ -20,6 +19,13 @@ export function createGitPaneModel(task: Task) {
     )
   const [selected, setSelected] = state<string | null>('worktree', () => null)
   const [section, setSection] = state<GitSection>('section', () => 'changes')
+  // A tab's queries run only while that tab is on screen. While it's hidden, its cached result stays,
+  // and Git events only mark it stale, so opening the tab refetches once. Changes never waits on them.
+  const onScreen = (tab: GitSection) => shown() && section() === tab
+  const inventory = createQuery(() => {
+    const options = worktreesOptions(task.projectId)
+    return { ...options, enabled: options.enabled && onScreen('worktrees') }
+  })
   // "Open in Changes" from elsewhere (./gitPane.ts § openChangesTab), held by the host until this
   // pane mounts.
   const applyIntent = (intent: PaneIntent | undefined) => {
@@ -49,6 +55,7 @@ export function createGitPaneModel(task: Task) {
     () => task.projectId,
     branchRef,
     () => task.id,
+    () => onScreen('history'),
   )
   const refreshHistory = () => {
     if (missingBranch()) {

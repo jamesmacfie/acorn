@@ -58,13 +58,6 @@ export class ProviderCatalogue {
     return (await this.list(true)).find(pick)
   }
 
-  /** The last answer already observed. Diagnostics must never start a probe. */
-  observed(id: string): AgentProviderDescriptor | null {
-    return this.cache?.generation === this.registry.generation
-      ? (this.cache.descriptors.find((provider) => provider.id === id) ?? null)
-      : null
-  }
-
   /** Harnesses that turn the person's read block into their own sandbox. */
   readBlockProviders(): string[] {
     return this.registry.providers().filter((id) => this.registry.create(id)?.readBlock === true)

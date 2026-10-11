@@ -99,6 +99,7 @@ type Live = {
   beat: ReturnType<typeof setInterval> | null
   awaitingPong: boolean
   dead: boolean
+  failureReason: string | null
   constructionReady: boolean
   treeReady: boolean
   connected: boolean
@@ -272,6 +273,8 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
   }
   return {
     mount(id, entry, props, authority) {
+      // A dead worker has already failed its trees. Reactive updates cannot restore its authority.
+      if (lease.live.dead) return
       const slot = slotFor(id)
       slot.authority ??= authority?.() ?? null
       slot.mount = { entry, props }
@@ -296,12 +299,14 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       if (!lease.released && !lease.live.dead && port) postSurfaceAction(port, command)
     },
     appearance(id, value) {
+      if (lease.live.dead) return
       const slot = slotFor(id)
       slot.appearance = value
       const port = lease.live.mode === 'legacy' ? lease.live.bootstrap : slot.bridgeSide
       if (port) postAppearance(port, value)
     },
     onHostRequest(id, handler) {
+      if (lease.live.dead) return () => {}
       const slot = slotFor(id)
       slot.hostRequest = handler
       return () => {
@@ -310,6 +315,7 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
     },
     transport: (id) => ({
       onBatch(listener) {
+        if (lease.live.dead) return () => {}
         const slot = slotFor(id)
         slot.batch.push(listener)
         for (const ops of slot.initialBatches) listener(ops)
@@ -321,10 +327,13 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       },
       onFailed(listener) {
         if (lease.live.dead) {
+          let subscribed = true
           queueMicrotask(() => {
-            if (!lease.released) listener('this plugin stopped responding')
+            if (subscribed && !lease.released) listener(lease.live.failureReason!)
           })
-          return () => {}
+          return () => {
+            subscribed = false
+          }
         }
         const slot = slotFor(id)
         slot.failed.push(listener)
@@ -555,6 +564,7 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
       beat: null,
       awaitingPong: false,
       dead: false,
+      failureReason: null,
       constructionReady: !readiness,
       treeReady: false,
       connected: false,
@@ -613,8 +623,19 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
       cleanup(() => current.owner.onRefused(reason))
       stop(current, reason)
     }
+    let lastBeatAt = Date.now()
     current.beat = setInterval(() => {
       if (current.dead || workers.get(current.key) !== current) return
+      const now = Date.now()
+      const gap = now - lastBeatAt
+      lastBeatAt = now
+      // Sleep, host stalls, and hidden WebKit views delay port replies as well as timers.
+      // Start another check after a pause instead of treating that delay as a plugin failure.
+      if (gap > HEARTBEAT_MS + 1_000 || gap < 0) current.awaitingPong = false
+      if (globalThis.document?.visibilityState === 'hidden') {
+        current.awaitingPong = false
+        return
+      }
       if (current.awaitingPong) return stop(current, 'this plugin stopped responding')
       current.awaitingPong = true
       // Construction waiting has the same two-beat deadline, without queueing traffic on a channel
@@ -763,6 +784,7 @@ function handleTreeMessage(live: Live, event: MessageEvent): void {
 function stop(live: Live, reason: string): void {
   if (live.dead) return
   live.dead = true
+  live.failureReason = reason
   if (workers.get(live.key) === live) workers.delete(live.key)
   if (live.beat) clearInterval(live.beat)
   if (live.grace) clearTimeout(live.grace)

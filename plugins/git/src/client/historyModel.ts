@@ -9,6 +9,7 @@ export function createHistoryModel(
   projectId: Accessor<string>,
   initialRef: Accessor<string | null>,
   owner: Accessor<string | null> = () => null,
+  shown: Accessor<boolean> = () => true,
 ) {
   const client = useQueryClient()
   const state = <T>(name: string, initial: Accessor<T>) =>
@@ -17,7 +18,10 @@ export function createHistoryModel(
   const [field, setField] = state<HistoryFilter['field']>('field', () => 'message')
   const [query, setQuery] = state('query', () => '')
   const filter = createMemo<HistoryFilter>(() => ({ ref: ref(), field: field(), query: query().trim() }))
-  const first = createQuery(() => historyOptions(projectId(), filter()))
+  const first = createQuery(() => {
+    const options = historyOptions(projectId(), filter())
+    return { ...options, enabled: options.enabled && shown() }
+  })
   const pageKey = () => `history:${initialRef()}:pages:${JSON.stringify(filter())}`
   const [extra, setExtra] = createGitViewSignal<HistoryPage[]>(projectId, pageKey, () => [], owner)
   const [dropped, setDropped] = createGitViewSignal(

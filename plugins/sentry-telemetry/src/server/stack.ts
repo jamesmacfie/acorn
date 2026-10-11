@@ -1,4 +1,4 @@
-// A V8 stack string, turned into the frames Sentry draws.
+// A V8 or WebKit stack string, turned into the frames Sentry draws.
 //
 // acorn carries a stack as the string `Error.stack` gave it, because a record is scalars and a
 // frame list is not (`TelemetryRecord` in protocol). Sentry wants `stacktrace.frames[]`, so somebody has to
@@ -28,6 +28,8 @@ export type SentryStackFrame = {
 // `at fn (/path/file.ts:1:2)`, `at fn (/path/file.ts)`, `at /path/file.ts:1:2`, and the
 // `at async fn (…)` form Node writes for an awaited call.
 const FRAME = /^\s*at\s+(?:(?<fn>.+?)\s+\()?(?<loc>[^()]+?)\)?$/
+// WebKit writes `fn@app://acorn/file.js:1:2`, `@url:1:2`, and `fn@[native code]`.
+const WEBKIT_FRAME = /^(?<fn>.*?)@(?<loc>.+:\d+(?::\d+)?|\[native code\])$/
 const LOCATION = /^(?<file>.*?)(?::(?<line>\d+))?(?::(?<col>\d+))?$/
 
 /** How many frames one error may carry. Sentry keeps 50 server-side, so more is bytes nobody sees. */
@@ -37,12 +39,15 @@ export function parseStack(stack: string): SentryStackFrame[] {
   const frames: SentryStackFrame[] = []
   for (const line of stack.split('\n')) {
     // The first line is `Error: message`, which is the exception's own type and value, not a frame.
-    if (!/^\s*at\s/.test(line)) continue
-    const parsed = FRAME.exec(line)
+    const parsed = FRAME.exec(line) ?? WEBKIT_FRAME.exec(line.trim())
     if (!parsed?.groups) continue
+    const fn = parsed.groups.fn?.trim()
+    if (parsed.groups.loc === '[native code]') {
+      if (fn) frames.push({ function: fn, in_app: false })
+      continue
+    }
     const location = LOCATION.exec(parsed.groups.loc.trim())
     const file = location?.groups?.file?.trim()
-    const fn = parsed.groups.fn?.trim()
     if (!file && !fn) continue
     const lineno = Number(location?.groups?.line)
     const colno = Number(location?.groups?.col)

@@ -29,10 +29,10 @@ export const gitPaneContribution: PaneLayoutContribution<GitTaskPaneModel> = {
   when: gitAvailable,
   layout: 'list-detail',
   // Held once per task by the host (`paneModel` in client-core). The Changes model is built
-  // with the pane, so its selection and commit draft survive a tab switch, but it only polls Git while
-  // its tab is the one on screen.
+  // with the pane, so its selection and commit draft survive a tab switch. Each tab only reads Git
+  // while it is the one on screen (`createGitPaneModel`).
   model: (task, pane) => {
-    const git = createGitPaneModel(task)
+    const git = createGitPaneModel(task, pane.shown)
     return { ...git, changes: createChangesModel(task, { shown: () => pane.shown() && git.section() === 'changes' }) }
   },
   collapsible: true,

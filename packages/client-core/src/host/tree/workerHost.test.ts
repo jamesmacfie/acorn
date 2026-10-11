@@ -419,6 +419,80 @@ describe('what reaches a tree', () => {
     expect(failures).toEqual(['this plugin stopped responding', 'this plugin stopped responding'])
   })
 
+  it('rechecks a worker after a host pause before declaring a missed heartbeat', async () => {
+    start(true)
+    // Keep MessagePort delivery on the real event loop; only the host's clock is paused.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const intervals = vi.spyOn(globalThis, 'setInterval')
+    const handle = acquire()
+    const failures: string[] = []
+    handle.transport('s1').onFailed((reason) => failures.push(reason))
+    handle.mount('s1', 'toolCard', {}, slotBridge)
+    const tick = intervals.mock.calls.find(([, delay]) => delay === 10_000)![0] as () => void
+    intervals.mockRestore()
+    answerHeartbeats(sandbox!)
+    tick()
+    // Resume before queued port messages have run, as can happen after sleep.
+    vi.setSystemTime(Date.now() + 120_000)
+    tick()
+    expect(sandbox!.terminated).toBe(false)
+    await settle()
+    await settle()
+    vi.setSystemTime(Date.now() + 10_000)
+    tick()
+    expect(failures).toEqual([])
+    expect(sandbox!.terminated).toBe(false)
+  })
+
+  it('disarms missed heartbeats while the renderer is hidden and checks again on return', async () => {
+    start(true)
+    vi.useFakeTimers()
+    const visibility = { visibilityState: 'visible' }
+    vi.stubGlobal('document', visibility)
+    try {
+      const handle = acquire()
+      handle.mount('s1', 'toolCard', {}, slotBridge)
+      await vi.advanceTimersByTimeAsync(10_000)
+      visibility.visibilityState = 'hidden'
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(sandbox!.terminated).toBe(false)
+      visibility.visibilityState = 'visible'
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(sandbox!.terminated).toBe(false)
+      // A genuinely unresponsive worker still fails after an active deadline.
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(sandbox!.terminated).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('contains updates after worker failure without reviving authority', async () => {
+    start(true)
+    const handle = acquire()
+    const failures: string[] = []
+    handle.transport('s1').onFailed((reason) => failures.push(reason))
+    handle.mount('s1', 'toolCard', {}, slotBridge)
+    await settle()
+    stopTreeWorker({ pluginId: 'stranger', hash: HASH }, 'trust withdrawn')
+    expect(failures).toEqual(['trust withdrawn'])
+    expect(() => {
+      handle.mount('s1', 'toolCard', { update: 2 }, slotBridge)
+      handle.appearance('s1', { theme: 'dark', style: 'terminal', tokens: {} })
+      handle.onHostRequest('s1', async () => ({ ok: true, body: null }))()
+      handle.transport('s1').onBatch(() => {})()
+    }).not.toThrow()
+    const lateFailures: string[] = []
+    handle.transport('s1').onFailed((reason) => lateFailures.push(reason))
+    await settle()
+    expect(lateFailures).toEqual(['trust withdrawn'])
+    expect(handle.bridgePort('s1')).toBeNull()
+    expect(sandboxes).toHaveLength(1)
+    expect(sandbox!.terminated).toBe(true)
+    handle.release()
+    expect(() => handle.mount('s1', 'toolCard', {})).toThrow('retired')
+  })
+
   it('does not let a handle from a dead worker stop the one that replaced it', async () => {
     start()
     vi.useFakeTimers()

@@ -134,13 +134,6 @@ DeepSeek and contributed ACP harnesses have no bridge and keep `agents:before-pe
 
 ## Coverage
 
-Settings > Security and backup can show the built-in harness bridge coverage for a selected running
-session without probing an executable. Its diagnostic says Claude's bridge can reach every tool call
-and Codex's permission hook reaches permission requests only. This is a configured bridge description,
-not proof that a handler is installed or that the harness restricts filesystem or network access.
-For contributed harnesses without recorded metadata, the diagnostic says unknown. The plugin page's
-live handler-specific coverage below remains the authority for one plugin's registered hooks.
-
 A driver reports `loop_before_tool` and `loop_after_tool` in its descriptor's capabilities only when
 its harness takes a bridge and this Node has the bridge program. A standalone Node has none.
 

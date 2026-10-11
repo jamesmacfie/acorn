@@ -8,7 +8,8 @@ code lives in the `changes` folders of `plugins/git`.
 The Git pane opens on Changes. Another pane opens it there with
 `openPane(taskId, 'git', { kind: 'plugin:select', item: 'changes' })`, which is also what
 `?pane=git&item=changes` does, so the request waits if the pane isn't mounted yet. The tab polls Git
-only while it's on screen.
+only while it's on screen. The History and Worktrees tabs fetch only while they're on screen too, and
+each tab waits behind its own loading state, so Changes never waits on a history or worktree read.
 
 The Git pane is missing from a task's pane rail when the task's project isn't a Git repository. The
 pane shows while the project list is still loading, and in the terminal client, which doesn't load

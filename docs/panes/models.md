@@ -52,7 +52,8 @@ The host calls `model(task, pane)`, and `pane.shown()` is true only while a moun
 that task. It's false on another task, behind a rail source such as Home, and while the same task
 shows a different pane. An effect that polls, or marks something as seen, reads it first. The agent
 pane marks sessions read and acknowledges finished turns only while it's drawn. The Changes tab
-skips its status poll while hidden and fetches once when it's drawn again.
+skips its status poll while hidden and fetches once when it's drawn again. The Git pane's History and
+Worktrees queries are disabled while their tab is hidden, so Git events only mark them stale.
 
 ## Closing and opening again
 

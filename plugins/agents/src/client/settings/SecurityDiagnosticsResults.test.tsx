@@ -18,7 +18,6 @@ const finding = (id: string, patch: Partial<SecurityFinding> = {}): SecurityFind
   owner: 'agents',
   nodeId: 'node-1',
   projectId: null,
-  sessionId: null,
   checkedAt: 1,
   state: 'configured_only',
   severity: 'info',
@@ -34,7 +33,6 @@ function mount(findings: SecurityFinding[], patch: Partial<SecurityDiagnostics> 
   const report: SecurityDiagnostics = {
     nodeId: 'node-1',
     projectId: null,
-    sessionId: null,
     checkedAt: 1,
     expiresAt: 300_001,
     findings,
@@ -80,21 +78,15 @@ it('puts actionable warnings first and keeps technical evidence closed until req
   expect(host.textContent).toContain('fixture.raw')
 })
 
-it('omits repeated unselected agent checks and never calls unknown results safe', () => {
+it('omits the unselected project check and never calls unknown results safe', () => {
   const host = mount([
-    finding('harness.identity', { state: 'unknown' }),
-    finding('harness.permission-profile', { state: 'unknown' }),
-    finding('harness.next-default', { state: 'unknown' }),
-    finding('agent-tools.ceiling', { state: 'unknown' }),
     finding('project.package-policy', { state: 'unknown' }),
     finding('plugins.grants', { state: 'unknown' }),
   ])
-  expect(host.textContent).toContain('No running agent was included')
   expect(host.textContent).toContain('No project was included')
   expect(host.textContent).toContain('No settings could be verified')
   expect(host.textContent).not.toContain('No warnings were reported')
-  expect(host.textContent).not.toContain('Running agent permissions')
-  expect(host.textContent).not.toContain('Defaults for new agents')
+  expect(host.textContent).not.toContain('Package installation rules')
   expect(host.querySelectorAll('.ui-card')).toHaveLength(0)
 })
 

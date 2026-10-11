@@ -28,11 +28,8 @@ export const agentSecurityDiagnostics = new Hono<AppEnv>()
   )
   .get('/security-diagnostics', requireDevice, (c) => {
     const projectId = c.req.query('projectId')
-    const sessionId = c.req.query('sessionId')
-    if ((projectId && !validId(projectId)) || (sessionId && !validId(sessionId))) {
-      return respondError(c, 400, 'bad_request', ['Invalid diagnostic scope.'])
-    }
-    const scope: SecurityScope = { ...(projectId ? { projectId } : {}), ...(sessionId ? { sessionId } : {}) }
+    if (projectId && !validId(projectId)) return respondError(c, 400, 'bad_request', ['Invalid diagnostic scope.'])
+    const scope: SecurityScope = projectId ? { projectId } : {}
     return viaBridge(c, AGENT_SECURITY_DIAGNOSTICS, (bridge) =>
       bridge.check(c.env.NODE_ID, c.get('principal')!.userId, scope, c.req.raw.signal),
     )

@@ -2,9 +2,8 @@
 
 Settings > Security and backup has **Check this node** under **Security check**. Use it to read evidence
 on the selected Node. The project list uses saved project names. Choose **Node settings only** to
-leave out project checks. A running agent is optional: choose one to include its active settings,
-which can differ from the defaults for new agents. This choice appears only when a running agent is
-available for the selected project. The agents plugin owns the
+leave out project checks. The check covers the Node's saved settings, not the settings of a running
+agent. The agents plugin owns the
 device-only `GET /v1/p/agents/security-diagnostics` report and `/scopes` choice routes. Task and
 service tokens cannot read either route.
 
@@ -14,7 +13,7 @@ desktop fallback, so this action is available in the desktop app on a device pai
 The report puts **Needs attention** first, followed by **Your settings**. Each card has a readable
 explanation, labeled settings, and a named action such as **Review tool permissions**. Tool access
 shows allowed and blocked counts rather than a list of internal tool names. Managed MCP cards use
-redacted server names. Checks that need an unselected project or running agent are omitted.
+redacted server names. The project package check is omitted when no project is selected.
 
 Unavailable checks are counted above the results and grouped under **Not verified**. A missing
 observation does not establish that a setting is unsafe. Read failures remain visible under
@@ -29,12 +28,10 @@ severity, source, bounded explanation, limit, and repair action. Optional displa
 human-readable title, description, and labeled facts; older reports use client-owned fallback copy.
 Observed, configured only, unknown,
 unsupported, and failed are evidence states, separate from severity. A failed read does not establish
-that a control is off. The selected session's observed settings take precedence over defaults for the
-next session.
+that a control is off.
 
-The check reads stored agent defaults, the selected session's recorded harness options and tool
-ceiling, the last already observed harness capability descriptor, the latest in-memory pre-turn
-admission outcome for the selected task or project, managed MCP definitions, core plugin-host counts,
+The check reads stored agent defaults, the latest in-memory pre-turn admission outcome for the
+selected project, managed MCP definitions, core plugin-host counts,
 core agent-tool preferences, the verified tool catalog, and fixed project files. It reads at most
 32 KiB from each named project file after resolving the project's canonical root. It does not execute
 configuration code, package managers, MCP servers,
@@ -61,8 +58,7 @@ The plugin host reports counts of active executable grants, enabled development 
 approved and unapproved skills, and pending changed packages. It does not expose package names or
 declarations.
 The `agents.read-block` finding says whether **Keep agents out of Acorn's data folder** is on, which
-harnesses enforce it, and whether a selected session starts blocked
-([read block](../managed-agents/read-block.md)).
+harnesses enforce it ([read block](../managed-agents/read-block.md)).
 The `host.keys` finding says whether the desktop app delivered the Node's keys sealed, or the Node read
 them from files or its environment, and names any plain key file still in the data root. A standalone
 Node, or a plain file left behind, is a warning, because agents on the Node can read it
@@ -70,9 +66,9 @@ Node, or a plain file left behind, is a warning, because agents on the Node can 
 Admission retains at most one recent passed, blocked, or incomplete outcome per task for up to 100 tasks
 in this Node process; it has no persistence or report history. No observation remains after a restart.
 Current approval status remains unknown because validation would decrypt stored instruction bodies.
-An old approved snapshot still does not prove current files match. Harness loop coverage comes only
-from an already observed provider descriptor; absent metadata stays unknown. Reported capability reach
-does not prove hook registration or enforcement. Global harness configuration remains unknown. A
+An old approved snapshot still does not prove current files match. The report doesn't cover a running
+session's permission mode, tool ceiling, or loop hook coverage. Global harness configuration remains
+unknown. A
 running session's MCP panel may have more harness-reported state than this passive report. Phase 09 owns managed MCP
 installation and review.
 

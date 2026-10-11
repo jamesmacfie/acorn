@@ -8,12 +8,11 @@ import {
 } from '../../shared/securityDiagnostics'
 import SecurityDiagnosticsResults from './SecurityDiagnosticsResults'
 
-const emptyChoices: SecurityScopeChoices = { projects: [], sessions: [] }
+const emptyChoices: SecurityScopeChoices = { projects: [] }
 
 export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null }) {
   const [choices, setChoices] = createSignal(emptyChoices)
   const [projectId, setProjectId] = createSignal('')
-  const [sessionId, setSessionId] = createSignal('')
   const [report, setReport] = createSignal<SecurityDiagnostics | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -34,14 +33,13 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
       clearReport()
       setChoices(emptyChoices)
       setProjectId('')
-      setSessionId('')
       const signal = request.next()
       void readJson<SecurityScopeChoices>(`${agentSecurityDiagnosticsRoute}/scopes`, { nodeId: selectedNode, signal })
         .then((found) => {
           if (!signal.aborted) setChoices(found)
         })
         .catch(() => {
-          if (!signal.aborted) setError('Could not load projects and running agents. You can still check this Node.')
+          if (!signal.aborted) setError('Could not load projects. You can still check this Node.')
         })
     }),
   )
@@ -55,22 +53,15 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
     const signal = request.next()
     const selectedNode = nodeId()
     const selectedProject = projectId()
-    const selectedSession = sessionId()
     const params = new URLSearchParams()
     if (selectedProject) params.set('projectId', selectedProject)
-    if (selectedSession) params.set('sessionId', selectedSession)
     setBusy(true)
     try {
       const result = await readJson<SecurityDiagnostics>(
         `${agentSecurityDiagnosticsRoute}${params.size ? `?${params}` : ''}`,
         { nodeId: selectedNode, signal },
       )
-      if (
-        !signal.aborted &&
-        nodeId() === selectedNode &&
-        projectId() === selectedProject &&
-        sessionId() === selectedSession
-      ) {
+      if (!signal.aborted && nodeId() === selectedNode && projectId() === selectedProject) {
         setReport(result)
         setClock(Date.now())
         if (timer) clearInterval(timer)
@@ -103,31 +94,9 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
           onChange={(value) => {
             clearReport()
             setProjectId(value)
-            setSessionId('')
           }}
         />
       </Field>
-      <Show when={choices().sessions.some((session) => !projectId() || session.projectId === projectId())}>
-        <Field
-          label="Running agent (optional)"
-          hint="Include the settings an agent is using. These can differ from the defaults for new agents."
-        >
-          <Select
-            label="Running agent"
-            value={sessionId()}
-            options={[
-              { value: '', label: 'Defaults for new agents' },
-              ...choices()
-                .sessions.filter((session) => !projectId() || session.projectId === projectId())
-                .map((session) => ({ value: session.id, label: session.label })),
-            ]}
-            onChange={(value) => {
-              clearReport()
-              setSessionId(value)
-            }}
-          />
-        </Field>
-      </Show>
       <Button size="sm" busy={busy()} onPress={() => void check()}>
         Check this node
       </Button>

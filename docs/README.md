@@ -328,6 +328,10 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [UI extension open acceptance](./future/ui-extension/README.md) and
   [Git client open acceptance](./future/git-client/README.md): the checks still open after those
   programmes shipped.
+- [Spawned agent notes](./future/spawned-agent-notes.md): proposed automatic note snapshots and parent
+  note inheritance in shared and worktree agent spawns.
+- [Inline line blame](./future/editor-line-blame.md): a proposal for Git blame on the Editor cursor
+  line, with a commit tooltip, built on a new `editor:line` annotation point.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once

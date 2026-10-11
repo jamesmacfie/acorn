@@ -82,6 +82,9 @@ stacks, and whether to send `task.id` as a tag.
 | A metric | Entries in one batched `trace_metric` item. A histogram goes as `p50`, `p95`, and `max` gauges plus a `count` counter |
 | An error | An `event` with `exception.values[0]`, and parsed frames when stacks are on |
 
+Stack parsing accepts V8 stacks from Node and WebKit stacks from the desktop renderer, including
+anonymous and native WebKit frames. It sends at most 50 frames, in the order Sentry expects.
+
 **A flush is several envelopes.** Most Sentry item types may appear once per envelope, and `event` and
 `transaction` share the envelope's single `event_id`. So the exporter builds one envelope per error,
 transaction, and check-in, plus one for the logs and one for the metrics.

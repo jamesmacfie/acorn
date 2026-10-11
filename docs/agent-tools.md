@@ -86,7 +86,7 @@ execute tool added in a later release stays off until you turn the tier on. The 
 `isToolPermitted` and the Settings page read the same constant.
 
 Security diagnostics reads the registered name and risk catalog through core's narrow `agentTools`
-service, then applies the stored preference and selected session ceiling. It shows only catalogued
+service, then applies the stored preference. It shows only catalogued
 tool names; a stale preference key cannot introduce a tool into the report.
 
 ## Safety rules
