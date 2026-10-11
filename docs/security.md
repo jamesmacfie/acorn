@@ -99,6 +99,12 @@ What stays readable to an agent:
   development build, and a packaged build whose keychain refused the item.
 - Every key on a standalone Node, which has no keychain and warns about this at boot.
 
+What it doesn't stop is an agent that plants a file and waits for a restart. It can delete
+`node-keys.sealed` and leave its own `session.key`, which the next start treats as an upgrade, or
+write a `.env` into the data root, which the helper loads. That's persistence as the person's own
+user, which no desktop app can rule out. The audit trail records a key check that fails, and
+**Check this node** shows a plain key file in the data root.
+
 **Check this node** shows which case applies to the Node it checks
 ([security diagnostics](./security/security-diagnostics.md)).
 

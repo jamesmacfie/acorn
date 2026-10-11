@@ -132,20 +132,22 @@ The first desktop start after the upgrade migrates the plain files:
 
 1. The helper seals the existing `session.key` as it is, because a new session key would leave every
    stored credential unreadable. It mints a new signing key, because any agent that ran before could
-   have read the old one.
+   have read the old one. The old signing key goes into the sealed file too, never read again from
+   `internal-token`, so a key an agent writes there later can't sign anything the Node re-signs.
 2. The Node boots with the sealed keys. Its first refresh pass re-signs every session token file
    that verifies under the old key, keeping the same task, session, and tool ceiling. Only that pass
    accepts the old key, so a token signed with it fails from then on.
 3. The Node tries the session key on its stored credentials and reports `ok`, `none`, or `failed` in
    its start result.
-4. The helper deletes `internal-token`. It deletes `session.key` only when that file holds the key
-   the Node used and the check answered `ok` or `none`. On `failed`, the file stays and the Node
-   records `keys.check.failed` in the audit trail.
+4. The helper drops the old signing key from the sealed file and deletes `internal-token`. It deletes
+   `session.key` only when that file holds the key the Node used and the check answered `ok` or
+   `none`. On `failed`, the file stays and the Node records `keys.check.failed` in the audit trail.
 
-A crash between steps is safe: the next start finds the sealed file and the plain files, and
-finishes the same migration. If the data key changes, for example because the keychain item was
-lost, the helper reseals from a plain `session.key` if one is left. With none, it refuses to start
-the Node and says why, rather than minting a key that orphans every stored credential.
+A crash between steps is safe: the next start finds the old key still sealed and finishes the same
+migration. If the helper can't open the sealed file, because the keychain item was lost or the file
+was damaged, it refuses to start the Node and says why. It never reseals from a plain `session.key`
+on its own, because an agent could plant one. Deleting the sealed file is the person's decision, and
+the next start then seals whatever plain `session.key` is left.
 
 A standalone Node has no keychain. It keeps `session.key` and `internal-token` in its data root, or
 takes `SESSION_ENC_KEY` from its environment, and warns at boot that agents on it can read them. It

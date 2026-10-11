@@ -28,7 +28,11 @@ const PLAIN_SESSION_KEY = 'session.key'
 const PLAIN_SIGNING_KEY = 'internal-token'
 const HEX_KEY = /^[0-9a-fA-F]{64}$/
 
-type SealedKeys = { sessionKey: string; signingKey: string }
+// `previousSigningKey` is the plain key from before the migration. It lives in the sealed file, not the
+// plain one, because an agent can write a plain `internal-token` at any time. Trusting that file would
+// let it sign a forged session file that the Node then re-signs with the real key. `settle` drops it
+// once the Node has re-signed.
+type SealedKeys = { sessionKey: string; signingKey: string; previousSigningKey?: string }
 
 export type NodeKeyCustody = {
   // The keys for the next start, sealing them first when the data root has no sealed file.
@@ -62,7 +66,8 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
     try {
       const keys = JSON.parse(cipher.decrypt(Buffer.from(body, 'base64'))) as Partial<SealedKeys>
       if (typeof keys.sessionKey === 'string' && HEX_KEY.test(keys.sessionKey) && typeof keys.signingKey === 'string' && keys.signingKey) {
-        return { sessionKey: keys.sessionKey, signingKey: keys.signingKey }
+        const previous = typeof keys.previousSigningKey === 'string' && keys.previousSigningKey ? { previousSigningKey: keys.previousSigningKey } : {}
+        return { sessionKey: keys.sessionKey, signingKey: keys.signingKey, ...previous }
       }
     } catch {
       // A different data key or a damaged file. The caller decides whether anything can rebuild it.
@@ -75,7 +80,7 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
     mkdirSync(dataDir, { recursive: true, mode: 0o700 })
     writePrivateAtomic(sealedPath, Buffer.from(cipher.encrypt(JSON.stringify(keys))).toString('base64'))
     const back = unseal()
-    if (back === null || back === 'unreadable' || back.sessionKey !== keys.sessionKey || back.signingKey !== keys.signingKey) {
+    if (back === null || back === 'unreadable' || JSON.stringify(back) !== JSON.stringify(keys)) {
       rmSync(sealedPath, { force: true })
       throw new Error(`${sealedPath} didn't read back after sealing, so the plain key files stay where they are.`)
     }
@@ -98,33 +103,36 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
       if (plainSession && !HEX_KEY.test(plainSession)) {
         throw new Error(`${join(dataDir, PLAIN_SESSION_KEY)} does not hold a 64-hex key. Fix or remove it. Minting a second key would orphan every secret encrypted under the first.`)
       }
-      const plainSigning = readPlain(PLAIN_SIGNING_KEY)
 
       let sealed = unseal()
+      // Never rebuilt from plain files. An agent can damage this file and plant its own session.key,
+      // and a rebuild would seal the agent's key. Deleting the file is the person's decision.
       if (sealed === 'unreadable') {
-        // The keychain item was lost or replaced, so the data key changed. Only a plain session key
-        // can rebuild the file without losing every stored credential.
-        if (!plainSession && !envSessionKey) {
-          throw new Error(`${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over without them.`)
-        }
-        log.warn(`${sealedPath} can't be opened with this app's data key; sealing again from the plain session key`)
-        sealed = null
+        throw new Error(`${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`)
       }
       if (!sealed) {
-        sealed = { sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'), signingKey: randomBytes(32).toString('hex') }
+        const previousSigningKey = readPlain(PLAIN_SIGNING_KEY)
+        sealed = {
+          sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'),
+          signingKey: randomBytes(32).toString('hex'),
+          ...(previousSigningKey ? { previousSigningKey } : {}),
+        }
         seal(sealed)
       }
       return {
         sessionKey: envSessionKey ?? sealed.sessionKey,
         signingKey: sealed.signingKey,
-        ...(plainSigning && plainSigning !== sealed.signingKey ? { previousSigningKey: plainSigning } : {}),
+        ...(sealed.previousSigningKey ? { previousSigningKey: sealed.previousSigningKey } : {}),
       }
     },
 
     settle(keys, check) {
       // The Node's boot pass has re-signed every session file under the sealed key, so the old
-      // signing key has nothing left to do. Keeping it would keep it readable.
-      if (keys.previousSigningKey) remove(PLAIN_SIGNING_KEY)
+      // signing key has nothing left to do. A plain file is never read again after sealing, so one an
+      // agent wrote goes too.
+      const sealed = unseal()
+      if (sealed && sealed !== 'unreadable' && sealed.previousSigningKey) seal({ sessionKey: sealed.sessionKey, signingKey: sealed.signingKey })
+      if (readPlain(PLAIN_SIGNING_KEY)) remove(PLAIN_SIGNING_KEY)
       // The plain session key goes only when it's the key the Node used and that key opened a stored
       // credential, or there was none to open. Anything else keeps it, and the Node records why.
       if (check !== 'failed' && readPlain(PLAIN_SESSION_KEY) === keys.sessionKey) remove(PLAIN_SESSION_KEY)

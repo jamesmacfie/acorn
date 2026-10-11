@@ -97,18 +97,28 @@ describe('node key custody', () => {
     expect(existsSync(join(dir, 'internal-token'))).toBe(false)
   })
 
-  it('reseals from the plain session key when the data key changed, and refuses when nothing can', () => {
+  it('refuses a sealed file this data key cannot open, even with a plain session key beside it', () => {
     const dir = upgraded()
     nodeKeyCustody(dir, cipherFor(dataKey)).prepare()
-    // The keychain item was lost, so Rust minted a new data key.
-    const lost = cipherFor(randomBytes(32))
-    expect(nodeKeyCustody(dir, lost).prepare().sessionKey).toBe(SESSION)
+    // The keychain item was lost, or an agent damaged the file and planted its own session.key.
+    // Either way, sealing whatever plain key is there would be the wrong answer.
+    writeFileSync(join(dir, 'session.key'), `${'d'.repeat(64)}\n`)
+    expect(() => nodeKeyCustody(dir, cipherFor(randomBytes(32))).prepare()).toThrow(/can't be opened with this app's data key/)
+    writeFileSync(join(dir, SEALED_NODE_KEYS_FILE), 'damaged')
+    expect(() => nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toThrow(/can't be opened with this app's data key/)
+  })
 
-    const sealedOnly = root()
-    const custody = nodeKeyCustody(sealedOnly, cipherFor(dataKey))
-    custody.settle(custody.prepare(), 'none')
-    expect(() => nodeKeyCustody(sealedOnly, lost).prepare()).toThrow(/can't be opened with this app's data key/)
-    expect(readdirSync(sealedOnly)).toEqual([SEALED_NODE_KEYS_FILE])
+  it('never takes a plain signing key written after the migration as the old key', () => {
+    const dir = upgraded()
+    const custody = nodeKeyCustody(dir, cipherFor(dataKey))
+    custody.settle(custody.prepare(), 'ok')
+    // An agent plants a key it chose, hoping the next start re-signs a token file it forged with it.
+    writeFileSync(join(dir, 'internal-token'), 'agent-chosen-signing-key')
+    const next = nodeKeyCustody(dir, cipherFor(dataKey))
+    const keys = next.prepare()
+    expect(keys.previousSigningKey).toBeUndefined()
+    next.settle(keys, 'ok')
+    expect(existsSync(join(dir, 'internal-token'))).toBe(false)
   })
 
   it('lets a developer key from the environment win, and keeps a plain key it never used', () => {
