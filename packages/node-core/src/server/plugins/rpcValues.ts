@@ -48,7 +48,8 @@ export const SYNC_REPLY_BYTES = 4 * 1024 * 1024
 // stops, so one bad plugin reads as the whole node being unreachable.
 export const SYNC_REPLY_TIMEOUT_MS = 5_000
 export const HEADER_BYTES = Int32Array.BYTES_PER_ELEMENT * 2
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
+// Arrays count, because the value walk has to descend into them too.
+export const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 // An object that already survives a structured clone with its own shape, so neither side walks it key
 // by key. `Object.entries` on a Uint8Array yields `{ '0': 26, '1': 80, … }`, and the receiver gets an

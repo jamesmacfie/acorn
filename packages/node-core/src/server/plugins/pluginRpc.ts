@@ -17,7 +17,7 @@ import {
   errorFromWire,
   errorToWire,
   HEADER_BYTES,
-  isRecord,
+  isObject,
   SYNC_REPLY_BYTES,
   SYNC_REPLY_TIMEOUT_MS,
   type WireAbort,
@@ -180,7 +180,7 @@ export class PluginRpcEndpoint {
             this.encode(item, `${path}[${index}]`, signalIds, transaction, scope, requestRoot),
           ),
         )
-      if (!isRecord(value) || carriesItsOwnShape(value)) return value
+      if (!isObject(value) || carriesItsOwnShape(value)) return value
       const ownedScope = isInvocationOwned(value) ? (transaction.scope ??= this.#references.scope()) : scope
       const ownedRoot = isInvocationOwned(value) ? path : requestRoot
       const out: Record<string, unknown> = {}
@@ -261,7 +261,7 @@ export class PluginRpcEndpoint {
     this.#check()
     if (Array.isArray(value))
       return value.map((item, index) => this.decode(item, `${path}[${index}]`, signalIds, retiredScope))
-    if (!isRecord(value) || carriesItsOwnShape(value)) return value
+    if (!isObject(value) || carriesItsOwnShape(value)) return value
     if (value.__acornRpc === 'function') {
       const wire = value as WireFunction
       if (wire.scopeId !== undefined && wire.scopeId === retiredScope)
@@ -426,7 +426,7 @@ export class PluginRpcEndpoint {
   }
 
   #reasonScope(encoding: Encoding, reason: unknown): RpcScope | undefined {
-    if (typeof reason === 'function' || (isRecord(reason) && !(reason instanceof Error)))
+    if (typeof reason === 'function' || (isObject(reason) && !(reason instanceof Error)))
       encoding.scope ??= this.#references.scope()
     return encoding.scope
   }
@@ -477,7 +477,7 @@ export class PluginRpcEndpoint {
     }
     if (Array.isArray(value))
       return value.map((item, index) => this.#encodeSync(item, `${path}[${index}]`, encoding, scope, requestRoot))
-    if (!isRecord(value) || carriesItsOwnShape(value)) return value
+    if (!isObject(value) || carriesItsOwnShape(value)) return value
     const out: Record<string, unknown> = {}
     const ownedScope = isInvocationOwned(value) ? (encoding.scope ??= this.#references.scope()) : scope
     const ownedRoot = isInvocationOwned(value) ? path : requestRoot
@@ -547,7 +547,7 @@ export class PluginRpcEndpoint {
   }
 
   #enqueue(message: unknown): void {
-    if (this.#closed || !isRecord(message)) return
+    if (this.#closed || !isObject(message)) return
     if (message.__acornRpc === 'abort') {
       const wire = message as WireAbort
       this.#remoteSignals.get(wire.id)?.abort(this.decode(wire.reason, 'abort.reason'))

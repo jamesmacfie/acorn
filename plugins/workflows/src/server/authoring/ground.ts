@@ -8,6 +8,7 @@
 // keys with a note. This keeps unknown `with` keys from passing through without validation.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../../shared/api'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { isRecord } from '@acorn/plugin-api/node'
 import type { WorkflowCatalog, WorkflowDef, WorkflowInput, WorkflowStepDef } from '../../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generate/forbiddenKeys'
 import { groundWorkflowDispatch } from './groundDispatch'
@@ -83,9 +84,6 @@ const FORBIDDEN_TOOL_KEYS = FORBIDDEN_KEYS.filter((key) => key.startsWith('tools
  *  holds a balanced pair of braces, so the first object a brace count finds is not always the
  *  definition. */
 const MAX_OBJECT_CANDIDATES = 8
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const without = <T extends object>(record: T, key: string): T =>
   Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) as T

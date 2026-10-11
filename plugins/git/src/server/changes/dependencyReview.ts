@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
-import { git, resolveInRoot } from '@acorn/plugin-api/node'
+import { git, isRecord, resolveInRoot } from '@acorn/plugin-api/node'
 import { parseDocument } from 'yaml'
 import type { DependencyFinding, DependencyReview, LocalScope } from '../../shared/changes/api'
 import type { StaticDependencyPolicy } from '@acorn/protocol/dependencyPolicy.ts'
@@ -37,8 +37,6 @@ const managerFiles = [
 ]
 const relevant = (path: string) =>
   manifestName(path) || managerFiles.some((name) => path === name || path.endsWith(`/${name}`))
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value)
 const record = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {})
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const safe = (value: unknown): string => {

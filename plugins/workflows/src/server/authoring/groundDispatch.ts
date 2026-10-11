@@ -8,11 +8,9 @@ import type {
 import { sameWorkflowRef } from '../../shared/workflowRefs'
 import { parseWorkflowJsonPointer, workflowEdges } from '../validation/definition'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { isRecord } from '@acorn/plugin-api/node'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { declaredOutputSchema } from '../../shared/gateForm'
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const without = <T extends object>(record: T, key: string): T =>
   Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) as T

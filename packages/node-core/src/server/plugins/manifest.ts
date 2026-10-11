@@ -5,6 +5,7 @@ import type { z } from 'zod'
 import { MAX_PLUGIN_MANIFEST_BYTES, readPluginFile } from './packageFiles'
 import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SEARCH_MAX } from '@acorn/protocol/settingsPages.ts'
 import { NODE_CORE_FACETS } from './coreFacets'
+import { isRecord } from '../integrations/codec'
 import { pluginManifestShape, CONTRIBUTION_KINDS } from '@acorn/protocol/plugin/contract.ts'
 import { validateDependencies, validateNodeDeclarations, validateRuntimeContributions } from './manifestValidation/node'
 import { validateFrames, validateSurfaceDestinations } from './manifestValidation/surfaces'
@@ -81,9 +82,6 @@ export type ManifestUnknown = readonly string[]
 export type PluginManifestResult =
   | { ok: true; manifest: PluginManifest; unknown: ManifestUnknown }
   | { ok: false; reason: string }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const droppedKeys = (raw: unknown, kept: object, prefix: string): string[] =>
   isRecord(raw)
