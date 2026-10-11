@@ -538,6 +538,14 @@ export class ManagedAgentEngine {
       }
     }
     await this.settleCommands()
+    // No harness outlives the Node, so a background command still marked running lost the process that
+    // would have reported its exit. Its session can be `ready`, which the rule above leaves running.
+    for (const record of await this.store.unfinishedCommands()) {
+      if (record.event.type !== 'tool' || !record.event.tool.background) continue
+      await this.record(record.sessionId, record.turnId, { type: 'tool', tool: {
+        id: record.event.tool.id, title: '', kind: 'execute', status: 'unknown', subagentId: record.event.tool.subagentId,
+      } })
+    }
     await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
@@ -1096,7 +1104,7 @@ export class ManagedAgentEngine {
       this.emit({ channel: 'agent:session', session })
     }
     if (event.type === 'turn_completed' || event.type === 'error'
-      || (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived'].includes(event.state))
+      || (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived', 'reconnecting'].includes(event.state))
       || (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))) {
       await this.settleCommands(sessionId)
     }
@@ -1310,7 +1318,7 @@ export class ManagedAgentEngine {
   /**
    * The session, if the idle rules would stop its process: idle since `before` and nothing living inside
    * the process or waiting on it. That is a turn in flight or queued, a request the owner has not
-   * answered, a background subagent still running, or a start in progress. Delegation reports and
+   * answered, a background subagent or command still running, or a start in progress. Delegation reports and
    * workflow steps reach a session through enqueueTurn, which resumes a stopped one, so those need no
    * exception.
    */
@@ -1321,6 +1329,8 @@ export class ManagedAgentEngine {
     // session anyway.
     if (this.stopped || !session || !['ready', 'failed'].includes(session.runtimeState) || session.queuedTurns > 0) return null
     if (session.subagents.some(isActiveSubagent)) return null
+    // A background command dies with the harness that started it.
+    if ((await this.store.unfinishedCommands(sessionId)).some((record) => record.event.type === 'tool' && record.event.tool.background)) return null
     // The request rows are the authority here. `ready` is only what the last event projected.
     if ((await this.store.pendingRequests(sessionId)).length) return null
     return session

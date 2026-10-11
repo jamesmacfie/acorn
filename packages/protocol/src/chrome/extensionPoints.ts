@@ -34,6 +34,11 @@ export type AgentToolCardCall = {
   outputAppend?: boolean
   paths?: string[]
   subagentId?: string
+  /** A command that keeps running after its turn. It stays `running` until the harness reports the
+   *  exit, and `unknown` means that report can no longer arrive. */
+  background?: boolean
+  /** The command's exit code, when the harness reported one. */
+  exitCode?: number
   web?: {
     action?:
       | { type: 'search'; queries: string[]; allowedDomains?: string[]; blockedDomains?: string[] }

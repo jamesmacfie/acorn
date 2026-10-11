@@ -107,6 +107,30 @@ describe('command lifecycle across restart and delayed output', () => {
     expect((await store.turn(second.id))?.status).toBe('active')
   })
 
+  it('keeps a background command running past its turn, then reads it as unknown after a restart', async () => {
+    const { session, turn } = await open()
+    await command(session.id, turn.id, 'item/started')
+    await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: '', kind: 'execute', background: true } })
+    await store.recordEvent(session.id, turn.id, { type: 'turn_completed' })
+    await command(session.id, null, 'item/commandExecution/outputDelta')
+    expect(await cards(session.id)).toMatchObject([{ status: 'running', background: true, output: 'first\n' }])
+    // A background command is not the session's own work.
+    expect((await store.requireSession(session.id)).runtimeState).toBe('ready')
+    runtime = new ManagedAgentRuntime({ db: ctx.storage.open(), core: ctx.core, dataDir: ctx.dataDir,
+      secrets: ctx.env.SECRETS, internalEnv: () => ({}), currentUserId: () => null, registry: new AgentDriverRegistry() })
+    await runtime.reconcile()
+    expect(await cards(session.id)).toMatchObject([{ status: 'unknown', background: true, output: 'first\n' }])
+  })
+
+  it('settles a background command with its exit code', async () => {
+    const { session, turn } = await open()
+    await command(session.id, turn.id, 'item/started')
+    await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: '', kind: 'execute', background: true } })
+    await store.recordEvent(session.id, turn.id, { type: 'turn_completed' })
+    await command(session.id, null, 'item/completed', { aggregatedOutput: 'boom\n', status: 'failed', exitCode: 1 })
+    expect(await cards(session.id)).toMatchObject([{ status: 'failed', exitCode: 1, background: true, output: 'boom\n' }])
+  })
+
   it('keeps background child execution live after the parent settles, then quiets it at Node startup', async () => {
     const { session, turn } = await open()
     await store.recordEvent(session.id, turn.id, { type: 'subagent', subagent: { id: 'child', status: 'running' } })

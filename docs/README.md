@@ -254,7 +254,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   icons](./workspaces-and-tasks/workspace-icons.md).
 - [managed-agents.md](./managed-agents.md): [Web activity and file
   changes](./managed-agents/activity.md), [App-access approval](./managed-agents/app-access.md),
-  [Context, files, and attachments](./managed-agents/attachments.md), [Client
+  [Context, files, and attachments](./managed-agents/attachments.md), [Background
+  commands](./managed-agents/background-commands.md), [Client
   surfaces](./managed-agents/client-surfaces.md), [The composer](./managed-agents/composer.md),
   [Custom agents](./managed-agents/custom-agents.md), [New-session
   defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),

@@ -1,0 +1,243 @@
+{
+ "capturedWith": {
+  "cli": "Claude Code 2.1.296",
+  "adapter": "@agentclientprotocol/claude-agent-acp 0.54.1"
+ },
+ "prompt": "Use the Bash tool with run_in_background set to true to run exactly this command: <command>. Then end the turn.",
+ "notes": [
+  "The session asked for emitRawSDKMessages: task_started, task_notification, task_updated, task_progress.",
+  "Kept: every update for the Bash call, and the task_notification extension notification. `at` is milliseconds",
+  "from the session start. Removed: usage, command list, agent prose, and the task_started and task_updated",
+  "messages, which add nothing the call and the notification do not already say.",
+  "The notification arrives after the prompt has returned, outside any turn, and the CLI then starts a",
+  "turn of its own to tell the model, which the adapter streams as agent_message_chunk."
+ ],
+ "succeeded": {
+  "command": "sleep 8; echo done",
+  "events": [
+   {
+    "at": 2179,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01HcvFNs7ANgoJSj8u9SbiFk",
+     "title": "Terminal",
+     "kind": "execute",
+     "status": "pending",
+     "content": [],
+     "rawInput": {},
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call"
+    }
+   },
+   {
+    "at": 2983,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01HcvFNs7ANgoJSj8u9SbiFk",
+     "kind": "execute",
+     "title": "sleep 8; echo done",
+     "content": [
+      {
+       "content": {
+        "text": "capture probe",
+        "type": "text"
+       },
+       "type": "content"
+      }
+     ],
+     "rawInput": {
+      "command": "sleep 8; echo done",
+      "description": "capture probe",
+      "run_in_background": true
+     },
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 5561,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01HcvFNs7ANgoJSj8u9SbiFk",
+     "_meta": {
+      "claudeCode": {
+       "toolResponse": {
+        "stdout": "",
+        "stderr": "",
+        "interrupted": false,
+        "isImage": false,
+        "noOutputExpected": false,
+        "backgroundTaskId": "b3jeu131u"
+       },
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 5563,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01HcvFNs7ANgoJSj8u9SbiFk",
+     "status": "completed",
+     "content": [
+      {
+       "content": {
+        "text": "```console\nCommand running in background with ID: b3jeu131u. Output is being written to: /private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/7dc0c46a-c1c3-4375-8c17-6916b57efbbe/tasks/b3jeu131u.output. You will be notified when it completes. To check interim output, use Read on that file path.\n```",
+        "type": "text"
+       },
+       "type": "content"
+      }
+     ],
+     "rawOutput": "Command running in background with ID: b3jeu131u. Output is being written to: /private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/7dc0c46a-c1c3-4375-8c17-6916b57efbbe/tasks/b3jeu131u.output. You will be notified when it completes. To check interim output, use Read on that file path.",
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 13592,
+    "extNotification": {
+     "method": "_claude/sdkMessage",
+     "params": {
+      "sessionId": "7dc0c46a-c1c3-4375-8c17-6916b57efbbe",
+      "message": {
+       "type": "system",
+       "subtype": "task_notification",
+       "task_id": "b3jeu131u",
+       "run_id": "0mv4dcozw-31365379",
+       "tool_use_id": "toolu_01HcvFNs7ANgoJSj8u9SbiFk",
+       "status": "completed",
+       "output_file": "/private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/7dc0c46a-c1c3-4375-8c17-6916b57efbbe/tasks/b3jeu131u.output",
+       "summary": "Background command \"capture probe\" completed (exit code 0)",
+       "uuid": "0406e5b5-11fd-4bb8-9c73-e14c34ddec67",
+       "session_id": "7dc0c46a-c1c3-4375-8c17-6916b57efbbe"
+      }
+     }
+    }
+   }
+  ]
+ },
+ "failed": {
+  "command": "sleep 3; echo boom >&2; exit 1",
+  "events": [
+   {
+    "at": 2000,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01LNKGfaEr9SjBdxhDrYR2Vm",
+     "title": "Terminal",
+     "kind": "execute",
+     "status": "pending",
+     "content": [],
+     "rawInput": {},
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call"
+    }
+   },
+   {
+    "at": 3076,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01LNKGfaEr9SjBdxhDrYR2Vm",
+     "kind": "execute",
+     "title": "sleep 3; echo boom >&2; exit 1",
+     "content": [
+      {
+       "content": {
+        "text": "capture probe",
+        "type": "text"
+       },
+       "type": "content"
+      }
+     ],
+     "rawInput": {
+      "command": "sleep 3; echo boom >&2; exit 1",
+      "description": "capture probe",
+      "run_in_background": true
+     },
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 5114,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01LNKGfaEr9SjBdxhDrYR2Vm",
+     "_meta": {
+      "claudeCode": {
+       "toolResponse": {
+        "stdout": "",
+        "stderr": "",
+        "interrupted": false,
+        "isImage": false,
+        "noOutputExpected": false,
+        "backgroundTaskId": "b4n23016g"
+       },
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 5116,
+    "sessionUpdate": {
+     "toolCallId": "toolu_01LNKGfaEr9SjBdxhDrYR2Vm",
+     "status": "completed",
+     "content": [
+      {
+       "content": {
+        "text": "```console\nCommand running in background with ID: b4n23016g. Output is being written to: /private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/edf6b074-d364-4c62-94b1-5d68c2b95ef4/tasks/b4n23016g.output. You will be notified when it completes. To check interim output, use Read on that file path.\n```",
+        "type": "text"
+       },
+       "type": "content"
+      }
+     ],
+     "rawOutput": "Command running in background with ID: b4n23016g. Output is being written to: /private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/edf6b074-d364-4c62-94b1-5d68c2b95ef4/tasks/b4n23016g.output. You will be notified when it completes. To check interim output, use Read on that file path.",
+     "_meta": {
+      "claudeCode": {
+       "toolName": "Bash"
+      }
+     },
+     "sessionUpdate": "tool_call_update"
+    }
+   },
+   {
+    "at": 8143,
+    "extNotification": {
+     "method": "_claude/sdkMessage",
+     "params": {
+      "sessionId": "edf6b074-d364-4c62-94b1-5d68c2b95ef4",
+      "message": {
+       "type": "system",
+       "subtype": "task_notification",
+       "task_id": "b4n23016g",
+       "run_id": "0mv4ddscl-9cabd5e6",
+       "tool_use_id": "toolu_01LNKGfaEr9SjBdxhDrYR2Vm",
+       "status": "failed",
+       "output_file": "/private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/edf6b074-d364-4c62-94b1-5d68c2b95ef4/tasks/b4n23016g.output",
+       "summary": "Background command \"capture probe\" failed with exit code 1",
+       "uuid": "0dd7d9da-8a37-4bcf-88d0-91067d9588dc",
+       "session_id": "edf6b074-d364-4c62-94b1-5d68c2b95ef4"
+      }
+     }
+    }
+   }
+  ]
+ }
+}

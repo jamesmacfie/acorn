@@ -260,6 +260,13 @@ export type AgentToolCall = {
   paths?: string[]
   /** The subagent that ran this call, when a harness attributes it (see AgentSubagent). */
   subagentId?: string
+  /** A command that keeps running after its turn: Claude Code's `run_in_background` Bash call, or a
+   *  Codex command still going when its turn completed. Sticky once set. Such a call stays `running`
+   *  until the harness reports its exit, and its output keeps arriving on this card
+   *  (docs/managed-agents/background-commands.md). */
+  background?: boolean
+  /** The command's exit code, when the harness reported one. */
+  exitCode?: number
   /** Web activity, when the driver recognised this call as some. It sits beside `input` and `output`
    *  rather than replacing them: a renderer that has never heard of it still has the request and the
    *  provider's own text to draw. */

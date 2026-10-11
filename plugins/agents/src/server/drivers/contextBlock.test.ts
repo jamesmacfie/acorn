@@ -23,7 +23,7 @@ describe('claudeHarness session metadata', () => {
     expect(meta('workflow').systemPrompt).toEqual({ append: attendanceInstructions('supervised') })
     expect(meta('delegated').systemPrompt).toEqual({ append: attendanceInstructions('supervised') })
     expect(meta('interactive').systemPrompt).toBeUndefined()
-    expect(meta('interactive').claudeCode).toEqual({ options: { settings: { autoContinueAtUsageLimit: false } } })
+    expect(meta('interactive').claudeCode).toEqual({ emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }], options: { settings: { autoContinueAtUsageLimit: false } } })
   })
 
   it('appends a custom agent’s instructions from the session’s snapshot', () => {
@@ -40,7 +40,7 @@ describe('claudeHarness session metadata', () => {
   it('grants read access to each skill folder only, loads the skill plugins, and keeps both out of the system prompt', () => {
     const sent = meta('interactive', { standingContext: 'Stored memory.' }, ['/data/agent-skills/s1/1/acme/skills/review'], ['/data/agent-skills/s1/1/acme'])
     expect(sent.systemPrompt).toEqual({ append: 'Stored memory.' })
-    expect(sent.claudeCode).toEqual({ options: {
+    expect(sent.claudeCode).toEqual({ emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }], options: {
       settings: {
         autoContinueAtUsageLimit: false,
         permissions: { allow: ['Read(//data/agent-skills/s1/1/acme/skills/review/**)'] },

@@ -116,6 +116,10 @@ export async function startCodexSession(
   let managedTurnId: string | null = null
   const managedTurns = new Map<string, string>()
   const commandTurns = new Map<string, string | null>()
+  // Commands Codex has started and not yet completed. One still here when its turn completes keeps
+  // running past the turn, and Codex reports its output and exit later
+  // (docs/managed-agents/background-commands.md).
+  const openCommands = new Map<string, { id: string; providerTurnId: string | null; owner: string | null }>()
   // Codex reports a failed turn twice: an `error` notification it will not retry, then
   // `turn/completed` carrying the same error. The transcript shows it once.
   let shownTurnFailure: string | null = null
@@ -234,6 +238,14 @@ export async function startCodexSession(
           }
         }
       }
+      // Marked before the turn's end is, so the runtime keeps the card running rather than reading the
+      // end of the turn as the end of the command.
+      if (notification.method === 'turn/completed') {
+        for (const command of openCommands.values()) {
+          if (command.providerTurnId !== providerTurnId) continue
+          emit({ type: 'tool', tool: { id: command.id, title: '', kind: 'execute', background: true }, acornTurnId: command.owner })
+        }
+      }
       for (const event of normalizeCodexNotification(notification)) {
         if (event.type === 'session_state') ready = event.state === 'ready'
         if (event.type === 'turn_completed' || event.type === 'error') currentTurnId = null
@@ -248,7 +260,10 @@ export async function startCodexSession(
           if (notification.method === 'item/started') {
             commandTurns.set(commandKey, owner)
             if (commandTurns.size > 512) commandTurns.delete(commandTurns.keys().next().value!)
+            openCommands.set(commandKey, { id: event.tool.id, providerTurnId: providerTurnId ?? null, owner })
+            if (openCommands.size > 512) openCommands.delete(openCommands.keys().next().value!)
           }
+          if (notification.method === 'item/completed') openCommands.delete(commandKey)
           emit({ ...event, acornTurnId: owner })
         } else emit(event)
         if (event.type === 'turn_completed' || event.type === 'error') managedTurnId = null

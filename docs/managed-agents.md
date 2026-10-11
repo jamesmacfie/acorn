@@ -90,6 +90,7 @@ These pages cover harnesses and the work agents do:
 <a id="provider-native-subagents"></a>
 
 - [Subagents](./managed-agents/subagents.md): provider-native subagents.
+- [Background commands](./managed-agents/background-commands.md): shell commands that run past their turn.
 
 <a id="managed-delegation"></a>
 <a id="reports-back-to-the-owner"></a>

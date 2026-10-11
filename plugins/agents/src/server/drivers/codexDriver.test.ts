@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from './types'
@@ -248,10 +249,35 @@ describe('Codex collaboration modes', () => {
     const commands = driverEvents.filter((event) => event.type === 'tool')
     expect(commands).toMatchObject([
       { acornTurnId: 'managed-first', tool: { status: 'running' } },
+      { acornTurnId: 'managed-first', tool: { background: true } },
       { acornTurnId: 'managed-first', tool: { status: 'completed' } },
       { acornTurnId: 'managed-first', tool: { output: 'late' } },
     ])
-    expect(commands[2]?.type === 'tool' && commands[2].tool.status).toBeUndefined()
+    expect(commands[3]?.type === 'tool' && commands[3].tool.status).toBeUndefined()
+    await handle.stop()
+  })
+
+  it('marks a command still running at the end of its turn as a background command, from a live capture', async () => {
+    const capture = JSON.parse(readFileSync(new URL('./__fixtures__/codexBackgroundCommandWire.json', import.meta.url), 'utf8')
+      .replaceAll('01a12d00-50e3-7e20-90b4-9240399277ff', 'thread-1')
+      .replaceAll('01a12d00-52a2-76a0-8ec9-2e23bdb54886', 'turn-provider-1')) as {
+      notifications: Array<{ method: string; params: Record<string, unknown> }>
+    }
+    const { handle, driverEvents } = await start()
+    const sent = { ...turn('default'), id: 'managed-turn' }
+    await handle.sendTurn({ turn: sent, input: sent.input, attachments: {} })
+    for (const notification of capture.notifications) wire.onNotification?.(notification)
+    const seen = driverEvents.flatMap((event): unknown[] => event.type === 'tool' ? [{ turn: event.acornTurnId, ...event.tool }]
+      : event.type === 'turn_completed' ? ['turn_completed'] : [])
+    // The mark lands before the turn's end, so the runtime never reads the end of the turn as the end
+    // of the command. Output after the turn and the exit stay on the card the turn opened.
+    expect(seen).toMatchObject([
+      { turn: 'managed-turn', status: 'running' },
+      { turn: 'managed-turn', background: true },
+      'turn_completed',
+      { turn: 'managed-turn', output: 'done\n', outputAppend: true },
+      { turn: 'managed-turn', status: 'completed', exitCode: 0 },
+    ])
     await handle.stop()
   })
 

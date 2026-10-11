@@ -208,6 +208,22 @@ const agentWebActivity = () => (process.env.ACORN_FIXTURE_WEB_ACTIVITY
   })]
   : [])
 
+// A command still running after its turn (docs/managed-agents/background-commands.md), with more output
+// than the card shows folded. Behind a flag for the same reason as the web call above.
+const agentBackgroundCommand = () => (process.env.ACORN_FIXTURE_BACKGROUND_COMMAND
+  ? [event(3, {
+    type: 'tool' as const,
+    tool: {
+      id: 'tool-3',
+      title: 'pnpm test',
+      kind: 'execute',
+      status: 'running' as const,
+      background: true,
+      output: Array.from({ length: 20 }, (_, index) => `test ${index + 1} passed`).join('\n'),
+    },
+  })]
+  : [])
+
 const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
   session: agentSessions()[0],
   turns: [{ ...AGENT_TURN, source: 'interactive', status: 'completed',
@@ -238,6 +254,7 @@ const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
     event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
     event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Read src/login.ts', status: 'completed', output: 'export async function signIn(' } }),
     ...agentWebActivity(),
+    ...agentBackgroundCommand(),
     event(4, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
     event(5, { type: 'request', requestId: 'request-1', kind: 'permission', title: 'Write src/login.ts', detail: 'Replace the password check', options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] }),
   ],

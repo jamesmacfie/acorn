@@ -14,6 +14,10 @@ export function commandStatus(
 ): AgentToolCall['status'] {
   if (tool.status && !['pending', 'running'].includes(tool.status)) return tool.status
   const stopped = ['stopped', 'failed', 'archived'].includes(session.runtimeState)
+  // A background command outlives its turn on purpose, and the harness reports its exit later. It
+  // runs while the harness that owns it does. Once that process is gone, reconnecting included, no
+  // exit can arrive, and whether the command finished is unknown.
+  if (tool.background) return stopped || session.runtimeState === 'reconnecting' ? 'unknown' : tool.status ?? 'running'
   if (tool.subagentId) {
     const child = session.subagents.find((entry) => entry.id === tool.subagentId)
     if (!stopped && child && isActiveSubagent(child)) return tool.status ?? 'running'

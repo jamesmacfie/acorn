@@ -23,6 +23,7 @@ import type { AgentPermissionSubject } from '../../contract/permissionHook.ts'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 import { webToolTitle } from './webActivity'
 import { diffHunks, hunksText } from './patchText'
+import { claudeBackgroundLaunch } from './claudeBackgroundCommands'
 
 const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
   kind === 'allow_once' || kind === 'allow_always' || kind === 'reject_once' || kind === 'reject_always'
@@ -338,6 +339,21 @@ function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | 
   return update.sessionUpdate === 'tool_call' ? 'Load tools' : ''
 }
 
+/**
+ * The launch receipt of Claude Code's background Bash call, from the update that completes the call.
+ *
+ * The call returns as soon as the command starts, with `Command running in background with ID: <id>.
+ * Output is being written to: <path>.` as its result, so its `completed` means launched. The driver
+ * reads the path from here to follow the output (./claudeBackgroundCommands.ts).
+ */
+export function claudeBashLaunch(update: SessionUpdate): { taskId: string; outputPath: string } | undefined {
+  if (update.sessionUpdate !== 'tool_call_update' || claudeToolMeta(update._meta).toolName !== 'Bash') return undefined
+  const text = typeof update.rawOutput === 'string'
+    ? update.rawOutput
+    : (update.content ?? []).flatMap((block) => block.type === 'content' && block.content.type === 'text' ? [unfenced(block.content.text)] : []).join('\n')
+  return claudeBackgroundLaunch(text)
+}
+
 // The CLI's two names for delegating to a subagent. `Agent` is what Claude Code 2.1.241 sends, `Task`
 // is the older name the adapter still maps, and both land on the same tool.
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
@@ -512,8 +528,14 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           ? [unfenced(content.content.text)]
           : [])
         .join('\n')
-      const status = toolStatus(update.status)
+      // A background command's launch receipt is not its end. It stays running until the harness
+      // reports the exit, and the receipt's own text gives way to the command's output.
+      const launch = claudeBashLaunch(update)
+      const backgroundCommand = meta.toolName === 'Bash'
+        && (asRecord(update.rawInput)?.run_in_background === true || meta.response?.backgroundTaskId != null || launch != null)
+      const reported = toolStatus(update.status)
         ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
+      const status = launch && reported === 'completed' ? 'running' : reported
       // A spawning call belongs to the subagent it starts, not to the parent. That is what makes the
       // transcript nest it inside the subagent's card, so the prompt and the final report read as the
       // subagent's own rather than as one more tool the parent ran.
@@ -552,8 +574,9 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           status,
           input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
           // A failed load keeps its output, because that is where the error is.
-          output: toolSearch != null && status !== 'failed' ? undefined : text || undefined,
+          output: launch ? '' : toolSearch != null && status !== 'failed' ? undefined : text || undefined,
           subagentId,
+          ...(backgroundCommand ? { background: true } : {}),
           ...(web ? { web } : {}),
         },
       }, ...diffs]

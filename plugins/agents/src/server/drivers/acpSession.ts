@@ -9,7 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { brokerEnv, AGENT_TOOL_PASSTHROUGH, createLogger } from '@acorn/plugin-api/node'
 import { spawnOwnedProcess } from '../processes/ownedProcess'
 import type { AgentInputPart } from '../../contract/wire.ts'
-import { acpPermissionSubject, type AcpToolCallFacts, normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
+import { acpPermissionSubject, type AcpToolCallFacts, claudeBashLaunch, normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
+import { ClaudeBackgroundCommands, claudeTaskRoots } from './claudeBackgroundCommands'
 import { providerStderrNotice } from './diagnostics'
 import { measureAgentStartup } from './startupTelemetry'
 import { contextBlock } from './contextBlock'
@@ -114,6 +115,7 @@ export function clientFor(
   label: string,
   pending: Map<string, PendingRequest>,
   replaying: () => boolean,
+  background?: ClaudeBackgroundCommands,
 ): Client {
   // What each tool call announced before it asked. DeepSeek's permission request carries only the call's
   // id and leaves the command on the earlier `tool_call` update, so the subject is read from both. Capped
@@ -179,6 +181,13 @@ export function clientFor(
       const update = params.update
       if (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') remember(update)
       for (const event of normalizeAcpUpdate(params.update, label)) await options.onEvent(event)
+      const launch = claudeBashLaunch(update)
+      if (launch && update.sessionUpdate === 'tool_call_update') background?.launched(update.toolCallId, launch)
+    },
+    // Claude Code's raw SDK messages, which the session asked for by type (claudeHarness.ts). A
+    // background command's exit is the only one read.
+    async extNotification(method, params) {
+      if (method === '_claude/sdkMessage') await background?.notified(params)
     },
   }
 }
@@ -248,6 +257,8 @@ export async function startAcpSession(
     if (chunk.byteLength) log.warn(providerStderrNotice(label, chunk.byteLength))
   })
   const pending = new Map<string, PendingRequest>()
+  // Only Claude Code launches these, and another harness never sends what starts one.
+  const background = new ClaudeBackgroundCommands(async (event) => { await options.onEvent(event) }, claudeTaskRoots(options.env))
   let replaying = options.session.providerSessionRef != null
   let agent!: Agent
   let stopped = false
@@ -255,6 +266,7 @@ export async function startAcpSession(
   const stop = (): Promise<void> => {
     stopped = true
     drain(pending)
+    background.stop()
     return owner.stop(async () => {
       if (providerSessionRef && agent?.closeSession) await agent.closeSession({ sessionId: providerSessionRef })
       child.stdin.end()
@@ -271,7 +283,7 @@ export async function startAcpSession(
   )
   const connection = new ClientSideConnection((remote) => {
     agent = remote
-    return clientFor(options, label, pending, () => replaying)
+    return clientFor(options, label, pending, () => replaying, background)
   }, stream)
 
   let notified = false
@@ -436,7 +448,8 @@ export async function startAcpSession(
           blocks.unshift({ type: 'text', text: fallbackInstructions })
           instructionsOwed = false
         }
-        const stopReason = await prompt(blocks)
+        background.turnId = turnOptions.turn.id
+        const stopReason = await prompt(blocks).finally(() => { background.turnId = null })
         await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
         return {}
       } catch (error) {

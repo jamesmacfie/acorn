@@ -123,7 +123,9 @@ export const claudeHarness: HarnessLaunchSpec = {
     const hookSettings = { ...bridged, ...(preToolUse.length ? { PreToolUse: preToolUse } : {}) }
     const hooks = Object.keys(hookSettings).length ? { hooks: hookSettings } : {}
     return {
-      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
+      // The adapter drops the SDK's task messages unless a session asks for them. A background
+      // command's exit arrives only as `task_notification` (./claudeBackgroundCommands.ts).
+      claudeCode: { emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }], options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },

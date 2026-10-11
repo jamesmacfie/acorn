@@ -7,6 +7,7 @@ import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
 import { WebStatusText, WebToolBody, webStatusIsNews, webSummary } from './webToolCard'
 import { eventTime } from './eventTime'
+import { lastLines } from './backgroundCommands'
 import type { AgentToolCall } from '../../contract/wire.ts'
 
 /** What the built-in card draws with: the point's props plus host-only metadata and a callback.
@@ -39,6 +40,20 @@ function useOpenToolClock(open: () => boolean): () => number {
 }
 
 const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 'unknown'
+
+/** The words beside the dot. A background command says it is one while it runs, and `lost` when the
+ *  harness that would report its exit went away (docs/managed-agents/background-commands.md). */
+const toolStateWords = (tool: AgentToolCall): string => {
+  const status = tool.status ?? 'unknown'
+  if (tool.background && status === 'running') return 'running in background'
+  if (tool.background && status === 'unknown') return 'lost'
+  return status
+}
+
+/** A command's exit code, when it says something: always for a background command, whose card is
+ *  read for its result, and otherwise only when the command failed. */
+const exitCodeText = (tool: AgentToolCall): string | undefined =>
+  tool.exitCode != null && (tool.background || tool.exitCode !== 0) ? `exit code ${tool.exitCode}` : undefined
 
 // Claude's Skill call has a generic provider title, while its useful name is in the recorded input.
 // Read it at presentation time so older transcript rows get the same label without rewriting events.
@@ -74,8 +89,9 @@ const AgentToolState: Component<AgentToolRendererProps> = (props) => {
         label={toolStatusLabel(props)}
       />
       <Show when={toolStatusLabel(props) !== 'completed'}>
-        <Text emphasis="muted">{toolStatusLabel(props)}</Text>
+        <Text emphasis="muted">{toolStateWords(props.tool)}</Text>
       </Show>
+      <Show when={exitCodeText(props.tool)}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
       <Show when={summary()}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
       <Show when={webStatusIsNews(props.tool.web?.status) && props.tool.web?.status}>
         {(status) => <WebStatusText status={status()} />}
@@ -137,7 +153,11 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
             <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
             <Text emphasis="muted">Started {started()}</Text>
             <Show when={output()}>
-              {(output) => <CodeBlock wrap maxHeight="block" ansi>{output()}</CodeBlock>}
+              {(output) => (
+                <Show when={props.tool.background} fallback={<CodeBlock wrap maxHeight="block" ansi>{output()}</CodeBlock>}>
+                  <BackgroundOutput text={output()} />
+                </Show>
+              )}
             </Show>
             <Index each={props.fileChanges ?? []}>
               {(change) => <Show when={change().patch} fallback={
@@ -166,6 +186,27 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
         )}
       </Show>
     </Fold>
+  )
+}
+
+const BACKGROUND_TAIL_LINES = 12
+
+/** A background command's output: its newest lines, because that is where a build or a test run says
+ *  how it went, with a control to show everything the card holds. */
+const BackgroundOutput: Component<{ text: string }> = (props) => {
+  const [all, setAll] = createSignal(false)
+  const tail = () => lastLines(props.text, BACKGROUND_TAIL_LINES)
+  return (
+    <Stack gap="inline">
+      <CodeBlock wrap maxHeight={all() ? 'block' : 'none'} ansi>{all() ? props.text : tail().text}</CodeBlock>
+      <Show when={tail().hidden > 0}>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={() => setAll(!all())}>
+            {all() ? 'Show the last lines' : `Show all output (${tail().hidden} more lines)`}
+          </Button>
+        </Inline>
+      </Show>
+    </Stack>
   )
 }
 

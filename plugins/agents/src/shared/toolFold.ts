@@ -28,6 +28,8 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
     : next.output ?? previous.output,
   paths: next.paths ?? previous.paths,
   subagentId: next.subagentId ?? previous.subagentId,
+  ...(next.background || previous.background ? { background: true } : {}),
+  ...((next.exitCode ?? previous.exitCode) != null ? { exitCode: next.exitCode ?? previous.exitCode } : {}),
   web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
 })
 

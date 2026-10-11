@@ -167,6 +167,7 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
         status,
         input: stringValue(item.command) ?? undefined,
         output: completed ? stringValue(item.aggregatedOutput) ?? undefined : undefined,
+        ...(completed && numberValue(item.exitCode) != null ? { exitCode: numberValue(item.exitCode)! } : {}),
       }
     case 'fileChange': {
       const paths = Array.isArray(item.changes)

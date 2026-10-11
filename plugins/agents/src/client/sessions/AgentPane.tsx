@@ -26,6 +26,7 @@ import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
+import { runningBackgroundCommands } from './backgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../paneIdentity'
 
@@ -53,6 +54,9 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
     () => (model.selected()?.kind === 'workflow' ? model.selected()?.id : undefined),
     async (sessionId) => (await clientCapability(WORKFLOW_CONTROL)?.runForSession(sessionId)) ?? null,
   )
+  const runningBackground = createMemo(() => runningBackgroundCommands(model.snapshot()?.events ?? []), [], {
+    equals: (left, right) => left.length === right.length && left.every((title, at) => title === right[at]),
+  })
   return (
     <Toolbar ariaLabel="Agent session">
       {/* The provider's mark, then the title, on one line. It used to be a "CLAUDE" eyebrow stacked
@@ -88,6 +92,15 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
             })}
           >
             {`Workflow: ${found().run.name} · ${found().step.name}`}
+          </Chip>
+        )}
+      </Show>
+      {/* Background commands outlive their turn and their card's place on screen, so the ones still
+          running stay named here (docs/managed-agents/background-commands.md). */}
+      <Show when={runningBackground().length}>
+        {(count) => (
+          <Chip leading={<Icon name="terminal" />} title={runningBackground().join('\n')}>
+            {count() === 1 ? '1 command running in background' : `${count()} commands running in background`}
           </Chip>
         )}
       </Show>

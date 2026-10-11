@@ -1,0 +1,126 @@
+{
+ "capturedWith": {
+  "cli": "codex-cli 0.159.2",
+  "protocol": "app-server v2 over stdio"
+ },
+ "prompt": "Start `sleep 12; echo done` in the background with a short yield time, then end the turn without polling.",
+ "notes": [
+  "Kept: turn/started, turn/completed, and every notification about the command item. `at` is milliseconds",
+  "from the process start. The command item stays inProgress past turn/completed, its output arrives as",
+  "item/commandExecution/outputDelta carrying the original turnId, and item/completed carries the exit code."
+ ],
+ "notifications": [
+  {
+   "at": 1117,
+   "method": "turn/started",
+   "params": {
+    "threadId": "01a12d00-50e3-7e20-90b4-9240399277ff",
+    "turn": {
+     "id": "01a12d00-52a2-76a0-8ec9-2e23bdb54886",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "inProgress",
+     "error": null,
+     "startedAt": 1791756358,
+     "completedAt": null,
+     "durationMs": null
+    }
+   }
+  },
+  {
+   "at": 6372,
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "commandExecution",
+     "id": "exec-26ed86da-00ef-460b-9f42-a91b33bad24f",
+     "pluginId": null,
+     "scriptPath": null,
+     "command": "/bin/bash -lc 'sleep 12; echo done'",
+     "cwd": "/tmp/acorn-bg-capture/work",
+     "processId": "54502",
+     "source": "unifiedExecStartup",
+     "status": "inProgress",
+     "commandActions": [
+      {
+       "type": "unknown",
+       "command": "sleep 12; echo done"
+      }
+     ],
+     "aggregatedOutput": null,
+     "exitCode": null,
+     "durationMs": null
+    },
+    "threadId": "01a12d00-50e3-7e20-90b4-9240399277ff",
+    "turnId": "01a12d00-52a2-76a0-8ec9-2e23bdb54886",
+    "startedAtMs": 1791756363658
+   }
+  },
+  {
+   "at": 8617,
+   "method": "turn/completed",
+   "params": {
+    "threadId": "01a12d00-50e3-7e20-90b4-9240399277ff",
+    "turn": {
+     "id": "01a12d00-52a2-76a0-8ec9-2e23bdb54886",
+     "items": [
+      {
+       "type": "agentMessage",
+       "id": "msg_0b163babcab9c289016acc084dc4dc8191a7e087ee877de562",
+       "text": "started",
+       "phase": "final_answer",
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      }
+     ],
+     "itemsView": "summary",
+     "status": "completed",
+     "error": null,
+     "startedAt": 1791756358,
+     "completedAt": 1791756365,
+     "durationMs": 7583
+    }
+   }
+  },
+  {
+   "at": 19436,
+   "method": "item/commandExecution/outputDelta",
+   "params": {
+    "threadId": "01a12d00-50e3-7e20-90b4-9240399277ff",
+    "turnId": "01a12d00-52a2-76a0-8ec9-2e23bdb54886",
+    "itemId": "exec-26ed86da-00ef-460b-9f42-a91b33bad24f",
+    "delta": "done\n"
+   }
+  },
+  {
+   "at": 19443,
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "commandExecution",
+     "id": "exec-26ed86da-00ef-460b-9f42-a91b33bad24f",
+     "pluginId": null,
+     "scriptPath": null,
+     "command": "/bin/bash -lc 'sleep 12; echo done'",
+     "cwd": "/tmp/acorn-bg-capture/work",
+     "processId": "54502",
+     "source": "unifiedExecStartup",
+     "status": "completed",
+     "commandActions": [
+      {
+       "type": "unknown",
+       "command": "sleep 12; echo done"
+      }
+     ],
+     "aggregatedOutput": "\u001b(B\u001b[mdone\n",
+     "exitCode": 0,
+     "durationMs": 13069
+    },
+    "threadId": "01a12d00-50e3-7e20-90b4-9240399277ff",
+    "turnId": "01a12d00-52a2-76a0-8ec9-2e23bdb54886",
+    "completedAtMs": 1791756376728
+   }
+  }
+ ]
+}
