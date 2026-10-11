@@ -24,14 +24,13 @@ export default function StartDialogHost() {
 function StartDialog(props: { request: StartRequest }) {
   const navigate = useNavigate()
   const inputs = () => props.request.inputs ?? []
-  const [values, setValues] = createSignal<Record<string, DataValue>>({
-    ...Object.fromEntries(
+  const [values, setValues] = createSignal<Record<string, DataValue>>(
+    Object.fromEntries(
       inputs()
         .filter((input) => input.default !== undefined)
         .map((input) => [input.name, input.default!]),
     ),
-    ...(props.request.prefill ?? {}),
-  })
+  )
   const [taskId, setTaskId] = createSignal(props.request.taskId ?? activeTaskId() ?? '')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>()

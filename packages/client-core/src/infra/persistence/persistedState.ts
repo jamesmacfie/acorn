@@ -1,10 +1,10 @@
 import { activeNodeId } from '../node/activeNode'
 import { Registry } from '../../kit/lib/state/registry'
 
-export type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
+type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
 export type RestorePhase = 'workspace' | 'view' | 'panes'
 
-export type PersistedStateCodec<T> = {
+type PersistedStateCodec<T> = {
   parse(raw: unknown): T
   serialize(value: T): unknown
 }
@@ -67,23 +67,6 @@ export const storageKeyFor = (
   // Both halves encoded (see the note above). `encodeURIComponent` cannot emit a `/`, so the
   // separator stays the only unescaped slash in the key either way.
   return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
-}
-
-// Which node a storage key is qualified for, without knowing which slice wrote it: `null` for an
-// unqualified key (an `app` slice, or a pre-qualification leftover). The raw `/` is the qualifier's
-// tell, per the note above; slice keys never contain one, so the id is the segment between the
-// last `:` before that slash and the slash itself. Used by the device-storage drain, which has a
-// bag of keys and no slice to match them against, and must not hand one node's layouts to another.
-export const nodeIdFromStorageKey = (key: string): string | null => {
-  const slash = key.indexOf('/')
-  if (slash === -1) return null
-  const colon = key.lastIndexOf(':', slash)
-  if (colon === -1) return null
-  try {
-    return decodeURIComponent(key.slice(colon + 1, slash))
-  } catch {
-    return null
-  }
 }
 
 export const scopeIdFromStorageKey = (

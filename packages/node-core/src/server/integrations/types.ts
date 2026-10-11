@@ -20,14 +20,14 @@ import type { ExternalItemStore } from './itemStore'
 import type { Cached, RefreshResult, RouteResult } from '../sync/engine'
 import type { PluginFetchHandler } from '../pluginHost/types'
 
-export type ProviderCredentials = Record<string, string>
-export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
+type ProviderCredentials = Record<string, string>
+type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
 export type ProviderRequestBudgets = Pick<
   ProviderBudgets,
   'maxConcurrentRequests' | 'maxConcurrentRequestsPerConnection'
 >
 
-export type NormalizedConnection = {
+type NormalizedConnection = {
   secret: string
   label: string
   account: ProviderAccountRef | null
@@ -36,7 +36,7 @@ export type NormalizedConnection = {
   capabilities: Record<string, 'available' | 'missing-scope' | 'degraded'>
 }
 
-export type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorCode }
+type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorCode }
 
 export type TypedConnectionContract<TValidated> = {
   authKind: IntegrationAuthKind
@@ -85,7 +85,7 @@ export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unk
   summary(item: CachedExternalItem<TSummary, TDetail>): TSummary
 }
 
-export type LinkContextFormatter = {
+type LinkContextFormatter = {
   summarize(ref: ExternalRef, item: CachedExternalItem | null, state: CacheState): ContextItem
 }
 
@@ -106,7 +106,7 @@ export type ProviderItemDetail = (context: ProviderDetailContext, identifier: st
 
 // What core lends a provider for a write on one item. The resource method is there so the provider
 // can turn a display id into whatever its API keys a write off, reading its own cache to do it.
-export type ProviderWriteContext = ProviderDetailContext & {
+type ProviderWriteContext = ProviderDetailContext & {
   secret: string
   // A UUID, one per agent tool call. Send it as the write's own id where the tracker accepts one, so
   // a call the agent's side retries after a lost reply cannot write twice.
@@ -129,14 +129,14 @@ export type ProviderItemImage = (
   url: string,
 ) => Promise<{ mimeType: string; data: string } | null>
 
-export type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
-export type ReferenceResolver = {
+type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
+type ReferenceResolver = {
   detectRefs(text: string): ReferenceCandidate[]
   toRef(connectionId: string, candidate: ReferenceCandidate): ExternalRef
   canAutoLink(ref: ExternalRef): 'attach' | 'suggest' | 'linkify-only'
 }
 
-export type ExternalIdContract = {
+type ExternalIdContract = {
   fromDisplay(connectionId: string, displayId: string): ExternalRef
   parse(raw: unknown, fallback: ExternalRef): ExternalRef | null
 }
@@ -167,7 +167,7 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
 // Project sources for how the host bounds and re-checks the list before it is offered for selection.
 export type ProviderProject = { id: string; label: string }
 
-export type ProviderProjectContext = { connection: StoredConnection; secret: string }
+type ProviderProjectContext = { connection: StoredConnection; secret: string }
 
 /**
 /** How the host enumerates a connection's projects for its own workspace-mapping picker; see

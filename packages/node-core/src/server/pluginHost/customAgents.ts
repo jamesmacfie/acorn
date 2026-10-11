@@ -25,7 +25,7 @@ export type CustomAgentRegistry = {
 }
 
 /** What the host hands `ctx.customAgents`: everything but the two fields only the host may set. */
-export type PluginCustomAgentRegistration = Omit<ManifestCustomAgent, 'id' | 'pluginId'> & { id: string }
+type PluginCustomAgentRegistration = Omit<ManifestCustomAgent, 'id' | 'pluginId'> & { id: string }
 
 export type PluginCustomAgentRegistry = {
   register(agent: PluginCustomAgentRegistration): void

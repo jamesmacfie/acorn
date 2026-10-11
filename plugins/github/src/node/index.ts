@@ -4,7 +4,6 @@ import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
-import { pins } from '../server/routes/pulls/pins'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
@@ -89,8 +88,6 @@ export const githubPlugin = (): NodePlugin => {
         { prefix: '/repos', note: 'repository and pull request mirror' },
       )
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
-      // The owner's pinned repositories (`pinned_repos`).
-      ctx.routes.register(pins(store), { prefix: '/pins' })
       // The device-flow connect writes core's own `integrations` row through connectProvider
       // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
       // takes no handle.

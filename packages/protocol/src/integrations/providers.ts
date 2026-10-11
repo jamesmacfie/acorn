@@ -32,7 +32,6 @@ export const PROVIDER_ERROR_CODES = [
 
 export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number]
 
-export type CapabilityState = 'available' | 'missing-scope' | 'degraded'
 export type ProviderCapabilities = Record<string, boolean | string | undefined> & {
   browse?: boolean
   linkExisting?: boolean
@@ -116,11 +115,6 @@ export type PublicIntegrationProvider = {
   models?: ModelCatalogEntry[]
   defaultModelId?: string
 }
-
-export type IntegrationPaneIntent =
-  | { type: 'show-ref'; ref: ExternalRef }
-  | { type: 'show-comment'; ref: ExternalRef; commentId: string }
-  | { type: 'compose-comment'; ref: ExternalRef; quotedText?: string }
 
 export type ProviderBudgets = {
   maxConcurrentRequests: number

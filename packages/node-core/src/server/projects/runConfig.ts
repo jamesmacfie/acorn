@@ -22,7 +22,7 @@ export type LayoutRecipe = {
   browser?: string // 'run:<id>', points the browser at that target's resolved URL
 }
 
-export type ConfigError = { source: string; message: string }
+type ConfigError = { source: string; message: string }
 
 export type RepoConfig = {
   runTargets: RunTarget[]

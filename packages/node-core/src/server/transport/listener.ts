@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { createApp } from '../index'
 import { makeBindings, type RuntimeBindings } from '../bindings'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
-import { openDataRoot, type DataRoot } from '../storage/dataRoot'
+import { type DataRoot } from '../storage/dataRoot'
 import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
@@ -207,7 +207,7 @@ export function closeListener(server: ServerType | null): Promise<void> {
 
 // Shutdown drains in-flight work with a bounded timeout. The process exits even if one plugin's dispose
 // never settles.
-export const DRAIN_TIMEOUT_MS = 30_000
+const DRAIN_TIMEOUT_MS = 30_000
 
 // Run a drain to completion or to the deadline, whichever comes first, reporting which. The steps are
 // awaited in order (each one's teardown assumes the previous one finished: plugins before core's SQLite
@@ -265,12 +265,4 @@ export function makeRuntime(
     serviceInstanceId,
     capabilities,
   })
-}
-
-// Open the data root, build the runtime and start listening in one call. Kept in core (pure engine); the
-// standalone entry lives in apps/node (apps/node/src/entries/standalone.ts) because choosing to
-// auto-start and registering plugin providers is composition, not engine.
-export function startServer(dataDir: string = devDataDir()): Promise<Listener> {
-  const root = openDataRoot(dataDir)
-  return startListener(makeRuntime(root), root)
 }

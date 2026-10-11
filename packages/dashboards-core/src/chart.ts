@@ -19,7 +19,7 @@ import { aggregateRows, boardColumns, groupField } from './shaping'
 // See docs/dashboards/views.md § Views are derived, not chosen from a menu.
 
 /** `1 | 2 | 3` are the identity slots; `other` is the fold. */
-export type ChartSeriesSlot = 1 | 2 | 3 | 'other'
+type ChartSeriesSlot = 1 | 2 | 3 | 'other'
 
 const SERIES_SLOTS = 3
 
@@ -112,9 +112,9 @@ const tickAnchor = (at: number, label: string, tickFont: number): ChartTick['anc
 
 export type ChartShape = 'bar' | 'line'
 
-export type ChartTick = { label: string; at: number; anchor?: 'start' | 'end' }
+type ChartTick = { label: string; at: number; anchor?: 'start' | 'end' }
 
-export type ChartBar = {
+type ChartBar = {
   key: string
   /** The category this bar stands in. The x axis names it, so several bars of one cluster share it. */
   label: string
@@ -132,7 +132,7 @@ export type ChartBar = {
   h: number
 }
 
-export type ChartLine = {
+type ChartLine = {
   id: string
   label: string
   /** Set when the plugin declared what this series means, and for the single unsplit line. One mark
@@ -148,7 +148,7 @@ export type ChartLine = {
 
 /** One key of the legend, carrying the same `tone` or `series` attribute the mark does, so the swatch
  *  and the mark cannot drift apart. */
-export type ChartLegendKey = {
+type ChartLegendKey = {
   id: string
   label: string
   tone?: PanelTone
@@ -193,30 +193,6 @@ export function chartShapesFor(schema: DashboardDisplaySchema): ChartShape[] {
   ]
 }
 
-export const chartSupportedBy = (schema: DashboardDisplaySchema): boolean => chartShapesFor(schema).length > 0
-
-/** The axis fields a shape may be pointed at. */
-export const chartAxisFields = (schema: DashboardDisplaySchema, shape: ChartShape): DashboardDisplayField[] =>
-  shape === 'bar' ? enumFields(schema) : datetimeFields(schema)
-
-/** The enums a shape may be split into series by: one line per value, or one bar per value inside each
- *  category's cluster.
- *
- *  A line's axis is a datetime, so every enum is a candidate. A bar's axis is already an enum, so the
- *  candidates are every other one. Splitting a bar by the field it is keyed by draws one bar per
- *  cluster, which is the ungrouped chart with extra arithmetic. A single-enum schema is therefore
- *  never offered a grouped bar. */
-export const chartSeriesFields = (
-  schema: DashboardDisplaySchema,
-  shape: ChartShape,
-  view: PanelView,
-  shaping: PanelShaping,
-): DashboardDisplayField[] => {
-  if (shape === 'line') return enumFields(schema)
-  const category = barCategoryField(schema, view, shaping)
-  return enumFields(schema).filter((field) => field.id !== category?.id)
-}
-
 /** The axis to pre-pick for a shape: the `updated`-role datetime for a line, the field the panel
  *  already groups by, then the `status`-role enum, for a bar. */
 export function defaultChartAxis(
@@ -229,33 +205,6 @@ export function defaultChartAxis(
   }
   const grouped = enumFields(schema).find((field) => field.id === shaping.groupBy)
   return (grouped ?? enumFields(schema).find((field) => field.role === 'status') ?? enumFields(schema)[0])?.id
-}
-
-/** Type-inferred defaults, so a person gets a sensible chart in two clicks and then adjusts rather
- *  than facing four empty selects.
- *
- *  Nothing here overwrites an answer the person already gave. The editor calls it when the view
- *  becomes a chart, and the selects then show what it decided. */
-export function defaultChartView(schema: DashboardDisplaySchema, shaping: PanelShaping): Partial<PanelView> {
-  // Time first where there is a time axis: a chart of a datetime collection is almost always "over
-  // time", and a bar of categories is the fallback rather than the headline.
-  const shape: ChartShape = chartShapesFor(schema).includes('line') ? 'line' : 'bar'
-  const grouped = enumFields(schema).find((field) => field.id === shaping.groupBy)
-  const x = defaultChartAxis(schema, shape, shaping)
-
-  return {
-    shape,
-    ...(x ? { x } : {}),
-    // Always a count, never the first number field. The field vocabulary can't tell a quantity from an
-    // identifier: `number` covers both a size in MB and github's pull request number, so a sum over the
-    // first number can chart "the sum of PR numbers per day". A count is meaningful over every
-    // collection, and the person is one select away from the sum they wanted. Adding an `id`-ish role to
-    // the field vocabulary to tell the two apart is not worth it for a default.
-    aggregate: 'count' as const,
-    // Only where the grouping is already a decision the person made. A series split nobody asked for
-    // turns one readable line into five.
-    ...(shape === 'line' && grouped ? { series: grouped.id } : {}),
-  }
 }
 
 // ── Scales and ticks ──────────────────────────────────────────────────────────────────────────

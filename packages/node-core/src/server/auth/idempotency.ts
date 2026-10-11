@@ -11,7 +11,7 @@ const TTL_MS = 24 * 60 * 60_000
 export const requestHash = (method: string, path: string, rawBody: string): string =>
   createHash('sha256').update(`${method}\n${path}\n${rawBody}`).digest('hex')
 
-export type StoredResponse = { requestHash: string; responseStatus: number; responseBody: string }
+type StoredResponse = { requestHash: string; responseStatus: number; responseBody: string }
 
 export type IdempotencyStore = {
   lookup(deviceId: string, key: string): Promise<StoredResponse | null>

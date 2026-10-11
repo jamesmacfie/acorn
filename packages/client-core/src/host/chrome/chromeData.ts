@@ -81,7 +81,6 @@ export const ownsRoute = (pluginId: string, path: string): boolean => {
 // it, a plugin sampling every two seconds re-reads every other plugin's badges and rail rows at the
 // same cadence. The split is per plugin rather than per contribution.
 const [chromeRevision, setChromeRevision] = createSignal(0)
-export { chromeRevision }
 
 // Created on demand, because a plugin that never pushes should not cost a signal. Plain signals at
 // module scope need no reactive owner; only computations would.
@@ -98,7 +97,7 @@ const revisionFor = (pluginId: string): { read: () => number; bump: () => void }
 }
 
 /** One plugin's own freshness. */
-export const pluginRevision = (pluginId: string): number => revisionFor(pluginId).read()
+const pluginRevision = (pluginId: string): number => revisionFor(pluginId).read()
 
 /** The freshness dependency a descriptor read watches: the shared revision plus this plugin's own, so
  *  a status ping invalidates everyone's and a push invalidates only its sender's. Both counters only
@@ -107,7 +106,7 @@ export const chromeDeps = (pluginId: string): number => chromeRevision() + plugi
 
 /** Nudge chrome. With no argument every descriptor refetches, which is what a content-free status ping
  *  means. With a plugin id, only that plugin's. */
-export const bumpChrome = (pluginId?: string): void => {
+const bumpChrome = (pluginId?: string): void => {
   // Same rule the poller registry applies: a hidden window is not worth a fan-out.
   if (typeof document !== 'undefined' && document.hidden) return
   if (pluginId === undefined) return void setChromeRevision((revision) => revision + 1)
@@ -488,7 +487,7 @@ export async function readAttention(
 // One row a cooperative extension point delivers. Display strings only. There is no `action` on the
 // wire, because the verb was declared on the contribution and checked when the node parsed the
 // manifest.
-export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null => {
+const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null => {
   const item = row as PluginExtensionItem
   if (
     !item ||

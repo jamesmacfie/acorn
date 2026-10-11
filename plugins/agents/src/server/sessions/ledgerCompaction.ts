@@ -77,7 +77,7 @@ function compactCard(tx: Transaction, sessionId: string, seqs: number[]): { dele
 }
 
 /** Compact one session's cards. Returns `null` when the signal stopped it part-way. */
-export async function compactSessionLedger(
+async function compactSessionLedger(
   db: PluginDatabase,
   sessionId: string,
   signal?: AbortSignal,

@@ -18,7 +18,6 @@ import {
   PRECISION_LABELS,
   PRESENTATION_LABELS,
   PREVIOUS_CHANGE_LABELS,
-  RELATIVE_OFFSET_LABELS,
   REQUIREMENT_STATUS_LABELS,
   OPERATION_HELP,
   SORT_DIRECTION_LABELS,
@@ -112,7 +111,6 @@ describe('panel labels', () => {
     expect(offsetLabel('+P1W')).toBe('1 week from now')
     expect(calendarLabel('startOfMonth')).toBe('the start of this month')
     expect(calendarLabel('startOfWeek', '-P2W')).toBe('the start of the week 2 weeks ago')
-    for (const [offset, label] of Object.entries(RELATIVE_OFFSET_LABELS)) expect(offsetLabel(offset)).toBe(label)
   })
 
   it('names the part a problem path points at', () => {

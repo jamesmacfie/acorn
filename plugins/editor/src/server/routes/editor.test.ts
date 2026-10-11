@@ -21,12 +21,14 @@ import { claimEditorPty } from '../editorPtyOwners'
 import { makeTestCoreServices, makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
-import * as coreFs from '@acorn/plugin-api/testkit'
+import { confineExistingFile, isContainedPath, isValidRepoIdent, resolveInRoot } from '@acorn/plugin-api/testkit'
 import { createTaskService } from '@acorn/plugin-api/testkit'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/plugin-api/testkit'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../../contract/imagePreview'
 import { MAX_EDITOR_FILE_READ_BYTES } from '../../contract/files'
+
+const coreFs = { confineExistingFile, isContainedPath, isValidRepoIdent, resolveInRoot }
 
 // Editor reads and writes inside the worktree, so this runs against a real one and exercises the
 // filesystem-containment contract end to end: path traversal, symlink escape, missing worktree.

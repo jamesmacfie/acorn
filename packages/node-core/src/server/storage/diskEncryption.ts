@@ -50,6 +50,6 @@ export function diskEncryption(): Promise<DiskEncryption> {
 
 // Test seam. The probe is a real subprocess, so a case that wants a known answer sets one here, and
 // a case that wants the real answer clears it.
-export function _setDiskEncryption(value: Promise<DiskEncryption> | null): void {
+function _setDiskEncryption(value: Promise<DiskEncryption> | null): void {
   cached = value
 }

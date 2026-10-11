@@ -64,7 +64,6 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   'GET /v1/p/agents/concurrency': 'owner settings, read only; the write is device-only',
   'GET /v1/p/agents/session-defaults': 'owner settings, read only; the write is device-only',
   'GET /v1/p/agents/custom-agents': 'owner settings, read only; the writes are device-only',
-  'GET /v1/p/github/pins': "the owner's pinned repository ids; the write is device-only",
   'GET /v1/p/agents/usage': "the owner's plan usage, read only",
   'POST /v1/p/agents/usage/refresh': "re-reads the owner's plan usage and changes nothing",
   'POST /v1/p/agents/usage/refresh/:providerId': "re-reads one provider's plan usage and changes nothing",

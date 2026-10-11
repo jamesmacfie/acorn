@@ -177,11 +177,11 @@ const sourceDescriptions = (tracking: SourceTracking): Record<string, DataSource
   Object.fromEntries(Object.entries(tracking.states()).map(([id, state]) => [id, state?.description]))
 // ── Sources ────────────────────────────────────────────────────────────────────────────────────
 
-export type SourceTracking = ReturnType<typeof createSourceTracking>
+type SourceTracking = ReturnType<typeof createSourceTracking>
 
 /** The starter with every source that reads the same source as `picked` moved onto its scope: the
  *  workspace, account, and reach the person chose. A starter carries no account of its own. */
-export function starterForPick(starter: PanelPlan, picked: Pick<DataSourceQuery, 'source' | 'scope'>): PanelPlan {
+function starterForPick(starter: PanelPlan, picked: Pick<DataSourceQuery, 'source' | 'scope'>): PanelPlan {
   const same = (query: DataSourceQuery) =>
     query.source.pluginId === picked.source.pluginId && query.source.sourceId === picked.source.sourceId
   return {

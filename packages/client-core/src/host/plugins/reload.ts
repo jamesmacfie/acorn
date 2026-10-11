@@ -19,7 +19,7 @@ import { invalidatePublishedPanels } from '../../features/dashboards/dashboardCl
 const log = createLogger('plugins')
 
 /** Reconcile only the node whose plugin state changed. */
-export async function reconcilePluginChange(nodeId: string = activeNodeId() ?? ''): Promise<void> {
+async function reconcilePluginChange(nodeId: string = activeNodeId() ?? ''): Promise<void> {
   if (!nodeId) return
   if (nodeId === activeNodeId()) {
     await refreshNodePlugins(nodeId)

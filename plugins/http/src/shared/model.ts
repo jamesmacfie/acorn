@@ -13,7 +13,6 @@ export type AuthConfig =
   | { mode: 'apikey'; key: string; value: string; placement: 'header' | 'query' }
 
 export const authModes = ['none', 'basic', 'bearer', 'apikey'] as const
-export type AuthMode = AuthConfig['mode']
 
 export type HttpRequest = {
   id: string

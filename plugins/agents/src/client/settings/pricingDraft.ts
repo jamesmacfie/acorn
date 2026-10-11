@@ -9,13 +9,13 @@ import {
 export type AgentPriceField = keyof AgentModelPrice
 export type AgentPriceDraft = Record<AgentPriceField, string>
 
-export type AgentPricingCatalogDraft = {
+type AgentPricingCatalogDraft = {
   catalogId: string
   overridden: boolean
   price: AgentPriceDraft
 }
 
-export type AgentPricingCustomDraft = {
+type AgentPricingCustomDraft = {
   id: string
   model: string
   price: AgentPriceDraft
@@ -23,7 +23,7 @@ export type AgentPricingCustomDraft = {
 
 export type AgentPricingProvider = 'claude' | 'codex'
 
-export type AgentPricingProviderDraft = {
+type AgentPricingProviderDraft = {
   catalog: AgentPricingCatalogDraft[]
   customModels: AgentPricingCustomDraft[]
 }

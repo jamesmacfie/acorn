@@ -16,7 +16,7 @@ import { z } from 'zod'
 /** Five states, which is as many as a merged list can mean across owners. An owner with a richer
  *  vocabulary, such as an agent session, maps into this and keeps its own for its own surfaces.
  *  `waiting` is blocked on a person or a gate; `running` is spending. */
-export const RUN_STATUSES = ['running', 'waiting', 'done', 'failed', 'cancelled'] as const
+const RUN_STATUSES = ['running', 'waiting', 'done', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
 export const isTerminalRunStatus = (status: RunStatus): boolean =>
@@ -55,7 +55,4 @@ export type RunRow = RunRowInput & {
   pluginId: string
 }
 
-export type RunsResponse = { runs: RunRow[] }
-
 export const coreRunsRoute = '/v1/core/runs'
-export const runsKey = ['runs'] as const

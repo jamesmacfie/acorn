@@ -11,8 +11,6 @@ import {
 
 export type QueryEditResult = { query: DataSourceQuery; invalidated: string[] }
 
-const encodePointerPart = (value: string) => value.replace(/~/g, '~0').replace(/\//g, '~1')
-
 export function schemaAtPointer(schema: DataSchema, pointer: string): DataSchema | undefined {
   const parts = parseDataPointer(pointer)
   if (!parts) return undefined
@@ -102,7 +100,7 @@ export function setScopeParameter(
 }
 
 export const literalBinding = (value: DataValue) => ({ address: { from: 'literal' as const, value } })
-export const itemBinding = (pointer: string) => ({ address: { from: 'item' as const, pointer } })
+const itemBinding = (pointer: string) => ({ address: { from: 'item' as const, pointer } })
 
 export function initialComparison(field: DataField, schema: DataSchema): DataPredicate {
   const operator = field.query?.operators[0] ?? 'eq'
@@ -183,23 +181,6 @@ export function failPreview(state: PreviewState, token: PreviewToken, error: str
 }
 export const previewIsStale = (state: PreviewState): boolean =>
   !!state.result && state.requestedDigest !== state.currentDigest
-
-export function observedFields(records: readonly { data: DataValue }[], described: readonly DataField[]): DataField[] {
-  const known = new Set(described.map((field) => field.pointer))
-  const observed = new Map<string, DataField>()
-  const visit = (value: DataValue, pointer: string): void => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return
-    for (const [key, child] of Object.entries(value)) {
-      const childPointer = `${pointer}/${encodePointerPart(key)}`
-      if (!known.has(childPointer) && !observed.has(childPointer)) {
-        observed.set(childPointer, { pointer: childPointer, label: key, origin: 'observed' })
-      }
-      visit(child, childPointer)
-    }
-  }
-  records.forEach((record) => visit(record.data, ''))
-  return [...observed.values()]
-}
 
 export function valueAt(value: DataValue, pointer: string): DataValue | undefined {
   const selected = readDataPointer(value, pointer)

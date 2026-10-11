@@ -78,12 +78,6 @@ export function annotationsFor(pointId: string, key: PluginAnnotationKey): Stamp
   return store(pointId).read().get(annotationKeyOf(point.key, key)) ?? []
 }
 
-/** Does anything currently annotate this point? This is a map read, never a fetch. */
-export const hasAnnotations = (pointId: string): boolean => store(pointId).read().size > 0
-
-/** Changes when the number of annotated keys changes, for layout consumers such as the diff. */
-export const annotationSignature = (pointId: string): string => String(store(pointId).read().size)
-
 /**
  * Ask every eligible contributor about one visible key batch.
  *

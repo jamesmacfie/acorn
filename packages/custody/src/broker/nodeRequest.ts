@@ -24,7 +24,7 @@ export type NodeRequestOptions = {
 
 // Normal JSON, document, and diff reads fit below this. The broker currently returns a whole body
 // over its process boundary, so an unbounded response from a paired Node must never reach that path.
-export const MAX_NODE_RESPONSE_BYTES = 64 * 1024 * 1024
+const MAX_NODE_RESPONSE_BYTES = 64 * 1024 * 1024
 
 export class NodeResponseTooLargeError extends Error {
   constructor(readonly maxBytes: number) {

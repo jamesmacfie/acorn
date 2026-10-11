@@ -145,9 +145,7 @@ export function normalizeAcpConfig(options: readonly SessionConfigOption[] | nul
   })
 }
 
-export const normalizeAcpCommands = (
-  commands: readonly AvailableCommand[] | null | undefined,
-): AgentCommandDescriptor[] =>
+const normalizeAcpCommands = (commands: readonly AvailableCommand[] | null | undefined): AgentCommandDescriptor[] =>
   (commands ?? []).map((command) => ({
     name: command.name,
     description: command.description || undefined,

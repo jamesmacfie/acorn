@@ -104,7 +104,7 @@ const REQUIREMENT_ICONS: Record<Requirement['status'], string> = {
 type AiRequest = { instruction?: string; focus?: { paths: string[]; title: string }; send?: boolean }
 
 /** "1 step added, 1 column changed", from a diff against the published plan. Empty when they match. */
-export function diffSummary(diff: OutlineDiff): string[] {
+function diffSummary(diff: OutlineDiff): string[] {
   const steps = Object.entries(diff.parts)
     .filter(([key]) => key.startsWith('stage:'))
     .map(([, change]) => change)

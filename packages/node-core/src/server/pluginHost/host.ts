@@ -98,12 +98,12 @@ export type PluginRosterEntry = {
   stage?: 'load' | 'init' | 'ready'
 }
 
-export type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 'ready' }
+type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 'ready' }
 
 // The new instance, as the caller took it off disk. The host does no filesystem work: the loader owns
 // importing a bundle and confining its migrations chain (server/plugins/reload.ts drives both).
 export type PluginReloadRequest = { plugin: NodePlugin; binding: LoadedPluginBinding }
-export type PluginReloadOutcome = { ok: true } | { ok: false; error: string; retained?: boolean }
+type PluginReloadOutcome = { ok: true } | { ok: false; error: string; retained?: boolean }
 
 export type PluginHostResult = {
   enabled: readonly string[]

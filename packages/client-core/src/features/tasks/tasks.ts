@@ -32,7 +32,6 @@ export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 // accepts an unknown string, so a missing plugin source stays inert and round-trips through
 // persistence until the user picks another one.
 export type SourceId = string
-export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && !!sourceRegistry.get(v)
 
 // The default source is registered after this module is evaluated. Keep the initial state unset so the
 // accessor resolves that contribution lazily, while retaining an explicit null for task views.
@@ -90,7 +89,6 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
 export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]
-export const activeLayout = (): TaskLayout => taskLayouts()[activeTaskId() ?? ''] ?? defaultLayout()
 
 export function dispatchLayout(taskId: string, action: LayoutAction): void {
   // Resizing can fire on every pointer move. The other actions are deliberate transitions and run
@@ -117,25 +115,9 @@ export function dispatchLayout(taskId: string, action: LayoutAction): void {
   if (focused && !nextLayout.panes.includes(focused)) clearFocusedPane(taskId, focused)
   if (action.type === 'show' || (maximized && !nextLayout.panes.includes(maximized))) setMaximizedPane(taskId, null)
 }
-export const dispatchActiveLayout = (action: LayoutAction): void => {
-  const id = activeTaskId()
-  if (id) dispatchLayout(id, action)
-}
 
-// Seed from persisted prefs at startup without clobbering any layout the user changed pre-hydration.
-export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
-  setTaskLayouts((p) => ({ ...map, ...p }))
-}
 export function hydrateTaskLayout(taskId: string, layout: TaskLayout): void {
   setTaskLayouts((current) => (current[taskId] ? current : { ...current, [taskId]: layout }))
-}
-
-// Recipe-resolved browser home URLs (docs/workspaces-and-tasks/project-config.md § Layout recipes): a layout recipe points the browser pane at
-// a run target's resolved URL. Session-only view state, per task.
-const [recipeBrowserUrls, setRecipeBrowserUrls] = createSignal<Record<string, string>>({})
-export const recipeBrowserUrl = (taskId: string): string | undefined => recipeBrowserUrls()[taskId]
-export function setRecipeBrowserUrl(taskId: string, url: string): void {
-  setRecipeBrowserUrls((p) => (p[taskId] === url ? p : { ...p, [taskId]: url }))
 }
 
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
@@ -210,14 +192,8 @@ export function toggleFocusedPaneMax(taskId: string): void {
 
 // Called by the `onScopeEvicted` listener at the foot of this file. Dropping the task's layout also
 // makes the slice persister write a tombstone for that scope.
-export function evictTaskState(taskId: string): void {
+function evictTaskState(taskId: string): void {
   setTaskLayouts((current) => {
-    if (!(taskId in current)) return current
-    const next = { ...current }
-    delete next[taskId]
-    return next
-  })
-  setRecipeBrowserUrls((current) => {
     if (!(taskId in current)) return current
     const next = { ...current }
     delete next[taskId]
@@ -251,10 +227,9 @@ export function evictTaskState(taskId: string): void {
 
 export { activeTaskId, setActiveTaskId, taskLayouts }
 
-export function clearNodeScopedTaskState(): void {
+function clearNodeScopedTaskState(): void {
   setWorkspaceViews({})
   setTaskLayouts({})
-  setRecipeBrowserUrls({})
   setTerminalOpenTasks(new Set<string>())
   setTerminalMaxTasks(new Set<string>())
   setFocusedPanes({})

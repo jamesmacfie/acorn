@@ -63,7 +63,6 @@ describe('workspace mode at Node routes and plugin seam', () => {
   }
 
   it('settles an empty Node to off, creates paired workspaces, and refuses other memberships', async () => {
-    expect(await (await request('/workspaces/bootstrap', 'POST')).json()).toEqual([])
     const first = await add('one')
     expect(first.status).toBe(200)
     const project = ((await first.json()) as { project: { id: string; workspaceId: string } }).project

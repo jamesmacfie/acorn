@@ -94,12 +94,3 @@ export const slotColor = (slot: Slot | undefined): Color => palette[slot ?? 'def
 export const setPalette = (next: Palette): void => {
   palette = next
 }
-
-// Density is the one style axis a terminal keeps (docs/ui-design/appearance.md § Roles, and what each host makes
-// of them). It decides whether a Section or a Card spends a blank line; shape, type and space have no
-// answer here.
-let density: 'compact' | 'default' = 'default'
-export const isCompact = (): boolean => density === 'compact'
-export const setDensity = (next: 'compact' | 'default'): void => {
-  density = next
-}

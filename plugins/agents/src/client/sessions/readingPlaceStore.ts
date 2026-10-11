@@ -40,7 +40,7 @@ export function clearReadingPlaces(sessionId: string): void {
 }
 
 /** All of them. A session id is one node's, so another node's ids may collide with these. */
-export function clearAllReadingPlaces(): void {
+function clearAllReadingPlaces(): void {
   places.clear()
 }
 

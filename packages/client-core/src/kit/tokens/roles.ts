@@ -13,7 +13,7 @@ import type { Border, Radius, RoleName, Size, Space, TextRole, Tone } from './to
 export type Slot = 'default' | 'muted' | 'accent' | 'ok' | 'warn' | 'danger'
 
 /** What a run of cells can be, beyond its colour. */
-export type CellAttribute = 'bold' | 'dim' | 'inverse' | 'underline'
+type CellAttribute = 'bold' | 'dim' | 'inverse' | 'underline'
 
 /** A role as cells: what the host draws for it, and nothing about how. Empty is an answer, and it is
  *  the answer for every role value whose sentence is `ignored`. */

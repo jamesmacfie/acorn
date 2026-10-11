@@ -18,9 +18,9 @@ import { segmentCaches } from './segmentCaches'
 
 /** Rows held across every diff on the node. About six of the largest pull requests anyone reviews;
  *  the segments on screen and near it are a few hundred. */
-export const SEGMENT_CACHE_ROWS = 40_000
+const SEGMENT_CACHE_ROWS = 40_000
 /** Estimated bytes held, plain and coloured together. */
-export const SEGMENT_CACHE_BYTES = 32 * 1024 * 1024
+const SEGMENT_CACHE_BYTES = 32 * 1024 * 1024
 
 // The estimator's allowances. A budget, not the engine's heap: an object's fields, an array's header
 // and a string's two bytes a character, counted the same way every time. Strings rows share, the

@@ -47,8 +47,6 @@ export type Clip = { x0: number; y0: number; x1: number; y1: number }
 /** How a run is drawn. `bg` absent means "keep the background that is already there". */
 export type Style = { fg: Color; bg?: Color; attrs: number }
 
-export const BLANK: Style = { fg: 'default', bg: 'default', attrs: 0 }
-
 const blank = (cell: Cell): void => {
   cell.char = ' '
   cell.fg = 'default'

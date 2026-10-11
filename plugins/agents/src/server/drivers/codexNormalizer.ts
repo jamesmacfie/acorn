@@ -23,7 +23,7 @@ export const asObject = (value: unknown): JsonObject | null =>
   typeof value === 'object' && value != null && !Array.isArray(value) ? (value as JsonObject) : null
 
 export const stringValue = (value: unknown): string | null => (typeof value === 'string' ? value : null)
-export const numberValue = (value: unknown): number | null =>
+const numberValue = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null
 
 // Codex passes a rejected API request through with the provider's raw JSON body as the message, for

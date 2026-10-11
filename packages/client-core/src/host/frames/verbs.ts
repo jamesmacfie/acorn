@@ -33,13 +33,13 @@ type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
         ? K
         : never
 
-export type FrameVerb = VerbName<PluginBridgeRequest>
+type FrameVerb = VerbName<PluginBridgeRequest>
 
 // Sent by the SDK on the author's behalf, never called by them: `cancel` rides an AbortSignal,
 // `keydown` is forwarded from a key handler the SDK installs, and `connected` is the handshake ack the
 // SDK posts the moment `connect()` resolves. They are wire verbs with no author surface, on purpose.
 type SdkInternalVerb = 'cancel' | 'keydown' | 'connected'
-export type AuthoredVerb = Exclude<FrameVerb, SdkInternalVerb>
+type AuthoredVerb = Exclude<FrameVerb, SdkInternalVerb>
 
 // ── The two projections ───────────────────────────────────────────────────────────────────────────
 //

@@ -1,6 +1,5 @@
 import type { PanelPlan, PlanExpression } from '@acorn/protocol/dashboards.ts'
 import type { DataOperator } from '@acorn/protocol/dataBindings.ts'
-import { PANEL_CAPABILITIES } from './capabilities'
 
 /** The one place a panel plan's schema values become words. Stored values never change; only what a
  *  person reads does. Each map is typed against its schema enum, and labels.test.ts reads the zod
@@ -210,17 +209,6 @@ export const UNIT_LABELS: Record<string, string> = {
   bytes: 'Bytes',
 }
 
-/** Relative date offsets a filter offers, as the signed ISO 8601 durations the schema stores. */
-export const RELATIVE_OFFSET_LABELS: Record<string, string> = {
-  '-P1D': '1 day ago',
-  '-P7D': '7 days ago',
-  '-P14D': '14 days ago',
-  '-P30D': '30 days ago',
-  '-P90D': '90 days ago',
-  '+P1D': '1 day from now',
-  '+P7D': '7 days from now',
-}
-
 /** "7 days ago" or "1 week from now" for any offset a filter stores, not only the ones it offers. */
 export function offsetLabel(offset: string): string {
   const match = /^([+-])P(\d+)([DWM])$/.exec(offset)
@@ -283,7 +271,3 @@ export function planPartLabel(plan: PanelPlan, path: string): string {
   if (part === 'title') return 'Title'
   return 'Settings'
 }
-
-/** "Keep matching rows" for a step's operation. */
-export const operationLabel = (op: Stage['op']): string =>
-  PANEL_CAPABILITIES.operations.find((operation) => operation.id === op)?.label ?? op

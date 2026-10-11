@@ -63,8 +63,7 @@ shows route registration and JSON response shape. The loaded fetch carrier can r
 so manifest activation proves the command path is confined but cannot prove the exact handler
 exists. A missing handler fails at invocation. Use `validatePluginConfig` from
 `@acorn/plugin-api/testkit` for a built package's configuration and exercise the handler against a
-real Node route. `testCliCommandDescriptor` from that testkit supplies a fixture descriptor for
-host tests; it does not validate an authored manifest.
+real Node route.
 
 ## Names, schemas, and writes
 

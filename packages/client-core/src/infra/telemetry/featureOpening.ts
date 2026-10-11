@@ -20,7 +20,7 @@ import { startSpan, type SpanHandle } from './emitter'
 export type UsableState = 'content' | 'empty' | 'offline' | 'error'
 
 /** How a record ended. `usable` covers all four `UsableState`s. */
-export type OpeningOutcome = 'usable' | 'timeout' | 'cancelled'
+type OpeningOutcome = 'usable' | 'timeout' | 'cancelled'
 
 export type FeatureKind = 'pane' | 'source' | 'settings'
 

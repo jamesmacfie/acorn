@@ -4,8 +4,8 @@ import { z } from 'zod'
 // node parser and the runtime validator must all describe the same accepted language.
 export const PLUGIN_TOOL_SCHEMA_MAX_BYTES = 64 * 1024
 export const PLUGIN_TOOL_SCHEMA_MAX_DEPTH = 8
-export const PLUGIN_TOOL_SCHEMA_MAX_PROPERTIES = 64
-export const PLUGIN_TOOL_SCHEMA_MAX_ENUM_VALUES = 64
+const PLUGIN_TOOL_SCHEMA_MAX_PROPERTIES = 64
+const PLUGIN_TOOL_SCHEMA_MAX_ENUM_VALUES = 64
 export const PLUGIN_TOOL_TIMEOUT_MAX_MS = 30_000
 export const PLUGIN_TOOL_OUTPUT_MAX_BYTES = 256 * 1024
 export const PLUGIN_CONTEXT_TIMEOUT_MAX_MS = 15_000

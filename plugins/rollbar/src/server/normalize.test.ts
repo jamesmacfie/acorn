@@ -47,13 +47,11 @@ describe('rollbar normalizer', () => {
       lastOccurrenceAt: null,
     })
     expect(s.framework).toBeUndefined()
-    expect(s.lastActivatedAt).toBeUndefined()
     expect(s.uniqueOccurrences).toBeUndefined()
   })
 
-  it('keeps regression and unique-IP fields when the plan supplies them (unix-seconds → ms)', () => {
+  it('keeps the unique-IP count when the plan supplies it', () => {
     const s = normalizeSummary('c', 'L', ITEM)
-    expect(s.lastActivatedAt).toBe(1_700_050_000_000)
     expect(s.uniqueOccurrences).toBe(12)
   })
 

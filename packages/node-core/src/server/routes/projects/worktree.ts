@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
-import { archiveTask, restoreTask, taskArchiveTree, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
+import { archiveTask, restoreTask, taskArchiveTree } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
@@ -244,5 +244,3 @@ export const worktree = new Hono<AppEnv>()
     })
     return 'busy' in result ? respondError(c, 409, 'task-busy', [result.reason]) : c.json(result)
   })
-
-export { TEARDOWN_TIMEOUT_MS }

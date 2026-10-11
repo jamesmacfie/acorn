@@ -1,4 +1,4 @@
-export type CliErrorShape = {
+type CliErrorShape = {
   apiVersion: 'acorn.cli/v1'
   error: { code: string; message: string; requestId?: string; retryable?: boolean }
 }

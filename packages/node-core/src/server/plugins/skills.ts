@@ -120,9 +120,7 @@ export function readPackageSkill(packageDir: string, descriptor: PluginSkillDesc
 }
 
 /** The frontmatter's `name` and `description`, checked, and the body's size. */
-export function parseSkillFile(
-  text: string,
-): { ok: true; name: string; description: string } | { ok: false; reason: string } {
+function parseSkillFile(text: string): { ok: true; name: string; description: string } | { ok: false; reason: string } {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
   if (lines[0]?.trim() !== '---')
     return { ok: false, reason: 'SKILL.md must start with YAML frontmatter between --- lines' }

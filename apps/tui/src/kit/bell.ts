@@ -9,9 +9,9 @@
 // may not import this one: this one reaches client-core, which reaches the node, and the seam is built
 // before the node is reachable (../platform.ts).
 import { registerNoticeSink } from '@acorn/client-core/features/notifications/deliver.ts'
-import { BEL, notifyMode, type NotifyMode } from './notify'
+import { BEL, notifyMode } from './notify'
 
-export { BEL, notifyMode, type NotifyMode }
+export { notifyMode }
 
 /** Ring the terminal for every unseen notice the gate lets through. */
 export function initBellNotices(out: NodeJS.WritableStream = process.stdout): () => void {

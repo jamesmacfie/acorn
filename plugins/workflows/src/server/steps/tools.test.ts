@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  decodeToolCeiling,
-  encodeToolCeiling,
-  intersectToolCeilings,
-  isToolWithinCeiling,
-  narrowsToolCeiling,
-} from './tools'
+import { intersectToolCeilings, isToolWithinCeiling, narrowsToolCeiling } from './tools'
 
 describe('workflow tool ceilings', () => {
   it('intersects allowlists and risk tiers without permitting a child to widen its parent', () => {
@@ -22,11 +16,9 @@ describe('workflow tool ceilings', () => {
     expect(narrowsToolCeiling({ allow: ['read'], maxRisk: 'read' }, { allow: ['write'], maxRisk: 'write' })).toBe(false)
   })
 
-  it('filters by both dimensions and round-trips the transport encoding', () => {
+  it('filters by both dimensions', () => {
     const ceiling = { allow: ['notes_list'], maxRisk: 'read' as const }
-    expect(decodeToolCeiling(encodeToolCeiling(ceiling))).toEqual(ceiling)
     expect(isToolWithinCeiling({ name: 'notes_list', risk: 'read' }, ceiling)).toBe(true)
     expect(isToolWithinCeiling({ name: 'notes_write', risk: 'write' }, ceiling)).toBe(false)
-    expect(decodeToolCeiling('not-base64')).toBeUndefined()
   })
 })

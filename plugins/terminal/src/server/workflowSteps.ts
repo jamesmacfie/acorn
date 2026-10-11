@@ -15,10 +15,10 @@ import type { TerminalRunTargets } from '../contract/runTargets'
 // which says why they are declared here rather than imported from plugins/workflows.
 
 export const COMMAND_TIMEOUT_MS = 120_000
-export const MIN_COMMAND_TIMEOUT_MS = 1_000
+const MIN_COMMAND_TIMEOUT_MS = 1_000
 export const MAX_COMMAND_TIMEOUT_MS = 600_000
 /** How long `waitForUrl` waits for a run target to report one before giving up. */
-export const RUN_TARGET_URL_TIMEOUT_MS = 60_000
+const RUN_TARGET_URL_TIMEOUT_MS = 60_000
 const URL_POLL_MS = 1_000
 /** What a failed command's error says. Enough to read, short enough to sit in a run list. */
 const ERROR_TAIL = 300

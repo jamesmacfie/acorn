@@ -17,7 +17,7 @@ import { edges, effectiveAfter } from './graphOrder'
 
 // The graph reading lives in ./graphOrder.ts, which the run pane's model needs at startup without the
 // rest of the editor. Re-exported so the editor keeps one import.
-export { edges, effectiveAfter, graphOrder, type GraphRow } from './graphOrder'
+export { effectiveAfter, graphOrder } from './graphOrder'
 
 /** What the inspector is showing. "Definition" and "Inputs" are rows in the list too, so the
  *  selection is not always a node. */
@@ -94,7 +94,7 @@ export function addNode(draft: WorkflowDraft, kind: string, base?: string): Work
     step.after ? step : { ...step, after: [...effectiveAfter(draft.def, index)] },
   )
   const step: WorkflowStepDef = {
-    ...(draft.def.formatVersion === 1 ? { id: crypto.randomUUID() } : {}),
+    id: crypto.randomUUID(),
     name,
     ...(kind === 'agent' ? {} : { kind }),
     ...(kind === 'workflow-map' ? { agent: { prompt: '', onFailure: 'continue' as const } } : {}),

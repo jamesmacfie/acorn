@@ -40,7 +40,7 @@ async function fetchManifest(): Promise<ManifestTool[]> {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
-export function buildServer(): Server {
+function buildServer(): Server {
   const server = new Server(
     { name: process.env.ACORN_MCP_NAME ?? 'acorn', version: '1.0.0' },
     { capabilities: { tools: { listChanged: true } } },

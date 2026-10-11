@@ -10,7 +10,7 @@ export type WorkflowRecovery = {
   savedAt: number
 }
 const prefix = 'workflow-recovery:v1:'
-export const workflowRecoveryKey = (copy: Pick<WorkflowRecovery, 'nodeId' | 'entityId' | 'baseRevision'>) =>
+const workflowRecoveryKey = (copy: Pick<WorkflowRecovery, 'nodeId' | 'entityId' | 'baseRevision'>) =>
   `${prefix}${JSON.stringify([copy.nodeId, copy.entityId, copy.baseRevision])}`
 
 export function workflowRecoveryStore(storage?: Storage) {

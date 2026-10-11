@@ -79,13 +79,11 @@ export { chosenWorkspace, setChosenWorkspace }
 const [highlightedTaskId, setHighlightedTaskId] = createSignal<string | null>(null)
 export { highlightedTaskId, setHighlightedTaskId }
 
-/** Release the transient shell state before mounting another Node's query cache. */
+/** Release the transient shell state before mounting another Node's query cache. Tests call it
+ *  between renders too, because module state outlives a render. */
 export function resetChromeForNodeSwitch(): void {
   setStack([])
   setChosenWorkspace(null)
   setHighlightedTaskId(null)
   setPlaceRestored(false)
 }
-
-/** Test seam. Module state outlives a render, so a suite must not inherit the previous one's shell. */
-export const _resetChrome = resetChromeForNodeSwitch

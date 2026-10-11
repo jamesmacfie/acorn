@@ -2,7 +2,7 @@ import type { RailMarkerData } from './surfaces.ts'
 
 // Data and host verbs for the task pane switcher. A sandbox receives the data through its tree
 // mount and invokes the verbs by name; only a compiled provider sees these functions directly.
-export type PaneSwitcherPane = {
+type PaneSwitcherPane = {
   id: string
   label: string
   description?: string

@@ -89,7 +89,7 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
       // wherever it is read, and an offline node would take the whole page down with it.
       try {
         const page = await nodeAuditPage({ nodeId: id, limit: PAGE })
-        setPluginLabels(Object.fromEntries((page.vocabulary ?? []).map((entry) => [entry.action, entry.label])))
+        setPluginLabels(Object.fromEntries(page.vocabulary.map((entry) => [entry.action, entry.label])))
         return page.entries
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : String(failure))

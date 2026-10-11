@@ -52,7 +52,7 @@ const SEG = '[^/]+'
 const shape = (pattern: string) => new RegExp(`^${pattern}$`)
 
 // Ordered: the first rule whose path matches decides. Literal paths come before the `:id` shapes they
-// would otherwise be captured by (`/workspaces/bootstrap` before `/workspaces/:id`).
+// would otherwise be captured by (`/workspaces/icon-images/:imageId` before `/workspaces/:id`).
 const RULES: readonly RouteRule[] = [
   // ── Tasks ───────────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/tasks'), scopes: { GET: 'core.tasks:read', POST: 'core.tasks:write' } },
@@ -65,7 +65,6 @@ const RULES: readonly RouteRule[] = [
   {
     path: shape(`/v1/core/tasks/${SEG}/links`),
     scopes: { GET: 'core.tasks:read', POST: 'core.tasks:write' },
-    note: 'DELETE stays absent: unlinking is a user-visible edit to task history, handled by native task UI.',
   },
   { path: shape(`/v1/core/tasks/${SEG}/context`), scopes: { GET: 'core.tasks:read' } },
   { path: shape(`/v1/core/tasks/${SEG}/archive`), scopes: { POST: 'core.tasks:write' } },
@@ -141,7 +140,6 @@ const RULES: readonly RouteRule[] = [
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
-  { path: shape('/v1/core/workspaces/bootstrap'), scopes: {}, note: 'Creates a project collection; mutation.' },
   {
     path: shape(`/v1/core/workspaces/icon-images/${SEG}`),
     scopes: {},

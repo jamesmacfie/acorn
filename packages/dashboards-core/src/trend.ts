@@ -43,7 +43,7 @@ export function historyPoints(samples: readonly MeasureSample[], now: number): T
 /** The datetime the activity tier buckets by: the declared `updated` role, then whatever datetime
  *  there is. Exported because it is also the editor's gate, so a schema with no datetime is never
  *  offered the activity trend and a trend that cannot draw is unrepresentable rather than validated. */
-export const activityField = (schema: DashboardDisplaySchema): DashboardDisplayField | undefined =>
+const activityField = (schema: DashboardDisplaySchema): DashboardDisplayField | undefined =>
   schema.fields.find((field) => field.role === 'updated' && field.type === 'datetime') ??
   schema.fields.find((field) => field.type === 'datetime')
 
@@ -90,7 +90,7 @@ const INSET = 3
 
 /** One unbroken run of days. A series with holes is several of these, which is what makes a gap read
  *  as a gap rather than as a straight line across the days nobody sampled. */
-export type SparkSegment = { line: string; area: string }
+type SparkSegment = { line: string; area: string }
 
 export type Sparkline = {
   segments: SparkSegment[]

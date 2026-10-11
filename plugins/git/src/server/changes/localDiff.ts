@@ -306,7 +306,7 @@ const run = async (
 
 /** How many paths ride on one git call. A folder checkbox over a large tree can name thousands, and
  *  argv has a length limit; 200 repo-relative paths is a few kilobytes whatever they are called. */
-export const STAGE_CHUNK = 200
+const STAGE_CHUNK = 200
 
 /** Pure: the batches one staging action turns into. Exported for the test that pins the size, since
  *  the count of git calls is the whole behaviour. */
@@ -518,7 +518,7 @@ export async function commitDiffText(worktree: string, staged: boolean, paths: r
 // Recent commits on the branch, for the MCP git_log tool.
 export type GitLogEntry = { sha: string; subject: string; author: string; committedAt: number }
 
-export function parseGitLog(stdout: string): GitLogEntry[] {
+function parseGitLog(stdout: string): GitLogEntry[] {
   return stdout
     .split('\n')
     .filter(Boolean)

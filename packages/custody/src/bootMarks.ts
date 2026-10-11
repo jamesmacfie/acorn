@@ -18,7 +18,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The clock starts when this module is evaluated, which in the helper is the first thing its bundle
 // does, so the offsets are from process start closely enough to subtract from Rust's own spawn time.
 
-export const HELPER_PERF = process.env.ACORN_PERF === '1'
+const HELPER_PERF = process.env.ACORN_PERF === '1'
 
 // The tag is the account's prefix, so `[helper:boot] <label> +<ms>ms (<ms>ms)`
 // is what reaches stderr and what the desktop boot test reads (apps/desktop/test/boot.test.ts).

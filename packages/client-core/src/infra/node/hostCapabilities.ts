@@ -29,7 +29,7 @@ import { nodePlugins } from './nodePlugins'
 // wrong both for anything whose implementation is an HTTP route and for anything a shell can ship
 // without — the desktop's own preview views are optional, so the preview pane asks `{ seam: 'preview' }`
 // rather than "am I the desktop" (docs/frontend/registries.md § Gates).
-export type HostRequirement = 'desktop' | { plugin: string } | { loadedPlugin: string } | { seam: SeamGroup }
+type HostRequirement = 'desktop' | { plugin: string } | { loadedPlugin: string } | { seam: SeamGroup }
 
 // `requires` on a contribution, and the rule for where that field belongs: EVERY contribution the host
 // filters before drawing takes it, because the question is the host's and the answer is the same

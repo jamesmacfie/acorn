@@ -311,9 +311,9 @@ describe('the Tauri shell boots its world', () => {
     })
     const grouped = await request('/v1/core/prefs', 'PUT', jsonBody({ key: 'core.workspaces', value: 'on' }))
     expect(grouped.status).toBe(200)
-    const bootstrap = await request('/v1/core/workspaces/bootstrap', 'POST')
-    expect(bootstrap.status).toBe(200)
-    const [workspace] = JSON.parse(Buffer.from(bootstrap.body, 'base64').toString()) as { id: string }[]
+    const created = await request('/v1/core/workspaces', 'POST', jsonBody({ name: 'Boot' }))
+    expect(created.status).toBe(200)
+    const workspace = JSON.parse(Buffer.from(created.body, 'base64').toString()) as { id: string }
     const path = `/v1/core/workspaces/${workspace.id}`
     const glyph = await request(
       path,

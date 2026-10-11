@@ -9,7 +9,7 @@ import type { RunStatus, RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { ApiError, readJson, writeJson } from '../../infra/node/apiClient'
 import { openRepoConfigTrust } from '../settings/trust/configTrust'
 
-export type RunLayout = { id: string; panes: string[]; terminal?: string; browser?: string }
+type RunLayout = { id: string; panes: string[]; terminal?: string; browser?: string }
 export type RunTargetsResult =
   | { targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: RunLayout[] }
   | { error: string }

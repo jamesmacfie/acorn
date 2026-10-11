@@ -64,7 +64,7 @@ export type { KitSection } from '@acorn/client-core/kit/components/layout'
 export { Composer } from '@acorn/client-core/kit/components/inputs'
 export { DocumentTabs } from '@acorn/client-core/kit/components/layout'
 export { FindBar } from '@acorn/client-core/kit/components/inputs'
-export { KeyValueEditor } from '@acorn/client-core/kit/components/inputs'
+export { KeyValueEditor } from '@acorn/client-core/kit/components/inputs/KeyValueEditor.tsx'
 // Drag-resize as a hook, because the three consumers model size differently: two panes against each
 // other, one absolute height, one fraction. Only a delta suits all three.
 export { createSplitDrag } from '@acorn/client-core/kit/lib'
@@ -73,57 +73,27 @@ export { createSplitDrag } from '@acorn/client-core/kit/lib'
 // read the state from here, because a row is created in the pane's own JSX and handed over as an
 // element, so no provider inside the column could ever own it.
 export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from '@acorn/client-core/kit/lib'
-// The delegated tooltip protocol, as a typed helper. Attributes are the API; a wrapper component
-// would add an element around every trigger, which is exactly what the protocol avoids.
-export { tip } from '@acorn/client-core/kit/components/overlays/tips.tsx'
-// A frame gets tooltips by mounting: `mountFrame` on ./ui/sdk calls the frame-side listener itself.
-//
-// Behavior that isn't a component ships as a hook, following the dismissable.ts precedent.
-// Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false.
-export { createArmedConfirm } from '@acorn/client-core/kit/lib'
-export { modelProviderFailure } from '@acorn/client-core/kit/lib'
 export { default as CopyButton } from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 export { copyText } from '@acorn/client-core/kit/lib'
 // The field that completes what is typed after a sigil and colours what it has completed. `mentions`
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
 // what the agents composer's `@file` / `/command` / `$skill` draft is written against.
 export { default as MentionTextarea } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
-export type {
-  MentionSegment,
-  MentionSource,
-  MentionSuggestion,
-} from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
+export type { MentionSegment, MentionSource } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 export { Modal, ModalActions, ModalBody } from '@acorn/client-core/kit/components/overlays'
 export { Tabs, TabPanel } from '@acorn/client-core/kit/components/layout'
-export type { TabDef } from '@acorn/client-core/kit/components/layout'
 export { UserAvatar } from '@acorn/client-core/kit/components/content'
-// Provider markdown to sanitized HTML. Also on ./client, which the compiled shell reaches it
-// through. It is here too so a sandboxed frame rendering a ticket description does not pull in the
-// router/query/apiClient half of ./client for one pure string function.
-export { renderMarkdown } from '@acorn/client-core/kit/lib'
-export type { MarkdownOptions } from '@acorn/client-core/kit/lib'
-// The component around it: the same sanitizing pass, plus a Shiki grammar per fence and a copy button
-// on each. A call site that already holds HTML, or that needs a `ref` on the element, uses the
-// `.ui-markdown` class and `renderMarkdown` instead.
+// Provider markdown, sanitized, with a Shiki grammar per fence and a copy button on each.
 export { default as Markdown } from '@acorn/client-core/kit/components/content/Markdown.tsx'
-
-// A density token as a number, on this barrel for the same reason as `renderMarkdown`: no imports,
-// no state. A virtualized list cannot read its row height from CSS. @tanstack/solid-virtual needs a
-// number and writes the result back as an inline style that beats any stylesheet rule. A frame gets
-// the same tokens the shell does, pushed onto `:root` by the SDK, so a plugin's grid can honor a
-// style pack's density instead of hardcoding 30.
-export { rowHeightSm } from '@acorn/client-core/kit/lib'
 
 // Controlled connection and model dropdowns over `availableModelConnections`. On this barrel because
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
 export { default as ModelBackendPicker } from '@acorn/client-core/features/settings/models/ModelBackendPicker.tsx'
-export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
 export { DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from '@acorn/client-core/kit/diff/DiffRows.tsx'
-export type { LineComposerController, ThreadCollapseController } from '@acorn/client-core/kit/diff'
 // The whole viewer as one component: virtualized unified and split lists, find, sticky file header,
 // per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
 // A plugin reaching for the row components directly is building a simpler surface than this one.
@@ -146,25 +116,21 @@ export { Section } from '@acorn/client-core/kit/components/layout'
 // Saved signal, the error, Reset and a value set elsewhere drawn the same way on every page. The save
 // helpers that drive them are on ./client (docs/frontend/settings.md § Settings).
 export { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
-export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a
 // rendering, so both hosts share it (docs/managed-agents/transcript.md § The window).
 export { createTimelineWindow } from '@acorn/client-core/kit/lib'
-export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export { Facts } from '@acorn/client-core/kit/components/content'
 export { ChipRow } from '@acorn/client-core/kit/components/layout'
 export { Log } from '@acorn/client-core/kit/components/content'
-export { Grid } from '@acorn/client-core/kit/components/layout'
+export { Grid } from '@acorn/client-core/kit/components/layout/Grid.tsx'
 // The canvas: cards on a grid, edges as curves, one card selected. A picture is exactly what a
 // plugin may not draw for itself — no raw DOM, no SVG — so the kit draws it and the terminal host
 // draws the same cards as an indented list. See docs/ui-design/closed-kit.md § The closed kit.
 export { Graph } from '@acorn/client-core/kit/components/content'
 export { HistoryMark, historyLayout } from '@acorn/client-core/kit/components/content'
-export type { HistoryNode, HistorySlot } from '@acorn/client-core/kit/components/content'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
-export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The container a run of `Row`s or `TreeRow`s lives in. It is what makes a list keyboard-operable:
 // the arrows, Home, End, the page keys, type-ahead, `aria-activedescendant`, and a selection that
 // survives a refetch all come from it, and the pane writes no key handling at all.
@@ -178,9 +144,9 @@ export { Rectangle } from '@acorn/client-core/kit/components/content'
 // bytes out) and the host draws the emulator, so no plugin builds its own xterm on the element
 // (docs/terminal/client.md § Client).
 export { attachPty } from '@acorn/client-core/features/terminal/attachPty.ts'
-export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
+export type { PtyIo } from '@acorn/client-core/kit/lib'
 
 // The two host wrappers: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where
 // the node cannot be drawn".
 export { Only } from '@acorn/client-core/kit/components/layout'
-export { Fallback } from '@acorn/client-core/kit/components/content'
+export { Fallback } from '@acorn/client-core/kit/components/content/Fallback.tsx'

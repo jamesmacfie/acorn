@@ -1,5 +1,5 @@
 export { resolveRailMarkers } from './railMarkers.ts'
-export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from './railMarkers.ts'
+export type { RailMarker, RailMarkerDot } from './railMarkers.ts'
 export { availableSources } from './railSources.ts'
 export type { SourceEntry } from './railSources.ts'
 export { createSourceScope } from './sourceScope.ts'

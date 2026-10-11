@@ -17,7 +17,7 @@ export type { SettingsCategory, SettingsScopeKind }
 /** What a page's body is looking at. `nodeId` is the node the page reads, which is the header's node
  *  switcher on a page that follows it and the active node on every other page. `null` only when the
  *  window is served by the node itself and there is no fleet to name one. */
-export type SettingsPageScope = {
+type SettingsPageScope = {
   nodeId: string | null
   workspace?: Workspace
   project?: Project
@@ -178,7 +178,7 @@ class SettingsRegistry extends Registry<SettingsContribution> {
 }
 
 export const settingsRegistry = new SettingsRegistry('settings')
-export const settingsContributions = (): readonly SettingsContribution[] =>
+const settingsContributions = (): readonly SettingsContribution[] =>
   [...settingsRegistry.entries()]
     .filter((page) => hasHostCapability(page.requires))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))

@@ -2,7 +2,7 @@ import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 import type { DockerClientFrame } from '../shared/wsFrames'
 import { isDockerRef } from '../shared/model'
 
-export const MAX_DOCKER_EXEC_ID_CHARS = 128
+const MAX_DOCKER_EXEC_ID_CHARS = 128
 export const MAX_DOCKER_INPUT_BYTES = 64 * 1024
 
 const execId = (value: unknown): value is string =>

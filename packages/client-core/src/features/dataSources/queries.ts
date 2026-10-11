@@ -2,8 +2,6 @@ import type { QueryClient } from '@tanstack/solid-query'
 import { canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import type {
   DataSourceCatalog,
-  DataSourceDiscoveryPage,
-  DataSourceDiscoveryRequest,
   DataSourceRequest,
   DataSourceResponse,
   DataSourceScope,
@@ -11,8 +9,8 @@ import type {
 } from '@acorn/protocol/dataSources.ts'
 import { writeJson } from '../../infra/node/apiClient'
 
-export const dataSourcesKey = ['data-sources'] as const
-export const dataSourceCatalogKey = (nodeId: string, scope: DataSourceScope) =>
+const dataSourcesKey = ['data-sources'] as const
+const dataSourceCatalogKey = (nodeId: string, scope: DataSourceScope) =>
   [
     ...dataSourcesKey,
     nodeId,
@@ -22,7 +20,7 @@ export const dataSourceCatalogKey = (nodeId: string, scope: DataSourceScope) =>
     scope.connectionId ?? null,
     canonicalDataEncoding(scope.parameters),
   ] as const
-export const dataSourceScopeKey = (nodeId: string, source: DataSourceRef, scope: DataSourceScope) =>
+const dataSourceScopeKey = (nodeId: string, source: DataSourceRef, scope: DataSourceScope) =>
   [
     ...dataSourcesKey,
     nodeId,
@@ -33,7 +31,7 @@ export const dataSourceScopeKey = (nodeId: string, source: DataSourceRef, scope:
     scope.projectId ?? null,
     canonicalDataEncoding(scope.parameters),
   ] as const
-export const dataSourceRequestDigest = (request: DataSourceRequest) => canonicalDataEncoding(parseDataValue(request))
+const dataSourceRequestDigest = (request: DataSourceRequest) => canonicalDataEncoding(parseDataValue(request))
 export function dataSourceQueryKey(nodeId: string, request: DataSourceRequest, revision?: string) {
   const source =
     request.operation === 'query'
@@ -74,26 +72,6 @@ export function dataSourceCatalogOptions(nodeId: string, scope: DataSourceScope)
         signal,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(scope),
-      }),
-    staleTime: 60_000,
-  }
-}
-export function discoverDataSourcesOptions(nodeId: string, request: DataSourceDiscoveryRequest) {
-  return {
-    queryKey: [
-      ...dataSourceCatalogKey(nodeId, request.scope),
-      'discover',
-      request.pluginId,
-      request.discoveryId,
-      request.cursor ?? null,
-    ] as const,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      writeJson<DataSourceDiscoveryPage>('/v1/core/data-sources/discover', {
-        method: 'POST',
-        nodeId,
-        signal,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(request),
       }),
     staleTime: 60_000,
   }

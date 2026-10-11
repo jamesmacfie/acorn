@@ -41,8 +41,6 @@ export type StudioReview = { proposal: Extract<AuthoringTurnResult, { state: 'pr
 
 const pushUndo = (stack: readonly PanelPlan[], plan: PanelPlan): PanelPlan[] => [...stack, plan].slice(-UNDO_DEPTH)
 
-export type StudioStore = ReturnType<typeof createStudioStore>
-
 export function createStudioStore(input: {
   nodeId: string
   client: Pick<ReturnType<typeof dashboardClient>, 'create' | 'save'>

@@ -5,7 +5,7 @@ import { taskArchiveTree } from '../../storage/archive'
 import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { z } from 'zod'
-import { and, desc, eq, inArray, max } from 'drizzle-orm'
+import { desc, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
@@ -423,7 +423,7 @@ export const tasks = new Hono<AppEnv>()
       ...(archiveTree.length ? { archivedTaskIds: archivedTasks.map((task) => task.id) } : {}),
     })
   })
-  // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
+  // Links grow after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
   // create-time insert above, same onConflictDoNothing, so a duplicate add is a no-op.
   .post('/:id/links', async (c) => {
@@ -455,26 +455,5 @@ export const tasks = new Hono<AppEnv>()
       warmItemDetails({ db, secrets: c.env.SECRETS }, ownerId(c), [link])
       broadcastTasksChanged({ taskId: id })
     }
-    return c.json({ ok: true })
-  })
-  .delete('/:id/links', async (c) => {
-    const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'connectionId' | 'identifier'>> & {
-      integrationId?: string
-    }
-    const connectionId = body.connectionId ?? body.integrationId
-    if (!connectionId || !body.identifier) return respondError(c, 400, 'bad_request')
-    const db = getDb(c.env)
-    const [deleted] = await db
-      .delete(schema.taskLinks)
-      .where(
-        and(
-          eq(schema.taskLinks.taskId, id),
-          eq(schema.taskLinks.integrationId, connectionId),
-          eq(schema.taskLinks.identifier, body.identifier),
-        ),
-      )
-      .returning({ taskId: schema.taskLinks.taskId })
-    if (deleted) broadcastTasksChanged({ taskId: id })
     return c.json({ ok: true })
   })

@@ -3,15 +3,15 @@ import { clampRemaining, sessionQuota } from '../../shared/usage'
 
 /** The bar under a quota row: how much is left, and where a steady spend would have left it by now.
  *  Both are 0-1 on the same scale, so the mark reads against the fill. */
-export type UsageMeter = { fill: number; pace: number | null; health: AgentUsageHealth }
+type UsageMeter = { fill: number; pace: number | null; health: AgentUsageHealth }
 export type UsageDetailRow = { label: string; value: string; meter?: UsageMeter }
 export type UsageSummaryEntry = { health: AgentUsageHealth; label: string; value: string }
 
-export function formatPercent(percent: number): string {
+function formatPercent(percent: number): string {
   return `${Math.round(percent)}%`
 }
 
-export function formatUsd(value: number): string {
+function formatUsd(value: number): string {
   return `$${value.toFixed(2)}`
 }
 
@@ -33,7 +33,7 @@ export function formatTokens(value: number): string {
   }).format(value)
 }
 
-export function formatDuration(seconds: number): string {
+function formatDuration(seconds: number): string {
   const rounded = Math.max(0, Math.round(seconds))
   const hours = Math.floor(rounded / 3_600)
   const minutes = Math.floor((rounded % 3_600) / 60)
@@ -60,7 +60,7 @@ export function formatReset(resetsAt: number | null, resetText: string | null, n
   return resetText?.replace(/^resets?\s*/i, 'resets ').replace(/\s*\([^()]*\)\s*$/, '') ?? null
 }
 
-export function formatUpdated(capturedAt: number | null, now = Date.now()): string {
+function formatUpdated(capturedAt: number | null, now = Date.now()): string {
   if (capturedAt == null) return 'not updated'
   const minutes = Math.max(0, Math.floor((now - capturedAt) / 60_000))
   if (minutes < 1) return 'updated just now'

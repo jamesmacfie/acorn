@@ -18,7 +18,7 @@ const fieldSchema = (schema: DataSchema | undefined): DataSchema => schema ?? { 
 
 /** The gate's output schema, derived from its fields. `approved` is left out of the properties,
  *  because it is `true` or `'autonomous'` and the schema subset has no union of two types. */
-export function gateFormOutputSchema(form: WorkflowGateForm): DataSchema {
+function gateFormOutputSchema(form: WorkflowGateForm): DataSchema {
   return {
     type: 'object',
     properties: {

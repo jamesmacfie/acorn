@@ -101,7 +101,7 @@ const walk = (node: unknown, visit: (node: AstNode) => void): void => {
  * `r.resolve('x')`. Read from the module before bundling, so its local names are still the ones the
  * source wrote, whatever the minifier later calls them.
  */
-export function requiredSpecifiers(program: unknown): string[] {
+function requiredSpecifiers(program: unknown): string[] {
   const nodes: AstNode[] = []
   walk(program, (node) => nodes.push(node))
   const makers = new Set(

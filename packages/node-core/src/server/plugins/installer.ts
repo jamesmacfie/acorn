@@ -21,7 +21,6 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   symlinkSync,
 } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
@@ -33,12 +32,7 @@ import type {
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
-import {
-  describePluginSource,
-  guardPluginUrl,
-  resolvePluginSource,
-  RELEASE_ASSET,
-} from '@acorn/protocol/plugin/source.ts'
+import { describePluginSource, guardPluginUrl, resolvePluginSource } from '@acorn/protocol/plugin/source.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { unpackPluginArchive } from './archive'
 import { assertPluginPackageTree } from './packageTree'
@@ -57,22 +51,19 @@ import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, st
 // A plugin package is source plus a bundle or two. 32 MiB is roughly four times the client-bundle
 // ceiling and leaves room for assets; anything past it is not a plugin, and a node should not spool a
 // gigabyte to disk because a URL said so.
-export const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
+const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
-
-// The convention: a GitHub release carries the package as one asset with this exact name.
-export { RELEASE_ASSET }
 
 // Everything a caller can be told about why an install did not happen. One class rather than a code
 // union because every one of these is the same outcome for the owner, "that package was refused, and
 // here is the sentence explaining it", and the route turns them all into one 400.
-export class PluginInstallError extends Error {}
+class PluginInstallError extends Error {}
 
 const fail = (message: string): never => {
   throw new PluginInstallError(message)
 }
 
-export type PluginProvenance = Record<string, string>
+type PluginProvenance = Record<string, string>
 
 // What was installed, pinned. `archiveSha256` answers "are these the bytes that were reviewed"; the
 // entrypoint hashes answer the same question for the two files that actually execute; `provenance`
@@ -122,7 +113,7 @@ export const describeSource = describePluginSource
 // https everywhere, plus http on loopback so a test or a local build server can hand this a real
 // archive over a real socket. Anything else is a downgrade: a plugin package is code, and fetching it
 // in the clear means whoever is between the node and the host chooses what runs.
-export const guardUrl = guardPluginUrl
+const guardUrl = guardPluginUrl
 
 // ── Download and unpack ───────────────────────────────────────────────────────────────────────────
 
@@ -132,7 +123,7 @@ export const guardUrl = guardPluginUrl
 // null and the caller treats that as "the registry told us nothing we can verify".
 const SRI_ALGORITHMS = ['sha512', 'sha384', 'sha256'] as const
 
-export function parseIntegrity(integrity: string | undefined): { algorithm: string; digest: string } | null {
+function parseIntegrity(integrity: string | undefined): { algorithm: string; digest: string } | null {
   if (!integrity) return null
   const entries = integrity
     .trim()
@@ -504,14 +495,4 @@ export function uninstallPlugin(
     for (const suffix of ['', '-wal', '-shm']) rmSync(`${db}${suffix}`, { force: true })
   }
   return { restartRequired: true, dataPurged: options.purgeData === true }
-}
-
-/** Whether a package directory is currently on disk, without reading it. Used by the roster to tell a
- * pending install from a running plugin. */
-export const isInstalled = (dataRoot: string, id: string): boolean => {
-  try {
-    return statSync(pluginDir(dataRoot, id)).isDirectory()
-  } catch {
-    return false
-  }
 }

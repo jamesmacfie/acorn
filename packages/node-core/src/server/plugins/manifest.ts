@@ -17,12 +17,8 @@ import { ManifestReferences, validateContributionIds } from './manifestValidatio
 export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 export type {
   NodePermissions,
-  PluginAgentContextDescriptor,
   PluginAuditActionDescriptor,
-  PluginChromeAction,
-  PluginClientRouteDescriptor,
   PluginCommandDescriptor,
-  PluginDocumentRegion,
   PluginExtensionDescriptor,
   PluginExtensionPointDescriptor,
   PluginFrameSurface,
@@ -30,13 +26,9 @@ export type {
   PluginCustomAgentDescriptor,
   PluginAgentToolDescriptor,
   PluginContextSectionDescriptor,
-  PluginKeybindingDescriptor,
-  PluginPaneRegion,
-  PluginRefResolverDescriptor,
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
 } from '@acorn/protocol/plugin/contract.ts'
-export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 
 /**
  * Whether a manifest gives the node something to hold with no node bundle behind it. Harnesses, custom

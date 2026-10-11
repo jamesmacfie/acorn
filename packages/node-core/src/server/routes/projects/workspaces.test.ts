@@ -104,7 +104,11 @@ describe('workspace identity', () => {
 
   it('saves solid and gradient icons without renaming, including Default, and publishes changes', async () => {
     const changed = vi.spyOn(notify, 'broadcastWorkspaceChanged')
-    await app.fetch(new Request('http://acorn.test/api/workspaces/bootstrap', { method: 'POST' }), {} as Env)
+    const now = Date.now()
+    t.db
+      .insert(schema.workspaces)
+      .values({ id: 'default', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+      .run()
     const [w] = t.db.select().from(schema.workspaces).all()
     for (const background of [
       { kind: 'solid', color: 'blue' },

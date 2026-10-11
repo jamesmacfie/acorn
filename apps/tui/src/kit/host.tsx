@@ -29,7 +29,6 @@ import {
   resolveSlot,
   type OwnerActions,
 } from '@acorn/client-core/host/tree'
-import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 import { RemoteTree } from '../plugins/remoteTreeLoader'
@@ -45,7 +44,7 @@ import {
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
-import { Button, CopyButton, IconButton, Input } from './asking'
+import { Button, CopyButton, IconButton } from './asking'
 import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
 // What `@acorn/plugin-api/ui/host` is on this host.
@@ -58,16 +57,9 @@ import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
-// From the model rather than from `willPhase.tsx`, which is the DOM's confirmation dialog and would
-// bring a `<div>` with it. The registration and the concern type are the model's own.
-export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
-export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 // The shell's one confirmation, drawn by the shell over whatever has the screen (../chrome/Confirmation.tsx).
 export { confirmAction } from '../chrome/confirmStore'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
-export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
-export { RemoteTree } from '../plugins/remoteTreeLoader'
-export type { RemoteTreeProps } from '../plugins/RemoteTree'
 // The `wizard` layout for a surface that is a wizard and is not a pane. The same component the layout
 // table hands the pane registry, so onboarding's overlay and a `wizard` pane are arranged alike.
 export { Wizard } from '../layouts/Wizard'
@@ -75,7 +67,6 @@ export { Wizard } from '../layouts/Wizard'
 // The compiled message composer uses the terminal projection of the host's model-choice control.
 export { ModelPickerPopover } from './asking/modelPickerPopover'
 export { IconPicker } from './asking/iconPicker'
-export type { IconPickerProps } from '@acorn/client-core/kit/components/inputs'
 
 // ── The acorn ────────────────────────────────────────────────────────────────────────────────────
 
@@ -112,54 +103,6 @@ export function Drawer(props: {
     <box flexDirection="column" flexGrow={1}>
       {props.children}
     </box>
-  )
-}
-
-/** A palette overlay somebody else owns: the editor's file finder, github's shortcut sheet.
- *
- *  The shell's own palette is `chrome/Palette.tsx` and is not this — it is core-owned and drives the
- *  overlay stack (docs/tui.md). This is the deduped chrome a *plugin* opens,
- *  and here it is the same `Modal` with a filter field and a list of rows, because that is what a
- *  terminal overlay is.
- *
- *  The cursor is the hook's, exactly as on the desktop: an input owns the typing, so a collection's
- *  bare keys would never fire inside one. What the hook cannot give this host is a DOM key event, so
- *  the arrows and Enter are the modal's own layer. */
-export function PaletteSurface<T>(props: {
-  palette: OverlayPalette
-  items: readonly T[]
-  placeholder: string
-  emptyText: string
-  row: (item: T, selected: boolean) => JSX.Element
-  rowClassList?: (item: T) => Record<string, boolean | undefined>
-  onPick: (item: T, index: number) => void
-  footer?: JSX.Element
-  status?: JSX.Element
-  class?: string
-  ariaLabel?: string
-}) {
-  return (
-    <Show when={props.palette.open()}>
-      <Modal onDismiss={props.palette.close} title={props.ariaLabel} size="wide">
-        <ModalBody>
-          <Input
-            kind="filter"
-            placeholder={props.placeholder}
-            value={props.palette.query()}
-            onInput={(value) => props.palette.setQuery(value)}
-          />
-          <Show when={props.status}>{props.status}</Show>
-          <For each={props.items} fallback={<Line role="muted">{props.emptyText}</Line>}>
-            {(item, index) => (
-              <Row selected={index() === props.palette.sel()} leading={index() === props.palette.sel() ? '›' : ' '}>
-                {props.row(item, index() === props.palette.sel())}
-              </Row>
-            )}
-          </For>
-          <Show when={props.footer}>{props.footer}</Show>
-        </ModalBody>
-      </Modal>
-    </Show>
   )
 }
 
@@ -200,9 +143,6 @@ export function PromoteToTaskModal(_props: {
 }) {
   return <Line role="muted">Making a task from this row is not drawn here.</Line>
 }
-// Type-only, so the DOM component this names is erased rather than imported.
-export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
-
 /** The Config files section of the agents plugin's MCP page.
  *
  *  Absent, and it says so: core draws the list with the desktop's own controls. */
@@ -248,7 +188,7 @@ export function ProviderHtml(props: {
 
 // ── Cooperative extension points ─────────────────────────────────────────────────────────────────
 
-export type SlotProps = {
+type SlotProps = {
   point: string
   key?: string
   props?: () => unknown
@@ -509,10 +449,7 @@ export function InlineSlot(props: { point: string; key?: string; taskId?: string
 
 // ── Selection actions ────────────────────────────────────────────────────────────────────────────
 
-export type {
-  SelectedContent,
-  SelectionActionsProps,
-} from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+export type { SelectedContent } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 
 /**
  * Other plugins' actions on selected text (`content.selection`), in cells.

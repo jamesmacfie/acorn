@@ -148,7 +148,7 @@ export function TurnActionsMenu(props: { target: () => AgentTurnTarget | undefin
 
 /** The target for text selected in a message card. It takes the message's own identity and revision,
  *  so a message that streams on after the menu opened refuses the row. */
-export const messageSelectionTarget = (
+const messageSelectionTarget = (
   message: AgentMessageTarget | undefined,
   selected: SelectedContent | undefined,
 ): ContentSelectionTarget | undefined =>
@@ -168,7 +168,7 @@ export const messageSelectionTarget = (
   }
 
 /** Does the card still show the message this selection came from, at the same revision? */
-export const messageSelectionIsCurrent = (
+const messageSelectionIsCurrent = (
   selection: ContentSelectionTarget,
   message: AgentMessageTarget | undefined,
 ): boolean =>

@@ -76,7 +76,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK; transport: Ret
  *  held as characters alone cannot see a column shift at all — `你|` comes back with the bar at index
  *  1 whether the wide character drew in one cell or two. The run frame is the only place the column
  *  count survives, which is why a test that cares about width reads spans rather than characters. */
-export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number; width: number }
+type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number; width: number }
 
 /** Where the keys are and what the line under them says (./keys/regions.ts). */
 export type Caret = { region: RegionRef | null; text: string }
@@ -223,7 +223,7 @@ export async function renderFixture(
   const { _resetCollections } = await import('./keys/collection')
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
-  const { _resetChrome } = await import('./chrome/state')
+  const { resetChromeForNodeSwitch } = await import('./chrome/state')
   const { resetPromotion } = await import('./chrome/promotionStore')
   const { resetFilePrompts } = await import('./chrome/filePrompt')
   const { resetConfirmations } = await import('./chrome/confirmStore')
@@ -246,7 +246,7 @@ export async function renderFixture(
   _resetCollections()
   _resetRegions()
   _resetLayoutState()
-  _resetChrome()
+  resetChromeForNodeSwitch()
   resetPromotion()
   resetFilePrompts()
   resetConfirmations()

@@ -15,8 +15,8 @@ import { validateWorkflow, type WorkflowValidationCatalog } from '../validation/
 import { agentDefinitionView } from './projection'
 
 export const MAX_TOOL_RESPONSE_BYTES = 64 * 1024
-export const MAX_LIST_ENTRIES = 50
-export const MAX_DEFINITION_BYTES = 256 * 1024
+const MAX_LIST_ENTRIES = 50
+const MAX_DEFINITION_BYTES = 256 * 1024
 
 export type WorkflowToolDeps = {
   db: PluginDatabase
@@ -350,7 +350,7 @@ export async function getDefinition(
 
 // Structural only, like the device route's body: a name, the format markers, and a list of steps.
 // The validator says everything else, field by field.
-export const candidateDefinitionSchema = z
+const candidateDefinitionSchema = z
   .object({
     baseline: z.literal(ACORN_BASELINE),
     formatVersion: z.literal(1),

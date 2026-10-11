@@ -12,7 +12,5 @@ export const githubRouteContributions: readonly SourceRouteContribution[] = [
   { id: 'github.pull', path: '/p/:projectId/pulls/:number', order: 50 },
 ]
 
-export const githubBrowseRoute = githubRouteContributions[0].path
 export const githubCreateRoute = githubRouteContributions[1].path
-export const githubPullRoute = githubRouteContributions[2].path
 export const githubBrowsePath = (projectId: string) => `/p/${encodeURIComponent(projectId)}/pulls`

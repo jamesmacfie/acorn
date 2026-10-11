@@ -10,7 +10,7 @@ import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 // independent, so a plugin disabled on one node leaves its rows off that node only, and a slow
 // source cannot hold up a fast one. The cost is N resources instead of one, which for two or three
 // sources is nothing.
-export type AttentionRow = {
+type AttentionRow = {
   item: AttentionItem
   nodeId: string
   node: NodeRecord

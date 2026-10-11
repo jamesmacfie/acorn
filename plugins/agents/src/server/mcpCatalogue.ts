@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 const MAX_CATALOGUE_BYTES = 256 * 1024
 const MAX_TOOLS = 256
 const MAX_DEPTH = 32
-export const MCP_CATALOGUE_VERSION = 1
+const MCP_CATALOGUE_VERSION = 1
 
 function canonical(value: unknown, depth: number): string {
   if (depth > MAX_DEPTH) throw new Error('The MCP catalogue is too deeply nested.')

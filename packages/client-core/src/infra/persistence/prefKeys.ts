@@ -127,8 +127,6 @@ export const PrefKeys = {
   telemetry: TELEMETRY_PREF_KEY,
 } as const
 
-export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]
-
 export const PersistedSliceKeys = {
   taskLayouts: PrefKeys.taskLayoutsScoped,
   editorOpenFiles: PrefKeys.editorOpenFilesScoped,

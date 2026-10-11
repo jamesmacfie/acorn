@@ -10,7 +10,8 @@ run reliable. Read it before you run the suite or change how it runs.
 | `pnpm test:focus <package> <file> [-t <name>]` | One file or one test case. Use it while you edit. |
 | `pnpm test --filter=<package>` | One package's full suite through Turborepo. |
 | `pnpm test` | Every suite. This is the full gate. |
-| `pnpm lint` | oxlint, then `oxfmt --check`, then `tsc --noEmit` in every package. |
+| `pnpm lint` | oxlint, then `oxfmt --check`, then the unused-export check, then `tsc --noEmit` in every package. |
+| `pnpm lint:exports` | The unused-export check alone: knip, configured in `knip.jsonc`. |
 | `pnpm lint:types` | `tsc --noEmit` in every package, without oxlint or the formatter check. |
 | `pnpm format [<file>...]` | Formats the given TypeScript files with oxfmt, or every one when you name none. |
 | `pnpm --filter @acorn/arch-tests test` | The repository-wide architecture rules, including the doc checks. |

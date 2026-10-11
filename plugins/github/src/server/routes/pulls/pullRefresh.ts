@@ -153,29 +153,6 @@ export async function refreshPullDetail(
   return { ok: true }
 }
 
-/** Force-refresh one PR's composite and changed files, fetching both in full before mirror writes begin. */
-export async function refreshPullWithFiles(
-  token: string,
-  db: PluginDatabase,
-  blobs: PatchBlobStore,
-  key: PullRefreshKey & { number: number },
-  emit: GithubEmit = NO_EMIT,
-): Promise<RefreshResult> {
-  const { fetchFiles, fetchPullComposite } = await import('../mirror/prFetch')
-  const [pull, files] = await Promise.all([
-    fetchPullComposite(token, key.owner, key.repo, key.number),
-    fetchFiles(token, key.owner, key.repo, key.number),
-  ])
-  if (!pull.ok) return pull
-  if (!files.ok) return files
-
-  const mirrorKey = { userId: key.userId, repoId: key.repoId, number: key.number }
-  const { checksChanged } = await mirrorPr(db, mirrorKey, pull.value, Date.now())
-  await mirrorFiles(blobs, db, mirrorKey, files.value)
-  announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
-  return { ok: true }
-}
-
 /** Force-refresh one PR's changed files: every page GitHub lists, then one swap. */
 export async function refreshPullFiles(
   token: string,

@@ -6,7 +6,7 @@ import type { WorkflowFileWrite } from '../../shared/workflowFileAuthoring'
 export type WorkflowFileRoot = { root: string; resolveInRoot(root: string, path: string): string | null }
 export const fileHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
-export function confinedWorkflowFile(scope: WorkflowFileRoot, path: string): string {
+function confinedWorkflowFile(scope: WorkflowFileRoot, path: string): string {
   if (!/^\.acorn\/workflows\/[A-Za-z0-9][A-Za-z0-9_-]*\.toml$/.test(path))
     throw new Error('Choose a workflow file inside .acorn/workflows')
   const absolute = scope.resolveInRoot(scope.root, path)

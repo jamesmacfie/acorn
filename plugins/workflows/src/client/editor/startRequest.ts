@@ -1,4 +1,3 @@
-import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // What "run this workflow" is, before anything draws it.
 //
 // A module of its own rather than a signal inside the dialog, because the palette asks for the
@@ -14,9 +13,6 @@ export type StartRequest = {
   defId: string
   name: string
   inputs?: readonly WorkflowInput[]
-  /** Values the caller already knows. The dialog fills them in, and a required input with one
-   *  does not make it ask. */
-  prefill?: Readonly<Record<string, DataValue>>
   /** The task to run on. Absent means the dialog asks. */
   taskId?: string
   projectId?: string
@@ -40,11 +36,8 @@ export const closeWorkflowStart = (): void => {
  * cannot call `requestWorkflowStart` for the other half: a command's refusal belongs in the palette
  * frame rather than in a toast, so that row throws. One rule, two readers.
  */
-export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
-  !next.taskId ||
-  (next.inputs ?? []).some(
-    (input) => input.required && input.default === undefined && next.prefill?.[input.name] === undefined,
-  )
+export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'taskId'>): boolean =>
+  !next.taskId || (next.inputs ?? []).some((input) => input.required && input.default === undefined)
 
 /**
  * Ask for the dialog.
@@ -60,8 +53,7 @@ export async function requestWorkflowStart(next: StartRequest): Promise<void> {
     setRequest(next)
     return
   }
-  const values = { ...(next.prefill ?? {}) }
-  const answer = await startWorkflow(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
+  const answer = await startWorkflow(taskId, { defId: next.defId })
   if (answer.error) toast(answer.error, { tone: 'danger' })
   else if (answer.runId) next.onStarted?.(answer.runId, taskId)
 }

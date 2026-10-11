@@ -42,10 +42,10 @@ export type PlainCodeRow = {
   newNo: number | null
   raw: string
 }
-export type PlainHunkRow = { kind: 'hunk'; text: string }
+type PlainHunkRow = { kind: 'hunk'; text: string }
 // A run of unchanged lines hidden above, between, or below hunks. `count` is null for the bottom gap:
 // its size needs the file's length, known only once the new side is read.
-export type PlainGapRow = {
+type PlainGapRow = {
   kind: 'gap'
   side: 'top' | 'mid' | 'bottom'
   oldStart: number

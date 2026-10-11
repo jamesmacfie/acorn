@@ -28,7 +28,6 @@ export type WorktreeInventory = {
   observedAt: number
 }
 
-export type CleanupRequest = { observation: string }
 export type CleanupResult = { ok: boolean; error?: string; inventory: WorktreeInventory }
 
 export const inventoryRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/worktrees`

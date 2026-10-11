@@ -2,7 +2,6 @@ import { testSecretEnv } from '@acorn/node-core/testkit'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  RollbarItemDetail,
   RollbarItemMetadata,
   RollbarItemsResponse,
   RollbarOccurrenceDetail,
@@ -62,14 +61,6 @@ const INSTANCE = {
     uuid: 'aaaa-bbbb',
     request: { method: 'POST', url: '/api/login', headers: { authorization: 'SECRET' } },
   },
-}
-
-// Compatibility item fetch: canonical item, occurrence list, and selected occurrence detail.
-const mockDetailFetch = () => {
-  vi.mocked(rollbarFetch)
-    .mockResolvedValueOnce(rollbarJson(API_ITEM))
-    .mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
-    .mockResolvedValueOnce(rollbarJson(INSTANCE))
 }
 
 describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § Rollbar)', () => {
@@ -208,8 +199,14 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
 
   it('never persists raw request headers/body in the item cache', async () => {
     const integrationId = await connect()
-    mockDetailFetch()
-    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    vi.mocked(rollbarFetch)
+      .mockResolvedValueOnce(rollbarJson(API_ITEM))
+      .mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
+      .mockResolvedValueOnce(rollbarJson(INSTANCE))
+    const query = `?integration=${integrationId}`
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/detail${query}`), env())
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences${query}`), env())
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences/555${query}`), env())
     await settleBackground()
     const rows = await t.db.select().from(schema.issues)
     const children = await t.db.select().from(schema.issueResources)
@@ -218,37 +215,17 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
     expect(cached).not.toContain('authorization')
   })
 
-  it('item detail returns normalized latest occurrence (no raw payload) and honors refresh=true', async () => {
+  it('item metadata honors refresh=true', async () => {
     const integrationId = await connect()
-    mockDetailFetch()
-    const res = await app.fetch(
-      new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`),
-      env(),
-    )
-    expect(res.status).toBe(200)
-    const detail = (await res.json()) as RollbarItemDetail
-    expect(detail).toMatchObject({
-      identifier: '142',
-      itemId: '999',
-      level: 'error',
-      url: 'https://rollbar.com/item/999/',
-    })
-    expect(detail.latestOccurrence).toMatchObject({
-      kind: 'trace',
-      exceptionClass: 'TypeError',
-      message: 'token is null',
-      url: 'https://rollbar.com/occurrence/uuid/?uuid=aaaa-bbbb',
-    })
-    expect(JSON.stringify(detail)).not.toContain('SECRET')
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    const url = `http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`
+    expect((await app.fetch(new Request(url), env())).status).toBe(200)
     await settleBackground()
 
     // refresh=true forces a fresh read past the TTL.
     const before = vi.mocked(rollbarFetch).mock.calls.length
-    mockDetailFetch()
-    const forced = await app.fetch(
-      new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}&refresh=true`),
-      env(),
-    )
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    const forced = await app.fetch(new Request(`${url}&refresh=true`), env())
     expect(forced.status).toBe(200)
     expect(vi.mocked(rollbarFetch).mock.calls.length).toBeGreaterThan(before)
   })
@@ -347,30 +324,28 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
 
   it('detail falls back to stale cache when a background refresh fails', async () => {
     const integrationId = await connect()
-    mockDetailFetch()
-    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    const url = `http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    await app.fetch(new Request(url), env())
     await settleBackground()
 
     await t.db.update(schema.issues).set({ fetchedAt: Date.now() - 2 * 60_000 - 1 })
     vi.mocked(rollbarFetch).mockResolvedValue(new Response('boom', { status: 500 }))
-    const res = await app.fetch(
-      new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`),
-      env(),
-    )
+    const res = await app.fetch(new Request(url), env())
     expect(res.status).toBe(200)
-    expect(((await res.json()) as RollbarItemDetail).identifier).toBe('142')
+    expect(((await res.json()) as RollbarItemMetadata).identifier).toBe('142')
   })
 
   it('legacy counter-only link resolves to the canonical item', async () => {
     const integrationId = await connect()
     // No prior list or summary, so detail must resolve via item_by_counter, which still returns id 999.
-    mockDetailFetch()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
     const res = await app.fetch(
-      new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`),
+      new Request(`http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`),
       env(),
     )
     expect(res.status).toBe(200)
-    expect(((await res.json()) as RollbarItemDetail).itemId).toBe('999')
+    expect(((await res.json()) as RollbarItemMetadata).itemId).toBe('999')
   })
 
   it('partial success: one connection fails, the other still returns items', async () => {
@@ -434,14 +409,14 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
   it('missing integration id → 400; not connected → 403', async () => {
     expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())).status).toBe(403)
     await connect()
-    expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items/142'), env())).status).toBe(400)
+    expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items/142/detail'), env())).status).toBe(400)
   })
 
   it('item not found → 404', async () => {
     const integrationId = await connect()
     vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('nope', { status: 404 }))
     const res = await app.fetch(
-      new Request(`http://acorn.test/api/rollbar/items/999?integration=${integrationId}`),
+      new Request(`http://acorn.test/api/rollbar/items/999/detail?integration=${integrationId}`),
       env(),
     )
     expect(res.status).toBe(404)

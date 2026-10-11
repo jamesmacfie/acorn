@@ -16,7 +16,7 @@ export type McpServerSummary = {
 const SECRET_KEY_RE = /(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL)S?$/i
 const SECRET_VALUE_RE = /^(sk-|ghp_|gho_|ghs_|github_pat_|xox[bapsr]?-)/
 
-export const maskSecret = (value: string): string => (value.length <= 4 ? '••••' : `${value.slice(0, 4)}••••`)
+const maskSecret = (value: string): string => (value.length <= 4 ? '••••' : `${value.slice(0, 4)}••••`)
 
 export function maskSecretEnv(env: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}

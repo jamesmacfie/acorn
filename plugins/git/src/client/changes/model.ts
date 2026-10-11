@@ -7,7 +7,7 @@ import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 
 /** The three groups the list draws, top to bottom. Conflicts, tracked edits and untracked files are
  *  three different situations for the reader, and only the middle one is a staging question. */
-export type ChangeGroup = 'conflicted' | 'tracked' | 'untracked'
+type ChangeGroup = 'conflicted' | 'tracked' | 'untracked'
 
 /** One file as the list draws it: one row per path, whichever of its two halves git reported.
  *

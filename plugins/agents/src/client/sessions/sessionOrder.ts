@@ -14,7 +14,7 @@ export type SessionGroup = 'managed' | 'workflow' | 'inline'
 type TaskOrders = Partial<Record<SessionGroup, SessionOrder>>
 
 // Newest first, so a sidebar nobody has reordered keeps its familiar order.
-export const DEFAULT_SESSION_ORDER: SessionOrder = 'created'
+const DEFAULT_SESSION_ORDER: SessionOrder = 'created'
 
 export const SESSION_ORDER_CHOICES: readonly { value: SessionOrder; label: string }[] = [
   { value: 'status', label: 'Running first' },

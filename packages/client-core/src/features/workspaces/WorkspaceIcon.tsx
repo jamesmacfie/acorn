@@ -6,7 +6,7 @@ import { iconNode } from '../../kit/tokens/iconNodes'
 import { acquireWorkspaceImage } from './workspaceImageResources'
 import './workspace-icons.css'
 
-export function workspaceInitials(name: string): string {
+function workspaceInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   return (
     words.length > 1 ? [...words[0]][0] + [...words.at(-1)!][0] : [...(words[0] ?? '?')].slice(0, 2).join('')

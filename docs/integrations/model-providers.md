@@ -70,7 +70,7 @@ A CLI generate is contained:
   and Codex reads `AGENTS.md` from it, so a worktree would add a repository's house rules.
 - The environment is the broker's base allowlist plus `AGENT_TOOL_PASSTHROUGH`
   (`packages/node-core/src/server/agentProfiles/toolEnv.ts`): no `ACORN_API_URL`, `ACORN_API_TOKEN`,
-  `ACORN_TOOL_CEILING`, MCP server, or acorn-held key. The CLI uses its own login
+  MCP server, or acorn-held key. The CLI uses its own login
   ([credential handling](../security/credentials.md)).
 - The run goes through `providerRequestScheduler` in a lane per profile, two at once.
 - A failure logs the stderr tail, profile, status, and duration, and the client gets

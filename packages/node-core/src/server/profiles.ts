@@ -14,7 +14,7 @@ export const requireProfile = (id: string): ProfileDef => agentProfileRegistry.r
 export const resolveCommand = (p: ProfileDef): string =>
   p.command === '$SHELL' ? process.env.SHELL || '/bin/zsh' : p.command
 
-export function onPath(command: string): boolean {
+function onPath(command: string): boolean {
   try {
     execFileSync('which', [command], { stdio: 'ignore' })
     return true

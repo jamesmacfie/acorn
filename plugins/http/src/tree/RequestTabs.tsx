@@ -304,5 +304,3 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
     </>
   )
 }
-
-export { KeyValueTable }

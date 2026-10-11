@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { dashboardViewKinds as PANEL_VIEW_KINDS } from '@acorn/protocol/dashboardViews.ts'
 import type { DashboardDisplaySchema } from './display'
 import {
   MAX_PANEL_REFRESH_SECONDS,
   MIN_PANEL_REFRESH_SECONDS,
-  PANEL_VIEW_KINDS,
-  isDrawnViewKind,
   panelRefreshSeconds,
   viewSupportedBy,
   viewsForSchema,
@@ -29,9 +28,6 @@ describe('views are derived from the schema', () => {
     expect(viewSupportedBy('board', withoutEnum)).toBe(false)
     expect(viewsForSchema(withEnum)).toEqual([...PANEL_VIEW_KINDS])
     expect(viewsForSchema(withoutEnum)).not.toContain('board')
-    expect(isDrawnViewKind('board')).toBe(true)
-    // A kind from a client that draws more than this one. Retained by the codec, inert at render.
-    expect(isDrawnViewKind('sankey-diagram')).toBe(false)
   })
 
   it('gates chart on an axis to draw against, which a text-only collection has not got', () => {

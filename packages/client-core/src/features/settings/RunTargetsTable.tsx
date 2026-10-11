@@ -54,7 +54,7 @@ const sameDraft = (a: Draft, b: Draft) =>
 
 /** The stored JSON as a list. Keys the table does not edit, such as `icon` or `restart`, stay on the
  *  object, so a save writes them back as they were. */
-export function parseRunTargets(stored: string | null): { targets: ProjectRunTarget[]; unreadable: boolean } {
+function parseRunTargets(stored: string | null): { targets: ProjectRunTarget[]; unreadable: boolean } {
   if (!stored?.trim()) return { targets: [], unreadable: false }
   try {
     const parsed = JSON.parse(stored) as unknown

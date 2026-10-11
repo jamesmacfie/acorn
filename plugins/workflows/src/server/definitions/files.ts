@@ -339,7 +339,7 @@ export function parseWorkflowToml(
 }
 
 // Inline sub-workflow expansion with cycle rejection: see docs/workflows/execution.md § Execution model.
-export function expandWorkflows(
+function expandWorkflows(
   raw: RawWorkflow[],
   errors: WorkflowFileError[],
   catalog: WorkflowValidationCatalog = defaultCatalog(),

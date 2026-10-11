@@ -313,8 +313,6 @@ export const paneContributions = (): readonly PaneContribution[] =>
   [...paneRegistry.entries()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
 export const paneContribution = (id: PaneId): PaneContribution | undefined => paneRegistry.get(id)
-export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id)
-export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
   hasHostCapability(pane.requires) &&
   (!task || task.status !== 'archived' || pane.readsArchived === true) &&
@@ -324,7 +322,7 @@ export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
 export const PANE_PREFETCH_HOVER_MS = 150
 
 /** Every available pane's `prefetch` for one task, run once. Failures are the pane's to swallow. */
-export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
+const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
   for (const pane of paneContributions()) {
     if (!pane.prefetch || !paneAvailable(pane, task)) continue
     try {

@@ -51,7 +51,7 @@ type RollbarValidated = { project: RollbarProject; secret: string }
 type RollbarCached = CachedExternalItem<RollbarItemSummary, RollbarItemMetadata>
 export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifier: string }
 export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
-export type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
+type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
 
 // One project, always. `normalize` writes it onto the connection when the token is validated, so
 // there is no fetch and the secret goes unused. See docs/integrations/rollbar.md § Rollbar.

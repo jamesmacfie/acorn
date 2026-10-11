@@ -1,5 +1,4 @@
 import type { JSX } from 'solid-js'
-import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 
 // What every layout is handed (docs/panes/layout.md § Layout model).
 //
@@ -55,5 +54,3 @@ export type LayoutProps = {
 }
 
 export type Layout = (props: LayoutProps) => JSX.Element
-
-export type { PaneLayoutName }

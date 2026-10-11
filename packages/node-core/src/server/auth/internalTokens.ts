@@ -19,8 +19,8 @@ export type InternalClaims = {
   // The terminal/agent session, when the child belongs to one. Agent-tool contributions may require
   // this signed owner rather than accepting attribution supplied as transport metadata.
   sessionId?: string
-  // The effective ceiling this server computed for the child. Unlike ACORN_TOOL_CEILING, this value is
-  // covered by the signature and is therefore safe to enforce on the loopback tool projection.
+  // The effective ceiling this server computed for the child. It is covered by the signature, which is
+  // what makes it safe to enforce on the loopback tool projection.
   toolCeiling?: ToolCeiling
   // A task token's revocable id. Minting picks one and renewal keeps it, so a renewed file stays the
   // same credential. Authentication checks it against ActiveCredentials (./activeCredentials.ts).

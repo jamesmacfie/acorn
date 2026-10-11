@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, extname, join, relative, resolve } from 'node:path'
 type SkillFolder = { name: string; dir: string }
 
-export const INSTRUCTION_ANALYZER_VERSION = 2
+const INSTRUCTION_ANALYZER_VERSION = 2
 const NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md'])
 const SKILLS = ['.claude/skills', '.agents/skills', '.codex/skills']
 const EXCLUDED = new Set([
@@ -53,7 +53,7 @@ const MAX_BYTES = 8 * 1024 * 1024
 const MAX_FILE_BYTES = 1_000_000
 const READ_CHUNK_BYTES = 64 * 1024
 const MAX_MS = 5_000
-export const INSTRUCTION_SCOPE = `root and nested AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md; Claude @imports (five hops); repository ${SKILLS.join(', ')} and delivered plugin skills with supporting files; excludes ${[...EXCLUDED].join(', ')} and ordinary repository symlink directories; scan limits ${MAX_FILES} files, ${MAX_DIRECTORIES} directories, ${MAX_DEPTH} levels, ${MAX_BYTES} bytes, ${MAX_FILE_BYTES} bytes per file, ${MAX_MS} ms; advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings`
+const INSTRUCTION_SCOPE = `root and nested AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md; Claude @imports (five hops); repository ${SKILLS.join(', ')} and delivered plugin skills with supporting files; excludes ${[...EXCLUDED].join(', ')} and ordinary repository symlink directories; scan limits ${MAX_FILES} files, ${MAX_DIRECTORIES} directories, ${MAX_DEPTH} levels, ${MAX_BYTES} bytes, ${MAX_FILE_BYTES} bytes per file, ${MAX_MS} ms; advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings`
 
 export type InstructionFile = {
   path: string

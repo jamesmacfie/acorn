@@ -83,22 +83,12 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     expect(await list()).toHaveLength(0)
   })
 
-  it('send stamps sentAt; edit clears it', async () => {
+  it('send stamps sentAt', async () => {
     const a = await create()
     const b = await create({ startLine: 80, endLine: 80, body: 'This log line leaks the token — drop it.' })
     const res = await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [a.id, b.id] }), {} as Env)
     expect(res.status).toBe(200)
-    let all = await list()
-    expect(all.every((n) => n.sentAt != null)).toBe(true)
-
-    await app.fetch(
-      jsonReq(`/api/tasks/task1/review-notes/${a.id}`, 'PATCH', { body: 'Edited — resend me.' }),
-      {} as Env,
-    )
-    all = await list()
-    expect(all.find((n) => n.id === a.id)?.sentAt).toBeNull()
-    expect(all.find((n) => n.id === a.id)?.body).toBe('Edited — resend me.')
-    expect(all.find((n) => n.id === b.id)?.sentAt).not.toBeNull()
+    expect((await list()).every((n) => n.sentAt != null)).toBe(true)
   })
 
   it('validates the anchor + body; unknown task 404s', async () => {
@@ -140,7 +130,7 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     ).toBe(404)
   })
 
-  it('announces current counts only after real create, delivery, edit, and delete writes', async () => {
+  it('announces current counts only after real create, delivery, and delete writes', async () => {
     const note = await create()
     expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
 
@@ -149,12 +139,6 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     const afterSent = frames.length
     await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [note.id] }), {} as Env)
     expect(frames).toHaveLength(afterSent)
-
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
-    expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
-    const afterEdit = frames.length
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
-    expect(frames).toHaveLength(afterEdit)
 
     await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'DELETE'), {} as Env)
     expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 0, unsent: 0 })

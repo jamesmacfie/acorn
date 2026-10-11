@@ -121,8 +121,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // run pane and preview home, and the `TERMINAL_RUN_TARGETS` capability, which other plugins resolve
       // without a mutable global.
       // `run:changed` is a core event (nodeEvents in @acorn/protocol) sent from here because terminal
-      // holds the process, not because it owns the fact; the core-side spelling is node-core's
-      // `broadcastRunTargetChanged`.
+      // holds the process, not because it owns the fact.
       // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a turn before a
       // process starts in a task's worktree.
       ctx.hooks.declare({

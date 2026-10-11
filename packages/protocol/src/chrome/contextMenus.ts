@@ -53,7 +53,7 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
 }
 
 /** The kinds of content a `content.selection` target can come from. */
-export const SELECTION_CONTENT_KINDS = ['markdown', 'code', 'document'] as const
+const SELECTION_CONTENT_KINDS = ['markdown', 'code', 'document'] as const
 export type SelectionContentKind = (typeof SELECTION_CONTENT_KINDS)[number]
 
 /** The most selected text an action is handed, in UTF-8 bytes. A larger selection is refused whole,

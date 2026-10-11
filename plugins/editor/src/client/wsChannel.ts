@@ -47,4 +47,4 @@ registerWsChannel('editor', (rawFrame) => {
 })
 
 // Test seam: the map is a module singleton, and core's _resetWsClient does not know about it.
-export const _resetEditorWsChannel = (): void => ptySubs.clear()
+const _resetEditorWsChannel = (): void => ptySubs.clear()

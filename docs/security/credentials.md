@@ -116,7 +116,7 @@ it fails, and the first start after the upgrade gives each session file a new to
 A service token never leaves the Node's process, so it carries no ID.
 
 The agent-tool route reads session identity and tool limits from the verified principal only. The
-`x-acorn-session-id` and `x-acorn-tool-ceiling` headers grant nothing. Session-required tools drop
+`x-acorn-session-id` header grants nothing. Session-required tools drop
 out of `tools/list` without a signed session claim. A per-call UUID is used only after the signed
 owner and tool name scope it as an idempotency key.
 

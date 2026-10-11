@@ -27,7 +27,7 @@ const runTargetWireSchema = z
   })
   .refine((target) => !(target.url && target.urlCommand), { message: 'url and urlCommand are mutually exclusive' })
 
-export function projectConfigFromRow(row: typeof schema.projects.$inferSelect): ProjectConfigResponse {
+function projectConfigFromRow(row: typeof schema.projects.$inferSelect): ProjectConfigResponse {
   return {
     projectId: row.id,
     config: {

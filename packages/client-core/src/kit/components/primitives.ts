@@ -1,10 +1,10 @@
 // Keep this import path for compiled plugins and the loaded-plugin UI facade.
 // Implementations live with their component families.
 export { Button, type ButtonProps } from './inputs/Button'
-export { Input, type InputProps, type InputType } from './inputs/Input'
-export { Select, type SelectOption, type SelectProps } from './inputs/Select'
-export { Textarea, type TextareaProps } from './inputs/Textarea'
-export { type ControlOwn } from './inputs/controlAttrs'
+export { Input, type InputProps } from './inputs/Input'
+export { Select, type SelectProps } from './inputs/Select'
+export { Textarea } from './inputs/Textarea'
+
 export { Field } from './inputs/Field'
 export { Checkbox } from './inputs/Checkbox'
 export { ConfirmButton } from './inputs/ConfirmButton'
@@ -21,7 +21,7 @@ export { DescriptionList } from './content/DescriptionList'
 export { Card } from './content/Card'
 export { Meter } from './content/Meter'
 export { CodeBlock } from './content/CodeBlock'
-export { isExternal } from './content/isExternal'
+
 export { SectionHeader } from './layout/SectionHeader'
 export { Row } from './layout/Row'
 export { FilterBar } from './layout/FilterBar'

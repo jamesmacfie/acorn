@@ -17,15 +17,15 @@ The facade has 14 entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
-| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser`, `respondError`, `portableCarrier`, and the first-use loaders `lazyFetch` and `lazyRouter` from [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use)), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, `capabilityId`, and provider and integration contracts |
+| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `respondError`, `portableCarrier`, and the first-use loaders `lazyFetch` and `lazyRouter` from [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use)), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, and provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, registration seams such as `registerCommands`, `registerKeybindings`, and `slotFills`, task, workspace, and fleet state, the design system's plain functions, and `readLocal`, `writeLocal`, and `clearLocal` for per-device scraps such as an unsent draft |
-| `@acorn/plugin-api/ui` | Frame-safe presentation components from the kit, the diff rows, `DiffPane`, `attachPty`, and `createTimelineWindow` |
-| `@acorn/plugin-api/ui/diff` | The diff row model, highlighter, find marks, the `DiffSource` port, the diff-document types, and `createDiffSnippets` ([the diff document](../diff-rendering/document.md)) |
-| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components, composed controls, and the confirmation and will-phase seams. Never import it from a frame |
+| `@acorn/plugin-api/ui` | Frame-safe presentation components from the kit, `DiffPane`, `attachPty`, and `createTimelineWindow` |
+| `@acorn/plugin-api/ui/diff` | The `CodeRow` type, the `DiffSource` port, line context, the diff-document types, and `createDiffSnippets` ([the diff document](../diff-rendering/document.md)) |
+| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components, composed controls, and the confirmation seam. Never import it from a frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned CodeMirror theme, view state, and `languageForPath`. Compiled panes only. The terminal client aliases it to a stub ([host switch](../tui/host-switch.md)) |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, plus `mountFrame` and `mountTree` |
 | `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them |
-| `@acorn/plugin-api/ui/tokens` | The role enums and the node support matrix as data |
+| `@acorn/plugin-api/ui/tokens` | `HOST`, the host this build draws on |
 | `@acorn/plugin-api/ui/data-sources` | Connected typed-data authoring components |
 | `@acorn/plugin-api/ui/model-provider-failure` | Shared model-provider failure presentation |
 | `@acorn/plugin-api/testkit` | A real plugin context and request context, temporary databases, the auth gate, core's tables for fixtures, and the manifest validator |

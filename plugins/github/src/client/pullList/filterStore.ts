@@ -15,28 +15,11 @@ export function setPrFilter(workspaceId: string, patch: Partial<PrFilter>): void
   setPrFilters((prev) => ({ ...prev, [workspaceId]: { ...(prev[workspaceId] ?? defaultFilter()), ...patch } }))
 }
 
-// Seed from the persisted `pr_filters` pref at startup without clobbering anything changed pre-hydration.
-export function hydratePrFilters(json: string | undefined): void {
-  if (!json) return
-  try {
-    const raw = JSON.parse(json) as Record<string, unknown>
-    const out: Record<string, PrFilter> = {}
-    for (const [id, v] of Object.entries(raw)) {
-      if (!v || typeof v !== 'object') continue
-      const o = v as Record<string, unknown>
-      out[id] = { tab: o.tab === 'closed' ? 'closed' : 'open', filter: typeof o.filter === 'string' ? o.filter : '' }
-    }
-    setPrFilters((p) => ({ ...out, ...p }))
-  } catch {
-    /* ignore malformed pref */
-  }
-}
-
-export function hydratePrFilter(workspaceId: string, filter: PrFilter): void {
+function hydratePrFilter(workspaceId: string, filter: PrFilter): void {
   setPrFilters((current) => (current[workspaceId] ? current : { ...current, [workspaceId]: filter }))
 }
 
-export function evictPrFilter(workspaceId: string): void {
+function evictPrFilter(workspaceId: string): void {
   setPrFilters((current) => {
     if (!(workspaceId in current)) return current
     const next = { ...current }
@@ -45,12 +28,10 @@ export function evictPrFilter(workspaceId: string): void {
   })
 }
 
-export { prFilters }
-
 // Everything this module holds is keyed by a node-minted id, so it must not survive a node switch:
 // the persistence pass reads these maps and writes each scope under the active node's storage key,
 // and a stale entry would carry one node's state into another's namespace.
-export function clearPrFilters(): void {
+function clearPrFilters(): void {
   setPrFilters({})
 }
 

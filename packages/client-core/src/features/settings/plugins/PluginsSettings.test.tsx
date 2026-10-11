@@ -243,11 +243,12 @@ describe('Installed', () => {
     expect(toggle()).toBeNull()
     expect(host.textContent).toContain('Reading the plugin list')
 
-    answerB({ plugins: [ROWS[0]], restartRequired: false })
+    answerB({ plugins: [ROWS[0]], restartRequired: false, requests: [] })
     await vi.waitFor(() => expect(toggle()).not.toBeNull())
     vi.mocked(saveDisabledNodePlugins).mockResolvedValue({
       plugins: [{ ...ROWS[0], disabled: true }],
       restartRequired: true,
+      requests: [],
     })
     toggle()!.click()
     // Built from B's rows, so A's disabled beta is not sent to B.
@@ -296,8 +297,12 @@ describe('Installed', () => {
       inputs: { granted: false, inputs: READINESS.inputs!.inputs.map((input) => ({ ...input, approved: false })) },
     }
     const developing: NodePluginRow = { ...folder, development: { on: true } }
-    slowReads.set('node-a', async () => ({ plugins: [folder], restartRequired: false }))
-    vi.mocked(setNodePluginDevelopment).mockResolvedValue({ plugins: [developing], restartRequired: false })
+    slowReads.set('node-a', async () => ({ plugins: [folder], restartRequired: false, requests: [] }))
+    vi.mocked(setNodePluginDevelopment).mockResolvedValue({
+      plugins: [developing],
+      restartRequired: false,
+      requests: [],
+    })
     dispose = render(
       () => (
         <PluginsSettings context={{ scope: { nodeId: 'node-a' }, navigate: () => {}, onWorkspaceDeleted: () => {} }} />

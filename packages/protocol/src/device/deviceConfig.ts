@@ -3,7 +3,7 @@ import { CORE_EXCLUSIVE_SLOTS } from '../chrome/extensionPoints.ts'
 
 // This is user-editable data. Unknown top-level keys survive a write for forward compatibility,
 // while known executable and custody fields are never accepted or interpreted.
-export const devicePluginSourceSchema = z.union([
+const devicePluginSourceSchema = z.union([
   z.strictObject({ github: z.string().min(1), tag: z.string().min(1).optional() }),
   z.strictObject({ npm: z.string().min(1), version: z.string().min(1).optional() }),
   z.strictObject({ url: z.url().startsWith('https://') }),
@@ -59,7 +59,6 @@ export const deviceConfigSchema = z
   })
 
 export type DeviceConfig = z.infer<typeof deviceConfigSchema>
-export type DeviceConfigInput = z.input<typeof deviceConfigSchema>
 
 export type DeviceConfigParse =
   | { ok: true; value: DeviceConfig }

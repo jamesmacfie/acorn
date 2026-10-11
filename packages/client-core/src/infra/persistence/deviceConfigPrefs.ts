@@ -1,5 +1,4 @@
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
-import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { PrefKeys } from './prefKeys'
 
 const scalarKeys = {
@@ -49,9 +48,3 @@ export const configPatchForPref = (key: string, value: string): Partial<DeviceCo
   if (key === PrefKeys.workspaceRail) return { workspaceRail: value === 'true' }
   return null
 }
-
-/** A file entry asks for the normal install flow; it is never a trust decision. */
-export const deviceConfigInstallOffers = (
-  config: DeviceConfig,
-  installed: ReadonlySet<string>,
-): { id: string; source: PluginInstallSource }[] => (config.plugins ?? []).filter((plugin) => !installed.has(plugin.id))

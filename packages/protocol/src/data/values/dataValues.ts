@@ -1,5 +1,5 @@
 /** Version 1 of the shared typed-data contract. Bounds apply before consumer effects. */
-export const DATA_VERSION = 1 as const
+const DATA_VERSION = 1 as const
 export const DATA_LIMITS = {
   depth: 12,
   fields: 256,
@@ -22,19 +22,6 @@ export type DataValue = DataPrimitive | DataValue[] | { [key: string]: DataValue
 export type VersionedDataValue = { version: typeof DATA_VERSION; value: DataValue }
 export const MISSING = Symbol('missing data value')
 export type DataRead = DataValue | typeof MISSING
-
-export function parseVersionedDataValue(input: unknown): VersionedDataValue {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Expected versioned data value')
-  const descriptors = Object.getOwnPropertyDescriptors(input)
-  if (
-    Object.keys(descriptors).length !== 2 ||
-    descriptors.version?.value !== DATA_VERSION ||
-    !descriptors.value ||
-    !('value' in descriptors.value)
-  )
-    throw new Error('Unsupported data value version or envelope')
-  return { version: DATA_VERSION, value: parseDataValue(descriptors.value.value) }
-}
 
 export function parseDataPointer(pointer: unknown): string[] | null {
   if (typeof pointer !== 'string' || pointer.length > DATA_LIMITS.pointerChars) return null

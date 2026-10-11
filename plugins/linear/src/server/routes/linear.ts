@@ -248,7 +248,7 @@ function railRows(found: { row: StoredConnection; node: LinearNode }[]) {
 // locally (never shared). A bare identifier is resolved across all connected Linear integrations;
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
-export const createLinearRoutes = (
+const createLinearRoutes = (
   projects?: LinearProjectScope,
   emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {},
 ) =>

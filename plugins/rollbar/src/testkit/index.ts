@@ -9,7 +9,6 @@ export { rollbarFetch } from '../server/index'
 export { rollbarProvider } from '../server/provider'
 export { createRollbarFetch } from '../server/routes/rollbar'
 export type {
-  RollbarItemDetail,
   RollbarItemMetadata,
   RollbarItemsResponse,
   RollbarOccurrenceDetail,

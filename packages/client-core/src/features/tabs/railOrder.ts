@@ -48,8 +48,6 @@ export function applyRailOrder<T extends { id: string }>(tasks: T[], order: Rail
   return out
 }
 
-export const isPinned = (order: RailOrder, id: string): boolean => order.pinned.includes(id)
-
 /** Keep newly installed sources after the saved order, in their registry order. */
 export function applySourceOrder<T extends { id: string }>(sources: T[], order: RailOrder): T[] {
   if (!order.sources?.length) return sources

@@ -29,13 +29,13 @@ import { createLogger } from '../telemetry/logger'
 /** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one line
  *  for the run row. The same signal shape source fetches already take. */
 export type ScheduleRunReason = 'due' | 'manual' | 'catch-up'
-export type ScheduleRunContext = {
+type ScheduleRunContext = {
   scheduleKey: string
   reason: ScheduleRunReason
   dueAt?: number
   requestKey?: string
 }
-export type ScheduleRunner = (signal: AbortSignal, context?: ScheduleRunContext) => Promise<string | void>
+type ScheduleRunner = (signal: AbortSignal, context?: ScheduleRunContext) => Promise<string | void>
 
 /** A schedule declared in code (core) or by a plugin. Registry-truth: this object is the definition, and
  *  the database stores only the owner's overrides and the run state. */
@@ -81,7 +81,7 @@ export type ScheduleTarget = {
 /** What the row remembers about the one time the owner was asked. Handed to every run because a target
  *  cannot see its own row, and checking that the stamp still covers the target's current declared tier is
  *  the whole of "consent is taken once and honoured forever". */
-export type ScheduleConsent = { risk?: ToolRisk }
+type ScheduleConsent = { risk?: ToolRisk }
 
 /** "I ran, and deliberately did nothing." Recorded as `skipped` with the message as the reason, and not
  *  as an error: a schedule failing closed on a risk change is behaving correctly, and backing it off
@@ -126,7 +126,7 @@ type Owner = { owner: 'core' | 'user' } | { owner: 'plugin'; pluginId: string }
 
 /** Which of the three parties declared a key. The format is the whole mechanism: one registry, one
  *  settings list, and an owner badge that needs no extra column. */
-export function keyOwner(key: string): Owner {
+function keyOwner(key: string): Owner {
   const separator = key.indexOf(':')
   if (separator < 0) return { owner: 'core' }
   const head = key.slice(0, separator)

@@ -818,18 +818,24 @@ export class AgentStore {
   }
 
   async searchSessionHistory(sessionId: string, query: string, role?: HistoryRole, limit = 8): Promise<HistoryHit[]> {
-    const [projection, history] = await Promise.all([this.ensureSearchProjection(), import('./sessionHistory')])
+    const [projection, { searchSessionHistory }] = await Promise.all([
+      this.ensureSearchProjection(),
+      import('./sessionHistory'),
+    ])
     return this.db.transaction((tx) => {
       projection.catchUp(tx, sessionId)
-      return history.searchSessionHistory(tx, sessionId, query, role, limit)
+      return searchSessionHistory(tx, sessionId, query, role, limit)
     })
   }
 
   async readSessionHistory(sessionId: string, seq: number, offset = 0): Promise<HistoryPage | null> {
-    const [projection, history] = await Promise.all([this.ensureSearchProjection(), import('./sessionHistory')])
+    const [projection, { readSessionHistory }] = await Promise.all([
+      this.ensureSearchProjection(),
+      import('./sessionHistory'),
+    ])
     return this.db.transaction((tx) => {
       projection.catchUp(tx, sessionId)
-      return history.readSessionHistory(tx, sessionId, seq, offset)
+      return readSessionHistory(tx, sessionId, seq, offset)
     })
   }
 

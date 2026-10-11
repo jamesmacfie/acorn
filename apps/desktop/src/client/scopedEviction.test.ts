@@ -13,11 +13,9 @@ import {
   isTerminalOpen,
   layoutForTask,
   maximizedPane,
-  recipeBrowserUrl,
   rememberWorkspaceView,
   setFocusedPane,
   setMaximizedPane,
-  setRecipeBrowserUrl,
   setTerminalMax,
   setTerminalOpen,
   workspaceView,
@@ -38,7 +36,6 @@ describe('scoped lifecycle eviction', () => {
     const stopSessions = initSessions()
     const taskId = 'evict-task'
     dispatchLayout(taskId, { type: 'add', pane: 'editor' })
-    setRecipeBrowserUrl(taskId, 'http://localhost:3000')
     setTerminalOpen(taskId, true)
     setTerminalMax(taskId, true)
     setFocusedPane(taskId, 'editor')
@@ -63,7 +60,6 @@ describe('scoped lifecycle eviction', () => {
     })
 
     expect(layoutForTask(taskId)).toBeUndefined()
-    expect(recipeBrowserUrl(taskId)).toBeUndefined()
     expect(isTerminalOpen(taskId)).toBe(false)
     expect(isTerminalMax(taskId)).toBe(false)
     expect(focusedPane(taskId)).toBeUndefined()

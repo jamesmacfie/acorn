@@ -12,7 +12,7 @@ const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as {
 
 const ENV_KEYS = ['HOME', 'PATH', 'SHELL', 'LANG', 'LC_ALL', 'USER', 'LOGNAME', 'TMPDIR'] as const
 
-export type PromptResponse = {
+type PromptResponse = {
   pattern: RegExp
   response: string
 }

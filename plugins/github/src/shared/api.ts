@@ -238,7 +238,6 @@ export const jobLogRoute = (owner: string, repo: string, jobId: number) =>
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/v1/p/github/pins'
 
 export const reposKey = ['repos'] as const
 export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') =>
@@ -269,7 +268,6 @@ export const branchesKey = (owner: string, repo: string) => ['branches', owner, 
 // hydrates into the current one.
 export const compareKey = (owner: string, repo: string, base: string, head: string) =>
   ['compare', owner, repo, base, head, 'v3'] as const
-export const pinsKey = ['pins'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const

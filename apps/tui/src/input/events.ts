@@ -43,7 +43,7 @@ export type MouseButton = 'left' | 'middle' | 'right' | 'none'
 export type MouseAction = 'press' | 'release' | 'move' | 'wheel'
 export type WheelDirection = 'up' | 'down' | 'left' | 'right'
 
-export type MouseEvent = Modifiers & {
+type MouseEvent = Modifiers & {
   type: 'mouse'
   /** Zero-based cells, so they index the cell buffer directly. SGR counts from one and the parser
    *  takes the one off (../paint/buffer.ts). */
@@ -58,16 +58,16 @@ export type MouseEvent = Modifiers & {
 /** Whether this terminal is the window the reader is looking at, which is the notification gate's
  *  `focused()` (../main.tsx § setHostFocused). DEC 1004 reports it; a terminal that ignores the
  *  request never sends one, and unknown counts as focused. */
-export type FocusEvent = { type: 'focus'; state: 'in' | 'out' }
+type FocusEvent = { type: 'focus'; state: 'in' | 'out' }
 
 /** A bracketed paste, whole. The terminal brackets it so a hundred lines arrive as one event rather
  *  than as a hundred Returns, which is the difference between pasting into a composer and sending it
  *  a hundred times. */
-export type PasteEvent = { type: 'paste'; text: string }
+type PasteEvent = { type: 'paste'; text: string }
 
 /** A new terminal size, from `SIGWINCH`. Not a byte sequence at all, but it arrives through the same
  *  stream because everything downstream of it wants the two in order. */
-export type ResizeEvent = { type: 'resize'; cols: number; rows: number }
+type ResizeEvent = { type: 'resize'; cols: number; rows: number }
 
 export type InputEvent = KeyEvent | MouseEvent | FocusEvent | PasteEvent | ResizeEvent
 

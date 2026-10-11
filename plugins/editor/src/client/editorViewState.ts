@@ -40,15 +40,10 @@ export function removeEditorViewStates(taskId: string, path: string, nodeId = ac
     if (key.startsWith(prefix) && pathContains(path, key.slice(prefix.length))) viewStates.delete(key)
 }
 
-export function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {
+function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {
   // A matching task ID on another Node has independent view state.
   const suffix = `${nodeId ?? ''}/${taskId}:`
   for (const key of viewStates.keys()) if (key.startsWith(suffix)) viewStates.delete(key)
-}
-
-// Test reset; ordinary Node switches retain independently keyed view state.
-export function clearEditorViewStates(): void {
-  viewStates.clear()
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list

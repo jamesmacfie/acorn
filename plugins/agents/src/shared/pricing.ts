@@ -11,17 +11,17 @@ export type AgentModelPrice = {
   cacheRead: number
 }
 
-export type AgentPricingOverride = {
+type AgentPricingOverride = {
   catalogId: string
   price: AgentModelPrice
 }
 
-export type AgentCustomModelPrice = {
+type AgentCustomModelPrice = {
   model: string
   price: AgentModelPrice
 }
 
-export type AgentPricingProviderPreferences = {
+type AgentPricingProviderPreferences = {
   overrides: AgentPricingOverride[]
   customModels: AgentCustomModelPrice[]
 }

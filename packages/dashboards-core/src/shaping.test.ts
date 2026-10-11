@@ -3,7 +3,6 @@ import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import {
   aggregateRows,
   boardColumns,
-  fieldWithRole,
   groupableFields,
   groupField,
   shapeRows,
@@ -144,12 +143,10 @@ describe('projection', () => {
     ])
   })
 
-  it('finds the lead field by role, then by type', () => {
+  it('finds the title field by role, then by type', () => {
     expect(titleField(schema)?.id).toBe('title')
     expect(titleField({ fields: [{ id: 'n', name: 'N', type: 'number' }] })?.id).toBe('n')
     expect(titleField({ fields: [] })).toBeUndefined()
-    expect(fieldWithRole(schema, 'status')?.id).toBe('status')
-    expect(fieldWithRole(schema, 'assignee')).toBeUndefined()
   })
 })
 

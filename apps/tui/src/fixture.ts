@@ -33,7 +33,7 @@ export const TASK: Task = {
   sort: 0,
 }
 
-export const TASK_NOTES: NoteSummary[] = [
+const TASK_NOTES: NoteSummary[] = [
   {
     slug: 'scratchpad',
     title: 'Scratchpad',
@@ -63,7 +63,7 @@ export const TASK_NOTES: NoteSummary[] = [
   },
 ]
 
-export const WORKSPACE_NOTES: NoteSummary[] = [
+const WORKSPACE_NOTES: NoteSummary[] = [
   {
     slug: 'conventions',
     title: 'Conventions',

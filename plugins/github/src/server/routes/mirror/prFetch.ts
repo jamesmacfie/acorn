@@ -20,7 +20,7 @@ const CONTINUATION_CONCURRENCY = 4
 // ─── GraphQL detail ──────────────────────────────────────────────────────────
 
 type PageInfo = { endCursor: string | null; hasNextPage: boolean }
-export type Connection<T> = { pageInfo: PageInfo; nodes: T[] }
+type Connection<T> = { pageInfo: PageInfo; nodes: T[] }
 
 type GqlActor = { login: string } | null
 export type GqlLabel = { name: string; color: string | null }
@@ -44,7 +44,7 @@ export type GqlCommit = {
     author: { name: string | null; user: { login: string } | null } | null
   }
 }
-export type GqlThreadComment = {
+type GqlThreadComment = {
   id: string
   databaseId: number | null
   author: GqlActor
@@ -136,7 +136,7 @@ const SCALARS = `id number title state isDraft bodyHTML headRefOid baseRefOid au
 
 // The first request: the scalars and the first page of every connection. Its worst case is 100 review
 // threads of 100 comments each, about 10,700 nodes against GitHub's 500,000 per call.
-export const PULL_FIRST_QUERY = `
+const PULL_FIRST_QUERY = `
 query PR($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -346,8 +346,8 @@ export type GitHubFile = {
 }
 
 // GitHub's documented limits for "List pull request files": 100 per page, 3,000 in all.
-export const FILES_PAGE_SIZE = 100
-export const FILES_UPSTREAM_LIMIT = 3000
+const FILES_PAGE_SIZE = 100
+const FILES_UPSTREAM_LIMIT = 3000
 const FILES_MAX_PAGES = FILES_UPSTREAM_LIMIT / FILES_PAGE_SIZE
 
 export type FilesFetch = { files: GitHubFile[]; completeness: PullTopologyCompleteness; revision?: string | null }

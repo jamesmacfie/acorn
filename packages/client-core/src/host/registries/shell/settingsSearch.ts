@@ -20,7 +20,7 @@ import {
 
 /** How strongly an entry matched, best first: the page's name, a section's name, a row's label, then a
  *  keyword. The names of workspaces, nodes and the rest count as pages or sections, by where they land. */
-export type SettingsSearchTier = 0 | 1 | 2 | 3
+type SettingsSearchTier = 0 | 1 | 2 | 3
 
 export type SettingsSearchEntry = {
   /** What the result opens: a page id, or another rail key such as a workspace's. */

@@ -16,7 +16,7 @@ import { workflowRecordIdentity } from '../processing/rules'
 const TITLE_LIMIT = 500
 const BOUND_TEMPLATE_RE = /\$\{([A-Za-z][A-Za-z0-9_]*)\}/g
 
-export type WorkflowMapRosterEntry = {
+type WorkflowMapRosterEntry = {
   index: number
   itemKey: string
   item: unknown
@@ -29,7 +29,7 @@ export type WorkflowMapRoster = {
   entries: WorkflowMapRosterEntry[]
 }
 
-export function readWorkflowJsonPointer(value: unknown, pointer: string): unknown {
+function readWorkflowJsonPointer(value: unknown, pointer: string): unknown {
   const segments = parseWorkflowJsonPointer(pointer)
   if (!segments) throw new Error(`Binding pointer '${pointer}' is not a safe JSON Pointer.`)
   let current = value

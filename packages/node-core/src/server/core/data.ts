@@ -9,12 +9,12 @@ import type { TaskService } from './tasks'
 import { taskDataPools } from './dataPools'
 import { dataCatalog, invalidateDataCatalog } from './dataCatalog'
 
-export type DataCell = string | null
+type DataCell = string | null
 export type DataColumn = { name: string; dataType: string; nullable: boolean; isPk: boolean }
 export type DataTable = { schema: string; name: string; columns: DataColumn[] }
-export type DataSchemaSource = 'auto' | 'script' | 'file'
+type DataSchemaSource = 'auto' | 'script' | 'file'
 
-export type DataQueryOptions = {
+type DataQueryOptions = {
   maxRows?: number
   /** Reads are the default. A permission-scoped service refuses `false` without `data:write`. */
   readOnly?: boolean
@@ -22,7 +22,7 @@ export type DataQueryOptions = {
   parameters?: DataCell[]
 }
 
-export type DataQueryResult = {
+type DataQueryResult = {
   columns: string[]
   rows: DataCell[][]
   rowCount: number | null
@@ -31,7 +31,7 @@ export type DataQueryResult = {
   ms: number
 }
 
-export type DataSchemaResult = {
+type DataSchemaResult = {
   tables: DataTable[]
   text: string
   source: DataSchemaSource
@@ -48,9 +48,9 @@ export type DataSourceService = {
   schema(taskId: string): Promise<DataSchemaResult>
 }
 
-export const DATA_MAX_QUERY_ROWS = 500
-export const DATA_DEFAULT_TIMEOUT_MS = 15_000
-export const DATA_MAX_TIMEOUT_MS = 60_000
+const DATA_MAX_QUERY_ROWS = 500
+const DATA_DEFAULT_TIMEOUT_MS = 15_000
+const DATA_MAX_TIMEOUT_MS = 60_000
 
 const SCHEMA_CHAR_CAP = 80_000
 type DataCore = {

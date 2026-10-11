@@ -95,7 +95,7 @@ const notePress = (box: Renderable): void => {
 }
 
 /** Make a renderable a stop: focusable, pressed by `activate`, and pressed by the mouse. */
-export function pressable(box: Renderable, options: StopOptions): void {
+function pressable(box: Renderable, options: StopOptions): void {
   const off = () => options.disabled?.() ?? false
   if (options.opens) opening.add(box)
   if (options.on?.expand || options.on?.collapse) crossing.add(box)

@@ -5,7 +5,7 @@ import { asObject } from './codexNormalizer'
 
 const stringValue = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
-export type CodexCollaborationModePreset = {
+type CodexCollaborationModePreset = {
   name: string
   mode: 'default' | 'plan'
   model: string | null

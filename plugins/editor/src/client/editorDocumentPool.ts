@@ -108,14 +108,3 @@ export function rebindEditorFile(
   if (saved) pool.saved.set(newPath, saved)
   pool.reading.delete(oldPath)
 }
-
-/** Called only after a confirmed delete; the custody retains dirty recovery after release. */
-export function retireEditorFile(pool: EditorPool, path: string): void {
-  const entry = pool.files.get(path)
-  if (!entry) return
-  entry.custody.retireFile()
-  pool.files.delete(path)
-  pool.saved.delete(path)
-  pool.reading.delete(path)
-  entry.release()
-}

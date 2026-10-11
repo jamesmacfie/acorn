@@ -69,7 +69,7 @@ const within = (path: string, root: string): boolean => path === root || path.st
 /** Where a file grant really points, or null when it can't be a single regular file. A missing file is
  *  allowed, because a read-write grant creates it, and is canonicalized through its folder. A dangling
  *  link is refused, because a write through it would create its target wherever it points. */
-export function fileGrantTarget(path: string): string | null {
+function fileGrantTarget(path: string): string | null {
   try {
     lstatSync(path)
   } catch {

@@ -1,31 +1,7 @@
 import { z } from 'zod'
 import type { AgentTurnSource } from '../contract/wire.ts'
 
-export const agentRuntimeStateSchema = z.enum([
-  'creating',
-  'connecting',
-  'replaying',
-  'ready',
-  'working',
-  'waiting',
-  'cancelling',
-  'reconnecting',
-  'stopped',
-  'failed',
-  'archived',
-])
-
-export const agentAttentionReasonSchema = z.enum([
-  'permission',
-  'question',
-  'workflow_gate',
-  'completed',
-  'error',
-  'unread',
-  'none',
-])
-
-export const agentInputPartSchema = z.discriminatedUnion('type', [
+const agentInputPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().max(1_000_000) }),
   z.object({ type: z.literal('attachment'), attachmentId: z.string().min(1).max(200) }),
   z.object({
@@ -162,4 +138,3 @@ export type ImportAgentTranscriptInput = z.infer<typeof importAgentTranscriptSch
 // `plugin` is the one source no HTTP caller may claim. Only the session messenger writes it, with the
 // host's `sentBy` (`SessionMessages`), so the schema above leaves it out.
 export type EnqueueAgentTurnInput = Omit<z.infer<typeof enqueueAgentTurnSchema>, 'source'> & { source: AgentTurnSource }
-export type ResolveAgentRequestInput = z.infer<typeof resolveAgentRequestSchema>

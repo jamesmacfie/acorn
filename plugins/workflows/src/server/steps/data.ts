@@ -34,7 +34,7 @@ export function assertWorkflowDataScope(
     throw new Error('Query is outside the workflow project')
 }
 
-export function evaluateWorkflowCondition(input: DataPredicate, context: StepHandlerContext): boolean {
+function evaluateWorkflowCondition(input: DataPredicate, context: StepHandlerContext): boolean {
   const values = { inputs: { ...context.inputs }, steps: { ...context.predecessorValues } }
   function evaluate(predicate: DataPredicate): boolean {
     if (predicate.kind !== 'comparison')

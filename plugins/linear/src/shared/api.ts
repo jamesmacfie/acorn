@@ -105,7 +105,6 @@ export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
 export const linearIssuesRoute = '/v1/p/linear/issues'
-export const linearProjectsRoute = '/v1/p/linear/projects'
 // `scopeIds` holds what the workspace mapped, which is a Linear project id or a prefixed team id
 // (server/index.ts's `linearTeamScopeId`).
 export const linearProjectIssuesRoute = (integrationId: string, scopeIds: string[]) =>

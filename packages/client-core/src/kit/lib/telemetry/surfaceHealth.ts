@@ -23,7 +23,7 @@ export type SurfaceKind = 'diff' | 'timeline'
 
 /** Every field a surface can report. Grouped by the question each answers; a field a surface has no
  *  concept of stays zero. */
-export type SurfaceHealth = {
+type SurfaceHealth = {
   /** The document as a whole. `ready` is the source-owned structure being complete. */
   topology: {
     files: number

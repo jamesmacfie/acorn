@@ -1,5 +1,5 @@
 export { TEARDOWN_TIMEOUT_MS } from './archive.ts'
-export { lockedBy, openDataRoot, readNodeAttachment, recordNodeAttachment, writePrivateAtomic } from './dataRoot.ts'
+export { lockedBy, openDataRoot, readNodeAttachment, recordNodeAttachment } from './dataRoot.ts'
 export type { DataRoot } from './dataRoot.ts'
 export { logStorageFootprint } from './footprint.ts'
 export { findWorkspaceRoot } from './paths.ts'

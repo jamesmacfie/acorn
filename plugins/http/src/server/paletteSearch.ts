@@ -50,7 +50,7 @@ export function savedRequestSearchScore(row: SavedRequestSummary, text: string):
 /** One row, as the palette draws it. The id is the request's own, which is the item the project
  *  surface's route captures (`/p/:projectId/x/http/requests/:requestId`), so picking a row addresses
  *  exactly what clicking it in the rail does. */
-export const savedRequestSearchItem = (row: SavedRequestSummary): CommandSearchItem => ({
+const savedRequestSearchItem = (row: SavedRequestSummary): CommandSearchItem => ({
   id: row.id,
   title: row.name.slice(0, TITLE),
   ...(row.folder ? { subtitle: row.folder.slice(0, SUBTITLE) } : {}),

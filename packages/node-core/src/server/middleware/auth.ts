@@ -7,7 +7,7 @@ import { isLoopbackPeer } from '../transport/loopbackPeer'
 // The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
 // integration records and are not part of Principal.
-export type PrincipalKind = 'device' | 'internal'
+type PrincipalKind = 'device' | 'internal'
 // `userId` is the node owner's opaque id, the scope key for every user-scoped table. `deviceId` is set
 // only for kind 'device'; the internal principal has no device row to revoke.
 export type Principal = {
@@ -30,7 +30,7 @@ export type Principal = {
 // `trace` is set by the same middleware and only while telemetry is collecting, which is why it is
 // the one optional variable here. It carries the request's own span so an error raised inside the
 // request lands in the same trace rather than starting a second one (docs/telemetry/model.md § Traces).
-export type TraceRef = { traceId: string; spanId: string }
+type TraceRef = { traceId: string; spanId: string }
 export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string; trace?: TraceRef } }
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped

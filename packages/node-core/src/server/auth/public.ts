@@ -3,6 +3,6 @@ export { idempotencyStore } from './idempotency.ts'
 export type { IdempotencyStore } from './idempotency.ts'
 export { mintInternalToken } from './internalTokens.ts'
 export { renewingInternalEnv } from './renewingEnv.ts'
-export { ActiveCredentials } from './activeCredentials.ts'
+
 export type { InternalEnvFactory } from './internalTokens.ts'
 export { pairingCodes } from './pairingCodes.ts'

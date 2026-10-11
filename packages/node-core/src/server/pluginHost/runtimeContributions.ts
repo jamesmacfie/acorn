@@ -124,11 +124,7 @@ async function boundedResponseText(response: Response, maxBytes: number, exceede
   return text + decoder.decode()
 }
 
-export function manifestAgentTool(
-  env: Env,
-  pluginId: string,
-  descriptor: PluginAgentToolDescriptor,
-): AgentToolContribution {
+function manifestAgentTool(env: Env, pluginId: string, descriptor: PluginAgentToolDescriptor): AgentToolContribution {
   // The manifest parser has already rejected the unsupported language. Compile once at registration;
   // safeParse below is still run for every call, like a compiled contribution's Zod schema.
   const input = z.fromJSONSchema(descriptor.inputSchema as Parameters<typeof z.fromJSONSchema>[0])
@@ -205,7 +201,7 @@ export function manifestAgentTool(
   }
 }
 
-export function manifestContextSection(
+function manifestContextSection(
   env: Env,
   pluginId: string,
   descriptor: PluginContextSectionDescriptor,

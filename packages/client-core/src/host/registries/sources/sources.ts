@@ -5,7 +5,7 @@ import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabili
 import type { InAppTarget } from '../panes/contentLinks'
 import { Registry } from '../../../kit/lib/state/registry'
 
-export type SourcePromotionContext = {
+type SourcePromotionContext = {
   projectId: string
   owner: string
   repo: string
@@ -129,7 +129,7 @@ export const sourceIsProjectScoped = (sourceId: string | null | undefined): bool
 
 // Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend/registries.md §
 // Registries and plugins covers the default/order fallback.
-export const defaultSource = (): SourceContribution | undefined => {
+const defaultSource = (): SourceContribution | undefined => {
   const sources = sourceRegistry.entries()
   return sources.find((source) => source.isDefault) ?? [...sources].sort(sourceOrder)[0]
 }

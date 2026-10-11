@@ -14,9 +14,7 @@ import type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJs
 import { requireProfile } from './profiles'
 import { spawnsReady } from './core/loginShellPath'
 
-export type HeadlessMode = 'interactive' | 'headless'
-
-export type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent }
+export type { HeadlessArgv, HeadlessOpts, StreamEvent }
 
 // Build the non-interactive invocation for a profile. `command` is injectable so tests route the same
 // template through the fake agent script.

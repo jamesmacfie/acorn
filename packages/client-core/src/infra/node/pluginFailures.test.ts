@@ -18,7 +18,7 @@ const row = (over: Partial<NodePluginRow>): NodePluginRow => ({
 })
 
 const serve = (plugins: NodePluginRow[]): void => {
-  mocks.readJson.mockResolvedValue({ plugins, restartRequired: false } satisfies NodePluginState)
+  mocks.readJson.mockResolvedValue({ plugins, restartRequired: false, requests: [] } satisfies NodePluginState)
 }
 
 const items = () => pluginFailureAttention.fetch('node-a', new AbortController().signal)

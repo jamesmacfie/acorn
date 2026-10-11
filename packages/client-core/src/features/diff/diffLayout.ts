@@ -32,15 +32,15 @@ import type { DiffItem } from './documentView'
 /** Mounted beyond each edge of the viewport: about two screens of runway altogether in a normal pane,
  *  so a momentum scroll does not outrun what is mounted. In pixels rather than items, because an item
  *  is a 36px header in one place and a 64-row segment in another. */
-export const DIFF_RUNWAY_PX = 800
+const DIFF_RUNWAY_PX = 800
 /** Scroller widths that share measured heights. A block's height depends on its width once it holds
  *  prose, and a pane resize of a few pixels should not make every remembered height suspect. Chosen by
  *  hand, not from a measured resize profile. */
-export const DIFF_WIDTH_BUCKET_PX = 80
+const DIFF_WIDTH_BUCKET_PX = 80
 /** How long after the reader's last scroll event the scroll counts as settled. Long enough to bridge
  *  the gaps in a momentum scroll's events, short enough that a held-back commit lands soon after the
  *  reader stops. Chosen by hand, not from a WebKit momentum profile. */
-export const DIFF_SCROLL_SETTLE_MS = 150
+const DIFF_SCROLL_SETTLE_MS = 150
 
 /**
  * Something between or under code rows whose height is measured rather than known.

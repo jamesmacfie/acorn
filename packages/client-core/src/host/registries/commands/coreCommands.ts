@@ -51,7 +51,7 @@ import type { ContributedCommand } from './commands'
 // disagreeing with itself.
 
 /** The two choices a Boolean setting offers. */
-export const BOOLEAN_CHOICES: readonly CommandSettingOption[] = [
+const BOOLEAN_CHOICES: readonly CommandSettingOption[] = [
   { value: 'on', label: 'On', keywords: ['yes', 'enable'] },
   { value: 'off', label: 'Off', keywords: ['no', 'disable'] },
 ]
@@ -68,9 +68,9 @@ const isOn = (value: string): boolean => value === 'on'
 const devicePrefs = (): Record<string, string> => readDevicePrefs()
 
 export const CORE_GO_TO_GROUP = 'core.goto'
-export const CORE_SETTINGS_GROUP = 'core.settings.pages'
-export const CORE_APPEARANCE_GROUP = 'core.appearance'
-export const CORE_NOTIFICATIONS_GROUP = 'core.notifications'
+const CORE_SETTINGS_GROUP = 'core.settings.pages'
+const CORE_APPEARANCE_GROUP = 'core.appearance'
+const CORE_NOTIFICATIONS_GROUP = 'core.notifications'
 
 /** Where the navigation searches live. Registered by each host, because what it can navigate to
  *  differs; the group is shared so the breadcrumb reads the same in both. */

@@ -51,7 +51,7 @@ import { hasRenderableBody, reviewAction, threadComments, type ConversationEntry
 /** Where a body goes until its turn comes near. Words rather than a blank, so a card is never empty. */
 const NOT_DRAWN = 'Shown when you scroll to it.'
 
-export function ConversationEntryItem(props: {
+function ConversationEntryItem(props: {
   entry: ConversationEntry
   near: Accessor<boolean>
   snippets: DiffSnippets

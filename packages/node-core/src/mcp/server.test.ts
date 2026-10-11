@@ -144,7 +144,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     body: unknown
     internal: string
     session: string
-    ceiling: string
     callId: string
     server: 'primary' | 'retry'
   }[] = []
@@ -173,7 +172,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
             body: raw ? JSON.parse(raw) : null,
             internal: String(req.headers['x-acorn-internal'] ?? ''),
             session: String(req.headers['x-acorn-session-id'] ?? ''),
-            ceiling: String(req.headers['x-acorn-tool-ceiling'] ?? ''),
             callId: String(req.headers['x-acorn-tool-call-id'] ?? ''),
             server,
           })
@@ -242,7 +240,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       NODE_EXTRA_CA_CERTS: caPath,
       ACORN_API_TOKEN: 'internal-token',
       ACORN_SESSION_ID: 'sess-42',
-      ACORN_TOOL_CEILING: 'encoded-scope',
     })
     try {
       await client.init()
@@ -265,7 +262,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(post?.body).toEqual({ slug: 'plan', text: 'Done.' })
       expect(post?.internal).toBe('internal-token')
       expect(post?.session).toBe('sess-42')
-      expect(post?.ceiling).toBe('encoded-scope')
       expect(post?.callId).toMatch(/^[0-9a-f-]{36}$/)
     } finally {
       client.kill()

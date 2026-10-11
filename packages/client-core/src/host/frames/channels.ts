@@ -25,7 +25,7 @@ import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { GrantDescription } from '../trust/permissions'
 
-export const SUBSCRIBABLE_CHANNELS = [
+const SUBSCRIBABLE_CHANNELS = [
   'runtime:task-archived',
   'runtime:workspace-removed',
   'runtime:node-removed',

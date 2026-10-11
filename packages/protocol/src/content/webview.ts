@@ -34,7 +34,7 @@ export function normalizeWebviewHost(pattern: string): string {
   return wildcard ? `*.${host}` : host
 }
 
-export const isLoopbackWebviewHost = (hostname: string): boolean => LOOPBACK.has(unbracket(hostname.toLowerCase()))
+const isLoopbackWebviewHost = (hostname: string): boolean => LOOPBACK.has(unbracket(hostname.toLowerCase()))
 
 export function webviewHostMatches(hostname: string, pattern: string): boolean {
   let normalized: string

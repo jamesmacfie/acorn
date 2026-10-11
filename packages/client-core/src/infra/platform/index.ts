@@ -126,7 +126,7 @@ export type CliInstaller = {
 
 // The native folder dialog. Its own group rather than part of `DesktopExtras`, so a gate on it hides
 // only what needs the dialog, not the rest of the product (see `HostRequirement`).
-export type FolderPicker = { pick(): Promise<string | null> }
+type FolderPicker = { pick(): Promise<string | null> }
 
 // Choosing files to attach, and saving one to disk. Unlike the folder dialog these are not
 // desktop-only: a page can open its own file input and click its own download link, so the seam
@@ -163,7 +163,7 @@ export type Notify = {
 
 // Whether anybody can see this client, for work that should pause while nobody can (client
 // schedules). A page answers from its own `document`, so only a host without one installs this.
-export type HostVisibility = { hidden(): boolean; onChange(cb: () => void): () => void }
+type HostVisibility = { hidden(): boolean; onChange(cb: () => void): () => void }
 
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
@@ -172,7 +172,7 @@ export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
 // The shell retains one preview per local task. Node switches retire every preview. Ensure replays
 // browsing state after observer registration and reconciles configured home independently of it.
-export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 export type PreviewViews = {
   ensure(taskId: string, url: string): Promise<boolean>
   setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
@@ -187,14 +187,14 @@ export type PreviewViews = {
 
 // Host-owned page surface for an accepted loaded plugin. The sandboxed plugin frame never sees this;
 // PluginWebview and its broker are the only callers.
-export type PluginWebviewState = {
+type PluginWebviewState = {
   key: string
   url: string
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
 }
-export type PluginWebviewBlocked = { key: string; url: string; host: string }
+type PluginWebviewBlocked = { key: string; url: string; host: string }
 export type PluginWebviews = {
   ensure(key: string, url: string, hosts: readonly string[]): Promise<boolean>
   setBounds(key: string, rect: { x: number; y: number; width: number; height: number }): void
@@ -253,7 +253,7 @@ export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
 }
 // Which plugins this device is developing, and against which node. See docs/security/plugin-install.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
-export type PluginDevGrant = {
+type PluginDevGrant = {
   pluginId: string
   nodeId: string
   source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
@@ -296,7 +296,7 @@ export type PluginPutResult =
         | 'invalid-manifest'
         | 'plugin-id-mismatch'
     }
-export type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
+type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 
 // ── The desktop implementation ────────────────────────────────────────────────────────────────
 

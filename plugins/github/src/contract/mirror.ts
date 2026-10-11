@@ -10,7 +10,7 @@ export type MirroredPullRequest = {
 }
 
 /** Repository metadata from one owner's disposable local GitHub mirror. */
-export type MirroredRepository = {
+type MirroredRepository = {
   id: number
   owner: string
   name: string

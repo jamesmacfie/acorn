@@ -25,7 +25,7 @@ export const dataSourceDescriptorSchema = z
 // A derived source names other statically registered sources as inputs. The host reads them for it,
 // with the accounts each query binds in `scope.inputs`, so it never owns a provider of its own.
 export const DATA_SOURCE_INPUT_NAME = /^[a-z][a-zA-Z0-9]{0,31}$/
-export const dataSourceInputSchema = z
+const dataSourceInputSchema = z
   .object({
     source: z
       .string()

@@ -39,10 +39,8 @@ const ROLE_FIELDS = [
   { id: 'url', name: 'Link', type: 'link', role: 'url' },
 ] as const satisfies readonly DashboardDisplayField[]
 
-export const PANEL_FIELDS: readonly DashboardDisplayField[] = ROLE_FIELDS
-
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
-export const PANEL_STATUS_FIELD_ID = 'status'
+const PANEL_STATUS_FIELD_ID = 'status'
 
 /** Where a row came from, as an ordinary panel-local field, fed by the host's stamp described in
  *  docs/dashboards/panels.md § Provenance, and what a row may not claim. See docs/dashboards/mapping-and-editor.md § The
@@ -95,10 +93,6 @@ export const panelFieldsFor = (
   ...provenanceField(sources),
 ]
 
-/** An invented field's id is never a role's, so `undefined` here means "this is one of the five". */
-const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
-  mapping?.extraFields?.find((definition) => definition.id === panelFieldId)
-
 /** Does this panel use the mapping layer at all?
  *
  *  Explicit triggers: more than one source, declared columns (an enum the user invented even over one
@@ -129,43 +123,6 @@ export function sourceFieldFor(
   // is exactly where the host has no opinion to offer.
   if (!role) return undefined
   return source.schema.fields.find((field) => field.role === role)?.id
-}
-
-/** The suggestion the host shows its work for. "Both of these sources have a status-role enum,
- *  here's a mapping" is the whole argument for the role vocabulary, and this is where it's cashed.
- *
- *  Only fields the user hasn't already answered are filled, so pressing it twice is harmless and a
- *  hand-made choice is never overwritten. The result is written into the config rather than applied
- *  invisibly, so the editor's selects show exactly what the panel will do. */
-export function suggestFieldMapping(
-  sources: readonly PanelSourcePage[],
-  mapping: PanelMapping | undefined,
-): PanelMapping['fields'] {
-  const out: Record<string, Record<string, string>> = { ...(mapping?.fields ?? {}) }
-  for (const source of sources) {
-    const key = panelSourceKey(source.source)
-    const existing = out[key] ?? {}
-    const suggested: Record<string, string> = { ...existing }
-    for (const field of ROLE_FIELDS) {
-      if (suggested[field.id] !== undefined) continue
-      const match = source.schema.fields.find((candidate) => candidate.role === field.role)
-      if (match) suggested[field.id] = match.id
-    }
-    if (Object.keys(suggested).length) out[key] = suggested
-  }
-  return Object.keys(out).length ? out : undefined
-}
-
-/** The source fields a panel-local field may be pointed at: the ones whose semantic type matches.
- *  Pointing the `updated` column at a text field would sort alphabetically on one source and
- *  chronologically on the other, which is what the type vocabulary was bought to prevent. */
-export const candidateFieldsFor = (
-  source: PanelSourcePage,
-  panelFieldId: string,
-  mapping?: PanelMapping | undefined,
-): DashboardDisplayField[] => {
-  const type = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.type ?? extraField(mapping, panelFieldId)?.type
-  return type ? source.schema.fields.filter((field) => field.type === type) : []
 }
 
 // ── Value mapping ─────────────────────────────────────────────────────────────────────────────
@@ -213,30 +170,6 @@ export function withMappedValue(
   const next: PanelMapping = { ...mapping }
   if (Object.keys(bySource).length) next.bySource = bySource
   else delete next.bySource
-  return next
-}
-
-/** Fill in the value mapping the host can honestly guess: a source value whose id or label matches a
- *  column's id or label, case-insensitively. linear's `completed` labelled "Done" finds a column called
- *  Done; github's `ready` finds nothing and stays unmapped, which is correct. The host doesn't invent a
- *  destination and then hide that it guessed.
- *
- *  Values the user already placed are left alone, so this is safe to press at any time. */
-export function suggestValueMapping(sources: readonly PanelSourcePage[], mapping: PanelMapping): PanelMapping {
-  const columns = mapping.columns ?? []
-  if (!columns.length) return mapping
-  let next = mapping
-  for (const source of sources) {
-    const key = panelSourceKey(source.source)
-    for (const value of statusValuesOf(source, mapping)) {
-      if (mappedColumnId(next, key, value.id)) continue
-      const wanted = [value.id, value.label].map((text) => text.toLowerCase())
-      const column = columns.find(
-        (candidate) => wanted.includes(candidate.id.toLowerCase()) || wanted.includes(candidate.label.toLowerCase()),
-      )
-      if (column) next = withMappedValue(next, key, value.id, column.id)
-    }
-  }
   return next
 }
 
@@ -358,58 +291,3 @@ export function unionRows(
     })
   })
 }
-
-// ── Pruning ───────────────────────────────────────────────────────────────────────────────────
-
-/** The mapping with everything naming a source or column the panel no longer has removed, and
- *  `undefined` when nothing is left. A value mapping written against a dropped source is valid config
- *  addressing nothing, and it would come back the day a source with the same key was added again. */
-export function pruneMapping(
-  mapping: PanelMapping | undefined,
-  sources: readonly PanelProjectionSource[],
-): PanelMapping | undefined {
-  if (!mapping) return undefined
-  const keys = new Set(sources.map(panelSourceKey))
-  const columns = (mapping.columns ?? []).filter((column) => column.id && column.label)
-  const columnIds = new Set(columns.map((column) => column.id))
-  const extraFields = (mapping.extraFields ?? []).filter((field) => field.id && field.label)
-  // The five roles plus whatever survived above. Anything else a `fields` entry names is a field the
-  // person deleted, and keeping it would bring the old mapping back the day they invented a field with
-  // the same id.
-  const fieldIds = new Set([...PANEL_FIELDS.map((field) => field.id), ...extraFields.map((field) => field.id)])
-
-  const bySource: Record<string, Record<string, PanelMappingColumn>> = {}
-  for (const [key, entries] of Object.entries(mapping.bySource ?? {})) {
-    if (!keys.has(key)) continue
-    const kept: Record<string, PanelMappingColumn> = {}
-    for (const [columnId, entry] of Object.entries(entries)) {
-      if (columnIds.has(columnId) && entry && Object.keys(entry).length) kept[columnId] = entry
-    }
-    if (Object.keys(kept).length) bySource[key] = kept
-  }
-
-  const fields: Record<string, Record<string, string>> = {}
-  for (const [key, entries] of Object.entries(mapping.fields ?? {})) {
-    if (!keys.has(key)) continue
-    const kept = Object.fromEntries(Object.entries(entries).filter(([fieldId]) => fieldIds.has(fieldId)))
-    if (Object.keys(kept).length) fields[key] = kept
-  }
-
-  const next: PanelMapping = {
-    ...(columns.length ? { columns } : {}),
-    ...(Object.keys(bySource).length ? { bySource } : {}),
-    ...(Object.keys(fields).length ? { fields } : {}),
-    ...(extraFields.length ? { extraFields } : {}),
-    ...(mapping.unmapped === 'hidden' ? { unmapped: 'hidden' as const } : {}),
-  }
-  // A panel that isn't mapped has no use for any of it: the field mapping the editor pre-filled on the
-  // way in, and everything a second source left behind, are config the single-source path never
-  // reads. Kept, they'd come back the day a source was re-added and quietly reshape a panel somebody
-  // had since made their own.
-  if (!isMapped(sources, next)) return undefined
-  return Object.keys(next).length ? next : undefined
-}
-
-/** A fresh column id, minted rather than slugged from the label, so renaming a column doesn't rebind
- *  every value mapped into it. */
-export const newColumnId = (): string => crypto.randomUUID().slice(0, 8)

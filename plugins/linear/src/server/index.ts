@@ -83,7 +83,7 @@ export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
 // The rail's Search field, one bounded page per connection (docs/integrations/linear.md § Rail search).
 // The row fields without labels, which are what makes a page of issues expensive, and `pageInfo` so a
 // connection holding more matches says so instead of looking finished.
-export const RAIL_SEARCH_PAGE = 50
+const RAIL_SEARCH_PAGE = 50
 export const RAIL_SEARCH_QUERY = `query($filter: IssueFilter) {
   issues(filter: $filter, first: ${RAIL_SEARCH_PAGE}) {
     nodes {
@@ -153,18 +153,10 @@ export function projectIssueSearchFilter(mappedIds: string[], query: string): Re
   return { and: [base, { or }] }
 }
 
-// The same query with a different filter: active issues assigned to whoever owns the credential,
-// across the whole workspace rather than the linked projects. A rail is scoped to the project someone
-// is looking at; a dashboard panel is scoped to the person.
-export const myIssuesFilter = (): Record<string, unknown> => ({
-  assignee: { isMe: { eq: true } },
-  state: { type: { nin: ['completed', 'canceled'] } },
-})
-
 // A single issue-history event. Linear records each change with from/to fields; one event may
 // carry several changes (state + assignee at once). Labels arrive as IDs, resolved to names via
 // the issue's current label set where possible. actor is the user; botActor covers integrations.
-export type LinearHistoryNode = {
+type LinearHistoryNode = {
   id: string
   createdAt: string
   actor: { name: string } | null

@@ -1,7 +1,7 @@
 import type { EditorFileChange, EditorFileStatusSnapshot } from '../contract/fileStatus'
 
-export type FileMark = { letter: string; tone: 'muted' | 'ok' | 'accent' | 'danger'; label: string }
-export type FolderMark = { count: number; conflicts: number; label: string; tone: 'muted' | 'danger' }
+type FileMark = { letter: string; tone: 'muted' | 'ok' | 'accent' | 'danger'; label: string }
+type FolderMark = { count: number; conflicts: number; label: string; tone: 'muted' | 'danger' }
 export type FileStatusProjection = { files: ReadonlyMap<string, FileMark>; folders: ReadonlyMap<string, FolderMark> }
 
 const rank: Record<EditorFileChange['status'], number> = {

@@ -27,10 +27,3 @@ export function wsOnAgentFrame(cb: AgentFrameCb): () => void {
     channel = null
   }
 }
-
-// Test seam: the set is a module singleton, and core's _resetWsClient doesn't know about it.
-export const _resetAgentWsChannel = (): void => {
-  agentFrameSubs.clear()
-  channel?.dispose()
-  channel = null
-}

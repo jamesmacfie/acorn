@@ -69,7 +69,7 @@ const OPERATORS: Record<NonNullable<PanelPlanColumn['type']>, DataOperator[]> = 
   person: ['eq', 'ne', 'missing', 'present'],
   link: ['eq', 'ne', 'missing', 'present'],
 }
-export const operatorsFor = (column: PanelPlanColumn | undefined): DataOperator[] =>
+const operatorsFor = (column: PanelPlanColumn | undefined): DataOperator[] =>
   column?.list ? ['contains', 'missing', 'present'] : OPERATORS[column?.type ?? 'text']
 const isPresence = (operator: DataOperator) => operator === 'missing' || operator === 'present'
 
@@ -145,7 +145,7 @@ export function newComparison(
   }
 }
 
-export const comparisonColumn = (comparison: Comparison): string | undefined => {
+const comparisonColumn = (comparison: Comparison): string | undefined => {
   const address = comparison.left.address
   return address.from === 'item' && /^\/[A-Za-z0-9_-]{1,100}$/.test(address.pointer)
     ? address.pointer.slice(1)

@@ -39,6 +39,3 @@ export const harnessAuthProbeSchema = z.object({
   authenticated: z.boolean().nullish(),
   diagnostic: z.string().max(200).optional(),
 })
-
-export type HarnessUsageProbeAnswer = z.infer<typeof harnessUsageProbeSchema>
-export type HarnessAuthProbeAnswer = z.infer<typeof harnessAuthProbeSchema>

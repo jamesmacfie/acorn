@@ -19,7 +19,7 @@ import type {
 import { processingFields } from '../processing/rules'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 
-export type ScheduleSourceDescription = {
+type ScheduleSourceDescription = {
   label: string
   schema: DataSchema
   fields: DataField[]

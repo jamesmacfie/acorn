@@ -61,6 +61,6 @@ export function setExtendedPane(component: ExtendedPaneComponent): void {
 export const suppliedExtendedPane = (): ExtendedPaneComponent | null => supplied
 
 /** Test seam. The component is module-level, so a suite must not inherit the previous one's host. */
-export function _resetExtendedPane(): void {
+function _resetExtendedPane(): void {
   supplied = null
 }

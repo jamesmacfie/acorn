@@ -28,7 +28,7 @@ const PLACEHOLDER: Record<SourceKind, string> = {
 
 // `name@version` is one field because that is how everyone writes it. The split is on the last `@`
 // past position 0, so a scoped npm name keeps its own.
-export function buildInstallSource(kind: SourceKind, raw: string): PluginInstallSource {
+function buildInstallSource(kind: SourceKind, raw: string): PluginInstallSource {
   const text = raw.trim()
   if (kind === 'url') return { url: text }
   if (kind === 'path') return { path: text }

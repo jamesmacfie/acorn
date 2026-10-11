@@ -121,7 +121,7 @@ export type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'pro
 
 type Emit = (frame: { channel: string } & Record<string, unknown>) => void
 
-export const databaseRoutes = (
+const databaseRoutes = (
   db: PluginDatabase,
   core: DatabaseRouteServices,
   bridge: DatabaseBridge,

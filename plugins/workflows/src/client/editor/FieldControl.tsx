@@ -32,7 +32,7 @@ export function useRequiredError(empty: () => boolean): { error: () => string | 
  *  Two guards, and both matter. The route must sit inside that plugin's namespace, because a
  *  description is data a node sent and a route outside it would let one plugin read another's; and a
  *  placeholder the editor cannot fill means no fetch at all, because half a path is not a path. */
-export function fieldOptionsRoute(
+function fieldOptionsRoute(
   route: string,
   pluginId: string | null,
   context: { projectId?: string; taskId?: string },

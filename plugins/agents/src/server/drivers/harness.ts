@@ -19,7 +19,7 @@ export type HarnessQuirks = {
   sessionPersistence?: boolean
 }
 
-export type HarnessSpawn =
+type HarnessSpawn =
   // An executable on PATH. The user installs the CLI; the descriptor's diagnostics say so when it is
   // missing.
   | { command: string; args?: readonly string[] }

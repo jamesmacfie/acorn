@@ -19,7 +19,7 @@ export function setSectionSelection(taskId: string, selection: TraySelection): v
   bumpContextRevision(taskId)
 }
 
-export function hydrateContextSelection(taskId: string, value: TraySelection): void {
+function hydrateContextSelection(taskId: string, value: TraySelection): void {
   setContextSelections((current) => (taskId in current ? current : { ...current, [taskId]: value }))
 }
 
@@ -33,12 +33,10 @@ export function evictContextSelection(taskId: string): void {
   evictContextRevision(taskId)
 }
 
-export { contextSelections as contextSelectionsByTask }
-
 // Everything this module holds is keyed by a node-minted id, so it must not survive a node switch.
 // The persistence pass reads these maps and writes each scope under the active node's storage key, so
 // keeping them would carry one node's state into another's namespace.
-export function clearContextSelections(): void {
+function clearContextSelections(): void {
   setContextSelections({})
 }
 

@@ -7,7 +7,7 @@ import { createDataSelectionPager, selectDataRecords } from './selection'
 import { registerCoreDataSource } from './registry'
 import type { WorktreeCounts } from './localGitRead'
 
-export const CORE_TASK_SOURCE_ID = 'tasks'
+const CORE_TASK_SOURCE_ID = 'tasks'
 
 // Starter panels for the Add panel launcher (docs/data-sources.md). Their scope names no workspace or
 // account: the launcher moves each one onto the scope the person picked.
@@ -46,7 +46,7 @@ const taskStarter = (title: string, columns: PanelPlan['columns'], where: PanelP
   sort: [{ column: 'updatedAt', direction: 'desc' }],
   view: { kind: 'list' },
 })
-export const coreTaskStarterPlans: PanelPlan[] = [
+const coreTaskStarterPlans: PanelPlan[] = [
   taskStarter('Tasks updated this week', [], {
     op: 'filter',
     where: {

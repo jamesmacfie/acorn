@@ -8,7 +8,7 @@ const usageColumn = (
   label: string,
   type: PanelPlan['columns'][number]['type'],
 ): PanelPlan['columns'][number] => ({ id, label, type, bind: { usage: { field: `/${id}` } } })
-export const usageStarterPlans: PanelPlan[] = [
+const usageStarterPlans: PanelPlan[] = [
   {
     version: 2,
     title: 'AI cost this month by task',

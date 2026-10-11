@@ -7,11 +7,11 @@ import type { DataRoot } from '../storage/dataRoot'
 
 const ENV_VAR = 'ACORN_ADVERTISE_HOST'
 
-export type LanCandidate = { address: string; iface: string }
+type LanCandidate = { address: string; iface: string }
 
 // Every non-internal IPv4 this machine currently has (docs/node-distribution.md § Reaching a node
 // from another machine, on why IPv6 is left out).
-export function lanCandidates(): LanCandidate[] {
+function lanCandidates(): LanCandidate[] {
   const found: LanCandidate[] = []
   for (const [iface, infos] of Object.entries(networkInterfaces())) {
     for (const info of infos ?? []) {

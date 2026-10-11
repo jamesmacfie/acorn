@@ -9,10 +9,6 @@ import { z } from 'zod'
 // (`CommandExecutionContext` in client-core). Protocol is a pure sink (docs/architecture/packages.md
 // § Package boundaries), so nothing here may reach for a client, a router or a plugin implementation type.
 
-/** What an entry in the command graph is. */
-export const COMMAND_KINDS = ['action', 'group', 'search', 'input', 'setting'] as const
-export type CommandKind = (typeof COMMAND_KINDS)[number]
-
 /**
  * Which identity a command needs before it can run, and how wide it reaches.
  *
@@ -20,7 +16,7 @@ export type CommandKind = (typeof COMMAND_KINDS)[number]
  * out, and it is opt-in for the reason docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses
  * gives: fanning out by default multiplies provider traffic, rate-limit pressure and partial errors.
  */
-export const COMMAND_SCOPES = ['none', 'task', 'project', 'workspace', 'node', 'fleet'] as const
+const COMMAND_SCOPES = ['none', 'task', 'project', 'workspace', 'node', 'fleet'] as const
 export type CommandScope = (typeof COMMAND_SCOPES)[number]
 export const DEFAULT_COMMAND_SCOPE: CommandScope = 'node'
 
@@ -133,5 +129,3 @@ export type CommandInputResult = z.infer<typeof commandInputResultSchema>
 /** What a setting's read and write routes both answer. The value has to name one of the options the
  *  manifest declared; the host checks that against its own copy rather than trusting the answer. */
 export const commandSettingValueSchema = z.object({ value: z.string().min(1).max(200) })
-
-export type CommandSettingValue = z.infer<typeof commandSettingValueSchema>

@@ -23,7 +23,7 @@ const MAX_SESSIONS = 8
 // picks up PLAYWRIGHT_BROWSERS_PATH.
 const CHANNELS = ['chrome', 'chromium'] as const
 
-export const NO_BROWSER =
+const NO_BROWSER =
   'No Chrome or Chromium on this machine. Install Google Chrome, or point PLAYWRIGHT_BROWSERS_PATH at a Playwright browser directory, and try again.'
 
 /// `ok: false` is an answer, not a crash. An agent that asked for something impossible gets told what

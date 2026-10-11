@@ -23,8 +23,8 @@ import { localSearch } from './localSearch'
 /** A task and the node it lives on. A task id is unique only within one node. */
 export type NavigationTask = { task: Task; nodeId: string }
 /** A workspace and the node it lives on. */
-export type NavigationWorkspace = { workspace: Workspace; nodeId: string }
-export type NavigationProject = { id: string; name: string; path?: string | null }
+type NavigationWorkspace = { workspace: Workspace; nodeId: string }
+type NavigationProject = { id: string; name: string; path?: string | null }
 
 /** What the Go to commands need from the host that draws them: what to list, and how to open it. */
 export type NavigationHost = {

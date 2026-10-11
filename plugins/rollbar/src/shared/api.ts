@@ -19,8 +19,6 @@ export type RollbarItemSummary = {
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
   framework?: string
-  // Optional, like framework.
-  lastActivatedAt?: number | null // later than firstOccurrenceAt ⇒ the item regressed after a resolve
   uniqueOccurrences?: number // distinct-IP count; plan-dependent upstream
 }
 
@@ -96,8 +94,6 @@ export type RollbarItemsResponse = {
 export const rollbarItemsRoute = '/v1/p/rollbar/items'
 export const rollbarItemsForConnectionsRoute = (integrationIds: readonly string[]) =>
   `${rollbarItemsRoute}?integrations=${encodeURIComponent([...new Set(integrationIds)].sort().join(','))}`
-export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemMetadataRoute = (integrationId: string, identifier: string, refresh = false) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
@@ -111,11 +107,3 @@ export const rollbarOccurrenceRoute = (
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = (integrationIds: readonly string[]) =>
   ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
-export const rollbarItemKey = (integrationId: string, identifier: string) =>
-  ['rollbar-item', integrationId, identifier] as const
-export const rollbarItemMetadataKey = (integrationId: string, identifier: string) =>
-  ['rollbar-item-metadata', integrationId, identifier] as const
-export const rollbarOccurrencesKey = (integrationId: string, identifier: string) =>
-  ['rollbar-occurrences', integrationId, identifier] as const
-export const rollbarOccurrenceKey = (integrationId: string, identifier: string, occurrenceId: string) =>
-  ['rollbar-occurrence', integrationId, identifier, occurrenceId] as const

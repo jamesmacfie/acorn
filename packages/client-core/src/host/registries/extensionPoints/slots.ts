@@ -1,4 +1,4 @@
-// The slot registry and its contribution types, re-exported by uiSlots.tsx. This module holds no JSX
+// The slot registry and its contribution types, beside the JSX hosts in uiSlots.tsx. This module holds no JSX
 // import (docs/frontend/registries.md § Registries and plugins), which is what lets the client plugin
 // registry (./plugin.ts) have a unit test.
 import type { Component } from 'solid-js'

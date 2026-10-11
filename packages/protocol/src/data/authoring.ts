@@ -22,7 +22,7 @@ const contextEntrySchema = z
   })
   .strict()
 
-export const authoringMetadataRequestSchema = z.discriminatedUnion('operation', [
+const authoringMetadataRequestSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('list-sources') }).strict(),
   z.object({ operation: z.literal('list-accounts') }).strict(),
   z
@@ -62,7 +62,7 @@ export const authoringMetadataRequestSchema = z.discriminatedUnion('operation', 
 ])
 
 const choiceSchema = z.object({ id: text(200), label: text(200), description: z.string().max(500).optional() }).strict()
-export const authoringModelReplySchema = z.discriminatedUnion('kind', [
+const authoringModelReplySchema = z.discriminatedUnion('kind', [
   z
     .object({ kind: z.literal('metadata'), request: authoringMetadataRequestSchema, progress: text(300).optional() })
     .strict(),
@@ -104,7 +104,7 @@ export const authoringTurnRequestSchema = z
 export type AuthoringMetadataRequest = z.infer<typeof authoringMetadataRequestSchema>
 export type AuthoringContextEntry = z.infer<typeof contextEntrySchema>
 export type AuthoringTurnRequest = z.infer<typeof authoringTurnRequestSchema>
-export type AuthoringUsage = { inputTokens: number; outputTokens: number; requests: number }
+type AuthoringUsage = { inputTokens: number; outputTokens: number; requests: number }
 export type AuthoringDiff = { path: string; change: 'add' | 'remove' | 'change'; before?: unknown; after?: unknown }
 export type AuthoringTurnResult = {
   context: AuthoringContextEntry[]

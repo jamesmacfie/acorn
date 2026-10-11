@@ -14,7 +14,7 @@ import { z } from 'zod'
 // `needs-trust` opens the config-trust modal and `provider_needs_auth` rewrites the message. Client
 // and Node ship from the same repo and release together (docs/api-reference/transport.md § Versioning),
 // so a route may return its own documented code, and anything without one falls back to these.
-export const ERROR_CODES = [
+const ERROR_CODES = [
   'bad_request',
   'unauthorized',
   'forbidden',
@@ -37,7 +37,7 @@ export type ErrorCodeOrDomain = ErrorCode | (string & {})
 // charset-restricted so an attacker-controlled header cannot inject into logs or response headers.
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9._-]{1,128}$/)
 
-export const errorEnvelopeSchema = z.object({
+const errorEnvelopeSchema = z.object({
   error: z.object({
     code: z.string().min(1),
     // Human/upstream prose (e.g. GitHub's verbatim 422 reason). Never a stack, SQL or path.

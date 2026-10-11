@@ -1,11 +1,5 @@
 export { createAppStartupRestore } from './appStartup.ts'
-export {
-  appStateBinding,
-  parseJson,
-  persistedStateRegistry,
-  stringifyPersistedValue,
-  utf8Bytes,
-} from './persistedState.ts'
+export { parseJson, persistedStateRegistry, stringifyPersistedValue, utf8Bytes } from './persistedState.ts'
 export type { PersistedStateSlice } from './persistedState.ts'
 export { PersistedSliceKeys, PrefKeys } from './prefKeys.ts'
 export { storageKeyFor } from './persistedState.ts'

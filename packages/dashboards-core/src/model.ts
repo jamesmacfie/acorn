@@ -38,7 +38,7 @@ export const panelSourceKey = (source: PanelProjectionSource): string => `${sour
 
 /** Small and all-AND. An OR or nested predicate tree is a query language, and a panel that needs one
  *  has outgrown the generic shaping layer. */
-export type PanelFilterOp = 'eq' | 'ne' | 'contains' | 'gt' | 'lt' | 'is-empty' | 'is-not-empty'
+type PanelFilterOp = 'eq' | 'ne' | 'contains' | 'gt' | 'lt' | 'is-empty' | 'is-not-empty'
 
 export type PanelFilter = {
   field: string
@@ -47,7 +47,7 @@ export type PanelFilter = {
   value?: DashboardDisplayCell
 }
 
-export type PanelSort = {
+type PanelSort = {
   field: string
   direction: 'asc' | 'desc'
 }
@@ -120,7 +120,7 @@ export type PanelMappingColumn = {
 }
 
 /** The user's own derived enum: one column of the board they invented. */
-export type PanelMappingColumnDef = { id: string; label: string; tone?: PanelTone }
+type PanelMappingColumnDef = { id: string; label: string; tone?: PanelTone }
 
 /** A panel-local field the user invented, beyond the five roles.
  *
@@ -180,11 +180,6 @@ export type PanelDefinition = {
 // the editor offers only what passes. See docs/dashboards/views.md § Views are derived, not chosen from a
 // menu.
 
-/** The views this build draws. The list lives in @acorn/protocol because a manifest can narrow it, and
- *  is re-exported here so callers can import it from `./model`: one vocabulary cannot live in two
- *  places. */
-export { PANEL_VIEW_KINDS }
-
 const VIEW_REQUIRES: Record<PanelViewKind, (schema: DashboardDisplaySchema) => boolean> = {
   // A count over nothing is still a number, so these three ask nothing of the schema.
   stat: () => true,
@@ -208,9 +203,6 @@ export const viewSupportedBy = (kind: PanelViewKind, schema: DashboardDisplaySch
 export const viewsForSchema = (schema: DashboardDisplaySchema): PanelViewKind[] =>
   PANEL_VIEW_KINDS.filter((kind) => viewSupportedBy(kind, schema))
 
-export const isDrawnViewKind = (kind: string): kind is PanelViewKind =>
-  (PANEL_VIEW_KINDS as readonly string[]).includes(kind)
-
 // ── Refresh ───────────────────────────────────────────────────────────────────────────────────
 
 // The manifest's own bound, re-spelled because it is declared inline on the descriptor schema
@@ -227,7 +219,3 @@ export function panelRefreshSeconds(panel: number | undefined, declared: number 
   if (wanted === undefined || !Number.isFinite(wanted)) return undefined
   return Math.min(MAX_PANEL_REFRESH_SECONDS, Math.max(MIN_PANEL_REFRESH_SECONDS, Math.round(wanted)))
 }
-
-// ── Construction ──────────────────────────────────────────────────────────────────────────────
-
-export const newPanelId = (): PanelId => crypto.randomUUID()

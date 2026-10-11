@@ -324,9 +324,6 @@ export function onWsBroadcast(listener: (frame: WsServerFrame) => void): () => v
   return () => void nodeListeners.delete(listener)
 }
 
-// True when any socket is connected. notify.ts uses the same "no window layer means no-op" idea for WS.
-export const wsHasClients = (): boolean => conns.size > 0
-
 export type WsAuthDeps = {
   internalToken: string
   // The live task token ids (../auth/activeCredentials.ts), checked at upgrade like HTTP checks them.
@@ -351,13 +348,8 @@ export type WsAuthDeps = {
 // socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
 type Authorized = { deviceId: string | null; internal?: InternalClaims }
 
+// Exported for the one property a loopback test socket can't reach: an internal token from a remote peer.
 export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
-  return authorize(req, deps)
-}
-
-export type { Authorized as AuthorizedWsUpgrade }
-
-async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
   if (!deps.allowedHosts.has(req.headers.host ?? '')) return null
   const bearer = req.headers.authorization
   if (bearer?.startsWith('Bearer ')) {
@@ -482,7 +474,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     let path: string
     try {
       // Only a syntactic base for parsing the path out. A request with no Host is refused by
-      // authorize() below regardless, so the placeholder never decides anything.
+      // authorizeWsUpgrade() below regardless, so the placeholder never decides anything.
       path = new URL(req.url ?? '', `http://${req.headers.host ?? 'placeholder.invalid'}`).pathname
     } catch {
       socket.destroy()
@@ -499,7 +491,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     socket.on('error', onPeerError)
     socket.once('close', () => pending.delete(socket))
     void (async () => {
-      const authorized = await authorize(req, deps)
+      const authorized = await authorizeWsUpgrade(req, deps)
       if (!ready(socket) || !authorized) return refuse(socket)
       // Cache the import-and-construction promise, so concurrent first upgrades share one server.
       loading ??= import('ws').then(({ WebSocketServer }) => {

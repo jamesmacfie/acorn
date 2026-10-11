@@ -18,7 +18,7 @@ export const SURFACE_HEALTH_REQUEST = 'acorn:surface-health'
 export const SURFACE_HEALTH_MARK = 'acorn:surface.health'
 
 /** Replace the one health mark on the performance timeline with the current snapshot. */
-export function markSurfaceHealth(): void {
+function markSurfaceHealth(): void {
   performance.clearMarks(SURFACE_HEALTH_MARK)
   performance.mark(SURFACE_HEALTH_MARK, { detail: surfaceHealthSnapshot() })
 }

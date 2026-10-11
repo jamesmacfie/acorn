@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const nodeFetchBodySchema = z.discriminatedUnion('kind', [
+const nodeFetchBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('bytes'), bytes: z.instanceof(Uint8Array) }),
   // Multipart is described rather than pre-encoded: main builds the real FormData, so we never have to
   // hand-roll boundary generation on the renderer side.
@@ -52,7 +52,7 @@ export const nodeFetchRequestSchema = z.strictObject({
 })
 export type NodeFetchRequest = z.input<typeof nodeFetchRequestSchema>
 
-export const nodeFetchResponseSchema = z.strictObject({
+const nodeFetchResponseSchema = z.strictObject({
   status: z.number().int(),
   headers: z.record(z.string(), z.string()),
   body: z.instanceof(Uint8Array),
@@ -62,10 +62,10 @@ export type NodeFetchResponse = z.infer<typeof nodeFetchResponseSchema>
 // docs/architecture/fleet.md § Client state and fleet behavior lists exactly these five. A
 // fingerprint mismatch is not a sixth: it surfaces as `offline` carrying an `identity_mismatch`
 // error, because it is a reason a node is unreachable rather than a distinct steady state.
-export const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
+const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
 export type NodeConnectionState = z.infer<typeof nodeConnectionStateSchema>
 
-export const nodeStatusSchema = z.strictObject({
+const nodeStatusSchema = z.strictObject({
   nodeId: z.string(),
   state: nodeConnectionStateSchema,
   // Set when the state has a nameable cause the UI must render differently. Above all
@@ -142,7 +142,6 @@ export const nodeAdoptRequestSchema = z.strictObject({
 export type NodeAdoptRequest = z.infer<typeof nodeAdoptRequestSchema>
 
 export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
-export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>
 
 // What the owner is asked to compare against the fingerprint the node itself displays. That
 // out-of-band comparison is the security of pairing (docs/api-reference/transport.md § Pairing): reading a
@@ -173,7 +172,6 @@ export const nodeRenameRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   label: z.string().min(1).max(120),
 })
-export type NodeRenameRequest = z.infer<typeof nodeRenameRequestSchema>
 
 // Unpair vs revoke (docs/authentication.md § Device tokens): `revoke: false` is this client
 // forgetting the node, `revoke: true` also asks the node to forget this client. Confusing them loses
@@ -182,4 +180,3 @@ export const nodeForgetRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   revoke: z.boolean(),
 })
-export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>

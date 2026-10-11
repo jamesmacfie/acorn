@@ -7,7 +7,7 @@ import type { AgentGoalVerdict } from './wire.ts'
 export const MAX_AGENT_GOAL_CHARS = 2_000
 
 /** Usage across the turns and checks a step owns so far. An unknown value stays unknown. */
-export type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult['capture']['usage'] }
+type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult['capture']['usage'] }
 
 /** Where a step's completion condition stands (docs/workflows/agent-steps.md § Completion conditions).
  *  `checking` and `continuing` are progress. The rest are terminal: `stopped` means the step ended for

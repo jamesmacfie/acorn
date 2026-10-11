@@ -2,7 +2,7 @@ import { Text, type EditorState } from '@codemirror/state'
 import { deviceStorage, readLocal } from '../../kit/lib/state/deviceStorage'
 import type { EditorViewState } from './viewState'
 
-export type DocumentAcknowledgement = { text?: string; revision?: string }
+type DocumentAcknowledgement = { text?: string; revision?: string }
 export type DocumentWriter = (text: string) => Promise<DocumentAcknowledgement>
 const documents = new Map<string, DocumentCustody>()
 const reservations = new Map<string, DocumentCustody | null>()

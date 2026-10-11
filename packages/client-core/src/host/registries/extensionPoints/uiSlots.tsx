@@ -12,16 +12,7 @@ import {
 } from './slots'
 
 // The two slot hosts over the one registry. The registry and its contribution types live in
-// ./slots.ts, JSX-free, and are re-exported here so this stays the one import path callers use.
-export { uiSlotRegistry } from './slots'
-export type {
-  ShellSlotContribution,
-  TaskSlotContribution,
-  TaskSlotId,
-  UiSlotContext,
-  UiSlotContribution,
-  UiSlotId,
-} from './slots'
+// ./slots.ts, JSX-free, so a caller that only registers never imports a component.
 
 const ordered = (slot: UiSlotId) =>
   [...uiSlotRegistry.entries()]

@@ -1,7 +1,7 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
 
 /** The two independent questions the editor can answer about a displayed line. */
-export type EditorLineMarkerKind = 'pull-request' | 'uncommitted'
+type EditorLineMarkerKind = 'pull-request' | 'uncommitted'
 
 /** Inclusive, one-based line numbers in the document currently on disk. */
 export type EditorLineRange = { from: number; to: number }

@@ -755,7 +755,7 @@ describe('architecture boundaries', () => {
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'host/registries/commands/corePaths.ts'), 'utf8')
     const manifest = readFileSync(join(node.src, 'server/plugins/manifest.ts'), 'utf8')
-    const segment = /export const PLUGIN_ROUTE_SEGMENT = '([^']+)'/.exec(corePaths)?.[1]
+    const segment = /^(?:export )?const PLUGIN_ROUTE_SEGMENT = '([^']+)'/m.exec(corePaths)?.[1]
     expect(segment).toBe('x')
     expect(manifest).toContain(`\`/p/:projectId/${segment}/\${manifest.id}/\``)
   })

@@ -38,7 +38,7 @@ export type PaneIntent =
   // is mounted.
   | { kind: 'workflows:show-run'; runId: string; stepId?: string }
 
-export type ClientEventMap = {
+type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }
   'presentation:pane-intent': { taskId: string; paneId: string; intent: PaneIntent }
   'presentation:terminal-focus': { taskId: string; sessionId: string }

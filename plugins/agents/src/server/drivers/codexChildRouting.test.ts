@@ -6,9 +6,9 @@
 import { describe, expect, it } from 'vitest'
 import capture from './__fixtures__/codexSubagentWire.json' with { type: 'json' }
 import type { JsonRpcNotification } from './jsonRpcProcess'
-import { evolveAgentState, initialAgentMachineState } from '../sessions/stateMachine'
 import { normalizeCodexNotification } from './codexNormalizer'
 import { CodexChildRouter, codexNotificationThreadId, routeCodexChildNotification } from './codexChildRouting'
+import { projectAgentEvent } from '../sessions/stateMachine'
 
 const notifications = capture.notifications as JsonRpcNotification[]
 const rootThreadId = capture.rootThreadId
@@ -308,17 +308,17 @@ describe('CodexChildRouter guards', () => {
 describe('the parent session\u2019s lifecycle across a fan-out', () => {
   // The regression that is hardest to see by eye, and the reason this module exists. Replays the whole
   // capture the way codexDriver does — route first, and only normalize what the router calls the
-  // parent's — then runs the resulting events through the session state machine.
+  // parent's — then folds the resulting events through the session's state projection.
   const trajectory = (): string[] => {
     const router = new CodexChildRouter()
     router.setRootThread(rootThreadId)
-    let state = evolveAgentState(initialAgentMachineState(), { type: 'user_message', text: 'go' }, 'turn-1')
-    const states = [state.runtimeState]
+    let state = projectAgentEvent({ type: 'user_message', text: 'go' }, 'turn-1').runtimeState ?? 'creating'
+    const states: string[] = [state]
     for (const notification of notifications) {
       if (router.route(notification).to !== 'parent') continue
       for (const event of normalizeCodexNotification(notification)) {
-        state = evolveAgentState(state, event, 'turn-1')
-        if (states[states.length - 1] !== state.runtimeState) states.push(state.runtimeState)
+        state = projectAgentEvent(event, 'turn-1').runtimeState ?? state
+        if (states[states.length - 1] !== state) states.push(state)
       }
     }
     return states

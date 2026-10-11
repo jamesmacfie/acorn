@@ -12,14 +12,10 @@ import {
 } from './dataSourceContributions'
 
 export {
-  dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
-  dataSourceInputSchema,
-  dataSourceInputsSchema,
   dataSourceRegistrationSchema,
   parseDataSourceInputRef,
   SOURCE_INPUTS_WITH_PROVIDER,
-  type DataSourceDescriptor,
   type DataSourceDiscovery,
   type DataSourceInput,
   type DataSourceRegistration,
@@ -61,7 +57,7 @@ const inputBindings = <T extends z.ZodType>(binding: T) =>
     .refine((inputs) => Object.keys(inputs).length <= 8, 'At most eight input bindings')
 /** One derived-source input's account and parameters, the same shape a direct call's scope uses. When
  *  the input is itself a derived source, `inputs` binds its inputs in turn: two derived levels at most. */
-export const dataSourceInputBindingSchema = z
+const dataSourceInputBindingSchema = z
   .object({
     connectionId: id.optional(),
     parameters,
@@ -91,7 +87,7 @@ export const dataSourceIdentitySchema = z
   })
   .strict()
 const coverageRangeSchema = z.object({ start: z.number().finite(), end: z.number().finite() }).strict()
-export const dataSourceCoverageSchema = z.discriminatedUnion('kind', [
+const dataSourceCoverageSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('snapshot') }).strict(),
   z
     .object({
@@ -353,7 +349,7 @@ export const dataSourceCatalogSchema = z
       .max(DATA_LIMITS.fields),
   })
   .strict()
-export const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
+const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('more'), cursor }).strict(),
   z.object({ kind: z.literal('complete') }).strict(),
   z.object({ kind: z.literal('bounded') }).strict(),
@@ -449,7 +445,7 @@ export type DataSourceResult = Omit<DataSourcePage, 'records'> & {
 }
 export type DataSourceOptions = z.infer<typeof dataSourceOptionsSchema>
 export type DataSourceDetails = z.infer<typeof dataSourceDetailsSchema>
-export type DataSourceActions = z.infer<typeof dataSourceActionsSchema>
+type DataSourceActions = z.infer<typeof dataSourceActionsSchema>
 export type DataSourceDiscoveryRequest = z.infer<typeof dataSourceDiscoveryRequestSchema>
 export type DataSourceDiscoveryPage = Omit<z.infer<typeof dataSourceDiscoveryPageSchema>, 'sources'> & {
   sources: (DataSourceDescriptor & DataSourceRef)[]

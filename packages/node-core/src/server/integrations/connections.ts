@@ -1,16 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq } from 'drizzle-orm'
-import type { Context } from 'hono'
 import type { ConnectIntegrationRequest, Integration, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import { broadcastConnectionChanged, broadcastTasksChanged, broadcastWorkspaceProjectsChanged } from '../notify'
 import type { AppDatabase } from '../db'
-import { getDb, schema } from '../db'
+import { schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
-import type { AppEnv } from '../middleware/auth'
-import { ownerId } from '../middleware/requireUser'
-import { createExternalItemStore, type ExternalItemStore } from './itemStore'
 import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import { connectionProviderRegistry } from './connectionProviders/registry'
 import { integrationProviderRegistry } from './registry'
@@ -358,26 +354,3 @@ export function externalRefForConnection(
 
 // --- Request-context seams, for provider plugins ---
 //
-// Core-owned routes pass their database explicitly. Provider plugins use these request-context wrappers,
-// which keep the core handle inside the service boundary and scope every read to the caller.
-
-/** Every stored connection for one provider, owned by the calling principal. */
-export const ownedConnections = (c: Context<AppEnv>, providerId: string): Promise<StoredConnection[]> =>
-  listProviderConnections(getDb(c.env), ownerId(c), providerId)
-
-/** `forEachConnection` for the calling principal: each visit runs inside the credential's secret scope. */
-export const withOwnedConnections = <T>(
-  c: Context<AppEnv>,
-  providerId: string,
-  visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>,
-): Promise<T[]> => forEachConnection(getDb(c.env), ownerId(c), providerId, c.env.SECRETS, visit)
-
-/**
- * The external-item read model for the calling principal, scoped to one provider
- * (integrations/itemStore.ts). This is how a compiled provider's route reaches core's `issues` table;
- * a provider's mirrored resource gets the same store on `ProviderResourceContext.items`. The compiled
- * tier is trusted, so `providerId` is taken at its word; the loaded tier's twin (`providers.items` on
- * the request context) asserts ownership first.
- */
-export const ownedExternalItems = (c: Context<AppEnv>, providerId: string): ExternalItemStore =>
-  createExternalItemStore(getDb(c.env), ownerId(c), providerId)

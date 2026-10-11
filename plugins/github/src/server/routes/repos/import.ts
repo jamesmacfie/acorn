@@ -80,8 +80,8 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) =>
           path = join(item.parentDir, repo.name)
         }
 
-        // Fills a path-less placeholder left by an older import rather than adding a rival row
-        // (docs/github-integration.md § Importing projects).
+        // Fills a deferred project, which has a GitHub facet and no path yet, rather than adding a
+        // rival row (docs/github-integration.md § Importing projects).
         const placeholder = await core.projects.byGithub(repo.owner, repo.name)
         const existingId = placeholder && placeholder.path === null ? placeholder.id : null
         const projectId = existingId ?? (await core.projects.create({ name: repo.name, path })).id

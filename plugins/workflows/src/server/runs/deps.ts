@@ -7,7 +7,7 @@ import type { ToolCeiling, WorkflowStepDef } from '../../shared/workflowContract
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../../contract/events'
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from '../dispatch/dispatcher'
 
-export type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
+type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
 /** Material a step's prompt works on: an upstream step's output, or the task context. */
 export type StepContextItem = { label: string; source: string; content: string }
 /** The prompt with its context written into it, for a runner that takes one string, and for the step

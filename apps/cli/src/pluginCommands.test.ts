@@ -56,6 +56,7 @@ const roster = (name: string, active = true): NodePluginState => ({
     },
   ],
   restartRequired: false,
+  requests: [],
 })
 
 const node = (nodeId: string, state: NodePluginState): CliNode => ({

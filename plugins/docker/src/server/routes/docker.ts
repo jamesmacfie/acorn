@@ -149,4 +149,3 @@ export const docker = new Hono<AppEnv>()
   // snapshot, so every task would ask to trust the repo again for an edit to three matcher keys.
   .get('/projects/:id/matcher', (c) => viaBridge(c, DOCKER, (b) => b.projectMatcher(c.req.param('id'))))
   .get('/tasks/:id/containers', (c) => viaBridge(c, DOCKER, (b) => b.taskContainers(c.req.param('id'))))
-  .post('/tasks/:id/teardown', (c) => viaBridge(c, DOCKER, (b) => b.taskTeardown(c.req.param('id'))))

@@ -34,13 +34,7 @@ const log = createLogger('commands')
 
 // The engine and the intent binder live in the kit's keymap host, which the kit may import; this module
 // reads the command and keybinding registries and so may not be imported from the kit.
-export {
-  keymap,
-  keysFor,
-  registerIntentLayer,
-  registerLayerWhenConnected,
-  type AcornKeymap,
-} from '../../kit/keys/keymapHost'
+export { keymap, registerLayerWhenConnected } from '../../kit/keys/keymapHost'
 
 /** xterm focuses a hidden textarea, so a terminal reads as a typing target, but Cmd chords are never
  *  terminal input on macOS (xterm leaves them to the browser), so chord shortcuts may fire there.

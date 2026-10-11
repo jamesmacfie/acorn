@@ -7,7 +7,7 @@ import {
 
 type RecoveryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'length' | 'key'>
 export const QUERY_AUTOSAVE_MS = 750
-export const queryRecoveryKey = (nodeId: string, entityId: string, baseRevision: number) =>
+const queryRecoveryKey = (nodeId: string, entityId: string, baseRevision: number) =>
   `query-recovery:v1:${JSON.stringify([nodeId, entityId, baseRevision])}`
 
 /** The caller supplies host storage; a terminal host can report that no durable copy is available. */

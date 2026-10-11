@@ -1,8 +1,8 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
-import type { DevicesResponse, PairedDevice, PairingWindow } from '@acorn/protocol/node.ts'
-import { coreDeviceRoute, coreDevicesRoute, corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
-import { readJson, sendJson } from './apiClient'
+import type { PairingWindow } from '@acorn/protocol/node.ts'
+import { corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
+import { sendJson } from './apiClient'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { selectActiveNode } from './activeNode'
 import { refreshFleet } from './fleet'
@@ -69,15 +69,6 @@ export const restartLocalNode = async (): Promise<void> => {
   await bridge.restartLocal()
 }
 
-// The node's own device list: every client paired with it, not just this one
-// (docs/security.md § Trust boundaries). `removeNode(nodeId, revoke)` deletes only this client's row;
-// this is what lets a lost or reinstalled machine be cut off without re-pairing everything.
-//
-// Device-only on the node (routes/pairing.ts, gated in server/index.ts), which is why it is here
-// beside the other fleet mutations rather than in a plugin.
-export const nodeDevices = async (nodeId: string): Promise<PairedDevice[]> =>
-  (await readJson<DevicesResponse>(coreDevicesRoute, { nodeId })).devices
-
 // Pair a second client with a node this device already owns. The code returns through the
 // authenticated broker to Settings; the renderer never receives the desktop's device token.
 export const openNodePairingWindow = (nodeId: string): Promise<PairingWindow> =>
@@ -85,11 +76,3 @@ export const openNodePairingWindow = (nodeId: string): Promise<PairingWindow> =>
 
 export const closeNodePairingWindow = (nodeId: string): Promise<void> =>
   sendJson(corePairRoute, { method: 'DELETE', nodeId })
-
-// Revoking a device closes its sockets immediately and fails its in-flight requests
-// (docs/security/transport-and-auth.md § Transport and auth). Revoking this client's own row is possible and is not
-// stopped here: it is the same thing `removeNode(nodeId, true)` does, and the caller is better placed
-// to warn about it.
-export const revokeNodeDevice = async (nodeId: string, deviceId: string): Promise<void> => {
-  await sendJson(coreDeviceRoute(deviceId), { method: 'DELETE', nodeId })
-}

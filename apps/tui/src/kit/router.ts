@@ -128,7 +128,7 @@ export const useMatch =
   }
 
 /** Test seam. Module state outlives a render, so a suite must not inherit the previous one's path.
- *  Beside `_resetChrome` and `_resetRegions`, and reset in the same place they are. */
+ *  Beside `resetChromeForNodeSwitch` and `_resetRegions`, and reset in the same place they are. */
 export function _resetRouter(): void {
   setPath('/')
 }

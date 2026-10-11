@@ -198,7 +198,7 @@ export const answerPluginRequest = async (
 
 // Test seam, and the node-switch reset. A stale list from the previous node must not decide which
 // contributions the next node's shell gets.
-export function clearNodePlugins(): void {
+function clearNodePlugins(): void {
   setNodePlugins(null)
 }
 

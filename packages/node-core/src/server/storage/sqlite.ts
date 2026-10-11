@@ -37,9 +37,9 @@ const OPEN_OPTIONS = { enableForeignKeyConstraints: false } as const
 
 const plainRow = (row: unknown): unknown => (row && typeof row === 'object' && !Array.isArray(row) ? { ...row } : row)
 
-export type SqliteRunResult = { changes: number | bigint; lastInsertRowid: number | bigint }
+type SqliteRunResult = { changes: number | bigint; lastInsertRowid: number | bigint }
 
-export type SqliteStatement = {
+type SqliteStatement = {
   run(...params: unknown[]): SqliteRunResult
   all(...params: unknown[]): unknown[]
   get(...params: unknown[]): unknown
@@ -50,7 +50,7 @@ export type SqliteStatement = {
 
 // The transaction handle better-sqlite3 returns: callable, and carrying the three locking behaviours
 // as properties. Drizzle reads `nativeTx[config.behavior ?? 'deferred']`, so all three exist.
-export type SqliteTransaction<A extends unknown[], R> = ((...args: A) => R) & {
+type SqliteTransaction<A extends unknown[], R> = ((...args: A) => R) & {
   deferred(...args: A): R
   immediate(...args: A): R
   exclusive(...args: A): R

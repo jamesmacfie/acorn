@@ -25,7 +25,7 @@ export type AgentAttentionReason =
   | 'unread'
   | 'none'
 
-export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
+type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
 export type AgentAttendance = 'attended' | 'supervised' | 'autonomous'
@@ -58,7 +58,7 @@ export type AgentGoalVerdict = {
   evidence_summary: string
   relied_on_assumption: boolean
 }
-export type AgentGoal = {
+type AgentGoal = {
   objective: string
   status: AgentGoalStatus
   continuations: number

@@ -66,7 +66,7 @@ export type AgentContextContribution = {
 // client half (the `agentContexts` entry) for the full contract: why this is the one descriptor
 // response with a real parser, and which fields the host binds rather than the plugin.
 export const MAX_PLUGIN_AGENT_CONTEXT_OPTIONS = 200
-export const MAX_PLUGIN_AGENT_CONTEXT_SNAPSHOTS = 50
+const MAX_PLUGIN_AGENT_CONTEXT_SNAPSHOTS = 50
 
 export const pluginAgentContextOptionsSchema = z
   .array(

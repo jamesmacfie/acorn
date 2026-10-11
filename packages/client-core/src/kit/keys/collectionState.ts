@@ -28,9 +28,6 @@ const [states, setStates] = createStore<Record<string, CollectionState>>({})
 /** One collection's state. Reactive, and never undefined: an unvisited collection reads as empty. */
 export const collectionState = (id: string): CollectionState => states[id] ?? EMPTY
 
-/** Read the roving target of a named collection for a focused-target command. */
-export const activeCollectionItem = (id: string): string | null => collectionState(id).active
-
 export function setActiveItem(id: string, key: string | null): void {
   setStates(id, (current) => ({ ...(current ?? EMPTY), active: key }))
 }

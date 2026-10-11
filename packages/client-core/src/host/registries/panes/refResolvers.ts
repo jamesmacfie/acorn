@@ -27,7 +27,7 @@ export const refResolverRegistry = new Registry<RefResolverContribution>('ref re
 // the caller renders the plain identifier, which is what it had before asking. Looked up at call time
 // rather than imported, so a mid-session disable degrades instead of failing (./refPanels.ts §
 // refPanelFor makes the same argument for the panel half).
-export const refResolverFor = (providerId: string): RefResolverContribution | undefined =>
+const refResolverFor = (providerId: string): RefResolverContribution | undefined =>
   refResolverRegistry.entries().find((entry) => entry.providerId === providerId)
 
 // One TanStack options factory for every provider (docs/plugins/client-half.md § "Loaded plugins: the client

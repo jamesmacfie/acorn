@@ -210,6 +210,6 @@ export function Dynamic<T extends Record<string, unknown>>(
   }) as unknown as SolidJSX.Element
 }
 
-export { laysOut, measuresText, runText, textOwner } from './node'
+export { runText } from './node'
 export type { Kind, Node } from './node'
 export type { JSX } from './jsx'

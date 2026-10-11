@@ -238,7 +238,7 @@ type Emit = (frame: { channel: string } & Record<string, unknown>) => void
 const savedRequestsChanged = (emit: Emit, projectId: string) =>
   emit({ channel: pluginChannel('http', 'saved-requests-changed'), projectId })
 
-export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emit = () => {}) => {
+const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emit = () => {}) => {
   const secrets = core.secrets
   return (
     new Hono<AppEnv>()

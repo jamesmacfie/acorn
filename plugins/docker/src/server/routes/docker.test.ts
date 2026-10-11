@@ -146,16 +146,13 @@ describe('docker routes', () => {
     expect(pruned).toBe('images')
   })
 
-  it('serves task summaries and forwards teardown', async () => {
-    let torn: string | null = null
-    setDockerBridge(fake({ taskTeardown: async (id) => ((torn = id), { ok: true }) }))
+  it('serves task summaries and containers', async () => {
+    setDockerBridge(fake())
     const app = authed()
     expect(await (await app.fetch(req('/api/docker/task-summary'), {} as Env)).json()).toEqual([
       { taskId: 't1', running: 2, total: 3, projects: ['runn_x'] },
     ])
     expect(await (await app.fetch(req('/api/docker/tasks/t1/containers'), {} as Env)).json()).toEqual([summary])
-    await app.fetch(req('/api/docker/tasks/t1/teardown', 'POST'), {} as Env)
-    expect(torn).toBe('t1')
   })
 
   it('passes BridgeError statuses through', async () => {
@@ -227,13 +224,10 @@ describe('the docker daemon surface is device-only', () => {
     expect(touched).toEqual([])
   })
 
-  it('leaves the task-addressed pair reachable, since core mount already confines them', async () => {
-    let torn: string | null = null
-    setDockerBridge(fake({ taskTeardown: async (id) => ((torn = id), { ok: true }) }))
+  it('leaves the task-addressed containers route reachable, since core mount already confines it', async () => {
+    setDockerBridge(fake())
     const app = asTask1()
     expect((await app.fetch(req('/api/docker/tasks/t1/containers'), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/docker/tasks/t1/teardown', 'POST'), {} as Env)).status).toBe(200)
-    expect(torn).toBe('t1')
   })
 
   it('still serves the whole daemon surface to a device', async () => {

@@ -22,14 +22,14 @@ import { presentCommand } from './presenter'
 // The graph itself — parents, breadcrumbs, inherited availability, root search — is ./graph.ts. This
 // file holds the registry, the gates and the executor, and nothing that walks.
 
-export type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
+type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
 
 /** Where a sibling with no stated `order` sorts. The number every registry in the repo uses for
  *  "middle", so a contributor who wants to come first or last says so and nobody else has to. */
 export const DEFAULT_COMMAND_ORDER = 500
 
 /** Which client captured the context. Absent when nothing did — see `DETACHED_COMMAND_CONTEXT`. */
-export type CommandHostKind = 'desktop' | 'tui'
+type CommandHostKind = 'desktop' | 'tui'
 
 /**
  * The identity a command runs against, captured once when a session opens and never re-read.
@@ -118,7 +118,7 @@ export type ActionCommand = CommandCommon & {
 }
 
 /** A parent. No executor: its children are the commands naming it as their `parentId`. */
-export type GroupCommand = CommandCommon & { kind: 'group' }
+type GroupCommand = CommandCommon & { kind: 'group' }
 
 /** A live query. `query` is debounced and cancellable; `select` owns what picking a row does. */
 export type SearchCommand = CommandCommon & {

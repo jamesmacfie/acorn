@@ -1,11 +1,9 @@
 // Broadcasts from this node to its connected clients. They go over the authenticated WebSocket hub and
 // do nothing when no socket is connected.
 import type {
-  AgentSessionChangedEvent,
   ConnectionChangedEvent,
   HeadChangedEvent,
   ProjectChangedEvent,
-  RunTargetChangedEvent,
   TaskChangedEvent,
   WorkspaceChangedEvent,
   WorkspaceProjectsChangedEvent,
@@ -30,17 +28,6 @@ export function broadcastStatus(pluginId?: string): void {
   wsBroadcast(pluginId ? { channel: 'term:status', pluginId } : { channel: 'term:status' })
 }
 
-// A terminal session was created, exited, or flipped between working and idle. Content-free, like
-// `tasks:changed`: the session roster is a fetchable route and a payload would be a second projection
-// to keep in step.
-//
-// A channel of its own, apart from `term:status`, because it is the one event on this node that fires
-// at machine speed. A build spewing output crosses the idle threshold repeatedly, and only the session
-// list needs to hear each edge, not every plugin's chrome.
-export function broadcastTerminalSessionsChanged(): void {
-  wsBroadcast({ channel: 'terminal:sessions-changed' })
-}
-
 // Something under a task's worktree changed (@acorn/protocol/nodeEvents.ts). Fired where the write
 // happens rather than wherever a terminal happened to go quiet.
 export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent): void {
@@ -59,12 +46,6 @@ export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent
 export function broadcastNotice(pluginId: string, notice: PluginNotice): void {
   wsBroadcast({ channel: 'workflow:notice', notice: { ...notice, pluginId } satisfies NoticeFrame })
   broadcastStatus(pluginId)
-}
-
-// One workflow step changed status. Per step, unlike the run-level `plugin:workflows:run-changed`:
-// the run pane moves a node's glyph from this instead of re-reading every step on every event.
-export function broadcastWorkflowStepChanged(runId: string, stepId: string, status: string): void {
-  wsBroadcast({ channel: 'workflow:step-changed', runId, stepId, status })
 }
 
 export function broadcastRepoConfigTrustNotice(taskId: string): void {
@@ -90,10 +71,6 @@ export function broadcastPluginApprovalNotice(taskId: string, action: 'install' 
     },
   })
   broadcastStatus()
-}
-
-export function broadcastWorkflowStepEvent(runId: string, stepId: string, event: unknown): void {
-  wsBroadcast({ channel: 'workflow:step:event', runId, stepId, event })
 }
 
 // This node's plugin set moved under a running client. A reload swapped a plugin's node half, so its
@@ -158,20 +135,6 @@ export function broadcastConnectionChanged(connection: ConnectionChangedEvent): 
 // deploy and scan plugins that act on the SHA itself rather than re-reading a list.
 export function broadcastHeadChanged(event: HeadChangedEvent): void {
   wsBroadcast({ channel: 'head:changed', ...event })
-}
-
-// A declared run target started or stopped (docs/api-reference/websocket.md § WebSocket). Emitted by the
-// terminal plugin, which holds the process, through `ctx.events.send`; this helper is the core-side
-// twin so the two never spell the frame differently.
-export function broadcastRunTargetChanged(event: RunTargetChangedEvent): void {
-  wsBroadcast({ channel: 'run:changed', ...event })
-}
-
-// A managed agent session finished a turn or asked for attention (docs/api-reference/websocket.md §
-// WebSocket). Same two kinds as the agents webhook service, on purpose: there is one reduction of
-// the session stream to human-scale edges.
-export function broadcastAgentSessionChanged(event: AgentSessionChangedEvent): void {
-  wsBroadcast({ channel: 'agent-session:changed', ...event })
 }
 
 // A project row or its config moved (docs/api-reference/websocket.md § WebSocket). Preview reads its URL

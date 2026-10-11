@@ -28,7 +28,7 @@ export const subagentStatusLabel = (status: AgentSubagentStatus | undefined): st
  * `collabAgentToolCall` item that spawns a child, so read that if a session ever runs children on a
  * model the parent is not on.
  */
-export const subagentFacts = (subagent: AgentSubagentUpdate, sessionModel?: string): string[] => {
+const subagentFacts = (subagent: AgentSubagentUpdate, sessionModel?: string): string[] => {
   const model = subagent.model ?? sessionModel
   return [
     subagentStatusLabel(subagent.status),

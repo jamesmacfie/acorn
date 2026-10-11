@@ -16,7 +16,7 @@ import type {
 } from '../../shared/workflowContracts'
 import { inlinePrompt, type RunnerDeps, type StepContextItem, type StepRunRequest } from '../runs/deps'
 
-export const MAX_STEP_TURNS = 8
+const MAX_STEP_TURNS = 8
 
 export { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../definitions/builtinDefinitions'
 

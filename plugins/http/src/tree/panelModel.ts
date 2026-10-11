@@ -22,7 +22,6 @@ import { clearDraftRecovery, draftRecovery } from './draftRecovery'
 export type Selection = { kind: 'saved'; id: string } | { kind: 'new' } | { kind: 'variables' }
 
 export { groupByFolder } from './requestGroups'
-export type { Group } from './requestGroups'
 
 export type PanelSubject = {
   bridge: AcornBridge

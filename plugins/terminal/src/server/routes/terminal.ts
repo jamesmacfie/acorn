@@ -16,7 +16,6 @@ import {
 } from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../../shared/send'
 
-export type { SendSubmit }
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
   // Answers from the same session map the WS hub reads through StreamHandlers.streamTaskId, not

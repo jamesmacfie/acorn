@@ -110,7 +110,7 @@ export function forgetAttentionSource(sourceId: string, nodeId: string): void {
   }
 }
 
-export function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryContext): void {
+function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryContext): void {
   // Off means off: no row either. A silent row that still counted would contradict the switch.
   if (!context.settings().events[EVENT_OF[edge.kind]]) return
   const key = snapshotKey(edge)
@@ -143,24 +143,6 @@ export function deliverNotice(
   // (docs/telemetry/model.md § What never leaves the machine).
   emitEvent('core', 'notice.delivered', { seam: 'notice.delivered', 'notice.kind': notice.kind, 'notice.seen': seen })
   return notice
-}
-
-/** Managed-agent notices carry no prompt-derived title, response, filename, or path. The durable
- *  notice target provides exact navigation without leaking sensitive content to the OS. */
-export function pushManagedAgentNotice(input: {
-  taskId: string
-  sessionId: string
-  requestId?: string
-  kind: Edge['kind']
-  title: string
-}): Notice {
-  return deliverNotice({
-    taskId: input.taskId,
-    kind: input.kind,
-    title: input.title,
-    at: Date.now(),
-    target: { kind: 'managed-agent', resourceId: input.sessionId, subresourceId: input.requestId },
-  })
 }
 
 /** Node-pushed notices: a workflow gate, a run finishing, a plugin asking to be installed, a memory

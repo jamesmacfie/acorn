@@ -1,11 +1,5 @@
-export {
-  agentSessionsFor,
-  focusSession,
-  refreshSessionSources,
-  sendToSession,
-  sessionSummaries,
-} from './agentSessions.ts'
-export type { SessionSubmit, SessionSummary } from './agentSessions.ts'
+export { agentSessionsFor, refreshSessionSources, sendToSession, sessionSummaries } from './agentSessions.ts'
+export type { SessionSummary } from './agentSessions.ts'
 export { completeTaskArchive, isArchiving, withArchiving } from './archiveLifecycle.ts'
 export { formatChord } from './paneShortcuts.ts'
 export { runApi } from './runClient.ts'
@@ -16,7 +10,7 @@ export { defaultLayout, isPaneId } from './taskLayout.ts'
 export { defaultBranchForTask } from './defaultBranch.ts'
 export type { TaskLayout } from './taskLayout.ts'
 export { setTaskLookup } from './taskLookup.ts'
-export { archiveTask, createTask } from './taskMutations.ts'
+export { createTask } from './taskMutations.ts'
 export { taskStatus, taskStatusRevision } from './taskStatus.ts'
 export { expandedWorkflowRoots, toggleWorkflowRoot } from './taskTreeViewState.ts'
 

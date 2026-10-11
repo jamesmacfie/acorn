@@ -45,7 +45,7 @@ export type EnrollmentOutcome =
   | { kind: 'enrolled'; controlPlaneUrl: string }
   | { kind: 'failed'; reason: string }
 
-export type EnrollmentEnv = {
+type EnrollmentEnv = {
   ACORN_ENROLLMENT_TOKEN?: string | undefined
   ACORN_CONTROL_PLANE_URL?: string | undefined
 }

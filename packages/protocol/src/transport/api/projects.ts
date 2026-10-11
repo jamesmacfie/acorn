@@ -230,7 +230,6 @@ export const taskOnCreatedRoute = (id: string) => `/v1/core/tasks/${id}/on-creat
 export const workspacesRoute = '/v1/core/workspaces'
 export const workspaceRoute = (id: string) => `/v1/core/workspaces/${id}`
 export const workspaceProjectOrderRoute = (id: string) => `${workspaceRoute(id)}/project-order`
-export const workspaceBootstrapRoute = '/v1/core/workspaces/bootstrap'
 export const workspaceExternalProjectsRoute = (id: string) => `/v1/core/workspaces/${id}/external-projects`
 // Tasks (Project -> Task units of work): rail rows.
 export const tasksRoute = '/v1/core/tasks'

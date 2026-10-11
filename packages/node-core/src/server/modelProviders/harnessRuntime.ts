@@ -125,7 +125,7 @@ export async function generateTextForHarness(
     const run = await scheduler.run(lane, lane, HARNESS_BUDGETS, () =>
       runHeadless(argv, {
         cwd,
-        // No `ACORN_API_URL`, no `ACORN_API_TOKEN`, no `ACORN_TOOL_CEILING`: there is no task, no MCP
+        // No `ACORN_API_URL` and no `ACORN_API_TOKEN`: there is no task, no MCP
         // server in the child, and nothing for a tool to call. `AGENT_TOOL_PASSTHROUGH` is
         // configuration only, so the CLI still authenticates with its own stored login and still works
         // behind a proxy, and no key acorn holds is anywhere in this environment.

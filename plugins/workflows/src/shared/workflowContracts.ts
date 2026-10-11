@@ -33,7 +33,7 @@ export type WorkflowDefinitionRef =
 /** Untrusted drafts remain wide enough to produce a field-located diagnostic. Runtime readers parse
  * the DataBinding branch and never translate another object shape. */
 export type WorkflowValueBinding = DataBinding | Record<string, unknown>
-export type WorkflowOutput = {
+type WorkflowOutput = {
   name: string
   label?: string
   schema: DataSchema
@@ -170,7 +170,7 @@ export type ResolvedWorkflowGraph = {
   requiresRepoTrust: boolean
 }
 
-export type WorkflowStepEvent = {
+type WorkflowStepEvent = {
   at: number
   event: Record<string, unknown>
 }
@@ -234,7 +234,7 @@ export type StepValidator = (step: WorkflowStepDef, context: StepValidationConte
 
 // What a kind's form looks like, as data (docs/workflows/step-kinds.md § Contributed step kinds). The host draws
 // it, so a kind can be edited in the UI on either host without the plugin shipping a component.
-export type StepFieldType =
+type StepFieldType =
   | 'text'
   | 'textarea'
   | 'number'
@@ -307,7 +307,7 @@ export type WorkflowCatalogTarget = {
 }
 export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
 
-export type WorkflowTriggerMatch = {
+type WorkflowTriggerMatch = {
   taskId: string
   workflow: WorkflowDef
 }

@@ -1,14 +1,12 @@
-// Synthetic daemon data only: neither the CLI nor the inventory service ever touches Docker.
-import { Hono } from 'hono'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestNodeContext, type AppEnv, type TestNodeContext } from '@acorn/plugin-api/testkit'
+import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { TaskRef } from '@acorn/plugin-api/node'
 import { dockerPlugin } from '../node/index'
 import type { DockerContainerSummary } from '../shared/model'
 import { dockerBridge } from './dockerBridge'
 import { dockerArchiveConcern } from './archiveCheck'
-import { docker as routes, setDockerBridge } from './routes/docker'
+import { setDockerBridge } from './routes/docker'
 import { docker, DockerCliError } from './cli'
 
 const mocks = vi.hoisted(() => ({ containers: vi.fn(), invalidate: vi.fn(), config: vi.fn() }))
@@ -173,31 +171,7 @@ describe('Docker task authority', () => {
   })
 })
 
-describe('manual and archive cleanup entrypoints', () => {
-  it('uses authoritative cleanup for the manual own-task route', async () => {
-    setDockerBridge(dockerBridge(ctx.core))
-    const app = new Hono<AppEnv>()
-      .use('*', async (c, next) => {
-        c.set('principal', { kind: 'internal', userId: 'synthetic', scope: 'task', taskId: task.id })
-        await next()
-      })
-      .route('/v1/p/docker', routes)
-    expect(
-      (await app.fetch(new Request('http://synthetic/v1/p/docker/tasks/t1/teardown', { method: 'POST' }), ctx.env))
-        .status,
-    ).toBe(200)
-    expect(
-      vi
-        .mocked(docker)
-        .mock.calls.slice(1)
-        .map(([args]) => args),
-    ).toEqual([
-      ['stop', own.id],
-      ['rm', own.id],
-      ['stop', loose.id],
-    ])
-  })
-
+describe('archive cleanup entrypoint', () => {
   it('offers only associated resources, and registered automatic archive cleanup uses the same policy', async () => {
     const plugin = dockerPlugin()
     const registration = vi.spyOn(ctx.taskChecks, 'register')

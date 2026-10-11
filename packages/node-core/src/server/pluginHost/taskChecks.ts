@@ -9,11 +9,11 @@ import { createLogger, describeError } from '../telemetry/logger'
 const log = createLogger('task-check')
 
 /** How long one check may take before the fan-out gives up on it (docs/plugins/task-checks.md § Task checks). */
-export const CHECK_TIMEOUT_MS = 2_000
+const CHECK_TIMEOUT_MS = 2_000
 
 /** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). Half
  *  the archive's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
-export const APPLY_TIMEOUT_MS = 60_000
+const APPLY_TIMEOUT_MS = 60_000
 
 /** How much of a plugin's own text reaches the dialog. Display-only strings, capped by the node, the
  *  same treatment a loaded plugin's failure `reason` gets on its way to the roster. */
@@ -22,7 +22,7 @@ const DETAIL_MAX = 300
 const LABEL_MAX = 80
 /** The dialog draws a list, not a file tree. Five fits above the buttons without pushing the confirm
  *  out of reach. The rest is a count. */
-export const DETAILS_MAX = 5
+const DETAILS_MAX = 5
 
 export type TaskConcern = {
   /** Unique within the check. The host qualifies it with the plugin and check ids before it leaves. */
@@ -65,7 +65,7 @@ const key = (pluginId: string, checkId: string): string => `${pluginId}:${checkI
 
 /** `<pluginId>:<checkId>:<concernId>`. Minted here and parsed here, so the string the client hands
  *  back on archive can only ever name a check the host registered. */
-export const qualifiedConcernId = (pluginId: string, checkId: string, concernId: string): string =>
+const qualifiedConcernId = (pluginId: string, checkId: string, concernId: string): string =>
   `${pluginId}:${checkId}:${concernId}`
 
 // A module singleton, like the route, source and node-action registries beside it, with the same

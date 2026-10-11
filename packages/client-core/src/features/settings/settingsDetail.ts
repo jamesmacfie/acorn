@@ -9,7 +9,7 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 // A context like `UnsavedChangesContext`, so the same page drawn outside settings registers with nothing
 // and draws its own back link instead.
 
-export type SettingsDetail = {
+type SettingsDetail = {
   /** The item's name, which the header shows as the page title. */
   title: Accessor<string>
   /** Back to the list. The view runs it after asking about unsaved changes. */

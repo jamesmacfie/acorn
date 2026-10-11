@@ -13,7 +13,7 @@ import {
 // attention inbox raises for what waits on the person (docs/plugins/activation.md § What the owner sees).
 // One function so the three never disagree about whether something needs the person.
 
-export type PluginStatusTone = 'ok' | 'warn' | 'danger' | 'muted' | 'accent'
+type PluginStatusTone = 'ok' | 'warn' | 'danger' | 'muted' | 'accent'
 
 export type PluginStatus = {
   tone: PluginStatusTone

@@ -15,12 +15,10 @@ export type {
   CachedItemCodec,
   CodecResult,
   MirroredResourceContribution,
-  ProviderDetailContext,
   ProviderItemComment,
   ProviderItemDetail,
   ProviderItemImage,
   ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
-  ProviderWriteContext,
 } from './types.ts'

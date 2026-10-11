@@ -46,7 +46,7 @@ export function publishTaskStatuses(list: readonly TaskStatus[]): void {
   setStatusRevision((revision) => revision + 1)
 }
 
-export const refreshTaskStatuses = latestOnly(async () => taskBridge().task.statuses(), publishTaskStatuses)
+const refreshTaskStatuses = latestOnly(async () => taskBridge().task.statuses(), publishTaskStatuses)
 
 // Start polling; returns an unsubscribe.
 //

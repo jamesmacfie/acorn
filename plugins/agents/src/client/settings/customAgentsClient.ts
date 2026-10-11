@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/solid-query'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import { customAgentsRoute, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
 
-export const customAgentsQueryKey = ['agents', 'custom-agents'] as const
+const customAgentsQueryKey = ['agents', 'custom-agents'] as const
 
 /** One query for every reader: the Settings page, the pane's New picker, and the palette, so a save on
  *  the page moves all three at once. */

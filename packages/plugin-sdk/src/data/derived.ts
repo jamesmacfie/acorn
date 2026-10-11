@@ -76,7 +76,7 @@ export const field: typeof Field = {
 }
 
 /** A field name as a JSON pointer: `~` and `/` are escaped. */
-export const pointerOf = (name: string) => `/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`
+const pointerOf = (name: string) => `/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`
 
 function describeFields(specs: FieldSpecs) {
   const entries = Object.entries(specs)
@@ -101,9 +101,9 @@ function hash(text: string): string {
 // ── Inputs ────────────────────────────────────────────────────────────────────────────────────────
 
 /** The most records one `all` reads from an input: the host's own cap on a query. */
-export const INPUT_RECORD_BUDGET = 5000
+const INPUT_RECORD_BUDGET = 5000
 
-export function wherePredicate(where: InputQuery['where']): DataPredicate | undefined {
+function wherePredicate(where: InputQuery['where']): DataPredicate | undefined {
   const tests = Object.entries(where ?? {})
   if (!tests.length) return undefined
   return {
@@ -119,12 +119,12 @@ export function wherePredicate(where: InputQuery['where']): DataPredicate | unde
 
 /** What one run learned about its inputs: whether an `all` stopped at the budget, and every record it
  *  saw, so `opens` can find the record a row points at. */
-export type InputLedger = { cut: boolean; seen: Map<string, InputRecord> }
+type InputLedger = { cut: boolean; seen: Map<string, InputRecord> }
 const refKey = (ref: DataRecordRef) =>
   JSON.stringify([ref.pluginId, ref.sourceId, ref.connectionId ?? null, ref.recordId])
 
 /** Wrap a host handle (or a test's fake) in the author-facing one. */
-export function inputHandle(host: DataSourceInputHandle, ledger: InputLedger): InputHandle {
+function inputHandle(host: DataSourceInputHandle, ledger: InputLedger): InputHandle {
   const read = async (query: InputQuery & { cursor?: string; pageSize?: number } = {}): Promise<InputRead> => {
     const { where, ...rest } = query
     const predicate = wherePredicate(where)
@@ -186,7 +186,7 @@ function opening(ledger: InputLedger, ref: DataRecordRef | undefined): Partial<P
 
 /** Check each record the way the host does, drop the ones that fail, and say why. A shared id is a
  *  host failure, not a dropped record, so it throws. */
-export function checkRecords(rows: DerivedRecord<FieldSpecs>[], schema: DataSchema, ledger: InputLedger): DerivedRun {
+function checkRecords(rows: DerivedRecord<FieldSpecs>[], schema: DataSchema, ledger: InputLedger): DerivedRun {
   const records: PageRecord[] = []
   const dropped: DerivedRun['dropped'] = []
   const ids = new Set<string>()
@@ -213,7 +213,7 @@ export function checkRecords(rows: DerivedRecord<FieldSpecs>[], schema: DataSche
   return { records, dropped, completeness }
 }
 
-export class MissingInputError extends Error {}
+class MissingInputError extends Error {}
 
 /** Run the author's logic over a set of handles. The handler and `testDerivedSource` both come here. */
 export async function runDerived(

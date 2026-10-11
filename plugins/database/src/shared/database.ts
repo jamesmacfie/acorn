@@ -28,7 +28,7 @@ export type DbCatalogResult = { tables: DbCatalogTable[] } | { error: string }
 // AI query generation (docs/data-layer/plugin-databases.md § The database plugin): where the schema text
 // in the prompt came from, and the result of a generate call. Generate errors travel as HTTP error
 // responses, not a union.
-export type DbSchemaSource = 'auto' | 'script' | 'file'
+type DbSchemaSource = 'auto' | 'script' | 'file'
 // `notes` is the project's free-form schema notes (projects.db_schema_notes), facts the schema text
 // can't express, carried here so the route needs no repo lookup.
 export type DbSchemaResult = { schema: string; source: DbSchemaSource; notes?: string } | { error: string }
@@ -51,7 +51,7 @@ export type DbSavedQuery = { id: string; name: string; notes: string | null; sql
 // rather than spelled at each call site so the frame, the manifest's document region, and the route
 // table cannot drift apart. The manifest declares the scratch and completions paths as literals with
 // `:taskId` in them, the one form these helpers cannot produce.
-export const DATABASE_ROUTE_PREFIX = '/v1/p/database'
+const DATABASE_ROUTE_PREFIX = '/v1/p/database'
 const taskRoute = (taskId: string, rest: string) =>
   `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
 

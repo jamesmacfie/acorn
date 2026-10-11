@@ -40,14 +40,14 @@ export class ApiError extends Error {
 
 // What a call site sees. Not a web Response, because a broker reply is fully buffered and pretending
 // otherwise invites streaming code that cannot work over IPC.
-export type ApiResponse = { ok: boolean; status: number; headers: Record<string, string>; body: Uint8Array }
+type ApiResponse = { ok: boolean; status: number; headers: Record<string, string>; body: Uint8Array }
 
 let requestSeq = 0
 const nextRequestId = (): string => `r${++requestSeq}-${Date.now()}`
 
 const decoder = new TextDecoder()
 
-export type ApiBody = string | NodeFetchBody
+type ApiBody = string | NodeFetchBody
 
 const asNodeBody = (body: ApiBody | undefined): NodeFetchBody | undefined =>
   body === undefined
@@ -312,12 +312,6 @@ export async function readBytes(
 // returns null and the caller names the file.
 const filenameFromDisposition = (header: string | undefined): string | null =>
   /filename="([^"]+)"/.exec(header ?? '')?.[1] ?? null
-
-// Reads the error prose out of a failed response. Kept as a separate export because a few call sites
-// want the message without the throw.
-export async function apiError(res: ApiResponse, fallback: string): Promise<string> {
-  return errorText(errorBody(res), fallback)
-}
 
 // Status, parsed body, and the node's own error envelope, without the throw. Every other export here
 export type RawApiResult = { ok: boolean; status: number; body: unknown; error?: ApiErrorBody['error'] }

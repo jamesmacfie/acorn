@@ -10,7 +10,7 @@ import type { WorkflowAgentServices } from './services'
 /** The longest one `workflow_wait` holds a request. */
 export const MAX_WAIT_MS = 30_000
 
-export const workflowRefSchema = z
+const workflowRefSchema = z
   .discriminatedUnion('source', [
     z.object({ source: z.literal('database'), id: z.string().min(1).max(200) }).strict(),
     z

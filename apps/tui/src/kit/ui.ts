@@ -101,24 +101,16 @@ export async function copyText(text: string): Promise<boolean> {
 export { Graph } from './graph'
 export { HistoryMark } from './historyMark'
 export { historyLayout } from '@acorn/client-core/kit/components/content'
-export type { HistoryNode, HistorySlot } from '@acorn/client-core/kit/components/content'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
-export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The other half of a `pty` rectangle: the caller says what the channel is and the host draws the
 // emulator. On the DOM that is an xterm on an element; here it is the rectangle's own, already drawn
 // (./pty.ts, client-core/features/terminal/attachPty.ts).
 export { attachPty } from './pty'
-export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
+export type { PtyIo } from '@acorn/client-core/kit/lib'
 export type { ItemProps } from '../keys/collection'
 // The prop-shape types a pane names in its own signatures. Types only, from the kit's own
 // declarations, so the two hosts cannot disagree about what a node takes.
-export type {
-  ButtonProps,
-  InputProps,
-  SelectOption,
-  SelectProps,
-} from '@acorn/client-core/kit/components/primitives.tsx'
-export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
+export type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 export type { KitSection } from '@acorn/client-core/kit/components/layout'
 export type { TimelineControls } from '@acorn/client-core/kit/components/content'
@@ -127,25 +119,17 @@ export type { TimelineControls } from '@acorn/client-core/kit/components/content
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which turns a long timeline draws. Counting, not measuring, so it holds in cells as it does on the DOM.
 export { createTimelineWindow } from '@acorn/client-core/kit/lib'
-export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export type {
   MentionSegment,
   MentionSource,
-  MentionSuggestion,
   MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 
 // Not components, and not the DOM ones either. Each is a rule rather than a rendering, and every rule
-// here holds in cells: arming a button to confirm is a decision the reader makes twice, markdown to
-// HTML is the shell's one policy (./markdown.ts draws what it decided), and a row height is a number
-// a virtualiser needs on any host. Re-exported from the kit's own library, which is host-neutral.
-export { createArmedConfirm } from '@acorn/client-core/kit/lib'
+// here holds in cells. Re-exported from the kit's own library, which is host-neutral.
 import type { SplitDrag, SplitDragOptions } from '@acorn/client-core/kit/lib'
 export type { SplitDrag } from '@acorn/client-core/kit/lib'
-export { renderMarkdown } from '@acorn/client-core/kit/lib'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib'
-export type { MarkdownOptions } from '@acorn/client-core/kit/lib'
-export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // The collapsed-sidebar signal, re-exported as it stands rather than stubbed. It reads device
 // storage, which this host does not have (client-core/kit/lib/state/deviceStorage.ts), so it answers
@@ -178,10 +162,3 @@ export function createSplitDrag(options: SplitDragOptions): SplitDrag {
     },
   }
 }
-
-// Two of the barrel's exports have no answer here and are absent rather than stubbed.
-//
-// `tip` is the delegated tooltip protocol, and hover is never load-bearing anywhere
-// (docs/tui/rectangles.md § What the TUI never does). `rowHeightSm` is a pixel count for
-// a DOM virtualiser; `Rows` here counts lines instead. A pane that reaches for one fails to build,
-// which is the answer we want: the affordance is gone, not silently broken.

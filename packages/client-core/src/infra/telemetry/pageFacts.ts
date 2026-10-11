@@ -29,7 +29,7 @@ const gauge = (name: string, value: number, unit = '1'): void => {
 }
 
 /** Count once now. Exposed for the test; the timer below is the caller in the app. */
-export function samplePageFacts(activeClient: () => QueryClient): void {
+function samplePageFacts(activeClient: () => QueryClient): void {
   if (!telemetryEnabled() || document.visibilityState !== 'visible') return
   try {
     gauge('ui.page.elements', document.getElementsByTagName('*').length)

@@ -10,7 +10,6 @@ import { pushBackgroundError } from '../../features/notifications/notifications'
 
 export type ConfigPluginRequest = { id: string; source: PluginInstallSource }
 const [requested, setRequested] = createSignal<ConfigPluginRequest[]>([])
-export const configPluginRequests = requested
 
 let stopped: (() => void) | undefined
 
@@ -54,6 +53,3 @@ export async function startDeviceConfigSync(
 
 export const configPluginOffers = (installed: ReadonlySet<string>): ConfigPluginRequest[] =>
   requested().filter((entry) => !installed.has(entry.id))
-
-export const selectedConfig = async (): Promise<DeviceConfig | null> =>
-  (await deviceConfigBridge()?.read())?.config ?? null

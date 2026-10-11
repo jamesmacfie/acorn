@@ -11,7 +11,7 @@ export const agentSessionDefaultsOptions = () => ({
 })
 
 // Only the fields Settings owns. The node merges them onto the `last` values the runtime maintains.
-export const saveAgentSessionDefaults = (patch: Partial<AgentSessionDefaults>) =>
+const saveAgentSessionDefaults = (patch: Partial<AgentSessionDefaults>) =>
   writeJson<AgentSessionDefaults>(
     agentSessionDefaultsRoute,
     {

@@ -18,7 +18,7 @@ import {
   type RollbarOccurrenceInput,
 } from '../occurrenceResources'
 
-export function errorRecord(item: RollbarItemSummary) {
+function errorRecord(item: RollbarItemSummary) {
   if (!/^\d+$/.test(item.itemId) || !/^\d+$/.test(item.identifier)) throw new Error('invalid_identity')
   for (const value of [item.title, item.environment, item.level, item.status]) {
     if (Buffer.byteLength(value) > CAPS.maxStringBytes) throw new Error('source_string_too_large')

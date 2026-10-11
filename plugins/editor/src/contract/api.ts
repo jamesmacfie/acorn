@@ -48,4 +48,4 @@ export const editorRenameAvailabilityRoute = (taskId: string) =>
 export const editorTrashRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash`
 export const editorTrashAvailabilityRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash-availability`
 
-export type { EditorLineMarkerSet, EditorLineMarkerSnapshot } from './lineMarkers'
+export type { EditorLineMarkerSnapshot } from './lineMarkers'

@@ -13,7 +13,7 @@ import type {
 import { resolveWorkflowInputs } from '../validation/definition'
 import { MAX_CHILD_WORKFLOW_DEPTH } from '../definitions/resolution'
 
-export type WorkflowInvocationIdentity = {
+type WorkflowInvocationIdentity = {
   callerKey: string
   payloadFingerprint: string
   rootRunId: string

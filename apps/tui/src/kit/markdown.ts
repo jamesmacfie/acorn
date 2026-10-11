@@ -13,7 +13,7 @@ import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
 // Images are asked for as `placeholder`, which is the policy's own way of saying "do not fetch this",
 // and in cells there is nothing to fetch with.
 
-export type Run = { text: string; role?: TextRole; tone?: Tone }
+type Run = { text: string; role?: TextRole; tone?: Tone }
 export type Line = { runs: Run[]; indent?: number; rule?: true }
 
 const TAG = /<\/?([a-z0-9-]+)((?:\s+[a-z-]+="[^"]*")*)\s*\/?>/gi

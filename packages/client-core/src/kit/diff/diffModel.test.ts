@@ -10,7 +10,6 @@ import {
   isCodeRow,
   maxLineCols,
   plainTokenize,
-  rowIdentityKeys,
   toBands,
   wordDiff,
   type CodeRow,
@@ -155,48 +154,6 @@ describe('diff model', () => {
     )
 
     expect(toBands(rows).map((band) => band.kind)).toEqual(['full', 'full', 'pair', 'full'])
-  })
-
-  it('gives progressively hydrated rows distinct stable identities', () => {
-    const summary = buildRenderableRows(
-      [
-        {
-          file: pullFile('src/app.ts', null),
-          diff: [{ kind: 'load', file: pullFile('src/app.ts', null), status: 'loading' }],
-        },
-      ],
-      [],
-    )
-    const hydrated = buildRenderableRows(
-      [
-        {
-          file: pullFile('src/app.ts', 'patch'),
-          diff: buildDiffRows(
-            pullFile(
-              'src/app.ts',
-              [
-                '@@ -1,2 +1,2 @@',
-                '-const a = 1',
-                '+const a = 2',
-                '@@ -10,2 +10,2 @@',
-                '-const b = 1',
-                '+const b = 2',
-              ].join('\n'),
-            ),
-            plainTokenize,
-          ),
-        },
-      ],
-      [],
-    )
-
-    const summaryKeys = rowIdentityKeys(summary)
-    const hydratedKeys = rowIdentityKeys(hydrated)
-
-    expect(summaryKeys[1]).toBe('load:src/app.ts:loading')
-    expect(hydratedKeys[1]).toBe('hunk:src/app.ts:@@ -1,2 +1,2 @@')
-    expect(hydratedKeys).not.toContain(summaryKeys[1])
-    expect(new Set(hydratedKeys).size).toBe(hydratedKeys.length)
   })
 
   it('measures the canvas width in columns, counting a tab to its next tab stop', () => {

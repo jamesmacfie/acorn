@@ -36,5 +36,4 @@ export const namedDataRecordActionSchema = z
   .strict()
 
 export type DataRecordAction = z.infer<typeof dataRecordActionSchema>
-export type DataRecordActionRisk = z.infer<typeof risk>
 export type NamedDataRecordAction = z.infer<typeof namedDataRecordActionSchema>

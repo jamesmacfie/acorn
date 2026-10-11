@@ -25,7 +25,7 @@ import { realpathSync } from 'node:fs'
 // The three module-shaped facets, named rather than left as `typeof <module>`, so an export added to
 // the module reaches plugins, and the `fs` permission grant, only when someone adds it below too. The
 // declarations are held to the modules by the `satisfies` assertions in createCoreServices.
-export type CoreFsService = {
+type CoreFsService = {
   isContainedPath: typeof fs.isContainedPath
   isValidRepoIdent: typeof fs.isValidRepoIdent
   resolveInRoot: typeof fs.resolveInRoot
@@ -220,38 +220,13 @@ export function createCoreServices(options: {
 }
 
 export { SecretService }
-export type {
-  AttachTaskPullInput,
-  ChildTaskSeed,
-  CompiledTaskService,
-  RootTaskSeed,
-  TaskLinkRef,
-  TaskPullRelation,
-  TaskRunConfig,
-  TaskService,
-} from './tasks'
-export type { IdentityService } from './identity'
-export type { CompiledProjectService, ProjectService } from './projectRefs'
+
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
 // and they carry no core config columns and no database handle.
-export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects/projects'
+export type { ProjectRef } from '../projects/projects'
 // The same arrangement one entity over: what TaskService hands back and takes in. A few fields off the
 // `tasks` row, and no database handle.
 export type { TaskRef } from '../worktrees/taskWorktree'
-export type { ContextService } from './context'
-export type { PrefService } from './prefs'
-export type { TelemetryService, TelemetrySink } from './telemetry'
-export type { GenerateTextRequest, ModelService, PluginGenerateTextRequest } from './models'
-export type {
-  DataCell,
-  DataColumn,
-  DataQueryOptions,
-  DataQueryResult,
-  DataSchemaResult,
-  DataSchemaSource,
-  DataSourceService,
-  DataTable,
-} from './data'
-export { SecretUnavailableError, redact } from './secrets'
-export type { ProcResult, ProcSpec } from './proc'
-export type { ConfineFailure, ConfineResult } from './fs'
+
+export type { GenerateTextRequest, ModelService } from './models'
+export type { DataColumn, DataTable } from './data'

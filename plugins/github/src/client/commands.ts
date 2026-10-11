@@ -24,7 +24,7 @@ import { githubBrowsePath, githubCreateRoute } from './clientRoutes'
 // command that needs no router, the rail source, is registered in the client entry through `ctx`.
 
 /** At most this many pull requests reach the palette. */
-export const MAX_PULL_ROWS = 50
+const MAX_PULL_ROWS = 50
 
 export type GithubCommandDeps = {
   /** The pull request on screen, or `null` when none is. The gate on all four PR commands. */

@@ -3,7 +3,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 // What github announces on its own channel (docs/plugins/events.md § Hearing another plugin). All four
 // verbs mean "re-read current mirror state"; the two repository source events need no content.
-export type GithubVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
+type GithubVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
 export type GithubEmit = (verb: GithubVerb, payload?: Record<string, unknown>) => void
 
 export const githubEmitter =

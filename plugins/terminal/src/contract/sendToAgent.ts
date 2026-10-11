@@ -13,8 +13,6 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { SendSubmit } from '../shared/send'
 
-export type { SendSubmit }
-
 // Fire and forget: 'after-ready' does not resolve until the session next goes idle, which may be
 // minutes away or never. Delivery failures are swallowed for the same reason. The only caller is
 // best-effort launch injection, which must never block or fail a session launch.

@@ -14,7 +14,7 @@ const log = createLogger('audit')
 // union rather than free-form strings, because the settings surface groups and filters on it, and an
 // action nobody can enumerate is one nobody reviews. Same argument as the error-code set in
 // docs/api-reference/transport.md § Errors.
-export type CoreAuditAction =
+type CoreAuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
   // the one moment this node will hand full owner authority to a stranger who knows a code.
   | 'pairing.window.opened'
@@ -95,7 +95,7 @@ export type PluginAuditAction = `${string}:${string}`
 
 export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction => `${pluginId}:${actionId}`
 
-export type AuditAction = CoreAuditAction | PluginAuditAction
+type AuditAction = CoreAuditAction | PluginAuditAction
 
 /** One declared plugin verb, as the registry holds it. */
 export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string; label: string }
@@ -135,7 +135,7 @@ export const auditVocabulary = (): DeclaredAuditAction[] =>
  *  literal in this binary — and a qualified one has to have been declared. Fail closed: an undeclared
  *  action writes nothing, because a trail that accepts arbitrary verbs is one nobody can enumerate,
  *  and enumerability is the whole point of the closed set. */
-export const isKnownAuditAction = (action: string): boolean => (action.includes(':') ? declared.has(action) : true)
+const isKnownAuditAction = (action: string): boolean => (action.includes(':') ? declared.has(action) : true)
 
 /** Whose verb this is. A plugin's actions are `<pluginId>:<actionId>` and no core action contains a
  *  colon, which is the same split `isKnownAuditAction` reads. */

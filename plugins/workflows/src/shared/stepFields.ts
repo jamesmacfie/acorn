@@ -288,7 +288,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
 
 /** Which built-in fields are named fields on the step rather than keys in `with`. Every built-in
  *  field is, and everything a plugin contributes is not, so the default answer is `'with'`. */
-export const FIELD_HOME: Readonly<Record<string, Readonly<Record<string, 'step' | 'with'>>>> = Object.fromEntries(
+const FIELD_HOME: Readonly<Record<string, Readonly<Record<string, 'step' | 'with'>>>> = Object.fromEntries(
   Object.entries(BUILTIN_STEP_DESCRIPTIONS).map(([kind, describe]) => [
     kind,
     Object.fromEntries(describe.fields.map((field) => [field.id, 'step' as const])),

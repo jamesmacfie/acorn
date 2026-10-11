@@ -25,7 +25,7 @@ import {
 /** Why a contribution did not make it into the tree. */
 export type CommandGraphIssue = 'duplicate-id' | 'missing-parent' | 'parent-not-group' | 'cross-owner-parent' | 'cycle'
 
-export type CommandGraphDiagnostic = {
+type CommandGraphDiagnostic = {
   /** The command that was dropped. */
   id: string
   issue: CommandGraphIssue
@@ -76,7 +76,7 @@ export type CommandGraph = {
 }
 
 /** One search hit: the node, and what it scored. */
-export type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
+type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
 
 type Draft = {
   command: CommandContribution

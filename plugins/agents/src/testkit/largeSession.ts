@@ -17,7 +17,7 @@ export type LargeSessionProfile = 'small' | 'scale' | 'canonical'
 
 /** Turns per profile, or a floor of events for the canonical one: the managed-agent docs' 7,000-event
  *  session, which projects to well over 1,200 cards, three times the flow's 400-turn mounted ceiling. */
-export const LARGE_SESSION_PROFILES: Record<LargeSessionProfile, { turns: number; events?: number }> = {
+const LARGE_SESSION_PROFILES: Record<LargeSessionProfile, { turns: number; events?: number }> = {
   small: { turns: 19 },
   scale: { turns: 94 },
   canonical: { turns: Infinity, events: 7_000 },

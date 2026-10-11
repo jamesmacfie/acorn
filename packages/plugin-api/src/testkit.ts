@@ -35,11 +35,6 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit'
-export {
-  testAgentToolDescriptor,
-  testContextSectionDescriptor,
-  testCliCommandDescriptor,
-} from '@acorn/node-core/testkit'
 
 // The skill catalogue as the host fills it from a loaded package, and the owner's answers about it
 // (docs/managed-agents/skills.md § Skills), so the agents plugin can test a start against real skills.
@@ -67,7 +62,7 @@ export {
   resolveInRoot,
   confineExistingFile,
 } from '@acorn/node-core/server/core/fs.ts'
-export type { ConfineFailure, ConfineResult } from '@acorn/node-core/server/core/fs.ts'
+
 export {
   ProviderOperationError,
   connectionProviderRegistry,

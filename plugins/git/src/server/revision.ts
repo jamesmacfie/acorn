@@ -28,7 +28,7 @@ const key = (repository: string, id: string, base: string | null) => `${reposito
 const docKey = (repository: string, id: string, base: string | null, patchKey: string) =>
   `${key(repository, id, base)}\0${patchKey}`
 
-export function parseRawFiles(output: string): RevisionFile[] {
+function parseRawFiles(output: string): RevisionFile[] {
   const fields = output.split('\0')
   const files: RevisionFile[] = []
   for (let i = 0; i < fields.length - 1;) {

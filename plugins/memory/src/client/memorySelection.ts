@@ -19,7 +19,8 @@ export function openMemory(name: string, scope: string, projectId?: string, navi
 }
 
 // Bumped by local writes and by the Node's change frame. Both regions refetch from it.
-export const [memoryRevision, setMemoryRevision] = createSignal(0)
+const [memoryRevision, setMemoryRevision] = createSignal(0)
+export { memoryRevision }
 export const memoriesChanged = (): void => {
   setMemoryRevision((value) => value + 1)
 }

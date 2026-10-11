@@ -45,49 +45,49 @@ import type {
  *  which one model call already outlives. */
 const GENERATE_TIMEOUT_MS = 240_000
 
-export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
+export type { WorkflowDefSummary } from '../contract/wire.ts'
 
 // Task-scoped defs/start/runs and run-scoped steps/gates.
-export const workflowTaskDefsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
-export const workflowStartRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
-export const workflowRunsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows/runs`
-export const workflowStepsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/steps`
-export const workflowGateRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/gate`
-export const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/cancel`
-export const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
-export const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
-export const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
-export const workflowRecordRoute = (runId: string, recordId: string) =>
+const workflowTaskDefsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+const workflowStartRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+const workflowRunsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows/runs`
+const workflowStepsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/steps`
+const workflowGateRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/gate`
+const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/cancel`
+const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
+const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
+const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
+const workflowRecordRoute = (runId: string, recordId: string) =>
   `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
 // Which run a managed agent session belongs to, for the agent pane's chip.
-export const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
+const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
 // Every run on this node, the same route core's merged run list reads.
-export const workflowAllRunsRoute = '/v1/p/workflows/runs'
-export const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
+const workflowAllRunsRoute = '/v1/p/workflows/runs'
+const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
 // Definitions stored as rows (docs/workflows/definitions.md § Database definitions). Device-only on the node, so
 // these answer 403 to anything but the app.
-export const workflowDefsRoute = '/v1/p/workflows/defs'
-export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
-export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
+const workflowDefsRoute = '/v1/p/workflows/defs'
+const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
+const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 // A whole definition written from a description or edited from the current graph
 // (docs/workflows/authoring.md § Authoring).
-export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
+const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // What the owner can generate with — a stored key, or an agent CLI installed on this machine — for
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key
 // ever leaves the node. The path says `model-connections`, though it lists backends; only this client
 // reads it.
-export const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
+const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (`WorkflowCatalog`).
-export const workflowCatalogRoute = '/v1/p/workflows/catalog'
-export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
-export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
+const workflowCatalogRoute = '/v1/p/workflows/catalog'
+const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
+const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
 // The owner's approvals for agents to start a workflow, device only (../server/routes/invocation.ts).
-export const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
+const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
 // rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
 // agent pane offers (docs/managed-agents/providers.md § Providers).
-export const agentProvidersRoute = '/v1/p/agents/providers'
+const agentProvidersRoute = '/v1/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 

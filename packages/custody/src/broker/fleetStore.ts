@@ -17,7 +17,7 @@ const log = createLogger('fleet')
 const FLEET_FILE = `${ACORN_BASELINE}-fleet.json`
 
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
-export const fleetNodeSchema = nodeRecordSchema.extend({
+const fleetNodeSchema = nodeRecordSchema.extend({
   // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but
   // the helper performs the TLS, so the renderer has no use for it.
   certPem: z.string().optional(),

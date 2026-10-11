@@ -17,7 +17,7 @@ import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormPro
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
-import { MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from '../steps/builtins'
+import { buildBuiltinWorkflowContributions } from '../steps/builtins'
 import { WorkflowTreeSafety } from '../validation/treeSafety'
 import { assertValidWorkflow, workflowEdges, type WorkflowValidationCatalog } from '../validation/definition'
 import { WorkflowChildLifecycle } from '../dispatch/childLifecycle'
@@ -29,11 +29,11 @@ import { unreachableSteps } from './graph'
 import { WorkflowStepExecution } from '../steps/execution'
 import { WorkflowRunState } from './state'
 import type { RunnerDeps } from './deps'
-export { MAX_CONCURRENT_HEADLESS } from '../steps/execution'
-export type { RunnerDeps, RunStepOptions, StepRunRequest, WorkflowChildTaskSeed } from './deps'
 
-export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
-export type { WorkflowInvocationIdentity, WorkflowStartOptions } from './start'
+export type { RunnerDeps } from './deps'
+
+export type { WorkflowDef } from '../../shared/workflowContracts'
+export type { WorkflowStartOptions } from './start'
 
 /** The outcome of answering a human gate. Invalid answers leave it waiting. */
 export type WorkflowGateResolution =
@@ -42,7 +42,6 @@ export type WorkflowGateResolution =
 
 const TERMINAL_RUN = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 const TERMINAL_STEP = new Set(['done', 'completed-with-failures', 'failed', 'skipped', 'safety-rail', 'cancelled'])
-export { MAX_STEP_TURNS }
 
 const now = () => Date.now()
 

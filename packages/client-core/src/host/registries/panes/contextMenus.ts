@@ -97,8 +97,8 @@ export type FileMenuTarget<L extends 'file.row' | 'document.tab' = 'file.row' | 
   extension: string
   revision?: string
 }
-export type FileRowTarget = FileMenuTarget<'file.row'>
-export type DocumentTabTarget = FileMenuTarget<'document.tab'>
+type FileRowTarget = FileMenuTarget<'file.row'>
+type DocumentTabTarget = FileMenuTarget<'document.tab'>
 
 /** A file target with its `extension` fact derived from the path, so no owner computes it its own way. */
 export const fileMenuTarget = <L extends 'file.row' | 'document.tab'>(

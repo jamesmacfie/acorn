@@ -18,7 +18,7 @@ export type ProvidedNodeState = z.infer<typeof providedNodeStateSchema>
 //
 // `endpoint` and `fingerprint` are nullable because a node under construction has neither. Adopting
 // one requires both, and the host refuses otherwise rather than pairing against a guess.
-export const providedNodeSchema = z.strictObject({
+const providedNodeSchema = z.strictObject({
   // The control plane's own id for this node, stable no matter which node asked. That stability is
   // what lets two nodes signed into one account list the same cloud nodes, and what makes moving
   // credential custody later renumber nothing.
@@ -73,7 +73,6 @@ export const nodeAdoptBodySchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),
 })
-export type NodeAdoptBody = z.infer<typeof nodeAdoptBodySchema>
 
 // Everything the host needs to remember a node, from the node that listed it. `certPem` is absent:
 // the host probes the endpoint itself and refuses a certificate whose fingerprint is not the one
@@ -94,11 +93,9 @@ export const nodeCreateRequestSchema = z.strictObject({
   label: z.string().min(1).max(120),
   options: z.record(z.string(), z.string()).default({}),
 })
-export type NodeCreateRequest = z.input<typeof nodeCreateRequestSchema>
 
 // `POST /v1/core/nodes/{destroy,start,stop}`.
 export const nodeLifecycleRequestSchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),
 })
-export type NodeLifecycleRequest = z.infer<typeof nodeLifecycleRequestSchema>

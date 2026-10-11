@@ -24,10 +24,6 @@ import {
 } from './sessionGoal'
 import { StepGoal, type GoalDecision } from './stepGoal'
 
-// The profile-to-driver map lives in the contract, so a caller can ask before it calls whether a
-// profile has a managed path at all. Nothing imports this re-export.
-export { managedProviderForProfile }
-
 function turnEvents(snapshot: AgentSessionSnapshot, turnIds: readonly string[]): StreamEvent[] {
   return snapshot.events
     .filter((record) => record.turnId != null && turnIds.includes(record.turnId))

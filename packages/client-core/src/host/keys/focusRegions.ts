@@ -32,7 +32,7 @@ export const focusedRegion = (): RegionRef | null => focused()
 const ordered = (): Group[] =>
   [...groups].sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
 
-export function registerRegion(element: HTMLElement, ref: RegionRef): () => void {
+function registerRegion(element: HTMLElement, ref: RegionRef): () => void {
   const group: Group = { ...ref, element }
   groups.push(group)
   return () => {
@@ -42,7 +42,7 @@ export function registerRegion(element: HTMLElement, ref: RegionRef): () => void
 }
 
 /** Called when focus lands inside a region. Idempotent, because focusin fires for every node. */
-export function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
+function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
   const group = groups.find((candidate) => candidate.paneId === ref.paneId && candidate.regionId === ref.regionId)
   if (group && node) group.last = node
   const current = focused()

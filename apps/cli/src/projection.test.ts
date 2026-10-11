@@ -69,6 +69,7 @@ describe('versioned resource contract', () => {
           },
         ],
         restartRequired: false,
+        requests: [],
       })[0],
     ]
     expect(projected).toEqual([node, workspace, project, task, plugin])

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { configPatchForPref, deviceConfigInstallOffers, deviceConfigPrefs } from './deviceConfigPrefs'
+import { configPatchForPref, deviceConfigPrefs } from './deviceConfigPrefs'
 import { PrefKeys } from './prefKeys'
 
 describe('device config projection', () => {
@@ -30,7 +30,6 @@ describe('device config projection', () => {
         { id: 'theme', source: { url: 'https://example.com/theme.tgz' } },
       ],
     }
-    expect(deviceConfigInstallOffers(config, new Set(['board']))).toEqual([config.plugins[1]])
     expect(deviceConfigPrefs(config)).toEqual({})
   })
 })

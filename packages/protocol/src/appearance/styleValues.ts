@@ -85,7 +85,7 @@ const font =
   /^(?:"[A-Za-z0-9 -]+"|'[A-Za-z0-9 -]+'|[A-Za-z][A-Za-z0-9 -]*)(?:, (?:"[A-Za-z0-9 -]+"|'[A-Za-z0-9 -]+'|[A-Za-z][A-Za-z0-9 -]*))*$/
 const shadow = new RegExp(`^(?:inset )?${scalarLength}(?: ${scalarLength}){2,3} var\\(--shadow-popover\\)$`)
 
-export const styleValueAlphabet: Readonly<Record<StyleTokenFamily, (value: string) => boolean>> = {
+const styleValueAlphabet: Readonly<Record<StyleTokenFamily, (value: string) => boolean>> = {
   length: (v) => length.test(v) || clamp.test(v),
   radius: (v) => length.test(v),
   space: (v) => length.test(v) || lengths.test(v),

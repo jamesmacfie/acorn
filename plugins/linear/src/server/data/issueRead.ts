@@ -23,7 +23,7 @@ type Issue = {
 }
 const pageFields = 'pageInfo { hasNextPage endCursor }'
 const issueFields = 'id identifier title url description project { id } state { id name type } createdAt updatedAt'
-export const projectId = (query: { parameters: Record<string, unknown> }) => {
+const projectId = (query: { parameters: Record<string, unknown> }) => {
   const id = query.parameters.project
   if (typeof id !== 'string' || !id || id.length > 200) throw new Error('project_required')
   return id

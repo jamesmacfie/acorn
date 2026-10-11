@@ -47,21 +47,21 @@ export function reviewDecision(reviews: readonly Review[]): ReviewDecision {
   return approving.length ? { state: 'approved', reviewers: approving } : { state: 'none', reviewers: [] }
 }
 
-export function shouldShowReviewSummary(review: Review): boolean {
+function shouldShowReviewSummary(review: Review): boolean {
   return hasRenderableBody(review.body) || (review.state ?? '').toUpperCase() !== 'COMMENTED'
 }
 
-export function byTime<T extends { createdAt: number | null }>(a: T, b: T): number {
+function byTime<T extends { createdAt: number | null }>(a: T, b: T): number {
   return (a.createdAt ?? Number.MAX_SAFE_INTEGER) - (b.createdAt ?? Number.MAX_SAFE_INTEGER)
 }
 
 export const threadComments = (thread: Thread) => [...thread.comments].sort(byTime)
-export function firstThreadComment(thread: Thread): Thread['comments'][number] | undefined {
+function firstThreadComment(thread: Thread): Thread['comments'][number] | undefined {
   let first: Thread['comments'][number] | undefined
   for (const comment of thread.comments) if (!first || byTime(comment, first) < 0) first = comment
   return first
 }
-export const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.createdAt ?? null
+const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.createdAt ?? null
 
 // `key` is the turn's identity in the conversation's Timeline: the kind and the provider's id, so a
 // commit SHA, a review's node id and a comment's id can never collide. It survives a refetch, a body

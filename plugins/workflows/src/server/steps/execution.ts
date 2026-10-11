@@ -37,7 +37,7 @@ import { Semaphore } from '../runs/semaphore'
 import type { RunnerDeps, RunStepOptions, StepRunRequest } from '../runs/deps'
 import type { WorkflowRunState } from '../runs/state'
 
-export const MAX_CONCURRENT_HEADLESS = 4
+const MAX_CONCURRENT_HEADLESS = 4
 const now = () => Date.now()
 const workflowPosture = (value: string): WorkflowPosture => {
   if (value === 'gated' || value === 'autonomous') return value

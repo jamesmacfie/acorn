@@ -75,7 +75,7 @@ export function toProjectRef(row: ProjectRow): ProjectRef {
   }
 }
 
-export type ProjectFacets = {
+type ProjectFacets = {
   vcs: 'git' | null
   remoteUrl: string | null
   githubOwner: string | null
@@ -98,7 +98,7 @@ export function parseGithubRemote(url: string): { owner: string; name: string } 
   return match ? { owner: match[1]!, name: match[2]! } : null
 }
 
-export async function detectFacets(path: string): Promise<ProjectFacets> {
+async function detectFacets(path: string): Promise<ProjectFacets> {
   const none: ProjectFacets = { vcs: null, remoteUrl: null, githubOwner: null, githubName: null, defaultBranch: null }
   // A `.git` entry, not a directory: a linked worktree holds a `.git` file and is still a git
   // checkout.
@@ -204,7 +204,7 @@ function insertProject(
   return { ok: true, project: result.project }
 }
 
-export class WorkspacesOffError extends Error {
+class WorkspacesOffError extends Error {
   readonly code = 'workspaces_off'
   constructor() {
     super(WORKSPACES_OFF_MESSAGE)

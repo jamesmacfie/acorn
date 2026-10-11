@@ -1,10 +1,10 @@
 // The test seam for this package (docs/architecture/packages.md § Package boundaries). The node app's
 // plugin integration tests reach the file loader, the runner, and its schema tables through it.
 export { loadWorkflowFiles } from '../server/definitions/files'
-export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/runs/runner'
+export { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/runs/runner'
 export { inlinePrompt } from '../server/runs/deps'
 export { WorkflowDispatcher } from '../server/dispatch/dispatcher'
-export { createDef } from '../server/definitions/store'
+
 export { createPublishedDef } from './publishedDefinition'
 export { generateWorkflowRequest } from '../server/authoring/generationRequest'
 export { catalogValidation } from '../server/authoring/generate'

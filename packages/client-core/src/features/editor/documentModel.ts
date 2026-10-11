@@ -11,12 +11,10 @@ import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 // one place to read them from.
 export type {
   PluginCompletionItem,
-  PluginCompletionKind,
   PluginCompletionRequest,
-  PluginCompletionResponse,
   PluginDocumentBody,
 } from '@acorn/protocol/documentSurface.ts'
-export { COMPLETION_KINDS, MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
+export { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
 
 /** A document big enough to wedge the renderer is refused rather than truncated: half a file in an
  * editor that will happily save it back is data loss. Declared on the wire

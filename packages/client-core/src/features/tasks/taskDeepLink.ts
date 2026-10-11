@@ -18,8 +18,8 @@ import { taskPath } from '../../host/registries/commands/corePaths'
 // This gives `openPluginContentTarget` an address. Every pane plugin gets it without contributing a
 // route.
 
-export const TASK_PANE_PARAM = 'pane'
-export const TASK_ITEM_PARAM = 'item'
+const TASK_PANE_PARAM = 'pane'
+const TASK_ITEM_PARAM = 'item'
 
 export type TaskDeepLink = { pane: string; item?: string }
 

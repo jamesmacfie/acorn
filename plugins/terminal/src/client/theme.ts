@@ -1,10 +1,6 @@
 import type { ITheme } from '@xterm/xterm'
 import { getHighlighter, token } from '@acorn/plugin-api/client'
 
-// Re-exported for convenience inside this plugin. The generic appearance readers live in
-// @acorn/plugin-api/client so other plugins reach them without a plugin→plugin import.
-export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/plugin-api/client'
-
 // xterm renders to its own canvas and ignores CSS, so it needs an explicit theme object. Rather
 // than hand-maintaining palettes, the theme is derived from the app's two existing sources:
 //  - chrome (background/foreground/cursor/selection) reads the CSS theme tokens at

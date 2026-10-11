@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryAttrs, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
 import { reportContributionError } from '../../kit/lib/telemetry/contributionErrors'
 import { _resetSurfaceHealth, registerSurfaceHealth } from '../../kit/lib/telemetry/surfaceHealth'
 import {
   _resetClientTelemetry,
-  currentTraceparent,
+  currentTrace,
   emitEvent,
   flushTelemetry,
   measure,
@@ -54,7 +53,7 @@ describe('with the switch off', () => {
     const span = startInteraction('core', { name: 'command' })
     expect(span.traceId).toBe('')
     span.end()
-    expect(currentTraceparent()).toBeUndefined()
+    expect(currentTrace()).toBeNull()
   })
 
   it('runs the measured call and returns its own result untouched', () => {
@@ -96,15 +95,12 @@ describe('the interaction trace', () => {
     setTelemetryEnabled(true)
   })
 
-  it('is a W3C traceparent while an interaction is open, and nothing after', () => {
-    expect(currentTraceparent()).toBeUndefined()
+  it('is the open interaction while one is open, and nothing after', () => {
+    expect(currentTrace()).toBeNull()
     const span = startInteraction('core', { name: 'command' })
-    const header = currentTraceparent()
-    expect(header).toBeDefined()
-    const parsed = parseTraceparent(header)
-    expect(parsed).toEqual({ traceId: span.traceId, parentSpanId: span.spanId, sampled: true })
+    expect(currentTrace()).toEqual({ traceId: span.traceId, spanId: span.spanId })
     span.end()
-    expect(currentTraceparent()).toBeUndefined()
+    expect(currentTrace()).toBeNull()
   })
 
   it('leaves the newer interaction in charge when an older one ends under it', () => {
@@ -113,7 +109,7 @@ describe('the interaction trace', () => {
     const first = startInteraction('core', { name: 'command' })
     const second = startInteraction('core', { name: 'nav.change' })
     first.end()
-    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(second.spanId)
+    expect(currentTrace()?.spanId).toBe(second.spanId)
   })
 
   it('hangs a plain span under the open interaction', async () => {
@@ -130,10 +126,10 @@ describe('the interaction trace', () => {
     const interaction = startInteraction('core', { name: 'nav.change' })
     const operation = startOperation('agents', { name: 'agents.sidebar.open' })
     expect(operation.traceId).toBe(interaction.traceId)
-    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(interaction.spanId)
+    expect(currentTrace()?.spanId).toBe(interaction.spanId)
 
     operation.end()
-    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(interaction.spanId)
+    expect(currentTrace()?.spanId).toBe(interaction.spanId)
     interaction.end()
     await flushTelemetry()
 
@@ -143,9 +139,9 @@ describe('the interaction trace', () => {
 
   it('becomes the ambient interaction when an operation opens directly', () => {
     const operation = startOperation('agents', { name: 'agents.center.open' })
-    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(operation.spanId)
+    expect(currentTrace()?.spanId).toBe(operation.spanId)
     operation.end()
-    expect(currentTraceparent()).toBeUndefined()
+    expect(currentTrace()).toBeNull()
   })
 
   it('attributes one render transition across the current turn and two frame opportunities', async () => {
@@ -337,7 +333,7 @@ it('does not resurrect an ended interaction when overlapping work finishes', () 
   const second = startInteraction('core', { name: 'second' })
   first.end()
   second.end()
-  expect(currentTraceparent()).toBeUndefined()
+  expect(currentTrace()).toBeNull()
 })
 
 it('does not restore a failed post across an off/on consent change', async () => {

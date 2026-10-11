@@ -2,8 +2,8 @@
 // sandboxed-frame SDK. Chords are persisted strings, so accepting a spelling that eventChord can
 // never produce would create a setting that looks valid and can never fire.
 
-export const CHORD_MODIFIERS = ['meta', 'ctrl', 'alt', 'shift'] as const
-export type ChordModifier = (typeof CHORD_MODIFIERS)[number]
+const CHORD_MODIFIERS = ['meta', 'ctrl', 'alt', 'shift'] as const
+type ChordModifier = (typeof CHORD_MODIFIERS)[number]
 
 export type ParsedChord = { modifiers: ChordModifier[]; key: string }
 

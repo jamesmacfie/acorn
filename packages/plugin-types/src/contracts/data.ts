@@ -151,7 +151,7 @@ export type DataRecordAction = (
   | { verb: 'navigate'; surface: string }
   | { verb: 'createTask' }
 ) & { risk?: 'read' | 'write' | 'execute' }
-export type NamedDataRecordAction = {
+type NamedDataRecordAction = {
   id: string
   label: string
   icon?: string
@@ -175,7 +175,7 @@ export type DataSourceResponse<R extends DataSourceRequest> = R extends { operat
           ? { actions: NamedDataRecordAction[] }
           : { kind: 'found'; data: DataValue; fetchedTime: number; writableFields?: string[] } | { kind: 'not-found' }
 export type DataValue = DataPrimitive | DataValue[] | { [key: string]: DataValue }
-export type DataSourceIdentity = {
+type DataSourceIdentity = {
   id?: string
   login?: string
   name?: string

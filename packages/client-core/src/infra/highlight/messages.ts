@@ -7,7 +7,7 @@
 // because a diff module exists.
 
 /** One highlighted run: its text, and the colour it takes under each of the two bundled themes. */
-export type HighlightTok = { content: string; light: string; dark: string }
+type HighlightTok = { content: string; light: string; dark: string }
 
 /** Tokens for a whole document, outer array per line. Empty inner array = a blank line. */
 export type HighlightLines = HighlightTok[][]

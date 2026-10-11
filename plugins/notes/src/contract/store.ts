@@ -5,9 +5,9 @@ import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@aco
 // agent's session id is what the pane's provenance badge and the context assembler's `origin` field
 // read; `author: 'workflow'` is how a seeded PR snapshot and a run handoff are told apart from a note
 // the owner typed.
-export type NoteWriter = { author: NoteAuthor; originSessionId?: string; originTaskId?: string }
+type NoteWriter = { author: NoteAuthor; originSessionId?: string; originTaskId?: string }
 
-export type NoteCreateOptions = {
+type NoteCreateOptions = {
   author?: NoteAuthor
   kind?: NoteKind
   originSessionId?: string

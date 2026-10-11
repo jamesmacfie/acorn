@@ -62,7 +62,7 @@ symbol rather than its file. To cite a doc, follow [writing-docs.md](./docs/writ
 | Command | What it does |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | Installs dependencies. A fresh worktree needs this first. |
-| `pnpm lint` | Runs oxlint, then the formatter check, then `tsc --noEmit` in every package. |
+| `pnpm lint` | Runs oxlint, the formatter check, the unused-export check, then `tsc --noEmit` in every package. |
 | `pnpm format [<file>...]` | Formats the given TypeScript files, or every one when you name none. |
 | `pnpm test:focus <package> <file> [-t <name>]` | Runs one file or test. Use it while you iterate. |
 | `pnpm test --filter=<package>` | Runs one package's full suite through Turborepo. |
@@ -111,3 +111,8 @@ because a linter that argues about style gets ignored.
 oxfmt sets the layout of every TypeScript file, configured in `.oxfmtrc.json`. `pnpm lint` fails on
 a file it would change. Run `pnpm format <file>` to fix one file, or `pnpm format` for the whole tree.
 Don't hand-format around it, and don't reformat files your change doesn't touch.
+
+knip fails `pnpm lint` on an export nothing imports, configured in `knip.jsonc`. A test counts as an
+importer. Delete the export, or drop the `export` keyword when the file still uses it. Run
+`pnpm lint:exports` to check on its own. A public surface or a name read by a build tool goes in
+`knip.jsonc` with its reason, not in an ignore comment.

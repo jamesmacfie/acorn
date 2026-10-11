@@ -168,5 +168,3 @@ export function createDiffLayoutIndex() {
     },
   }
 }
-
-export type DiffLayoutIndex = ReturnType<typeof createDiffLayoutIndex>

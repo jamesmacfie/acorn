@@ -19,7 +19,7 @@
 // node's row in docs/ui-design/every-node.md § Every node at 80 by 24.
 
 export type Host = 'dom' | 'tui'
-export type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
+type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
 /** A row: a level per host, and what a `reduced` level costs. */
 export type NodeSupportRow = Record<Host, SupportLevel> & { loss?: string }
 

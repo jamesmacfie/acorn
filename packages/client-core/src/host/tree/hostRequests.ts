@@ -21,7 +21,7 @@ import type { TreeHostResult } from './workerHost'
  * owner whose action is a person's act, such as reloading a page or interrupting a terminal, refuses
  * without it (docs/plugins/toolbar-actions.md).
  */
-export type OwnerInvocation = { byPerson: boolean }
+type OwnerInvocation = { byPerson: boolean }
 
 export type OwnerActions = Record<string, (payload: unknown, invocation: OwnerInvocation) => unknown | Promise<unknown>>
 

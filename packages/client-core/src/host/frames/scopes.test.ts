@@ -106,7 +106,6 @@ describe('the route table covers every core route', () => {
       api.projectMcpRoute(ID),
       api.projectMcpStarterRoute(ID),
       api.projectRunTargetsRoute(ID),
-      api.workspaceBootstrapRoute,
       api.integrationsRoute,
       api.integrationRoute(ID),
       api.integrationTestRoute(ID),
@@ -179,15 +178,13 @@ describe('scope checking', () => {
     })
   })
 
-  it('allows adding a task link with task write, but never allows unlinking', () => {
+  it('allows adding a task link with task write', () => {
     const writer = { pluginId: 'board', api: ['core.tasks:write'] }
     expect(allowApi(writer, 'POST', api.taskLinksRoute(ID)).allowed).toBe(true)
     expect(allowApi(board, 'POST', api.taskLinksRoute(ID))).toEqual({
       allowed: false,
       reason: 'missing scope core.tasks:write',
     })
-    expect(allowApi(writer, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
-    expect(allowApi(board, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
   })
 
   it('does not let a read on the task or project collection leak MCP config or preview credentials', () => {

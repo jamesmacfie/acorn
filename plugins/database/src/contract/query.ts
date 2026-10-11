@@ -8,7 +8,7 @@ import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 // refusal, instead of each caller remembering both.
 
 /** A cell, as the pane renders it: every value flattened to text, and NULL kept distinct. */
-export type DatabaseQueryCell = string | null
+type DatabaseQueryCell = string | null
 
 export type DatabaseQueryResult = {
   columns: string[]

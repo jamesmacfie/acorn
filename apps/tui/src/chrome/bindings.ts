@@ -94,7 +94,7 @@ export type Words = { moveKeys: string; move: string; act: string; cross: string
  * The kind does not always settle the `cross` column, so read the words through `words()` below
  * rather than off this table (§ the cross word).
  */
-export const WORDS: Record<FocusedKind, Words> = {
+const WORDS: Record<FocusedKind, Words> = {
   // Down enters the panel the strip is showing and Up leaves the strip, so the pair is not a pair.
   parent: { moveKeys: 'j', move: 'enter', act: 'press', cross: 'tab', commit: 'commit', next: 'region' },
   item: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit', next: 'region' },

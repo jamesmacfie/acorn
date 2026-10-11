@@ -14,7 +14,7 @@ export type CreatePullInput = {
   draft?: boolean
 }
 
-export type CreatePullFailure = {
+type CreatePullFailure = {
   status: 400 | 401 | 403 | 422 | 429 | 502
   error: string
   detail?: string[]

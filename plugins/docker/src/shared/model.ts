@@ -57,7 +57,7 @@ export type DockerNetwork = {
   internal: boolean
 }
 
-export type DockerMount = { type: string; source: string; destination: string; rw: boolean }
+type DockerMount = { type: string; source: string; destination: string; rw: boolean }
 
 export type DockerContainerDetail = DockerContainerSummary & {
   command: string
@@ -142,5 +142,3 @@ export const dockerProjectMatcherRoute = (projectId: string): string =>
   `/v1/p/docker/projects/${encodeURIComponent(projectId)}/matcher`
 export const dockerTaskContainersRoute = (taskId: string): string =>
   `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/containers`
-export const dockerTaskTeardownRoute = (taskId: string): string =>
-  `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/teardown`

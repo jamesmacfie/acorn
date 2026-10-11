@@ -40,11 +40,10 @@ export type NodePluginObservation = {
   rows: readonly NodePluginRow[]
   reachable: boolean
   stale: boolean
-  generation: number
   observedAt: number
 }
 
-export type OfferedPluginCandidate = {
+type OfferedPluginCandidate = {
   nodeId: string
   pluginId: string
   row: NodePluginRow
@@ -53,7 +52,7 @@ export type OfferedPluginCandidate = {
   relation: 'active' | 'installed'
 }
 
-export type PluginSelection = {
+type PluginSelection = {
   nodeId: string
   pluginId: string
   row: NodePluginRow
@@ -159,7 +158,7 @@ const latestPrevious = (
     .filter((ack) => ack.pluginId === pluginId && ack.hash !== hash && ack.decision === 'accepted' && !ack.partial)
     .sort((a, b) => b.decidedAt - a.decidedAt)[0]
 
-/** Pure policy for one fleet revision. I/O and generation checks live in distribution.ts. */
+/** Pure policy for one fleet revision. I/O and request ordering live in distribution.ts. */
 export function derivePluginDistribution(
   byNode: ReadonlyMap<string, NodePluginObservation>,
   host: PluginHostState,

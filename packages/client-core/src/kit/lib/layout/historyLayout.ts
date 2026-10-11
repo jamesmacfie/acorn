@@ -1,6 +1,6 @@
 /** History geometry uses only immutable commit IDs and parent relationships. */
 export type HistoryNode = { id: string; parents: readonly string[] }
-export type HistoryEdge = {
+type HistoryEdge = {
   from: number
   to: number
   start: 'top' | 'center'

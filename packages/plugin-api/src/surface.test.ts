@@ -73,7 +73,7 @@ it('the private plugin facade matches its snapshot', () => {
   expect(actual).toContain('node: NodePlugin')
   expect(actual).toContain('client: ClientPlugin')
   expect(actual).toContain('ui: Button')
-  expect(actual).toContain('ui/diff: buildDiffRows')
+  expect(actual).toContain('ui/diff: createDiffSnippets')
   expect(new Set(actual).size).toBe(actual.length) // no entrypoint exports the same name twice
 
   const snapshotPath = join(HERE, 'surface.snapshot.txt')

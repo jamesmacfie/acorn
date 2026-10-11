@@ -11,7 +11,7 @@ export const CREATE_TASK_ROUTE = '/p/:projectId/new'
 export const TASK_ROUTE = '/t/:taskId'
 
 // The prefix every project-scoped URL shares, plugin-contributed ones included.
-export const PROJECT_PATH_PREFIX = '/p/'
+const PROJECT_PATH_PREFIX = '/p/'
 
 // The one segment core reserves for a loaded plugin's project-scoped URLs, and the per-plugin prefix
 // minted from it (docs/architecture/packages.md § Two spellings that must not
@@ -20,12 +20,11 @@ export const PROJECT_PATH_PREFIX = '/p/'
 // Compiled plugins are not confined this way: github writes `/p/:projectId/pulls` directly through
 // `SourceContribution.routes`, because it is part of the binary and its patterns are reviewed with the
 // rest of it. A manifest is not, which is the whole difference and the reason this prefix exists.
-export const PLUGIN_ROUTE_SEGMENT = 'x'
+const PLUGIN_ROUTE_SEGMENT = 'x'
 export const pluginProjectRoutePrefix = (pluginId: string): string =>
   `${PROJECT_ROUTE}/${PLUGIN_ROUTE_SEGMENT}/${pluginId}/`
 
 export const projectPath = (projectId: string): string => `/p/${encodeURIComponent(projectId)}`
-export const newTaskPath = (projectId: string): string => `${projectPath(projectId)}/new`
 export const taskPath = (taskId: string): string => `/t/${encodeURIComponent(taskId)}`
 
 export const isProjectPath = (path: string): boolean => path.startsWith(PROJECT_PATH_PREFIX)

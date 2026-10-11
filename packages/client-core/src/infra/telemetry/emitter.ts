@@ -31,7 +31,6 @@ import {
   ATTR_KEY_MAX,
   ATTR_VALUE_MAX,
   LOG_BODY_MAX,
-  formatTraceparent,
 } from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/telemetry/workTelemetry'
@@ -218,11 +217,6 @@ export const newSpanId = (): string => hex(8)
 
 /** The span every request made right now should hang under, or null between interactions. */
 export const currentTrace = (): { traceId: string; spanId: string } | null => state.trace
-
-/** The `traceparent` header value for the open interaction, or nothing when there is none. A request
- *  outside an interaction starts its own trace on the node rather than joining a stale one. */
-export const currentTraceparent = (): string | undefined =>
-  state.trace ? formatTraceparent(state.trace.traceId, state.trace.spanId) : undefined
 
 /**
  * Open a span and make it the parent of everything the renderer does until it ends.

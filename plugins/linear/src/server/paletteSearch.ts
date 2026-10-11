@@ -32,7 +32,7 @@ const BADGE = 80
  * prefix both have an `ENG-42` (../shared/rail.ts). The surface parses the pair back out, which is
  * how a rail row has always addressed one.
  */
-export const linearSearchItem = ({ issue, connectionLabel }: LinearSearchRow): CommandSearchItem => {
+const linearSearchItem = ({ issue, connectionLabel }: LinearSearchRow): CommandSearchItem => {
   const priority = priorityMeta(issue.priority, issue.priorityLabel)
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),

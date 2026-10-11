@@ -83,7 +83,7 @@ export function outputPlanColumns(plan: PanelPlan): PanelPlanColumn[] {
 }
 
 /** Every column id a plan declares: bound, attached by a relation, calculated, measured, or expanded. */
-export function planColumnIds(plan: PanelPlan): Set<string> {
+function planColumnIds(plan: PanelPlan): Set<string> {
   return new Set([
     ...plan.columns.map((column) => column.id),
     ...(plan.relations ?? []).flatMap((relation) => (relation.output ? [relation.output] : [])),

@@ -48,9 +48,9 @@ jobs:
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: turbo-${{ runner.os }}-
 
-      # oxlint, the oxfmt check, then `tsc --noEmit` in every package. Three parts in one script: an
-      # oxlint or formatter failure means tsc never ran, so read which part went red before trusting
-      # the types.
+      # oxlint, the oxfmt check, the knip unused-export check, then `tsc --noEmit` in every package. Four
+      # parts in one script: an earlier failure means tsc never ran, so read which part went red before
+      # trusting the types.
       - run: pnpm lint
 
       # `pnpm test`, not `turbo run test`: the root script rebuilds node-pty for this ABI first and

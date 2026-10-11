@@ -88,10 +88,4 @@ export function renderAxTree(tree: AxNode[], depth = 0): string {
   return lines.join('\n')
 }
 
-// ERR_ABORTED (-3) on navigation is benign: redirects and SPA transitions produce it.
-export const isBenignNavError = (err: unknown): boolean => {
-  const e = err as { errno?: number; code?: string; message?: string }
-  return e?.errno === -3 || e?.code === 'ERR_ABORTED' || !!e?.message?.includes('ERR_ABORTED')
-}
-
 export const isAllowedBrowserUrl = (url: string): boolean => /^https?:\/\//i.test(url)

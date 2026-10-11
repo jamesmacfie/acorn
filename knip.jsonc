@@ -1,0 +1,80 @@
+// The unused-export check `pnpm lint` runs (docs/testing/commands.md). Every export needs an importer
+// outside its own file, a test counts as one, and a package's `exports` map entries are checked too.
+// A deliberate public surface opts out below with `includeEntryExports: false`, and every other
+// exception sits in `ignoreIssues` with its reason.
+{
+  "$schema": "./node_modules/knip/schema-jsonc.json",
+  "include": ["exports", "nsExports", "types", "nsTypes", "duplicates"],
+  "includeEntryExports": true,
+  "ignore": ["apps/node/.plugin-build/**"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/**/*.{mjs,mts,ts}"]
+    },
+    "apps/cli": {
+      "entry": ["bin/acorn.mjs"]
+    },
+    "apps/desktop": {
+      // The helper and bridge bundles have their own Vite configs, built by `pnpm stage`.
+      "entry": ["scripts/**/*.{mjs,ts}", "src/helper/helperMain.ts", "vite.*.config.ts"]
+    },
+    "apps/node": {
+      "entry": ["scripts/**/*.mjs", "test/__fixtures__/**/*.{js,mjs,ts}"]
+    },
+    "apps/tui": {
+      // The kit files stand in for `@acorn/plugin-api/ui*` and stub packages through build aliases
+      // (apps/tui/vite.config.ts), so a plugin's imports reach them where knip can't follow. Their
+      // exports mirror the facade by hand: prune both together.
+      "entry": [
+        "scripts/**/*.mjs",
+        "src/kit/{ui,dataSources,dataSourceKit,editor,router,iconNodes,codemirrorGrammars,xterm,shiki}.ts",
+        "src/kit/host.tsx",
+        "src/tree/jsx-runtime.ts"
+      ],
+      "includeEntryExports": false
+    },
+    "packages/client-core": {
+      // Type-level checks that nothing imports.
+      "entry": ["src/host/frames/verbs.ts"]
+    },
+    "packages/create-acorn-plugin": {
+      "includeEntryExports": false
+    },
+    "packages/plugin-api": {
+      // The first-party facade. Its names are reviewed through src/surface.snapshot.txt.
+      "includeEntryExports": false
+    },
+    "packages/plugin-sdk": {
+      // Published to npm, so outside plugins are the callers. The `public.ts` files become the d.ts.
+      "entry": ["src/{data,testing}/index.ts", "src/public.ts", "src/*/public.ts"],
+      "includeEntryExports": false
+    },
+    "packages/plugin-types": {
+      // Published to npm, like plugin-sdk.
+      "entry": ["src/public.ts"],
+      "includeEntryExports": false
+    },
+    "packages/protocol": {
+      "entry": ["src/**/*.test-d.ts"]
+    },
+    "plugins/*": {
+      // A loaded plugin's build declaration, and the tree bundle it names. Bundled plugins have neither.
+      "entry": ["acorn-plugin.config.mjs", "src/tree/index.tsx"]
+    }
+  },
+  "ignoreIssues": {
+    // A tool reads the default export.
+    "**/*.config.{ts,mjs}": ["exports"],
+    "plugins/{drizzle,vitest}.shared.ts": ["exports"],
+    "apps/node/test/__fixtures__/**": ["exports"],
+    // A type-level test declares its assertions as types nothing imports.
+    "**/*.test-d.ts": ["exports", "types"],
+    // `acorn-plugin.config.mjs` names the factory as a string (`factory: 'httpPlugin'`).
+    "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry-telemetry}/src/node/index.ts": ["exports"],
+    // JSX runtimes. Solid's compiler emits calls to these names, set by `moduleName` in the build.
+    "apps/tui/src/tree/renderer.ts": ["exports", "types"],
+    "packages/client-core/src/host/frames/remoteSolid.ts": ["exports", "types"],
+    // The published SDK's source. acorn-plugin-sdk re-exports it through @acorn/plugin-api/ui/sdk.
+    "packages/client-core/src/host/frames/sdk.ts": ["exports", "types"]
+  }
+}

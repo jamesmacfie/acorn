@@ -252,8 +252,6 @@ export function clientFor(nodeId: string): NodeCache {
   return cache
 }
 
-export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NODE_ID).client
-
 // Forget everything this client cached for a node. The payoff of the per-node partition: one place a
 // node's data lives, so eviction is this function alone, unlike `runtime:task-archived`, which fans
 // out to every state owner.

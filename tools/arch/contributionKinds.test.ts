@@ -29,7 +29,7 @@ const TABLE = read('docs/contribution-kinds.md')
  *  suite to read twelve property names. */
 const members = (source: string, typeName: string): string[] => {
   // The compiled type of each pair is `<Loaded> & { … }`, so the intersection prefix is optional here.
-  const body = new RegExp(`export type ${typeName} = (?:\\w+ & )?\\{(.*?)\\n\\}`, 's').exec(source)
+  const body = new RegExp(`^(?:export )?type ${typeName} = (?:\\w+ & )?\\{(.*?)\\n\\}`, 'ms').exec(source)
   if (!body) throw new Error(`Could not find ${typeName}`)
   return [...body[1].matchAll(/^ {2}(?:readonly )?([a-zA-Z]+)[?]?:/gm)].map((match) => match[1]!)
 }

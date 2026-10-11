@@ -42,27 +42,16 @@ import {
   type WorkspaceExternalProjectsResponse,
 } from '@acorn/protocol/api.ts'
 
-export {
-  integrationsKey,
-  modelBackendsKey,
-  prefsKey,
-  projectsKey,
-  tasksKey,
-  workspacesKey,
-} from '@acorn/protocol/api.ts'
+export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type {
   ArchivedTask,
-  Integration,
   IntegrationMapping,
   IntegrationProject,
   IntegrationsResponse,
   Project,
   ProjectsResponse,
   Task,
-  TaskLink,
-  TaskSeed,
   Workspace,
-  WorkspaceExternalProject,
 } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
@@ -77,7 +66,7 @@ export const tasksOptions = (enabled: boolean) => ({
 
 // Archived tasks for the archive page, newest first. Keyed under tasksKey so every invalidation of the
 // active list, including `tasks:changed`, refreshes this one too.
-export const archivedTasksKey = [...tasksKey, 'archived'] as const
+const archivedTasksKey = [...tasksKey, 'archived'] as const
 export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
@@ -88,7 +77,7 @@ export const archivedTasksOptions = (enabled: boolean) => ({
 // Every deleted task's id (docs/workspaces-and-tasks/archive.md § Deleting a task), so a reference to
 // one reads "Deleted task" instead of a link to nothing. Under tasksKey, so the tasks change a delete
 // broadcasts refreshes it. An array rather than a Set, because the query cache is persisted as JSON.
-export const deletedTasksKey = [...tasksKey, 'deleted'] as const
+const deletedTasksKey = [...tasksKey, 'deleted'] as const
 export const deletedTasksOptions = (enabled: boolean) => ({
   queryKey: deletedTasksKey,
   enabled,
@@ -142,7 +131,7 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
 //
 // No staleTime and no retry. A picker's list is a claim about the provider now, and a connection that
 // failed should say so at once with a Retry button rather than after three silent attempts.
-export const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
+const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
 export const integrationProjectsOptions = (connectionId: string, enabled: boolean) => ({
   queryKey: integrationProjectsKey(connectionId),
   enabled: enabled && !!connectionId,
@@ -186,7 +175,7 @@ export const prefsOptions = (enabled: boolean) => ({
 //
 // For a named node, because the page follows the settings header's node switcher rather than the
 // window's active node. `null` is the node serving this window, when there is no fleet.
-export const telemetrySummaryKey = ['telemetry-summary'] as const
+const telemetrySummaryKey = ['telemetry-summary'] as const
 export const telemetrySummaryOptions = (enabled: boolean, nodeId: string | null) => ({
   queryKey: [...telemetrySummaryKey, nodeId ?? ''] as const,
   enabled,

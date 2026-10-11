@@ -1,10 +1,7 @@
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
-import type { Context } from 'hono'
 import type { AppDatabase } from '../db'
-import { getDb, schema } from '../db'
-import type { AppEnv } from '../middleware/auth'
-import { ownerId } from '../middleware/requireUser'
+import { schema } from '../db'
 import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import { serveThenRevalidate, type RouteFailure, type RouteResult } from '../sync/engine'
 import { getConnection } from './connections'
@@ -110,12 +107,3 @@ export async function runProviderResource<TInput, TOutput>(args: {
   })
   return !result.ok && fallback ? { ok: true, value: fallback.data } : result
 }
-
-// The request-context form, for a provider plugin's routes: the same function, with core supplying
-// the database handle, the owner id and the secret service so no provider plugin assembles them
-// itself (docs/integrations/contributions.md § Connection and integration contributions).
-export const providerResource = <TInput, TOutput>(
-  c: Context<AppEnv>,
-  args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },
-): Promise<RouteResult<TOutput>> =>
-  runProviderResource<TInput, TOutput>({ db: getDb(c.env), userId: ownerId(c), secrets: c.env.SECRETS, ...args })

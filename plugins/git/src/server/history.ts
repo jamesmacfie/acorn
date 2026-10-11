@@ -51,7 +51,7 @@ function readCursor(value: string | null, filter: HistoryFilter): { snapshot: st
   }
 }
 
-export function parseCommits(output: string): Commit[] {
+function parseCommits(output: string): Commit[] {
   const values = output.split('\0')
   const commits: Commit[] = []
   for (let i = 0; i + 9 < values.length; i += 10) {

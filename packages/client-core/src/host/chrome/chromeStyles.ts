@@ -3,7 +3,6 @@ import type { PluginStyleDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { styleRegistry } from '../registries/shell/styles'
 
-export const PLUGIN_STYLE_PREFIX = 'plugin:'
 export const pluginStyleId = (pluginId: string, styleId: string): string => `plugin:${pluginId}:${styleId}`
 const SAFE_ID = /^plugin:[a-z][a-z0-9-]{1,31}:[a-z0-9][a-z0-9-]{0,63}$/
 

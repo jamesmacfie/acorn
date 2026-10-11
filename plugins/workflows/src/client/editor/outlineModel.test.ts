@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkflowDef } from '../../shared/workflowContracts'
-import { branchLabel, dependencyLabels, referencingSteps, stepSummary } from './outlineModel'
+import { branchLabel, referencingSteps, stepSummary } from './outlineModel'
 
 const inlineQuery = (pluginId: string, sourceId: string) => ({
   kind: 'inline' as const,
@@ -49,7 +49,6 @@ describe('outline model', () => {
   it('describes guided record loops and their dependencies', () => {
     expect(stepSummary(def.steps[0]!, def, undefined)).toBe('Find records with a saved query.')
     expect(stepSummary(def.steps[1]!, def, undefined)).toContain('For each result from Recent issues')
-    expect(dependencyLabels(def.steps[1]!, def)).toEqual(['Recent issues'])
     expect(
       stepSummary({ ...def.steps[1]!, childWorkflow: undefined, agent: { prompt: 'Fix it.' } }, def, undefined),
     ).toBe('For each result from Recent issues, start an agent session.')
@@ -87,7 +86,6 @@ describe('outline model', () => {
     expect(stepSummary(journey.steps[1]!, journey, undefined)).toBe(
       'For each result from Find records, run an unavailable workflow.',
     )
-    expect(dependencyLabels(journey.steps[1]!, journey)).toEqual(['Find records'])
     expect(stepSummary(journey.steps[1]!, journey, undefined)).not.toContain('/records')
   })
 })

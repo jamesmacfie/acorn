@@ -41,17 +41,17 @@ import { registerSessionSource, type SessionSource } from '../sessions/sessionSo
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
 // (docs/plugins/activation.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
-export type ClientContributionPoint<T> = {
+type ClientContributionPoint<T> = {
   register(entry: T): void
 }
 
 /** What a compiled plugin declares when it opens a point. The two fields the host owns are missing:
  *  `id` here is the bare point id, and `ownerId` is stamped from the plugin doing the registering. */
-export type CompiledExtensionPoint = Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
+type CompiledExtensionPoint = Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
 
 /** What a compiled plugin declares when it fills somebody else's point. `pluginId` and `carrier` are
  *  the host's; `component` is the only carrier a plugin in this process can bring. */
-export type CompiledExtension = Omit<
+type CompiledExtension = Omit<
   ExtensionContribution,
   'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'
 > & { component: NonNullable<ExtensionContribution['component']> }
@@ -61,7 +61,7 @@ export type CompiledExtension = Omit<
 // into the same contributions from outside. The split is here anyway, because
 // docs/contribution-kinds.md names a tier per kind and the test that reads this file should see the same
 // partition the table does.
-export type ClientPluginContext = {
+type ClientPluginContext = {
   readonly name: string
   panes: ClientContributionPoint<PaneRegistration>
   // Generic per call. A source's promotion is typed on the item it promotes, and the registry holds a
@@ -107,7 +107,7 @@ export type ClientPluginContext = {
 // What a plugin compiled into this bundle is handed: everything above, plus the five kinds
 // docs/contribution-kinds.md marks compiled-only on the client. An intersection rather than a second
 // literal, for the same reason as the node's CompiledNodePluginContext.
-export type CompiledClientPluginContext = ClientPluginContext & {
+type CompiledClientPluginContext = ClientPluginContext & {
   // Live, node-scoped summaries for host navigation and send pickers. The compiled owner keeps its
   // complete records and the registration is disposed with its other contributions.
   sessionSources: { register(source: SessionSource): void }
@@ -129,7 +129,7 @@ export type CompiledClientPluginContext = ClientPluginContext & {
 
 // The client half of the node's `Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>`. Same
 // four verbs, so an author who learned one half does not get the other backwards.
-export type ClientCapabilities = {
+type ClientCapabilities = {
   provide<T>(id: ClientCapabilityId<T>, impl: T): void
   get<T>(id: ClientCapabilityId<T>): T | undefined
   // For a capability whose provider cannot be disabled. Throws rather than returning undefined, so a

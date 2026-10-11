@@ -217,5 +217,3 @@ export function createDiffMeasureScheduler(options: DiffMeasureSchedulerOptions)
     },
   }
 }
-
-export type DiffMeasureScheduler = ReturnType<typeof createDiffMeasureScheduler>

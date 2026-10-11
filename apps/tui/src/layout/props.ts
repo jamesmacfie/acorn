@@ -157,12 +157,6 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   style: "a run's colour and attributes, read by paint",
   fg: "a run's foreground, read by paint",
   attributes: "a run's bold, dim, underline and inverse bits, read by paint",
-  // The same four bits again, one prop each. `textStyle` returns them beside the mask, so a spread of
-  // its answer onto a `text` carries them. Paint reads only the mask.
-  bold: "a run's weight, said as a boolean for a span",
-  dim: "a run's dimness, said as a boolean for a span",
-  underline: "a run's underline, said as a boolean for a span",
-  inverse: "a run's inversion, said as a boolean for a span",
   transform: "the role's own change to the characters, already applied by `styled`",
   textColor: "a widget's foreground, read by paint",
   placeholder: "a field's empty-state text, read by paint (../paint/paint.ts § drawField)",

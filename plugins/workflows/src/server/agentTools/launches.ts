@@ -34,7 +34,7 @@ import {
 type LaunchRow = typeof workflowAgentLaunches.$inferSelect
 export type LaunchState = 'awaiting-caller' | 'started' | 'failed' | 'cancelled'
 
-export const ACTIVE_RUN_STATUSES = ['running', 'gated', 'cancelling'] as const
+const ACTIVE_RUN_STATUSES = ['running', 'gated', 'cancelling'] as const
 const BUSY_TURN = new Set(['queued', 'dispatching', 'active'])
 
 export type WorkflowRunTarget = { kind: 'workflow-run'; resourceId: string; taskId: string }
@@ -71,7 +71,7 @@ const min = (left: number | undefined, right: number | undefined): number | unde
   left === undefined ? right : right === undefined ? left : Math.min(left, right)
 
 /** The definition's own budget, narrowed by the owner's limits. Nothing a caller sends can widen it. */
-export function narrowedBudget(budget: WorkflowBudget | undefined, limits: WorkflowInvocationLimits): WorkflowBudget {
+function narrowedBudget(budget: WorkflowBudget | undefined, limits: WorkflowInvocationLimits): WorkflowBudget {
   const out: WorkflowBudget = {
     maxTurns: min(budget?.maxTurns, limits.maxTurns),
     maxWallTimeMs: min(budget?.maxWallTimeMs, limits.maxWallTimeMs),

@@ -21,7 +21,7 @@ export type AgentTurnChangedEvent = {
   attempt: number
 }
 
-export type AgentRequestChangedEvent = {
+type AgentRequestChangedEvent = {
   taskId: string
   sessionId: string
   requestId: string
@@ -32,7 +32,7 @@ export type AgentRequestChangedEvent = {
 export type SessionRenameSource = 'generated' | 'user'
 export type AgentSessionChange = 'created' | 'renamed' | 'archived' | 'restored' | 'deleted'
 
-export type AgentSessionsChangedEvent = {
+type AgentSessionsChangedEvent = {
   taskId: string
   sessionId: string
   present: boolean
@@ -147,7 +147,7 @@ export type AgentReviewProvenance =
 export type AgentReviewText = { text: string; provenance: AgentReviewProvenance; truncated: boolean }
 
 /** One completed turn, bounded. No ledger, tool output, reasoning, path, or attachment. */
-export type AgentReviewInput = {
+type AgentReviewInput = {
   taskId: string
   sessionId: string
   turnId: string

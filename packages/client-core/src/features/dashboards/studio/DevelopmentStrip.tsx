@@ -28,7 +28,7 @@ const ms = (value: number): string => `${Math.round(value)} ms`
 const records = (count: number): string => `${count} ${count === 1 ? 'record' : 'records'}`
 
 /** How many records each source dropped for not matching its declared fields. */
-export const droppedCount = (sources: readonly SourceDiagnostic[]): number =>
+const droppedCount = (sources: readonly SourceDiagnostic[]): number =>
   sources.reduce(
     (sum, source) =>
       sum +

@@ -129,7 +129,7 @@ async function readResult(
 }
 
 /** One conflicted path's index stages and working file, or null when the path is no longer conflicted. */
-export async function readConflict(
+async function readConflict(
   core: Pick<CoreServices, 'git' | 'fs'>,
   checkout: string,
   path: string,

@@ -5,11 +5,11 @@ import { renderMemoryIndex } from './memory'
 import type { MemoryStore } from './memoryStore'
 
 // The build embeds this file; source launches read it directly. One contract for every harness.
-export const memoryContract = readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8').trim()
+const memoryContract = readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8').trim()
 export const MEMORY_CAPS_KEY = 'memory:index-caps:v1'
-export const DEFAULT_MEMORY_CAPS = { private: 4000, project: 12000 }
+const DEFAULT_MEMORY_CAPS = { private: 4000, project: 12000 }
 
-export function cappedMemoryIndex(index: string, cap: number): string {
+function cappedMemoryIndex(index: string, cap: number): string {
   if (index.length <= cap) return index
   const lines = index.trimEnd().split('\n')
   const lengths = [0]
@@ -21,7 +21,7 @@ export function cappedMemoryIndex(index: string, cap: number): string {
   return '[MEMORY.md truncated: call memory_list to see every entry.]'
 }
 
-export async function memoryCaps(core: Pick<CoreServices, 'identity' | 'prefs'>) {
+async function memoryCaps(core: Pick<CoreServices, 'identity' | 'prefs'>) {
   const user = core.identity.active()
   const caps = { ...DEFAULT_MEMORY_CAPS }
   if (user) {

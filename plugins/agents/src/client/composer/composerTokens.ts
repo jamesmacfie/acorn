@@ -1,7 +1,7 @@
 import { fuzzyScore } from '@acorn/plugin-api/client'
 import { fileMentionMatches } from './fileMentions'
 
-export type ComposerTokenKind = 'file' | 'command' | 'skill'
+type ComposerTokenKind = 'file' | 'command' | 'skill'
 
 /** `name` is the token without its sigil, which is what a description is keyed by. */
 export type ComposerToken = { kind: ComposerTokenKind; name: string; start: number; end: number }

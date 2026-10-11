@@ -28,12 +28,12 @@ const createBody = z.object({
 
 // GitHub's compare lists at most 300 changed files for the whole comparison, on the first page only,
 // and gives no total. So 300 files means there may be more.
-export const COMPARE_FILES_LIMIT = 300
+const COMPARE_FILES_LIMIT = 300
 
 // Patch bodies written at once while a comparison is answered.
 const PATCH_WRITE_CONCURRENCY = 8
 
-export const compareCompleteness = (received: number): PullTopologyCompleteness =>
+const compareCompleteness = (received: number): PullTopologyCompleteness =>
   received >= COMPARE_FILES_LIMIT
     ? {
         kind: 'incomplete',

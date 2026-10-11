@@ -23,7 +23,7 @@ export type RegisteredDataSource = DataSourceRegistration & {
   loaded?: boolean
   coreHandler?: CoreDataSourceHandler
 }
-export type RegisteredDiscovery = DataSourceDiscovery & { pluginId: string }
+type RegisteredDiscovery = DataSourceDiscovery & { pluginId: string }
 const sources = new Map<string, RegisteredDataSource>()
 const discoveries = new Map<string, RegisteredDiscovery>()
 const discoveryScopes = new Map<string, Set<string>>()

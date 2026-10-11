@@ -3,7 +3,7 @@ import type { AgentSession, AgentSubagent } from '../../contract/wire.ts'
 // Which runtime states count as "this agent is doing something". Shared by Agent Center's `active`
 // filter and header count and by the Fleet home stat below, which is why it lives outside the component:
 // two places disagreeing about "active" would show different numbers for the same node on two screens.
-export const ACTIVE_AGENT_STATES: ReadonlySet<string> = new Set([
+const ACTIVE_AGENT_STATES: ReadonlySet<string> = new Set([
   'creating',
   'connecting',
   'replaying',

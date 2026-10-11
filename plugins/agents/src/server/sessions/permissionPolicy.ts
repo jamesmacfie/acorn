@@ -107,7 +107,7 @@ const boundedSubject = (subject: AgentPermissionSubject): AgentPermissionSubject
 
 /** The answer a veto sends: the first "reject once" option, never a lasting rule in the harness's own
  *  settings. A request that offers none is cancelled, which both drivers answer as a plain refusal. */
-export const vetoResolution = (options: readonly AgentPermissionOption[] | undefined): unknown => {
+const vetoResolution = (options: readonly AgentPermissionOption[] | undefined): unknown => {
   const reject = options?.find((option) => option.kind === 'reject_once')
   return reject ? { optionId: reject.id } : { cancelled: true }
 }

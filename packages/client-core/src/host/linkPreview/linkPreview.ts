@@ -68,7 +68,7 @@ export function closeLinkPreview(): void {
 }
 
 /** The pointer reached a link. It opens after the dwell unless the pointer leaves first. */
-export function hoverLink(request: Omit<LinkPreviewRequest, 'focus'>): void {
+function hoverLink(request: Omit<LinkPreviewRequest, 'focus'>): void {
   clearTimeout(grace)
   const open = current()
   if (open && open.anchor === request.anchor) return
@@ -110,7 +110,7 @@ export function linkLabel(text: string, url: string): string | undefined {
 
 /** The previewable link an event landed on, or `null`. A link with no HTTPS href, such as a bare
  *  `ENG-1` reference, has nothing to preview. */
-export function previewableLink(target: EventTarget | null): { anchor: HTMLAnchorElement; url: string } | null {
+function previewableLink(target: EventTarget | null): { anchor: HTMLAnchorElement; url: string } | null {
   const anchor = target instanceof Element ? target.closest<HTMLAnchorElement>('a[href]') : null
   const url = anchor ? linkPreviewKey(anchor.getAttribute('href') ?? '') : null
   return anchor && url ? { anchor, url } : null
@@ -126,7 +126,7 @@ const claim = (event: Event): boolean => {
 }
 
 /** What a right-click or the menu key on a link opened, for the desktop's link menu. */
-export type LinkMenuOpening = { at: { x: number; y: number }; request: LinkPreviewRequest }
+type LinkMenuOpening = { at: { x: number; y: number }; request: LinkPreviewRequest }
 
 const [linkMenu, setLinkMenu] = createSignal<LinkMenuOpening | null>(null)
 export { linkMenu, setLinkMenu }

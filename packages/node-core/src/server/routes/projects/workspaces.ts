@@ -79,16 +79,6 @@ export const workspaces = new Hono<AppEnv>()
   .get('/', async (c) => {
     return c.json(await listWorkspaces(getDb(c.env)))
   })
-  // Idempotent first-run setup: the core owns only the Default workspace. Provider candidates are
-  // imported explicitly through their plugin-owned importer; boot must not turn a disposable mirror
-  // projection into application-owned project state.
-  .post('/bootstrap', async (c) => {
-    const db = getDb(c.env)
-    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return c.json(await listWorkspaces(db))
-    const ensured = await ensureDefault(db)
-    if (ensured.created) broadcastWorkspaceChanged({ workspaceId: ensured.id })
-    return c.json(await listWorkspaces(db))
-  })
   .post('/', async (c) => {
     const db = getDb(c.env)
     if (nodeWorkspacesMode(db, ownerId(c)) === 'off')

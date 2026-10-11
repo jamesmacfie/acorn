@@ -31,7 +31,7 @@ const { SerializeAddon } = nodeRequire('@xterm/addon-serialize') as {
   SerializeAddon: new () => SerializeAddon
 }
 
-export const DISPLAY_SCROLLBACK_LINES = 1_000
+const DISPLAY_SCROLLBACK_LINES = 1_000
 export const DISPLAY_RESET = '\x1bc'
 
 export type TerminalScreen = {

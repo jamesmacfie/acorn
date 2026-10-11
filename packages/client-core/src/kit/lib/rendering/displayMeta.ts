@@ -1,7 +1,7 @@
 import type { DiffFile } from '../../diff/diffModel'
 import type { RailMarkerDot } from '../../tokens/rail'
 
-export type FileStatusTone = 'ok' | 'danger' | 'warn' | 'muted'
+type FileStatusTone = 'ok' | 'danger' | 'warn' | 'muted'
 
 export type FileStatusMeta = {
   letter: string

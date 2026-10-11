@@ -8,7 +8,7 @@
 // its position, and a deleted definition takes its layout with it.
 import { clearLocal, readLocal, writeLocal } from '@acorn/plugin-api/client'
 
-export type NodePosition = { x: number; y: number }
+type NodePosition = { x: number; y: number }
 export type WorkflowLayout = Record<string, NodePosition>
 
 export const layoutKey = (defId: string): string => `plugin:workflows:layout:${defId}`
@@ -40,14 +40,6 @@ export function readLayout(defId: string): WorkflowLayout {
 export function writeLayout(defId: string, layout: WorkflowLayout): void {
   if (!Object.keys(layout).length) return clearLocal(layoutKey(defId))
   writeLocal(layoutKey(defId), JSON.stringify(layout))
-}
-
-/** A renamed node keeps where it was put. */
-export function renameInLayout(defId: string, from: string, to: string): void {
-  const layout = readLayout(defId)
-  if (!(from in layout) || from === to) return
-  const { [from]: moved, ...rest } = layout
-  writeLayout(defId, { ...rest, [to]: moved })
 }
 
 /** A deleted definition takes its layout with it. `forgetNodeInLayout` does the same for a node. */

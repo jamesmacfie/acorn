@@ -155,7 +155,6 @@ describe('plugin distribution reconciliation', () => {
     release!([row('one')])
     await Promise.all([earlier, later])
     expect(selected('b')).toBe('two')
-    expect(distribution().byNode.get('b')?.generation).toBeGreaterThan(1)
   })
 
   it("stops a withdrawn identity's workers in the commit that withdraws it", async () => {

@@ -15,7 +15,7 @@ export { parsePanelDefinition }
 /** `(surface, ownerId, workspaceId?)`. All three surfaces are drawn: `home` (a tab per `ownerId`,
  *  per workspace), `pane`, and `plugin-region`, a rail source's side panel or a plugin pane's aside
  *  owned as `<pluginId>:<somethingId>`. */
-export type PlacementSurface = 'home' | 'pane' | 'plugin-region'
+type PlacementSurface = 'home' | 'pane' | 'plugin-region'
 
 export type PlacementScope = {
   surface: PlacementSurface

@@ -28,7 +28,6 @@ import {
   dockerPruneRoute,
   dockerTaskContainersRoute,
   dockerTaskSummaryRoute,
-  dockerTaskTeardownRoute,
   dockerVolumeRemoveRoute,
   dockerVolumesRoute,
 } from '../shared/model'
@@ -97,5 +96,3 @@ export const fetchTaskContainers = (
   nodeId: string | null = activeNodeId(),
 ): Promise<DockerContainerSummary[]> =>
   readJson<DockerContainerSummary[]>(dockerTaskContainersRoute(taskId), { nodeId })
-export const teardownTaskContainers = (taskId: string, nodeId: string | null = activeNodeId()): Promise<{ ok: true }> =>
-  post(dockerTaskTeardownRoute(taskId), {}, nodeId)

@@ -5,7 +5,7 @@ import { decideAgentCommand } from './stateMachine'
 
 type QueueHead = { session: AgentSession; turn: AgentTurn }
 
-export type QueueGeneration = {
+type QueueGeneration = {
   generation: ProviderGeneration
   activeTurnId: string | null
   admissionTurnId: string | null

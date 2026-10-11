@@ -422,8 +422,6 @@ export async function requireTaskRoot(db: AppDatabase, taskId: string): Promise<
   return resolve(cwd)
 }
 
-export { resolveInRoot } from '../core/fs'
-
 // The setup script and trigger configured for this project. 'off' never runs, 'created' pre-creates
 // the worktree at task creation, and 'terminal' leaves creation lazy. The script runs once when the
 // worktree is first created through the onWorktreeCreated hook.
@@ -439,7 +437,7 @@ export async function projectSetup(
 // Copy files into a fresh worktree (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup): read the
 // config from the source checkout, since the entries are usually gitignored and only it has them.
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
-export async function copyConfiguredFiles(
+async function copyConfiguredFiles(
   db: AppDatabase,
   t: Pick<TaskRef, 'projectId'>,
   checkout: string,
@@ -456,7 +454,7 @@ export async function copyConfiguredFiles(
   }
 }
 
-export async function workspaceIdForProject(db: AppDatabase, projectId: string): Promise<string | null> {
+async function workspaceIdForProject(db: AppDatabase, projectId: string): Promise<string | null> {
   const project = await getProject(db, projectId)
   return project?.workspaceId ?? null
 }
@@ -468,15 +466,6 @@ export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<s
   const workspaceId = await workspaceIdForProject(db, t.projectId)
   if (!workspaceId) throw new Error('Task has no project scope.')
   return workspaceId
-}
-
-export async function repoFor(db: AppDatabase, taskId: string): Promise<string> {
-  const t = await loadTask(db, taskId)
-  if (!t) throw new Error('Task not found.')
-  const project = await projectForTask(db, t)
-  return project?.githubOwner && project.githubName
-    ? `${project.githubOwner}/${project.githubName}`
-    : (project?.name ?? '')
 }
 
 // Merged run-target config + the cwd to run in (the task worktree, created lazily like a terminal).

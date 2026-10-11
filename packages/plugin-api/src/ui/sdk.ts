@@ -3,7 +3,7 @@
 // for `window` at module scope). See docs/plugins/client-half.md § Loaded plugins: the client half for the
 // frame's full sandbox and the `mountFrame` boot sequence.
 //
-// `openLinkOnClick` is here rather than beside `renderMarkdown` on ./ui because it needs the bridge.
+// `openLinkOnClick` is here rather than on ./ui because it needs the bridge.
 export { connect, AcornBridgeError, mountFrame, openLinkOnClick } from '@acorn/client-core/host/frames/sdk'
 // `AcornBridge` is the whole bridge; its `.api` sub-shape has no name of its own.
 export type { AcornBridge } from '@acorn/client-core/host/frames/sdk'

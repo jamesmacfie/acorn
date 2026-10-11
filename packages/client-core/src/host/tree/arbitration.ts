@@ -1,13 +1,3 @@
-// Who fills a box when more than one contributor could (docs/plugins/cooperative-extension-points.md § Arbitration).
-//
-// No JSX here (docs/frontend/registries.md § Registries and plugins), because the decision is the part worth a
-// test: which contributors match a key, who wins a `replace` tie, where the user's pick comes in, and
-// what happens past `max`. `Slot.tsx` is a `<For>` over the answer.
-//
-// The rule in one sentence: an override is an offer, not a seizure. Two contributors matching one key
-// draw the owner's default until the user says which, because a package that could take a box by
-// registering for it could take one from another package by registering later.
-import type { ArbitrationMode } from '@acorn/protocol/extensionPoints.ts'
 import {
   extensionDeliveries,
   type ExtensionContribution,
@@ -135,5 +125,3 @@ export function withSlotChoice(raw: string | undefined, slot: string, choice: st
  */
 export const slotFills = (pointId: string, key?: string): boolean =>
   extensionDeliveries(pointId).some((entry) => matchesKey(entry.matches, key))
-
-export type ArbitrationModeValue = ArbitrationMode

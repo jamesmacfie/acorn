@@ -22,8 +22,8 @@ const data = z.unknown().transform((value, ctx) => {
     return z.NEVER
   }
 })
-export const datasetModeSchema = z.enum(['current-mirror', 'event-archive', 'snapshot-history'])
-export const datasetFeederSchema = z.enum(['capture', 'workflow', 'agent'])
+const datasetModeSchema = z.enum(['current-mirror', 'event-archive', 'snapshot-history'])
+const datasetFeederSchema = z.enum(['capture', 'workflow', 'agent'])
 export const datasetCreateSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -111,7 +111,7 @@ export const datasetDrilldownSchema = z
 export type DatasetCreate = z.infer<typeof datasetCreateSchema>
 export type DatasetWrite = z.infer<typeof datasetWriteSchema>
 export type DatasetMode = z.infer<typeof datasetModeSchema>
-export type DatasetFeeder = z.infer<typeof datasetFeederSchema>
+type DatasetFeeder = z.infer<typeof datasetFeederSchema>
 export type DatasetSummary = {
   id: string
   workspaceId: string

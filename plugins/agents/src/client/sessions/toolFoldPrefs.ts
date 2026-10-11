@@ -50,7 +50,7 @@ export const foldPrefsAfterToggle = (prefs: AgentToolFoldPrefs, open: boolean): 
   return last === prefs.last ? null : { ...prefs, last }
 }
 
-export const saveAgentToolFoldPrefs = (qc: QueryClient, next: AgentToolFoldPrefs): Promise<boolean> =>
+const saveAgentToolFoldPrefs = (qc: QueryClient, next: AgentToolFoldPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.agentToolFold, next)
 
 /** Choose the mode without disturbing the `last` toggle beside it. The page and the palette's setting

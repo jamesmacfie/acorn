@@ -9,9 +9,9 @@ import { schema } from '../db'
 import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { isDir, loadTask, projectForTask } from '../worktrees/taskWorktree'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from './repoConfigSnapshot'
-export { readRepoConfigSnapshot, type ProjectExecutableConfig } from './repoConfigSnapshot'
+export { readRepoConfigSnapshot } from './repoConfigSnapshot'
 
-export const NEEDS_CONFIG_TRUST = 'needs-trust'
+const NEEDS_CONFIG_TRUST = 'needs-trust'
 
 export class RepoConfigTrustError extends Error {
   readonly code = NEEDS_CONFIG_TRUST

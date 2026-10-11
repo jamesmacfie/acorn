@@ -13,7 +13,7 @@ export type NodePluginRuntimeState =
   | { kind: 'waiting-for-restart'; candidate: InstalledPluginRow }
   | { kind: 'active'; runtime: PluginRuntimeIdentity; pendingCandidate?: InstalledPluginRow; warning?: string }
 
-export type LoadedSelectionState =
+type LoadedSelectionState =
   | { kind: 'accepted'; hash: string }
   | { kind: 'pending-trust'; hash: string }
   | { kind: 'rejected'; hash: string }

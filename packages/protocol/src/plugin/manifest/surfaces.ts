@@ -29,7 +29,7 @@ export const documentCompletions = z.object({
 })
 
 // One language capability: a route in the declaring plugin's namespace, POSTed position and text.
-export const documentService = z.object({ route: pluginRoute })
+const documentService = z.object({ route: pluginRoute })
 
 export const documentRegion = z.object({
   // From the published vocabulary, so an unknown id is a parse error rather than a document that

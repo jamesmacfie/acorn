@@ -7,7 +7,7 @@ import { isRecord } from '../integrations/codec'
 // The `node-action` schedule target: what it may do (docs/schedules/user-schedules.md § `node-action`) and where
 // its consent lives (docs/schedules/user-schedules.md § Consent, and the two ways it fails closed).
 
-export type NodeActionTarget = {
+type NodeActionTarget = {
   pluginId: string
   actionId: string
   params: Record<string, string>
@@ -16,7 +16,7 @@ export type NodeActionTarget = {
 /** Parse a proposed target. Returns null to refuse the create, the one non-tolerant edge in the
  *  scheduler: a schedule pointing at nothing is not a version-skew case, it is a typo, and the
  *  person is standing right there. */
-export function parseNodeActionTarget(raw: unknown): NodeActionTarget | null {
+function parseNodeActionTarget(raw: unknown): NodeActionTarget | null {
   if (!isRecord(raw)) return null
   const pluginId = typeof raw.pluginId === 'string' ? raw.pluginId : ''
   const actionId = typeof raw.actionId === 'string' ? raw.actionId : ''

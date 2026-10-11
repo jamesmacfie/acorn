@@ -21,10 +21,9 @@ import {
  *  into that row's text. */
 type Cursor = { file: number; ordinal: number; row: number; offset: number }
 
-export const encodeSearchCursor = (cursor: Cursor): string =>
-  `${cursor.file}.${cursor.ordinal}.${cursor.row}.${cursor.offset}`
+const encodeSearchCursor = (cursor: Cursor): string => `${cursor.file}.${cursor.ordinal}.${cursor.row}.${cursor.offset}`
 
-export function decodeSearchCursor(text: string | null): Cursor | null {
+function decodeSearchCursor(text: string | null): Cursor | null {
   if (text == null) return { file: 0, ordinal: 0, row: 0, offset: 0 }
   const parts = text.split('.').map(Number)
   if (parts.length !== 4 || !parts.every((part) => Number.isInteger(part) && part >= 0)) return null

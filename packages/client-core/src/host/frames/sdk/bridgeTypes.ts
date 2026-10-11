@@ -21,7 +21,7 @@ export class AcornBridgeError extends Error {
 
 // Five verbs, matching `PluginBridgeApiRequest.method` exactly. A method absent here is a method no
 // plugin can reach, however permissive the table underneath.
-export type AcornBridgeApi = {
+type AcornBridgeApi = {
   get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
   post<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   put<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>

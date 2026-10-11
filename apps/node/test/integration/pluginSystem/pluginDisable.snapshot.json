@@ -30,7 +30,6 @@
       "github/data/actions",
       "github/data/branches",
       "github/data/pulls",
-      "github/pins",
       "github/repos",
       "github/tasks",
       "memory",
@@ -207,7 +206,6 @@
         "github/data/actions",
         "github/data/branches",
         "github/data/pulls",
-        "github/pins",
         "github/repos",
         "github/tasks"
       ],

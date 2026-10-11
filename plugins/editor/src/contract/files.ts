@@ -9,9 +9,9 @@ import { MAX_PLUGIN_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 // confinement, and re-derives the worktree on every call, so a closed task or a moved worktree reads
 // as missing.
 
-export type EditorFileReadInput = { taskId: string; path: string }
+type EditorFileReadInput = { taskId: string; path: string }
 
-export type EditorFileRead =
+type EditorFileRead =
   | { status: 'ok'; bytes: Uint8Array; revision: string }
   /** No worktree, a path outside it, a directory, or no such file. One answer for all of them, so a
    *  caller learns nothing about what sits outside the worktree. */

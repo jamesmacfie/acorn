@@ -131,7 +131,6 @@ describe('generateTextForHarness', () => {
     // whole point is that it authenticates with its own stored login.
     expect(report.env.ACORN_API_TOKEN).toBeUndefined()
     expect(report.env.ACORN_API_URL).toBeUndefined()
-    expect(report.env.ACORN_TOOL_CEILING).toBeUndefined()
     expect(Object.keys(report.env).filter((key) => key.startsWith('ANTHROPIC_') || key.startsWith('OPENAI_'))).toEqual(
       [],
     )

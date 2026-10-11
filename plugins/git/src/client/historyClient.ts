@@ -16,7 +16,7 @@ const post = <T>(url: string, body: unknown, signal?: AbortSignal) =>
   })
 export const historyKey = (projectId: string, filter: HistoryFilter) =>
   ['git-history', activeNodeId(), projectId, filter.ref, filter.field, filter.query] as const
-export const revisionKey = (projectId: string, id: string, base?: string | null, comparison = false) =>
+const revisionKey = (projectId: string, id: string, base?: string | null, comparison = false) =>
   ['git-revision', activeNodeId(), projectId, id, base, comparison] as const
 export const historyOptions = (projectId: string, filter: HistoryFilter, cursor: string | null = null) => ({
   queryKey: [...historyKey(projectId, filter), cursor],

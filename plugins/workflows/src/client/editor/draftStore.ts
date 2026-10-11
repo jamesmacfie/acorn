@@ -30,7 +30,7 @@ import { workflowRecoveryStore, WORKFLOW_AUTOSAVE_MS } from './recoveryStore'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import type { WorkflowAgentOrigin } from '../../contract/wire'
 import { createWorkflowApi } from '../workflowsClient'
-import { forgetLayout, renameInLayout } from '../layoutPrefs'
+import { forgetLayout } from '../layoutPrefs'
 import { applyJson, emptyDefinition, newDraft, pushUndo, renameNode, toJson, type WorkflowDraft } from './draft'
 
 /** Where the draft stands against the node. One badge draws it: "Saving…" covers the autosave gap as
@@ -284,13 +284,8 @@ export function createDraftStore(input: {
     lastPush = 0
   }
 
-  /** A rename carries the node's canvas position with it, or the layout would name a node that is
-   *  gone. A version 1 step's position is keyed by its id, which a rename leaves alone. */
-  const rename = (from: string, to: string): void => {
-    apply((current) => renameNode(current, from, to))
-    const current = ref()
-    if (current && draft().def.formatVersion !== 1) renameInLayout(defRefKey(current), from, to)
-  }
+  /** A step's canvas position is keyed by its id, which a rename leaves alone. */
+  const rename = (from: string, to: string): void => apply((current) => renameNode(current, from, to))
 
   const [problems, setProblems] = createSignal<string[]>([])
   const validation = latestSignal()

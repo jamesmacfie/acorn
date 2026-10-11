@@ -8,7 +8,6 @@ import {
   taskLinksRoute,
   taskRoute,
   tasksRoute,
-  type TaskLink,
   type TaskLinkSeed,
 } from '@acorn/protocol/api.ts'
 import { taskBridge } from './taskBridge'
@@ -44,17 +43,7 @@ export async function patchTask(
   )
 }
 
-export const renameTask = async (id: string, title: string) => patchTask(id, { title })
 export const archiveTask = async (id: string) => patchTask(id, { status: 'archived' })
-// Back-fill (or clear, with null) the PR linked to a task. Callers invalidate tasksKey after so
-// pathForTask starts routing the task to its PR.
-export const setTaskPull = async (id: string, pullNumber: number | null) => patchTask(id, { pullNumber })
 
 // Grow/shrink a task's links after creation (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.
 export const addTaskLink = (id: string, link: TaskLinkSeed) => postJson<{ ok: boolean }>(taskLinksRoute(id), link)
-export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'connectionId' | 'identifier'>) =>
-  writeJson<{ ok: boolean }>(taskLinksRoute(id), {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(ref),
-  })

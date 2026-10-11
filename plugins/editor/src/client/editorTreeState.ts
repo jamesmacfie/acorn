@@ -96,12 +96,6 @@ export function evictEditorTreeState(taskId: string, nodeId = activeNodeId()): v
   })
 }
 
-// Expanded paths are session state for their captured Node and task.
-export function clearEditorTreeStates(): void {
-  folderOwners.clear()
-  setExpandedByTask(new Map())
-}
-
 // Registered beside the signal it clears rather than in the shell's evictor list
 // (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {

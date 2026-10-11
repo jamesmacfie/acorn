@@ -53,5 +53,3 @@ export function freeYogaNode(node: Node): void {
   for (let count = yoga.getChildCount(); count > 0; count -= 1) yoga.removeChild(yoga.getChild(count - 1))
   yoga.free()
 }
-
-export { Yoga }

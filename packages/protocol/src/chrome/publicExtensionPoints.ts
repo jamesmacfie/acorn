@@ -14,7 +14,7 @@ type PublicPointCommon = {
   terminal?: string
 }
 
-export type PublicRemotePoint = PublicPointCommon & {
+type PublicRemotePoint = PublicPointCommon & {
   kind: 'remote'
   mode: ArbitrationMode
   max: number
@@ -26,7 +26,7 @@ export type PublicRemotePoint = PublicPointCommon & {
   actions?: readonly string[]
 }
 
-export type PublicAnnotationPoint = PublicPointCommon & {
+type PublicAnnotationPoint = PublicPointCommon & {
   kind: 'annotation'
   /** The fields of each key the host posts, and of each mark's `key`. */
   key: readonly string[]

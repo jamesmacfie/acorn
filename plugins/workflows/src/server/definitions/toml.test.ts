@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseWorkflowToml } from './files'
-import { uniqueWorkflowSlug, workflowSlug, writeWorkflowToml } from './toml'
+import { workflowSlug, writeWorkflowToml } from './toml'
 
 // The writer's contract is a round trip, not a shape: whatever the loader read out of a file, writing
 // it and reading it again must give the same definition back (docs/workflows/definitions.md § Database
@@ -347,11 +347,5 @@ describe('the file id a saved row gets', () => {
     expect(workflowSlug('Investigate an issue')).toBe('investigate-an-issue')
     expect(workflowSlug('../../etc/passwd')).toBe('etc-passwd')
     expect(workflowSlug('///')).toBe('workflow')
-  })
-
-  it('deduplicates against what the folder already holds', () => {
-    expect(uniqueWorkflowSlug('Ship it', new Set())).toBe('ship-it')
-    expect(uniqueWorkflowSlug('Ship it', new Set(['ship-it']))).toBe('ship-it-2')
-    expect(uniqueWorkflowSlug('Ship it', new Set(['ship-it', 'ship-it-2']))).toBe('ship-it-3')
   })
 })

@@ -1,7 +1,5 @@
-export type { RemoteTreeProps } from './RemoteTree.tsx'
-export type { SlotProps } from './Slot.tsx'
 export type { TreeHostProps } from './TreeHost.tsx'
-export { resolveSlot, slotChoiceFor, slotChoices, slotFills } from './arbitration.ts'
+export { resolveSlot } from './arbitration.ts'
 export { createSlotChoice } from './slotChoice.ts'
 export {
   answerOwnerInvoke,

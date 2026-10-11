@@ -58,7 +58,7 @@ const firstInstant = (date: Parts, at: string, timezone: string): number | null 
   return null
 }
 
-export function nextScheduleOccurrence(cadence: Cadence, after: number, timezone: string): number {
+function nextScheduleOccurrence(cadence: Cadence, after: number, timezone: string): number {
   new Intl.DateTimeFormat('en', { timeZone: timezone }).format(after)
   if ('every' in cadence) return after + cadence.every * 1000
   const local = partsAt(after, timezone)

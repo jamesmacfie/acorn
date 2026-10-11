@@ -20,7 +20,6 @@ another id, such as a session or a run, checks scope in its own handler
 | --- | --- |
 | `/v1/p/github/auth/device/start`, `/poll` | OAuth device flow. Device-only |
 | `/v1/p/github/import` | Import a GitHub repository as a project. Device-only |
-| `/v1/p/github/pins` | Pinned repositories |
 | `/v1/p/github/repos`, `/repos/refresh` | The repository mirror and its refresh |
 | `/v1/p/github/repos/:owner/:repo/pulls` | Pull request lists, and create a pull request |
 | `/v1/p/github/repos/:owner/:repo/pulls/batch` | Prefetch several pulls at once |
@@ -115,7 +114,7 @@ failure looks like an unknown session and returns 404.
 | `/v1/p/editor/tasks/:id/editor/*` | [Guarded file reads, writes, and file actions](./editor.md), listings, images, and line markers |
 | `/v1/p/editor/tasks/:id/search` | Search a task's files |
 | `/v1/p/docker/*` | Node inventory: containers, images, volumes, networks, compose, prune, and `info` |
-| `/v1/p/docker/tasks/:id/containers`, `/teardown` | Task containers and their cleanup |
+| `/v1/p/docker/tasks/:id/containers` | Task containers |
 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Global Docker actions require a device ([Docker](../docker.md)).

@@ -2,7 +2,7 @@ import { scanContentRefs, type Task } from '@acorn/plugin-api/client'
 import type { Pull, PullDetail, TaskPullRelation } from '../../shared/api'
 import { formatPullRef, parsePullRef, type PullRef } from '../../shared/pullRef'
 
-export type RelatedPullEvidence =
+type RelatedPullEvidence =
   | { kind: 'stack'; anchorPullNumber: number; direction: 'parent' | 'child' }
   | { kind: 'mention'; sourcePullNumber: number; surface: 'description' | 'comment' | 'review' | 'thread' }
   | { kind: 'agent'; sessionId: string; requestId?: string }

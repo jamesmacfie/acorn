@@ -197,7 +197,7 @@ export function normalize(layout: PanelLayout, sizeOf: (id: PanelId) => PanelSiz
  *  this function's output live, so release persists exactly what was on screen.
  *
  *  `undefined` means the push chain hit the right wall, which only `x` can do. */
-export function apply(
+function apply(
   layout: PanelLayout,
   id: PanelId,
   candidate: Rect,

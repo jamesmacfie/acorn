@@ -43,7 +43,7 @@ export type DiffItem =
 
 /** Revealed context is drawn in slices this long, so opening a five-thousand-line gap mounts a
  *  segment's worth of rows rather than all of them. */
-export const OVERLAY_SLICE_ROWS = 64
+const OVERLAY_SLICE_ROWS = 64
 
 /** Where a thread sits: the new side unless GitHub said LEFT. The same rule that interleaves it. */
 export const threadAnchor = (thread: DiffThread): { side: 'old' | 'new'; line: number } | null =>
@@ -165,5 +165,3 @@ export function createDocumentView(props: {
 
   return { files, fileByPath, items, indexByKey, fixedHeight, threadsIn, placedThreads }
 }
-
-export type DocumentView = ReturnType<typeof createDocumentView>

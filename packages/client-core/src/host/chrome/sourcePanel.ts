@@ -31,6 +31,6 @@ export function setSourcePanel(factory: SourcePanelFactory): void {
 export const suppliedSourcePanel = (): SourcePanelFactory | null => supplied
 
 /** Test seam. The factory is module-level, so a suite must not inherit the previous one's host. */
-export function _resetSourcePanel(): void {
+function _resetSourcePanel(): void {
   supplied = null
 }

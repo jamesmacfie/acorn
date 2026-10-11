@@ -31,7 +31,7 @@ export type LayoutAction =
   | { type: 'equalize' }
   | { type: 'replace'; layout: TaskLayout }
 
-export const DEFAULT_PANE: PaneId = 'pr'
+const DEFAULT_PANE: PaneId = 'pr'
 export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane] })
 
 // Persistence validation intentionally answers "is this a pane-shaped id?", not "is it registered

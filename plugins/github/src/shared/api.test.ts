@@ -8,7 +8,6 @@ import {
   pullDiffRoute,
   diffSegmentsRoute,
   diffSearchRoute,
-  pinsKey,
   pullKey,
   pullPrefixKey,
   pullRoute,
@@ -59,7 +58,6 @@ describe('github wire contract', () => {
     expect(repoLabelsKey('octo', 'repo')).toEqual(['labels', 'octo', 'repo'])
     expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary', 'v2'])
     expect(pullDiffKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'diff'])
-    expect(pinsKey).toEqual(['pins'])
   })
 
   // The same net protocol keeps over its own builders, scoped to this plugin: enumerated from the

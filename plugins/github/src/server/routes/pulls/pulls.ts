@@ -165,7 +165,7 @@ export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emi
  * reader. Each typed word is quoted, so a word like `repo:other/name` or `is:merged` is text to match
  * rather than a qualifier that could widen or change the scope.
  */
-export const pullSearchQuery = (owner: string, repo: string, state: 'open' | 'closed', text: string): string => {
+const pullSearchQuery = (owner: string, repo: string, state: 'open' | 'closed', text: string): string => {
   const words = text
     .split(/\s+/)
     .map((word) => word.replace(/["\\]/g, ''))

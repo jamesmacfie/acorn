@@ -26,7 +26,7 @@ export const LIVE: ReadingPlace = { at: 'live' }
 
 /** Within this of the foot is the foot. A turn's last line and the end of the list are the same
  *  reading position to a person, and the gap between them is whatever padding the pane has. */
-export const LIVE_SLACK = 96
+const LIVE_SLACK = 96
 
 /** What a scroller reports about itself. Named rather than taking the element, so the rules below can
  *  be exercised without a layout engine. */

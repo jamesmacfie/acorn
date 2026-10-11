@@ -22,7 +22,7 @@ export type BindingOrigin =
       fields?: readonly DataField[]
     }
 
-export type BindingCompatibility =
+type BindingCompatibility =
   | { kind: 'exact' }
   | { kind: 'conversion'; conversion: NonNullable<DataBinding['conversion']>; label: string }
   | { kind: 'incompatible'; reason: string }
@@ -41,11 +41,11 @@ export type BindingCandidate = {
 }
 
 const primaryTypes = (schema: DataSchema): DataType[] => (Array.isArray(schema.type) ? schema.type : [schema.type])
-export const schemaTypeLabel = (schema: DataSchema): string => primaryTypes(schema).join(' or ')
+const schemaTypeLabel = (schema: DataSchema): string => primaryTypes(schema).join(' or ')
 const scalar = (schema: DataSchema) =>
   primaryTypes(schema).every((type) => ['string', 'number', 'integer', 'boolean', 'null'].includes(type))
 
-export function bindingCompatibility(source: DataSchema, destination: DataSchema): BindingCompatibility {
+function bindingCompatibility(source: DataSchema, destination: DataSchema): BindingCompatibility {
   const sourceTypes = primaryTypes(source)
   const destinationTypes = primaryTypes(destination)
   const exact = sourceTypes.every(

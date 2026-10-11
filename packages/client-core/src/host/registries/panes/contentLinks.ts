@@ -224,7 +224,7 @@ export function splitRefTokens(text: string, prefixes: ReadonlyMap<string, strin
 
 // The class the host styles these with (styles/integrations.css). Named here because the anchors are
 // minted here, and read by the Solid-rendered variant so both spellings cannot drift.
-export const REF_LINK_CLASS = 'ref-inline-link'
+const REF_LINK_CLASS = 'ref-inline-link'
 
 /** The same split, applied to provider HTML after the kit has copied only safe nodes into the host
  * DOM. That subtree is opaque to Solid, so the host walks its text nodes here. */

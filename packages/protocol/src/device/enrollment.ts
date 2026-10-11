@@ -44,7 +44,6 @@ export const enrollmentResponseSchema = z.object({
   // already there.
   controlPlaneName: z.string().optional(),
 })
-export type EnrollmentResponse = z.infer<typeof enrollmentResponseSchema>
 
 // The path the node posts to, appended to ACORN_CONTROL_PLANE_URL.
 export const ENROLLMENT_PATH = '/enroll'

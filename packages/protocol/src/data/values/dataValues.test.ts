@@ -6,18 +6,11 @@ import {
   canonicalDataProjection,
   parseDataPointer,
   parseDataValue,
-  parseVersionedDataValue,
   readDataPointer,
   type DataValue,
 } from './dataValues'
 
 describe('typed JSON values', () => {
-  it('preserves typed nested values and enforces the envelope version', () => {
-    const value = { title: 'record', count: 1, done: false, owner: null, items: [{ id: 'a' }] }
-    expect(parseVersionedDataValue({ version: 1, value })).toEqual({ version: 1, value })
-    expect(() => parseVersionedDataValue({ version: 2, value })).toThrow()
-    expect(() => parseVersionedDataValue({ version: 1 })).toThrow()
-  })
   it('rejects values JSON would silently change and never invokes accessors', () => {
     for (const value of [NaN, Infinity, undefined, new Date(), [undefined], Array(2), { x: undefined }])
       expect(() => parseDataValue(value)).toThrow()

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SqliteDatabase } from './sqlite'
 
-export class MigrationHistoryError extends Error {
+class MigrationHistoryError extends Error {
   override readonly name = 'MigrationHistoryError'
 }
 

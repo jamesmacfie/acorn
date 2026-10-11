@@ -74,7 +74,7 @@ export const clampDim = (n: unknown, fallback: number): number =>
 
 // tmux session names for our sessions: `acorn-<uuid>`. The prefix lets reconciliation pick out our
 // sessions from any the user runs, and is the handle for `tmux attach -t` from a real terminal.
-export const TMUX_PREFIX = 'acorn-'
+const TMUX_PREFIX = 'acorn-'
 export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 
 // argv for the two tmux calls. new-session -A -d is create-or-noop, detached (a separate attach PTY
@@ -142,7 +142,7 @@ const SPINNER_RE = /[⠁⠂⠄⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g
 
 const BLOCKED_PATTERNS: RegExp[] = [/\(y\/n\)/i, /\[y\/n\]/i, /do you want to proceed/i, /press enter/i]
 
-export const TAIL_SCAN_LINES = 12
+const TAIL_SCAN_LINES = 12
 
 export function matchBlockedPrompt(ringTail: string): boolean {
   const cleaned = ringTail.replace(ANSI_RE, '').replace(SPINNER_RE, '').replace(/\r/g, '\n')

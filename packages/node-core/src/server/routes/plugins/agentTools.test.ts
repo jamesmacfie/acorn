@@ -360,7 +360,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect((await post('/api/tasks/t1/tools/read_tool', {})).status).toBe(404)
   })
 
-  it('enforces the signed ceiling and treats ACORN_TOOL_CEILING as metadata only', async () => {
+  it('enforces the signed ceiling and ignores a ceiling header', async () => {
     const headers = {
       'x-test-max-risk': 'read',
       // A caller-controlled transport ceiling that permits execute must not widen the signed claim.

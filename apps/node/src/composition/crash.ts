@@ -19,7 +19,7 @@ const log = createLogger('crash')
 
 /** How long the flush gets. A crash is not the moment to wait on a network sink, and one second is
  *  long enough for an in-process one to write a file. */
-export const FLUSH_DEADLINE_MS = 1_000
+const FLUSH_DEADLINE_MS = 1_000
 
 export type CrashHandlerOptions = {
   /** Overridden in the test, which cannot call the real one. */

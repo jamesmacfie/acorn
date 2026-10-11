@@ -7,15 +7,7 @@ import { registerNodeActionTarget } from './nodeAction'
 import { registerDatasetCaptureTarget } from '../datasets/schedule'
 import { type Clock, Scheduler } from './scheduler'
 
-export { keyOwner, Scheduler } from './scheduler'
-export type {
-  Clock,
-  CreateScheduleInput,
-  DeclaredSchedule,
-  PatchScheduleInput,
-  ScheduleRunner,
-  ScheduleTarget,
-} from './scheduler'
+export { Scheduler } from './scheduler'
 
 /** The handle on the one scheduler this process owns. A capability rather than a binding on c.env, for
  *  the same reason PLUGIN_STATE is one: the scheduler exists only once the composition root has built

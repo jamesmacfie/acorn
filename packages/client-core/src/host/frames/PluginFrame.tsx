@@ -11,7 +11,6 @@ import { createLogger } from '../../infra/telemetry/logger'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction } from './broker'
 import { createFrameServices, type PluginFrameProps } from './frameServices'
 
-export { SUBSCRIBABLE_CHANNELS } from './channels'
 export type { PluginFrameProps } from './frameServices'
 
 const PLUGIN_FRAME_SCHEME = 'app-plugin'

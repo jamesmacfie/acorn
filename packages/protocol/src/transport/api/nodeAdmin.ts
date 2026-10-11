@@ -74,7 +74,7 @@ export type AuditVocabularyEntry = { action: string; label: string }
 // `vocabulary` rides on every page rather than taking a route of its own: its only reader is the list
 // beside it, the two are always fetched together, and it is a few dozen short strings. Optional on the
 // wire, though every `acorn-1` Node sends it.
-export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary?: AuditVocabularyEntry[] }
+export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary: AuditVocabularyEntry[] }
 export const coreAuditRoute = '/v1/core/audit'
 
 // `POST /v1/core/backup` (docs/data-layer/backup-and-retention.md § Backup and import). `destPath` is a path on the node's filesystem,

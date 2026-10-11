@@ -3,7 +3,7 @@ import { readdir, readFile, rename, lstat, stat, unlink, writeFile } from 'node:
 import { join } from 'node:path'
 import type { MemoryScope, MemoryType } from '../contract/library'
 
-export type { MemoryScope, MemoryType } from '../contract/library'
+export type { MemoryType } from '../contract/library'
 export const DIRECT_MEMORY_TYPES = ['user', 'feedback', 'project', 'reference'] as const
 export const normalizeMemoryType = (type: string): (typeof DIRECT_MEMORY_TYPES)[number] =>
   ['convention', 'architecture', 'decision', 'fix', 'task'].includes(type)
@@ -48,12 +48,6 @@ export const isValidMemoryName = (s: string): boolean => /^[a-z0-9][a-z0-9._-]*$
 // ones that apply wherever the owner is working.
 export const privateMemoryRoot = (homeDir: string): string =>
   process.env.ACORN_DATA_DIR ? join(process.env.ACORN_DATA_DIR, 'memory') : join(homeDir, '.acorn', 'memory')
-
-// The project id is a path segment here, so it goes through the same name check a memory file does.
-export function projectMemoryDir(homeDir: string, projectId: string): string {
-  if (!isValidMemoryName(projectId)) throw new Error('Invalid project id.')
-  return join(privateMemoryRoot(homeDir), 'projects', projectId)
-}
 
 export const contentHashId = (name: string, body: string, description: string): string =>
   createHash('sha256').update(`${name}\n${description}\n${body}`).digest('hex').slice(0, 24)

@@ -16,7 +16,6 @@ import {
   qualifiedExtensionPointId,
   type ArbitrationMode,
   type DetailRegion,
-  type ExtensionPointKind,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginExtensionDescriptor, PluginExtensionPointDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import {
@@ -31,7 +30,7 @@ import { ownsRoute, readAnnotationMarks, readExtensionItems } from './chromeData
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin's contribution can
  *  never take its place. Same shape a context-menu row's id takes (docs/plugins/menus-and-markers.md § Context menus). */
-export const pluginExtensionId = (pluginId: string, id: string): string => `plugin:${pluginId}:${id}`
+const pluginExtensionId = (pluginId: string, id: string): string => `plugin:${pluginId}:${id}`
 
 export type PluginExtensionBinding = {
   /** The node the surface drawing this is looking at. */
@@ -52,7 +51,7 @@ export type PluginExtensionBinding = {
  * manifest are otherwise only observable as a strip that did or did not appear in a pane, and no test
  * can render one.
  */
-export function pluginExtensionPoint(
+function pluginExtensionPoint(
   pluginId: string,
   descriptor: PluginExtensionPointDescriptor,
   binding: PluginExtensionBinding,
@@ -114,7 +113,7 @@ export function pluginExtensionPoint(
 }
 
 /** One validated contribution. Throws with a reason if the descriptor is unusable on this device. */
-export function pluginExtension(
+function pluginExtension(
   pluginId: string,
   descriptor: PluginExtensionDescriptor,
   binding: PluginExtensionBinding,
@@ -211,7 +210,3 @@ export const registerPluginExtension = (
   descriptor: PluginExtensionDescriptor,
   binding: PluginExtensionBinding,
 ): Disposable => extensionRegistry.register(pluginExtension(pluginId, descriptor, binding), pluginId)
-
-/** Every kind this shell can draw, for the developer view's own header. Derived rather than typed out,
- *  so a kind added to the protocol shows up here without a second edit. */
-export type { ExtensionPointKind }

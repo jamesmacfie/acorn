@@ -9,11 +9,7 @@ export { editorTheme, refreshEditorTheme, watchEditorTheme } from '@acorn/client
 export { languageForPath, shouldHighlightDocument } from '@acorn/client-core/features/editor'
 // Hover and diagnostics from routes the host resolved, drawn by the host's editor. The owner names
 // routes and its edit counter, nothing more.
-export {
-  languageServices,
-  refreshLanguageServices,
-  type LanguageServiceSource,
-} from '@acorn/client-core/features/editor'
+export { languageServices, refreshLanguageServices } from '@acorn/client-core/features/editor'
 export { applyViewState, captureViewState, type EditorViewState } from '@acorn/client-core/features/editor'
 // Find and replace drawn with the kit's controls.
 export { editorSearch, openReplacePanel } from '@acorn/client-core/features/editor'

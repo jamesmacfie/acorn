@@ -14,7 +14,7 @@ export type FileMark = ReturnType<typeof annotationsFor>[number]
 const MAX_GLYPHS = 3
 
 /** The severity mapping both hosts use, the same one the shared marks use. */
-export const FILE_MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } as const
+const FILE_MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } as const
 
 /**
  * Ask every contributor about these files, in one request each.

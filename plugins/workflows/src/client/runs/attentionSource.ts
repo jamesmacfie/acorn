@@ -7,7 +7,7 @@ import type { AttentionItem, AttentionSourceContribution } from '@acorn/plugin-a
 import { workflowApi } from '../workflowsClient'
 
 /** The row's identity, built in one place so a refetch re-renders the row instead of replacing it. */
-export const gateAttentionItemId = (stepId: string): string => `workflow:gate:${stepId}`
+const gateAttentionItemId = (stepId: string): string => `workflow:gate:${stepId}`
 
 export const workflowsAttentionSource: AttentionSourceContribution = {
   id: 'workflows.gates',

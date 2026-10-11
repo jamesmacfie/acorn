@@ -41,7 +41,6 @@ import {
 // discard and remote actions. Task-scoped HTTP behind the `LocalGitBridge`. Pure Node, so it works in
 // dev:node.
 
-export type { LocalScope } from '../../../shared/changes/api'
 /** `secretCheck` is present when the secret publication gate refused (docs/security/secret-publication.md). */
 export type GitActionResult = { ok: boolean; reason?: string; secretCheck?: SecretPublicationRefusal }
 export type LocalGitBridge = {

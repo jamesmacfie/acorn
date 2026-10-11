@@ -41,12 +41,6 @@ import {
 
 const log = createLogger('plugins')
 
-// A client bundle is one ESM file that has to travel a broker request and land in a device's cache
-// (docs/plugins.md). The ceiling is here rather than only in the
-// device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
-// generous enough that no honest bundle meets it.
-export { MAX_CLIENT_BUNDLE_BYTES } from './packageFiles'
-
 export type LoadedPlugin = {
   manifest: PluginManifest
   plugin: NodePlugin

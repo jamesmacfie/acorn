@@ -26,7 +26,7 @@ export type Frame = {
  *  A char frame answers what is on the screen and nothing about how it is drawn, and this host's
  *  answer to "this control has focus" is a colour and a weight rather than a character — so without
  *  this the whole of `litControl` would be untested (../harness.tsx has the same pair for the shell). */
-export type Run = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
+type Run = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
 
 export type Cells = Frame & {
   /** The frame as coloured runs rather than characters. */

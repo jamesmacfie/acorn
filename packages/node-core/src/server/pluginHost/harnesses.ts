@@ -9,7 +9,7 @@ import { capabilityId, type Disposable } from './capabilities'
  *  non-2xx, or not JSON. `unknown` because these are bytes a plugin wrote, so the consumer validates
  *  them at its own boundary. The signal is required: a probe calls a plugin route, so something has to
  *  bound the wait. */
-export type HarnessProbe = (signal: AbortSignal) => Promise<unknown>
+type HarnessProbe = (signal: AbortSignal) => Promise<unknown>
 
 export type ManifestHarnessSpawn =
   | { command: string; args: string[] }
@@ -51,7 +51,7 @@ export type HarnessRegistry = {
 
 /** What a plugin hands `ctx.harnesses`: everything but the two fields only the host may set. `id` is
  *  the harness's own local id, and the host mints the qualified one. */
-export type PluginHarnessRegistration = Omit<ManifestHarness, 'id' | 'pluginId'> & { id: string }
+type PluginHarnessRegistration = Omit<ManifestHarness, 'id' | 'pluginId'> & { id: string }
 
 /** Where this plugin's managed agent harnesses go (docs/managed-agents/harnesses.md § Harnesses). Registering
  *  when the agents plugin is absent is the same silent nothing every unmatched contribution gets. */

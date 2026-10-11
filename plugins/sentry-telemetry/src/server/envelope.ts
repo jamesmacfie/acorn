@@ -41,7 +41,7 @@ type TelemetryFailure = Extract<TelemetryRecord, { kind: 'error' }>
  *  one item type per envelope. */
 export type SentryDataCategory = 'error' | 'transaction' | 'log_item' | 'trace_metric' | 'monitor'
 
-export type SentryEnvelopeItem = { header: Record<string, unknown>; payload: unknown }
+type SentryEnvelopeItem = { header: Record<string, unknown>; payload: unknown }
 
 export type SentryEnvelope = {
   category: SentryDataCategory

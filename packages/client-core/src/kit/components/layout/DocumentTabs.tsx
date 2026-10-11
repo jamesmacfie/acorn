@@ -22,7 +22,7 @@ export type DocTabDef = {
   marks?: readonly DocTabMark[]
 }
 
-export type DocTabMark = { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }
+type DocTabMark = { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }
 
 const MAX_TAB_MARK_GLYPHS = 3
 

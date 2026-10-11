@@ -3,7 +3,7 @@ import { normalizeWebviewHost } from './webview'
 export const CONTENT_LINK_PATTERN_MAX_LENGTH = 512
 export const CONTENT_LINK_PATTERN_MAX_CAPTURES = 8
 
-export type ContentLinkCaptures = Readonly<Record<string, string>>
+type ContentLinkCaptures = Readonly<Record<string, string>>
 export type CompiledContentLinkPattern = {
   readonly captures: readonly string[]
   match(href: string): ContentLinkCaptures | null

@@ -1,12 +1,11 @@
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { patchBlobKey } from '@acorn/plugin-api/testkit'
-import { filesResource, prResource, pullsResource } from '../../resourceKeys'
+import { pullsResource } from '../../resourceKeys'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { createTaskService } from '@acorn/plugin-api/testkit'
-import { mirrorPr, patchDigest } from '../mirror/prMirror'
+import { mirrorPr } from '../mirror/prMirror'
 import type { PullComposite } from '../mirror/prFetch'
-import { announcePrSynced, refreshOpenPulls, refreshPullWithFiles } from './pullRefresh'
+import { announcePrSynced, refreshOpenPulls } from './pullRefresh'
 import { checks, comments, prFiles, pullRequests, syncState } from '../../../node/schema'
 
 const USER = 'octocat'
@@ -40,17 +39,6 @@ const composite: PullComposite = {
   threads: [],
   checks: [],
 }
-const lastPage = <T>(nodes: T[]) => ({ nodes, pageInfo: { endCursor: null, hasNextPage: false } })
-const gqlPull = {
-  ...scalars,
-  labels: lastPage([{ name: 'bug', color: 'ff0000' }]),
-  reviews: lastPage([]),
-  reviewRequests: lastPage([]),
-  comments: lastPage([]),
-  commits: lastPage([]),
-  reviewThreads: lastPage([]),
-  latestCommit: { nodes: [] },
-}
 
 const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
@@ -63,13 +51,11 @@ describe('shared pull refresh operations', () => {
   let core: TestDb
   let plugin: TestPluginDb
   let tasks: ReturnType<typeof createTaskService>
-  let blobs: Map<string, string>
 
   beforeEach(async () => {
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
     tasks = createTaskService(core.db)
-    blobs = new Map()
     const now = Date.now()
     await core.db
       .insert(schema.workspaces)
@@ -297,91 +283,5 @@ describe('shared pull refresh operations', () => {
     expect(byId.get('task-adopt')).toBe(5)
     expect(byId.get('task-taken')).toBe(99)
     expect(byId.get('task-other')).toBeNull()
-  })
-
-  it('refreshes one PR composite and changed files, including patch blobs', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = String(input)
-        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
-        if (url.includes('/pulls/5/files')) {
-          return json([
-            {
-              filename: 'src/app.ts',
-              status: 'modified',
-              additions: 2,
-              deletions: 1,
-              sha: 'file-sha',
-              patch: '@@ patch',
-            },
-          ])
-        }
-        if (url.endsWith('/pulls/5'))
-          return json({ base: { sha: 'base-sha' }, head: { sha: gqlPull.headRefOid }, updated_at: gqlPull.updatedAt })
-        throw new Error(`Unexpected URL ${url}`)
-      }),
-    )
-    const store = {
-      get: async (blobKey: string) => blobs.get(blobKey) ?? null,
-      put: async (blobKey: string, value: string) => {
-        blobs.set(blobKey, value)
-      },
-    }
-
-    expect(await refreshPullWithFiles('token', plugin.db, store, { ...key, number: 5 })).toEqual({ ok: true })
-    expect((await plugin.db.select().from(pullRequests))[0]).toMatchObject({
-      number: 5,
-      title: 'Fresh title',
-      headRef: 'feature',
-    })
-    expect((await plugin.db.select().from(prFiles))[0]).toMatchObject({
-      path: 'src/app.ts',
-      sha: 'file-sha',
-      position: 0,
-      patchState: 'available',
-      patchKey: patchDigest('@@ patch'),
-    })
-    expect(blobs.get(patchBlobKey(patchDigest('@@ patch')))).toBe('@@ patch')
-    const resources = (await plugin.db.select().from(syncState)).map((row) => row.resource)
-    expect(resources).toEqual(expect.arrayContaining([prResource(REPO_ID, 5), filesResource(REPO_ID, 5)]))
-  })
-
-  it('does not write either mirror when the files fetch fails', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = String(input)
-        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
-        return new Response('unavailable', { status: 500 })
-      }),
-    )
-    const result = await refreshPullWithFiles(
-      'token',
-      plugin.db,
-      { get: async () => null, put: async () => undefined },
-      { ...key, number: 5 },
-    )
-    expect(result).toEqual({ ok: false, failure: { error: 'github_unavailable', status: 502 } })
-    expect(await plugin.db.select().from(pullRequests)).toEqual([])
-    expect(await plugin.db.select().from(prFiles)).toEqual([])
-  })
-
-  it('returns not found when GitHub has no such pull request', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = String(input)
-        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: null } } })
-        return json([])
-      }),
-    )
-    const result = await refreshPullWithFiles(
-      'token',
-      plugin.db,
-      { get: async () => null, put: async () => undefined },
-      { ...key, number: 404 },
-    )
-    expect(result).toEqual({ ok: false, failure: { error: 'pull_not_found', status: 404 } })
   })
 })

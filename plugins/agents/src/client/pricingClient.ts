@@ -3,8 +3,7 @@ import { agentPricingRoute, type AgentPricingPreferences } from '../shared/prici
 
 export const agentPricingQueryKey = ['agents', 'pricing'] as const
 
-export const readAgentPricing = (signal?: AbortSignal) =>
-  readJson<AgentPricingPreferences>(agentPricingRoute, { signal })
+const readAgentPricing = (signal?: AbortSignal) => readJson<AgentPricingPreferences>(agentPricingRoute, { signal })
 
 export const agentPricingOptions = () => ({
   queryKey: agentPricingQueryKey,

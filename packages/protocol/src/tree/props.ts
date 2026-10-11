@@ -24,7 +24,7 @@ import { safeContentHref } from '../content/externalUrl.ts'
 
 /** A handler on the wire. Never a function: the sandbox mints an id, the host maps it back to a
  *  closure that posts the event. */
-export const handlerRef = z.object({ $handler: z.number().int().positive() }).strict()
+const handlerRef = z.object({ $handler: z.number().int().positive() }).strict()
 export type HandlerRef = z.infer<typeof handlerRef>
 
 export const isHandlerRef = (value: unknown): value is HandlerRef =>
@@ -94,7 +94,7 @@ export const KIT_NODE_SCHEMAS: Record<KitNodeName | typeof TEXT_NODE, z.ZodType>
 const forbidden: ReadonlySet<string> = new Set<string>(FORBIDDEN_PROPS)
 
 /** How many props one node may carry. A node with more than this is not a node, it is a payload. */
-export const MAX_PROP_KEYS = 64
+const MAX_PROP_KEYS = 64
 
 export type SanitizedProps = { props: Record<string, unknown>; dropped: string[] }
 

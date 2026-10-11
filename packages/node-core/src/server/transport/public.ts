@@ -1,2 +1,2 @@
 export { advertisedHosts, confirmAdvertiseHost } from './advertise.ts'
-export { certificateFingerprint, ensureCert } from './tls.ts'
+export { ensureCert } from './tls.ts'

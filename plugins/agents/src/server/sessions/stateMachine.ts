@@ -34,15 +34,8 @@ export type AgentSessionProjection = {
   configJson?: string
 }
 
-export const initialAgentMachineState = (): AgentMachineState => ({
-  runtimeState: 'creating',
-  attention: 'none',
-  activeTurnId: null,
-  pendingRequestIds: [],
-})
-
-// The database projection and the richer in-memory reducer share this one pure transition map.
-// Provider adapters produce facts; neither persistence nor process supervision invents state.
+// The session's state as the database projects it from one event. Provider adapters produce facts;
+// neither persistence nor process supervision invents state.
 //
 // `turnId` is null for an event that belongs to no turn Acorn dispatched, which is why it gates the
 // turn-scoped cases below. A harness can stream after the prompt call it was answering has already
@@ -264,87 +257,5 @@ export function decideAgentCommand(state: AgentMachineState, command: AgentMachi
       return state.runtimeState === 'working' || state.runtimeState === 'waiting'
         ? { ok: false, code: 'controller_busy', message: 'The terminal-owned session still has active work.' }
         : { ok: true }
-  }
-}
-
-export function evolveAgentState(
-  state: AgentMachineState,
-  event: AgentNormalizedEvent,
-  turnId: string | null,
-): AgentMachineState {
-  switch (event.type) {
-    case 'session_state':
-      return {
-        ...state,
-        runtimeState: event.state,
-        attention: event.state === 'failed' ? 'error' : state.attention,
-        activeTurnId:
-          event.state === 'ready' || event.state === 'stopped' || event.state === 'failed' ? null : state.activeTurnId,
-      }
-    case 'user_message': {
-      const active = turnId ?? state.activeTurnId
-      if (!active) return state
-      return { ...state, runtimeState: 'working', attention: 'none', activeTurnId: active }
-    }
-    case 'assistant_message':
-    case 'reasoning':
-    case 'tool':
-    case 'plan':
-    case 'plan_proposal':
-    case 'file_change':
-    case 'terminal':
-    case 'artifact': {
-      // Same turn gate as projectAgentEvent, for the same reason. The reducer knows more than the
-      // projection does, so it asks whether any turn is in flight rather than just this event's.
-      const active = turnId ?? state.activeTurnId
-      if (!active) return { ...state, attention: 'unread' }
-      return { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
-    }
-    case 'request': {
-      if (event.blocked) {
-        const active = turnId ?? state.activeTurnId
-        return active
-          ? { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
-          : { ...state, attention: 'unread' }
-      }
-      return {
-        ...state,
-        runtimeState: 'waiting',
-        attention:
-          event.kind === 'permission' ? 'permission' : event.kind === 'workflow_gate' ? 'workflow_gate' : 'question',
-        pendingRequestIds: state.pendingRequestIds.includes(event.requestId)
-          ? state.pendingRequestIds
-          : [...state.pendingRequestIds, event.requestId],
-      }
-    }
-    case 'request_resolved': {
-      const pendingRequestIds = state.pendingRequestIds.filter((id) => id !== event.requestId)
-      return {
-        ...state,
-        runtimeState: pendingRequestIds.length === 0 ? 'working' : 'waiting',
-        attention: pendingRequestIds.length === 0 ? 'none' : state.attention,
-        pendingRequestIds,
-      }
-    }
-    case 'turn_completed':
-      return {
-        ...state,
-        runtimeState: 'ready',
-        attention: 'completed',
-        activeTurnId: null,
-        pendingRequestIds: [],
-      }
-    case 'error':
-      return {
-        ...state,
-        runtimeState: event.retryable ? 'reconnecting' : 'failed',
-        attention: 'error',
-        activeTurnId: null,
-      }
-    case 'session_metadata':
-    case 'subagent':
-    case 'usage':
-    case 'diagnostic':
-      return state
   }
 }

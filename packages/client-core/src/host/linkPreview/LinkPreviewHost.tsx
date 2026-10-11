@@ -30,7 +30,7 @@ import './link-preview.css'
 
 /** Open is the same host action as a click: an in-app destination when one claims the URL, else the
  *  browser. A preview never navigates on its own. */
-export function openPreviewedLink(request: LinkPreviewRequest): void {
+function openPreviewedLink(request: LinkPreviewRequest): void {
   if (openInAppUrl(request.url, { taskId: request.scope.taskId ?? null })) return
   window.open(request.url, '_blank', 'noopener,noreferrer')
 }

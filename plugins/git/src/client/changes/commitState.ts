@@ -26,8 +26,6 @@ export type CommitDeps = {
   onCommitted: () => void | Promise<void>
 }
 
-export type CommitState = ReturnType<typeof createCommitState>
-
 /** Where a commit draft is kept on this device. The task id follows it and the node does not: a
  *  draft belongs to the worktree the reader is looking at, and the same task on another node is
  *  another worktree with another set of changes in it. */

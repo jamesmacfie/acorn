@@ -201,13 +201,3 @@ export function workflowSlug(name: string): string {
     .replace(/-+$/, '')
   return slug || 'workflow'
 }
-
-/** The same, made unique against the ids the folder already holds. */
-export function uniqueWorkflowSlug(name: string, taken: ReadonlySet<string>): string {
-  const base = workflowSlug(name)
-  if (!taken.has(base)) return base
-  for (let at = 2; at < 1000; at += 1) {
-    if (!taken.has(`${base}-${at}`)) return `${base}-${at}`
-  }
-  return `${base}-${Date.now()}`
-}

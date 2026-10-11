@@ -73,7 +73,7 @@ export function bandCount(rows: readonly PlainDiffRow[]): number {
   return bands
 }
 
-export function describeSegment(rows: readonly PlainDiffRow[], limits: SegmentLimits = LIMITS): DiffSegmentDescriptor {
+function describeSegment(rows: readonly PlainDiffRow[], limits: SegmentLimits = LIMITS): DiffSegmentDescriptor {
   let gaps = 0
   let columns = 0
   let oldFirst = 0

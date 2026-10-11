@@ -206,7 +206,7 @@ export { byTask as editorStateByTask }
 // Every map here is keyed by a node-minted task id and must not survive a node switch
 // (docs/state-ownership/scope-rules.md § Scope rules). Writing each scope under the active node's storage key leaks one
 // node's state into another's namespace.
-export function clearEditorStates(): void {
+function clearEditorStates(): void {
   tabInstances.clear()
   setByTask({})
 }

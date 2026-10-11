@@ -59,11 +59,7 @@ export async function workflowTaskResolutionScope(
   return { task, project, workspaceId: project.workspaceId, projectId: project.id, repoDir, userDir }
 }
 
-export type {
-  ResolvedWorkflowGraph,
-  ResolvedWorkflowNode,
-  WorkflowDefinitionProvenance,
-} from '../../shared/workflowContracts'
+export type { ResolvedWorkflowGraph, WorkflowDefinitionProvenance } from '../../shared/workflowContracts'
 
 type ResolvedDefinition = {
   definition: WorkflowDef

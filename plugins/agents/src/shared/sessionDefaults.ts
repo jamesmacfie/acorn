@@ -10,7 +10,7 @@ export const agentSessionDefaultsRoute = '/v1/p/agents/session-defaults'
 export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 
 /** providerId to optionId to the value that option is set to. */
-export type AgentDefaultValues = Record<string, Record<string, string>>
+type AgentDefaultValues = Record<string, Record<string, string>>
 
 export type SpawnedAgentDefaults = {
   mode: 'inherit' | 'explicit'

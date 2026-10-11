@@ -9,7 +9,7 @@ export type CacheStorage = {
   removeItem(key: string): Promise<void>
 }
 
-export type QueryCacheLease = { restored: Promise<void>; release(): void }
+type QueryCacheLease = { restored: Promise<void>; release(): void }
 export type QueryCacheLifecycle = {
   persister: Persister
   acquire(): QueryCacheLease

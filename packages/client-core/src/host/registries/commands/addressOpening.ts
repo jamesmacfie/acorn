@@ -109,7 +109,7 @@ function linkForAddress(address: Address): string {
   }
 }
 
-export async function openAddress(address: Address, link = ''): Promise<LinkRefusal | { kind: 'opened' }> {
+async function openAddress(address: Address, link = ''): Promise<LinkRefusal | { kind: 'opened' }> {
   const shownLink = link || linkForAddress(address)
   // A cold-start OS event can arrive before the helper's first fleet answer. The shell already
   // starts that read; wait for its result instead of treating an empty projection as unpaired.

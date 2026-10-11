@@ -8,14 +8,7 @@ export {
 export { disabledPluginsStore } from './disabled.ts'
 export { inputGrantsStore } from './inputGrants.ts'
 export { skillStateStore } from './skillState.ts'
-export {
-  installPlugin,
-  pluginDir,
-  pluginInstallRoot,
-  uninstallPlugin,
-  updatePlugin,
-  withPluginPackage,
-} from './installer.ts'
+export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin } from './installer.ts'
 export {
   installedPluginInfo,
   loadedPluginBinding,
@@ -39,9 +32,4 @@ export {
 } from './pendingReview.ts'
 export type { PluginDatabase } from './storage.ts'
 
-export {
-  MAX_CLIENT_BUNDLE_BYTES,
-  MAX_PLUGIN_MANIFEST_BYTES,
-  PluginPackageFileError,
-  readPluginFile,
-} from './packageFiles.ts'
+export { MAX_CLIENT_BUNDLE_BYTES, readPluginFile } from './packageFiles.ts'

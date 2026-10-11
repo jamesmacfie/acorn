@@ -38,5 +38,3 @@ export const telemetryServiceFor = (owner: string): TelemetryService => ({
 /** The unbound facet on `CoreServices`. Every plugin gets a bound one instead; this is what the
  *  node's own code holds, and its records say `core`. */
 export const createTelemetryService = (): TelemetryService => telemetryServiceFor('core')
-
-export type { TelemetrySink }

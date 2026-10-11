@@ -45,9 +45,6 @@ export const noteExclusiveSlotFailure = (slot: CoreExclusiveSlot, pluginId: stri
 export const exclusiveSlotFailed = (slot: CoreExclusiveSlot, pluginId: string): boolean =>
   (failures.get(`${slot}:${pluginId}`) ?? 0) >= 3
 
-export const exclusiveSlotFailureCount = (slot: CoreExclusiveSlot, pluginId: string): number =>
-  failures.get(`${slot}:${pluginId}`) ?? 0
-
 /** Cleared by the contribution sync, which is the one moment the bytes behind a provider can have
  *  changed. Also the test seam. */
 export const clearExclusiveSlotFailures = (pluginId?: string): void => {

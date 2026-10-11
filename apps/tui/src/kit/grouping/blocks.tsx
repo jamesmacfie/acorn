@@ -3,7 +3,7 @@ import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
 import type { FilterBarProps, SectionProps } from '@acorn/client-core/kit/components/layout'
-import { isCompact, slotColor } from '../../appearance'
+import { slotColor } from '../../appearance'
 import { Line, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
 import { stop } from '../../keys/stops'
@@ -145,18 +145,16 @@ export function Card(props: {
       minWidth={0}
       width={props.fit ? undefined : '100%'}
       alignSelf={props.fit ? 'flex-start' : undefined}
-      marginTop={isCompact() ? 0 : 1}
-      marginBottom={isCompact() ? 0 : 1}
+      marginTop={1}
+      marginBottom={1}
       ref={(element: Renderable) => {
         if (props.onPress) control.ref(element)
       }}
-      {...(isCompact()
-        ? { border: accent() ? (['left'] as const) : false, borderStyle: 'single' as const }
-        : boxBorder('surface', lit() ? { tone: 'accent' } : {}))}
+      {...boxBorder('surface', lit() ? { tone: 'accent' } : {})}
       borderLeftAccent={accent() ? { glyph: borderCell('stripe').glyph, color: slotColor(accent()!) } : undefined}
       title={props.title}
-      paddingLeft={isCompact() ? 0 : 1}
-      paddingRight={isCompact() ? 0 : 1}
+      paddingLeft={1}
+      paddingRight={1}
     >
       {props.children}
     </box>

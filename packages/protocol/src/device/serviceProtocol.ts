@@ -4,7 +4,7 @@ import { ACORN_BASELINE } from '../baseline.ts'
 // Parent and child ship together. A version bump is a hard break.
 export const SERVICE_PROTOCOL_VERSION = 1
 
-export const serviceStateSchema = z.enum([
+const serviceStateSchema = z.enum([
   'starting',
   'migrating',
   'listening',
@@ -27,14 +27,14 @@ export const serviceStateEventSchema = z.strictObject({
 //
 // The sealed file's name in the data root. The helper owns it. The Node only checks that it exists.
 export const SEALED_NODE_KEYS_FILE = 'node-keys.sealed'
-export const nodeKeysSchema = z.strictObject({
+const nodeKeysSchema = z.strictObject({
   sessionKey: z.string().regex(/^[0-9a-fA-F]{64}$/, 'sessionKey must be 64 hex characters'),
   signingKey: z.string().min(32),
 })
 export type NodeKeys = z.infer<typeof nodeKeysSchema>
 
 // Whether the delivered session key opened a stored credential. `none` means there was nothing to try.
-export const nodeKeyCheckSchema = z.enum(['ok', 'none', 'failed'])
+const nodeKeyCheckSchema = z.enum(['ok', 'none', 'failed'])
 export type NodeKeyCheck = z.infer<typeof nodeKeyCheckSchema>
 
 export const serviceStartConfigSchema = z.strictObject({
@@ -61,7 +61,7 @@ export type ServiceStartConfig = z.infer<typeof serviceStartConfigSchema>
 
 // What `service.start` resolves with. The child owns its endpoint and certificate identity and reports
 // them so the parent can adopt the Node and establish the pinned broker connection.
-export const serviceEndpointSchema = z.strictObject({
+const serviceEndpointSchema = z.strictObject({
   origin: z.string().url(),
   port: z.number().int().min(1).max(65535),
 })
@@ -86,8 +86,8 @@ export type ServiceStartResult = z.infer<typeof serviceStartResultSchema>
 
 // The peer is symmetric, but every method here is one the shell calls on the service. Nothing on the
 // node side calls back the other way (docs/shell/node-child.md § Service protocol).
-export const serviceRpcMethods = ['service.start', 'service.stop'] as const
-export const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
+const serviceRpcMethods = ['service.start', 'service.stop'] as const
+const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
 export type ServiceRpcMethod = z.infer<typeof serviceRpcMethodSchema>
 
 const rpcRequestSchema = z.strictObject({
@@ -114,7 +114,7 @@ const rpcEventSchema = z.strictObject({
   payload: z.unknown(),
 })
 
-export const serviceMessageSchema = z.discriminatedUnion('kind', [rpcRequestSchema, rpcResponseSchema, rpcEventSchema])
+const serviceMessageSchema = z.discriminatedUnion('kind', [rpcRequestSchema, rpcResponseSchema, rpcEventSchema])
 export type ServiceMessage = z.infer<typeof serviceMessageSchema>
 
 export type ServiceMessageTransport = {

@@ -69,7 +69,7 @@ export function workflowValueProblems(def: WorkflowDef): string[] {
   return errors
 }
 
-export function completedWorkflowValues(def: WorkflowDef, rows: readonly WorkflowStepRow[]): Record<string, DataValue> {
+function completedWorkflowValues(def: WorkflowDef, rows: readonly WorkflowStepRow[]): Record<string, DataValue> {
   return Object.fromEntries(
     rows
       .filter(

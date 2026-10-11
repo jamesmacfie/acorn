@@ -24,9 +24,7 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v1/core/plugins'], // node administration: which plugins this node runs (routes/plugins.ts)
   ['GET', '/v1/p/changes/tasks/t1/review-notes'],
   ['GET', '/v1/p/notes/tasks/t1/notes'],
-  ['GET', '/v1/p/linear/projects'],
   ['GET', '/v1/p/rollbar/items'],
-  ['GET', '/v1/p/github/pins'],
   ['GET', '/v1/p/github/repos'],
   ['GET', '/v1/p/github/repos/o/r/labels'],
   ['GET', '/v1/p/github/repos/o/r/pulls'],

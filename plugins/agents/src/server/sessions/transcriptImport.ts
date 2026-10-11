@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export type ImportedTranscriptTurn = {
+type ImportedTranscriptTurn = {
   user: string
   assistant: string[]
 }

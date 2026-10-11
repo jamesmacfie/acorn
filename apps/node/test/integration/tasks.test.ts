@@ -132,31 +132,6 @@ describe('task links grow/shrink', () => {
     expect(await listLinks(task.id)).toHaveLength(1)
   })
 
-  it('delete removes exactly one link', async () => {
-    const task = await createTask()
-    await app.fetch(
-      jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-1', identifier: 'ENG-42' }),
-      {} as Env,
-    )
-    await app.fetch(
-      jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-2', identifier: '142' }),
-      {} as Env,
-    )
-    const res = await app.fetch(
-      jsonReq(`/api/tasks/${task.id}/links`, 'DELETE', { connectionId: 'int-1', identifier: 'ENG-42' }),
-      {} as Env,
-    )
-    expect(res.status).toBe(200)
-    expect(await listLinks(task.id)).toEqual([
-      {
-        connectionId: 'int-2',
-        providerId: 'rollbar',
-        identifier: '142',
-        ref: { providerId: 'rollbar', connectionId: 'int-2', displayId: '142' },
-      },
-    ])
-  })
-
   it('unknown task → 404 on add', async () => {
     const res = await app.fetch(
       jsonReq('/api/tasks/nope/links', 'POST', { integrationId: 'int-1', provider: 'linear', identifier: 'ENG-42' }),

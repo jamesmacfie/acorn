@@ -89,13 +89,6 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
   return described?.label ?? kind
 }
 
-export function dependencyLabels(step: WorkflowStepDef, def: WorkflowDef): string[] {
-  const index = def.steps.findIndex((candidate) => stepIdentity(candidate) === stepIdentity(step))
-  return effectiveAfter(def, index).map(
-    (id) => def.steps.find((candidate) => stepIdentity(candidate) === id)?.name ?? id,
-  )
-}
-
 export function branchLabel(step: WorkflowStepDef, def: WorkflowDef): string | undefined {
   for (const parent of def.steps) {
     for (const [branch, target] of Object.entries(parent.branches ?? {})) {

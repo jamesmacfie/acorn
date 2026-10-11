@@ -31,7 +31,6 @@ const emptySnapshot = (): PluginDistributionSnapshot =>
   derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR)
 const [distribution, setDistribution] = createSignal<PluginDistributionSnapshot>(emptySnapshot())
 let initialized = false
-let requestedGeneration = 0
 let reconcileTail: Promise<void> = Promise.resolve()
 let lastHostState = emptyHost()
 const dismissed = new Set<string>()
@@ -77,6 +76,7 @@ export const activeBundles = (): ReadonlyMap<string, { hash: string }> | null =>
   for (const [id, entry] of snapshot.selectedDevice) bundles.set(id, { hash: entry.hash })
   return bundles
 }
+
 export const bundleAccepted = (pluginId: string, hash: string): boolean =>
   distribution().acceptedKeys.has(decisionKey(pluginId, hash))
 
@@ -235,7 +235,6 @@ export function markPluginNodeStale(nodeId: string): void {
 
 /** Remove a node immediately so an in-flight read cannot keep its authority alive. */
 export function forgetPluginNode(nodeId: string): void {
-  requestedGeneration++
   const byNode = new Map(distribution().byNode)
   if (!byNode.delete(nodeId)) return
   const current = distribution()
@@ -280,7 +279,6 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
 }
 
 function enqueuePass(options: DistributionSyncOptions): Promise<void> {
-  const generation = ++requestedGeneration
   const pass = async (): Promise<void> => {
     if (!pluginHostAvailable()) return
     const previous = distribution()
@@ -307,7 +305,7 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
           if (legacyRuntimeIdentityWithheld(row)) {
             log.warn(`${row.name} on ${nodeId} has no provable running identity; loaded UI is withheld`)
           }
-        byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, generation, observedAt: Date.now() })
+        byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, observedAt: Date.now() })
       } catch (error) {
         log.warn(`could not read the plugin roster on ${nodeId}`, error)
         const old = byNode.get(nodeId)
@@ -390,7 +388,7 @@ export function _seedPluginDistribution(
   const byNode = new Map<string, NodePluginObservation>(
     [...rosters].map(([nodeId, rows]) => [
       nodeId,
-      { nodeId, rows, reachable: true, stale: false, generation: 1, observedAt: Date.now() },
+      { nodeId, rows, reachable: true, stale: false, observedAt: Date.now() },
     ]),
   )
   const cached: PluginHostState['cached'] = {}
@@ -458,7 +456,6 @@ export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void
 
 export function _resetPluginDistribution(): void {
   setDevicePluginIds([])
-  requestedGeneration++
   initialized = false
   dismissed.clear()
   lastHostState = emptyHost()

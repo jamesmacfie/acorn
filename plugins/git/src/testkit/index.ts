@@ -4,4 +4,3 @@
 //   apps/desktop/scripts/agent/seed.ts             seedReviewNotes
 export { localGitAgentTools } from '../server/changes/agentTools'
 export { seedReviewNotes } from './reviewNotes'
-export type { SeedReviewNote } from './reviewNotes'

@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import type { UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 
 const NotificationBell = lazy(() => import('@acorn/client-core/features/notifications/NotificationBell.tsx'))
 const CommandPalette = lazy(() => import('@acorn/client-core/host/palette/CommandPalette.tsx'))

@@ -18,7 +18,7 @@ export type TerminalToolbarProps = {
 
 /** `host.invoke('interrupt', payload)`. Refused unless `expectedSessionId` is still the selected,
  *  running session of the task the contributor was mounted for. */
-export type TerminalInterruptPayload = { expectedSessionId: string }
+type TerminalInterruptPayload = { expectedSessionId: string }
 
 /**
  * What `interrupt` answers. A refusal, not an error, so the contributor can say why in its own control.

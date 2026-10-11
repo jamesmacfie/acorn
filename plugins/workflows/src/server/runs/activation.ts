@@ -23,7 +23,6 @@ import { WorkflowProcessingStore } from '../processing/store'
 import { WorkflowRunner, type RunnerDeps } from './runner'
 import { destinationQuery } from '../validation/destination'
 import { assertWorkflowDataScope } from '../steps/data'
-import { encodeToolCeiling } from '../steps/tools'
 import { workflowRuns } from '../../node/schema'
 import type { WorkflowNotices } from '../../contract/notices'
 
@@ -175,12 +174,7 @@ export const createWorkflowExecution = (
                 : null,
             // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it
             // is denied the owner's provider credentials and confined to this task's tool surface.
-            env: {
-              ...credentials,
-              // Transitional transport metadata for older MCP proxies. Authorization uses only the
-              // signed claim above.
-              ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}),
-            },
+            env: credentials,
           })
           return await runHeadless(argv, {
             cwd,

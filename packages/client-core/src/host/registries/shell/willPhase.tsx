@@ -9,7 +9,7 @@ import Icon from '../../../kit/components/content/Icon'
 import { Heading } from '../../../kit/components/content/Heading'
 import { Modal } from '../../../kit/components/overlays/Modal'
 import { createLogger } from '../../../infra/telemetry/logger'
-export { collectConcerns, registerWillHandler } from './willPhaseModel'
+export { registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
 
 const log = createLogger('will')

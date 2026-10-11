@@ -24,7 +24,7 @@ import { MAX_WAIT_MS } from './tools'
 type RunRow = typeof workflowRuns.$inferSelect
 type StepRow = typeof workflowSteps.$inferSelect
 
-export const MAX_STEP_SUMMARIES = 100
+const MAX_STEP_SUMMARIES = 100
 const MAX_VALUE_BYTES = 16 * 1024
 const MAX_TEXT = 1_000
 const POLL_MS = 500

@@ -18,7 +18,7 @@ const MAX_REPORT_TEXT = 8 * 1024
 const MAX_REPORTS_PER_OWNER = 100
 
 export const reportKey = (childTurnId: string): string => `delegation-report:${childTurnId}`
-export const requestReportKey = (requestId: string): string => `delegation-request:${requestId}`
+const requestReportKey = (requestId: string): string => `delegation-request:${requestId}`
 
 export const turnResultSchema = (turn: AgentTurn): object | undefined => {
   const value = turn.effectivePolicy.resultSchema ?? turn.effectivePolicy.schema

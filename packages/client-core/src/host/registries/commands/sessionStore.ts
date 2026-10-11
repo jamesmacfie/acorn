@@ -30,7 +30,7 @@ import { groupRows, inputRows, rootRows, searchRows, settingRows } from './sessi
 
 /** What activating a row does. Owned by whoever produced the row, so the session never switches on
  *  what kind of thing a row is about. */
-export type SessionRowAction =
+type SessionRowAction =
   /** Push this command's own frame. A group, a search, an input or a setting. */
   | { effect: 'enter'; commandId: string }
   /** Run something. A leaf action, a search result and a setting choice are all this. */
@@ -53,14 +53,14 @@ export type SessionRow = {
   readonly action: SessionRowAction
 }
 
-export const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
+const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
 
 /** What the top frame is for. The root, a group and a setting list rows; the other two own the field
  *  above the list rather than filtering it. */
 export type SessionFrameKind = 'root' | 'group' | 'search' | 'input' | 'setting'
 
 /** Where a search frame is between "nothing typed" and "here are the rows". */
-export type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
+type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
 
 /** One row a provider answered with, and the world it answered in. */
 export type SessionSearchResult = {
@@ -99,7 +99,7 @@ export type SessionSearchState = {
 }
 
 /** Where a setting frame is between "asking the owner what it is" and "here are the choices". */
-export type SessionSettingPhase = 'loading' | 'ready' | 'error'
+type SessionSettingPhase = 'loading' | 'ready' | 'error'
 
 /**
  * A setting frame's current value.

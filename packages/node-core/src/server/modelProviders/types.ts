@@ -6,7 +6,7 @@ export type GenerateTextInput = {
   signal?: AbortSignal
 }
 
-export type GenerateTextUsage = {
+type GenerateTextUsage = {
   inputTokens?: number
   outputTokens?: number
 }

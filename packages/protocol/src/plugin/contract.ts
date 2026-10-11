@@ -163,7 +163,7 @@ const manifestPermissions = z.object({
 // plugin's own frames; declaring it is what lets another manifest name it in `permissions.events`, and
 // what gives the settings page a line to render. The description is the author's own words and is
 // shown as text, never as trust-prompt copy.
-export const pluginEmitSchema = z.object({
+const pluginEmitSchema = z.object({
   verb: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'a verb is lowercase, starts with a letter, and holds no colon'),
   description: z.string().min(1).max(200),
 })
@@ -242,7 +242,6 @@ const manifestShape = z.object({
 // `pluginManifestSchema` in node-core wraps this with the cross-field refinements (route confinement, surface
 // reachability, id uniqueness), which need `id` and the frame list and so can't live on the fields.
 export const pluginManifestShape = manifestShape
-export type PluginManifestShape = z.infer<typeof manifestShape>
 
 // The permissions block on its own, because the desktop parses it a second time. It arrives there
 // over IPC and goes into the trust store, where a wrong shape would not crash: it would show the owner
@@ -279,17 +278,6 @@ export const hasRemoteRegion = (frame: { regions?: Record<string, unknown> }): b
   Object.values(frame.regions ?? {}).some(
     (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'remote',
   )
-
-/** Does this pane have a host-drawn editor in it? */
-export const hasDocumentRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
-  Object.values(frame.regions ?? {}).some(
-    (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'document',
-  )
-
-/** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,
- *  no click site of its own and no verb that opens it. The user's arbitration is the only thing that
- *  ever puts one on screen (`CORE_EXCLUSIVE_SLOTS`). */
-export const isCoreSlotSurface = (frame: { target: string }): boolean => frame.target === 'coreSlot'
 
 // ── The wire projection ───────────────────────────────────────────────────────────────────────────
 //
@@ -368,11 +356,11 @@ export type PluginCommandCategory = z.infer<typeof commandCategory>
 // header states: the field was added to a shape that had already shipped, so a roster row from a node
 // running the previous parser carries no `kind` at all and means the action it always meant. The other
 // four members can only have come from a node that has this schema.
-export type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
-export type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
-export type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
-export type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
-export type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
+type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
+type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
+type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
+type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
+type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
 /** A newer node may send a kind this build has no frame for, so every reader switches on `kind` and
  *  skips what it does not know rather than coercing it into an action. */
 export type PluginCommandDescriptor =
@@ -446,7 +434,6 @@ export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 export type PluginSkillDescriptor = z.infer<typeof skillDescriptor>
 export type PluginCustomAgentDescriptor = z.infer<typeof customAgentDescriptor>
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
-export type { PluginCliCommandDescriptor } from './cliCommands.ts'
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's

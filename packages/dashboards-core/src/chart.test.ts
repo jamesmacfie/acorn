@@ -1,18 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
-import {
-  buildChart,
-  CHART_FRAME,
-  chartAxisFields,
-  chartSeriesFields,
-  chartShapesFor,
-  chartSupportedBy,
-  dayBucket,
-  defaultChartAxis,
-  defaultChartView,
-  niceTicks,
-  TICK_FONT,
-} from './chart'
+import { buildChart, CHART_FRAME, chartShapesFor, dayBucket, defaultChartAxis, niceTicks, TICK_FONT } from './chart'
 import { viewsForSchema } from './model'
 
 // The chart's arithmetic. `ChartView.tsx` cannot be tested here, because vitest runs in node with no
@@ -52,53 +40,19 @@ describe('what a schema can chart', () => {
 
   it('offers nothing for a schema with numbers but no axis to draw them against', () => {
     expect(chartShapesFor(schema(title, size))).toEqual([])
-    expect(chartSupportedBy(schema(title, size))).toBe(false)
   })
 
   it('agrees with the view gate in model.ts, which spells the same predicate separately', () => {
     for (const candidate of [schema(status), schema(updated), schema(title, size), schema()]) {
-      expect(viewsForSchema(candidate).includes('chart')).toBe(chartSupportedBy(candidate))
+      expect(viewsForSchema(candidate).includes('chart')).toBe(chartShapesFor(candidate).length > 0)
     }
-  })
-
-  it('offers only fields of the type the shape needs', () => {
-    expect(chartAxisFields(schema(status, updated, size), 'bar').map((field) => field.id)).toEqual(['state'])
-    expect(chartAxisFields(schema(status, updated, size), 'line').map((field) => field.id)).toEqual(['updated'])
   })
 })
 
 describe('type-inferred defaults', () => {
-  it('prefers a time axis, and the updated-role field on it', () => {
-    const view = defaultChartView(schema(status, updated, size), {})
-    expect(view.shape).toBe('line')
-    expect(view.x).toBe('updated')
-  })
-
-  it('falls back to a bar keyed on the status-role enum', () => {
-    const other = { id: 'kind', name: 'Kind', type: 'enum' as const }
-    const view = defaultChartView(schema(other, status), {})
-    expect(view.shape).toBe('bar')
-    expect(view.x).toBe('state')
-  })
-
   it('takes the panel’s existing grouping over the role, so board → chart keeps the categories', () => {
     const other = { id: 'kind', name: 'Kind', type: 'enum' as const }
     expect(defaultChartAxis(schema(status, other), 'bar', { groupBy: 'kind' })).toBe('kind')
-  })
-
-  it('always counts rows, and never pre-picks a number field to sum', () => {
-    // The field vocabulary cannot tell a quantity from an identifier, since `number` covers a size in
-    // MB and github's pull request number alike. Summing "the first number there is" would open the PR
-    // panel on the sum of PR numbers, an axis reaching 200,000 that means nothing. A count always
-    // means something, and the sum is one select away.
-    expect(defaultChartView(schema(status, size), {})).toMatchObject({ aggregate: 'count' })
-    expect(defaultChartView(schema(status, size), {}).field).toBeUndefined()
-    expect(defaultChartView(schema(status), {})).toMatchObject({ aggregate: 'count' })
-  })
-
-  it('splits a line into series only where the grouping was already a decision', () => {
-    expect(defaultChartView(schema(status, updated), {}).series).toBeUndefined()
-    expect(defaultChartView(schema(status, updated), { groupBy: 'state' }).series).toBe('state')
   })
 })
 
@@ -299,17 +253,6 @@ describe('the grouped bar', () => {
     ])
     // The x axis still names the category once, at the centre of its cluster.
     expect(plot.xTicks.map((tick) => tick.label)).toEqual(['Open', 'Merged'])
-  })
-
-  it('offers the split only where a second enum exists, and never the category axis itself', () => {
-    expect(chartSeriesFields(schema(status, kind), 'bar', { kind: 'chart', x: 'state' }, {}).map((f) => f.id)).toEqual([
-      'kind',
-    ])
-    expect(chartSeriesFields(schema(status), 'bar', { kind: 'chart', x: 'state' }, {})).toEqual([])
-    // A line's axis is a datetime, so every enum is a candidate there.
-    expect(
-      chartSeriesFields(schema(status, updated), 'line', { kind: 'chart', x: 'updated' }, {}).map((f) => f.id),
-    ).toEqual(['state'])
   })
 
   it('ignores a split naming the category axis rather than drawing one bar per cluster', () => {

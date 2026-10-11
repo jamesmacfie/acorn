@@ -60,7 +60,7 @@ export const annotationRailMarkers = (marks: readonly StampedMark[]): RailMarker
   }))
 
 /** One task's marks as rail markers. */
-export const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
+const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
   annotationRailMarkers(annotationsFor(CORE_TASK_POINT, { task: taskId }))
 
 railMarkerRegistry.register({

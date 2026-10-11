@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 
-export const PROTOCOL_CLOSE_MS = 1_000
+const PROTOCOL_CLOSE_MS = 1_000
 const SIGNAL_GRACE_MS = 2_000
 const EXIT_ACK_MS = 2_000
 

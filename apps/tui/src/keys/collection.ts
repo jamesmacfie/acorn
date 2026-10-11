@@ -18,12 +18,7 @@
 import { onCleanup } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { _resetCollectionState, registerCollectionReveal } from '@acorn/client-core/kit/keys'
-import {
-  COLLECTION_INTENTS,
-  createCollectionIntents,
-  type CollectionIntentOptions,
-  type CollectionItem,
-} from '@acorn/client-core/kit/keys'
+import { COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions } from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { bindKeys } from './install'
 import {
@@ -159,8 +154,6 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
     },
   }
 }
-
-export type { CollectionItem }
 
 /** Test seam: the host store outlives a single render, so a suite must not inherit a caret. */
 export function _resetCollections(): void {

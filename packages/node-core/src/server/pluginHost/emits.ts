@@ -22,9 +22,6 @@ export function declareEmits(pluginId: string, emits: readonly PluginEmit[]): ()
   }
 }
 
-/** The declared verbs of a producer, or undefined when no such plugin is running. */
-export const declaredEmits = (pluginId: string): readonly PluginEmit[] | undefined => producers.get(pluginId)?.emits
-
 /** Throw when `channel` names a running producer that did not declare the verb. Silent for an absent
  *  producer, and for the subscriber's own channel. */
 export function assertSubscribableVerb(channel: string, subscriber: string): void {
@@ -39,4 +36,4 @@ export function assertSubscribableVerb(channel: string, subscriber: string): voi
 }
 
 // Test seam.
-export const _resetEmits = (): void => producers.clear()
+const _resetEmits = (): void => producers.clear()

@@ -58,7 +58,7 @@ const configBody = z.object({
 })
 const runTargetsBody = z.object({ runTargets: z.string() })
 
-export const toWireProject = (row: ProjectRow): Project => ({
+const toWireProject = (row: ProjectRow): Project => ({
   id: row.id,
   name: row.name,
   path: row.path,

@@ -29,7 +29,7 @@ import type {
   TrashAvailability,
 } from '../../contract/api'
 export type { EditorEntry } from '../../contract/api'
-export type { EditorWriteResult } from '../../contract/api'
+
 export type EditorBridge = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>

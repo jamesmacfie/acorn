@@ -58,7 +58,7 @@ export const TIER_LABEL: Record<TierKey, string> = {
   web: 'Web pages',
 }
 
-export type TrustLine = PermissionLine & {
+type TrustLine = PermissionLine & {
   tier: TierKey
   // Did the version the owner last approved lack this grant? Always false on a first install, where
   // there is no previous version for anything to be new against.

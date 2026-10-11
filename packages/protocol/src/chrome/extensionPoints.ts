@@ -16,7 +16,7 @@
 
 // These host extension props are small portable projections. The full agent event and usage models
 // belong to Agents; Protocol must not import a plugin contract.
-export type AgentToolCardCall = {
+type AgentToolCardCall = {
   id: string
   parentId?: string
   /** Stable MCP tool name, separate from the provider’s display title. */
@@ -41,7 +41,7 @@ export type AgentToolCardCall = {
   }
 }
 
-export type AgentHeaderUsage = {
+type AgentHeaderUsage = {
   inputTokens?: number
   outputTokens?: number
   cachedInputTokens?: number
@@ -89,11 +89,6 @@ export const takesPluginExtensions = (location: ExtensionPointLocation): boolean
 /** Does this location hold somebody else's rectangle beside the owner's own? */
 export const isInlineLocation = (location: ExtensionPointLocation): boolean =>
   location === 'pane.inline-below' || location === 'pane.inline-beside'
-
-/** Which kinds hang off a named location of a named surface, and so must name both. An annotation
- *  draws at whichever site the owner registered in code, a remote slot is a node in the owner's own
- *  tree, and a hook draws nothing at all: none of the three has a location to name. */
-export const kindNeedsLocation = (kind: ExtensionPointKind): boolean => kind === 'rows' || kind === 'rectangle'
 
 /**
  * Who fills a box when more than one contributor could.
@@ -160,8 +155,6 @@ export type PluginExtensionItem = {
   badge?: string
 }
 
-export type PluginExtensionItems = { items: PluginExtensionItem[] }
-
 // ── The annotation half ───────────────────────────────────────────────────────────────────────────
 //
 // Rows answer "what is related to this pane". Annotations answer "what do you know about this line".
@@ -172,7 +165,7 @@ export type PluginExtensionItems = { items: PluginExtensionItem[] }
  *  key is a lookup, not a payload: `{ file: 'README.md', line: 42, side: 'new' }`. */
 export type PluginAnnotationKey = Record<string, string | number>
 
-export const ANNOTATION_SEVERITIES = ['info', 'warn', 'danger'] as const
+const ANNOTATION_SEVERITIES = ['info', 'warn', 'danger'] as const
 
 export type AnnotationSeverity = (typeof ANNOTATION_SEVERITIES)[number]
 
@@ -202,8 +195,6 @@ export type PluginAnnotationMark = {
  * row has been validated; `core:task` does so for its compact rail surface.
  */
 export const MAX_RAW_ANNOTATION_ROWS = 4_096
-
-export type PluginAnnotationMarks = { items: PluginAnnotationMark[] }
 
 /**
  * One key as a lookup string, in the field order the owner declared.
@@ -240,7 +231,7 @@ export const isHookMode = (value: unknown): value is HookMode =>
  */
 export const HOOK_PAYLOAD_TYPES = ['string', 'number', 'boolean', 'string[]', 'number[]', 'boolean[]'] as const
 
-export type HookPayloadType = (typeof HOOK_PAYLOAD_TYPES)[number]
+type HookPayloadType = (typeof HOOK_PAYLOAD_TYPES)[number]
 
 /** `{ branch: 'string', commits: 'string[]' }`. */
 export type HookPayloadShape = Record<string, HookPayloadType>
@@ -286,26 +277,6 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
    *  decision until the person answers. */
   ask?: { reason: string; by: string }
 }
-
-/**
- * The hooks core itself owns, as opposed to the ones a plugin declares.
- *
- * Core has no manifest, so its points are named here and the runner treats this list as their
- * declaration. Same shape as `CORE_EXCLUSIVE_SLOTS` below and for the same reason: a designated list
- * a plugin may name but not extend.
- */
-export const CORE_HOOK_POINTS = [
-  'core:worktree-created',
-  'core:task-archiving',
-  'core:task-deleted',
-  'core:before-tool-call',
-  'core:before-snapshot',
-] as const
-
-export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
-
-export const isCoreHookPoint = (value: unknown): value is CoreHookPoint =>
-  typeof value === 'string' && (CORE_HOOK_POINTS as readonly string[]).includes(value)
 
 /**
  * Core's annotation point for task rows on the rail. Core has no manifest, so it is declared here.
@@ -454,14 +425,14 @@ export type AgentRequestCardProps = {
  *  consume the same point without inheriting another contributor's product decision. */
 export const AGENT_SESSION_HEADER_POINT = 'agents:session-header'
 
-export type AgentSessionTokenPrice = {
+type AgentSessionTokenPrice = {
   input: number
   output: number
   cacheWrite: number
   cacheRead: number
 }
 
-export type AgentSessionHeaderTurn = {
+type AgentSessionHeaderTurn = {
   turnId: string
   model: string | null
   usage: AgentHeaderUsage

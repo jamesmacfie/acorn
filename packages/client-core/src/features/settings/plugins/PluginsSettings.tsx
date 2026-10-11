@@ -52,7 +52,7 @@ import './plugins.css'
 // The seeded prompt behind "Create a plugin" (docs/plugins/agent-install.md § Teaching the agent). The teaching
 // lives in the `plugin_authoring` tool this text names, not in the text; that tool's test asserts
 // this file still names it.
-export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
+const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
 
 Call the \`plugin_authoring\` tool first. It returns the authoring contract and this node's own manifest
 vocabulary, and an answer from memory will be wrong. Then write the package and ask me for it with
@@ -63,7 +63,7 @@ What it should do: `
 /** The prompt behind "Build a data source from your connections" (docs/plugin-authoring/derived-sources.md).
  *  It names the template and the helpers, and each input by id. The agent reads each input's fields
  *  with `data_source_describe`, because this page can't describe a source without an account. */
-export function dataSourceStarterPrompt(row: string, inputs: { source: string; name: string }[]): string {
+function dataSourceStarterPrompt(row: string, inputs: { source: string; name: string }[]): string {
   return `I want an acorn plugin with a derived data source: rows my own rules build from data acorn already reads.
 
 Call the \`plugin_authoring\` tool first, and follow its section on derived data sources. Start from

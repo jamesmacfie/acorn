@@ -41,7 +41,7 @@ export const LANGUAGE_IDS = [
 export type LanguageId = (typeof LANGUAGE_IDS)[number]
 
 /** The one fallback for both engines. */
-export const DEFAULT_LANGUAGE_ID: LanguageId = 'plaintext'
+const DEFAULT_LANGUAGE_ID: LanguageId = 'plaintext'
 
 const IDS: ReadonlySet<string> = new Set(LANGUAGE_IDS)
 

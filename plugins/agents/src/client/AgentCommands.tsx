@@ -34,7 +34,7 @@ import {
 
 const on = (value: boolean): string => (value ? 'on' : 'off')
 
-export function AgentCommands() {
+function AgentCommands() {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
 

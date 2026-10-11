@@ -78,8 +78,8 @@ links in intermediate directories and dangling links. The pane carries the stagi
 document file's `sha`, which the viewer hands back through `fileText`. A deleted file has a null
 `sha`, so its gaps can't expand.
 
-Review-note writes publish `plugin:git:review-notes-changed` only after a create, edit, delete,
-or sent-state change. The event carries `{ taskId, total, unsent }` and no note IDs, paths, or
+Review-note writes publish `plugin:git:review-notes-changed` only after a create, delete, or
+sent-state change. The event carries `{ taskId, total, unsent }` and no note IDs, paths, or
 bodies, so badges and delivery gates react without receiving review content.
 
 ## The file list

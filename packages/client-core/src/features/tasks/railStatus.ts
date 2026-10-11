@@ -14,7 +14,7 @@ import type { TaskStatus } from '@acorn/protocol/task.ts'
 import { CHECK_TONE } from '../../kit/lib/rendering/displayMeta'
 import type { RailMarker } from '../tabs/railMarkers'
 
-export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
+type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
 
 export type RailStatusInputs = {
   checks: RailChecks | null // null when the task has no PR / no checks

@@ -30,7 +30,7 @@ import type { PluginTelemetry } from '../telemetry/collector'
 import type { Logger } from '../telemetry/logger'
 
 // Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.
-export type PluginEventChannel = `plugin:${string}:${string}`
+type PluginEventChannel = `plugin:${string}:${string}`
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
@@ -42,7 +42,7 @@ import type {
   DataSourceResult,
 } from '@acorn/protocol/dataSources.ts'
 
-export type PluginRouteOptions = {
+type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
   // task-scoped sub-resources. The effective mount is /v1/p/<plugin><prefix>.
   prefix?: string
@@ -76,11 +76,11 @@ export type DataSourceInputHandle = {
   options(request: DataSourceInputOptionsRequest): Promise<DataSourceOptions>
 }
 // The host fills in the source, the bound scope, the mode, and the evaluation time.
-export type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & {
+type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & {
   cursor?: string
   pageSize?: number
 }
-export type DataSourceInputOptionsRequest = {
+type DataSourceInputOptionsRequest = {
   target: 'field' | 'parameter'
   pointer: string
   search?: string
@@ -98,10 +98,7 @@ export type PluginProviderResourceRequest<TInput> = {
   requireFresh?: boolean
 }
 
-export type PluginProviderConnectionVisitor<T> = (
-  connection: StoredConnection,
-  secret: string,
-) => Promise<T | undefined>
+type PluginProviderConnectionVisitor<T> = (connection: StoredConnection, secret: string) => Promise<T | undefined>
 
 export type PluginProviderRuntime = {
   resource<TInput, TOutput>(args: PluginProviderResourceRequest<TInput>): Promise<RouteResult<TOutput>>
@@ -124,14 +121,14 @@ export type PluginProviderRuntime = {
 // hand over `app.fetch`.
 export type PluginFetchHandler = (request: Request, context: PluginRequestContext) => Response | Promise<Response>
 
-export type PluginRouteRegistry = {
+type PluginRouteRegistry = {
   // The portable half, and the only one a loaded plugin gets. Same mount, same auth gate. The handler
   // receives a Request whose path is relative to that mount, exactly as `register` gives a router paths
   // relative to its own.
   fetch(handler: PluginFetchHandler, options?: PluginRouteOptions): void
 }
 
-export type CompiledPluginRouteRegistry = PluginRouteRegistry & {
+type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   // The plugin id is bound by the host, so a plugin can't mount itself under another's namespace, which
   // a raw registerRoute({ plugin }) call could do by typo or intent.
   //
@@ -140,7 +137,7 @@ export type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
 }
 
-export type PluginToolRegistry = {
+type PluginToolRegistry = {
   // Agent-tool contributions live with the engine they drive. The host binds the plugin owner and
   // projects the registry to HTTP, MCP and renderer permission surfaces.
   register(tool: AgentToolContribution): void
@@ -151,16 +148,16 @@ export type PluginToolRegistry = {
 //
 // Declaring one is the whole lifecycle: the host mints the key, ties removal to teardown, and keeps the
 // state row across a disable and re-enable. Any `setInterval` in plugin node code is a review flag.
-export type PluginScheduleRegistry = {
+type PluginScheduleRegistry = {
   register(schedule: PluginSchedule): void
 }
 
-export type CompiledPluginScheduleRegistry = PluginScheduleRegistry & {
+type CompiledPluginScheduleRegistry = PluginScheduleRegistry & {
   /** User-owned target kinds are live host callbacks and therefore compiled-only. */
   registerTarget(target: import('../schedules/scheduler').ScheduleTarget): void
 }
 
-export type PluginSchedule = {
+type PluginSchedule = {
   // Unique within this plugin. The host prefixes it, so a plugin can't file a schedule under a
   // stranger's name any more than it can mount a route under one.
   scheduleId: string
@@ -181,14 +178,14 @@ export type PluginSchedule = {
 // What this plugin has to say when the owner archives a task, and the cleanup it can offer
 // (./taskChecks.ts). See docs/plugins/task-checks.md § Task checks. Declaring one is the whole lifecycle: the host
 // binds the owner, qualifies every concern id, bounds the call and ties removal to teardown.
-export type PluginTaskCheckRegistry = {
+type PluginTaskCheckRegistry = {
   register(check: TaskCheck): void
 }
 
 // What this plugin can find for a search, and how a hit opens (./search.ts). See docs/plugins/search-providers.md §
 // Search providers. The host binds the owner, bounds the call, sanitises the hits and ties removal to
 // teardown.
-export type PluginSearchRegistry = {
+type PluginSearchRegistry = {
   register(provider: SearchProvider): void
 }
 
@@ -235,7 +232,7 @@ export type PluginHookPoint = {
   collect?: boolean
 }
 
-export type PluginHookHandler = {
+type PluginHookHandler = {
   /** Unique within this plugin. The host qualifies it before it leaves. */
   id: string
   mode: HookMode
@@ -252,7 +249,7 @@ export type PluginHookHandler = {
 //
 // Register one if your plugin owns work that starts, takes time, and ends. A plugin that owns no such
 // thing registers nothing, which is the right answer for most.
-export type PluginRunRegistry = {
+type PluginRunRegistry = {
   register(source: RunSourceRegistration): void
 }
 
@@ -261,7 +258,7 @@ export type PluginRunRegistry = {
 // the risk tier, and not a schedule seam, though a user schedule is one thing that asks
 // (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means
 // nothing outside this plugin can make it act, which is the right default for most.
-export type PluginNodeActionRegistry = {
+type PluginNodeActionRegistry = {
   register(action: NodeActionRegistration): void
 }
 
@@ -272,7 +269,7 @@ export type PluginNodeActionRegistry = {
 //
 // The verbs are the same three words hooks uses, because it is the same shape: an owner declares a
 // point, anyone handles it, the owner reads the handlers (docs/plugins/plugin-api.md § The plugin API).
-export type PluginExtensionPointRegistry = {
+type PluginExtensionPointRegistry = {
   // Declare a point this plugin hosts. The id must start with this plugin's own name.
   declare<T>(point: ExtensionPointId<T>, label: string): void
   // Deliver one entry into a point, this plugin's own or another's. The host mints the entry id from
@@ -290,7 +287,7 @@ export type PluginExtensionPointRegistry = {
 // The host qualifies every verb with the plugin id and refuses a `record` naming one this plugin did
 // not declare, so the trail stays enumerable: the settings surface can name every verb it might draw
 // because each one came from a parsed manifest.
-export type PluginAuditRegistry = {
+type PluginAuditRegistry = {
   declare(action: { id: string; label: string }): void
   // Fire-and-forget, like core's own writes: an audit row is evidence, and a failed insert must never
   // fail the thing it describes. `details` takes allowlisted scalars decided at the call site — never a
@@ -301,7 +298,7 @@ export type PluginAuditRegistry = {
   ): void
 }
 
-export type PluginContextSectionRegistry = {
+type PluginContextSectionRegistry = {
   // A plugin contributes one task-context section. Core owns assembly, ordering, budgets and output
   // format; the section gets no core database handle and declares only its own data source.
   register(section: PluginContextSection): void
@@ -309,7 +306,7 @@ export type PluginContextSectionRegistry = {
 
 // Connection, integration and model-provider descriptors are registered by the plugin that owns them.
 // The host validates provider ids and projects provider routes under the provider namespace.
-export type PluginProviderRegistry = {
+type PluginProviderRegistry = {
   // `route` is a built-in Hono router or a portable fetch handler, mounted at /v1/p/<provider.id>
   // through buildIntegrationProviderRoutes(). Both stay behind `requireProviderAccess`; loaded plugins
   // must use the fetch carrier.
@@ -398,7 +395,7 @@ export type CompiledPluginBroadcast = PluginBroadcast & {
 
 // The registry as plugins may use it. Structural rather than the class itself, because a loaded plugin
 // receives a filtered wrapper (server/plugins/permissions.ts).
-export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
+type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
 
 // Host-bound storage, for both tiers. The host binds the database filename to the plugin id. A loaded
 // plugin opens and migrates that exact file inside its isolated realm; a built-in does so in the host.

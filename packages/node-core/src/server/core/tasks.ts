@@ -26,7 +26,7 @@ import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
-export type TaskRunConfig =
+type TaskRunConfig =
   | {
       targets: RunTarget[]
       cwd: string
@@ -40,14 +40,14 @@ export type TaskRunConfig =
 // The three columns a `task_links` row is read for outside core: which provider, through which
 // stored connection, under which identifier. Narrower than the row, because `refJson` is parsed
 // through the integration provider registry, which is core's job.
-export type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
+type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
 
 // What a dispatched child needs to exist. `branch` is a suggestion: it is slugged and de-duped against
 // task reservations, worktree directories, and Git worktrees. A base also reserves local branches.
-export type ChildTaskSeed = { title: string; branch: string; origin?: string; baseBranch?: string }
-export type RootTaskSeed = { title: string; branch?: string; origin: string }
+type ChildTaskSeed = { title: string; branch: string; origin?: string; baseBranch?: string }
+type RootTaskSeed = { title: string; branch?: string; origin: string }
 
-export type TaskPullRelation = {
+type TaskPullRelation = {
   taskId: string
   repoOwner: string
   repoName: string
@@ -58,7 +58,7 @@ export type TaskPullRelation = {
   requestId?: string
 }
 
-export type AttachTaskPullInput = {
+type AttachTaskPullInput = {
   repoOwner: string
   repoName: string
   pullNumber: number

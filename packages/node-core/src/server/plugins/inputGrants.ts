@@ -9,7 +9,7 @@ import { writePrivateAtomic } from '../storage/dataRoot'
 // or changes an input keeps reading the ones the old grant still matches.
 // See docs/data-sources/derived-sources.md § Approve inputs for loaded plugins.
 
-export type GrantedInput = { source: string; optional: boolean }
+type GrantedInput = { source: string; optional: boolean }
 export type InputGrant = {
   pluginId: string
   /** Source id, then input name, exactly as the approved version declared them. */

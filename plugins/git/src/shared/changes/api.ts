@@ -27,7 +27,6 @@ export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'e
 export const reviewNotesRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/review-notes`
 export const reviewNoteRoute = (taskId: string, noteId: string) => `/v1/p/git/tasks/${taskId}/review-notes/${noteId}`
 export const reviewNotesSentRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/review-notes/sent`
-export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 
 // Local-changes review: working-tree status, diff and blob reads, plus the staging, commit, discard
 // and remote actions.

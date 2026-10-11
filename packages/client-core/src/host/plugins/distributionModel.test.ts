@@ -43,7 +43,6 @@ const observation = (nodeId: string, rows: NodePluginRow[], reachable = true): N
   rows,
   reachable,
   stale: !reachable,
-  generation: 1,
   observedAt: 1,
 })
 const host = (

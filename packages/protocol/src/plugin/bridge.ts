@@ -20,7 +20,6 @@ import type { ErrorEnvelope } from '../transport/errors'
 // the SDK's `connect()` resolves on it. Versioned so a future protocol change is a different number
 // rather than a silently mis-parsed message.
 export const PLUGIN_BRIDGE_VERSION = 1
-export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 
 // What the frame was opened to look at. Handed over on the port rather than read from the URL by the
 // SDK, so the query string stays an implementation detail of how the host happens to serve frames.
@@ -99,7 +98,7 @@ export type PluginBridgeApiRequest = {
  * No streaming. The desktop broker fully buffers a node response already, so a chunked API here would be
  * a shape with no transport under it. `MAX_PLUGIN_BYTES` is the memory bound instead.
  */
-export type PluginBridgeApiBytesRequest = {
+type PluginBridgeApiBytesRequest = {
   id: number
   kind: 'api.bytes'
   method: 'GET' | 'POST'
@@ -119,18 +118,13 @@ export type PluginBridgeApiBytesRequest = {
  * limit stays authoritative for what may be stored; this only bounds what may cross a port. */
 export const MAX_PLUGIN_BYTES = 12 * 1024 * 1024
 
-/** What a successful `api.bytes` call resolves to. Rides the ordinary reply envelope's `body`, because
- * a `Uint8Array` is structured-clone-safe and a parallel reply type would be a second envelope to keep
- * in step for no gain. The request kind is what carries the security property, not the reply's shape. */
-export type PluginBridgeApiBytesBody = { bytes: Uint8Array; type: string; filename: string | null }
-
 // Server-push. The channel must appear in the manifest's `events` list and be one the shell actually
 // has; subscribing does not create a channel.
-export type PluginBridgeSubscribeRequest = { id: number; kind: 'subscribe'; channel: string }
+type PluginBridgeSubscribeRequest = { id: number; kind: 'subscribe'; channel: string }
 
 // Namespaced durable storage, keyed `(pluginId, key)` by the host. Distinct from the frame's own
 // `localStorage`, which works but is keyed by bundle hash and so rotates with every plugin update.
-export type PluginBridgeStateRequest =
+type PluginBridgeStateRequest =
   | { id: number; kind: 'state.get'; key: string }
   | { id: number; kind: 'state.set'; key: string; value: unknown }
 
@@ -191,8 +185,8 @@ export type PluginBridgeWebviewRequest =
 
 // Abandon an in-flight request. The SDK sends this when an AbortSignal fires; the host stops caring
 // about the response rather than pretending it can un-send an HTTP request.
-export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
-export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
+type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
+type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
 // One telemetry record from inside a frame (docs/telemetry.md, docs/plugin-authoring/the-bridge.md § Telemetry
 // from a frame).
@@ -219,7 +213,7 @@ export type PluginBridgeTelemetryAttrs = Record<string, string | number | boolea
 // so there is no outcome for the frame to await and nothing it could do with one. The message still
 // counts against the port's rate window, which is what stops a frame emitting in a loop: it kills
 // itself long before the collector notices.
-export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTelemetryRecord }
+type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTelemetryRecord }
 
 // The acknowledgement. The SDK posts it the moment `connect()` resolves, and it is the only message
 // a frame is required to send: the host starts a deadline when it transfers the port and shows a
@@ -229,7 +223,7 @@ export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTel
 // No id and no reply. It is not a request, so the broker's request parser drops it and only the
 // arrival matters, which also means any other message from the frame is just as good an ack, and the
 // host treats it as one.
-export type PluginBridgeConnected = { kind: 'connected'; treeSlotBridge?: 1 }
+type PluginBridgeConnected = { kind: 'connected'; treeSlotBridge?: 1 }
 
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
@@ -267,7 +261,7 @@ export type PluginBridgeAppearance = {
   tokens: Record<string, string>
 }
 
-export type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
+type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
 
 // A row was selected on this plugin's declarative rail source while its pane was already mounted. The
 // first such selection arrives in `context`; this is every one after it, because remounting a frame per

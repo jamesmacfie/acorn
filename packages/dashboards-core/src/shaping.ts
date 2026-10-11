@@ -160,11 +160,6 @@ export function titleField(schema: DashboardDisplaySchema): DashboardDisplayFiel
   )
 }
 
-export const fieldWithRole = (
-  schema: DashboardDisplaySchema,
-  role: NonNullable<DashboardDisplayField['role']>,
-): DashboardDisplayField | undefined => schema.fields.find((field) => field.role === role)
-
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
 // See docs/dashboards/views.md § Views are derived, not chosen from a menu for why a board is group-by

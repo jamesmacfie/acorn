@@ -59,9 +59,8 @@ list, while the workflows node half already needed the agents plugin to run a se
 couplings point opposite ways, and a package cycle won't build. A capability id breaks the cycle.
 
 It has the Node registry's four verbs behind `ctx.capabilities`: `provide`, `get`, `require`, and
-`ids`. `clientCapability` and `requireClientCapability` are the same reads as free functions, for a
-component with no `ctx`. It isn't the platform gate. That's `requires` on a contribution, answered by
-`hostCapabilities()`.
+`ids`. `clientCapability` is the same read as a free function, for a component with no `ctx`. It
+isn't the platform gate. That's `requires` on a contribution, answered by `hostCapabilities()`.
 
 Call sites resolve at call time, never at module scope or in a component body that runs once, because
 client registration order isn't a contract. The Node's registry is per runtime, because the service

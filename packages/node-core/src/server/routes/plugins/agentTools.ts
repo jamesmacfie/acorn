@@ -81,7 +81,7 @@ function hasRequiredSession(c: Context<AppEnv>, tool: AgentToolContribution): bo
 
 // Match the high-level MCP SDK's schema projection: draft-07 for argument-bearing tools, and its exact
 // empty-object literal for no-argument tools.
-export function mcpInputSchema(input: AgentToolContribution['input']): Record<string, unknown> {
+function mcpInputSchema(input: AgentToolContribution['input']): Record<string, unknown> {
   const schema = z.toJSONSchema(input, { target: 'draft-7', io: 'input' }) as Record<string, unknown>
   const properties = schema.properties as Record<string, unknown> | undefined
   if (properties && Object.keys(properties).length === 0 && !schema.required) return { type: 'object', properties: {} }

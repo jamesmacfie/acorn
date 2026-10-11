@@ -57,7 +57,7 @@ const roots = (): Array<[string, string]> => {
  *  data root, so this is also what turns `/Users/sam/.acorn/worktrees/acorn-42/src/x.ts` into
  *  `<data>/worktrees/acorn-42/src/x.ts`: the repo-relative part survives and the person's disk
  *  layout does not. */
-export function collapseRoots(value: string): string {
+function collapseRoots(value: string): string {
   let out = value
   for (const [prefix, replacement] of roots()) out = out.replaceAll(prefix, replacement)
   return out

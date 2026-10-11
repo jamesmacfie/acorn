@@ -23,7 +23,6 @@ import { failedWorkerHandle } from './failedWorkerHandle'
 import { installTreeWorkerTeardown } from './workerTeardown'
 export { treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from './bridgeAuthority'
 
-export const pluginWorkerUrl = (hash: string): string => `/plugin-worker/${hash}.js`
 class TreeCapacityError extends Error {}
 const GRACE_MS = 30_000
 const HEARTBEAT_MS = 10_000

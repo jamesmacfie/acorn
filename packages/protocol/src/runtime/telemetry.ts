@@ -33,7 +33,7 @@ export const LOG_BODY_MAX = 2_000
 
 /** Scalars only. An object here would be a place for a request body to hide, and a nested shape is
  *  something no sink's column model can index anyway. */
-export const telemetryAttrsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+const telemetryAttrsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 export type TelemetryAttrs = z.infer<typeof telemetryAttrsSchema>
 
 /** Typed, sorted labels and length-prefixed dimensions keep distinct legal series apart.
@@ -56,7 +56,7 @@ export function telemetryHistogramKey(owner: string, seam: string, unit: string,
 const traceIdSchema = z.string().regex(/^[0-9a-f]{32}$/)
 const spanIdSchema = z.string().regex(/^[0-9a-f]{16}$/)
 
-export const telemetrySpanSchema = z.object({
+const telemetrySpanSchema = z.object({
   kind: z.literal('span'),
   traceId: traceIdSchema,
   spanId: spanIdSchema,
@@ -71,7 +71,7 @@ export const telemetrySpanSchema = z.object({
   attrs: telemetryAttrsSchema,
 })
 
-export const telemetryLogSchema = z.object({
+const telemetryLogSchema = z.object({
   kind: z.literal('log'),
   at: z.number(),
   level: z.enum(['debug', 'info', 'warn', 'error']),
@@ -82,7 +82,7 @@ export const telemetryLogSchema = z.object({
   traceId: traceIdSchema.optional(),
 })
 
-export const telemetryEventSchema = z.object({
+const telemetryEventSchema = z.object({
   kind: z.literal('event'),
   at: z.number(),
   name: z.string().min(1),
@@ -92,7 +92,7 @@ export const telemetryEventSchema = z.object({
 /** A histogram arrives pre-aggregated over one flush window. That is how a seam firing a thousand
  *  times a second costs one record every five seconds instead of a thousand spans a sink has to
  *  drop (docs/telemetry/model.md § Hot seams are metrics). */
-export const telemetryHistogramSchema = z.object({
+const telemetryHistogramSchema = z.object({
   count: z.number(),
   sum: z.number(),
   min: z.number(),
@@ -100,9 +100,8 @@ export const telemetryHistogramSchema = z.object({
   p50: z.number(),
   p95: z.number(),
 })
-export type TelemetryHistogram = z.infer<typeof telemetryHistogramSchema>
 
-export const telemetryMetricSchema = z.object({
+const telemetryMetricSchema = z.object({
   kind: z.literal('metric'),
   at: z.number(),
   name: z.string().min(1),
@@ -112,7 +111,7 @@ export const telemetryMetricSchema = z.object({
   attrs: telemetryAttrsSchema,
 })
 
-export const telemetryErrorSchema = z.object({
+const telemetryErrorSchema = z.object({
   kind: z.literal('error'),
   at: z.number(),
   name: z.string(),
@@ -140,7 +139,6 @@ export const telemetryRecordSchema = z.discriminatedUnion('kind', [
 
 export type TelemetrySpan = z.infer<typeof telemetrySpanSchema>
 export type TelemetryLog = z.infer<typeof telemetryLogSchema>
-export type TelemetryEvent = z.infer<typeof telemetryEventSchema>
 export type TelemetryMetric = z.infer<typeof telemetryMetricSchema>
 export type TelemetryError = z.infer<typeof telemetryErrorSchema>
 export type TelemetryRecord = z.infer<typeof telemetryRecordSchema>

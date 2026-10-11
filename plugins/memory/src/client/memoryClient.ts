@@ -22,7 +22,7 @@ import type { MemoryRow, MemoryType } from '../contract/library'
 export type { MemoryRow, MemoryType } from '../contract/library'
 
 // The memory words every surface shares: the page, the palette, and the transcript card.
-export const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
+const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
   project: 'Project',
   convention: 'Convention',
   architecture: 'Architecture',

@@ -38,7 +38,7 @@ const within = (path: string, root: string): boolean =>
 
 /** The path with every link resolved. A path that doesn't exist yet resolves through its nearest
  *  existing folder, so a new file is judged by where it would land. */
-export function canonicalPath(path: string): string {
+function canonicalPath(path: string): string {
   try {
     return realpathSync.native(path)
   } catch {

@@ -47,7 +47,6 @@ const noteBody = z
   .transform((note) => ({ ...note, endLine: note.endLine ?? note.startLine }))
   .refine((note) => note.endLine >= note.startLine, { message: 'endLine must not precede startLine' })
 
-const editBody = z.object({ body: z.string() })
 const sentBody = z.object({ ids: z.array(z.string()).default([]) })
 
 const rowToNote = (r: Row): ReviewNote => ({
@@ -94,26 +93,6 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       await db.insert(reviewNotesTable).values(row)
       await announceNotes(db, taskId, emit)
       return c.json(rowToNote(row))
-    })
-    // Edit clears sentAt, so an edited note counts as unsent again.
-    .patch('/:id/review-notes/:noteId', async (c) => {
-      const parsed = editBody.safeParse(await c.req.json().catch(() => null))
-      if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
-      const taskId = c.req.param('id')
-      const noteId = c.req.param('noteId')
-      const [before] = await db
-        .select({ body: reviewNotesTable.body, sentAt: reviewNotesTable.sentAt })
-        .from(reviewNotesTable)
-        .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
-      const body = parsed.data.body.trim()
-      if (before && (before.body !== body || before.sentAt !== null)) {
-        await db
-          .update(reviewNotesTable)
-          .set({ body, sentAt: null })
-          .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
-        await announceNotes(db, taskId, emit)
-      }
-      return c.json({ ok: true })
     })
     .delete('/:id/review-notes/:noteId', async (c) => {
       const taskId = c.req.param('id')

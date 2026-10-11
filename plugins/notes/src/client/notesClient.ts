@@ -4,7 +4,7 @@
 import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../shared/api'
 import { activeNodeId, openPane, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
-export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
+export type { Note, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 
 export type NotesApi = {
   list(location: NoteLocation): Promise<NoteSummary[] | { error: string }>

@@ -107,8 +107,8 @@ describe('GitHub project importer', () => {
     expect(update).toHaveBeenCalledWith(expect.any(String), { path: '/checkouts/clone-me', githubRepoId: 102 })
   })
 
-  // The duplicate this closes: an older import left a path-less placeholder for the repository, and
-  // mapping a folder afterwards produced a second project for the same repo.
+  // The duplicate this closes: a deferred project already names the repository with no path, and
+  // mapping a folder afterwards would produce a second project for the same repo.
   it('fills in a path-less project for the same repository instead of creating a rival', async () => {
     byGithub.mockResolvedValue(ref('placeholder-id', null))
     const response = await post({ repositories: [{ repoId: 103, action: 'map', path: '/checkouts/placeholder-me' }] })

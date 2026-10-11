@@ -7,7 +7,7 @@ import { parseDataValue, type DataValue } from '../values/dataValues'
 
 const id = z.string().min(1).max(200)
 export const queryScopeSchema = z.object({ workspaceId: id, projectId: id.optional() }).strict()
-export const queryBindingsSchema = z.record(z.string().min(1).max(200), dataBindingSchema)
+const queryBindingsSchema = z.record(z.string().min(1).max(200), dataBindingSchema)
 const parametersSchema = z.unknown().transform((input, ctx): DataSchema => {
   try {
     const schema = parseDataSchema(input)
@@ -147,4 +147,3 @@ export const queryLibraryRequestSchema = z.discriminatedUnion('operation', [
     })
     .strict(),
 ])
-export type QueryLibraryRequest = z.infer<typeof queryLibraryRequestSchema>

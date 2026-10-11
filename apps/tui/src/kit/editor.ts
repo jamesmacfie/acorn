@@ -52,7 +52,6 @@ export const editorSearch = (): Extension => []
 export const openReplacePanel = (_view: EditorView): boolean => false
 
 import type { LanguageServiceSource } from '@acorn/client-core/features/editor'
-export type { LanguageServiceSource }
 /** No tooltip or underline to draw in cells. The terminal asks the same routes through explicit
  *  commands instead (../plugins/DocumentSurface.tsx, Editor's own Diagnostics button). */
 export const languageServices = (_source: LanguageServiceSource): Extension => []

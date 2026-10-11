@@ -363,5 +363,3 @@ export function Graph(props: {
     </div>
   )
 }
-
-export default Graph

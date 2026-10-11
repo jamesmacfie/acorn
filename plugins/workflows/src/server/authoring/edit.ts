@@ -89,25 +89,6 @@ const protectedSourceFor = (
   return before.length === 1 && changed.steps.filter(sameIdentity).length === 1 ? before[0] : undefined
 }
 
-/** Restores only protected child targets before grounding, so bindings are checked against the
- *  target the edit keeps. The rest of the protected configuration is restored after grounding. */
-export function restoreProtectedWorkflowTargets(current: WorkflowDef, changed: WorkflowDef): WorkflowDef {
-  return {
-    ...changed,
-    steps: changed.steps.map((step) => {
-      const before = protectedSourceFor(current, changed, step)
-      if (!before?.childWorkflow || step.agent) return step
-      return {
-        ...step,
-        childWorkflow: {
-          ...step.childWorkflow,
-          ref: before.childWorkflow.ref,
-        },
-      }
-    }),
-  }
-}
-
 const restoreTools = <T extends { allow?: unknown }>(current: T | undefined, changed: T | undefined): T | undefined =>
   current && Object.hasOwn(current, 'allow') ? ({ ...changed, allow: current.allow } as T) : changed
 

@@ -72,7 +72,7 @@ const railItem = (item: CommandSearchItem): PluginRailItem => ({
  * inherit an unrelated task: the descriptor chose which scope it is in, and this chooses what that
  * scope's identifier currently is.
  */
-export const commandRouteScope = (scope: CommandScope, context: CommandExecutionContext): CommandRouteScope => {
+const commandRouteScope = (scope: CommandScope, context: CommandExecutionContext): CommandRouteScope => {
   switch (scope) {
     case 'task':
       return context.taskId ? { taskId: context.taskId } : {}

@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 export const TASK_SCRIPT_OUTPUT_BYTES = 64 * 1024
-export const TASK_SCRIPT_QUERY_BYTES = 32 * 1024
-export const TASK_SCRIPT_WAIT_MS = 30_000
-export const taskScriptPhaseSchema = z.enum(['setup', 'teardown'])
-export const taskScriptStateSchema = z.enum([
+const TASK_SCRIPT_QUERY_BYTES = 32 * 1024
+const TASK_SCRIPT_WAIT_MS = 30_000
+const taskScriptPhaseSchema = z.enum(['setup', 'teardown'])
+const taskScriptStateSchema = z.enum([
   'not_started',
   'starting',
   'running',
@@ -14,7 +14,7 @@ export const taskScriptStateSchema = z.enum([
   'interrupted',
   'unknown',
 ])
-export const taskScriptReasonSchema = z.enum([
+const taskScriptReasonSchema = z.enum([
   'not_requested',
   'legacy_history',
   'admitted',
@@ -60,7 +60,7 @@ export const taskScriptsStatusSchema = z.object({
   attempts: z.array(taskScriptSnapshotSchema),
   attemptsTruncated: z.boolean(),
 })
-export const taskScriptSelectionSchema = z.strictObject({
+const taskScriptSelectionSchema = z.strictObject({
   phase: taskScriptPhaseSchema,
   attemptId: z.string().min(1).max(200).optional(),
 })
@@ -89,8 +89,6 @@ export type TaskScriptState = z.infer<typeof taskScriptStateSchema>
 export type TaskScriptReason = z.infer<typeof taskScriptReasonSchema>
 export type TaskScriptSnapshot = z.infer<typeof taskScriptSnapshotSchema>
 export type TaskScriptsStatus = z.infer<typeof taskScriptsStatusSchema>
-export type TaskScriptWaitInput = z.infer<typeof taskScriptWaitInputSchema>
-export type TaskScriptLogsInput = z.infer<typeof taskScriptLogsInputSchema>
 export type TaskScriptWait = z.infer<typeof taskScriptWaitSchema>
 export type TaskScriptLogs = z.infer<typeof taskScriptLogsSchema>
 export const taskScriptsRoute = (id: string) => `/v1/core/tasks/${encodeURIComponent(id)}/scripts`

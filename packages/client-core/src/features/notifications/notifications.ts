@@ -8,7 +8,7 @@ import { createSignal } from 'solid-js'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { homeNodeId } from '../../infra/node/fleet'
 
-export type NoticeKind = string
+type NoticeKind = string
 export type NoticeTarget = {
   kind: string
   resourceId: string

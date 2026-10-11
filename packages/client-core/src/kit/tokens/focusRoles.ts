@@ -137,7 +137,5 @@ export const NODE_FOCUS = {
  *  typing-exempt intents get past. `isTypingTarget` in @acorn/protocol/keybindings.ts is the DOM host's form of this. */
 export const OWNS_KEYS: readonly KitNode[] = ['Input', 'Textarea', 'Composer', 'MentionTextarea']
 
-export const focusRole = (node: KitNode): FocusRole => NODE_FOCUS[node]
-
 /** Every node the support matrix knows, so a test can walk both tables together. */
 export const KIT_NODES = Object.keys(NODE_SUPPORT) as KitNode[]

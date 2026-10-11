@@ -26,7 +26,7 @@ const holds = (node: Node, x: number, y: number): boolean =>
 
 /** The deepest node whose rectangle contains the cell, or nothing where the point is outside the
  *  tree altogether. */
-export function hit(node: Renderable, x: number, y: number): Renderable | null {
+function hit(node: Renderable, x: number, y: number): Renderable | null {
   if (node.props.visible === false || !holds(node, x, y)) return null
   for (let at = node.children.length - 1; at >= 0; at -= 1) {
     const child = node.children[at]!

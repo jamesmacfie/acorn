@@ -25,10 +25,7 @@ export {
   extensionPointRegistry,
   extensionRegistry,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-export type {
-  ExtensionContribution,
-  ExtensionPointContribution,
-} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export type { ExtensionContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // Hover and diagnostics providers by language, for an owner's test that needs one present. The chrome
 // pass fills it from `contributions.documentServices` in production.
 export { documentServiceRegistry } from '@acorn/client-core/host/registries/panes'
@@ -45,7 +42,6 @@ export { provideClientCapability } from '@acorn/client-core/infra/node'
 // test. This is how a pane test sees exactly what the sandbox would post, with no worker and no host on
 // the other side. Production code never builds one; the SDK's `mountTree` does, per slot.
 export { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
-export type { RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
 
 // Client host state used by plugin tests.
 export {

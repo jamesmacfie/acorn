@@ -185,7 +185,7 @@ const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteL
 /** Does this value fit the overlay conversation's ceiling, and is it something structured clone would
  *  have carried anyway? A cycle or a BigInt fails both questions at once, which is why one `try` answers
  *  them together. */
-export const withinOverlayBudget = (value: unknown): boolean => {
+const withinOverlayBudget = (value: unknown): boolean => {
   try {
     return utf8Bytes(JSON.stringify(value ?? null) ?? 'null') <= MAX_OVERLAY_INPUT_BYTES
   } catch {

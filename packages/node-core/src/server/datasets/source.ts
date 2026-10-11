@@ -21,7 +21,7 @@ import {
   type DatasetDefinition,
 } from './store'
 
-export const datasetSourceId = (id: string) => `dataset:${id}`
+const datasetSourceId = (id: string) => `dataset:${id}`
 export const datasetIdFromSource = (sourceId: string): string | null =>
   sourceId.startsWith('dataset:') ? sourceId.slice(8) : null
 

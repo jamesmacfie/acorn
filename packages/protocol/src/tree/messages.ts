@@ -5,10 +5,7 @@
 // events are the kit's twelve semantic names rather than keys or pointers, so a terminal host maps
 // its own keys onto them.
 import { z } from 'zod'
-import { KIT_EVENTS } from './nodes.ts'
-import type { PluginFrameContext } from '../plugin/bridge.ts'
 
-export { TREE_PROTOCOL_VERSION } from './nodes.ts'
 import { propValue } from './props.ts'
 
 /**
@@ -54,7 +51,7 @@ export const TREE_LIMITS = {
  * Two operations, not a dispatcher. Each is a different question with a different grant behind it, and
  * neither takes a plugin, point or slot id: the host addresses the request from the port and the slot
  * it arrived on, so there is nothing here for plugin code to forge. */
-export const TREE_HOST_OPS = ['owner.invoke', 'overlay.open'] as const
+const TREE_HOST_OPS = ['owner.invoke', 'overlay.open'] as const
 export type TreeHostOp = (typeof TREE_HOST_OPS)[number]
 
 const nodeId = z.string().min(1).max(64)
@@ -66,7 +63,7 @@ const props = z.record(z.string().min(1).max(64), propValue)
 // the whole batch. That is docs/plugins.md's forward-compatibility rule applied to nodes.
 export type TreeNode = { id: string; type: string; props: Record<string, unknown>; children: TreeNode[] }
 
-export const treeNode: z.ZodType<TreeNode> = z.lazy(() =>
+const treeNode: z.ZodType<TreeNode> = z.lazy(() =>
   z.object({
     id: nodeId,
     type: z.string().min(1).max(64),
@@ -134,44 +131,6 @@ export const sandboxMessage = z.discriminatedUnion('kind', [
     payload: z.unknown().optional(),
   }),
 ])
-export type TreeSandboxMessage = z.infer<typeof sandboxMessage>
-
-/** Host to sandbox. A second `tree:mount` for a slot already mounted is a props update, which is what
- *  keeps a tool card's redraw one message rather than a teardown. */
-export const hostMessage = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('tree:mount'),
-    slot: slotId,
-    entry: z.string().min(1).max(64),
-    props: z.unknown(),
-    slotBridge: z.literal(1).optional(),
-    context: z.custom<PluginFrameContext>().optional(),
-    bridgePort: z.custom<MessagePort>().optional(),
-  }),
-  z.object({ kind: z.literal('tree:unmount'), slot: slotId }),
-  z.object({
-    kind: z.literal('tree:event'),
-    slot: slotId,
-    handler: z.number().int().positive(),
-    event: z.enum(KIT_EVENTS),
-    payload: z.unknown(),
-  }),
-  z.object({ kind: z.literal('tree:ping') }),
-  // The answer to one `tree:host-request`. `ok` picks the arm rather than a second discriminator,
-  // because this union already discriminates on `kind`.
-  //
-  // The failure arm is a code and a sentence, never a host stack: what went wrong on this side of the
-  // port is not something a contributor gets to read.
-  z.object({
-    kind: z.literal('tree:host-reply'),
-    slot: slotId,
-    id: z.number().int().positive(),
-    ok: z.boolean(),
-    body: z.unknown().optional(),
-    error: z.object({ code: z.string().min(1).max(64), message: z.string().max(1_000) }).optional(),
-  }),
-])
-export type TreeHostMessage = z.infer<typeof hostMessage>
 
 /** Reject oversized or over-deep structured-clone input before a recursive wire schema sees it.
  *  The sandbox is accepted plugin code, but its size claims are not an authority. */

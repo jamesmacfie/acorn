@@ -10,7 +10,7 @@
 import type { RailLegendItem, RailMarkerDot, RailTone } from '../../kit/tokens/rail'
 
 // Keep these names on the feature entrypoint for compiled plugins and the plugin API.
-export type { RailLegendItem, RailMarkerDot, RailTone } from '../../kit/tokens/rail'
+export type { RailMarkerDot, RailTone } from '../../kit/tokens/rail'
 
 export type RailMarkerPosition =
   | 'top-start'
@@ -21,7 +21,7 @@ export type RailMarkerPosition =
   // sits under the main glyph rather than in a corner, and two things there read as one broken one.
   | 'bottom-center'
 
-export const RAIL_MARKER_POSITIONS: readonly RailMarkerPosition[] = [
+const RAIL_MARKER_POSITIONS: readonly RailMarkerPosition[] = [
   'top-start',
   'top-end',
   'bottom-start',
@@ -42,7 +42,7 @@ export type RailMarker = {
   priority?: number
 }
 
-export type PlacedRailMarker = RailMarker & { position: RailMarkerPosition }
+type PlacedRailMarker = RailMarker & { position: RailMarkerPosition }
 
 export type ResolvedRailMarkers = {
   placed: readonly PlacedRailMarker[]
@@ -51,7 +51,7 @@ export type ResolvedRailMarkers = {
 
 // Contributed markers are clamped into this range so a plugin can order its own markers among
 // themselves without outranking a core lifecycle state. Host priorities live above it.
-export const RAIL_MARKER_PLUGIN_MAX_PRIORITY = 100
+const RAIL_MARKER_PLUGIN_MAX_PRIORITY = 100
 
 export function clampMarkerPriority(priority: number | undefined): number {
   if (typeof priority !== 'number' || !Number.isFinite(priority)) return 0

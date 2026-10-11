@@ -36,7 +36,7 @@ export const LARGE_SURFACE_PROFILES: Record<
 }
 
 /** A review note on one line, in the Changes plugin's own vocabulary. */
-export type LargeDiffNote = {
+type LargeDiffNote = {
   path: string
   side: 'additions' | 'deletions'
   line: number

@@ -19,7 +19,7 @@ export type SentryValidated = { dsn: SentryDsn; environment: string; release: st
 
 /** What `config` holds on the connection row: non-secret, provider-owned, and read back on every
  *  flush. A staging project is a second row rather than a mode, because these live here. */
-export type SentryConnectionConfig = { host: string; projectId: string; environment: string; release: string }
+type SentryConnectionConfig = { host: string; projectId: string; environment: string; release: string }
 
 const trimmed = (value: string | undefined): string => (value ?? '').trim()
 

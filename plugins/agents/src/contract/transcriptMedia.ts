@@ -20,7 +20,7 @@ export const AGENT_TRANSCRIPT_ATTACHMENT_POINT = 'agents:transcript-attachment'
  *  row stay this plugin's. */
 export const AGENT_ARTIFACT_POINT = 'agents:artifact'
 
-export type TranscriptMediaKind = 'attachment' | 'artifact'
+type TranscriptMediaKind = 'attachment' | 'artifact'
 
 export type TranscriptMedia = {
   kind: TranscriptMediaKind
@@ -47,7 +47,7 @@ export const transcriptMediaType = (mediaType?: string | null): string =>
 /** The binary bridge's cap, so any bytes this returns fit through `bridge.api.getBytes`. */
 export const MAX_TRANSCRIPT_MEDIA_READ_BYTES = MAX_PLUGIN_BYTES
 
-export type TranscriptMediaReadInput = {
+type TranscriptMediaReadInput = {
   taskId: string
   sessionId: string
   kind: TranscriptMediaKind

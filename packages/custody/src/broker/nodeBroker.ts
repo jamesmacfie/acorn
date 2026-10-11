@@ -607,7 +607,7 @@ export function pinnedTlsOptions(fingerprint: string | undefined, certPem: strin
   }
 }
 
-export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
+const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
 export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
 

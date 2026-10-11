@@ -6,7 +6,7 @@ import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { AgentCheck } from '../../shared/delegationSchemas'
 import * as schema from '../../node/schema'
 
-export type AgentSpawnState = 'creating' | 'provisioned' | 'failed'
+type AgentSpawnState = 'creating' | 'provisioned' | 'failed'
 export type AgentSpawnIsolation = 'shared' | 'worktree'
 
 export type AgentSpawn = {

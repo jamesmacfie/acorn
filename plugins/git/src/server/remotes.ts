@@ -5,8 +5,8 @@ import { repositoryFor } from './history'
 import { canonicalPath } from './worktreeRoster'
 
 type Core = Pick<CompiledCoreServices, 'git' | 'projects' | 'repositoryMetadata'>
-export const REMOTE_TIMEOUT_MS = 120_000
-export const REMOTE_FETCH_ARGS = [
+const REMOTE_TIMEOUT_MS = 120_000
+const REMOTE_FETCH_ARGS = [
   '-c',
   'protocol.allow=never',
   '-c',

@@ -27,7 +27,7 @@ export function readDockerPrefs(prefs: Record<string, string> | undefined): Dock
   }
 }
 
-export const saveDockerPrefs = (qc: QueryClient, next: DockerPrefs): Promise<boolean> =>
+const saveDockerPrefs = (qc: QueryClient, next: DockerPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.dockerPrefs, next)
 
 /**

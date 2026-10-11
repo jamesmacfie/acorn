@@ -61,7 +61,6 @@ const result = (rows: NodePluginRow[], decision?: 'accepted' | 'rejected', reach
     rows,
     reachable,
     stale: !reachable,
-    generation: 1,
     observedAt: 1,
   }
   return derivePluginDistribution(new Map([['a', observation]]), host(decision), 1, PLUGIN_API_MAJOR)

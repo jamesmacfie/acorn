@@ -7,7 +7,7 @@
 
 /** The character that opens a completion. `@` for a name or a path, `/` for a command, `$` for a
  *  skill: the field never assumes which, and takes the set from whoever declared the sources. */
-export type MentionSigil = string
+type MentionSigil = string
 
 export type ActiveMention = {
   sigil: MentionSigil

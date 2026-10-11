@@ -22,7 +22,7 @@ export const workflowOutputSchema = (
 const unescapePointer = (value: string) => value.replace(/~1/g, '/').replace(/~0/g, '~')
 
 /** Resolve the bounded structural-schema subset with the same JSON Pointer vocabulary bindings use. */
-export function schemaAtPointer(schema: DataSchema | undefined, pointer: string): DataSchema | undefined {
+function schemaAtPointer(schema: DataSchema | undefined, pointer: string): DataSchema | undefined {
   if (!schema || !pointer) return schema
   if (!pointer.startsWith('/')) return undefined
   let current: DataSchema | undefined = schema

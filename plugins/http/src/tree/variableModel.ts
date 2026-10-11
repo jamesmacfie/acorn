@@ -19,7 +19,7 @@ const subjects = new Map<string, Entry[]>()
 // Mixed-version path until 2026-12-31.
 const legacy = new WeakMap<HttpClient, number>()
 let sequence = 0
-export function variableScope(client: HttpClient, projectId: string): string {
+function variableScope(client: HttpClient, projectId: string): string {
   let id = legacy.get(client)
   if (!id) {
     id = ++sequence

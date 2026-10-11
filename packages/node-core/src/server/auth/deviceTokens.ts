@@ -32,9 +32,9 @@ const sha256 = (input: string): Buffer => createHash('sha256').update(input).dig
 
 // The wire shape lives in @acorn/protocol because the device list is an owner-facing response
 // (GET /v1/core/devices); this alias keeps the name every call site here already uses.
-export type DeviceSummary = PairedDevice
+type DeviceSummary = PairedDevice
 
-export type IssuedDevice = { token: string; device: DeviceSummary }
+type IssuedDevice = { token: string; device: DeviceSummary }
 
 export type DeviceService = {
   issue(name: string): Promise<IssuedDevice>

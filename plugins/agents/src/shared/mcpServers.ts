@@ -37,10 +37,6 @@ const MAX_TEXT = 4_096
 
 export type AgentMcpTransport = 'stdio' | 'http'
 
-/** An environment variable or header as the form sends it. A secret with no `value` keeps the stored
- *  one, so an edit never has to see a secret to leave it alone. */
-export type AgentMcpPairInput = { name: string; value?: string; secret: boolean }
-
 /** An environment variable or header as the node returns it. A secret's value is always `null`. */
 export type AgentMcpPair = { name: string; value: string | null; secret: boolean }
 

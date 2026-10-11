@@ -73,7 +73,7 @@ export const inputScope = (scope: DataSourceScope, binding: DataSourceInputBindi
 })
 
 /** The registered source an input names, if it may be one: static, not discovered. */
-export function inputSource(input: DataSourceInput): RegisteredDataSource | undefined {
+function inputSource(input: DataSourceInput): RegisteredDataSource | undefined {
   const source = registeredDataSource(parseDataSourceInputRef(input.source))
   return source && !dataSourceDiscovered(source) ? source : undefined
 }

@@ -112,8 +112,6 @@ export type EditorControllerInput = {
   prefs: () => Record<string, string> | undefined
 }
 
-export type EditorController = ReturnType<typeof createEditorController>
-
 // What the editor pane does, apart from drawing it. It owns one reused CodeMirror view, the pooled
 // documents behind the tabs, disk reads, saves, and navigation (docs/editor.md § Pages). Call it
 // from the pane's body or from a test's `createRoot`. Its effects and cleanups belong to the

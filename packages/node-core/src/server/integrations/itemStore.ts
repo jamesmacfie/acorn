@@ -3,10 +3,10 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 
 /** One cached external item: the provider's opaque envelope plus when it was last written. */
-export type ExternalItemRow = { integrationId: string; identifier: string; data: string; fetchedAt: number }
+type ExternalItemRow = { integrationId: string; identifier: string; data: string; fetchedAt: number }
 
 /** One provider-owned child payload of an item (a Rollbar occurrence list, an occurrence detail). */
-export type ExternalResourceRow = { identifier: string; data: string; fetchedAt: number }
+type ExternalResourceRow = { identifier: string; data: string; fetchedAt: number }
 
 export type ExternalItemStore = {
   /** One item within one connection. */
@@ -106,9 +106,7 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
       // `inArray` and die as a malformed-SQL error three layers down. Say what is actually wrong
       // instead.
       if (!Array.isArray(identifiers)) {
-        throw new TypeError(
-          `listByIdentifier takes an array of identifiers — got ${typeof identifiers}. A plugin bundle built before the store was provider-scoped needs rebuilding (build:plugin).`,
-        )
+        throw new TypeError(`listByIdentifier takes an array of identifiers — got ${typeof identifiers}.`)
       }
       // `inArray` with an empty list is a SQL syntax error in SQLite rather than an empty result, and
       // the caller legitimately reaches here with nothing to resolve.

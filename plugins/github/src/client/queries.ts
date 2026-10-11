@@ -27,8 +27,6 @@ import {
   jobLogRoute,
   mentionsKey,
   mentionsRoute,
-  pinsKey,
-  pinsRoute,
   pullDiffKey,
   pullDiffRoute,
   pullKey,
@@ -145,12 +143,6 @@ export const repoLabelsOptions = (owner: string, repo: string, enabled: boolean)
   staleTime: 5 * 60 * 1000,
   queryFn: async ({ signal }: QueryContext): Promise<Label[]> =>
     readJson<Label[]>(repoLabelsRoute(owner, repo), { signal }),
-})
-
-export const pinsOptions = (enabled: boolean) => ({
-  queryKey: pinsKey,
-  enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<number[]> => readJson<number[]>(pinsRoute, { signal }),
 })
 
 // The pull's files as the diff viewer's document: descriptors only, no patch text.

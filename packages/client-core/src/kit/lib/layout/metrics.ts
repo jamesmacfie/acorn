@@ -9,7 +9,7 @@
 // font swap that lies about itself.
 
 /** Resolve a length token to a number of pixels, falling back if it is unset or non-numeric. */
-export const cssPx = (name: string, fallback: number): number => {
+const cssPx = (name: string, fallback: number): number => {
   if (typeof document === 'undefined') return fallback
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name)
   const n = Number.parseFloat(raw)

@@ -35,7 +35,7 @@ export const MAX_COUNTED_MATCHES = 1000
 type Matches = { ranges: { from: number; to: number }[]; more: boolean }
 
 /** Every match of a query, using the engine's own cursor so the semantics cannot drift from its own. */
-export function findMatches(state: EditorState, query: SearchQuery): Matches {
+function findMatches(state: EditorState, query: SearchQuery): Matches {
   const ranges: Matches['ranges'] = []
   const cursor = query.getCursor(state)
   for (let next = cursor.next(); !next.done; next = cursor.next()) {

@@ -1,21 +1,16 @@
 import { z } from 'zod'
-import {
-  queryReferenceSchema,
-  queryScopeSchema,
-  type QueryReference,
-  type QueryScope,
-} from '../data/queries/dataQueries'
+import { queryReferenceSchema, queryScopeSchema, type QueryScope } from '../data/queries/dataQueries'
 import { parseDataPredicate, type DataPredicate } from '../data/values/dataBindings'
 import { parseDataValue, type DataValue } from '../data/values/dataValues'
 import { dashboardViewSchema } from './dashboardViews'
 
-export { dashboardViewKinds, dashboardViewSchema, type DashboardView } from './dashboardViews'
+export { type DashboardView } from './dashboardViews'
 
 const id = z.string().min(1).max(200)
 const label = z.string().min(1).max(200)
 const pointer = z.string().refine((value) => value === '' || value.startsWith('/'), 'Expected a JSON Pointer')
 
-export const dashboardMappingSchema = z
+const dashboardMappingSchema = z
   .object({
     columns: z
       .array(
@@ -40,7 +35,7 @@ export const dashboardMappingSchema = z
   .strict()
 
 /** The panel field ids dashboards-core projects a mapped panel onto. */
-export const dashboardPanelFieldIds = ['title', 'status', 'assignee', 'updated', 'url', 'source'] as const
+const dashboardPanelFieldIds = ['title', 'status', 'assignee', 'updated', 'url', 'source'] as const
 
 const dashboardPanelContentObject = z
   .object({
@@ -66,19 +61,19 @@ type DashboardContentShape = z.infer<typeof dashboardPanelContentObject>
 
 /** The same test `isMapped` in dashboards-core applies to the projected sources: a mapped panel's
  * schema is the panel field vocabulary, an unmapped one passes its source's fields through. */
-export const isMappedDashboard = (content: Pick<DashboardContentShape, 'queries' | 'mapping'>): boolean =>
+const isMappedDashboard = (content: Pick<DashboardContentShape, 'queries' | 'mapping'>): boolean =>
   content.queries.length > 1 ||
   content.mapping.columns.length > 0 ||
   content.queries.some((query) => !!content.mapping.fields[query.id] || !!content.mapping.values[query.id])
 
 /** `display.fields` and `display.groupBy` name a panel field on a mapped panel and a source pointer
  * otherwise, because those are the ids each projected schema carries. */
-export const dashboardDisplayRefFits = (mapped: boolean, ref: string): boolean =>
+const dashboardDisplayRefFits = (mapped: boolean, ref: string): boolean =>
   mapped ? (dashboardPanelFieldIds as readonly string[]).includes(ref) : ref === '' || ref.startsWith('/')
 
 /** Drops display references that the panel's mapping state can't resolve. A reference that no longer
  * fits shows nothing, so dropping it keeps the draft saveable without changing what it draws. */
-export function fitDashboardDisplay<T extends DashboardContentShape>(content: T): T {
+function fitDashboardDisplay<T extends DashboardContentShape>(content: T): T {
   const mapped = isMappedDashboard(content)
   const fields = content.display.fields.filter((ref) => dashboardDisplayRefFits(mapped, ref))
   const { groupBy, ...display } = content.display
@@ -394,7 +389,7 @@ export const panelPlanSchema = z
   .strict()
 export type PanelPlan = z.infer<typeof panelPlanSchema>
 export type PanelPlanColumn = PanelPlan['columns'][number]
-export const dashboardContentSchema = z.union([panelPlanSchema, dashboardPanelContentSchema])
+const dashboardContentSchema = z.union([panelPlanSchema, dashboardPanelContentSchema])
 export type DashboardContent = PanelPlan | DashboardPanelContent
 
 /** A stored row may name a source pointer on a mapped panel. Reading it drops what can't resolve,
@@ -405,7 +400,6 @@ export const storedDashboardPanelContentSchema = dashboardPanelContentObject
 
 export type DashboardMapping = z.infer<typeof dashboardMappingSchema>
 export type DashboardPanelContent = z.infer<typeof dashboardPanelContentSchema>
-export type DashboardPanelQuery = { id: string; label: string; reference: QueryReference }
 export type DashboardScope = QueryScope
 export type DashboardDraft = QueryScope & {
   id: string
@@ -464,4 +458,3 @@ export const dashboardLibraryRequestSchema = z.discriminatedUnion('operation', [
     .strict(),
   z.object({ operation: z.literal('delete'), scope: queryScopeSchema, id, expectedRevision: revision }).strict(),
 ])
-export type DashboardLibraryRequest = z.infer<typeof dashboardLibraryRequestSchema>

@@ -109,12 +109,12 @@ export class WorkflowValidationError extends Error {
   }
 }
 
-export function templateReferences(prompt: string | undefined): string[] {
+function templateReferences(prompt: string | undefined): string[] {
   if (!prompt) return []
   return [...prompt.matchAll(TEMPLATE_RE)].map((match) => match[1])
 }
 
-export function inputReferences(prompt: string | undefined): string[] {
+function inputReferences(prompt: string | undefined): string[] {
   if (!prompt) return []
   return [...prompt.matchAll(INPUT_RE)].map((match) => match[1])
 }
@@ -142,7 +142,7 @@ function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
  * conditions). The step runs as a managed session, and the check runs through the same harness's
  * one-shot mode. The length is checked again after rendering, when bindings have been filled in.
  */
-export function goalProblems(
+function goalProblems(
   label: string,
   goal: unknown,
   profileId: string,

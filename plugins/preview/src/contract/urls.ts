@@ -1,6 +1,6 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
-export type PreviewUrlSource = 'run-target' | 'config' | 'script' | 'recipe'
+type PreviewUrlSource = 'run-target' | 'config' | 'script' | 'recipe'
 
 export type PreviewUrlState = {
   taskId: string

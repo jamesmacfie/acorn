@@ -4,7 +4,7 @@ export type {
   DashboardDisplayRow,
   DashboardDisplaySchema,
 } from '../display.ts'
-export { formatRelativeTime } from '../relativeTime.ts'
+
 export {
   COMPARE_LABELS,
   SPARK_BOX,

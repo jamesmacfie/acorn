@@ -12,13 +12,7 @@ export type WorkflowRunStatus =
   | 'cancelled'
 export type WorkflowGateStatus = 'waiting-gate' | 'done' | 'failed' | 'cancelled'
 
-export type WorkflowRunChangedEvent = {
-  taskId: string
-  runId: string
-  status: WorkflowRunStatus
-}
-
-export type WorkflowGateChangedEvent = {
+type WorkflowGateChangedEvent = {
   taskId: string
   runId: string
   stepId: string
@@ -30,7 +24,7 @@ export type WorkflowChildChangedEvent = WorkflowChildRunSummary & {
   ownerTaskId: string
 }
 
-export type WorkflowGateRecord = WorkflowGateChangedEvent & { name: string }
+type WorkflowGateRecord = WorkflowGateChangedEvent & { name: string }
 
 /** Rebuild a task's approval inbox after reconnecting or missing a gate event. */
 export type WorkflowGatesCapability = {

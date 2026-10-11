@@ -209,7 +209,7 @@ export type PluginApprovalRequest = {
 
 // `requests` is optional so this response type could gain the field without a query-key bump
 // (docs/caching.md). Every `acorn-1` Node sends it.
-export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
+export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests: PluginApprovalRequest[] }
 
 // Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory
 // on the node's filesystem, allowed on every build and symlinked rather than copied, so it's the one

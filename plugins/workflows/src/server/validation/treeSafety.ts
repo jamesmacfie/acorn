@@ -6,8 +6,8 @@ import type { ToolCeiling, WorkflowBudget, WorkflowRunRow, WorkflowStepRow } fro
 import * as schema from '../../node/schema'
 import { intersectToolCeilings } from '../steps/tools'
 
-export const MAX_WORKFLOW_DESCENDANTS = 500
-export const DEFAULT_WORKFLOW_DESCENDANTS = 100
+const MAX_WORKFLOW_DESCENDANTS = 500
+const DEFAULT_WORKFLOW_DESCENDANTS = 100
 
 export function descendantLimit(def: { maxDescendants?: number }): number {
   return Math.min(MAX_WORKFLOW_DESCENDANTS, def.maxDescendants ?? DEFAULT_WORKFLOW_DESCENDANTS)

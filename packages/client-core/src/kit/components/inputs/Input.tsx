@@ -3,7 +3,7 @@ import { assistAttrs, claimField, controlAttrs, type ControlOwn } from './contro
 
 /** The text-entry kinds a control may be. No `file`, no `range`, no `color`: each of those is a
  *  different control wearing an input's clothes. */
-export type InputType = 'text' | 'search' | 'password' | 'email' | 'url' | 'number' | 'date' | 'time'
+type InputType = 'text' | 'search' | 'password' | 'email' | 'url' | 'number' | 'date' | 'time'
 
 export type InputProps = ControlOwn & {
   value?: string | number

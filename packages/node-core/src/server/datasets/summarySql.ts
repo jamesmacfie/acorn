@@ -62,7 +62,7 @@ function mappedColumn(plan: PanelPlan, sourceId: string, description: DataSource
   return { text: expression, params }
 }
 
-export function baseSql(
+function baseSql(
   dataset: DatasetDefinition,
   plan: PanelPlan,
   sourceId: string,

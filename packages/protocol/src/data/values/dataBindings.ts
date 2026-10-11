@@ -51,7 +51,7 @@ export type DataBindingAddress = z.infer<typeof addressSchema>
 export type DataBinding = z.infer<typeof dataBindingSchema>
 export const DATA_OPERATORS = ['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'contains', 'in', 'missing', 'present'] as const
 export type DataOperator = (typeof DATA_OPERATORS)[number]
-export const dataFieldSchema = z
+const dataFieldSchema = z
   .object({
     pointer: dataPointerSchema,
     label: z.string().min(1).max(DATA_LIMITS.labelChars),

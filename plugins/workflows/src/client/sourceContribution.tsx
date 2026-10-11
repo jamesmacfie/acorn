@@ -20,12 +20,10 @@ const WorkflowsBrowseDetail = lazy(() =>
 )
 const WorkflowEditor = lazy(() => import('./editor/WorkflowEditor'))
 
-export { WORKFLOWS_SOURCE_ID, WORKFLOWS_SURFACE_ID, WORKFLOWS_SURFACE_PATH, workflowsSurfacePath } from './surfacePath'
-
 // Registered as a source route as well as a surface, so the terminal's "which source owns this path"
 // question has an answer and the shell keeps Workflows selected when the address is a definition
 // (`sourceIdForPath`).
-export const workflowsRouteContributions: readonly SourceRouteContribution[] = [
+const workflowsRouteContributions: readonly SourceRouteContribution[] = [
   { id: 'workflows.editor', path: WORKFLOWS_SURFACE_PATH, order: 30 },
 ]
 
