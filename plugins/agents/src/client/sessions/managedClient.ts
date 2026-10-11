@@ -126,6 +126,7 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(`${ROOT}/transcript-imports`, 'POST', input),
   // `fold=1`: this reader takes one record per tool call and pages on from `foldedThroughSeq`
   // (`foldToolEvents`). A node that predates it ignores the flag and sends every row.
+  // Mixed-version path until 2026-12-24.
   snapshot: (sessionId: string, afterSeq = 0, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
   referenceContext: (sessionId: string, taskId: string, options: AgentOrigin = {}) =>

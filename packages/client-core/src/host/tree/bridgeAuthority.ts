@@ -57,7 +57,8 @@ export const treeModelAuthorityKey = (
     document ? identity(refreshTreeDocumentGrant(document).generation) : 0,
   ])
 
-/** Legacy global connect().context retains its immutable initial selection as well as its grants. */
+/** Legacy global connect().context retains its immutable initial selection as well as its grants.
+ *  Mixed-version path until 2026-12-30. */
 export const treeAuthorityKey = (
   hash: string,
   qc: QueryClient,

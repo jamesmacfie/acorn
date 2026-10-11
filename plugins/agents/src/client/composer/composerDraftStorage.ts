@@ -9,6 +9,8 @@ export const composerDraftKey = (nodeId: string | null, sessionId: string): stri
   `acorn.agent-payload.${JSON.stringify([nodeId, sessionId])}`
 const fields: readonly DraftField[] = ['text', 'attachmentIds', 'contexts']
 const fieldKey = (key: string, field: DraftField) => `${key}.${field}`
+// Where an earlier build kept a draft, keyed by session alone. Reading a draft there moves it.
+// Mixed-version path until 2026-12-31.
 const legacyKeys = (id: string) => [
   `acorn.agent-draft.${id}`,
   `acorn.agent-attachments.${id}`,

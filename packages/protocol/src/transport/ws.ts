@@ -69,7 +69,7 @@ export type WsSendOptions = { intent?: WsSubscriptionIntent; cleanup?: boolean }
 //
 // The node tags the session id. On an opted-in events socket it adds the logical viewer id around
 // that frame; the broker removes that routing layer. The helper then tags the node id around the
-// unchanged session frame. Legacy Node peers always retain the original session-id layout.
+// unchanged session frame. A socket that didn't opt in keeps the plain session-id layout.
 //
 // A binary frame carries no `seq` and consumes none. The sequence is the invalidation channel's
 // gap detector (`WsServerWireFrame` above), and terminal output is not part of it.

@@ -86,6 +86,7 @@ export const editorApiForNode = (nodeId: string | null): EditorApi => ({
       { nodeId },
     )
     // An old Node ignores the added query parameter and returns an unverifiable array.
+    // Mixed-version path until 2026-12-31.
     return !Array.isArray(result) && result.revision === revision ? result : null
   },
   entry: (taskId, path) => readJson<FileTarget>(editorEntryRoute(taskId, path), { nodeId }),

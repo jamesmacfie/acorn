@@ -24,7 +24,7 @@ const log = createLogger('node-keys')
 // new signing key, because any agent that ran before could have read the old one. Nothing re-signs
 // with the old key: the Node writes fresh token files for the terminal sessions it reattaches, and an
 // agent session gets one when its process starts. A plain `internal-token` is never read, so one an
-// agent writes can't sign a token file the Node then trusts.
+// agent writes can't sign a token file the Node then trusts. Mixed-version path until 2027-01-09.
 
 const PLAIN_SESSION_KEY = 'session.key'
 const PLAIN_SIGNING_KEY = 'internal-token'

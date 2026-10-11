@@ -186,6 +186,8 @@ export function runTreeChannel(
       port.postMessage({ kind: 'tree:failed', slot: id, message: `no renderer named '${entry}'` })
       return
     }
+    // A legacy host passes no bridge per mount, so its trees share the bootstrap bridge.
+    // Mixed-version path until 2026-12-30.
     if ((!bridgePort || typeof bridgePort.postMessage !== 'function') && fallbackBridge?.treeBridgeMode !== 'legacy') {
       port.postMessage({ kind: 'tree:failed', slot: id, message: 'this tree has no scoped bridge' })
       return

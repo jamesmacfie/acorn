@@ -189,6 +189,8 @@ export class NodeBroker {
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
       const parsed = nodeInfoSchema.safeParse(payload)
       if (parsed.success) {
+        // A Node that doesn't advertise viewers predates them, so even a multiplexing broker keeps the
+        // single-viewer transport for it. Mixed-version path until 2026-12-30.
         connection.viewers.setTransport(this.viewerMultiplexing && parsed.data.eventTransport?.viewers === 1)
         return parsed.data.protocolVersion === NODE_PROTOCOL_VERSION
       }
@@ -295,10 +297,10 @@ export class NodeBroker {
     const connection = this.connections.get(nodeId)
     if (!connection) return
     const id = viewerId ?? connection.viewers.defaultId
-    const resetLegacy = connection.viewers.retire(id)
+    const resetSingle = connection.viewers.retire(id)
     if (connection.ws?.readyState !== WebSocket.OPEN) return
     if (connection.viewers.multiplexed) connection.ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: id }))
-    else if (resetLegacy) connection.ws.terminate()
+    else if (resetSingle) connection.ws.terminate()
   }
 
   private openSocket(connection: Connection): void {
@@ -404,7 +406,7 @@ export class NodeBroker {
     connection.lastSeenAt = Date.now()
     const frame = Array.isArray(data) ? Buffer.concat(data as Buffer[]) : (data as Buffer)
     if (!connection.viewers.multiplexed)
-      return this.events.bytes(connection.node.nodeId, frame, connection.viewers.legacyRecipient())
+      return this.events.bytes(connection.node.nodeId, frame, connection.viewers.singleRecipient())
     const tagged = decodeIdFrame(frame)
     if (!tagged || !wsViewerIdSchema.safeParse(tagged.id).success) return
     this.events.bytes(connection.node.nodeId, tagged.payload, connection.viewers.externalId(tagged.id))
@@ -467,7 +469,7 @@ export class NodeBroker {
       this.events.frame(
         connection.node.nodeId,
         frame,
-        connection.viewers.multiplexed ? undefined : connection.viewers.legacyRecipient(),
+        connection.viewers.multiplexed ? undefined : connection.viewers.singleRecipient(),
       )
   }
 

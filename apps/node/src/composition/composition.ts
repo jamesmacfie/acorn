@@ -50,7 +50,7 @@ export type NodeComposition = {
 // installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   // An older data root can hold a `changes` database. The git plugin owns those review notes, so they
-  // move to git's database before any plugin opens one.
+  // move to git's database before any plugin opens one. Mixed-version path until 2027-01-09.
   if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git'))
     pluginLog.info('moved the changes plugin database to git')
   const builtins = nodePlugins(dataDir, deps)

@@ -21,7 +21,7 @@ asynchronous failure inside its connection.
 
 ## Logical event viewers
 
-Legacy upgrades keep raw JSON channel frames and the terminal binary layout: 36 ASCII session UUID
+A single-viewer upgrade keeps raw JSON channel frames and the terminal binary layout: 36 ASCII session UUID
 bytes, then the payload. `NodeBroker` uses this transport by default, the terminal client included.
 The desktop helper opts in to viewers when the Node advertises viewer version 1
 ([versioning](./transport.md#versioning)).
@@ -48,7 +48,7 @@ Removing a viewer, removing a Node, or disposing the connection clears their own
 
 The helper declares the selected Node with a nested `ws:viewer-open` lease. Selecting another Node
 closes the old lease, and returning from cached UI state opens a fresh one. Fleet HTTP reads never
-open leases. On a legacy Node only one viewer can hold the events lease. Another gets
+open leases. On a Node that predates viewers, only one viewer can hold the events lease. Another gets
 `viewers_unsupported` through the client's transport-error seam, and the first keeps working. Closing
 that lease reconnects the physical socket to retire resources the old Node can't close one by one.
 

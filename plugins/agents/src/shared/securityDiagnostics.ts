@@ -14,7 +14,8 @@ export type SecurityFinding = {
   severity: SecuritySeverity
   source: string
   summary: string
-  /** Human-readable result; the full evidence remains in summary and limits. Optional for older Nodes. */
+  /** Human-readable result; the full evidence remains in summary and limits. Optional for older Nodes.
+   *  Mixed-version path until 2027-01-07. */
   description?: string
   title?: string
   facts?: Array<{ label: string; value: string }>

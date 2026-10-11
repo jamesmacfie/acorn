@@ -1,5 +1,6 @@
-// Bundle module lifetime and mounted authority are separate owners. Modern SDKs share one worker;
-// legacy SDKs use one immutable mounted slot per worker and retain no idle authority.
+// Bundle module lifetime and mounted authority are separate owners. Modern SDKs share one worker.
+// Legacy SDKs, in bundles built before the shared worker, use one immutable mounted slot per worker
+// and retain no idle authority. Mixed-version path until 2026-12-30.
 import {
   PLUGIN_BRIDGE_VERSION,
   type PluginFrameContext,

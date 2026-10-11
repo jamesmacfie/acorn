@@ -59,7 +59,7 @@ const rollbarProjectSource: ProviderProjectSource = {
   list({ connection }) {
     const config = parseJson(connection.config)
     const projectId = isRecord(config) && typeof config.projectId === 'string' ? config.projectId : null
-    // No project id means the row predates `normalize` writing one. An invented id would become a
+    // No project id means a connection row `normalize` didn't write. An invented id would become a
     // database row, so offer none.
     return Promise.resolve(projectId ? [{ id: projectId, label: connection.label }] : [])
   },

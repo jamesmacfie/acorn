@@ -111,9 +111,8 @@ export const disclosureSchema = z.object({
     )
     .max(64)
     .default([]) as z.ZodType<PluginNavigationDestinationGrant[]>,
-  // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
-  // disclosure with no such field, and refusing it would put a decision beyond recording, which is
-  // the re-queueing loop the split exists to prevent.
+  // Defaulted, not required. Every `acorn-1` Node sends it, but refusing a disclosure without it would
+  // put a decision beyond recording, which is the re-queueing loop the split exists to prevent.
   extensions: z.array(pluginExtensionGrantSchema).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
   // Defaulted for the same reason `extensions` is.
   schedules: z

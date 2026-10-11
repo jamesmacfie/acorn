@@ -39,8 +39,8 @@ export const previewConfiguredSchedule: ClientScheduleContribution = {
     try {
       next = await readJson<Record<string, boolean>>(previewConfiguredRoute)
     } catch (error) {
-      // A 404 is a Node without the route. Any other failure keeps the last answer, so a dropped
-      // request does not flicker the button.
+      // A 404 is a Node without the route. Mixed-version path until 2026-12-29.
+      // Any other failure keeps the last answer, so a dropped request does not flicker the button.
       if ((error as { status?: number }).status === 404) setConfigured(null)
       return
     }

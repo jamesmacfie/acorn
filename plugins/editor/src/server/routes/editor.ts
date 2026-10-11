@@ -115,6 +115,8 @@ export const editor = new Hono<AppEnv>()
     if (!path) return respondError(c, 400, 'bad_request')
     const revision = c.req.query('revision')
     if (revision !== undefined && !/^[a-f0-9]{64}$/.test(revision)) return respondError(c, 400, 'bad_request')
+    // A request without a revision comes from a client that predates marker snapshots, and gets the
+    // plain array it expects. Mixed-version path until 2026-12-31.
     return viaBridge(c, EDITOR, async (b) =>
       revision === undefined
         ? b.lineMarkers(c.req.param('id'), path)

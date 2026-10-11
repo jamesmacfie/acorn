@@ -47,7 +47,8 @@ export declare class AcornBridgeError extends Error {
 /** The whole surface a sandboxed frame has. There is no second door: no `window.acorn`, no network
  * (`connect-src 'none'`), no host DOM. */
 export type AcornBridge = {
-  /** Tree authority mode; absent on frame bridges and SDKs predating this field. */
+  /** Tree authority mode; absent on frame bridges and SDKs predating this field. `legacy` names a host
+   *  without per-mount bridges. Mixed-version path until 2026-12-30. */
   readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. Throws if read before `connect()` resolves. */
   readonly context: PluginFrameContext

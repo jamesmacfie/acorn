@@ -34,7 +34,8 @@ function handshake(): Promise<AcornBridge> {
       target.removeEventListener?.('message', onWindowMessage)
       // A worker host transfers a second port beside the bridge's: the tree channel. A frame host
       // transfers one, so this is undefined there and `mountTree` refuses, which is the honest answer
-      // for a bundle asking a rectangle to draw a tree.
+      // for a bundle asking a rectangle to draw a tree. A worker host without `treeSlotBridge` predates
+      // per-mount bridges, so it's `legacy`. Mixed-version path until 2026-12-30.
       acceptTreePort(event.ports?.[1] ?? null)
       resolve(
         attach(

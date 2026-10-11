@@ -71,7 +71,8 @@ export type RemoteTreeProps = {
    * reactive; a props update cannot lend the worker another mount's API or document grant.
    */
   scope?: () => TreeScope
-  /** The shared composed owner's immutable opening selection, for legacy context affinity. */
+  /** The shared composed owner's immutable opening selection, for legacy context affinity.
+   *  Mixed-version path until 2026-12-30. */
   openingItem?: string
   /**
    * The sibling host editor's document, for a tree that is one region of a composed pane.

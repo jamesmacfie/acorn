@@ -14,6 +14,7 @@ export type LocalChange = {
   // read it again. The modes and objects git reports for the HEAD and index sides, plus a stat of the
   // file on disk for the working-tree side, which git has not hashed. Optional: an older node does not
   // send it, and a submodule, whose new commit git does not report, has none.
+  // Mixed-version path until 2026-12-24.
   contentKey?: string
 }
 

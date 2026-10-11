@@ -172,6 +172,7 @@ export class PluginCache {
       if (response.status === 404) {
         // A node from before the hash-addressed route only has /client.js. The device still hashes
         // what arrives and refuses anything other than this exact claim below.
+        // Mixed-version path until 2026-12-26.
         response = await this.broker.fetch(
           nodeId,
           {

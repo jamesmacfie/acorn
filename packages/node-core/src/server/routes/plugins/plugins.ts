@@ -300,8 +300,8 @@ export const plugins = new Hono<AppEnv>()
       'cache-control': 'private, no-store',
     })
   })
-  // Compatibility for clients that predate the advertised-hash route. Their roster names the current
-  // installed candidate, so this endpoint continues to serve that candidate while they roll forward.
+  // For clients that predate the advertised-hash route. Their roster names the current installed
+  // candidate, so this endpoint serves that candidate. Mixed-version path until 2026-12-26.
   .get('/:id/client.js', async (c) => {
     const bridge = routeCapabilityFor(c, PLUGIN_STATE)
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')

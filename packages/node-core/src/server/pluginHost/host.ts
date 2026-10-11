@@ -191,8 +191,8 @@ export async function initPlugins(
     try {
       db.close()
     } catch {
-      // An older loaded bundle may close its own handle in dispose, and node:sqlite refuses a second
-      // close. Nothing to report: the file drains either way.
+      // A loaded bundle may close its own handle in dispose, and node:sqlite refuses a second close.
+      // Nothing to report: the file drains either way.
     }
   }
 

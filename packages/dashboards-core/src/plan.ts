@@ -636,8 +636,8 @@ export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): 
 }
 
 export function resolvePlanColumns(plan: PanelPlan, sources: readonly PlanSource[]): PanelPlan {
-  // Version 1 panels without a display field selection meant "all source fields".
-  // Resolve that legacy meaning against the current description at run time.
+  // A single-source plan with no columns draws the source's fields, resolved against its current
+  // description at run time. Any plan version can reach this, so it isn't only for old panels.
   const columns: PanelPlanColumn[] =
     plan.columns.length || sources.length !== 1
       ? plan.columns

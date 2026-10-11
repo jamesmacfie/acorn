@@ -48,8 +48,8 @@ export type LinearRelatedIssue = { id: string; identifier: string; title: string
 // `label` is the ready-to-render string ("Blocked by", "Blocks", "Duplicate of", "Related").
 export type LinearRelationKind = 'blocks' | 'blocked-by' | 'duplicate' | 'duplicated-by' | 'related'
 export type LinearRelation = { id: string; kind: LinearRelationKind; label: string; issue: LinearRelatedIssue }
-// Detail fields are optional so an older short-TTL cached row stays valid and self-heals on the next
-// fetch. Summary fields above stay lean for PR-reference resolution.
+// Detail fields past `activity` are optional, and readers default them. Summary fields above stay
+// lean for PR-reference resolution.
 export type LinearIssueDetail = LinearIssueSummary & {
   id: string
   description: string | null

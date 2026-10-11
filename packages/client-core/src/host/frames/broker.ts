@@ -205,7 +205,8 @@ export function createFrameBridge(input: {
   // request from a bundle built before that ack existed. It is the host's only evidence that the bundle
   // evaluated, and it cancels the handshake deadline in PluginFrame.
   onConnected?(): void
-  /** The bundle bootstrap port has no tree authority until a single legacy slot is mounted. */
+  /** The bundle bootstrap port has no tree authority until a single legacy slot is mounted.
+   *  Mixed-version path until 2026-12-30. */
   authorize?(): boolean
 }): FrameBridge {
   const { port, binding, services, onMisbehaving } = input

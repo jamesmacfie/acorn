@@ -13,7 +13,7 @@ export type NodePluginRow = {
    * manifest `name`, and a compiled plugin's from its definition. Display text only: never key
    * anything on it. Optional so a node that predates it still parses, and so the client can fall back
    * to the id (client-core's `pluginLabel`). A loaded plugin writes its own, so trust
-   * prompts keep showing the id. */
+   * prompts keep showing the id. Mixed-version path until 2026-12-30. */
   label?: string
   /** Events this running or installed plugin declares for cross-plugin subscribers. */
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
@@ -40,7 +40,8 @@ export type NodePluginRow = {
   // it the client's answer to "is this third-party?" (docs/plugins/activation.md).
   installed?: InstalledPluginRow
   /** The declaration committed with the service this process runs. `null` means this node has no
-   * active loaded runtime; omission identifies a response cached from a node predating this field. */
+   * active loaded runtime; omission identifies a response cached from a node predating this field.
+   * Mixed-version path until 2026-12-26. */
   active?: PluginRuntimeIdentity | null
   /** An agent-requested disk candidate held inert until the owner reviews these exact bytes. */
   pendingReview?: { reviewId: string; fingerprint: string; stagedAt: number } | { corrupt: true }
@@ -206,8 +207,8 @@ export type PluginApprovalRequest = {
   requestedAt: number
 }
 
-// `requests` is optional so a node that predates approval-mediated install still parses, and so this
-// response type can gain the field without a query-key bump (docs/caching.md).
+// `requests` is optional so this response type could gain the field without a query-key bump
+// (docs/caching.md). Every `acorn-1` Node sends it.
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
 
 // Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory

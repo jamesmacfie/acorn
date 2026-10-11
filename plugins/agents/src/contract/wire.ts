@@ -498,7 +498,8 @@ export type AgentSessionSnapshot = {
   turns: AgentTurn[]
   events: AgentEventRecord[]
   requests: AgentRequest[]
-  /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field. */
+  /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field.
+   *  Mixed-version path until 2026-12-31. */
   wait?: AgentWaitFacts & { eventsThroughSeq: number; eventsComplete: boolean }
 }
 

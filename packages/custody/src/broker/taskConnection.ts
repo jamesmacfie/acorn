@@ -25,7 +25,9 @@ export async function openTaskConnection(env: NodeJS.ProcessEnv, target?: string
       return readFileSync(tokenFile, 'utf8')
     } catch {
       if (env.ACORN_API_TOKEN_FILE) throw new Error('Task launch credential file is unavailable.')
-      return env.ACORN_API_TOKEN // An older shell has not yet been reconciled.
+      // A task an older shell launched has a token in its environment, not a file.
+      // Mixed-version path until 2027-01-07.
+      return env.ACORN_API_TOKEN
     }
   }
   if (!taskId || !currentToken() || !env.NODE_EXTRA_CA_CERTS)

@@ -12,7 +12,8 @@ export function persistedAttendance(
   legacy?: { session: AgentSession; source: AgentTurnSource },
 ): Attendance {
   const value = policy.attendance
-  // Legacy sessions without a host snapshot default to their original supervised/attended behavior.
+  // Turns written before attendance was stored default to their original supervised/attended
+  // behavior. Deleting this needs a backfill first. Mixed-version path until 2027-01-06.
   if (value === undefined && legacy) {
     resolveAttendance(legacy.session, legacy.source)
     return sessionAttendance(legacy.session)

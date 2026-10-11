@@ -9,7 +9,7 @@ export type RollbarItemSummary = {
   integrationId: string
   integrationLabel: string
   identifier: string // the project-visible counter ('142')
-  itemId: string // system-wide item id, a string at Acorn boundaries ('' when a legacy row predates it)
+  itemId: string // system-wide item id, a string at Acorn boundaries
   url: string | null // Rollbar's account-independent item permalink
   title: string
   level: string
@@ -19,7 +19,7 @@ export type RollbarItemSummary = {
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
   framework?: string
-  // Optional, like framework, so an older cached row stays valid until the next list refresh.
+  // Optional, like framework.
   lastActivatedAt?: number | null // later than firstOccurrenceAt ⇒ the item regressed after a resolve
   uniqueOccurrences?: number // distinct-IP count; plan-dependent upstream
 }

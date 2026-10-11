@@ -105,7 +105,8 @@ export function validateChrome(refs: ManifestReferences): void {
       })
     }
   })
-  // Reject broken command groups at installation. The client also guards older roster rows.
+  // Reject broken command groups at installation. The client also drops an orphaned command from any
+  // roster row.
   commands.forEach((entry, i) => {
     if (entry.parentId === undefined) return
     const at = ['contributions', 'commands', i, 'parentId'] as (string | number)[]

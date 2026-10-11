@@ -87,7 +87,7 @@ by restarting, and the reconnect is where a new major shows up.
 The same probe may carry `eventTransport: { viewers: 1 }`, which advertises logical event viewers. A
 host that enables viewer multiplexing adds `x-acorn-viewers: 1` to its `/v1/events` upgrade only
 after it sees that advertisement. An absent or malformed advertisement, an unknown viewer version, or
-a failed probe keeps the legacy event transport. The advertisement doesn't change the major.
+a failed probe keeps the single-viewer event transport. The advertisement doesn't change the major.
 [WebSocket](./websocket.md#logical-event-viewers) covers the frames.
 
 **Within a major, changes are additive.** New routes, new optional response fields, and new WebSocket
@@ -108,6 +108,31 @@ covers the standalone artifact.
 The plugin bridge follows the same rule. Frame SDK verbs ship inside plugin bundles while the broker
 ships in the shell, so within a `PLUGIN_API_MAJOR` bridge verbs are additive only. See
 [the plugins doc](../plugins.md).
+
+### Mixed builds
+
+A client, a Node, and a loaded plugin's bundle may come from different builds of the same major, up to
+90 days apart, and so may device state and stored data an earlier build wrote.
+
+Code that lets a newer build cope with an older one is a mixed-version path. Its comment says
+`Mixed-version path until <date>.`, so `git grep -n "Mixed-version path until"` lists every one. The
+date is 90 days after the commit that added the path, which `git log --reverse -S'<string>'` finds.
+After it, every supported build has the newer behavior, and the path can go. A comment that covers
+several fields takes the newest field's date. A field that's also optional for another reason keeps
+that reason. Code for builds or data from before the `acorn-1` baseline isn't a mixed-version path,
+because the baseline refuses them.
+
+The window counts from the commit because Acorn tags no releases and has no updater: a machine
+upgrades when its owner rebuilds. Ninety days gives a paired Node elsewhere, or a plugin built outside
+this repository, three months to catch up.
+
+A client that meets a build outside this policy:
+
+- **Refuses a different baseline or protocol major**, and asks the owner to upgrade the older side.
+- **Refuses a loaded plugin whose `apiVersion` range misses the host's major**
+  ([published packages](../plugins/publishing.md#the-compatibility-promise)).
+- **Can't detect the same major more than 90 days apart**, because the probe carries no build date.
+  A request that needed a deleted path fails where it's made, as a 404 or a missing field.
 
 ## Request processing
 

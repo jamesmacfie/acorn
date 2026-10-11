@@ -265,6 +265,7 @@ export const agentsClientPlugin: ClientPlugin = {
     })
     // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself.
     // `mcp` is an alias for the config files section, so a link to that page id lands there.
+    // Mixed-version path until 2027-01-07.
     ctx.settingsPages.register({
       id: 'agent-mcp-servers',
       label: 'MCP',
@@ -321,6 +322,7 @@ export const agentsClientPlugin: ClientPlugin = {
     })
     // Concurrency and pricing. `agent-concurrency` and `agent-pricing` are aliases, so a link, a
     // remembered page or another plugin's `openSettings('agent-pricing')` lands on its section here.
+    // Mixed-version path until 2026-12-29.
     // "Unpriced models" is left out: it is only drawn while recent usage names a model with no price.
     ctx.settingsPages.register({
       id: 'agent-limits',

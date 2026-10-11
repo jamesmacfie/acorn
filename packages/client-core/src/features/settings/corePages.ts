@@ -488,6 +488,7 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'plug',
     order: 10,
+    // A remembered page or deep link from an earlier build. Mixed-version path until 2027-01-05.
     aliases: ['connections'],
   },
   {

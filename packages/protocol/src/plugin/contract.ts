@@ -255,9 +255,9 @@ export const pluginPermissionsSchema = manifestPermissions
 // node checks that an `openPane` names a pane the manifest declared, and the client builds the runtime
 // allowlist for the same verb.
 //
-// `scope !== 'project'` rather than `scope === 'task'`: the client reads these off a roster row, where
-// the field is absent whenever the sending node predates it. Only the negative spelling is correct
-// before defaults are applied.
+// `scope !== 'project'` rather than `scope === 'task'`: the roster row's type keeps `scope` optional,
+// though every `acorn-1` Node fills its default. Only the negative spelling is correct before
+// defaults are applied.
 export const isTaskPaneSurface = (frame: { target: string; scope?: string }): boolean =>
   frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')
 
@@ -426,8 +426,8 @@ export type PluginExtensionPointDescriptor = Omit<
   mode?: string
   allows?: string[]
   order?: string
-  // Optional for the reason the projection's header gives: these gained defaults when the kinds
-  // landed, and an older node's roster row carries none of them.
+  // Optional on the wire, though every `acorn-1` Node's roster row carries them: they gained defaults
+  // before the baseline.
   max?: number
   timeoutMs?: number
   onTimeout?: 'allow' | 'deny'
@@ -450,7 +450,7 @@ export type { PluginCliCommandDescriptor } from './cliCommands.ts'
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
-// roster row won't carry it, and every reader uses `?? []`.
+// roster row won't carry it, and every reader uses `?? []`. Mixed-version path until 2027-01-08.
 export type PluginContributions = {
   frames: PluginFrameSurface[]
   sources?: PluginSourceDescriptor[]

@@ -15,6 +15,8 @@ export type VariableRow = {
 }
 type Entry = { row: VariableRow; revision: number; dirty: boolean; write?: Promise<void> }
 const subjects = new Map<string, Entry[]>()
+// A host without bridge authority gives the client no scope, so each client keys its own variables.
+// Mixed-version path until 2026-12-31.
 const legacy = new WeakMap<HttpClient, number>()
 let sequence = 0
 export function variableScope(client: HttpClient, projectId: string): string {

@@ -100,7 +100,7 @@ export function pluginExtensionPoint(
     ...(descriptor.mode === 'stack' || descriptor.mode === 'replace'
       ? { mode: descriptor.mode as ArbitrationMode }
       : {}),
-    // An older node's roster row carries no ceiling; four is the schema's own default.
+    // Four is the schema's own default, though every `acorn-1` Node's roster row carries a ceiling.
     max: descriptor.max ?? 4,
     // Names the owner declared, kept as declared. Whether a given `Slot` actually bound a handler for
     // one is the owner's business at draw time, and the host checks both before it forwards a request

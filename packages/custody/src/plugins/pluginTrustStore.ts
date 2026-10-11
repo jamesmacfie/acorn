@@ -103,12 +103,13 @@ const ackSchema = z.strictObject({
   hash: z.string().regex(/^[0-9a-f]{64}$/),
   // The node that served these bytes, so the prompt can name it and a later audit can answer "where
   // did this come from". Not part of the key, because the same bundle from a second node is the same
-  // code.
+  // code. Defaulted for an acknowledgement written before the field. Mixed-version path until 2026-12-26.
   nodeId: z.string().default(''),
   source: bundleSourceSchema.optional(),
   version: z.string().min(1),
   // Older records lack this binding and must be reviewed again before selection. The string is
   // produced by the shared protocol projection, not accepted from the Node as an authority claim.
+  // Mixed-version path until 2026-12-27.
   declaration: z.string().min(1).max(1_000_000).optional(),
   // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
   // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
@@ -124,13 +125,13 @@ const ackSchema = z.strictObject({
   contextSections: z.array(contextSectionGrantSchema).max(8),
   // Default keeps acknowledgements written before custom agents existed readable. An old
   // acknowledgement says the accepted bundle added no agent, which was true.
+  // Mixed-version path until 2026-12-28.
   customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure behind the decision could not be fully parsed, because a node ran a newer
   // manifest schema than this shell. The decision is exact and the snapshot is not, so this row must
-  // never become the baseline of a "what changed" diff. Optional, because a file written before this
-  // field existed does not carry it and its absence means complete.
+  // never become the baseline of a "what changed" diff. Optional, because its absence means complete.
   partial: z.literal(true).optional(),
   // The dev grant below wrote this row when a bundle arrived for a plugin the owner put into
   // development mode. No human answered a prompt.

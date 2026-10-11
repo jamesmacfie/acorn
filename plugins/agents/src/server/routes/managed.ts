@@ -143,7 +143,7 @@ const pageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(2_000).default(500),
   // Asked for, not assumed. A reader that sends `fold=1` gets one record per tool call per page and
   // honours `foldedThroughSeq`; an older one would page from the wrong seq and apply streamed output
-  // twice, so it keeps every row (`foldToolEvents`).
+  // twice, so it keeps every row (`foldToolEvents`). Mixed-version path until 2026-12-24.
   fold: z.literal('1').optional(),
 })
 

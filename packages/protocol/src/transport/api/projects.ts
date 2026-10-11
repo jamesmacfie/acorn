@@ -115,6 +115,7 @@ export type ProjectRunTarget = {
 }
 // `repoConfig` is only on the config read, and only when the project has a folder on disk. An older
 // node never sends it, which a client reads as "nothing set by the repo".
+// Mixed-version path until 2026-12-29.
 export type ProjectConfigResponse = { projectId: string; config: ProjectConfig; repoConfig?: ProjectRepoConfig }
 
 // Tasks are the project-level units of work and appear as rail rows (docs/workspaces-and-tasks.md).

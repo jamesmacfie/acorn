@@ -45,7 +45,8 @@ export const pluginDbPath = (dataDir: string, plugin: string): string =>
 /** Give a renamed built-in the database it had under its old id. Moves the files once, before
  *  anything opens either one, and does nothing when there is no old database or the new id already
  *  has one, so a fresh install and every later boot are no-ops. The write-ahead log and shared-memory
- *  files move before the database, so a crash halfway leaves the database where the next boot retries. */
+ *  files move before the database, so a crash halfway leaves the database where the next boot retries.
+ *  Mixed-version path until 2027-01-09. */
 export function adoptRenamedPluginDb(dataDir: string, from: string, to: string): boolean {
   const source = pluginDbPath(dataDir, from)
   const target = pluginDbPath(dataDir, to)

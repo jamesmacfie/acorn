@@ -36,6 +36,8 @@ export type PanelSubject = {
 
 export type HttpPanelModel = ReturnType<typeof buildPanel>
 
+// A host without bridge authority sends no `context.authority`, so each bridge keys its own panel.
+// Mixed-version path until 2026-12-30.
 const bridgeIds = new WeakMap<AcornBridge, number>()
 let bridgeSequence = 0
 const affinity = (bridge: AcornBridge): string => {
