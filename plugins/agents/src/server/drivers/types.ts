@@ -83,8 +83,11 @@ export type AgentDriverReadBlock = {
   /** What its commands may write outside the worktree: the repository's shared git folder, so a commit
    *  from a worktree works. */
   writable: string[]
-  /** Top-level data root entries holding nothing the agent reads, for the harness's own file tools,
-   *  which its shell sandbox doesn't cover. */
+  /** Paths it may never write even where `writable` allows it: the git files that make the Node's own
+   *  unsandboxed git run a program (./readBlock.ts § gitControlFiles). May hold `*` and `**`. */
+  writeDenied: string[]
+  /** Data root paths holding nothing the agent works in, for the harness's own file tools, which its
+   *  shell sandbox doesn't cover. */
   hidden: string[]
   /** `host:port` of the Node's loopback API, for the task CLI. */
   loopback: string | null

@@ -44,7 +44,7 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox:
       allowUnsandboxedCommands: false,
       // A machine that can't run the sandbox refuses the session rather than running it unconfined.
       failIfUnavailable: true,
-      filesystem: { denyRead: [block.dataDir], allowRead: block.readable, allowWrite: block.writable },
+      filesystem: { denyRead: [block.dataDir], allowRead: block.readable, allowWrite: block.writable, denyWrite: block.writeDenied },
       ...(block.loopback ? { network: { allowedDomains: [block.loopback] } } : {}),
     },
     // `//` anchors at the filesystem root, as the skill allow rules below do.

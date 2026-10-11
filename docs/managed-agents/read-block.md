@@ -27,17 +27,23 @@ own Claude settings files.
 A blocked session's shell commands, and every process they start:
 
 - Can't read the data folder, except its own worktree, its own token file, the Node's certificate,
-  and its own skill folders. The task CLI uses the token file and the certificate.
+  and its own skill folders. The task CLI uses the token file and the certificate. A hard link from
+  the data folder into the worktree fails too, because the sandbox checks the source path.
 - Can write only in its worktree, a temporary folder, and the repository's shared `.git` folder,
-  which a commit from a worktree writes to.
+  which a commit from a worktree writes to. Inside that folder, the files that make git run a program
+  or read a different repository stay unwritable: `config`, `config.worktree`, `hooks`, each
+  worktree's `commondir` and `gitdir`, submodule `config` and `hooks`, and the worktree's own `.git`
+  file. The Node runs git in the worktree unsandboxed for every status refresh, so a hook or an
+  `fsmonitor` setting written there would run as you.
 - Reach the network through Claude Code's proxy. The Node's own address is allowed. In
   skip-permissions mode other hosts are allowed too. In other modes Claude Code decides per host, as
   its sandbox documentation describes.
 - Can't rerun a refused command outside the sandbox, because `allowUnsandboxedCommands` is off.
   Without that, a skip-permissions session could retry any blocked command unconfined.
 
-Claude's own Read and Edit tools run outside the sandbox, so deny rules keep them out of every data
-folder entry that holds nothing the session works in. The Edit rules also stop the agent planting a
+Claude's own Read and Edit tools run outside the sandbox, so deny rules keep them out of everything in
+the data folder beside what the session works in, including other tasks' worktrees and the plugin
+databases beside a plugin's skill folder. The Edit rules also stop the agent planting a
 file there, such as a `.env` the helper would load at the next start.
 
 If the machine can't run the sandbox, for example Linux without `bubblewrap`, the session fails to
@@ -46,6 +52,7 @@ start rather than running unconfined.
 ## What stops working
 
 - Installs that write outside the worktree, such as `pnpm install` writing to its package store.
+- Git commands that change the repository's settings, such as `git config` or `git push -u`.
 - `git push` over SSH, when the sandbox blocks the `ssh-agent` socket.
 - Any tool that writes to a folder in your home directory, such as a cache.
 
@@ -55,8 +62,6 @@ outside contributors, and leave it off for work that needs those tools.
 ## What it doesn't cover
 
 - The agent's own token, which reaches only its own task.
-- Other worktrees, when the data folder holds them, which a development checkout does. Claude's file
-  tools can still read them, though its shell can't.
 - Anything outside the data folder that your user can read.
 
 For the rest of the model, see
