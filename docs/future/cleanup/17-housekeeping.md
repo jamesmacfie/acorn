@@ -1,5 +1,78 @@
 # 17: Housekeeping
 
+> **Completion note, October 12, 2026.** All five code fixes landed, one commit each, and the three
+> decisions are recorded in their reference pages. `pnpm lint`, the arch tests, and the touched
+> packages' suites pass on Node 26.8.1 after each commit. `pnpm test` passed 35 of 36 packages. The
+> red was the `PreviewTaskPane.test.tsx` case "binds same-ID task reads to the originating Node",
+> which proposals 13 and 15 saw fail under load. This branch doesn't touch the preview plugin, and
+> its suite passed twice alone.
+>
+> What landed:
+>
+> - **Node-core's project files.** The ten modules and their four tests are in
+>   `packages/node-core/src/server/projects/`. The file names stay. Inside a `projects/` folder,
+>   `projectConfig.ts` would lose its prefix and become `config.ts` beside `runConfig.ts` and
+>   `repoConfigTrust.ts`, which reads worse. `routes/projects/projects.ts` already sets the
+>   `projects/projects.ts` pattern. The exports map keeps its three keys, so no other package's
+>   import changed. Docs and comments that named the old paths follow.
+> - **The terminal capability.** The terminal plugin provides `TERMINAL_RUNTIME`
+>   (`plugins/terminal/src/contract/runtime.ts`), a `{ reconcile() }` handle in the same shape as
+>   `AGENTS_RUNTIME`, and `reconcileNode` calls it with `get`, so a boot without terminal skips the
+>   pass as `reconcileTmux` did. The entry no longer re-exports `reconcileTmux` or
+>   `refreshAcornMcpRegistrations`.
+> - **MCP registration moved to node-core.** Core holds the profile registry, and each harness's
+>   `mcpRegistration` is registered there, so core owns the job. `mcpRegister.ts` gained
+>   `refreshAcornMcpRegistrations(name, launcher)`, which the boot calls, and
+>   `registerAcornMcpBeforeSpawn(profile, name, launcher)`, which the terminal calls before it
+>   starts a harness's CLI. They share one set of registered profiles, as the two terminal
+>   functions did, so a spawn after a good boot refresh skips the CLI round trip. The
+>   `ACORN_SKIP_MCP_REGISTRATION` check moved with them. Phase 02's rule holds: the boot refreshes
+>   only when the root hands it an MCP launcher, so a standalone Node never does. The terminal keeps
+>   its own fallback launcher for spawn on a standalone Node, unchanged. `@acorn/plugin-api/node`
+>   exports the spawn function, and its surface snapshot gained that line.
+> - **`isRecord`.** Node-core's exported copy in `integrations/codec.ts` is its only one. The
+>   manifest reader and the schedule action parser import it, and the git and workflows plugins
+>   take it from `@acorn/plugin-api/node`.
+> - **`createHelper`** is in `packages/custody/src/helper.ts`. `runtime/public.ts` still exports it,
+>   so no caller changed.
+> - **The single viewer.** `WsViewers.legacy` is `WsViewers.single`, with a comment that says which
+>   connections use it.
+>
+> Decisions:
+>
+> - **The `claude` and `claude-code` pair stays.** `docs/managed-agents/harnesses.md` says why,
+>   beside the paragraph on persisted IDs, and tells the next harness not to copy the split.
+> - **The recoverable reset stays.** `docs/data-layer/data-root.md` says it's the supported way to
+>   reset any data root. The docs and the Node's old-schema error already described it that way.
+>   The crossover framing was in the reset's own messages: "restore with the old Acorn binary" and
+>   "do not import them into the new baseline". Both now name the build that wrote the files, and so
+>   does `docs/local-development.md`.
+> - **A command without a `kind` stays the default action.** Phase 15 had already replaced the
+>   compatibility wording. The comment still said the leaf "carries no `kind` at all", which is
+>   wrong, because `ActionCommand` allows `kind: 'action'`, so it now says the kind is optional. The
+>   decision is in the refusals list in `docs/command-palette-and-shortcuts/palette-data.md`.
+>
+> Deviations:
+>
+> - **`rpcValues.ts` kept its guard, renamed `isObject`.** It wasn't the same check: it accepts
+>   arrays, because the RPC value walk descends into them. Merging it would have changed behavior.
+> - **Client-core and dashboards-core keep one `isRecord` each.** Client-core could import the
+>   dashboards contract's copy, but the plugin host would then load the panel parser and the
+>   dashboard view schema for one line.
+> - **Nothing to commit for `plugins/changes/`.** Git tracks nothing there, and this worktree has no
+>   such folder. `~/Source/acorn` still has one holding `dist` and `node_modules`. It's untracked
+>   build output from before Changes moved into Git, so delete it by hand in any checkout that has
+>   it.
+> - **One stale fact fixed in passing.** `docs/data-layer/migrations.md` listed a `changes`
+>   migration chain. That chain is `git`'s.
+> - `docs/future/cleanup/17-housekeeping.md` stays, with this note, as the coordinator asked. Its
+>   custody paragraph marks the old `index.ts` path as moved, so the doc path check passes.
+>
+> For later phases: proposal 11 owns the custody broker's `legacyOwner` and `legacyRecipient`. Those
+> do describe a Node without viewer multiplexing, so they were left alone. A new compiled plugin
+> that the composition root has to call gets a capability in its `contract/`, not an export from its
+> entry.
+
 This proposal collects small structural fixes that don't need their own proposal, plus three naming
 decisions the owner should make.
 
