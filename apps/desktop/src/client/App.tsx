@@ -452,9 +452,12 @@ export default function App() {
   // gate releases, so these are created while the local node may still be starting. `nodeReady()` holds
   // them until the broker has the node, which is also when the gate releases, and it still lets a
   // known offline remote node draw cached data.
-  // Always refetched on mount, because the startup restore waits for the node's answer and a cached
-  // value inside its stale time would otherwise never be asked for again.
-  const prefs = createQuery(() => ({ ...prefsOptions(nodeReady()), refetchOnMount: 'always' as const }))
+  const prefs = createQuery(() => prefsOptions(nodeReady()))
+  // The startup restore waits for the node's own answer, so ask for it every time the node becomes
+  // reachable. `refetchOnMount` can't do this. On a cold launch the query is still disabled at mount,
+  // and enabling it later only fetches once the cached answer is past its stale time. A relaunch
+  // inside that window would otherwise never restore.
+  createEffect(on(createMemo(nodeReady), (ready) => void (ready && prefs.refetch())))
   const workspaceMode = createWorkspacesMode()
   const mountedAt = Date.now()
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
