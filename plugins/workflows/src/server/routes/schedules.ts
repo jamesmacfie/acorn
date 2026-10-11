@@ -58,6 +58,8 @@ const approveBody = z.object({
 const pauseBody = z.object({ paused: z.boolean() }).strict()
 
 export const workflowScheduleRoutes = new Hono<AppEnv>()
+  // Both mount forms: `/` is the bare list path this router is mounted at.
+  .use('/', requireDevice)
   .use('*', requireDevice)
   .get('/', c => viaBridge(c, WORKFLOW_SCHEDULES_ROUTE, async bridge => bridge.list()))
   .get('/defaults', c => viaBridge(c, WORKFLOW_SCHEDULES_ROUTE, async bridge => bridge.defaults()))

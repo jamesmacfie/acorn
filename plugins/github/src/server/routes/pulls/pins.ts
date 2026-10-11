@@ -1,7 +1,7 @@
 import { and, eq, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, ownerId, type PluginDatabase, requireDevice, respondError } from '@acorn/plugin-api/node'
 import { pinnedRepos } from '../../../node/schema'
 
 const pinBody = z.object({ repoId: z.number().int(), pinned: z.boolean() })
@@ -17,7 +17,8 @@ export const pins = (db: PluginDatabase) =>
         .orderBy(pinnedRepos.sort)
       return c.json(rows.map((r) => r.repoId))
     })
-    .put('/', async (c) => {
+    // Device only: pins arrange the owner's sidebar, and a task's agent has no reason to change them.
+    .put('/', requireDevice, async (c) => {
       const uid = ownerId(c)
       const parsed = pinBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request')

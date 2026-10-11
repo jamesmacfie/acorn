@@ -6,6 +6,7 @@ export { beginTaskArchive, finishTaskArchive } from '../server/worktrees/archive
 export type { TestDb, TestPluginDb } from './db.ts'
 export { seedProviderConnection } from './integration.ts'
 export { PLUGIN_CONFIG_FILE, validatePluginConfig } from './manifest.ts'
+export { mountCovers } from './mountCoverage.ts'
 export { resetTelemetryForTest } from '../server/telemetry/collector.ts'
 export { makeTestNodeContext, makeTestRequestContext } from './pluginContext.ts'
 export type { TestNodeContext } from './pluginContext.ts'

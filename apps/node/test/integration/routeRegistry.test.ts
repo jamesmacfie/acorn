@@ -1,23 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { nodePlugins } from '../../src/composition/plugins'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
-import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
-import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routes/registry.ts'
+import { initCompiledPlugins } from '../helpers/compiledPlugins'
 import { readGolden, writeGolden } from '../helpers/golden'
 
 describe('plugin route registry', () => {
@@ -101,54 +93,9 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
 
 describe('assembled routes', () => {
-  // A plugin that declares periodic work resolves the scheduler through the capability registry at
-  // registration time, so a graph assembled without one throws; both composition roots provide it
-  // before initPlugins for that reason (docs/schedules.md § Why the node, and only the node). Never
-  // started: this suite asserts the mount table, and a running loop would fire jobs at a temp data
-  // root while the assertions run.
-  const schedulerCapable = (capabilities: CapabilityRegistry, db: TestDb['db']): CapabilityRegistry => {
-    capabilities.provide(SCHEDULER, new Scheduler(db))
-    return capabilities
-  }
-
-  let core: TestDb
-  let dataDir: string
-  let plugins: Awaited<ReturnType<typeof initPlugins>>
-  beforeAll(async () => {
-    core = makeTestDb()
-    dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
-    plugins = await initPlugins(
-      nodePlugins(dataDir, {
-        // agents is `required` too, so it initializes here as well, the same treatment as terminal
-        // below: the deps are inert because this suite asserts the mount table and nothing it
-        // exercises starts a provider child.
-        agents: { internalEnv: () => ({}), reconciled: Promise.resolve() },
-        notes: { internalEnv: () => ({}) },
-        // terminal is required; nothing in this suite spawns a pseudo-terminal.
-        terminal: {
-          internalEnv: () => ({}),
-          reconciled: Promise.resolve(),
-        },
-        // This suite asserts the mount table, so nothing here starts a workflow run.
-        workflows: {
-          internalEnv: () => ({}),
-          reconciled: Promise.resolve(),
-        },
-      }),
-      {
-        capabilities: schedulerCapable(new CapabilityRegistry(), core.db),
-        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
-        dataDir,
-      },
-    )
-  })
-  // Disposed, not just cleaned up: the terminal plugin opens a WAL-mode SQLite file and starts an
-  // idle-watch interval, and the plugin databases have to be closed before their temp dir is removed.
-  afterAll(async () => {
-    await plugins.dispose()
-    core.cleanup()
-    rmSync(dataDir, { recursive: true, force: true })
-  })
+  let plugins: { dispose(): Promise<void> }
+  beforeAll(async () => { plugins = await initCompiledPlugins() })
+  afterAll(async () => plugins.dispose())
 
   const routes = () => createApp().routes
 

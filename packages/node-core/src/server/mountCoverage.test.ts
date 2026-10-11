@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createApp } from './index'
 import { requireDevice, requireProviderAccess, requireTaskScope } from './middleware/requireUser'
 import { CORE_NAMESPACE } from './routes/registry'
+import { mountCovers } from '../testkit/mountCoverage'
 
 // Every core route is reachable by a task-scoped agent token unless something says otherwise, because
 // `requireUser` accepts either credential kind. Three route reviews in a row found the same shape of
@@ -54,22 +55,6 @@ const GATES = new Map<unknown, string>([
   [requireProviderAccess, 'requireProviderAccess'],
   [requireTaskScope, 'requireTaskScope'],
 ])
-
-// Does a `.use()` mount path cover a route path? Deliberately stricter than the router: `*` here
-// matches one or more further segments and never the bare path, whereas the Hono this repo pins does
-// match the bare path too. The strict reading is what makes this test demand both mount forms, so a
-// gate stays correct if that behaviour moves again in a Hono upgrade. A `:param` on either side
-// matches one segment, so a gate at `/tasks/:id/*` covers `/tasks/:id/run/:target/start`.
-export function mountCovers(mount: string, route: string): boolean {
-  const m = mount.split('/')
-  const r = route.split('/')
-  for (let i = 0; i < m.length; i++) {
-    if (m[i] === '*') return r.length > m.length - 1
-    if (i >= r.length) return false
-    if (m[i] !== r[i] && !m[i].startsWith(':')) return false
-  }
-  return m.length === r.length
-}
 
 describe('core mount coverage', () => {
   const routes = createApp().routes

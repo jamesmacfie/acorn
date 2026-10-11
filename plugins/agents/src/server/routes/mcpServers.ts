@@ -37,7 +37,8 @@ export const setAgentMcpServersBridge = (bridge: AgentMcpServersBridge | null): 
   setRouteTestCapability(AGENT_MCP_SERVERS, bridge)
 
 export const agentMcpServers = new Hono<AppEnv>()
-  // Hono's trailing `/*` matches zero segments too, so this covers the bare list route.
+  // Both mount forms, so the bare list route doesn't depend on how a Hono version matches `/*`.
+  .use('/mcp-servers', requireDevice)
   .use('/mcp-servers/*', requireDevice)
   .get('/mcp-servers', (c) => viaBridge(c, AGENT_MCP_SERVERS, (bridge) => bridge.list()))
   .get('/mcp-servers/reviews', (c) => viaBridge(c, AGENT_MCP_SERVERS, (bridge) => bridge.pendingReviews()))

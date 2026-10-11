@@ -69,6 +69,13 @@ request does, and fails unless each route is covered by a gate mount or named in
 reason a task token may reach it. It reads `/*` strictly, as not covering the bare path. Adding a
 route under a gated prefix stays free. Adding one anywhere else is a decision someone writes down.
 
+`apps/node/test/integration/pluginMountCoverage.test.ts` does the same for every `/v1/p` route the
+compiled plugins register with `ctx.routes.register`. A route passes when a core gate covers it before
+its handler, either as a mount or on the route itself, or when a named plugin ownership mount does.
+An ownership mount resolves the task behind a session, run, or attachment ID. Any other route needs an
+entry in the test's open list with its reason. Fetch handlers, which every loaded plugin uses, and
+`lazyRouter` mounts are opaque to the route table, so each checks its caller inside the handler.
+
 ## Task scope
 
 A task token names one task. The task-scope gate matches a task id out of the URL, at

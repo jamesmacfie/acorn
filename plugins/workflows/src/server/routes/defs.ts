@@ -148,7 +148,9 @@ const parseBody = async <T>(c: Context<AppEnv>, schema: z.ZodType<T>): Promise<T
 }
 
 export const workflowDefsRoutes = new Hono<AppEnv>()
-  // One gate for the family: in Hono a `/defs/*` mount matches the bare `/defs` as well.
+  // Both mount forms, so the gate doesn't depend on whether a Hono version lets `/*` match the bare
+  // path (docs/security/transport-and-auth.md § The gates).
+  .use('/defs', requireDevice)
   .use('/defs/*', requireDevice)
   .post('/defs/files', async c => {
     const parsed = await parseBody(c, fileBody)

@@ -137,6 +137,12 @@ const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Pr
   })
 
 const ownsSession = owns('sessionId', (b, id) => b.taskIdForSession(id))
+// `/sessions/search` is a static sibling of `/sessions/:sessionId`, so the session guard skips it.
+// Without the skip it resolves a session named "search", gets null, and 404s a legitimate query for
+// every confined caller. The search handler confines its own filter below.
+const ownsSessionUnlessSearch = createMiddleware<AppEnv>((c, next) => (c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next)))
+const ownsAttachment = owns('attachmentId', (b, id) => b.taskIdForAttachment(id))
+const ownsArtifact = owns('artifactId', (b, id) => b.taskIdForArtifact(id))
 
 // Pin a list or search filter to a confined caller's own task. Returns null when the caller asked for a
 // different task, which the route turns into the same 404 as every other denial. Rewriting the request
@@ -170,16 +176,14 @@ export const managedAgents = new Hono<AppEnv>()
   ], requireDevice)
   .on('PATCH', ['/sessions/:sessionId', '/sessions/:sessionId/turns/:turnId'], requireDevice)
   .on('DELETE', ['/sessions/:sessionId'], requireDevice)
-  // One mount per id kind. Hono's trailing `/*` matches zero segments, so `/sessions/:sessionId/*`
-  // already covers `/sessions/:sessionId` itself.
-  //
-  // That same zero-segment match is why `/sessions/search` needs an explicit skip. It is a static
-  // sibling of `/sessions/:sessionId`, and Hono applies `.use()` by path whatever the registration
-  // order, so without the skip the guard resolves a session named "search", gets null, and 404s a
-  // legitimate query for every confined caller. The search handler confines its own filter below.
-  .use('/sessions/:sessionId/*', (c, next) => (c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next)))
-  .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
-  .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
+  // Both mount forms per id kind, so the bare `/sessions/:sessionId` doesn't depend on whether a Hono
+  // version lets `/*` match it.
+  .use('/sessions/:sessionId', ownsSessionUnlessSearch)
+  .use('/sessions/:sessionId/*', ownsSessionUnlessSearch)
+  .use('/attachments/:attachmentId', ownsAttachment)
+  .use('/attachments/:attachmentId/*', ownsAttachment)
+  .use('/artifacts/:artifactId', ownsArtifact)
+  .use('/artifacts/:artifactId/*', ownsArtifact)
   // This plugin's contribution to core's merged run list (@acorn/protocol/runs.ts). Read by the node
   // with service authority, so it takes no params and answers node-wide. Task callers use core's
   // filtered merged run list and cannot read this unfiltered source directly.

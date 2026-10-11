@@ -18,7 +18,9 @@ Read it first, because a kind may already draw what you want. Then follow these 
    token the contribution needs. An undeclared token is a facet absent from `ctx.core`, and a
    `TypeError` on first call.
 4. Register the Node or client entry in the right composition list, named below.
-5. Add package-local tests.
+5. Add package-local tests. A new compiled route must also pass
+   `apps/node/test/integration/pluginMountCoverage.test.ts`. Gate it with `requireDevice` in both
+   mount forms, or name it in that test's open list with the reason a task's agent may reach it.
 6. Regenerate the golden lists and read the diff before you commit it.
 7. Run the architecture test, `pnpm lint`, and the relevant tests.
 
