@@ -6,7 +6,7 @@ import { createWorkspaceWords } from '../../features/workspaces/words'
 import { fuzzyScore } from '../../kit/lib/controls/fuzzy'
 import { createOverlayPalette } from './overlay'
 import { PaletteSurface } from './PaletteSurface'
-import { projectCount } from './navigationCommands'
+import { projectCount } from '../registries/commands/navigationCommands'
 import './palette.css'
 
 export default function WorkspacePalette() {

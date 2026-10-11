@@ -15,6 +15,14 @@ for UI that needs browser APIs, and declare the host requirement
 installs the client plugin host, scoped persistence, query clients, broker event handling,
 notification sources, and the shell registries before rendering.
 
+What the desktop and the terminal client start the same way is one call,
+`startClientRuntime` in `packages/client-core/src/host/clientRuntime.ts`. It wires telemetry, the Node
+event watchers, the plugin watcher, the workflow and system notices, client schedules, and device
+config sync, and returns one function that stops them. Each entry keeps only its own host's work. The
+desktop keeps responsiveness, page facts, desktop links, and sound. The terminal client keeps plugin
+workers, the roster, and the bell, and passes a promise that holds the plugin watcher until its worker
+factory is installed.
+
 `index.html` loads the entry directly as a module, so the page preloads every startup chunk and links
 the stylesheet from the head. Before the entry runs, the page runs `apps/desktop/public/startup-guard.js`,
 a deferred classic script, which runs first because deferred and module scripts run in document order.

@@ -1,4 +1,4 @@
-export { clientScheduleRegistry, startClientSchedules } from './schedules.ts'
+export { clientScheduleRegistry } from './schedules.ts'
 export type { ClientScheduleContribution } from './schedules.ts'
 export { evictScope, onScopeEvicted, scopeEvictorCount } from './scopeEviction.ts'
 export {

@@ -33,7 +33,9 @@ groups what a host provides into separate nullable capabilities: Node transport,
 plugin custody, and native extras. The client's API layer calls the transport group. No other client
 file may read the injected `window.acorn` global, and `tools/arch/boundaries.test.ts` fails any file
 outside the folder that does. The desktop bridge implements every group. A web client would implement
-transport and leave out the desktop extras.
+transport and leave out the desktop extras. A host with no page `document`, such as the terminal
+client, also installs `visibility`, which says whether anybody can see it. Client schedules pause
+while a host is hidden. On the desktop, the page's own `document` answers.
 
 The helper supplies the Node endpoint, the pinned HTTPS agent, and the bearer token. The renderer
 never holds a token or certificate, and the app's CSP stops it from opening a direct network

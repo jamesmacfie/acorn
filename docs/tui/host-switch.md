@@ -21,8 +21,9 @@ client ([caching](../caching.md) § Renderer query cache).
 
 The roster and the loaded-plugin worker factory load after the first frame.
 `apps/tui/src/roster.ts` holds the 12 client plugins. `main.tsx` imports it and the worker factory on
-the renderer's first `frame` event, then installs the factory before starting the loaded-plugin
-watcher. Every contribution registry is a Solid signal, so the chrome draws first and the rail, pane
+the renderer's first `frame` event. The shared client start, which `main.tsx` awaits before the first
+frame, holds its loaded-plugin watcher until the factory is installed
+([composition](../frontend.md#composition)). Every contribution registry is a Solid signal, so the chrome draws first and the rail, pane
 strip, and palette fill in as plugins register. The four host seams in `App.tsx`, the layout table
 above all, stay eager, because a pane needs them before it can draw.
 

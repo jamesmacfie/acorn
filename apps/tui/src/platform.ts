@@ -186,6 +186,10 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       setBadge: setTerminalBadge,
     },
 
+    // Visible for as long as this process runs, because the screen is up until `quit` takes it down
+    // and exits. Client schedules pause while a host is hidden; a terminal has no `document` to ask.
+    visibility: { hidden: () => false, onChange: () => () => {} },
+
     // Custody of third-party plugin bundles: a content-addressed file cache and an acknowledgement
     // file under the TUI's config directory, hashed here rather than by a helper because there is no
     // helper (./plugins/custody.ts). The broker is the fetcher, which is why this is built after it.

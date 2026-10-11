@@ -149,6 +149,10 @@ export type Notify = {
   setBadge(count: number | null): void
 }
 
+// Whether anybody can see this client, for work that should pause while nobody can (client
+// schedules). A page answers from its own `document`, so only a host without one installs this.
+export type HostVisibility = { hidden(): boolean; onChange(cb: () => void): () => void }
+
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
@@ -280,6 +284,7 @@ type AcornPreload = {
   folderPath?: FolderPicker
   files?: FileDialogs
   notify?: Notify
+  visibility?: HostVisibility
   preview?: PreviewViews
   webview?: PluginWebviews
 }
@@ -486,6 +491,23 @@ export const canSetBadge = (): boolean => !!acornGlobal()?.notify
 
 /** The number on the app icon, or null for none. A no-op where there is no icon to draw on. */
 export const setBadge = (count: number | null): void => acornGlobal()?.notify?.setBadge(count)
+
+// Whether this client is out of sight: the host's answer where it installed one, the page's otherwise,
+// and visible where there is neither.
+export const hostHidden = (): boolean => {
+  const host = acornGlobal()?.visibility
+  if (host) return host.hidden()
+  return typeof document !== 'undefined' && document.hidden
+}
+
+/** Called whenever `hostHidden()` may have changed its answer. */
+export const onHostVisibilityChange = (cb: () => void): (() => void) => {
+  const host = acornGlobal()?.visibility
+  if (host) return host.onChange(cb)
+  if (typeof document === 'undefined') return () => {}
+  document.addEventListener('visibilitychange', cb)
+  return () => document.removeEventListener('visibilitychange', cb)
+}
 
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.

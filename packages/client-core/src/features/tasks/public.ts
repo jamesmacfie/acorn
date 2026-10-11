@@ -14,7 +14,7 @@ export { defaultBranchForTask } from './defaultBranch.ts'
 export type { TaskLayout } from './taskLayout.ts'
 export { setTaskLookup } from './taskLookup.ts'
 export { archiveTask, createTask } from './taskMutations.ts'
-export { taskStatus, taskStatusRevision, taskStatusScheduleContribution } from './taskStatus.ts'
+export { taskStatus, taskStatusRevision } from './taskStatus.ts'
 export { expandedWorkflowRoots, toggleWorkflowRoot } from './taskTreeViewState.ts'
 
 export { cachedTaskScripts, createTaskScripts, scriptLabel } from './taskScripts'

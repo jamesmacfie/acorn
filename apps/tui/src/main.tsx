@@ -86,29 +86,12 @@ const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-co
 const { fileCacheStorage } = await import('./node/cache')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { refreshNodeQueries } = await import('./chrome/recovery')
-const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
-const { startDeviceConfigSync } = await import('@acorn/client-core/infra/persistence/deviceConfigSync.ts')
+const { startClientRuntime } = await import('@acorn/client-core/host/clientRuntime.ts')
 const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
 const { paletteFor, reportsTruecolor, setPalette } = await import('./appearance')
-const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
-const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
-const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
-const { watchWorkspaceChanges } = await import('@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts')
-const { watchNodeEvents } = await import('@acorn/client-core/infra/node/watchNodeEvents.ts')
 const { createEffect, createRoot, createSignal } = await import('solid-js')
 const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
-const { startClientTelemetry } = await import('@acorn/client-core/infra/telemetry/emitter.ts')
-const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/post.ts')
 const [linkReady, setLinkReady] = createSignal(false)
-
-// This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
-// off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
-// arrangement the desktop's composition root has (docs/telemetry/model.md § The switch).
-//
-// The poster is client-core's, unchanged. A batch leaves over the ordinary API client, which on this
-// host is the platform seam installed above, so the terminal client needed no transport of its own —
-// only a different `runtime` on the batch (docs/tui/reporting.md § What the terminal client reports).
-startClientTelemetry({ runtime: 'tui', post: postTelemetryBatch('tui') })
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
@@ -135,11 +118,29 @@ const cacheLease = persistence.acquire()
 // Await the shared public restore before this host draws its first shell.
 await cacheLease.restored
 bootMark('cache restored')
-const stopDeviceConfig = await startDeviceConfigSync(() => client, (config) => {
-  // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
-  // Without a selected theme, retain the terminal's own palette.
-  const id = config.themeFollowSystem ? config.themeLight : config.theme
-  setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+
+// The runtime both clients share: telemetry, the node event watchers, notices, client schedules and
+// device config sync (client-core/host/clientRuntime.ts). Awaited, so the device config's theme is the
+// palette the first frame draws in.
+//
+// Telemetry posts over the ordinary API client, which on this host is the platform seam installed
+// above, so the terminal client needs no transport of its own, only a different `runtime` on the
+// batch (docs/tui/reporting.md § What the terminal client reports).
+//
+// Loaded plugin bundles wait for the worker factory, which loads after the first frame with the rest
+// of the plugin work (`fillIn` below).
+let pluginWorkersInstalled!: () => void
+const pluginsReady = new Promise<void>((resolve) => { pluginWorkersInstalled = resolve })
+const stopClientRuntime = await startClientRuntime({
+  runtime: 'tui',
+  client: () => client,
+  onDeviceConfig: (config) => {
+    // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
+    // Without a selected theme, retain the terminal's own palette.
+    const id = config.themeFollowSystem ? config.themeLight : config.theme
+    setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+  },
+  pluginsReady,
 })
 
 // The shell, and not one line earlier: a module that reaches the node must not be evaluated before
@@ -214,8 +215,8 @@ async function fillIn(): Promise<void> {
     import('./roster'),
     import('./plugins/workerFactory'),
   ])
-  // Loaded bundles are first discovered by `watchPluginChanges` below. Install their Node worker
-  // factory here, before that first pass, rather than in the graph needed to draw empty chrome.
+  // Loaded bundles are first discovered by the shared runtime's plugin watcher, which waits for this.
+  // Their Node worker factory is installed here rather than in the graph needed to draw empty chrome.
   installPluginWorkers()
   installRoster()
   bootMark('roster registered')
@@ -229,15 +230,7 @@ async function fillIn(): Promise<void> {
   const { registerDevicePluginCommands } = await import('./plugins/commands')
   stopDeviceCommands = registerDevicePluginCommands().dispose
 
-  // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
-  // of the client the shell reads — which it now is (docs/plugins/events.md § Hearing a core event). The
-  // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
-  // another window moved nothing on screen until a restart.
-  watchTaskChanges()
-  watchConnectionChanges()
-  watchProjectChanges()
-  watchWorkspaceChanges()
-  watchNodeEvents()
+  pluginWorkersInstalled()
 
   // The node's arrival, which is behind the first frame now. Everything the shell asked for while a
   // node it had just spawned was booting came back as `ECONNREFUSED`, and the first non-offline state
@@ -254,14 +247,6 @@ async function fillIn(): Promise<void> {
     })
   })
 
-  // Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
-  // device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
-  // has not is queued for the trust prompt, which the shell draws as an overlay.
-  //
-  // The watcher owns that first pass as well as the reload one, and runs it when a node first becomes
-  // reachable. Fired from here it asked a node this run had just spawned and was still `offline`, found
-  // no roster, and never ran again — the same boot race the effect above answers for the query cache.
-  watchPluginChanges()
   if (link) {
     // Core places need the compiled roster, which is already installed above. Plugin paths and
     // sources need the selected Node's loaded contributions too. A stalled roster read must not
@@ -315,7 +300,7 @@ const engine = installKeymap(renderer)
 let stopDeviceCommands: (() => void) | undefined
 async function quit(code = 0): Promise<never> {
   stopDeviceCommands?.()
-  stopDeviceConfig()
+  stopClientRuntime()
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()

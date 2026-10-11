@@ -12,11 +12,9 @@ import { directPreferenceSlices } from '@acorn/client-core/infra/persistence'
 import { persistedStateRegistry } from '@acorn/client-core/infra/persistence'
 import { coreStateSlices } from '@acorn/client-core/infra/persistence'
 import { noticeKindRegistry } from '@acorn/client-core/host/registries/rail'
-import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell'
 import { settingsRegistry } from '@acorn/client-core/host/registries/shell'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { taskStatusScheduleContribution } from '@acorn/client-core/features/tasks'
 import { settingsPageContributions } from './pageContributions'
 import { createPluginStartup } from './pluginStartup'
 import { activateScopedStateEviction } from './scopedEviction'
@@ -41,7 +39,6 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // direct preference slices. Which features persist state is each plugin's own declaration now,
 // through ctx.persistedStateSlices. The app no longer holds a list of four plugin slices it does not own.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
-clientScheduleRegistry.register(taskStatusScheduleContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)

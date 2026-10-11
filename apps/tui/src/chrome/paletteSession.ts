@@ -20,7 +20,7 @@ import { focusedCollectionTarget } from '../keys/regions'
 // "open" and "closed" live, because there is no window to float a dialog over.
 //
 // This host handed the session row providers until 2026-09-03 — go-to-task and switch-workspace, then
-// the `paletteRows` contributions after those two became commands (./navigationCommands.ts). There is
+// the `paletteRows` contributions after those two became commands (./navigation.ts). There is
 // no such seam left on either host: every row in the palette comes from the command registry.
 
 /**

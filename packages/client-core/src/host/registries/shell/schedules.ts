@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createRoot, onCleanup, untrack } from 'solid-js'
 import { activeNodeId } from '../../../infra/node/activeNode'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
+import { hostHidden, onHostVisibilityChange } from '../../../infra/platform'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
@@ -10,6 +11,9 @@ const log = createLogger('schedule')
 // deliberately not the same shape: a node cadence is budgeted and floored at 300s because it runs with
 // nobody watching, and below that floor a schedule is a poll, which is the client's job for a person
 // who is present (docs/schedules.md § Cadence). So `intervalMs`, raw, and no floor.
+//
+// Both hosts run these. Whether anybody is looking comes from the platform seam rather than from
+// `document`, which the terminal client does not have.
 export type ClientScheduleContribution = {
   id: string
   intervalMs: number
@@ -44,7 +48,7 @@ export function startClientSchedules(): () => void {
         let running = false
         let dirty = false
         const refresh = () => {
-          if (stopped || activeNodeId() !== nodeId || document.hidden || !hasHostCapability(entry.requires)) return
+          if (stopped || activeNodeId() !== nodeId || hostHidden() || !hasHostCapability(entry.requires)) return
           if (running) { dirty = true; return }
           running = true
           void (async () => {
@@ -53,19 +57,19 @@ export function startClientSchedules(): () => void {
                 dirty = false
                 try { await entry.run() }
                 catch (error) { log.error(entry.id, error, { 'schedule.id': entry.id }) }
-              } while (dirty && !stopped && activeNodeId() === nodeId && !document.hidden && hasHostCapability(entry.requires))
+              } while (dirty && !stopped && activeNodeId() === nodeId && !hostHidden() && hasHostCapability(entry.requires))
             } finally { running = false }
           })()
         }
-        const timer = window.setInterval(refresh, entry.intervalMs)
+        const timer = setInterval(refresh, entry.intervalMs)
         const off = entry.subscribe?.(refresh)
         untrack(refresh)
-        document.addEventListener('visibilitychange', refresh)
+        const offVisibility = onHostVisibilityChange(refresh)
         owners.set(entry, () => {
           if (stopped) return
           stopped = true
           dirty = false
-          document.removeEventListener('visibilitychange', refresh)
+          offVisibility()
           off?.()
           clearInterval(timer)
         })

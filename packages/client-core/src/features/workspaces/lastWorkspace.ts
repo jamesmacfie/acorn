@@ -5,9 +5,9 @@
 // startup restore hydrates the list before either host reports its settled workspace. Keeping the
 // current id too lets an explicit desktop URL count as a new visit after a restart.
 //
-// Ids and nothing else. The desktop looks an id up against the fleet when it needs one
-// (host/palette/navigationCommands.ts), so a workspace whose node has come back is found again
-// rather than remembered against a node id that was right at the time.
+// Ids and nothing else. The Last workspace command looks an id up when it needs one, against the fleet
+// on the desktop (host/registries/commands/navigationCommands.ts), so a workspace whose node has come
+// back is found again rather than remembered against a node id that was right at the time.
 
 import { createSignal } from 'solid-js'
 

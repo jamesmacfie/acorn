@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
-import { canPickFolder, canSetBadge, fleetBridge, nodeTransport, pickFiles, pickFolder, saveFile, setBadge, showNotification } from './index'
+import { canPickFolder, canSetBadge, fleetBridge, hostHidden, nodeTransport, onHostVisibilityChange, pickFiles, pickFolder, saveFile, setBadge, showNotification } from './index'
 
 // The seam contract against a mock host. Each shell runs the same checker against its real host
 // object (apps/desktop/src/shell/bridge.test.ts). That half catches a renamed preload key, this half
@@ -173,6 +173,20 @@ describe('the platform seam contract', () => {
       expect(canPickFolder()).toBe(true)
       await expect(pickFolder()).resolves.toBeNull()
     })
+  })
+
+  // Not a contract group: the desktop's page answers from its own `document`, so only a host without
+  // one installs it, and the terminal's half is checked where it installs it (apps/tui/src/platform.ts).
+  it('takes visibility from the host where it installed it, and counts no answer as visible', () => {
+    const changed = vi.fn()
+    install({ visibility: { hidden: () => true, onChange: (cb: () => void) => { cb(); return () => {} } } })
+    expect(hostHidden()).toBe(true)
+    onHostVisibilityChange(changed)
+    expect(changed).toHaveBeenCalledOnce()
+    install({})
+    vi.stubGlobal('document', undefined)
+    expect(hostHidden()).toBe(false)
+    expect(() => onHostVisibilityChange(changed)()).not.toThrow()
   })
 
   it('names every group in the seam, so a new one cannot be added without a decision here', () => {

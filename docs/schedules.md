@@ -104,9 +104,13 @@ workflow target does.
 
 The renderer has its own `ctx.schedules`, and it isn't this one. A client schedule takes a raw
 `intervalMs` with no floor (`packages/client-core/src/host/registries/shell/schedules.ts`), because
-below the 300-second floor a schedule is a poll, and polling is the client's job. It starts when its
-plugin becomes available, stops when the plugin goes, admits no reads in a hidden window, and coalesces
-timer, event, and visibility edges into one refresh and one follow-up.
+below the 300-second floor a schedule is a poll, and polling is the client's job. Both clients run
+client schedules, from the shared start in `packages/client-core/src/host/clientRuntime.ts`, once the
+Node is ready. A schedule starts when its plugin becomes available, stops when the plugin goes, admits
+no reads while its host is hidden, and coalesces timer, event, and visibility edges into one refresh and
+one follow-up. The host reports whether it's hidden through the platform seam, and the terminal client
+always reports itself visible
+([the platform seam](./architecture/node-api.md#the-platform-seam)).
 
 ## Policies
 

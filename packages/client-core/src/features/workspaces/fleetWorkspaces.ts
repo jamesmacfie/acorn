@@ -80,7 +80,7 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
 // active workspace from that repo against the active node's query cache, so navigating first
 // would resolve the path against the wrong node, which either finds nothing or, worse, finds a
 // different repo that happens to share the owner/name.
-export function selectFleetWorkspace(entry: FleetWorkspace, navigate: (path: string) => void): void {
+export function selectFleetWorkspace(entry: Pick<FleetWorkspace, 'workspace' | 'nodeId'>, navigate: (path: string) => void): void {
   const first = entry.workspace.projects[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker
   if (entry.nodeId !== activeNodeId()) setActiveNode(entry.nodeId)

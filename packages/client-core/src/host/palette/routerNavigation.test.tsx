@@ -5,7 +5,9 @@ import { prefsKey, projectsKey, tasksKey, type Task } from '@acorn/protocol/api.
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import type { Disposable } from '../../kit/lib/state/registry'
 
-// Go to task, and the one thing about it that is not obvious: the node comes first.
+// The Go to commands on the desktop: the shared commands (../registries/commands/navigationCommands.ts)
+// over the router-backed host (./routerNavigation.ts). Go to task has the one thing about it that is
+// not obvious: the node comes first.
 //
 // `activateTaskSignals` and the route both resolve against whichever node is active, so activating a
 // task that lives on another machine without switching first addresses the wrong one. That order was
@@ -52,7 +54,8 @@ function makeTask(id: string, title: string): Task {
   }
 }
 
-const { registerNavigationCommands } = await import('./navigationCommands')
+const { registerNavigationCommands } = await import('../registries/commands/navigationCommands')
+const { createRouterNavigation } = await import('./routerNavigation')
 const { commandRegistry, commandTitle, commandHint } = await import('../registries/commands/commands')
 type SearchCommand = import('../registries/commands/commands').SearchCommand
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
@@ -77,7 +80,7 @@ beforeEach(() => {
     { id: 'p2', name: 'hidden one', color: null, hidden: true },
   ])
   const Registrar = () => {
-    registerNavigationCommands({ open: () => true, fleetWorkspaces: () => ({ entries: [], grouped: false, unavailable: [] }) })
+    held.push(registerNavigationCommands(createRouterNavigation({ open: () => true, fleetWorkspaces: () => ({ entries: [], grouped: false, unavailable: [] }) })))
     return <span />
   }
   dispose = render(() => <QueryClientProvider client={client}><Registrar /></QueryClientProvider>, host)

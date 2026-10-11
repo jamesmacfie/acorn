@@ -12,7 +12,6 @@ import {
   addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createProjectAddNavigation, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace, workspaceWords,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
-import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
 import { sessionSummaries } from '@acorn/client-core/features/tasks'
 import { workspaceRailShown } from '@acorn/client-core/features/workspaces/workspaceRailPrefs.ts'
@@ -44,7 +43,6 @@ import { taskBridge } from '@acorn/client-core/features/tasks'
 import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
 import { createLinkPreviewBoundary } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 import { LinkPreviewHost } from '@acorn/client-core/host/linkPreview/LinkPreviewHost.tsx'
-import { startClientSchedules } from '@acorn/client-core/host/registries/shell'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
 import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
@@ -191,7 +189,7 @@ export default function App() {
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Toggle rail', category: 'Global', defaultChord: 'meta+b', when: 'global' },
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Maximize or restore the focused pane', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
       // The command is the palette's own Last workspace row, registered with the rest of the Go to
-      // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
+      // group (client-core/host/registries/commands/navigationCommands.ts); this is the chord that reaches it.
     ])
     createEffect(() => {
       const description = `Switch to the last ${workspaceWords(workspaceMode()).singular}`
@@ -255,31 +253,9 @@ export default function App() {
     if (off) onCleanup(off)
   })
 
-  // The session-source owners start their own roster subscriptions at activation. The shell starts
-  // its schedules once the node can answer. App mounts before the startup gate releases, and each
-  // schedule runs once on start and then waits for its interval or an event. Started at mount, the
-  // first run went to a local node the broker had not adopted yet, failed, and left task statuses
-  // empty for up to 10 s and workflow run counts for up to 2 min.
-  //
-  // Started once and kept, because the gate can briefly hold again while Settings → Nodes re-reads
-  // the fleet.
-  let stopSchedules: (() => void) | undefined
-  createEffect(() => {
-    if (!stopSchedules && nodeReady()) stopSchedules = startClientSchedules()
-  })
-  onCleanup(() => stopSchedules?.())
-
-  // Workflow notices are broadcast over `/v1/events` by main, not by the terminal plugin, and a node
-  // without a terminal still runs workflows. They were inside the guard above, which meant no gate
-  // notice at all on such a node.
-  onMount(() => onCleanup(initWorkflowNotices()))
-
-  // The sound channel. Every unseen notice the gate lets through, whatever raised it.
+  // The sound channel. Every unseen notice the gate lets through, whatever raised it. The workflow and
+  // system channels are the shared runtime's (client-core/host/clientRuntime.ts).
   onMount(() => onCleanup(initSoundNotices()))
-
-  // The system channel, on the same terms. The dock badge is the bell's, because it is the bell's
-  // number (features/notifications/NotificationBell.tsx).
-  onMount(() => onCleanup(initSystemNotices()))
 
   // Which plugins the node this shell is showing runs.
   //

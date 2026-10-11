@@ -93,8 +93,9 @@ pane placeholders ([states](../ui-design/states.md#loading)).
 
 ### Startup order
 
-`apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` without
-blocking. `activate.ts` registers core eagerly. After the first paint, a queued task imports the
+`apps/desktop/src/client/index.tsx` first calls `startClientRuntime()`, the start it shares with the
+terminal client ([composition](../frontend.md#composition)), and doesn't wait for it. It then starts
+`selectActiveNode()` and `applyNodePlugins()` without blocking. `activate.ts` registers core eagerly. After the first paint, a queued task imports the
 12-plugin roster and runs its registration and activation passes. A window hidden behind others gets a
 250 ms fallback, because macOS can suspend animation frames. Workspace restore waits for registration,
 including plugin state slices, before it reopens tasks or follows pane deep links.

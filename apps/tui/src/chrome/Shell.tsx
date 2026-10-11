@@ -13,7 +13,7 @@ import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
-import { buildLink, clientEvents, registerCommands, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
+import { buildLink, clientEvents, registerCommands, registerNavigationCommands, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -21,7 +21,6 @@ import { sourceIsProjectScoped } from '@acorn/client-core/host/registries/source
 import { currentPath } from '../kit/router'
 import { copyToTerminal } from '../kit/copy'
 import { pendingTerminalTrust } from '@acorn/client-core/host/plugins/distribution.ts'
-import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { Dynamic } from '../tree/renderer'
 import { Line } from '../kit/cells'
 import { EmptyState, keyedRows, Row, Rows } from '../kit/showing'
@@ -50,7 +49,7 @@ import { Inbox, initInbox } from './Inbox'
 import { trustPromptComponent } from '../plugins/trustPromptLoader'
 import { Palette } from './Palette'
 import { createShellPalette } from './paletteSession'
-import { registerNavigationCommands } from './navigationCommands'
+import { shellNavigation } from './navigation'
 import { CheatSheet } from './CheatSheet'
 import type { SetupStep } from './Setup'
 import { promotionRequest } from './promotionStore'
@@ -247,17 +246,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // One tick for every spinner on screen (../kit/tick.ts).
   onMount(() => onCleanup(startSpinner()))
 
-  // What is waiting, and the three things that feed it. The desktop's `App.tsx` mounts the same three
-  // and this is the same place in the same order.
-  //
-  // Terminal's activated session source watches PTY sessions. `initWorkflowNotices`
-  // is outside that question on purpose: main broadcasts gate and run-done events over `/v1/events`,
-  // and a node with no terminal still runs workflows. `initSystemNotices` is the channel this host
-  // answers with an escape sequence rather than an OS banner (../platform.ts, ../kit/notify.ts).
-  onMount(() => {
-    onCleanup(initWorkflowNotices())
-    onCleanup(initSystemNotices())
-  })
+  // What is waiting. The workflow and system notices that feed it are the shared runtime's
+  // (client-core/host/clientRuntime.ts); the system channel answers here with an escape sequence
+  // rather than an OS banner (../platform.ts, ../kit/notify.ts).
   initInbox()
 
   // The command layer, tier 0: every keybinding the app and its plugins registered, over the command
@@ -319,7 +310,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       } },
       // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
       // the palette at all — but the palette's own row for each is the search under Go to, and two rows
-      // saying "Switch workspace" is one too many (./navigationCommands.ts).
+      // saying "Switch workspace" is one too many
+      // (client-core/host/registries/commands/navigationCommands.ts).
       { id: 'core.workspace.switch', title: () => `Switch ${words().singular}`, category: 'workspace', palette: false, run: () => openOverlay('workspace') },
       { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: false, run: () => openOverlay(mode() === 'off' ? 'workspace' : 'project') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
@@ -337,8 +329,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
         { id: 'core.workspace.switch', command: 'core.workspace.switch', description: label, category: 'Global', defaultChord: 'w', when: 'global' },
         { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
         // Beside `w`, because it is the other half of switching workspace, and bare for the same
-        // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
-        // dropped from this layer while there is nowhere to go back to.
+        // reason. The command is the palette's Last workspace row
+        // (client-core/host/registries/commands/navigationCommands.ts), and it is dropped from this
+        // layer while there is nowhere to go back to.
         { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: `Last ${words().singular}`, category: 'Global', defaultChord: ';', when: 'global' },
         { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
         { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
@@ -349,7 +342,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     })
     // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
     // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
-    const navigation = registerNavigationCommands(model, words)
+    const navigation = registerNavigationCommands(shellNavigation(model, words))
     onCleanup(() => { navigation.dispose(); commands.dispose() })
   })
 

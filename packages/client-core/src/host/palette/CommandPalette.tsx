@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
@@ -7,7 +7,8 @@ import { taskById } from '../../features/tasks/taskLookup'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
 import type { CommandExecutionContext } from '../registries/commands/commands'
-import { registerNavigationCommands } from './navigationCommands'
+import { registerNavigationCommands } from '../registries/commands/navigationCommands'
+import { createRouterNavigation } from './routerNavigation'
 import { registerHiddenSourceOpeners } from './sourceOpeners'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
@@ -70,9 +71,13 @@ export default function CommandPalette() {
     fleet: () => (nodes().length > 1 ? nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })) : []),
   })
 
-  // The four navigation searches, which need the session's own open flag: the task fan-out runs only
-  // while somebody is looking at the palette.
-  registerNavigationCommands({ open: session.open, fleetWorkspaces })
+  // The Go to commands, which need the session's own open flag: the task fan-out runs only while
+  // somebody is looking at the palette.
+  const navigation = createRouterNavigation({ open: session.open, fleetWorkspaces })
+  onMount(() => {
+    const commands = registerNavigationCommands(navigation)
+    onCleanup(() => commands.dispose())
+  })
   // A way back to every plugin source the rail is not drawing.
   registerHiddenSourceOpeners(() => context().workspaceId)
 
