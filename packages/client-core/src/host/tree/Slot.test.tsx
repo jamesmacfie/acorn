@@ -1,4 +1,6 @@
 import { render } from 'solid-js/web'
+import { createEffect, createSignal, ErrorBoundary } from 'solid-js'
+import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Slot } from './Slot'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
@@ -20,9 +22,12 @@ vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 // The tree itself is the worker path, tested in TreeHost/workerHost. Here it only has to be
 // identifiable on screen.
 vi.mock('./RemoteTree', () => ({
-  RemoteTree: (props: { contribution: { pluginId: string }; scope?: () => { taskId?: string } }) => (
-    <span>tree:{props.contribution.pluginId}{props.scope?.().taskId ? ` in ${props.scope!().taskId}` : ''}</span>
-  ),
+  RemoteTree: (props: { contribution: { pluginId: string }; scope?: () => { taskId?: string }; props?: () => unknown }) => {
+    createEffect(() => {
+      if ((props.props?.() as { fail?: boolean })?.fail) throw new Error('remote contribution failed')
+    })
+    return <span>tree:{props.contribution.pluginId}{props.scope?.().taskId ? ` in ${props.scope!().taskId}` : ''}</span>
+  },
 }))
 
 const registered: Disposable[] = []
@@ -121,6 +126,32 @@ describe('Slot', () => {
       .toBe('tree:images in t-42')
     // And an owner with no task to give says so rather than inventing one.
     expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:images')
+  })
+
+  it.each(['replace', 'stack'] as const)('contains a remote contribution update failure in a %s slot', (mode) => {
+    point({ mode })
+    contributor('images', 'agents:attachment')
+    const [fail, setFail] = createSignal(false)
+    const reports: unknown[] = []
+    setContributionErrorHandler((report) => reports.push(report))
+    const host = document.createElement('div')
+    const dispose = render(() => (
+      <ErrorBoundary fallback="pane crashed">
+        <span>conversation</span>
+        <Slot point="agents:attachment" props={() => ({ fail: fail() })}>default</Slot>
+      </ErrorBoundary>
+    ), host)
+    try {
+      expect(host.textContent).toContain('tree:images')
+      setFail(true)
+      expect(host.textContent).toBe('conversationdefault')
+      expect(reports).toEqual([expect.objectContaining({ contributionId: 'plugin:images:draw', owner: 'images' })])
+      setFail(false)
+      expect(host.textContent).toBe('conversationdefault')
+    } finally {
+      dispose()
+      setContributionErrorHandler(null)
+    }
   })
 
   it('resolves a slot in the owner’s default without nesting a contributor', () => {

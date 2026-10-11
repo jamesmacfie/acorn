@@ -1,7 +1,9 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type Component, type JSX } from 'solid-js'
+import { ErrorBoundary, For, Show, createEffect, createMemo, createSignal, onCleanup, type Component, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { RemoteTree } from './RemoteTree'
+import { reportContributionError } from '../../kit/lib/telemetry/contributionErrors'
+import { recordTreeFailure } from './treeFailures'
 import { resolveSlot } from './arbitration'
 import { createSlotChoice } from './slotChoice'
 import { compiledOwnerHost, createGestureClock, type OwnerActions } from './hostRequests'
@@ -128,43 +130,52 @@ export function Slot(props: SlotProps) {
       <Show when={outcome()?.occupants.length}>
         <For each={outcome()!.occupants}>
           {(contribution) => (
-            <Show
-              when={contribution.carrier === 'component' && contribution.component}
-              fallback={
-                <RemoteTree
-                  contribution={{
-                    id: contribution.id,
-                    pluginId: contribution.pluginId,
-                    hash: contribution.hash ?? '',
-                    entry: contribution.entry ?? '',
-                    ...(contribution.overlay ? { overlay: contribution.overlay } : {}),
-                  }}
-                  props={props.props ?? (() => ({}))}
-                  actions={() => props.actions ?? {}}
-                  declaredActions={() => resolved()?.actions ?? []}
-                  scope={() => ({
-                    ...(props.taskId ? { taskId: props.taskId } : {}),
-                    ...(props.projectId ? { projectId: props.projectId } : {}),
-                  })}
-                  onFailed={() => setFailed((ids) => [...ids, contribution.id])}
-                />
-              }
-            >
-              {/* Spread rather than one `props` object, so the contributor writes an ordinary component
-                  with the owner's own prop names. Solid keeps a dynamic spread reactive. */}
-              {(component) => (
+            <Show when={!failed().includes(contribution.id)}>
+              <ErrorBoundary fallback={(error) => {
+                reportContributionError({ contributionId: contribution.id, owner: contribution.pluginId, error })
+                recordTreeFailure(contribution.id, error instanceof Error ? error.message : String(error))
+                setFailed((ids) => [...ids, contribution.id])
+                return null
+              }}>
                 <Show
-                  when={resolved()?.actions.length}
-                  fallback={<Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+                  when={contribution.carrier === 'component' && contribution.component}
+                  fallback={
+                    <RemoteTree
+                      contribution={{
+                        id: contribution.id,
+                        pluginId: contribution.pluginId,
+                        hash: contribution.hash ?? '',
+                        entry: contribution.entry ?? '',
+                        ...(contribution.overlay ? { overlay: contribution.overlay } : {}),
+                      }}
+                      props={props.props ?? (() => ({}))}
+                      actions={() => props.actions ?? {}}
+                      declaredActions={() => resolved()?.actions ?? []}
+                      scope={() => ({
+                        ...(props.taskId ? { taskId: props.taskId } : {}),
+                        ...(props.projectId ? { projectId: props.projectId } : {}),
+                      })}
+                      onFailed={() => setFailed((ids) => [...ids, contribution.id])}
+                    />
+                  }
                 >
-                  <CompiledWithHost
-                    component={component()}
-                    props={() => props.props?.() as Record<string, unknown>}
-                    declared={() => resolved()?.actions ?? []}
-                    actions={() => props.actions ?? {}}
-                  />
+                  {/* Spread rather than one `props` object, so the contributor writes an ordinary component
+                      with the owner's own prop names. Solid keeps a dynamic spread reactive. */}
+                  {(component) => (
+                    <Show
+                      when={resolved()?.actions.length}
+                      fallback={<Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+                    >
+                      <CompiledWithHost
+                        component={component()}
+                        props={() => props.props?.() as Record<string, unknown>}
+                        declared={() => resolved()?.actions ?? []}
+                        actions={() => props.actions ?? {}}
+                      />
+                    </Show>
+                  )}
                 </Show>
-              )}
+              </ErrorBoundary>
             </Show>
           )}
         </For>

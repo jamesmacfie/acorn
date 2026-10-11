@@ -33,6 +33,15 @@ and a worker that stops answering is ended and removed from every place it contr
 `@acorn/protocol/tree/`, the host is `client-core/src/host/tree/`, and the sandbox is in
 [the client sandbox](../security/plugin-client-sandbox.md).
 
+The host checks workers every ten seconds. It starts a fresh check after a host pause and skips
+checks while the renderer is hidden, so delayed replies after sleep or background throttling don't
+retire a healthy worker. An unanswered check during normal activity still ends the worker. Once
+ended, it receives no more props or appearance updates and retains no bridge authority.
+
+Each cooperative contribution has its own render error boundary. A failed contribution is removed
+for that slot's lifetime; a `replace` slot restores its owner's default, and a `stack` slot keeps
+the other contributions. The containing pane keeps working. Remounting the slot tries again.
+
 A tree isn't the right path for two things. UI that reacts per keystroke, such as a live filter over
 a large list, pays a message hop per key and should be a frame. A surface whose pixels are the
 product, such as an image editor, is a frame by definition.
