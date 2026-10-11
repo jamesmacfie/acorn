@@ -27,7 +27,7 @@ carry the window's own commands and menu. `overlays.rs`, `notifications.rs`, `cr
 `footprint.rs`, `cli_install.rs`, and `dev_server.rs` cover native overlays, banners, crash records,
 memory readings, the CLI launcher, and the development server check. Custody is TypeScript.
 
-`packages/custody` is the other half, composed by its `src/index.ts`: service supervision and the
+`packages/custody` is the other half, composed by `createHelper` in its `src/helper.ts`: service supervision and the
 restart policy, the connection broker and its fleet, device-token custody, and the plugin cache and
 trust store. It runs as its own process under the bundled Node, with
 `apps/desktop/src/helper/helperMain.ts` as its entry. Rust talks to it over stdin and stdout in lines:

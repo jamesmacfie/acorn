@@ -31,8 +31,8 @@ agents plugin, not the terminal. Move it to whichever owns the harness profiles.
 Keep one per package that can't import another's. The loaded plugins `http` and `sentry-telemetry`
 may keep their own copies.
 
-**Name `createHelper`'s file for what it is.** `packages/custody/src/index.ts` holds the 333-line
-`createHelper`, the desktop helper's composition. It isn't an entry point. The exports map reaches it
+**Name `createHelper`'s file for what it is.** `packages/custody/src/index.ts` (since moved to
+`helper.ts`) held the 333-line `createHelper`, the desktop helper's composition. It isn't an entry point. The exports map reaches it
 through `packages/custody/src/runtime/public.ts`. `docs/conventions.md` says `index.ts` exists only
 as an entry point, so rename the file, for example to `helper.ts`.
 
