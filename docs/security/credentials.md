@@ -103,7 +103,9 @@ The node-owner identity is opaque, explicit, and persisted at first boot. It's i
 provider connections, and internal auth fails closed if it's unset. A task token can't use another
 task's routes, terminal streams, preview tunnel, or worktree operations.
 
-Provider-credential limits are route-specific. A GitHub route reachable by an internal principal can
-spend the owner's GitHub credential. Routes that administer or spend a connection sit behind
-`requireProviderAccess`, which admits devices and `service` calls and refuses a task token
+A task token can't spend a stored provider credential. Core's `providerCredential`
+(`server/integrations/credential.ts`) returns the credential only to a device or the Node's own
+`service` calls, and an empty string to a task token. A GitHub route that a task token reaches gets no
+token, so it can't call GitHub as the owner. Routes that administer or spend a connection also sit
+behind `requireProviderAccess`, which admits devices and `service` calls and refuses a task token
 ([the gates](./transport-and-auth.md#the-gates)).

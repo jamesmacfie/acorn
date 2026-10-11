@@ -70,7 +70,8 @@ the plugin iframe's separate cross-origin boundary and the ACL's subframe limit.
 
 The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
-is [review-2026-10-01.md](./security/review-2026-10-01.md).
+is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
+[review-2026-10-11.md](./security/review-2026-10-11.md).
 
 ## Instruction file checks and review
 

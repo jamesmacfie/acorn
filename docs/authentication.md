@@ -132,9 +132,9 @@ Workflow child files are refreshed while their steps run and removed when the ch
 the signing key still revokes all outstanding tokens.
 
 The GitHub credential is an integration secret, not part of `Principal`. GitHub routes read it through
-`plugins/github/src/server/githubToken.ts`, so an internal caller that can reach a GitHub route can spend
-the owner's GitHub credential. Task scope limits task access. It isn't a universal provider-credential
-firewall.
+`plugins/github/src/server/githubToken.ts`, which calls core's `providerCredential`. That returns the
+credential to a device or the Node's own `service` calls, and an empty string to a task token. A task
+token that reaches a GitHub route gets no token, so it can't spend the owner's GitHub credential.
 
 ## GitHub connection
 
