@@ -59,7 +59,8 @@ step. An app-server without the list endpoint runs with no Mode picker.
 Codex's `turn/plan/updated` steps draw as a progress card. A completed `plan` item is stored as a
 proposal and shown in the transcript. For the latest completed interactive Plan turn, the card offers
 **Implement plan**. The Node checks the proposal and turn in one transaction, switches the Mode option
-to Default, and queues one continuation in the same thread. The turn records the proposal, so a
+to Default, and queues one continuation in the same thread
+(`plugins/agents/src/server/drivers/codexPlanHandoff.ts`). The turn records the proposal, so a
 second click reuses it. A revision turn or a rejected handoff leaves Plan selected.
 
 Generated files cross a provider-neutral seam. A driver emits bytes with a title, media type, and

@@ -253,7 +253,7 @@ export function createSessionExecute(
     const registry = await followUps?.()
     const beforeSeq = (await runtime.store.requireSession(session.id)).lastEventSeq
     const forwarding = new ExecutionEvents(session.id, beforeSeq, request.onEvent)
-    const unsubscribe = runtime.subscribe((frame) => forwarding.receive(frame))
+    const unsubscribe = runtime.frames.subscribe((frame) => forwarding.receive(frame))
     try {
       const first = await runtime.enqueueTurn(session.id, {
         input: stepInput(request, objective),

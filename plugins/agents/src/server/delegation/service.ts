@@ -312,7 +312,7 @@ export class AgentDelegationService {
     const custom = await this.customAgentFor(input)
     const defaults = await this.runtime.spawnedAgentDefaults()
     const profileId = spawnProfileId(defaults, caller.profileId, input.profileId, custom)
-    const provider = await this.runtime.usableProvider((candidate) => candidate.profileId === profileId)
+    const provider = await this.runtime.providers.usable((candidate) => candidate.profileId === profileId)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
     if (!provider.installed || provider.authenticated === false) {
       throw new ToolError('bad_request', provider.diagnostics[0] ?? `Profile '${profileId}' is unavailable.`)

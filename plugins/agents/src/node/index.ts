@@ -268,7 +268,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         id: 'stop-sessions',
         mode: 'transform',
         run: async (payload) => {
-          await runtime?.stopTaskSessions(payload.taskId as string)
+          await runtime?.upkeep.stopTaskSessions(payload.taskId as string)
           return { payload }
         },
       })
@@ -364,7 +364,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       instructionReviewRoute = ctx.capabilities.provide(AGENT_INSTRUCTION_REVIEW, {
         tasks: async () => (await core.tasks.active()).map(({ id, title, projectId }) => ({ id, title, projectId })),
-        admission: () => runtime!.instructionAdmission(),
+        admission: () => runtime!.instructionAdmission.get(),
       })
       securityDiagnosticsRoute = ctx.capabilities.provide(AGENT_SECURITY_DIAGNOSTICS, {
         check: async (nodeId, userId, scope, signal) => {
@@ -374,9 +374,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
             session: (id) => runtime!.store.requireSession(id).catch(() => null),
             managedMcp: () => runtime!.mcpServers.list(),
-            instructionObservation: async (projectId, taskId) => (await runtime!.observedInstructionAdmission())?.latest(projectId, taskId) ?? null,
-            observedProvider: (id) => runtime!.observedProvider(id),
-            readBlockProviders: () => runtime!.readBlockProviders(),
+            instructionObservation: async (projectId, taskId) => (await runtime!.instructionAdmission.built())?.latest(projectId, taskId) ?? null,
+            observedProvider: (id) => runtime!.providers.observed(id),
+            readBlockProviders: () => runtime!.providers.readBlockProviders(),
             staticDependencyPolicy: async (root, signal) => {
               const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
               return policy?.read(root, signal)
@@ -392,7 +392,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         if (typeof event.projectId !== 'string') return
         const projectId = event.projectId
         void core.projects.byId(projectId).then(async (project) => {
-          if (!project) await (await runtime!.instructionAdmission()).store.deleteProject(projectId)
+          if (!project) await (await runtime!.instructionAdmission.get()).store.deleteProject(projectId)
         }).catch(() => undefined)
       })
 
@@ -453,9 +453,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           ctx.audit.record('mcp-package-activation', { subject: name, details: { package: server.managed?.package ?? '', version: server.managed?.version ?? '', bin } })
           return server
         },
-        pendingReviews: () => runtime!.pendingMcpReviews(),
+        pendingReviews: async () => (await runtime!.mcpReviews.get()).pending(),
         approveReview: async (name, sessionId, revision, digest) => {
-          const server = await runtime!.approveMcpCatalogue(name, sessionId, revision, digest)
+          const server = await (await runtime!.mcpReviews.get()).approve(name, sessionId, revision, digest)
           ctx.audit.record('mcp-catalogue-approval', { subject: name, details: { sessionId, digest } })
           return server
         },
@@ -466,7 +466,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // harnesses a plugin's tool hooks reach. Coverage is loaded on first use, like each bridge call.
       loopHooksRoute = ctx.capabilities.provide(AGENT_LOOP_HOOKS, {
         answer: (caller, request) => runtime!.loopHook(caller, request),
-        coverage: async (pluginId) => (await import('../server/sessions/loopHooks')).loopCoverage(ctx.hooks, await runtime!.providers(), pluginId),
+        coverage: async (pluginId) => (await import('../server/sessions/loopHooks')).loopCoverage(ctx.hooks, await runtime!.providers.list(), pluginId),
       })
       ctx.routes.register(agentLoopHooks, { prefix: '', note: '/loop-hook, /loop-coverage — harness bridge calls and what they reach' })
 

@@ -3,7 +3,7 @@ import { redactSecretText, scanSecretText } from '@acorn/plugin-api/node'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
-import { agentTurnInputText } from './runtimeEngine'
+import { agentTurnInputText } from './runtimeContext'
 import type { AgentStore } from './store'
 import { parseAgentTranscript } from './transcriptImport'
 

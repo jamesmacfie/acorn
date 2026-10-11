@@ -1580,7 +1580,7 @@ describe('managed agent runtime conformance', () => {
     await vi.waitFor(async () => expect((await runtime!.store.requireSession(idle.id)).runtimeState).toBe('ready'))
     await vi.waitFor(async () => expect((await runtime!.store.requireSession(bystander.id)).runtimeState).toBe('ready'))
 
-    await runtime.stopTaskSessions(archived.taskId)
+    await runtime.upkeep.stopTaskSessions(archived.taskId)
 
     expect([...driver.stopped].sort()).toEqual([working.id, idle.id].sort())
     const stopped = await runtime.store.snapshot(working.id)
@@ -2199,7 +2199,7 @@ describe('managed agent runtime conformance', () => {
       taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions: advertised() },
     })
     const rows: AgentSession[] = []
-    runtime.subscribe((frame) => { if (frame.channel === 'agent:session') rows.push(frame.session) })
+    runtime.frames.subscribe((frame) => { if (frame.channel === 'agent:session') rows.push(frame.session) })
     // What the host hands a loaded plugin (node-core's scopeCapabilities).
     const bound = (createSessionControl(runtime) as AgentSessionControl & { [BIND_CAPABILITY_CALLER]: (id: string) => AgentSessionControl })[BIND_CAPABILITY_CALLER]('acorn-session-meter')
 
@@ -2541,9 +2541,9 @@ describe('managed agent runtime conformance', () => {
 
       // Archived, the process stops and its copy goes. Restored, the next start writes a new one, and
       // with the harness silent the skill reaches the agent through the index, at the copy's path.
-      await runtime.archive(session.id, true)
+      await runtime.patchSession(session.id, { archived: true })
       await expect(readdir(sessionFolders)).resolves.toEqual([])
-      await runtime.archive(session.id, false)
+      await runtime.patchSession(session.id, { archived: false })
       advertise = false
       await turn('And this.')
       await vi.waitFor(() => expect(sent).toHaveLength(2))

@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { codexPlanHandoffState } from '../../shared/codexPlanHandoff'
-import { AgentStore } from './store'
+import { AgentStore } from '../sessions/store'
+import { acceptCodexPlan } from './codexPlanHandoff'
 
 const PROVIDER: AgentProviderDescriptor = {
   id: 'codex', profileId: 'codex', label: 'Codex', driverKind: 'codex-app-server',
@@ -57,8 +58,8 @@ describe('Codex plan handoff', () => {
     expect(codexPlanHandoffState(before.session, before.turns, before.events, proposal)).toBe('actionable')
 
     const [first, second] = await Promise.all([
-      store.acceptCodexPlan(session.id, 'plan-1', 'Implement the plan'),
-      store.acceptCodexPlan(session.id, 'plan-1', 'Implement the plan'),
+      acceptCodexPlan(store, session.id, 'plan-1', 'Implement the plan'),
+      acceptCodexPlan(store, session.id, 'plan-1', 'Implement the plan'),
     ])
     expect([first.inserted, second.inserted].sort()).toEqual([false, true])
     expect(first.turn.id).toBe(second.turn.id)
@@ -81,7 +82,7 @@ describe('Codex plan handoff', () => {
       source: 'interactive', input: [{ type: 'text', text: 'Revise the plan' }],
       effectivePolicy: { mode: 'plan' }, idempotencyKey: randomUUID(),
     })
-    await expect(store.acceptCodexPlan(session.id, 'plan-1', 'Implement')).rejects.toThrow('no longer available')
+    await expect(acceptCodexPlan(store, session.id, 'plan-1', 'Implement')).rejects.toThrow('no longer available')
     const after = await store.snapshot(session.id)
     expect(after.turns).toHaveLength(2)
     expect((after.session.config.configOptions as Array<{ currentValue: string }>)[0]?.currentValue).toBe('plan')

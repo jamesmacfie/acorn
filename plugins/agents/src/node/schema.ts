@@ -37,7 +37,7 @@ export const agentSessions = sqliteTable(
     parentSessionId: text('parent_session_id'),
     parentTurnId: text('parent_turn_id'),
     // The subagent roster, projected from this session's own `subagent` events by
-    // server/sessions/sessionRepository.ts. On the row rather than in a table of its own because the row is
+    // server/sessions/store.ts. On the row rather than in a table of its own because the row is
     // broadcast to every client whenever an event changes it, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),
@@ -59,7 +59,7 @@ export const agentSessions = sqliteTable(
     // the pass reads only the sessions that still need it.
     ledgerCompactedAt: integer('ledger_compacted_at'),
     // When the retention pass removed this session's history because its task had been archived
-    // longer than the owner keeps it (server/sessions/sessionRepository.ts § finishHistoryRemoval). The row
+    // longer than the owner keeps it (server/sessions/store.ts § finishHistoryRemoval). The row
     // stays so the task still lists the session. Null means the history is still here.
     historyRemovedAt: integer('history_removed_at'),
     createdAt: integer('created_at').notNull(),

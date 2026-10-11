@@ -16,7 +16,7 @@ the workflow editor asks you to open a session on it once. Execution validates r
 against the new session's own advertised values.
 
 A probe starts each harness's CLI, which took 211 ms typically and up to 5 seconds, so the Node serves
-the last answer from memory (`ManagedAgentEngine.providers` in `runtimeEngine.ts`). Once that answer
+the last answer from memory (`ProviderCatalogue.list` in `providerCatalogue.ts`). Once that answer
 is 30 seconds old, the next read still gets it, and one probe runs behind the read to replace it.
 Callers that arrive meanwhile share that probe. Three reads wait for a fresh probe:
 

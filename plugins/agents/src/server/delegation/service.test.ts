@@ -87,7 +87,7 @@ describe('agent delegation service', () => {
     defaults = defaultSpawnedAgentDefaults()
     runtime = {
       store: sessions,
-      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick),
+      providers: { usable: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick) },
       spawnedAgentDefaults: async () => defaults,
       customAgents: async () => customAgents,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) =>

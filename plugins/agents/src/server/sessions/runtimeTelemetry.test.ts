@@ -5,6 +5,7 @@ import type { PluginTelemetry, TelemetryRecord } from '@acorn/plugin-api/node'
 import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
+import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
 
 // Starting a provider and running a turn, as spans this plugin raises through `ctx.telemetry`
 // (docs/managed-agents/session-events.md § What a session reports).
@@ -36,9 +37,11 @@ async function seedTask(ctx: TestNodeContext): Promise<string> {
 describe('what a session reports', () => {
   let ctx: TestNodeContext
   let runtime: ManagedAgentRuntime | null
+  // Built by build() and handed to the runtime, so a test can start a provider directly.
+  let engine: ManagedAgentEngine
 
-  const build = (registry: AgentDriverRegistry, telemetry?: PluginTelemetry, footprintSampleMs?: number): ManagedAgentRuntime =>
-    new ManagedAgentRuntime({
+  const build = (registry: AgentDriverRegistry, telemetry?: PluginTelemetry, footprintSampleMs?: number): ManagedAgentRuntime => {
+    const options: AgentRuntimeOptions = {
       db: ctx.storage.open(),
       dataDir: ctx.dataDir,
       core: ctx.core,
@@ -48,7 +51,10 @@ describe('what a session reports', () => {
       registry,
       ...(telemetry ? { telemetry } : {}),
       ...(footprintSampleMs ? { footprintSampleMs } : {}),
-    })
+    }
+    engine = new ManagedAgentEngine(options)
+    return new ManagedAgentRuntime(options, engine)
+  }
 
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
@@ -119,7 +125,7 @@ describe('what a session reports', () => {
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry, ctx.telemetry)
     const accepted = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
-    await expect(runtime['engine'].ensureSession(accepted)).rejects.toThrow('private checkout path and credential')
+    await expect(engine.ensureSession(accepted)).rejects.toThrow('private checkout path and credential')
     const phase = spanNamed(ctx, 'agent.session.phase')!
     expect(phase).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'error' } })
     const total = spanNamed(ctx, 'agent.session.start')!
@@ -137,7 +143,7 @@ describe('what a session reports', () => {
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry, ctx.telemetry)
     const session = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
-    const starting = runtime['engine'].ensureSession(session).catch((error: unknown) => error)
+    const starting = engine.ensureSession(session).catch((error: unknown) => error)
     await vi.waitFor(() => expect(root).toHaveBeenCalledOnce())
     await runtime.stop()
     expect(await starting).toBeInstanceOf(Error)
@@ -169,7 +175,7 @@ describe('what a session reports', () => {
 
     it('reports live, idle and summed memory as gauges this plugin owns', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
-      vi.spyOn(runtime['engine'], 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
+      vi.spyOn(runtime.upkeep, 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
       // The timer keeps running while this waits, so only the first sample is compared.
       await vi.waitFor(() => expect(gauges().slice(0, 3)).toEqual([
         ['agent.processes.live', 2, 'agents'],
@@ -180,7 +186,7 @@ describe('what a session reports', () => {
 
     it('leaves memory out when the process table could not be read', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
-      vi.spyOn(runtime['engine'], 'processFootprint').mockResolvedValue({ live: 1, idle: 0, memoryBytes: null })
+      vi.spyOn(runtime.upkeep, 'processFootprint').mockResolvedValue({ live: 1, idle: 0, memoryBytes: null })
       await vi.waitFor(() => expect(gauges().length).toBeGreaterThanOrEqual(2))
       expect(gauges().map(([name]) => name)).not.toContain('agent.processes.memory')
     })
@@ -188,7 +194,7 @@ describe('what a session reports', () => {
     it('does not list processes at all while nothing is collecting', async () => {
       const off: PluginTelemetry = { ...ctx.telemetry, enabled: () => false }
       runtime = build(new AgentDriverRegistry(), off, 20)
-      const footprint = vi.spyOn(runtime['engine'], 'processFootprint')
+      const footprint = vi.spyOn(runtime.upkeep, 'processFootprint')
       await new Promise((done) => setTimeout(done, 100))
       expect(footprint).not.toHaveBeenCalled()
       expect(gauges()).toEqual([])

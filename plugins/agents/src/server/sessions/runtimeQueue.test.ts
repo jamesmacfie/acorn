@@ -7,6 +7,7 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import type { AgentDriverSession, AgentDriverStartOptions } from '../drivers/types'
 import { ManagedAgentRuntime } from './runtime'
+import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
 import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
 import { InstructionAdmissionError } from './instructionAdmissionError'
 
@@ -16,16 +17,11 @@ const deferred = <T>() => {
   return { promise, resolve }
 }
 
-class Runtime extends ManagedAgentRuntime {
-  counts() { return this['engine']['processes'].occupancy().reduce((counts, live) => ({
-    active: counts.active + Number(!!live.activeTurnId),
-    reserved: counts.reserved + Number(!!live.admissionTurnId),
-  }), { active: 0, reserved: 0 }) }
-}
 
 describe('durable queue admission', () => {
   let ctx: TestNodeContext
-  let runtime: Runtime
+  let runtime: ManagedAgentRuntime
+  let engine: ManagedAgentEngine
   let starts: AgentDriverStartOptions[]
   let sends: string[]
   let stops: string[]
@@ -52,10 +48,22 @@ describe('durable queue admission', () => {
       probe: () => new FakeAgentDriver().probe(),
       start: async (options) => { starts.push(options); return launch(options) },
     }))
-    runtime = new Runtime({ db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
-      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' })
+    build()
   })
   afterEach(async () => { await runtime.stop(); ctx.cleanup(); vi.restoreAllMocks() })
+
+  // The engine is built here and handed to the runtime, so a test can pump the queue and count the
+  // provider processes directly.
+  const build = () => {
+    const options: AgentRuntimeOptions = { db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
+      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' }
+    engine = new ManagedAgentEngine(options)
+    runtime = new ManagedAgentRuntime(options, engine)
+  }
+  const counts = () => engine.processes.occupancy().reduce((total, live) => ({
+    active: total.active + Number(!!live.activeTurnId),
+    reserved: total.reserved + Number(!!live.admissionTurnId),
+  }), { active: 0, reserved: 0 })
 
   const session = async (kind: 'interactive' | 'workflow' = 'interactive') => runtime.store.createSession({
     taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {},
@@ -65,14 +73,14 @@ describe('durable queue admission', () => {
   })
 
   it('applies required admission at the shared dispatch point for every queued source', async () => {
-    const admission = await runtime.instructionAdmission()
+    const admission = await runtime.instructionAdmission.get()
     const gate = vi.spyOn(admission, 'admit').mockRejectedValue(new InstructionAdmissionError('instruction_review_required', 'Instruction review required.'))
     for (const source of ['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import', 'plugin', 'goal'] as const) {
       const item = await session(source === 'workflow' ? 'workflow' : 'interactive')
       const { turn } = await runtime.store.enqueueTurn(item.id, {
         source, input: [{ type: 'text', text: source }], effectivePolicy: {}, idempotencyKey: randomUUID(),
       })
-      await runtime['engine'].pump()
+      await engine.pump()
       await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('failed'))
       expect((await runtime.store.snapshot(item.id)).events).toContainEqual(expect.objectContaining({
         event: expect.objectContaining({ type: 'error', code: 'instruction_review_required' }),
@@ -100,7 +108,7 @@ describe('durable queue admission', () => {
       const { turn } = await runtime.store.enqueueTurn(item.id, {
         source: 'interactive', input: [{ type: 'attachment', attachmentId: attachment.id }], effectivePolicy: {}, idempotencyKey: randomUUID(),
       })
-      await runtime['engine'].pump()
+      await engine.pump()
       return turn.id
     }
     const failed = async (turnId: string) => vi.waitFor(async () => expect((await runtime.store.turn(turnId))?.status).toBe('failed'))
@@ -118,7 +126,7 @@ describe('durable queue admission', () => {
   })
 
   it('aborts an in-flight instruction scan when its turn is cancelled', async () => {
-    const admission = await runtime.instructionAdmission()
+    const admission = await runtime.instructionAdmission.get()
     let entered = false
     let aborted = false
     vi.spyOn(admission, 'admit').mockImplementation(async (_taskId, signal) => {
@@ -132,7 +140,7 @@ describe('durable queue admission', () => {
     const { turn } = await runtime.store.enqueueTurn(item.id, {
       source: 'interactive', input: [{ type: 'text', text: 'Cancel' }], effectivePolicy: {}, idempotencyKey: randomUUID(),
     })
-    void runtime['engine'].pump()
+    void engine.pump()
     await vi.waitFor(() => expect(entered).toBe(true))
     await runtime.cancelTurn(item.id, turn.id)
     await vi.waitFor(() => expect(aborted).toBe(true))
@@ -178,12 +186,12 @@ describe('durable queue admission', () => {
     const sessions = await Promise.all(Array.from({ length: 20 }, session))
     const turns = await Promise.all(sessions.map((item) => enqueue(item.id)))
     await vi.waitFor(() => expect(starts).toHaveLength(1))
-    expect(runtime.counts()).toEqual({ active: 0, reserved: 1 })
+    expect(counts()).toEqual({ active: 0, reserved: 1 })
     expect(turns.every((turn) => turn.status === 'queued')).toBe(true)
     held.resolve()
     await vi.waitFor(() => expect(sends).toHaveLength(2))
     expect(starts).toHaveLength(2)
-    expect(runtime.counts()).toEqual({ active: 2, reserved: 0 })
+    expect(counts()).toEqual({ active: 2, reserved: 0 })
   })
 
   it('joins cancellation to a late startup handle and releases admission for the next head', async () => {
@@ -200,7 +208,7 @@ describe('durable queue admission', () => {
     await vi.waitFor(() => expect(sends).toEqual([next.id]))
     expect(stops).toEqual([item.id])
     expect((await runtime.store.snapshot(item.id)).events.some((record) => record.turnId === first.id && record.event.type === 'user_message')).toBe(false)
-    expect(runtime.counts()).toEqual({ active: 1, reserved: 0 })
+    expect(counts()).toEqual({ active: 1, reserved: 0 })
   })
 
   it('rechecks cancellation after a held workspace read before starting any provider', async () => {
@@ -303,8 +311,8 @@ describe('durable queue admission', () => {
     runtime.drainQueue()
     await vi.waitFor(() => expect(sends).toEqual([firstTurn.turn.id]))
     await vi.waitFor(() => expect(resolveAttachment).toHaveBeenCalledOnce())
-    await runtime.stopTaskSessions(first.taskId)
-    await runtime.stopTaskSessions(later.taskId)
+    await runtime.upkeep.stopTaskSessions(first.taskId)
+    await runtime.upkeep.stopTaskSessions(later.taskId)
     held.resolve()
 
     await vi.waitFor(() => expect(sends).toEqual([firstTurn.turn.id, pending.turn.id]))
@@ -388,7 +396,7 @@ describe('durable queue admission', () => {
       expect(stored.map((turn) => turn?.status)).toEqual(['queued', 'queued'])
       expect(sessions[0]?.events.some((record) => record.turnId === turns[0]?.id && record.event.type === 'error')).toBe(true)
     })
-    expect(runtime.counts()).toEqual({ active: 0, reserved: 0 })
+    expect(counts()).toEqual({ active: 0, reserved: 0 })
   })
 
   it('shutdown joins the reserved process generation and leaves its durable turn queued', async () => {
@@ -405,7 +413,7 @@ describe('durable queue admission', () => {
     expect(stops).toEqual([item.id])
     expect(sends).toEqual([])
     expect((await runtime.store.turn(turn.id))?.status).toBe('queued')
-    expect(runtime.counts()).toEqual({ active: 0, reserved: 0 })
+    expect(counts()).toEqual({ active: 0, reserved: 0 })
   })
 
   it('survives repeated start and cancel, then admits accepted work from a new runtime', async () => {
@@ -432,8 +440,7 @@ describe('durable queue admission', () => {
     expect((await runtime.store.turn(accepted.id))?.status).toBe('queued')
 
     launch = start
-    runtime = new Runtime({ db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
-      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' })
+    build()
     await runtime.reconcile()
     await vi.waitFor(() => expect(sends).toContain(accepted.id))
     expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('working')

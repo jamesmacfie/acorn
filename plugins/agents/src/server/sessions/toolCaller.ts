@@ -2,14 +2,14 @@ import { createLogger } from '@acorn/plugin-api/node'
 import type { AgentTurnChangedEvent } from '../../contract/lifecycle'
 import type { AgentSettledTurn, AgentToolCallerLookup } from '../../contract/toolCaller'
 import { sessionMayDelegate } from '../delegation/policy'
-import type { AgentSessionRepository } from './sessionRepository'
+import type { AgentStore } from './store'
 
 const log = createLogger('agents:tool-caller', 'agents')
 const SETTLED = new Set<string>(['completed', 'cancelled', 'failed', 'interrupted'])
 
 /** The `agents.toolCaller` capability over this plugin's own session rows, plus the feed the lifecycle
  *  publisher calls for each turn change (../../node/index.ts). */
-export function createToolCallers(store: Pick<AgentSessionRepository, 'getSession' | 'activeTurn'>) {
+export function createToolCallers(store: Pick<AgentStore, 'getSession' | 'activeTurn'>) {
   const listeners = new Set<(turn: AgentSettledTurn) => void>()
   const lookup: AgentToolCallerLookup = {
     resolve: async (taskId, sessionId) => {

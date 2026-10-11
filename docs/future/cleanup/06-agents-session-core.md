@@ -1,5 +1,69 @@
 # 06: Agents session core
 
+> **Completion note, October 11, 2026.** `ManagedAgentRuntime` is the one object routes, capabilities,
+> and the composition root call, and it has no forwarding member. `AgentStore` is one class. The
+> Codex plan handoff lives in `plugins/agents/src/server/drivers/codexPlanHandoff.ts`, and the
+> acceptance `git grep` returns nothing. `pnpm lint`, the arch tests, and the `@acorn/plugin-agents`
+> and `@acorn/node` suites pass on Node 26.8.1. In `pnpm dev:agent`, a managed Claude session and a
+> Codex session each completed a turn through the Node API, and `POST /v1/p/agents/stop-idle` stopped
+> both processes.
+>
+> What landed:
+>
+> - The runtime takes its engine as an optional second constructor argument,
+>   `new ManagedAgentRuntime(options, engine?)`. Production passes one argument. The three test
+>   subclasses are gone, and so is every `runtime['engine']` reach in tests. A test that drives the
+>   engine builds `new ManagedAgentEngine(options)` and passes it in.
+> - That needed the engine to stop calling back into the runtime. Turn acceptance (the `before-send`
+>   hook, input checks, checkout admission, the queue write, and the wake-up) moved into
+>   `ManagedAgentEngine.acceptTurn`, so a goal's continuation queues its turn without the runtime.
+>   `runtime.enqueueTurn` calls it and then starts title generation. `TurnVetoedError` moved with it.
+> - Each of the 17 forwarders went to an owner the caller reaches directly:
+>   - `runtime.providers` is a `ProviderCatalogue` (`sessions/providerCatalogue.ts`): `list`,
+>     `usable`, `observed`, and `readBlockProviders`. The engine never used the probe cache.
+>   - `runtime.frames` is a `SessionFrames` (`sessions/sessionFrames.ts`): `subscribe`, `emit`, and
+>     the changed-row check. It holds the listeners, the last broadcast rows, the webhook hand-off,
+>     and the `agent-session:changed` announcement.
+>   - `runtime.upkeep` is a `ProcessUpkeep` (`sessions/processUpkeep.ts`): task-archive stops, idle
+>     stops, the Settings stop, both footprints, and the telemetry sample.
+>   - `runtime.instructionAdmission` and `runtime.mcpReviews` are `LazyService`s
+>     (`sessions/lazyService.ts`), with `get()` and `built()`. Session goals use one inside the engine.
+>   - `reconcile` and `loopHook` moved into the runtime as real methods. The bridge's held asks moved
+>     with `loopHook`, so `resolveRequest` answers them in the same class.
+> - The runtime no longer exposes `webhooks`, which nothing outside used. `archive(sessionId, flag)`
+>   is gone. Only tests called it, and they call `patchSession`.
+> - `AgentSessionRepository` is merged into `AgentStore`. `sessionRepository.ts` is deleted, and its
+>   roster test is `subagentRoster.test.ts`.
+> - The store keeps the transaction the handoff needs as a generic method, `enqueueAfterLatestTurn`.
+>   The handoff passes it a function that checks the proposal and rewrites the options. The old
+>   `store.test.ts` held only handoff tests, so it moved to `drivers/codexPlanHandoff.test.ts`.
+> - `docs/managed-agents/operations.md`, `providers.md`, `sessions.md`, `session-events.md`, and
+>   `harnesses.md` name the new owners.
+>
+> Decisions and deviations:
+>
+> - **The engine still builds the store, attachments, artifacts, MCP servers, and the new
+>   collaborators, and the runtime holds the same instances as fields.** The engine's `stop()`
+>   closes them in order, and the injected-engine tests need one construction path. No runtime
+>   method passes a call through to the engine.
+> - **One class, ordered as before, not split by aggregate.** `store.ts` is 1,706 lines, which makes
+>   it the largest hand-written file. Splitting it into session, turn, event, and request classes
+>   would break "one store class owns the session tables" and change every caller that reads
+>   `runtime.store`. Proposal 14 can take it on.
+> - **A few one-line user commands stay on the runtime**: `setGoal`, `resumeGoal`, `regenerateTitle`,
+>   `applyRequestedConfig`, `importTranscript`, `verifyImportedResume`, and `drainQueue`. Requirement 2
+>   keeps user commands on the public object. Each reaches a command module that loads on first use,
+>   and routes shouldn't handle that loading.
+> - **The provider catalogue clears its cache when shutdown starts**, not after the engine's drain. A
+>   `providers.list()` call during shutdown rejects instead of serving the last answer.
+> - Leftover `protected` modifiers in the engine are `private`, since nothing subclasses it.
+> - I ran the agents suite after each of the three steps and the real-app check once at the end,
+>   because all three land in one commit.
+>
+> For later phases: a caller outside `sessions/` reaches the runtime and its fields, never the
+> engine. A new user command goes on the runtime. New process, frame, or provider behavior goes on
+> the collaborator that owns it.
+
 This proposal reshapes the managed-agent session core in the agents plugin. It should end with one
 public runtime object and one store, split by responsibility instead of by inheritance and
 forwarding.

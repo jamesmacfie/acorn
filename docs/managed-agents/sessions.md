@@ -42,7 +42,7 @@ restart doesn't resubmit it: reconciliation marks the work interrupted for you t
 
 On the tail, each event goes out as an `agent:event` frame. The session row follows as an
 `agent:session` frame only when the event changed something a client keeps, about one event in 30.
-`runtimeEngine.ts` compares the row with the last one broadcast and ignores `lastEventSeq`,
+`sessionFrames.ts` compares the row with the last one broadcast and ignores `lastEventSeq`,
 `updatedAt`, each subagent's last-heard time, and `config`. A `session_metadata` event always sends
 the row, because it's the event that writes `config`. Rewriting the roster on every event woke every
 reader about 25 times a second. The pane's read mark needs the live sequence, so it reads
@@ -119,7 +119,7 @@ while the summary describes the captured point in its history.
 
 ## Where the code is
 
-`runtime.ts` coordinates session commands with the provider engine, `sessionTitleGeneration.ts` owns
-titles, `sessionDefaultsCommands.ts` applies saved options, `transcriptCommands.ts` imports, verifies,
-and exports transcripts, and `sessionWait.ts` checks frames against durable wait facts. Wire types are
-in `plugins/agents/src/contract/wire.ts`.
+`runtime.ts` coordinates session commands with the provider engine, `store.ts` owns the session
+tables, `sessionTitleGeneration.ts` owns titles, `sessionDefaultsCommands.ts` applies saved options,
+`transcriptCommands.ts` imports, verifies, and exports transcripts, and `sessionWait.ts` checks frames
+against durable wait facts. Wire types are in `plugins/agents/src/contract/wire.ts`.

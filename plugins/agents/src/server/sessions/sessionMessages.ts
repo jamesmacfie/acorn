@@ -16,7 +16,8 @@ import {
 } from '../../contract/sessionMessages.ts'
 import type { AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
-import { TurnVetoedError, type ManagedAgentRuntime } from './runtime'
+import type { ManagedAgentRuntime } from './runtime'
+import { TurnVetoedError } from './runtimeEngine'
 import type { TurnFollowUps } from './turnFollowUps'
 
 const log = createLogger('agents:session-messages', 'agents')

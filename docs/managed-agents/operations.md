@@ -1,16 +1,14 @@
 # Operations
 
 This page covers how the agents plugin queues and dispatches turns, waits out a plan limit, starts and
-stops provider processes, and recovers from failure. `queueCoordinator.ts` owns queue scans,
-fairness, delayed wakeups, and drain. `providerSessionLifecycle.ts` owns live provider generations,
-children, process timers, and callback joins. `runtimeEngine.ts` owns durable event handling and
-dispatch outcomes; `runtime.ts` composes one engine and persists accepted turns before requesting a
-scan. The facade owns session reservation, initialization, defaults, titles, transcript import and
-export, configuration, and history retention. Its readonly store, attachment, artifact, webhook, and
-MCP references point to the engine's instances. Product commands call explicit engine operations
-for readiness, provider handles, event recording, queue wakeup, and retirement.
-Transcript import, resume verification, and export load their command module on first use, then
-share one instance.
+stops provider processes, and recovers from failure. `runtime.ts` is the one object routes,
+capabilities, and the composition root call. Its methods are the session commands and lifecycle
+steps, and its fields are the collaborators a caller reaches directly, such as the store, the provider
+catalogue, and process upkeep (`processUpkeep.ts`). `runtimeEngine.ts` is internal to it: it accepts
+turns into the durable queue, records events, and settles dispatch outcomes. `queueCoordinator.ts` owns
+queue scans, fairness, delayed wakeups, and drain. `providerSessionLifecycle.ts` owns live provider
+generations, children, process timers, and callback joins. `store.ts` owns the session tables.
+Transcript import, resume verification, and export load their command module on first use.
 
 ## The turn queue
 
@@ -147,13 +145,13 @@ agent CLI and its MCP servers, about 450 MB.
 
 Archiving a task runs core's `core:task-archiving` hook
 ([hooks](../plugins/hooks.md#hooks)) before the worktree is removed.
-`stopTaskSessions` stops each of the task's processes, marks an active turn `interrupted`, expires
-pending requests, and records `stopped` with a note to restore the task and send a prompt. The sessions
-aren't archived. After a restore, the next prompt resumes them.
+`stopTaskSessions` in `processUpkeep.ts` stops each of the task's processes, marks an active turn
+`interrupted`, expires pending requests, and records `stopped` with a note to restore the task and send
+a prompt. The sessions aren't archived. After a restore, the next prompt resumes them.
 
 **Stop idle agents after** is 30 minutes unless you pick 15 minutes, 2 hours, or never.
-`stopIdleSessions` runs every five minutes and reads the limit each time. It stops a process only when
-all of these hold:
+`stopIdleSessions` in `processUpkeep.ts` runs every five minutes and reads the limit each time. It
+stops a process only when all of these hold:
 
 - The process has started and isn't being set up, stopped, or reconnected.
 - No turn is running or queued.

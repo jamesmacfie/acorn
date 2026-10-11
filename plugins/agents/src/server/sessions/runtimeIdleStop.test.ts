@@ -195,10 +195,10 @@ describe('stopping idle provider processes', () => {
     const before = await runtime.store.requireSession(session.id)
 
     // Under the default 30 minutes nothing happens.
-    expect(await runtime.stopIdleSessions(later(20))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(20))).toEqual([])
     expect(driver.stopped).toEqual([])
 
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([session.id])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([session.id])
     expect(driver.stopped).toEqual([session.id])
     const stopped = await runtime.store.snapshot(session.id)
     expect(stopped.session.runtimeState).toBe('stopped')
@@ -227,8 +227,8 @@ describe('stopping idle provider processes', () => {
     await driver.push(session.id, { type: 'diagnostic', level: 'info', message: 'Still here.' })
 
     // 40 minutes after the start, 15 after the last event.
-    expect(await runtime.stopIdleSessions(later(15))).toEqual([])
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([session.id])
+    expect(await runtime.upkeep.stopIdleSessions(later(15))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([session.id])
   })
 
   it('skips a session with a turn in flight or a turn queued', async () => {
@@ -242,7 +242,7 @@ describe('stopping idle provider processes', () => {
     const queued = await prompt(waiting.id)
     await vi.waitFor(async () => expect((await runtime.store.requireSession(waiting.id)).queuedTurns).toBe(1))
 
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([])
     expect(driver.stopped).toEqual([])
     expect((await runtime.store.turn(queued.id))?.status).toBe('queued')
   })
@@ -258,7 +258,7 @@ describe('stopping idle provider processes', () => {
     })
     await vi.waitFor(async () => expect(await runtime.store.pendingRequests(session.id)).toHaveLength(1))
 
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([])
     expect(driver.stopped).toEqual([])
   })
 
@@ -267,7 +267,7 @@ describe('stopping idle provider processes', () => {
     const session = await idleSession()
     expect((await runtime.store.requireSession(session.id)).subagents.map((entry) => entry.status)).toEqual(['running'])
 
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([])
     expect(driver.stopped).toEqual([])
   })
 
@@ -276,7 +276,7 @@ describe('stopping idle provider processes', () => {
     const session = await idleSession()
     expect((await runtime.store.requireSession(session.id)).runtimeState).toBe('failed')
 
-    expect(await runtime.stopIdleSessions(later(31))).toEqual([session.id])
+    expect(await runtime.upkeep.stopIdleSessions(later(31))).toEqual([session.id])
     expect(driver.stopped).toEqual([session.id])
     const after = await runtime.store.snapshot(session.id)
     expect(after.session.runtimeState).toBe('failed')
@@ -286,10 +286,10 @@ describe('stopping idle provider processes', () => {
   it('reads the limit at sweep time, and Never keeps every process', async () => {
     const session = await idleSession()
     await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAfterMinutes: 0 })
-    expect(await runtime.stopIdleSessions(later(24 * 60))).toEqual([])
+    expect(await runtime.upkeep.stopIdleSessions(later(24 * 60))).toEqual([])
 
     await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAfterMinutes: 15 })
-    expect(await runtime.stopIdleSessions(later(16))).toEqual([session.id])
+    expect(await runtime.upkeep.stopIdleSessions(later(16))).toEqual([session.id])
     expect((await runtime.store.snapshot(session.id)).events.at(-1)?.event).toMatchObject({
       detail: 'The provider process stopped after 15 minutes idle to free memory. Send a prompt to resume.',
     })
@@ -314,7 +314,7 @@ describe('stopping idle provider processes', () => {
     const held = await prompt(busy.id)
     await vi.waitFor(async () => expect((await runtime.store.turn(held.id))?.status).toBe('active'))
 
-    expect(await runtime.stopIdleSessionsNow()).toEqual([idle.id])
+    expect(await runtime.upkeep.stopIdleSessionsNow()).toEqual([idle.id])
     expect(driver.stopped).toEqual([idle.id])
     expect((await runtime.store.snapshot(idle.id)).events.at(-1)?.event).toEqual({
       type: 'session_state',
@@ -342,8 +342,8 @@ describe('stopping idle provider processes', () => {
       { pid: 3001, ppid: busyPid, rssBytes: 20 },
     ]
 
-    expect(await runtime.processFootprint(async () => table)).toEqual({ live: 2, idle: 1, memoryBytes: 331 })
+    expect(await runtime.upkeep.processFootprint(async () => table)).toEqual({ live: 2, idle: 1, memoryBytes: 331 })
     // Where the node cannot list processes, the counts stand and memory is unknown.
-    expect(await runtime.processFootprint(async () => null)).toEqual({ live: 2, idle: 1, memoryBytes: null })
+    expect(await runtime.upkeep.processFootprint(async () => null)).toEqual({ live: 2, idle: 1, memoryBytes: null })
   })
 })

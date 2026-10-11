@@ -71,12 +71,12 @@ export function managedAgentsBridge(
       const sessionId = (await runtime.artifacts.get(artifactId))?.sessionId
       return sessionId ? await taskIdForSession(sessionId) : null
     },
-    providers: (force) => guarded(() => runtime.providers(force)),
+    providers: (force) => guarded(() => runtime.providers.list(force)),
     footprint: async () => ({
-      ...await runtime.processFootprint(),
-      ...await runtime.diskFootprint(),
+      ...await runtime.upkeep.processFootprint(),
+      ...await runtime.upkeep.diskFootprint(),
     }),
-    stopIdleNow: async () => ({ stopped: (await runtime.stopIdleSessionsNow()).length }),
+    stopIdleNow: async () => ({ stopped: (await runtime.upkeep.stopIdleSessionsNow()).length }),
     // A session projected to the merged run list's shape (@acorn/protocol/runs.ts). Live sessions
     // only: the list answers "what is happening on this node", and an archived session is history the
     // Agents pane already shows in full.

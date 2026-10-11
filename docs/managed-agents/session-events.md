@@ -154,7 +154,7 @@ enqueue, because a turn can wait minutes behind the concurrency limit. It closes
 an error, a provider that closed, or a retry that puts the turn back in the queue. A turn whose
 process died reports nothing.
 
-Every 60 seconds while telemetry is on, the engine reports three gauges: `agent.processes.live`,
+Every 60 seconds while telemetry is on, `processUpkeep.ts` reports three gauges: `agent.processes.live`,
 `agent.processes.idle` (those the idle rules would stop now), and `agent.processes.memory` (summed
 resident bytes of their process trees). They come from `processFootprint()`, the same numbers
 Settings > Storage and memory draws. Counting memory runs `ps` through the process broker, so the

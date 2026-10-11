@@ -8,6 +8,7 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import type { AgentDriverSession, AgentDriverStartOptions } from '../drivers/types'
 import { ManagedAgentRuntime } from './runtime'
+import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
 import { BEFORE_PERMISSION_HOOK } from '../../contract/permissionHook.ts'
 
 // `agents:before-permission` through the real hook chain: the agents plugin declares the point, a second
@@ -32,6 +33,7 @@ describe('agents:before-permission', () => {
   let agents: TestNodeContext
   let policy: TestNodeContext
   let runtime: ManagedAgentRuntime
+  let engine: ManagedAgentEngine
   let frames: AgentLifecycleFrame[]
   // What the driver's parked request was answered with, and the knobs a test turns on it.
   let answers: unknown[]
@@ -90,11 +92,14 @@ describe('agents:before-permission', () => {
         }
       },
     }))
-    runtime = new ManagedAgentRuntime({
+    const runtimeOptions: AgentRuntimeOptions = {
       db: agents.storage.open(), dataDir: agents.dataDir, core: agents.core, registry, hooks: agents.hooks,
       internalEnv: () => ({}), secrets: agents.env.SECRETS, currentUserId: () => 'owner',
       publish: (frame) => { if (frame.channel.startsWith('plugin:agents:')) frames.push(frame as AgentLifecycleFrame) },
-    })
+    }
+    // Handed to the runtime, so a test can stop a provider directly.
+    engine = new ManagedAgentEngine(runtimeOptions)
+    runtime = new ManagedAgentRuntime(runtimeOptions, engine)
   })
   afterEach(async () => { await runtime.stop(); policy.cleanup(); agents.cleanup(); vi.restoreAllMocks() })
 
@@ -235,7 +240,7 @@ describe('agents:before-permission', () => {
     handle(() => verdict.promise)
     const { session } = await start()
     await vi.waitFor(() => expect(parked.has('permission-1')).toBe(true))
-    const stopping = runtime['engine'].stopLive(session.id)
+    const stopping = engine.stopLive(session.id)
     verdict.resolve({ ok: false, reason: 'No.' })
     await stopping
     await new Promise((resolve) => setImmediate(resolve))

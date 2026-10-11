@@ -7,7 +7,8 @@ import type { ManagedAgentEngine } from './runtimeEngine'
 // task). ManagedAgentRuntime.purgeDeletedTasks loads it on first use.
 
 export type DeletedTaskPurgeDeps = {
-  engine: Pick<ManagedAgentEngine, 'isStopped' | 'liveSessionIds' | 'emit' | 'revokeSessionCredential'>
+  engine: Pick<ManagedAgentEngine, 'isStopped' | 'liveSessionIds' | 'revokeSessionCredential'>
+  frames: ManagedAgentEngine['frames']
   store: ManagedAgentEngine['store']
   attachments: ManagedAgentEngine['attachments']
   artifacts: ManagedAgentEngine['artifacts']
@@ -44,7 +45,7 @@ export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: rea
         deps.attachments.collectNow(removed.attachmentIds),
         deps.artifacts.collectRemoved(removed.artifactObjects),
       ])
-      engine.emit({ channel: 'agent:deleted', sessionId })
+      deps.frames.emit({ channel: 'agent:deleted', sessionId })
     }
     await new Promise((resolve) => setImmediate(resolve))
   }
