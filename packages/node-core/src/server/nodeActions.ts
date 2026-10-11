@@ -6,12 +6,12 @@ import type { Disposable } from './pluginHost/capabilities'
 // Work a plugin will do when something asks, with no client attached and no request in sight, and the
 // registry that makes it askable.
 //
-// A schedule is the one thing asking today (docs/schedules/user-schedules.md § `node-action`) and it is not the
+// A schedule is one thing that asks (docs/schedules/user-schedules.md § `node-action`), and it is not the
 // definition. An event, a monitor crossing a threshold, a webhook, a run finishing: each of those is a
 // different caller of the same actions, and the tier on the record below is what lets them ask for
 // different confirmations. Nothing here may grow a schedule-shaped assumption.
 //
-// The plainer primitive underneath is ../plugin/dispatch.ts, which schedules, source reads, task
+// The plainer primitive underneath is `dispatchPluginRoute`, which schedules, source reads, task
 // checks and harnesses all use directly. What this layer adds is the two things an unattended fire
 // needs and a dispatch does not have: a stable name a stored record can point at, and a declared risk
 // tier stamped onto that record when the owner consents.
@@ -25,10 +25,10 @@ export type NodeAction = {
   /** What a picker and a settings row call it. */
   name: string
   /** POST → whatever. Confined to the plugin's own namespace on every fire, not merely at
-   *  registration (../plugin/dispatch.ts). */
+   *  registration (`confinePluginPath`). */
   path: string
   /** The tier the host's confirmation is drawn from, and what gets stamped onto whatever record armed
-   *  this — a schedule row today. Absent means `execute`, see `riskOf` below. */
+   *  this, such as a schedule row. Absent means `execute`, see `riskOf` below. */
   risk?: ToolRisk
 }
 
@@ -37,8 +37,8 @@ export type NodeActionRegistration = Omit<NodeAction, 'pluginId'>
 /** An action that declares no tier is treated as `execute`, the strongest (docs/schedules.md
  *  § `node-action`).
  *
- *  This repairs the design's assumption rather than meeting it, so it fails in the safe direction:
- *  an undeclared tier means nobody has said what this does, and arming the strongest confirmation
+ *  This fails in the safe direction: an undeclared tier means nobody has said what this does, and
+ *  arming the strongest confirmation
  *  for that is the answer that cannot be wrong in a way that matters. It also means an action that
  *  later declares a real tier can only ever go down, so the tier-rise check below never fires
  *  spuriously on a plugin that started declaring what it always did. */

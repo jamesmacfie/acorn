@@ -393,7 +393,7 @@ export class Scheduler {
       if (candidates.length === 0) return
       const soonest = Math.min(...candidates.map((entry) => entry.state.nextRunAt))
       let delay = Math.max(0, soonest - this.#clock.now())
-      // ponytail: at the cap, back off a second rather than arming a zero-delay timer that would spin
+      // At the cap, back off a second rather than arming a zero-delay timer that would spin
       // until a slot frees. Completions re-arm anyway, so this only covers the case where every slot is
       // held by a long run.
       if (this.#inflight.size >= CONCURRENCY) delay = Math.max(delay, 1_000)

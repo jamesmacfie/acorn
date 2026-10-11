@@ -7,18 +7,17 @@ import { makeTestDb, testSecretEnv, type TestDb } from '../testkit/db'
 import type { Env } from './bindings'
 
 // What an agent's own credential can reach, asserted end to end through the real mount table rather
-// than through a hand-built router. Every route below was reachable by a task-scoped internal token
-// before phase 1 of the review program, and each one is here because it was: the preference write that
-// let an agent raise its own tool ceiling, the project scripts this node executes later, and workspace
-// deletion.
+// than through a hand-built router. Every route below must refuse a task-scoped internal token: the
+// preference write that would let an agent raise its own tool ceiling, the project scripts this node
+// executes later, and workspace deletion.
 //
-// mountCoverage.test.ts is the structural companion — it fails when an ungated core mount appears at
-// all. This one is the behavioural check on the specific routes the review named, so a refactor that
-// keeps a gate mounted but stops it applying still fails something.
+// mountCoverage.test.ts is the structural companion: it fails when an ungated core mount appears at
+// all. This one is the behavioural check on these specific routes, so a refactor that keeps a gate
+// mounted but stops it applying still fails something.
 //
-// Core routes only. The plugin half of the same review — GitHub's OAuth device flow, notes' workspace
-// routes — is asserted in each plugin's own suite, because a plugin router reaches this mount table
-// only once the app composes it and node-core does not know those plugins exist.
+// Core routes only. The plugin routes with the same concern, GitHub's OAuth device flow and notes'
+// workspace routes, are asserted in each plugin's own suite, because a plugin router reaches this
+// mount table only once the app composes it and node-core does not know those plugins exist.
 
 const ENC_KEY = '0'.repeat(64)
 const KEY = 'internal-signing-key'
@@ -99,12 +98,12 @@ describe('what a task-scoped agent token can reach', () => {
   afterEach(() => testDb.cleanup())
 
   it.each([
-    // The self-unlock. `agentTools.perms` is a preference key, so this write was the agent turning its
-    // own execute tier back on.
+    // The self-unlock. `agentTools.perms` is a preference key, so this write would let the agent turn
+    // its own execute tier back on.
     ['PUT', '/v1/core/prefs'],
     // Project writes. Each of these lands `setup_script`, `dev_script`, `teardown_script`,
     // `db_url_script` or `run_targets` — commands this node runs on the next task — and none of them is
-    // task-addressed, so the write went against any project id, not the token's own.
+    // task-addressed, so the write would go against any project id, not the token's own.
     ['POST', '/v1/core/projects'],
     ['PATCH', '/v1/core/projects/other-project'],
     ['PUT', '/v1/core/projects/other-project/config'],

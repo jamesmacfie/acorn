@@ -54,7 +54,7 @@ const manifest = (id: string, over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   // A path with a space on purpose: the loader must reach the bundle through pathToFileURL, and a
-  // bare `import('/a b/c.js')` fails on exactly this input (and on every Windows path).
+  // bare `import()` of a path with a space in it fails on exactly this input (and on every Windows path).
   root = mkdtempSync(join(tmpdir(), 'acorn loader-'))
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -605,7 +605,7 @@ export default {
     expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
   })
 
-  // A penetration review read a marker core.sqlite through both of these with real plugin workers.
+  // Each case below tries to read a marker core.sqlite from a real plugin worker through a file grant.
   const snoop = (path: string) => {
     writeFileSync(join(root, 'core.sqlite'), 'core')
     vi.stubEnv('PLUGIN_FILE', path)
@@ -849,7 +849,7 @@ describe('declared frame contributions', () => {
 
   it('defaults a surface to a desktop pane at order 500', async () => {
     // `layout` and `regions` are not defaulted: a pane has to say how it is drawn, and the plainest
-    // true answer is still a sentence the author writes (pluginManifest.ts).
+    // true answer is still a sentence the author writes (the manifest schema).
     const declared = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
     install('board', withFrames([declared]), BUNDLE('board'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
@@ -904,8 +904,8 @@ describe('declared frame contributions', () => {
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {
-    // Phase 4's declarative chrome lands under sibling keys. A strict object here would turn "this
-    // acorn contributes less" into "this plugin does not parse".
+    // Contribution kinds this acorn does not know land under sibling keys. A strict object here would
+    // turn "this acorn contributes less" into "this plugin does not parse".
     install(
       'board',
       manifest('board', { contributions: { frames: [], descriptors: [{ kind: 'badge' }] } }),
@@ -943,8 +943,8 @@ describe('rejections', () => {
   })
 
   it('names the field a bad manifest broke, not just the schema', async () => {
-    // The whole reason this reason exists. One collapsed sentence sent an author looking through ~30
-    // rules by hand; the path is what tells them which line to open.
+    // The path in the reason is what tells an author which manifest line to open, rather than one
+    // collapsed sentence covering every rule.
     const bad = manifest('board', { contributions: { frames: [{ target: 'toolbar', id: 'board', label: 'Board' }] } })
     install('board', bad, BUNDLE('board'))
     const reason = await reasonFor('board')
@@ -1073,8 +1073,8 @@ describe('evaluating a fresh isolated package realm', () => {
   })
 })
 
-// `requires.plugins` in the manifest. Before it, a package that consumed another plugin's capability
-// failed at whichever route reached for it first, with a message naming a missing capability and
+// `requires.plugins` in the manifest. Without it, a package that consumes another plugin's capability
+// fails at whichever route reaches for it first, with a message naming a missing capability and
 // nothing naming the package that should have provided it.
 describe('declared plugin dependencies', () => {
   it('refuses a package whose dependency is not installed, and names it', async () => {

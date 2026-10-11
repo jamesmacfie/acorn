@@ -16,8 +16,8 @@ const KEY_FILE = 'session.key'
 // The key that encrypts stored credentials at rest (server/secretBox.ts). 32 bytes as 64 hex chars,
 // the size A256GCM requires.
 //
-// Read it from the environment when it is there: the desktop supplies it from safeStorage before any
-// binding reads it, and a service manager may pass one in. Otherwise mint it into the data root, the
+// Read it from the environment when it is there, because a service manager may pass one in. Otherwise
+// mint it into the data root, the
 // same place the TLS private key sits. A headless node has no keychain, and making an operator
 // invent a 64-hex secret before boot buys nothing on a machine where the key lands beside the
 // database anyway.

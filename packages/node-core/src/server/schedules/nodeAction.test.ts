@@ -65,7 +65,7 @@ afterEach(() => clearRegistrations(PLUGIN))
 
 // `nodeActions` is a host seam, not a plugin one (server/pluginHost/types.ts § HostPluginContext): in
 // production the only feeder is a manifest command with the `runNodeAction` verb. This suite needs the
-// risk tier, which no manifest declares yet, so it registers the way the host does and says so with a
+// risk tier, which no manifest declares, so it registers the way the host does and says so with a
 // cast rather than putting the member back on the authoring type.
 async function world(
   register: (ctx: HostPluginContext) => void,

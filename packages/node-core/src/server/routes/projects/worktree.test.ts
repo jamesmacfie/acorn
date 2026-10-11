@@ -155,7 +155,7 @@ describe('worktree routes', () => {
 
   it('archive goes through the PTY slot and 503s when it is unfilled', async () => {
     const app = authed()
-    // Unfilled: exactly the degraded mode dev:node had when the whole terminal bridge was unset.
+    // Unfilled: the degraded mode of a node with no terminal plugin to fill the bridge.
     expect((await app.fetch(req('/core/tasks/task1/archive', 'POST', { force: true }), env())).status).toBe(503)
 
     const seen: string[] = []

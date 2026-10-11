@@ -117,7 +117,7 @@ export function hostFunctionMode(path: string): Mode {
   if (!prefix) return 'async'
   const method = path.slice(prefix.length)
   // A constructor is exposed as an opaque value in the published declarations. RPC cannot lend its
-  // prototype; retain the existing asynchronous proxy classification for that one named value.
+  // prototype, so that one named value keeps the asynchronous proxy classification.
   if (method === 'core.proc.ProcessError') return 'async'
   // A host result may contain a registered handle or a dynamic capability implementation. Keep
   // known handle methods synchronous; every other result callback remains asynchronous.

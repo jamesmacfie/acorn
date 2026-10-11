@@ -36,7 +36,7 @@ export async function dashboardContentProblems(
       })
     }
   }
-  // The rest needs every source's description, so an unreadable query is the only answer for now.
+  // The rest needs every source's description, so an unreadable query is the only answer at this point.
   return problems.length
     ? problems
     : validatePanelPlan(plan, described).filter((problem) => problem.severity === 'error')

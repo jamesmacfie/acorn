@@ -263,8 +263,8 @@ export class ProviderOperationError extends Error {
  * node_modules to resolve against (apps/node/scripts/build-plugin.mjs). So a provider error thrown
  * inside a plugin bundle and caught by a host route is an instance of the plugin's copy of the
  * class, never the host's, and the reverse holds for a host error caught inside a plugin. Every
- * `instanceof` across that boundary was false, which sent typed failures like `provider_needs_auth`
- * to the catch-all and told the owner a working provider was unavailable.
+ * `instanceof` across that boundary is false, which would send typed failures like
+ * `provider_needs_auth` to the catch-all and tell the owner a working provider was unavailable.
  *
  * The shape is checked rather than a brand, because a brand only reaches a plugin package that has
  * been rebuilt since, and a plugin installed from a folder is rebuilt when its author says so.

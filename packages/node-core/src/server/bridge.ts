@@ -3,14 +3,13 @@ import type { AppEnv } from './middleware/auth'
 import { respondError } from './respond'
 import { capabilityId, type CapabilityId } from './pluginHost/capabilities'
 
-// Route handlers resolve their provider from the per-runtime registry carried by c.env. Keeping this
-// helper in the historical bridge module makes the migration mechanical for existing route families;
-// the module contains no mutable slot, setter, or process-global implementation.
+// Route handlers resolve their provider from the per-runtime registry carried by c.env. The module
+// holds no mutable slot, setter, or process-global implementation.
 export const routeCapability = <T>(id: string): CapabilityId<T> => capabilityId<T>(id)
 
-// Route tests historically installed fakes through module setters. Keep that test ergonomics without
-// reintroducing a production bridge: the map is consulted only when a test omits RuntimeBindings, and
-// every production request resolves from its per-runtime registry.
+// Route tests install fakes here without reintroducing a production bridge: the map is consulted only
+// when a test omits RuntimeBindings, and every production request resolves from its per-runtime
+// registry.
 const routeTestOverrides = new Map<string, unknown>()
 export const setRouteTestCapability = <T>(id: CapabilityId<T>, impl: T | null): void => {
   if (impl === null) routeTestOverrides.delete(id)

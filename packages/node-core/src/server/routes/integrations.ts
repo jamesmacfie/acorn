@@ -49,7 +49,7 @@ const connectBody = z
   .looseObject({ providerId: z.string().optional(), credentials: credentialsSchema })
   .refine((body) => !Object.hasOwn(body, 'token'))
 // The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
-// (routes/workspaces.ts) because both land in the same table.
+// (`/:id/external-projects` on the workspaces router) because both land in the same table.
 const mappingsBody = z.object({
   mappings: z
     .array(

@@ -6,8 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PLUGIN_DB_DIR, adoptRenamedPluginDb, openPluginDb } from './storage'
 import { openSqlite } from '../storage/sqlite'
 
-// The per-plugin database factory has ten-plus production consumers and had no direct test: every
-// plugin's storage goes through it, covered only incidentally by integration suites.
+// The per-plugin database factory, tested directly: every plugin's storage goes through it.
 describe('plugin storage', () => {
   let dir: string
   let migrations: string

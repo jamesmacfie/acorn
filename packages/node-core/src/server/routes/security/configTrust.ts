@@ -7,12 +7,9 @@ import type { AppEnv } from '../../middleware/auth'
 import { requireDevice } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 
-// Called directly rather than through a bridge slot. It had one, filled by a wireConfigTrust() in the
-// composition roots, but both ends of that indirection were core's: the route is core's, the
-// implementation is core's (server/repoConfigTrust.ts), and the handle is core's `c.env.DB`. A bridge
-// slot exists so a route handler can reach something it cannot import, a plugin's engine, and
-// nothing here was ever a plugin's. Deleting it removes a module-global, a setter, a null-check on
-// every request, and a wiring function each composition root had to remember to call.
+// Called directly rather than through a bridge slot: the route, the implementation, and the `c.env.DB`
+// handle are all core's. A bridge slot exists so a route handler can reach something it cannot import,
+// such as a plugin's engine.
 
 const ackBody = z.object({ hash: z.string().regex(/^[a-f0-9]{64}$/) })
 

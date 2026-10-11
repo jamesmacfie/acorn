@@ -17,8 +17,8 @@ import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { projectBranches } from '../../worktrees/branches'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
-// Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
-// validated. Project ids are the only live core identity for local folders and remote candidates.
+// This demands nothing of the folder: facets are detected, not validated. Project ids are the only
+// core identity for local folders and remote candidates.
 
 const createBody = z.object({
   path: z.string().min(1),

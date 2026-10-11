@@ -1,7 +1,6 @@
 // The reload path's acceptance list (docs/plugins/dev-loop.md § The dev loop § Reloading one plugin without a
-// restart): candidate-then-commit, contained failure, a stale handle that throws, plus the fix that
-// made all three pointless until it landed, which is that a reloaded plugin's routes have to serve
-// the new handler.
+// restart): candidate-then-commit, contained failure, a stale handle that throws, plus the rule that
+// makes all three matter: a reloaded plugin's routes serve the new handler.
 //
 // Everything here uses the real host, the real context builder and the real module-singleton registries,
 // because the whole question is what those do when a second instance of one plugin arrives.
@@ -208,7 +207,7 @@ describe('plugin reload', () => {
   })
 
   it('never shadows a built-in router, which is mounted before it', async () => {
-    // The regression this change could have caused. createApp mounts every built-in's Hono router first
+    // The mount order this depends on. createApp mounts every built-in's Hono router first
     // and the dispatcher last, so a path a router already answers must never reach the dispatcher, and a
     // path under a built-in's namespace that nothing claims must still be the app's own 404.
     const host = await initPlugins([acme('loaded').plugin], hostOptions())
@@ -288,8 +287,8 @@ describe('plugin reload', () => {
   })
 })
 
-// Boot and reload once built their bindings separately, and the reload's copy had no data sources, so
-// a reloaded derived source vanished from the catalog until the next restart.
+// Boot and reload must build the same binding. A reload binding with no data sources would make a
+// reloaded derived source vanish from the catalog until the next restart.
 describe('a folder plugin through the loader, the host, and the reloader', () => {
   it('still has its data source after a reload', async () => {
     const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
@@ -356,8 +355,8 @@ describe('a folder plugin through the loader, the host, and the reloader', () =>
 })
 
 // The manifest carrier for hooks: a folder package's route-backed handler joins another plugin's hook
-// and its answer reaches the owner. The binding once dropped `extensions`, and every such handler
-// installed, showed its grant, and never ran.
+// and its answer reaches the owner. Without `extensions` on the binding, such a handler installs,
+// shows its grant, and never runs.
 describe('a folder plugin’s hook handler through the loader and the host', () => {
   it('vetoes through its route', async () => {
     const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')

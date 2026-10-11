@@ -4,7 +4,7 @@
 //
 // It checks the real path of every target, including a file that doesn't exist yet, against the
 // session's allowlist. Rules written at start only cover the entries that existed then, so a `.env`
-// created later in the data root had none.
+// created later in the data root would have none.
 //
 // Unlike the loop hook bridge, it fails closed. Claude Code reads exit code 2 as a refusal, so bad input
 // or an internal error refuses the call. The harness runs it only for its file tools.

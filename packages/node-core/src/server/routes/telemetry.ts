@@ -5,7 +5,6 @@ import { respondError } from '../respond'
 import { ingestTelemetry, telemetrySummary } from '../telemetry/collector'
 
 // Where every runtime that is not the node posts its records (docs/telemetry/runtimes.md § Other runtimes).
-// The renderer today, the terminal client and the desktop helper next.
 //
 // Device-only, mounted with `requireDevice` in server/index.ts. A task-scoped internal token must
 // not be able to put records into a stream a sink will send off this machine: a plugin holding the

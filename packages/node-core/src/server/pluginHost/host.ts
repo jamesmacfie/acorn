@@ -2,7 +2,7 @@
 // once. See docs/plugins/activation.md § Activation and § Loaded plugins.
 //
 // Declaration order must not be load-bearing, because a disabled plugin removes a step from the
-// sequence and because the inits now overlap. Cross-plugin needs resolve through the capability
+// sequence and because the inits overlap. Cross-plugin needs resolve through the capability
 // registry at call time, and a plugin that has to read another plugin's contributions does it in
 // `ready`, which runs after every init.
 import type { Env } from '../bindings'
@@ -64,15 +64,14 @@ export type PluginHostOptions = {
   // (server/pluginHost/scheduleRun.ts). Optional because a suite that declares no schedule has nothing to
   // run. A binding that declares one without this is a wiring bug and throws.
   env?: Env
-  // The composition root's boot timer, if it kept one. Both passes run before the listener binds, and a
-  // single `install` label cannot say which plugin was the slow one, so there is a line per plugin per
-  // pass. Read them as wall-clock slices rather than per-plugin costs once the passes overlap: a
-  // plugin's line says when it finished.
+  // The composition root's boot timer (`bootTimer`), if it kept one. Both passes run before the listener
+  // binds, and a single `install` label cannot say which plugin was the slow one, so there is a line per
+  // plugin per pass in the boot log. Read them as wall-clock slices rather than per-plugin costs, because
+  // the passes overlap: a plugin's line says when it finished.
   //
-  // These are the marks that refused the 503-until-ready wire contract. Both passes together measure
-  // 24 ms warm and 38 to 41 ms on a first boot against a realistic data root, out of a 132 ms boot,
-  // which is not worth a code every client and the MCP child would honour forever
-  // (apps/node/src/composition/boot.ts § bootTimer).
+  // The listener waits for both passes rather than answering 503 until ready. That holds while these
+  // marks stay a small slice of the boot; a ready code is a contract every client and the MCP child
+  // would have to honour.
   mark?: (label: string) => void
 }
 
@@ -296,17 +295,16 @@ export async function initPlugins(
     throw error
   }
 
-  // The init pass, all at once. Nothing here consumes another plugin's contributions, which is what
-  // `ready` below is for, so the serial loop was serial because loops are.
+  // The init pass, all at once. Nothing here consumes another plugin's contributions; that is what
+  // `ready` below is for.
   //
   // Do not expect this to be faster. Most of these inits are synchronous: `ctx.storage.open()` opens a
   // node:sqlite handle and runs drizzle's migration chain without awaiting anything, so one thread runs
-  // them one after another either way, and the measured pass is 24 ms warm before and after
-  // (measured 2026-09-03). What this buys is that a plugin
-  // that does await something no longer holds up its neighbours.
+  // them one after another either way. What this buys is that a plugin that does await something does
+  // not hold up its neighbours.
   //
-  // `allSettled` rather than `all`, because the failure handling per plugin is the same as the serial
-  // loop's `catch` and one plugin throwing must not hide what its neighbours did.
+  // `allSettled` rather than `all`, because each plugin's failure is handled on its own and one plugin
+  // throwing must not hide what its neighbours did.
   const inits = await Promise.allSettled(
     running.map(async ({ plugin, ctx }) => {
       await plugin.init(ctx)
@@ -319,8 +317,8 @@ export async function initPlugins(
   // one's resources, which is the reason that order is declaration and not "whoever finished last".
   //
   // A built-in failing still fails the boot, because every built-in is first-party code in the same
-  // binary. The difference from the serial loop is that its neighbours have already run, so all of
-  // them are torn down rather than the prefix: each holds a WAL-mode SQLite handle and the composition
+  // binary. Its neighbours have already run, so all of them are torn down: each holds a WAL-mode SQLite
+  // handle and the composition
   // root's catch releases the data-root lock. A loaded plugin is contained instead
   // (docs/plugins/loaded-plugins.md § Loaded plugins).
   let fatal: { error: unknown } | null = null
@@ -353,9 +351,8 @@ export async function initPlugins(
   // The one manifest contribution that lands in another plugin's registry, so the one that cannot be
   // declared before the init pass: `ctx.harnesses.register` resolves AGENTS_HARNESS_REGISTRY at
   // registration time, and the agents plugin provides it in its own init
-  // (server/pluginHost/context.ts § harnesses). Declared here it no longer matters which order the
-  // roster puts the two in; declared before init it silently registered nothing whenever agents had
-  // not run yet.
+  // (server/pluginHost/context.ts § harnesses). Declared after every init, the roster order of the two
+  // does not matter; declared before init, it would register nothing whenever agents had not run yet.
   for (const { plugin, ctx, loaded } of running) {
     if (!started.includes(plugin)) continue
     try {
@@ -651,8 +648,8 @@ async function disposeStarted(
       pluginLog(plugin.name).warn(`dispose failed: ${describeError(error).message}`)
     }
     closeStorage(plugin.name)
-    // A host can be stopped and started again in one process (tests do this, and supervised reload may
-    // eventually do the same). Teardown must revoke every live registry closure, not rely on process exit.
+    // A host can be stopped and started again in one process, as tests do. Teardown must revoke every
+    // live registry closure, not rely on process exit.
     clearRegistrations(plugin.name)
     const ctx = contexts.get(plugin.name)
     if (ctx) revokePluginContext(ctx)

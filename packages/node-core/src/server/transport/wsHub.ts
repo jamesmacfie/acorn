@@ -175,21 +175,17 @@ function watchDrain(conn: Conn): void {
 
 // One frame out, and the whole of this node's backpressure policy.
 //
-// It used to drop a frame when the socket buffered past the mark and increment `seq` anyway, so the
-// client saw a gap; the broker reads a gap as loss and closes the socket
-// (@acorn/custody/broker/nodeBroker.ts), reconnect re-attaches every terminal, and each re-attach
-// makes the node serialise a framebuffer while the client refetches its active queries. A build
-// spewing output was answered with more load, at the moment the node was busiest.
+// A stream frame over the mark is still sent, and its producer is paused until the socket drains.
+// Nothing is dropped, so nothing is lost. A frame with no producer to pause, such as an invalidation
+// ping, is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed
+// something and the broker sees no gap. A gap would make the broker read loss and close the socket
+// (the custody package's nodeBroker), and the reconnect would add load at the moment the node is
+// busiest. Later sheds in the same congested window consume no sequence number at all, because one
+// "you are behind" is the whole message.
 //
-// Now: a stream frame over the mark is still sent, and its producer is paused until the socket drains.
-// Nothing is dropped, so nothing is lost. A frame with no producer to pause — an invalidation ping —
-// is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed something
-// and the broker sees no gap. Later sheds in the same congested window consume no sequence number at
-// all, because one "you are behind" is the whole message.
-// Serialising and writing one frame, as a histogram per channel. At sixty frames a second across
-// every attached socket this is a metric and could never be a span
-// (docs/telemetry/model.md § Hot seams are metrics), and it is where the performance programme's
-// re-escaping cost showed up.
+// Serialising and writing one frame is timed as a histogram per channel. At sixty frames a second
+// across every attached socket this is a metric and could never be a span
+// (docs/telemetry/model.md § Hot seams are metrics).
 //
 // The channel is `<owner>:<verb>`, so the prefix is the label and a plugin's own channel names the
 // plugin as owner. Terminal output is not counted here: it takes the binary path below, which
@@ -249,11 +245,10 @@ function sendFrame(conn: Conn, frame: WsServerFrame, viewerId?: string | null): 
 
 // Terminal output, as one binary frame instead of an escaped JSON string.
 //
-// The bytes were bytes when the pseudo-terminal produced them, and this used to be the one channel that
-// re-escaped them once per attached socket and again on the helper hop, at 60 frames a second while a
-// build talks. The frame is the session id and then the
-// payload (@acorn/protocol/ws.ts § The one binary frame); the desktop broker forwards it without
-// looking inside, and the renderer's bridge tags it with the node id.
+// The bytes were bytes when the pseudo-terminal produced them, so JSON would re-escape them once per
+// attached socket and again on the helper hop, at 60 frames a second while a build talks. The frame is
+// the session id and then the payload (@acorn/protocol/ws.ts § The one binary frame); the desktop
+// broker forwards it without looking inside, and the renderer's bridge tags it with the node id.
 //
 // Everything the JSON path does is still done here: the same backpressure decision, and the same
 // refusal to drop bytes out of the middle of a stream. What it does not do is take a sequence number,
@@ -372,11 +367,10 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
     return authenticated ? { deviceId: authenticated.deviceId } : null
   }
   const token = req.headers['x-acorn-internal']
-  // HMAC-verified, not compared with `===`, which used to leak the token's length and a prefix-match
-  // position through timing. INTERNAL_TOKEN is now a signing key rather than the credential
-  // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null`, since it has no
-  // device row to revoke, but the claims are carried so a future sweep can close a task's sockets when
-  // the task ends.
+  // HMAC-verified, not compared with `===`, which would leak the token's length and a prefix-match
+  // position through timing. INTERNAL_TOKEN is a signing key rather than the credential
+  // (server/auth/internalTokens.ts). An internal socket gets `deviceId: null`, since it has no device
+  // row to revoke, but its claims are carried for the task-scope checks.
   if (!isLoopbackPeer(req.socket.remoteAddress) || typeof token !== 'string' || !token) return null
   const claims = authenticateInternalToken(deps.internalToken, deps.internalCredentials, token)
   return claims ? { deviceId: null, internal: claims } : null

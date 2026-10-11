@@ -11,9 +11,7 @@ import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 // The measure-history read route (docs/dashboards/views.md § Trends).
 //
 // One route, GET only. There is no write route: the sampler and the store share a process, so the
-// only writer is `core:sample-measures`. An earlier design had clients PUT samples while panels
-// rendered, with last-write-wins buckets to make several clients converge, all of it compensating for
-// the wrong writer and obsoleted by the scheduler.
+// only writer is `core:sample-measures`.
 //
 // Device-only, like the library operations below, by the mount in server/index.ts. A panel id carries
 // no scope, so a task token reading history could reach any workspace's panel.

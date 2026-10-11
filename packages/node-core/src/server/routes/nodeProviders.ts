@@ -20,12 +20,11 @@ import { respondError } from '../respond'
 //
 // The client reads this by fanning out over every reachable node and unioning the answers, deduped on
 // providerId plus providerNodeId. So the route answers for this node only and never tries to be the
-// fleet's view of itself: whichever node holds the cloud connection is the one whose providers reply,
-// and today that is usually the local one, which is exactly the assumption the fan-out avoids baking
-// in.
+// fleet's view of itself: whichever node holds the cloud connection is the one whose providers reply.
+// That is usually the local one, which is exactly the assumption the fan-out avoids baking in.
 
 // Long enough for a cloud API round trip, short enough that one wedged provider does not hold the
-// response open past the client's own per-node deadline (5s in client-core/infra/node/fanout.ts).
+// response open past the client's own per-node deadline (5s, `DEFAULT_TIMEOUT_MS` in client-core's fanout).
 const LIST_TIMEOUT_MS = 4_000
 // Provisioning is slower than listing, and by a lot. Still bounded: a caller that never gets an answer
 // cannot tell a slow create from a failed one.

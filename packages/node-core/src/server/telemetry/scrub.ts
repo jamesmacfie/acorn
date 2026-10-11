@@ -83,7 +83,7 @@ export function scrub(value: unknown, fallback = '', max = LOG_BODY_MAX): string
     // Only the last pattern has a capture group. `typeof` and not a truthiness check, because for a
     // pattern with no groups the replacer's second argument is the match offset, and a token that
     // happened to sit at index 6 would come back as `6<redacted>`. The copy in
-    // `plugins/agents/src/server/drivers/diagnostics.ts` had that bug.
+    // `plugins/agents/src/server/drivers/diagnostics.ts` makes the same check.
     message = message.replace(pattern, (_match, prefix?: unknown) =>
       typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>',
     )

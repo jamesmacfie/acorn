@@ -107,7 +107,7 @@ export function nextRunAtInTimezone(cadence: Cadence, from: number, timezone: st
   throw new Error(`Could not resolve the next calendar occurrence in '${timezone}'.`)
 }
 
-/** Existing callers omit timezone and retain the scheduler's node-local calendar behavior. */
+/** A caller that omits timezone keeps the scheduler's node-local calendar behavior. */
 export function nextRunAtForTarget(
   cadence: Cadence,
   from: number,

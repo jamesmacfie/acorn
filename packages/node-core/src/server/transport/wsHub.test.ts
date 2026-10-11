@@ -25,7 +25,7 @@ import {
 } from './wsHub'
 type TestStreamMsg = Parameters<StreamSink>[0]
 
-// Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
+// Headless verification of the delicate transport bits a smoke suite can't cover in a unit:
 // upgrade auth (device bearer / internal-token / host), per-connection seq,
 // revocation (immediate and by sweep), deterministic replay-before-live ordering on attach, input
 // routing, detach, and status broadcast. Drives a real `ws` client against a real http.Server with
@@ -144,10 +144,9 @@ const decodeText = (frame: Buffer): { id: string; text: string } => {
 // Resolves once the socket has closed, so a revocation assertion waits for the real close rather than
 // polling readyState.
 const closed = (ws: WebSocket): Promise<void> => new Promise((r) => ws.on('close', () => r()))
-// Wait for a server-side effect to arrive, rather than sleeping a fixed interval and hoping. A
-// fixed 30ms sleep is what made this file the suite's most frequent load-sensitive failure: 30ms
-// is plenty on an idle machine and not always enough with 6 packages testing concurrently. The
-// timeout is generous because it only bounds a genuine hang, never the happy path.
+// Wait for a server-side effect to arrive, rather than sleeping a fixed interval and hoping. A fixed
+// sleep is plenty on an idle machine and not always enough with several packages testing
+// concurrently. The timeout is generous because it only bounds a genuine hang, never the happy path.
 const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
@@ -466,7 +465,7 @@ describe('wsHub streaming', () => {
     liveSink!({ type: 'output', data: 'LIVE' } satisfies TestStreamMsg)
     await waitFor(() => bin.length >= 2, 'the live frame')
     // `ready` carries a session object, so it is still JSON. Spelled out rather than Extract<>'d: the
-    // frame envelope is open now, so there is no union left to discriminate. The shape asserted here
+    // frame envelope is open, so there is no union left to discriminate. The shape asserted here
     // is terminal's, and this is a terminal test.
     const outs = got.filter((f) => f.channel === 'term:out') as unknown as {
       channel: 'term:out'
@@ -656,7 +655,7 @@ describe('wsHub streaming', () => {
 })
 
 // A task-scoped internal credential is confined to its own task's streams
-// (docs/security/transport-and-auth.md § Transport and auth, on the finding this test guards against).
+// (docs/security/transport-and-auth.md § Transport and auth).
 describe('wsHub task scope', () => {
   const streamHandlers = (seen: string[]) => ({
     input: (id: string, data: string) => void seen.push(`input:${id}:${data}`),
@@ -717,8 +716,8 @@ describe('wsHub task scope', () => {
   })
 })
 
-// The second half of the same finding: the scope check used to live inside the `term:` branch, so
-// every other channel, and every broadcast, was unchecked (docs/security/transport-and-auth.md § Transport and auth).
+// Task scope covers every channel and every broadcast, not only `term:` frames
+// (docs/security/transport-and-auth.md § Transport and auth).
 describe('wsHub non-term channels and broadcast, under task scope', () => {
   const taskToken = () => mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' })
 
@@ -807,10 +806,9 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
   })
 })
 
-// Backpressure, which used to be handled by amplifying load: the hub dropped a frame when a socket
-// buffered past its mark and incremented `seq` anyway, the broker read the gap as loss and closed the
-// socket, and reconnect re-attached every terminal and refetched every active query — at the moment
-// the node was busiest.
+// Backpressure. Dropping a frame and incrementing `seq` anyway would make the broker read the gap as
+// loss and close the socket, and reconnect would re-attach every terminal and refetch every active
+// query at the moment the node is busiest.
 //
 // The mark is set to a byte here rather than four megabytes, so the pause and the resume happen over a
 // real socket without pushing real megabytes through it. `paused` on the client end is what makes the

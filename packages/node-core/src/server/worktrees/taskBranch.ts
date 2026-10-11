@@ -66,8 +66,9 @@ export async function withBranchReservation<T>(
       return await repositoryMetadataKey(mapped)
     } catch (error) {
       if (!allowUnavailable) throw error
-      // Legacy lazy tasks reserve a database branch even when Git cannot inspect the checkout.
-      // Metadata writes and tasks with a pinned base still require the verified common directory.
+      // A task whose worktree is created lazily reserves a database branch even when Git cannot inspect
+      // the checkout. Metadata writes and tasks with a pinned base still require the verified common
+      // directory.
       try {
         return `checkout:${realpathSync(mapped.path!)}`
       } catch {

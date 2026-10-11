@@ -34,7 +34,7 @@ export function redact(text: string, secrets: readonly string[]): string {
 // against `Object.freeze(new Error(...))`. When a field cannot be rewritten, a redacted plain Error
 // replaces it: losing the class is bad, leaking the credential is worse.
 //
-// `seen` breaks a circular cause chain, which otherwise recursed until RangeError.
+// `seen` breaks a circular cause chain, which would otherwise recurse until RangeError.
 function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = new Set()): unknown {
   if (!(error instanceof Error)) {
     return typeof error === 'string' ? redact(error, secrets) : error

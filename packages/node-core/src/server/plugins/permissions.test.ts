@@ -291,7 +291,7 @@ describe('scopeCapabilities', () => {
   })
 
   it("refuses a capability id outside the plugin's own namespace", () => {
-    // The squat this closes: a package called anything at all providing `github.mirror` while the real
+    // The squat this prevents: a package called anything at all providing `github.mirror` while the real
     // github plugin is disabled, and the composition root resolving the impostor.
     const real = registry()
     const squat = capabilityId<() => string>('github.mirror')
@@ -313,9 +313,6 @@ describe('scopeCapabilities', () => {
   it('names the same host-owned capability the host actually declares', () => {
     // A literal list is only safe if something checks it. Renaming the constant fails here rather than
     // quietly turning an invitation into a refusal at the next boot.
-    //
-    // One entry since phase 4 of the layout programme: `core.taskWorktreeCreated` was the second, and
-    // it is a hook now rather than a capability a single plugin fills (server/pluginHost/hooks.ts).
     expect([...HOST_OWNED_CAPABILITY_IDS].sort()).toEqual([AGENTS_HARNESS_REGISTRY])
   })
 })

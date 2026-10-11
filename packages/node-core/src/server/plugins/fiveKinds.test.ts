@@ -11,8 +11,7 @@ import { installedPluginInfo, loadExternalPlugins, pluginInstallDir } from './lo
 // Every kind has tests of its own — the manifest parser's, the hook runner's, the arbitration rule's,
 // the two slot hosts'. What none of them answers is whether the five fit together in one manifest:
 // the parser reads one `extensionPoints` array with five shapes in it, and each shape needs different
-// fields to be present and different ones to be absent. Phase 4 of the layout programme called this
-// its "done when" and never wrote it.
+// fields to be present and different ones to be absent.
 //
 // From disk, through the real loader, because that is the path a stranger's package takes. A manifest
 // object handed straight to the parser would skip the part where the bytes are read, the id is bound

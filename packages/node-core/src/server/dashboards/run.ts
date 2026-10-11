@@ -98,8 +98,9 @@ const sourcePath = (plan: PanelPlan, index: number, input?: string): string =>
     ? `/sources/${index}/reference/content/query/scope/inputs/${input}`
     : `/sources/${index}`
 
-/** A source that couldn't answer, as a problem. `message` keeps the Node's wording for older clients,
- *  and `failure` carries the code, source, and input so a client can word it and offer the fix. */
+/** A source that couldn't answer, as a problem. `message` is the Node's own sentence, which every
+ *  problem carries and a client shows wherever it does not word the failure itself. `failure` carries
+ *  the code, source, and input so a client can word it and offer the fix. */
 function sourceProblem(
   plan: PanelPlan,
   index: number,

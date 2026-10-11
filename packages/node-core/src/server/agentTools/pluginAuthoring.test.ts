@@ -299,8 +299,8 @@ describe('the two doors', () => {
     expect(guide).toContain('`ctx.telemetry`')
     expect(guide).toContain('`ctx.core.telemetry.onBatch`')
     expect(guide).toContain('permissions.node.core: ["telemetry"]')
-    // The line that used to be here said there is no `ctx.log` and to use `console`. It was true
-    // until 2026-09-10 and is the kind of stale instruction an agent follows for a whole session.
+    // "There is no `ctx.log`, use `console`" is wrong, and it is the kind of stale instruction an agent
+    // follows for a whole session.
     expect(guide).not.toContain('There is no `ctx.log`')
     expect(pluginAuthoringVocabulary().permissions.core).toContain('telemetry')
     expect(Object.keys(pluginAuthoringVocabulary().bridge.kinds)).toContain('telemetry')

@@ -14,8 +14,8 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { readPairingBody } from './pairingBody'
 
-// Pairing and device management (docs/api-reference/transport.md § Pairing, docs/security.md
-// § Transport and auth).
+// Pairing and device management (docs/api-reference/transport.md § Pairing,
+// docs/security/transport-and-auth.md § Transport and auth).
 //
 // Two routers, because they sit on opposite sides of the auth gate. `open` is how a client holding no
 // credential gets one, so it mounts above requireUser. `core` is owner-only device administration and
@@ -68,7 +68,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
         fingerprint: c.env.NODE_FINGERPRINT,
         // This is the one response that must stay readable by every client forever, so the bar for a
         // field on it is a real consumer, not a plausible use. Adding one back is one line and always
-        // safe, because the schema is additive forever (protocol/node.ts).
+        // safe, because the schema is additive forever (`nodeInfoSchema`).
         ...(authenticated ? { nodeId: c.env.NODE_ID } : {}),
         ...(authenticated && c.env.SERVICE_INSTANCE_ID ? { serviceInstanceId: c.env.SERVICE_INSTANCE_ID } : {}),
       }

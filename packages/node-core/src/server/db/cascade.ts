@@ -24,15 +24,12 @@ export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, 
 // The same shape one entity over: everything in the core database that belongs to one plugin id, for
 // an uninstall the owner asked to purge (docs/plugins/data-ownership.md § Uninstalling).
 //
-// Uninstall used to delete the package directory, the lockfile and the plugin's own SQLite files, then
-// audit `dataPurged: true` while leaving these behind. The prefs rows are the sharp edge: every
-// sandboxed frame's state lives under `plugin:<id>:*`, and nothing could enumerate or delete that
-// namespace, so a reinstall inherited the old plugin's state with no way for anyone to look at it
-// first.
+// The prefs rows are the sharp edge: every sandboxed frame's state lives under `plugin:<id>:*`, and
+// without this a reinstall inherits the old plugin's state with no way for anyone to look at it first.
 //
 // Both key spaces are host-bound, so a LIKE on the prefix cannot reach another plugin's rows: prefs
 // keys are stamped by pluginStateKey and schedule keys by `<pluginId>:<scheduleId>`
-// (docs/schedules.md). `_` and `%` are not legal in a plugin id (pluginContract.ts § ID_RE), so no
+// (docs/schedules.md). `_` and `%` are not legal in a plugin id (`ID_RE` in @acorn/protocol), so no
 // escape clause is needed.
 //
 // What this deliberately does not reach, and why the audit row is still honest:

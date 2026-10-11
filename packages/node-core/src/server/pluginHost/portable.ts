@@ -1,21 +1,17 @@
-// The plugin side of the portable route carrier, as one helper instead of a paragraph every loaded
-// plugin pasted out of the previous one.
+// The plugin side of the portable route carrier.
 //
 // A loaded plugin serves `(Request, PluginRequestContext) -> Response` (types.ts § PluginFetchHandler)
-// because a Hono instance cannot cross a process boundary. Plugins still want Hono, so all four of
-// them had arrived at the same trick: hide the request context in `c.env` behind a symbol on the way
-// in, and read it back out in each handler. Identical code, four copies, and the sort of code an
-// author can only get identically right or subtly wrong.
+// because a Hono instance cannot cross a process boundary. Plugins still want Hono, so this hides the
+// request context in `c.env` behind a symbol on the way in, and each handler reads it back out.
 //
-// `servePluginFetch` (fetchRoute.ts) is the host half of the same carrier; this is what the plugin
-// wraps its router in.
+// `servePluginFetch` is the host half of the same carrier; this is what the plugin wraps its router in.
 import type { Context, Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import type { PluginFetchHandler, PluginRequestContext } from './types'
 
-// One symbol shared by every plugin, where each plugin used to mint its own. The symbol was never the
-// protection. The context is the capability, and a plugin only ever holds the one the host handed to
-// its own fetch handler. What the symbol buys is that a stray host binding cannot collide with it.
+// One symbol shared by every plugin. The symbol is not the protection: the context is the capability,
+// and a plugin only ever holds the one the host handed to its own fetch handler. What the symbol buys
+// is that a stray host binding cannot collide with it.
 const PORTABLE_REQUEST_CONTEXT = Symbol('acorn-plugin-request-context')
 
 type PortableBindings = AppEnv['Bindings'] & { [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext }

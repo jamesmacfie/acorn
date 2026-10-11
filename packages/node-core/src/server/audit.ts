@@ -82,12 +82,11 @@ export type CoreAuditAction =
 // call), the host qualifies each with the plugin id, and `recordAudit` refuses an action nobody
 // declared. So the vocabulary is still enumerable — `auditVocabulary()` below is the enumeration — and
 // the settings surface can name every verb it might draw. It is the same trade the harness registry
-// already makes.
+// makes.
 //
-// Why it had to open at all: nothing a plugin does was on the trail, and for an agent-driven product
-// the interesting events (a run cost money, a workflow pushed a branch, a schedule made an outbound
-// request with the owner's credentials) are exactly the ones the one surface built for review could
-// not see (2026-08-27 extensibility review, finding 9).
+// Why it is open at all: for an agent-driven product the interesting events (a run cost money, a
+// workflow pushed a branch, a schedule made an outbound request with the owner's credentials) are
+// plugin events, and the trail is the one surface built for review.
 //
 // `<pluginId>:<actionId>`. No core action contains a colon, so a plugin can never take a core verb's
 // place, and the id is minted here rather than read off a descriptor — the same rule a plugin theme's

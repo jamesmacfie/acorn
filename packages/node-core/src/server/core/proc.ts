@@ -1,5 +1,5 @@
 // The process broker. See docs/security/process-and-paths.md § Process, path, and configuration controls for the
-// guarantee this gives every caller and the incidents that led to it.
+// guarantee this gives every caller.
 import { spawn } from 'node:child_process'
 import { basename } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
@@ -218,9 +218,9 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
       clearTimeout(timer)
       // The SIGKILL escalation is not cleared here. The direct child exiting is exactly the case where a
       // group member that ignored SIGTERM is still alive: its parent is gone, the pipes closed, 'close'
-      // fired, and clearing the timer at that moment left the survivor running forever. Confirmed with a
-      // grandchild that traps TERM. The timer is unref'd, so letting it run costs nothing and cannot hold
-      // the process open.
+      // fired, and clearing the timer at that moment would leave the survivor running forever, as a
+      // grandchild that traps TERM shows. The timer is unref'd, so letting it run costs nothing and cannot
+      // hold the process open.
       spec.signal?.removeEventListener('abort', abort)
       // Events rather than attributes on the histogram: both are rare, both are worth seeing one at
       // a time, and neither belongs in a distribution.
@@ -252,7 +252,7 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
 }
 
 // Decode accumulated chunks as one stream. StringDecoder carries a partial multi-byte sequence across
-// chunk boundaries, which is the property `chunk.toString()` lacked, and `.end()` is deliberately not
+// chunk boundaries, which `chunk.toString()` does not, and `.end()` is deliberately not
 // called, so a sequence left incomplete by the output cap is dropped rather than flushed as U+FFFD.
 // Dropping it is what keeps the result both valid UTF-8 and within maxOutputBytes.
 function decode(chunks: readonly Buffer[], encoding: 'utf8' | 'latin1' = 'utf8'): string {

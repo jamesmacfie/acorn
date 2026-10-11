@@ -1,10 +1,5 @@
 // `ctx.events.notice`: one bell row, two tiers, and the tier is what decides how much of the row the
 // caller gets to write (./types.ts § PluginBroadcast).
-//
-// This exists because the seam it replaces had no tier question at all. The bell had left `ctx.events`
-// for the `workflows.notices` capability, and the plugins that wanted a row borrowed that capability —
-// which can only say "a run, at this node". So the memory-proposal gate raised a row with no
-// destination, and clicking it, in the bell or on the desktop banner, did nothing.
 import { describe, expect, it, vi } from 'vitest'
 
 const broadcasts: Record<string, unknown>[] = []

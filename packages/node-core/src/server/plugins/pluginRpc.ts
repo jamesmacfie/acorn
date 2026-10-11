@@ -31,7 +31,7 @@ import {
 } from './rpcValues.ts'
 
 // Statuses that must not carry a body. The constructor throws on any body for these, even an empty
-// one, so a plugin's 204 became a 500 after its handler had already done the work. The same set as
+// one, so a plugin's 204 would become a 500 after its handler had already done the work. The same set as
 // ../middleware/idempotency.ts.
 const BODILESS = new Set([204, 205, 304])
 

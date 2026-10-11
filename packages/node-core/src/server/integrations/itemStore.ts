@@ -50,8 +50,8 @@ export type ExternalItemStore = {
 /**
 /**
  * Scoped to one provider at construction, not per call; see docs/integrations.md § Connection
- * lifecycle for why that is what makes the ownership check at the ask (`assertOwnedProvider` in
- * plugin/requestContext.ts) the truth about every row the store can touch.
+ * lifecycle for why that is what makes the ownership check at the ask (`assertOwnedProvider`) the
+ * truth about every row the store can touch.
  */
 export function createExternalItemStore(db: AppDatabase, userId: string, provider: string): ExternalItemStore {
   const item = (row: typeof schema.issues.$inferSelect): ExternalItemRow => ({
@@ -102,9 +102,9 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
     },
 
     async listByIdentifier(identifiers) {
-      // This signature used to be (provider, identifiers); a plugin bundle built before the store was
-      // provider-scoped passes its provider id here, where it would reach `inArray` as a string and
-      // die as a malformed-SQL error three layers down. Say what is actually wrong instead.
+      // A plugin bundle built against the older `(provider, identifiers)` signature passes its provider
+      // id here, where it would reach `inArray` as a string and die as a malformed-SQL error three
+      // layers down. Say what is actually wrong instead.
       if (!Array.isArray(identifiers)) {
         throw new TypeError(
           `listByIdentifier takes an array of identifiers — got ${typeof identifiers}. A plugin bundle built before the store was provider-scoped needs rebuilding (build:plugin).`,

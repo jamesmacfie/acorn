@@ -76,7 +76,7 @@ export const enrollmentTokenId = (token: string): string =>
 /** Is this a control-plane URL worth posting a durable credential to?
  *
  *  There is deliberately no allowlist of permitted control planes: whoever set the environment
- *  variable made that decision (the extensibility review says so in as many words). The scheme is a
+ *  variable made that decision. The scheme is a
  *  different question. Plain http off this machine would put the device token on the wire in the
  *  clear, so it is refused; loopback http stays allowed because that is what a test stub and a local
  *  development control plane are. */
@@ -112,7 +112,7 @@ async function post(
     signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${response.status} from ${url}`)
-  // Tolerant on the way back in (protocol/enrollment.ts): an unparseable body still leaves a node
+  // Tolerant on the way back in (`enrollmentResponseSchema`): an unparseable body still leaves a node
   // that enrolled successfully, so take what parses and ignore the rest.
   const parsed = enrollmentResponseSchema.safeParse(await response.json().catch(() => ({})))
   return parsed.success ? parsed.data : {}

@@ -9,8 +9,8 @@ export const worktreeDirName = (owner: string, repo: string, number: number | st
 
 // The filesystem and DNS-safe branch slug, shared by the worktree dir
 // name and the ACORN_TASK_SLUG env var that isolates parallel tasks.
-// plugins/docker/main/matcher.ts duplicates this one-liner to keep its plugin boundary frozen. Keep
-// the two in sync.
+// The docker plugin's matcher duplicates this one-liner to keep its plugin boundary frozen. Keep the
+// two in sync.
 export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
 // Workspace worktree directory name (docs/workspaces-and-tasks.md), keyed by branch because a

@@ -96,8 +96,8 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
 // A histogram and not a span: this is the hottest seam in the node by a wide margin
 // (docs/telemetry/model.md § Hot seams are metrics). The owner is `'core'` here and resolved against the
 // ambient context inside `recordDuration`, which is the only way a statement eleven frames below a
-// plugin's route can name that plugin (../telemetry/context.ts). Reading the context costs about 8
-// nanoseconds, so a statement can afford to ask.
+// plugin's route can name that plugin (../telemetry/context.ts). Reading the context is cheap enough
+// that a statement can afford to ask.
 const sqlSeam = (sql: string): string => `sql.${sql.trim().split(/\s+/, 1)[0]?.toLowerCase() || 'unknown'}`
 
 const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
@@ -105,7 +105,7 @@ const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
   const time = <T>(run: () => T): T => {
     // Read per call rather than per prepare. Statements are prepared once and reused for the life of
     // the process, so a switch that can be flipped while the node runs cannot be resolved at prepare
-    // time any more: a statement prepared before a sink subscribed would never be timed.
+    // time: a statement prepared before a sink subscribed would never be timed.
     if (!telemetryEnabled()) return run()
     const started = process.hrtime.bigint()
     try {
@@ -145,8 +145,8 @@ export function openSqlite(
   }
 
   // Depth-tracked, so a nested transaction becomes a SAVEPOINT instead of a second BEGIN, which
-  // SQLite rejects. better-sqlite3 did this for us, and `batch()` in server/bindings.ts is a
-  // transaction a caller can reach from inside another one.
+  // SQLite rejects. better-sqlite3 does this itself and `node:sqlite` does not, and `batch()` in
+  // server/bindings.ts is a transaction a caller can reach from inside another one.
   let depth = 0
   const transaction = <A extends unknown[], R>(fn: (...args: A) => R): SqliteTransaction<A, R> => {
     const run =
@@ -177,12 +177,12 @@ export function openSqlite(
   }
 
   return {
-    // `prepare` is where the timing wrapper goes on, not `openSqlite`. It goes on unconditionally
-    // now, because the switch is no longer a constant read at boot: the wrapper costs one boolean
-    // read and one call frame per statement while nothing is collecting.
+    // `prepare` is where the timing wrapper goes on, not `openSqlite`. It goes on unconditionally,
+    // because the switch can flip while the node runs: the wrapper costs one boolean read and one call
+    // frame per statement while nothing is collecting.
     prepare: (sql) => timeStatement(wrapStatement(db.prepare(sql)), sql),
     exec: (sql) => db.exec(sql),
-    // better-sqlite3 had a `.pragma()` helper and `node:sqlite` does not. Every caller sets a value
+    // better-sqlite3 has a `.pragma()` helper and `node:sqlite` does not. Every caller sets a value
     // and ignores the result, so this covers it.
     pragma: (statement) => db.exec(`PRAGMA ${statement}`),
     function: (name, options, callback) => db.function(name, options, callback),
@@ -190,10 +190,10 @@ export function openSqlite(
     // SQLite's online-backup API, which is a module-level function here rather than a method.
     backup: async (destination) => {
       if (options.allowBackup === false) throw new Error('Loaded plugin storage cannot export database files.')
-      // Node 26 can finish an online backup without waking the event loop to settle its promise.
-      // Three sequential copies in one backup then waited for Vitest's 20-second test timer;
-      // a short live timer let each copy settle in milliseconds. Keep that wake-up scoped to an
-      // active backup, so an idle node has no polling work and failures still clear the timer.
+      // Node 26 can finish an online backup without waking the event loop to settle its promise, so
+      // each copy would wait for whatever unrelated timer fires next. A short live timer lets each copy
+      // settle at once. Keep that wake-up scoped to an active backup, so an idle node has no polling
+      // work and failures still clear the timer.
       const wake = setInterval(() => {}, 50)
       try {
         await sqliteBackup(db, destination)

@@ -21,7 +21,7 @@ describe('makeTestNodeContext', () => {
       // Unscoped core, all facets present.
       expect(ctx.core.secrets).toBeDefined()
       expect(ctx.core.proc).toBeDefined()
-      // Both tiers get the seam now: a built-in that declares `migrationsModule` opens its database
+      // Both tiers get the seam: a built-in that declares `migrationsModule` opens its database
       // through the host too.
       expect(ctx.storage.open).toBeTypeOf('function')
     } finally {
@@ -57,8 +57,8 @@ describe('makeTestNodeContext', () => {
   })
 
   it("records what the plugin emitted, with no sink of the test's own", () => {
-    // The recorder is the reason a plugin test does not stand up the collector by hand: three
-    // suites used to (docs/plugin-authoring/testing.md § In tests).
+    // The recorder is the reason a plugin test does not stand up the collector by hand
+    // (docs/plugin-authoring/testing.md § In tests).
     const ctx = makeTestNodeContext({ plugin })
     try {
       ctx.telemetry.measure('reindex', () => 41 + 1)
@@ -123,8 +123,8 @@ describe('makeTestNodeContext', () => {
   })
 
   it("confines a loaded plugin's broadcast to its own channel namespace", () => {
-    // `send` used to be handed over raw, which let a loaded package post on `term:` or `workflow:` and
-    // impersonate core's own streams. The confinement is also the definition of the namespace its frames
+    // A raw `send` would let a loaded package post on `term:` or `workflow:` and impersonate core's own
+    // streams. The confinement is also the definition of the namespace its frames
     // may subscribe to (client-core/host/plugins/pluginChannel.ts).
     const ctx = makeTestNodeContext({ plugin, permissions: {} })
     try {
@@ -161,8 +161,7 @@ describe('makeTestNodeContext', () => {
   })
 
   it("resolves a workspace plugin's chain from its id alone", () => {
-    // The default that replaced twenty `migrationsDir()` call sites: a real chain, really migrated, with
-    // the test naming nothing but the plugin id.
+    // The default: a real chain, really migrated, with the test naming nothing but the plugin id.
     const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     try {
       const db = ctx.storage.open()

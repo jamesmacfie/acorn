@@ -17,7 +17,7 @@ const log = createLogger('runs')
 export type RunSource = {
   pluginId: string
   /** `GET` → `{ runs }`. Confined to the plugin's own namespace on every call, not merely at
-   *  registration (../plugin/dispatch.ts). */
+   *  registration (`confinePluginPath`). */
   runs: string
 }
 

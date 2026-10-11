@@ -3,16 +3,15 @@
 //
 // Install is per node. A fleet is a set of independently administered nodes, so there is no
 // cross-node transaction here and no attempt at one: this module answers "make this node carry this
-// package", and every device that pairs with the node picks the bundle up through phase 2's
-// distribution path afterwards.
+// package", and every device that pairs with the node picks the bundle up through plugin
+// distribution afterwards.
 //
 // This is also the node's only outbound HTTP consumer (docs/http-client.md says there is no shared
-// client). The fetch usage stays inside this file rather than becoming a general helper, the same
-// posture docs/security.md asks of the future credential broker.
+// client). The fetch usage stays inside this file rather than becoming a general helper.
 //
 // Nothing here loads or executes plugin code. The package is validated, hashed and placed; the loader
-// runs it at the node's next start (pluginLoader.ts), which is why every result says
-// `installed-restart-required` rather than pretending the plugin is live.
+// runs it at the node's next start, which is why every result says `installed-restart-required`
+// rather than pretending the plugin is live.
 import { createHash, randomUUID } from 'node:crypto'
 import {
   createWriteStream,
@@ -61,8 +60,7 @@ import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, st
 export const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
 
-// The convention this phase establishes: a GitHub release carries the package as one asset with this
-// exact name.
+// The convention: a GitHub release carries the package as one asset with this exact name.
 export { RELEASE_ASSET }
 
 // Everything a caller can be told about why an install did not happen. One class rather than a code
@@ -129,9 +127,8 @@ export const guardUrl = guardPluginUrl
 // ── Download and unpack ───────────────────────────────────────────────────────────────────────────
 
 // npm publishes each version's tarball digest as a Subresource Integrity string,
-// `<algorithm>-<base64 digest>`, optionally several separated by spaces. It was recorded into
-// provenance and never checked, which made it a note about the package rather than a statement about
-// the bytes on disk. This parses the strongest entry we can compute; an unrecognised algorithm returns
+// `<algorithm>-<base64 digest>`, optionally several separated by spaces. This parses the strongest
+// entry we can compute; an unrecognised algorithm returns
 // null and the caller treats that as "the registry told us nothing we can verify".
 const SRI_ALGORITHMS = ['sha512', 'sha384', 'sha256'] as const
 
@@ -255,8 +252,8 @@ function validate(root: string, expectId: string | null): PluginManifest {
       )
     }
   }
-  // Custody retains its established too-large projection; its callback reads client bytes with
-  // the shared descriptor guard. Node placement hashes with the client ceiling below.
+  // The client bundle has a larger ceiling, so it isn't read here. `place` hashes it under
+  // `MAX_CLIENT_BUNDLE_BYTES`, and a custody `inspect` callback reads it through the same file guard.
   if (expectId && manifest.id !== expectId) fail(`That package is '${manifest.id}', not '${expectId}'.`)
   return manifest
 }
@@ -501,8 +498,7 @@ export function uninstallPlugin(
   rmSync(lockfilePath(dataRoot, id), { force: true })
   removePluginReview(dataRoot, id)
 
-  // Retained by default, which mirrors what disabling has always done (docs/plugins.md: "SQLite files
-  // remain on disk and can be re-enabled later"). Reinstalling then finds its data where it left it.
+  // Retained by default, as disabling does, so reinstalling finds its data where it left it.
   if (options.purgeData) {
     const db = pluginDbPath(dataRoot, id)
     for (const suffix of ['', '-wal', '-shm']) rmSync(`${db}${suffix}`, { force: true })

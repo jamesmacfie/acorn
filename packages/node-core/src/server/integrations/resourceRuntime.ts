@@ -42,7 +42,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
   // Built once per call, scoped to this owner and provider; see docs/integrations/contributions.md § Connection
-  // and integration contributions for why this replaced a raw database handle here.
+  // and integration contributions for why a provider gets this store rather than a raw database handle.
   const items = createExternalItemStore(args.db, args.userId, args.providerId)
   const context = (): ProviderResourceContext => ({
     items,
@@ -112,9 +112,8 @@ export async function runProviderResource<TInput, TOutput>(args: {
 }
 
 // The request-context form, for a provider plugin's routes: the same function, with core supplying
-// the database handle, the owner id and the secret service instead of eight call sites in linear and
-// rollbar assembling them by hand. That assembly is what put both plugins on the schema ratchet
-// described in docs/integrations/contributions.md § Connection and integration contributions.
+// the database handle, the owner id and the secret service so no provider plugin assembles them
+// itself (docs/integrations/contributions.md § Connection and integration contributions).
 export const providerResource = <TInput, TOutput>(
   c: Context<AppEnv>,
   args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },

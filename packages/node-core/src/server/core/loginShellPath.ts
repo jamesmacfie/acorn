@@ -13,7 +13,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 const log = createLogger('service:boot')
 
 // Long enough for a slow profile, short enough that a broken shell cannot wedge the first spawn
-// forever. Unchanged from when the probe ran in front of the whole boot.
+// forever.
 const PROBE_TIMEOUT_MS = 5_000
 
 let pending: Promise<unknown> | null = null

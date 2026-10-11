@@ -43,8 +43,8 @@ export type RepoConfig = {
   repoTargetIds: string[]
 }
 
-// The DB columns the file layers override: the project config row (project-level settings,
-// formerly per-workspace columns). The `dev` run button comes from the dev script or explicit
+// The DB columns the file layers override: the project config row. The `dev` run button comes from
+// the dev script or explicit
 // config; see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
   devScript?: string | null // "run dev" command → a base `dev` target (repo config overrides)
@@ -109,16 +109,14 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   const scripts = doc.scripts
   if (scripts && typeof scripts === 'object') {
     const s = scripts as Record<string, unknown>
-    // `[scripts] setup` and `[scripts] archive` are not read. They were parsed and merged over the
-    // project row for a while and nothing ever consumed the result: the setup script comes from
+    // `[scripts] setup` and `[scripts] archive` are not read: the setup script comes from
     // `projects.setup_script` through projectSetup(), and the archive script from
-    // `projects.teardown_script` through server/storage/archive.ts. A repo could declare either and watch it do
-    // nothing.
+    // `projects.teardown_script` through server/storage/archive.ts.
     //
     // Reported rather than wired. Wiring them would make a committed file run a command on worktree
     // creation and on archive, and neither path asks the repo-config trust gate first, so it would be
-    // a new execution surface rather than a fix. Reported rather than dropped in silence, because the
-    // whole complaint was a declaration that quietly did nothing, and the palette already draws these.
+    // a new execution surface. Reported rather than dropped in silence, because a declaration that
+    // quietly does nothing is the problem, and the palette already draws these.
     for (const key of ['setup', 'archive'] as const) {
       if (s[key] !== undefined) {
         errors.push({
@@ -185,8 +183,7 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
 }
 
 // The projects.run_targets JSON column, converted to RunTarget[] (the per-project DB fallback
-// surface). Malformed JSON yields no targets. The pre-0017 scalar runCommand/devPort columns are
-// gone: migration 0017 folded them into this JSON column, and 0018 dropped them.
+// surface). Malformed JSON yields no targets.
 export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
   if (!db.runTargetsJson) return []
   try {

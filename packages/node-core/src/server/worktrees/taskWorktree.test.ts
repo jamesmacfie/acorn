@@ -279,10 +279,10 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
   })
 
-  // A path persisted once was trusted forever, so a worktree that drifted kept serving the task
-  // another branch's files, which is what put an agent in a tree that wasn't its task's. HEAD is now
-  // the fact and the row follows it, because work that needs a second pull request switches branch
-  // in the one worktree and the task has to survive that.
+  // A persisted path is verified, not trusted: a worktree that drifted would otherwise serve the task
+  // another branch's files and put an agent in a tree that isn't its task's. HEAD is the fact and the
+  // row follows it, because work that needs a second pull request switches branch in the one worktree
+  // and the task has to survive that.
   it('adopts the branch its worktree has drifted onto', async () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     git(res.cwd, 'checkout', '-b', 'second-pr')

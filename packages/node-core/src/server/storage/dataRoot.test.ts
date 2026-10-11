@@ -68,9 +68,9 @@ describe('openDataRoot', () => {
 
     const identity = JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))
     expect(identity.createdAt).toBeGreaterThan(0)
-    // Deliberately absent. It was written once here and read by nothing, and it went stale the moment the
-    // binary serving this root moved on (docs/api-reference/transport.md § Versioning). The live answer is the
-    // running binary's NODE_PROTOCOL_VERSION, reported at GET /v1/node.
+    // Deliberately absent: a stored version goes stale the moment the binary serving this root moves on
+    // (docs/api-reference/transport.md § Versioning). The live answer is the running binary's
+    // NODE_PROTOCOL_VERSION, reported at GET /v1/node.
     expect(identity).not.toHaveProperty('protocolVersion')
   })
 
@@ -224,7 +224,7 @@ describe('the attachment record on node.json', () => {
 
   it('does not let an in-process write clobber an attachment recorded after the root opened', () => {
     // The reason recordPort re-reads the file instead of serialising its own cached copy. Two writers
-    // own node.json now, and the second one to write used to win everything.
+    // own node.json, and a cached copy would let the second one to write win everything.
     const dir = freshDir()
     const root = openTracked(dir)
     recordNodeAttachment(dir, {

@@ -23,9 +23,8 @@ export const PLUGIN_CONFIG_FILE = 'acorn-plugin.config.mjs'
  * contributions block, where the rules and the mistakes both are. The builder stamps the other half,
  * `id` from the directory name, `version` from package.json, `apiVersion` and the bundle paths, and
  * this file mirrors it so the schema sees a complete manifest. That mirror is the one coupling here.
- * apps/node/scripts/build-plugin.mjs is the authority, and the two integration suites that run the
- * real builder, apps/node/test/integration/pluginLoader.test.ts and httpLoaded.test.ts, keep the
- * stamped half honest. */
+ * apps/node/scripts/build-plugin.mjs is the authority, and the two integration suites in apps/node
+ * that run the real builder, the plugin loader's and httpLoaded's, keep the stamped half honest. */
 export async function validatePluginConfig(configPath: string): Promise<PluginManifestResult> {
   const path = resolve(configPath)
   const file = basename(path) === PLUGIN_CONFIG_FILE ? path : join(path, PLUGIN_CONFIG_FILE)

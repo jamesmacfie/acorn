@@ -246,12 +246,7 @@ export type PluginHookHandler = {
   run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 
-// Where this plugin's data sources can be read from the node, with no client attached.
-// (docs/schedules.md § Sampling a published dashboard). Not a second way to declare a data source: the client-side
-// registration is what makes one appear in a panel editor, and this is the pointer that lets the
-// measure sampler ask the same route the same question. A loaded plugin registers nothing here.
-
-// Where this plugin's runs can be read from the node (../runs/registry.ts). Not a second way to
+// Where this plugin's runs can be read from the node (`registerRunSource`). Not a second way to
 // declare a run: the plugin keeps its own table, its own lifecycle and its own surfaces, and this is
 // the pointer that lets the host list them beside another plugin's without either importing the other.
 //
@@ -262,10 +257,10 @@ export type PluginRunRegistry = {
 }
 
 // Work this plugin will do when something asks: a name, a route inside its own namespace, and how
-// dangerous it is (../nodeActions/registry.ts). Not a way to declare an action — it is the pointer
-// plus the risk tier — and not a schedule seam, though a user schedule is the one thing asking today
-// (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means nothing outside this plugin can make it
-// act, which is the right default for most.
+// dangerous it is (`registerNodeAction`). Not a way to declare an action, since it is the pointer plus
+// the risk tier, and not a schedule seam, though a user schedule is one thing that asks
+// (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means
+// nothing outside this plugin can make it act, which is the right default for most.
 export type PluginNodeActionRegistry = {
   register(action: NodeActionRegistration): void
 }
@@ -351,7 +346,7 @@ export type PluginBroadcast = {
   // Push a frame to every connected client. The hub skips task-confined sockets.
   send(frame: WsServerFrame): void
   // "Re-read my chrome descriptors": this plugin's rail rows, badges, sources and agent context.
-  // Scoped to the calling plugin by the host, so one plugin saying its rows moved no longer costs every
+  // Scoped to the calling plugin by the host, so one plugin saying its rows moved does not cost every
   // other plugin a descriptor round trip on every connected client
   // (docs/plugins/events.md § Hearing a core event).
   status(): void
@@ -362,13 +357,8 @@ export type PluginBroadcast = {
   // "This repo's committed config changed and needs the owner's review". The one notice that carries an
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void
-  // A row in the client's bell, and where clicking it lands (@acorn/protocol/notices.ts).
-  //
-  // This member existed before, lost to the `workflows.notices` capability in the API-4 batch, and is
-  // back because the objection was to the vocabulary rather than to the surface: what sat here was a
-  // `'gate' | 'run-done'` kind and a `runId`/`stepId` pair, one plugin's nouns on the context all
-  // twenty-one receive. A `target` is core's own, shared with the attention inbox
-  // (client-core host/registries/rail/attention.ts), so nothing here knows what a workflow run is.
+  // A row in the client's bell, and where clicking it lands (@acorn/protocol/notices.ts). A `target` is
+  // core's own vocabulary, shared with the attention inbox, so nothing here knows what a workflow run is.
   //
   // Both tiers, and they are not handed the same thing. A loaded plugin's `target` is dropped and its
   // `kind` is forced to `plugin`: naming a target kind is naming another plugin's handler and an
@@ -377,8 +367,7 @@ export type PluginBroadcast = {
   // rail source, or the Settings page listing it (client-core host/plugins/rowTargets.ts).
   //
   // A compiled plugin names its own kind and registers the handler for it with
-  // `registerNoticeTargetHandler` from `@acorn/plugin-api/client`. That half was always here; this is
-  // the half that was missing.
+  // `registerNoticeTargetHandler` from `@acorn/plugin-api/client`.
   notice(notice: PluginNotice): void
   // Hear a core event on this node, whether or not a client is attached
   // (docs/plugins/events.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
@@ -389,7 +378,7 @@ export type PluginBroadcast = {
   // its own namespace and hears core's and, through the producer's `emits` declaration, another
   // plugin's.
   //
-  // Since 2026-08-28 `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
+  // `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
   // declared the verb in its `emits` and, for a loaded subscriber, the channel is in its own
   // `permissions.events`. An absent producer delivers nothing and errors nothing
   // (docs/plugins/events.md § Hearing another plugin).
@@ -494,13 +483,13 @@ export type NodePluginContext = {
   // files under this plugin, because the host closed over the id rather than taking one
   // (../telemetry/collector.ts, docs/plugin-authoring/telemetry.md § Telemetry and logging).
   telemetry: PluginTelemetry
-  // Both tiers. A stderr line prefixed with this plugin's id, exactly as `console.error` gave you,
-  // and a log record with the owner bound when telemetry is on. That attribution is the whole reason
-  // this member came back after being removed on 2026-08-27 (docs/plugins/activation.md § Activation).
+  // Both tiers. A stderr line prefixed with this plugin's id, and a log record with the owner bound when
+  // telemetry is on. That attribution is why a plugin logs through this rather than `console.error`
+  // (docs/plugins/activation.md § Activation).
   log: Logger
 }
 
-// What a plugin compiled into this binary is handed: everything above, plus the six seams that cannot
+// What a plugin compiled into this binary is handed: everything above, plus the seams that cannot
 // cross a process boundary or are otherwise first-party
 // (docs/contribution-kinds.md names the reason per kind).
 //
@@ -514,17 +503,17 @@ export type CompiledNodePluginContext = NodePluginContext & {
   tools: PluginToolRegistry
   contextSections: PluginContextSectionRegistry
   events: CompiledPluginBroadcast
-  // Compiled only for now: no loaded plugin has asked to be searchable. Its twin would be a manifest
-  // route the host calls with the query, the way task checks work (docs/contribution-kinds.md).
+  // Compiled only. A loaded twin would be a manifest route the host calls with the query, the way task
+  // checks work (docs/contribution-kinds.md).
   search: PluginSearchRegistry
 }
 
 // The two seams the host fills in on a plugin's behalf, kept off the authoring types above.
 //
 // Neither is something a plugin writes. A manifest declares node actions (as commands whose verb is
-// `runNodeAction`) and harnesses, and server/pluginHost/host.ts replays those declarations through here.
-// Sitting on a context a plugin author reads they'd look like members to reach for, and in 21 plugins
-// nobody ever did. `harnesses` is not even a registry: it is a handover to whichever plugin owns agent
+// `runNodeAction`) and harnesses, and the host replays those declarations through here. Sitting on a
+// context a plugin author reads, they would look like members to reach for. `harnesses` is not even a
+// registry: it is a handover to whichever plugin owns agent
 // sessions (./harnesses.ts), and `customAgents` is the same handover for a manifest's saved agents
 // (./customAgents.ts).
 export type HostPluginContext = CompiledNodePluginContext & {

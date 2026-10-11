@@ -1,6 +1,7 @@
 // Teaching the agent to write a plugin: the third piece of the dev loop. For the two doors, why the
-// vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
-// § plugin_authoring, docs/plugins/agent-install.md § Teaching the agent, and docs/plugin-authoring.md.
+// vocabulary below is derived rather than written, and what it leaves out, see
+// docs/agent-tools/plugin-tools.md § plugin_authoring, docs/plugins/agent-install.md § Teaching the
+// agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
@@ -58,7 +59,7 @@ const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | und
 /**
  * One field off a descriptor's items, where the items may be a union of kinds.
  *
- * A command is five shapes now — action, group, search, input, setting — so `items.properties` is only there
+ * A command is five shapes (action, group, search, input, setting), so `items.properties` is only there
  * for the descriptors that are one shape. The first member carrying the field is the answer, because a
  * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
  */

@@ -137,8 +137,8 @@ describe('a histogram keeps one label set', () => {
     return seen.filter((record): record is TelemetryMetric => record.kind === 'metric')
   }
 
-  // Merging on owner and seam alone kept the first sample's attributes for the whole window, so a
-  // seam with a varying label reported one value for every sample.
+  // Merging on owner and seam alone would keep the first sample's attributes for the whole window, so
+  // a seam with a varying label would report one value for every sample.
   it('splits samples whose attributes differ', () => {
     recordDuration('core', 'ws.frame', 1, { channel: 'term' })
     recordDuration('core', 'ws.frame', 3, { channel: 'term' })

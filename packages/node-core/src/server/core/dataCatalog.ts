@@ -11,7 +11,7 @@ type CatalogRow = {
 }
 
 // information_schema owns table and column visibility, including column-only grants. The PK lookup
-// uses the same pg_index membership as the former per-table query, without widening visibility.
+// uses pg_index membership without widening visibility.
 const CATALOG_SQL = `SELECT t.table_schema, t.table_name, c.column_name, c.data_type, c.is_nullable,
   EXISTS (SELECT 1 FROM pg_catalog.pg_index i
     JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)

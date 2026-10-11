@@ -139,8 +139,8 @@ describe('createBackup', () => {
       // including a freed page. Scanned over the raw bytes rather than through SQL.
       //
       // This does not prove the VACUUM matters here: the test passes even with that line removed,
-      // because a database this small keeps the row in place and better-sqlite3's close()
-      // checkpoints the WAL away. The VACUUM earns its keep on a real data root, not in this test.
+      // because a database this small keeps the row in place and close() checkpoints the WAL away.
+      // The VACUUM earns its keep on a real data root, not in this test.
       expect(readFileSync(join(dir, 'core.sqlite')).includes('SUPER-SECRET-CIPHERTEXT')).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })

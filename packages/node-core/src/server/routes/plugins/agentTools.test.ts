@@ -22,9 +22,8 @@ vi.mock('../../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
-// One fixture registry drives both projections' tests (the agent-tool registry acceptance: "covered by table-driven
-// tests from the same contribution fixture"). The MCP projection is proven in mcp/server.test.ts;
-// this is the harness HTTP projection over the identical shapes.
+// One fixture registry drives both projections' tests. The MCP projection is proven in
+// mcp/server.test.ts; this is the harness HTTP projection over the identical shapes.
 const OWNER = 'test'
 const calls: {
   name: string
@@ -138,7 +137,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       const kind = c.req.header('x-test-principal') === 'device' ? 'device' : 'internal'
-      // An internal principal now carries a scope. These cases address many different task ids, so the
+      // An internal principal carries a scope. These cases address many different task ids, so the
       // default is the unbound 'service' scope; 'x-test-task' opts into a 'task'-scoped credential bound
       // to one task, which is what the cross-task case needs.
       const boundTask = c.req.header('x-test-task')

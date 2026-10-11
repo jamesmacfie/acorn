@@ -135,7 +135,7 @@ describe('seal', () => {
   })
 })
 
-// Two edge cases an adversarial review confirmed by probe. Both matter more than they look: this is the
+// Two edge cases. Both matter more than they look: this is the
 // one function whose entire job is non-disclosure, so a failure mode that leaks is worse than the leak
 // it was preventing.
 describe('scrub cannot become the leak', () => {

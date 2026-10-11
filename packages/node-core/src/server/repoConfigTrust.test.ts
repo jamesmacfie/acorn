@@ -155,8 +155,8 @@ describe('repo config trust', () => {
     expect(await repoConfigTrustReview(testDb.db, 'task1')).toMatchObject({ trusted: true, current: null })
   })
 
-  // The project row is untrusted input too, since the premise the gate started on — checkout untrusted,
-  // database trusted — only holds while nothing but the owner can write the row. Changing a script
+  // The project row is untrusted input too, since the premise "checkout untrusted, database trusted"
+  // only holds while nothing but the owner can write the row. Changing a script
   // through the settings UI has to move the hash, or a compromised write would run unseen.
   it("hashes the project row's script columns and invalidates trust when one changes", async () => {
     writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')

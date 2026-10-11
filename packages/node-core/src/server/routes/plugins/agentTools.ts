@@ -98,10 +98,8 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal')
     return respondError(c, 404, 'not_found')
   // Task scope enforced against the credential, not the URL. toolContext() below reads the taskId from
-  // the path, so before internal tokens carried a task a credential minted for task A could invoke task
-  // B's tools: the token said nothing about which task it belonged to
-  // (server/auth/internalTokens.ts). 404, matching every other denial here, so the surface reveals
-  // nothing about which tasks exist.
+  // the path, so without this check a credential minted for task A could invoke task B's tools. 404,
+  // matching every other denial here, so the surface reveals nothing about which tasks exist.
   if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
   const registry = contributions()
   if (!registry) return respondError(c, 503, 'bridge-unavailable')

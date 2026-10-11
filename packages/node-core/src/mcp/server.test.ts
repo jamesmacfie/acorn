@@ -63,8 +63,8 @@ class McpClient {
   constructor(env: Record<string, string | undefined>) {
     // Start from an environment with acorn's own variables stripped, then apply the test's. A
     // developer working on acorn runs this suite from inside an acorn task, where ACORN_DATA_DIR and
-    // NODE_EXTRA_CA_CERTS are already set. Inheriting them pointed the child at the live node, and
-    // the "acorn is not running" case connected to a real one and got a 401 instead.
+    // NODE_EXTRA_CA_CERTS are already set. Inheriting them would point the child at the live node, and
+    // the "acorn is not running" case would connect to a real one and get a 401 instead.
     const ambient = Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !key.startsWith('ACORN_') && key !== 'NODE_EXTRA_CA_CERTS'),
     )
@@ -94,8 +94,8 @@ class McpClient {
   send(method: string, params: Record<string, unknown> = {}): Promise<{ result?: unknown; error?: unknown }> {
     const id = this.nextId++
     const p = new Promise<{ result?: unknown; error?: unknown }>((resolvePromise, reject) => {
-      // Matches the 30s each test declares. At 15s this timer fired first, so a slow tsx startup
-      // read as a hung request.
+      // Matches the 30s each test declares. A shorter timer fires first, and a slow tsx startup reads
+      // as a hung request.
       const timer = setTimeout(() => reject(new Error(`timeout waiting for ${method}`)), 30_000)
       this.pending.set(id, (msg) => {
         clearTimeout(timer)

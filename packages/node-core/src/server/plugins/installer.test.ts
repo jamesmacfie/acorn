@@ -78,7 +78,7 @@ function serve(bytes: Buffer, url = 'https://example.test/acorn-plugin.tgz'): vo
 }
 
 beforeEach(() => {
-  // A space in the path on purpose, matching pluginLoader.test.ts: every path this module builds ends
+  // A space in the path on purpose, as the plugin loader's integration test has: every path this module builds ends
   // up in an argv or a rename, and quoting mistakes only show up on input like this.
   root = mkdtempSync(join(tmpdir(), 'acorn install-'))
   workshop = mkdtempSync(join(tmpdir(), 'acorn workshop-'))
@@ -186,8 +186,8 @@ describe('resolving a source', () => {
     expect(readLockfile(root, 'ntfy')!.provenance).toEqual({ version: '1.0.0', integrity })
   })
 
-  // The finding this closes: the integrity was recorded into provenance and never compared, so bytes
-  // that were not the published ones installed and ran with the node's own access.
+  // The integrity is compared, not only recorded into provenance. Otherwise bytes that are not the
+  // published ones install and run with the node's own access.
   it('refuses a package whose bytes do not match the published digest', async () => {
     const bytes = tarball(packageDir(), { nested: true })
     serveNpm(bytes, `sha512-${createHash('sha512').update('something else').digest('base64')}`)
@@ -306,8 +306,8 @@ describe('updating', () => {
     await expect(updatePlugin(root, 'handmade')).rejects.toThrow(/does not know where/)
   })
 
-  // "A mid-install crash cannot corrupt an existing installation" is the phase's exit criterion, and it
-  // rests on two things this suite checks separately: everything up to the swap happens in staging (this
+  // "A mid-install crash cannot corrupt an installed plugin" rests on two things this suite checks
+  // separately: everything up to the swap happens in staging (this
   // test), and the swap's own window is reclaimed at the next boot (the debris tests).
   it('leaves the running version untouched when the new package is refused', async () => {
     await install('1.0.0')
@@ -353,9 +353,8 @@ describe('uninstalling', () => {
 })
 
 describe('folder installs', () => {
-  // The gate this used to assert, `allowLocalPath`, dev builds only, is gone. A folder is a
-  // first-class source on every build (docs/security/plugin-install.md § Installing from a folder), so the absence of
-  // any option at all is the assertion: nothing left for a composition root to get wrong.
+  // A folder is a first-class source on every build (docs/security/plugin-install.md § Installing from a
+  // folder), so the absence of any option at all is the assertion: nothing for a composition root to get wrong.
   it('need no option to say which kind of build this is', async () => {
     const result = await installPlugin(root, { path: packageDir() })
     expect(result).toMatchObject({ id: 'ntfy', state: 'installed-restart-required' })

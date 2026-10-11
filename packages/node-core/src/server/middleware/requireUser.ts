@@ -14,8 +14,8 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
 export const ownerId = (c: Context<AppEnv>): string => c.get('principal')!.userId
 
 // Device-only gate, for surfaces an agent-spawned child must never reach (docs/security/transport-and-auth.md §
-// Transport and auth: why requireUser cannot express this on its own, the pairing-escalation finding
-// this closes, and why the response is 403 rather than 401).
+// Transport and auth: why requireUser cannot express this on its own, and why the response is 403
+// rather than 401).
 export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
   const principal = c.get('principal')
   if (!principal) return respondError(c, 401, 'unauthenticated')
@@ -68,13 +68,12 @@ export const isTaskConfined = (c: Context<AppEnv>): boolean => {
 }
 
 // Middleware form of mayActOnTask, for a whole router whose paths are all `/:id/...` task-scoped
-// (docs/security/transport-and-auth.md § Transport and auth: the adversarial-review finding this closes). 404, not 403,
-// matching the agent-tool surface: the denial reveals nothing about which tasks exist.
+// (docs/security/transport-and-auth.md § Transport and auth). 404, not 403, matching the agent-tool
+// surface: the denial reveals nothing about which tasks exist.
 //
 // A missing `:id` denies too. Hono populates the parameter under every mount this gate is used at, so
-// there is no request that takes the second branch today; it is written this way because the first
-// version allowed the request when the id was absent, and a gate whose failure mode is "allow"
-// depends on a fact two files away staying true.
+// no request takes the second branch, but a gate whose failure mode is "allow" would depend on a fact
+// two files away staying true.
 export const requireTaskScope = createMiddleware<AppEnv>(async (c, next) => {
   const taskId = c.req.param('id')
   if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')

@@ -63,9 +63,7 @@ export const lineDelimitedJsonAdapter: StreamJsonAdapter = { parse: parseStreamJ
 // answer is the text of the last `item.completed` whose item is an `agent_message`, the resume
 // reference arrives up front on `thread.started`, and the token counts arrive at the end on
 // `turn.completed`. Read through `parseStreamJson` above, every field of the capture comes back null,
-// `runHeadless` calls the run `malformed`, and no codex turn can ever succeed. That was already true of
-// codex headless steps before any one-shot mode existed, so this fixes a standing bug rather than
-// paying for a new feature.
+// `runHeadless` calls the run `malformed`, and no codex turn can ever succeed.
 //
 // The stream carries no cost, so `costUsd` is null and stays null. Codex reports tokens only, and a
 // number we would have to invent from a price table is worse than an honest absence.

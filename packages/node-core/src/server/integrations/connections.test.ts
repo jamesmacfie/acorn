@@ -164,9 +164,8 @@ describe('connection-only provider lifecycle', () => {
     expect(await testDb.db.select().from(schema.integrations)).toEqual([])
   })
 
-  // Every status write announces itself, which is what defect 4 in docs/plugins/events.md § Hearing a core event was
-  // about: four writers flipped a connection to `needs-auth` and none of them said so, so a second
-  // client and every integration plugin found out from the next 401.
+  // Every status write announces itself (docs/plugins/events.md § Hearing a core event), so a second
+  // client and every integration plugin hear about `needs-auth` before the next 401.
   it('broadcasts connection:changed on every status write', async () => {
     const connected = await connectProvider(
       testDb.db,
@@ -191,7 +190,7 @@ describe('connection-only provider lifecycle', () => {
 
   it('broadcasts the demotion nobody asked for', async () => {
     // `rejected` is what this provider's `test` treats as a revoked credential, so this is the shape of
-    // the failure a client currently discovers by getting a 401 back.
+    // the failure a client would otherwise discover by getting a 401 back.
     const connected = await connectProvider(
       testDb.db,
       'alice',

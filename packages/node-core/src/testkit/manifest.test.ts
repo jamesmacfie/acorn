@@ -35,8 +35,8 @@ describe('validatePluginConfig', () => {
   })
 
   it('names the field and the path when a contribution is wrong', async () => {
-    // A frame declaring a surface the schema does not know. Today this is found by running the builder,
-    // or by a boot-time console line in a packaged app that shows it to nobody.
+    // A frame declaring a surface the schema does not know. Without this check it is found only by
+    // running the builder, or by a boot-time console line in a packaged app that shows it to nobody.
     const root = pkg(
       'probe',
       `export default {

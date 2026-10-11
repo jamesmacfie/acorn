@@ -69,7 +69,7 @@ export function createModelService(db: AppDatabase, secrets: SecretService): Mod
       // Connections first, in the order they already came in, then the installed CLIs in registry
       // order. The palette fast path and the changes plugin's silent fallback both take `[0]`, and
       // they must keep spending the key the owner configured on purpose; a CLI is chosen for someone
-      // only when there is no key at all, which is the lock-out this list exists to fix.
+      // only when there is no key at all, which is the lock-out this list exists to prevent.
       //
       // No cache. `which` costs milliseconds, and the list is read when a dialog opens.
       return [...connections, ...(await harnessBackends()).backends]

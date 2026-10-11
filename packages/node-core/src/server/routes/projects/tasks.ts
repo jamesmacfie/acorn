@@ -25,14 +25,13 @@ import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
-// list-active / rename / archive. Worktree teardown on archive is the main process's job (it owns
-// git/fs); this route only flips the status and runs the archiving hook.
+// list-active / rename / archive. Worktree teardown on archive belongs to the worktree router's archive
+// route; this one only flips the status and runs the archiving hook.
 
 type Row = typeof schema.tasks.$inferSelect
 
-// Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). The positive-integer
-// constraint on pullNumber used to be three conjuncts of a `typeof` chain; getting it wrong here writes
-// a bad row rather than returning a 400.
+// Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). Getting the
+// positive-integer constraint on pullNumber wrong here writes a bad row rather than returning a 400.
 const taskPatchBody = z.object({
   title: z.string().optional(),
   icon: z.string().nullable().optional(),
@@ -63,13 +62,9 @@ function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<type
   }
 }
 
-// The wire names only. This accepted `integrationId` and `provider` as aliases for `connectionId` and
-// `providerId`, which was not input leniency but naming history leaking outward: those two are the
-// storage column names (`task_links.integration_id`, `task_links.provider`), so the request body
-// documented the schema instead of the API.
-//
-// The columns keep their names. Renaming them is a migration for no behavioural gain, and `rowLink`
-// below is the one place that maps between the two vocabularies, which is where a mapping belongs.
+// The wire names only: `connectionId` and `providerId`. The storage columns are
+// `task_links.integration_id` and `task_links.provider`, and `rowLink` below is the one place that maps
+// between the two vocabularies, so the request body documents the API rather than the schema.
 type LinkInput = Partial<TaskLinkSeed>
 
 const taskSeedBody = z.object({
@@ -182,9 +177,9 @@ export const tasks = new Hono<AppEnv>()
       list.push(rowLink(l))
       byTask.set(l.taskId, list)
     }
-    // One query for every project the list mentions, not one per task. This was `await getProject` in
-    // a loop over rows, so a hundred tasks in one project was a hundred identical `SELECT`s per list
-    // read, and the list is read on every `tasks:changed`.
+    // One query for every project the list mentions, not one per task. A lookup per row would make a
+    // hundred tasks in one project a hundred identical `SELECT`s per list read, and the list is read on
+    // every `tasks:changed`.
     const projectIds = [...new Set(rows.flatMap((row) => (row.projectId ? [row.projectId] : [])))]
     const projects = new Map<string, ProjectRow>()
     if (projectIds.length) {
@@ -334,7 +329,7 @@ export const tasks = new Hono<AppEnv>()
       warmItemDetails({ db, secrets: c.env.SECRETS }, uid, links)
     }
     // Every write on this router announces itself (server/notify.ts § broadcastTasksChanged). The task
-    // list is what the rail draws, so a second window that missed a create used to sit on a stale list
+    // list is what the rail draws, so a second window that missed a create would sit on a stale list
     // until it reconnected (docs/plugins/events.md § Hearing a core event).
     await recordSetupDecision(db, id, false)
     broadcastTasksChanged({ taskId: id })
@@ -367,8 +362,8 @@ export const tasks = new Hono<AppEnv>()
   .patch('/:id', async (c) => {
     const id = c.req.param('id')
     // Every field optional and every absent field left untouched, which is what makes this a PATCH.
-    // The parse REPLACES a chain of hand-rolled `typeof` guards; it is deliberately lenient about
-    // unknown keys (zod strips them) and strict about the ones it knows.
+    // The parse is deliberately lenient about unknown keys (zod strips them) and strict about the ones
+    // it knows.
     const parsed = taskPatchBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const body = parsed.data

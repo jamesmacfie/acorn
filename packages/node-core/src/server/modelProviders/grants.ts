@@ -2,8 +2,8 @@
 // model grants).
 //
 // The owner picks a backend, a model and a daily output-token allowance for one plugin. A call from that
-// plugin that names no backend spends the grant. A call that names one behaves as it always has, and is
-// only recorded. So the allowance bounds the omitted-backend path, not everything the broad `models`
+// plugin that names no backend spends the grant. A call that names one is not limited, and is only
+// recorded. So the allowance bounds the omitted-backend path, not everything the broad `models`
 // permission lets a plugin spend.
 //
 // Admission is one synchronous SQLite transaction: sum the day's charges and open reservations, refuse
@@ -229,7 +229,7 @@ export function pluginModelService(db: AppDatabase, models: ModelService, identi
       usage = result.usage
       return result
     } finally {
-      // Recorded, never limited. Same behaviour as before grants existed.
+      // Recorded, never limited.
       const now = Date.now()
       db.insert(calls)
         .values({

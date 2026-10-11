@@ -46,11 +46,11 @@ function projectRowText(project: ProjectExecutableConfig): string | null {
 // project row's script columns. Keeping the verbatim text makes the approval inspectable and diffable;
 // sorting paths makes the hash deterministic across platforms.
 //
-// The row is in here because the gate's original premise — the checkout is untrusted, the database is
-// trusted — only holds while nothing but the owner can write the database. `PUT /v1/core/projects/:id/config`
-// is device-only now (server/index.ts), so that premise is true again; this is the belt behind it. A
-// write the owner did not make still changes the hash, and the next thing that asks for trust shows the
-// owner the script rather than running it.
+// The row is in here because the premise "the checkout is untrusted, the database is trusted" only
+// holds while nothing but the owner can write the database. `PUT /v1/core/projects/:id/config` is
+// device-only (server/index.ts), and this is the belt behind it: a write the owner did not make still
+// changes the hash, and the next thing that asks for trust shows the owner the script rather than
+// running it.
 export type RepoConfigSnapshotLimits = {
   fileBytes: number
   totalBytes: number

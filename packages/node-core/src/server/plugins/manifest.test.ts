@@ -334,9 +334,8 @@ describe('overlay surfaces', () => {
     ).toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
   })
 
-  // The second opener, and the reason it had to be added to the same set: a plugin whose only opener is
-  // a companion overlay would otherwise fail the check above, which reads as a plugin bug rather than
-  // the missing platform rule it was.
+  // The second opener, in the same set: a plugin whose only opener is a companion overlay would
+  // otherwise fail the check above, which reads as a plugin bug when the plugin did nothing wrong.
   it('accepts an overlay opened by a remote contribution that associated it', () => {
     const result = webviewManifest({
       frames: [overlay],
@@ -776,9 +775,8 @@ describe('pane layouts', () => {
     ).toContain('this pane draws no frame, so there is nothing here to claim keys')
   })
 
-  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them. The
-  // layout that arrived with its consumer, the database pane, which is what shipping the region
-  // addressing on day one was for.
+  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them, as
+  // the database pane uses.
   const composed = (document: Record<string, unknown>) => ({
     ...PANE,
     layout: 'document-over-frame',
@@ -900,8 +898,8 @@ describe('surface actions', () => {
     expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
   })
 
-  // A document beside the region is NOT required, although the verb was born in a pane that has one.
-  // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
+  // A document beside the region is NOT required. The palette is another way in, and from there "do
+  // this in the thing I am looking at" is a sentence
   // about any pane the plugin draws — http's `list-detail` request panel as much as database's
   // editor-over-panel (docs/http-client/client.md § From the command palette).
   it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
@@ -1846,7 +1844,7 @@ describe('project-scoped surfaces and their routes', () => {
   })
 
   it('keeps openPane and navigate on disjoint sets of surfaces', () => {
-    // The refusal the whole change is about: `openPane` on a project-scoped surface would toast "open a
+    // The refusal that matters most: `openPane` on a project-scoped surface would toast "open a
     // task first" forever, so the manifest says no instead of the runtime saying nothing useful.
     expect(
       messages(
@@ -1888,7 +1886,7 @@ describe('project-scoped surfaces and their routes', () => {
 
   // The one click site inside a command that can carry `navigate`: a search result. It has a picked
   // row and, at project scope, the project the palette session captured, which is exactly the pair the
-  // verb was missing everywhere else (docs/plugins/commands.md § Command kinds).
+  // verb needs (docs/plugins/commands.md § Command kinds).
   it('lets a search result navigate, and counts it as a mount site for the surface', () => {
     const find = {
       id: 'find',
@@ -2705,7 +2703,7 @@ describe('extensions', () => {
   })
 
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
-    // Sixteen since the one key grew from rows to five kinds: a plugin that opens a pane, a slot in it,
+    // Sixteen, because the one key covers five kinds: a plugin that opens a pane, a slot in it,
     // a hook before it acts and an annotation on its rows is describing one integration, not four.
     expect(
       nodeManifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success,
@@ -3020,8 +3018,8 @@ describe('the exclusive slot', () => {
 })
 
 describe('forward compatibility: unknown is retained and reported', () => {
-  // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn still loads on this
-  // one; what changed is that it no longer does so in silence.
+  // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn
+  // still loads on this one, and it does not do so in silence.
   const parse = (extra: Record<string, unknown>) =>
     parsePluginManifest({
       id: 'board',
@@ -3050,7 +3048,7 @@ describe('forward compatibility: unknown is retained and reported', () => {
   it('still loads it, which is the half that must not change', () => {
     const result = parse({ widgets: [], permissions: { node: { core: ['git'] } } })
     // The known facet survives, the unknown key is gone from the parsed shape, and the manifest is
-    // usable. Refusing it here is what `apiVersion` used to do and what this rule exists to prevent.
+    // usable. Refusing it here is what this rule exists to prevent.
     expect(result.ok && result.manifest.permissions.node.core).toEqual(['git'])
     expect(result.ok && 'widgets' in result.manifest).toBe(false)
   })

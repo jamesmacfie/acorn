@@ -53,9 +53,6 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 // An object that already survives a structured clone with its own shape, so neither side walks it key
 // by key. `Object.entries` on a Uint8Array yields `{ '0': 26, '1': 80, … }`, and the receiver gets an
 // object that looks close enough to the real thing to pass every check and then has no `.slice`.
-//
-// That was a live failure. A plugin reading an image through a capability got its bytes back as a
-// numbered object and the route threw, which the host answered as a bare 500.
 export const carriesItsOwnShape = (value: unknown): boolean =>
   value instanceof Date || value instanceof RegExp || ArrayBuffer.isView(value) || value instanceof ArrayBuffer
 export const bodyBuffer = (value: Uint8Array): ArrayBuffer => {
@@ -73,8 +70,8 @@ export const errorToWire = (error: unknown): WireError => {
     ...(source.stack ? { stack: source.stack } : {}),
     ...('code' in source ? { code: (source as Error & { code?: unknown }).code } : {}),
     // `status` travels with `code` because the pair is one answer, not two facts. A provider error
-    // that arrived with its code and no status stopped looking like a provider error to the host
-    // (integrations/types.ts § isProviderOperationError), so a rejected credential was reported as
+    // that arrives with its code and no status stops looking like a provider error to the host
+    // (integrations/types.ts § isProviderOperationError), so a rejected credential is reported as
     // the provider being unavailable.
     ...('status' in source ? { status: (source as Error & { status?: unknown }).status } : {}),
     ...('permission' in source ? { permission: (source as Error & { permission?: unknown }).permission } : {}),

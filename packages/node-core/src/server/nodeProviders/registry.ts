@@ -10,15 +10,12 @@ import type { Disposable } from '../pluginHost/capabilities'
 // (docs/plugins/node-providers.md § Node providers). The second door into the fleet, beside probe-then-pair.
 //
 // **A provider runs on some node, not necessarily the one the person is sitting at, and with no
-// client necessarily attached.** Write nothing into a provider that assumes otherwise. That sentence
-// is a contract term rather than advice: the client reads this registry by fanning out over every
-// reachable node and unioning the answers, so a provider registered on a headless node in a data
-// centre is exactly as visible as one on the laptop, and a provider that only works while somebody is
-// looking is broken in the case this seam exists for.
+// client necessarily attached.** Write nothing into a provider that assumes otherwise. The client reads
+// this registry by fanning out over every reachable node and unioning the answers, so a provider on a
+// headless node in a data centre is exactly as visible as one on the laptop.
 //
-// Node-side, and staying that way. A renderer-side provider would put the cloud account credential in
-// the renderer, the one place the architecture has always kept credentials out of. The credential is the thing that may
-// move later; the provider is not.
+// Node-side, because a renderer-side provider would put the cloud account credential in the renderer,
+// the one place the architecture keeps credentials out of.
 
 /** What `list` answers with. The wire projection (`providedNodeSchema`) is strict and has no
  *  `enrollment` member, so the credential cannot reach a client by forgetting to strip it: it has to
@@ -40,9 +37,9 @@ export type NodeProviderContribution = {
   id: string
   label: string
   list(signal: AbortSignal): Promise<ProvidedNodeRecord[]>
-  /** Declaring `create` makes this a machine provider, and the host then requires `destroy`. Stolen
-   *  verbatim from DevPod's provider model, and validated at registration: a provider that can make
-   *  nodes but not remove them is a load error rather than a support ticket. */
+  /** Declaring `create` makes this a machine provider, and the host then requires `destroy`, as DevPod's
+   *  provider model does. Validated at registration: a provider that can make nodes but not remove them
+   *  is a load error rather than a support ticket. */
   create?(spec: NodeSpec, signal: AbortSignal): Promise<ProvidedNodeRecord>
   destroy?(providerNodeId: string, signal: AbortSignal): Promise<void>
   start?(providerNodeId: string, signal: AbortSignal): Promise<void>

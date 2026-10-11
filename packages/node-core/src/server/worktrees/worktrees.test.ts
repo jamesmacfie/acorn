@@ -88,9 +88,9 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     }
   })
 
-  // The PR branch used to be created from FETCH_HEAD, a file in the repo's common dir that every
-  // concurrent fetch rewrites, so the branch could be born at another PR's head: right name, clean
-  // status, no diff, another task's tree. Asserting the private per-PR ref keeps it out.
+  // FETCH_HEAD is a file in the repo's common dir that every concurrent fetch rewrites, so a PR branch
+  // created from it could be born at another PR's head: right name, clean status, no diff, another
+  // task's tree. Asserting the private per-PR ref keeps it out.
   it('creates a PR branch from a private per-PR ref, not FETCH_HEAD', async () => {
     // A decoy FETCH_HEAD: whatever it says must not reach the new branch.
     writeFileSync(join(checkout, '.git', 'FETCH_HEAD'), `${localMainSha}\t\t'refs/pull/999/head' of nowhere\n`)

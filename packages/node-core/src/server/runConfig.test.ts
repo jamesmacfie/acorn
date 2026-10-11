@@ -188,7 +188,7 @@ value = "https://app.test"
   })
 
   it('dbUrlFromRepo reports url_script provenance — it decides whether the trust gate applies', () => {
-    // dbUrlScript runs as a shell script (plugins/database/main/database.ts), so a checkout authoring it
+    // dbUrlScript runs as a shell script (in the database plugin), so a checkout authoring it
     // must be gated on review while a user authoring it must not be. That hinges entirely on this flag,
     // so it's asserted for every layer that can win.
     expect(loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' }).dbUrlFromRepo).toBe(false)
@@ -221,8 +221,8 @@ value = "https://app.test"
     ])
   })
 
-  // The drift this replaced: `[scripts] setup` and `[scripts] archive` parsed, merged, and were read by
-  // nothing, so a repo could declare a setup script and watch it never run. They are reported now.
+  // `[scripts] setup` and `[scripts] archive` are read by nothing, so a repo that declares one is told
+  // so rather than left watching it never run.
   it('tells a repo that [scripts] setup and archive are not read', () => {
     writeConfig(repoDir, `[scripts]\nsetup = "repo-setup"\n[scripts.archive]\ncommand = "docker compose down"`)
     const messages = loadRepoConfig(repoDir, null, {}).errors.map((e) => e.message)

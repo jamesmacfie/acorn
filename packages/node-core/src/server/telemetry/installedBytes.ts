@@ -9,8 +9,8 @@ import { createLogger, describeError } from './logger'
 //
 // Two sources, kept apart by their `method` label:
 //
-//   build  the numbers apps/desktop/scripts/size-report.mjs wrote into helper/size-report.json when
-//          the app was built. Immutable, so they are read, never measured again.
+//   build  the numbers apps/desktop/scripts/size-report.mjs wrote into the helper's `size-report.json`
+//          when the app was built. Immutable, so they are read, never measured again.
 //   walk   the component directories that report names, measured on this machine. That is what the
 //          owner actually has on disk after an update, a partial install, or a development build.
 //

@@ -27,7 +27,7 @@ import type { PluginSkillState } from '@acorn/protocol/api.ts'
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
-// One of the four source forms, matched in the order the phase doc prefers them. Strict objects so a
+// One of the four source forms. Strict objects so a
 // body carrying two forms at once is a parse error rather than a coin toss.
 const installSource = z.union([
   z.strictObject({ github: z.string().min(1).max(200), tag: z.string().min(1).max(120).optional() }),
@@ -133,8 +133,8 @@ const skillState = async (bridge: Parameters<typeof pluginState>[0], id: string)
 }
 
 // The installer's refusals are all operator-fixable: a bad manifest, an unreachable release, a
-// downgrade. They surface as one 400 carrying the sentence rather than a 500, the stance
-// routes/backup.ts takes for tar failures.
+// downgrade. They surface as one 400 carrying the sentence rather than a 500, the stance the backup
+// route takes for tar failures.
 const asBadRequest = async <T>(work: () => Promise<T> | T): Promise<T> => {
   try {
     return await work()

@@ -1,11 +1,10 @@
-// The node-side twin of the client's extension points
-// (packages/client-core/src/host/registries/extensionPoints/extensionPoints.ts, docs/plugins/cooperative-extension-points.md § Cooperative extension
-// points), and the node's only many-to-many seam between plugins.
+// The node-side twin of the client's extension points (docs/plugins/cooperative-extension-points.md §
+// Cooperative extension points), and the node's only many-to-many seam between plugins.
 //
-// Capabilities are the other one and they are deliberately single-provider: one named typed function,
+// Capabilities are the other seam and they are deliberately single-provider: one named typed function,
 // one owner, a duplicate is a programming error. That is the wrong shape for "many plugins each add a
 // workflow step kind", and every private registry a plugin hand-rolls to get around it gets the
-// lifecycle slightly different (2026-08-27 extensibility review, finding 4).
+// lifecycle slightly different.
 //
 // Same rules as the client's: the owner declares a point in its own namespace, contributions are
 // ordered, a plugin cannot file two entries under one id, and everything goes when the plugin does.

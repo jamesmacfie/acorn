@@ -23,7 +23,7 @@ import type { ActiveIdentityStore } from '../activeIdentity'
 // than the identity-level `projects:read` grant (server/plugins/permissions.ts).
 export type ProjectService = {
   byId(id: string): Promise<ProjectRef | null>
-  // Oldest project wins, matching projectByGithub's legacy-pair bridge. Callers that need every clone
+  // Oldest project wins, matching projectByGithub. Callers that need every clone
   // use project checkouts and their own project-level IDs rather than guessing from the pair.
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
   checkouts(): Promise<{ id: string; path: string }[]>

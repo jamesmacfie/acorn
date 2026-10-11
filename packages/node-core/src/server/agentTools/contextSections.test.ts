@@ -13,8 +13,8 @@ import { defaultBudgets, publicProvider } from '../integrations/providerShared'
 import { integrationProviderRegistry } from '../integrations/registry'
 import type { IntegrationProviderContribution } from '../integrations/types'
 
-// `order` defaults to the four real ids' declared values so the cases below read the way they did
-// before order moved onto the contribution; anything else gets a high number, i.e. "unlisted".
+// `order` defaults to the four real ids' declared values; anything else gets a high number, meaning
+// "unlisted".
 const ORDERS: Record<string, number> = { pr: 10, issues: 20, notes: 30, memory: 40 }
 
 const section = (id: string, over: Partial<PluginContextSection> = {}): PluginContextSection => ({
@@ -38,8 +38,8 @@ const args = {
 }
 
 describe('the context-section registry', () => {
-  // Runs before each case too, not just after: importing this module now registers core's real `issues`
-  // section at module scope (that is the fix for a standalone node losing it). Every case below builds a
+  // Runs before each case too, not just after: importing this module registers core's real `issues`
+  // section at module scope, so a standalone node has it too. Every case below builds a
   // synthetic registry, and two of them register their own 'issues', which would collide with the
   // real one on the first case, before any afterEach has run.
   beforeEach(() => {
@@ -66,8 +66,7 @@ describe('the context-section registry', () => {
     expect(getContextSections().map((s) => s.id)).toEqual(['memory', 'experimental'])
   })
 
-  // A new section can land between two existing ones (docs/agent-tools/context-sections.md § Context sections);
-  // under the old hardcoded list it could only go last.
+  // A new section can land between two existing ones (docs/agent-tools/context-sections.md § Context sections).
   it('lets a new section slot between two existing ones', () => {
     registerContextSection('a', asContextSection(section('pr')))
     registerContextSection('b', asContextSection(section('memory')))

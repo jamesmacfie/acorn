@@ -132,7 +132,7 @@ describe('createLogger', () => {
     createLogger('rollbar', 'rollbar').info('refresh scheduled', { every: 300 })
     const log = records().find((record) => record.kind === 'log') as TelemetryLog
     expect(log).toMatchObject({ level: 'info', logger: 'rollbar', body: 'refresh scheduled' })
-    // The owner is the host's, which is the whole reason `ctx.log` came back.
+    // The owner is the host's, which is the reason `ctx.log` exists.
     expect(log.attrs).toMatchObject({ owner: 'rollbar', every: 300 })
   })
 })

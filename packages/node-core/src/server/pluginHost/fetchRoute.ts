@@ -39,12 +39,11 @@ export async function servePluginFetch(
  *
  * A handler rather than a mount per contribution, because a reload replaces a plugin's entries in the
  * route registry while the app's mount table stays as it was built at boot: closing over
- * `contribution.fetch` made every request reach the previous instance
- * (routes/registry.ts § resolvePluginFetch).
+ * `contribution.fetch` would send every request to the previous instance (`resolvePluginFetch`).
  *
  * Falls through with `next()` when no plugin claims the path, which is what makes it invisible: built-in
  * routers and the provider routes are registered earlier and answer first, and an unclaimed path reaches
- * the app's own 404 exactly as it did before. */
+ * the app's own 404. */
 export const dispatchPluginFetch = async (c: Context<AppEnv>, next: Next): Promise<Response | void> => {
   const pluginId = c.req.param('plugin')
   const match = pluginId ? resolvePluginFetch(pluginId, c.req.path) : null

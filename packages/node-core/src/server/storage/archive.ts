@@ -3,7 +3,7 @@ import { taskScripts } from '../taskScripts/service'
 // Task archive orchestration. docs/workspaces-and-tasks/archive.md § Archive a task covers the
 // lifecycle order.
 //
-// Split out from the route handler so it runs under plain Node against a temp git repo, with the
+// Kept apart from the route handler so it runs under plain Node against a temp git repo, with the
 // PTY concerns injected: the live session map and drawer streaming.
 import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -88,7 +88,7 @@ export type ArchiveDeps = {
   taskArchiving?: (taskId: string) => Promise<void>
 }
 
-// The repo-level teardown script, paired with repoSetup in taskWorktree.ts.
+// The repo-level teardown script, the counterpart of the project's setup script.
 async function teardownScriptFor(db: AppDatabase, projectId: string): Promise<string | null> {
   const config = await getProjectConfig(db, projectId)
   return config?.config.teardownScript?.trim() || null

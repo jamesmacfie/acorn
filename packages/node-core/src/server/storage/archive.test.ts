@@ -24,10 +24,10 @@ import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from '
 import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
 
 // Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
-// parallel run. Matches the other git-backed suites (plugins/git/main/localGitService.test.ts).
+// parallel run. Matches the other git-backed suites.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
-// Real temp git repo + worktree per test (plan §validation: never test against the acorn repo).
+// Real temp git repo + worktree per test, never the acorn repo itself.
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' })
 
 const isDir = (p: string) => {

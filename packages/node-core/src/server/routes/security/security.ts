@@ -5,10 +5,8 @@ import type { AppEnv } from '../../middleware/auth'
 
 // What this node can tell the owner about its own posture (docs/security/audit.md § Filesystem and backup).
 //
-// One field today, and deliberately only one. Two others were considered and dropped because reporting
-// them would be decoration rather than information: the data root's mode is always 0700 (dataRoot.ts
-// creates it that way and nothing changes it), and the bind host is always 127.0.0.1 (server/transport/listener.ts
-// hard-codes it, there is no non-loopback setting yet, which is also why security.md's "non-loopback
+// The data root's mode is not reported: it is always 0700, because the data root is created that way
+// and nothing changes it, so the field would be decoration rather than information.
 export const security = new Hono<AppEnv>().get('/', async (c) =>
   c.json({ diskEncrypted: await diskEncryption(), platform: process.platform } satisfies NodeSecurityPosture),
 )

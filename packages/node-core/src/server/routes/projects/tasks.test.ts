@@ -29,9 +29,9 @@ vi.mock('../../transport/wsHub', async (importOriginal) => ({
 
 // What the active-task list costs to answer.
 //
-// It used to `await getProject` inside a loop over rows, so a hundred tasks in one project was a
-// hundred identical `SELECT`s, on the node's single event loop, on every `tasks:changed` — and the
-// list is what every client refetches when one arrives.
+// A `getProject` per row would make a hundred tasks in one project a hundred identical `SELECT`s, on
+// the node's single event loop, on every `tasks:changed`, and the list is what every client refetches
+// when one arrives.
 
 const makeApp = () => {
   const app = new Hono<AppEnv>()

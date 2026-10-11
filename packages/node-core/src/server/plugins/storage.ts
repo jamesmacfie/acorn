@@ -3,7 +3,8 @@
 // Two reasons this is a separate function rather than a parameter on openDb:
 //
 //   1. Core cannot import a plugin's schema. @acorn/node-core is a lib, and a lib importing a plugin
-//      breaks tools/arch/boundaries.test.ts rule 6. So each tier supplies its own chain: a built-in
+//      breaks the "shared libraries never import a plugin" rule in tools/arch/boundaries.test.ts. So each
+//      tier supplies its own chain: a built-in
 //      declares the module it sits beside, a loaded package declares a confined directory in its
 //      manifest. Core owns the file either way.
 //   2. The handle stays in the owning plugin's closure, not on `Env`. `c.env` reaches every core and

@@ -19,8 +19,8 @@ const TOKEN_RE = /^acorn_dt_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 
-// How long a resolved bearer is answered from memory instead of from SQLite. Every authenticated
-// request used to run a synchronous `SELECT` on the node's single event loop, which on a client
+// How long a resolved bearer is answered from memory instead of from SQLite. Without it every
+// authenticated request runs a synchronous `SELECT` on the node's single event loop, which on a client
 // holding a live socket and refetching a few queries is the most-executed statement in the process.
 //
 // Sixty seconds, matched to the hub's revocation sweep (server/transport/wsHub.ts): a revoke made

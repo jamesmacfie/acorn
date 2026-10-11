@@ -33,8 +33,8 @@ const assertOwnedCredential = (pluginId: string, providerId: string): void => {
 }
 
 // The one construction site for fetch-handler request context. The methods close over host-owned
-// services, but their inputs and results are plain data and their call shape can move to RPC without
-// widening the plugin contract when loaded plugins move out of process.
+// services, but their inputs and results are plain data, so the same call shape works across the RPC
+// boundary to a loaded plugin's worker without widening the plugin contract.
 //
 // Env + Principal rather than a Hono Context, because a scheduled run has neither a request nor a
 // route (server/pluginHost/scheduleRun.ts). The two arguments are exactly what the Hono form read off `c`,

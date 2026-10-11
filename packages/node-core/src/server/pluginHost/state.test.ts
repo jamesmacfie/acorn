@@ -11,9 +11,8 @@ import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import type { InputGrant } from '../plugins/inputGrants'
 import type { PluginDevelopmentState } from '../plugins/development'
 
-// Objects in, rows out. This logic used to live inside the route, so reaching it meant a Hono app and a
-// nine-member fixture. The judgement calls it makes, what counts as stale, which gaps raise the restart
-// banner, deserve a test that is only about them.
+// Objects in, rows out, with no Hono app. The judgement calls it makes, what counts as stale, which
+// gaps raise the restart banner, deserve a test that is only about them.
 const NO_PERMISSIONS = {
   api: [],
   events: [],
@@ -365,9 +364,9 @@ describe('pluginState', () => {
 
   it('reports a package whose bundle would not import as failed, not pending-restart', () => {
     // The trap this whole seam exists for. The package is on disk with a parseable manifest, so it is in
-    // `installed()`; the loader could not import it, so it is absent from `booted()`. That pair used to
-    // read as "waiting for a restart", with a Restart banner that restarting could never clear, because
-    // restarting re-runs the same failing import.
+    // `installed()`; the loader could not import it, so it is absent from `booted()`. That pair must not
+    // read as "waiting for a restart": a Restart banner could never clear, because restarting re-runs the
+    // same failing import.
     const result = pluginState(
       bridge({
         installed: [installed('ntfy')],
@@ -385,8 +384,8 @@ describe('pluginState', () => {
       state: 'failed',
       stage: 'load',
       reason: 'could not import node/index.js: SyntaxError: Unexpected end of input',
-      // The loader's own stamp, carried through. Without it the row had no timestamp at all and the
-      // attention item fell back to 0, which renders as an event 56 years old.
+      // The loader's own stamp, carried through. Without it the attention item falls back to 0, which
+      // renders as an event decades old.
       failedAt: FAILED_AT,
     })
     expect(result.restartRequired).toBe(false)
@@ -394,7 +393,7 @@ describe('pluginState', () => {
 
   it('gives a package whose manifest never parsed a row of its own', () => {
     // Nothing else can: `scanInstalled` drops it, so it is in neither `installed()` nor the roster, and
-    // before this the owner saw an installed plugin that simply was not in the list.
+    // without this row the owner sees an installed plugin missing from the list.
     const result = pluginState(
       bridge({
         loadFailures: [
@@ -415,8 +414,8 @@ describe('pluginState', () => {
   it('reports a broken package whose name a running plugin already answers to', () => {
     // The dogfooding case: `build:plugin rollbar` installs a disk copy of a compiled-in plugin, and the
     // built-in steps aside only if the disk copy actually loads. When it does not, the built-in keeps
-    // running and the roster row for that name is honestly 'active', so this failure used to be dropped
-    // on the floor and the owner had no way to learn that the code running is not the copy they built.
+    // running and the roster row for that name is honestly 'active'. The failure reason is the only way
+    // the owner learns that the code running is not the copy they built.
     const result = pluginState(
       bridge({
         roster: [{ name: 'rollbar', required: false, disabled: false, state: 'active' }],

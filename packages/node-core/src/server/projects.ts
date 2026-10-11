@@ -104,7 +104,7 @@ export async function detectFacets(path: string): Promise<ProjectFacets> {
   // checkout.
   if (!existsSync(join(path, '.git'))) return none
 
-  // Exit code as data (core/vcs/git.ts): a repo with no origin remote is a git project, not an error.
+  // Exit code as data (`git` in core): a repo with no origin remote is a git project, not an error.
   const remote = await git(['remote', 'get-url', 'origin'], { cwd: path, timeoutMs: 5_000 })
   const remoteUrl = remote.code === 0 ? remote.stdout.trim() || null : null
   const github = remoteUrl ? parseGithubRemote(remoteUrl) : null

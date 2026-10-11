@@ -194,9 +194,9 @@ describe('plugin host', () => {
       }),
       plugin('fast', { init: () => void done.push('fast') }),
     ])
-    // The whole pass is still awaited, so a plugin's migration is finished before the listener binds.
-    // What is gone is the queueing: 'fast' does not sit behind 'slow', which is why completion order is
-    // not declaration order and must not be depended on.
+    // The whole pass is awaited, so a plugin's migration is finished before the listener binds. But
+    // 'fast' does not queue behind 'slow', so completion order is not declaration order and must not be
+    // depended on.
     expect(done).toEqual(['fast', 'slow'])
   })
 
@@ -263,10 +263,9 @@ describe('plugin host', () => {
       plugin('after', { init: () => void started.push('after') }),
     ])
     await expect(result).rejects.toThrow('nope')
-    // 'after' ran, where the serial loop never reached it: the whole pass is in flight before any
-    // failure is read. What matters is unchanged — the boot fails rather than serving a node one of
-    // whose plugins never initialized — and the test below is the one that proves the neighbours are
-    // torn down again.
+    // 'after' ran: the whole pass is in flight before any failure is read. The boot still fails rather
+    // than serving a node one of whose plugins never initialized, and the test below proves the
+    // neighbours are torn down again.
     expect(started).toEqual(['after'])
   })
 
@@ -340,8 +339,8 @@ describe('plugin host', () => {
         plugin('last', { dispose: () => void disposed.push('last') }),
       ]),
     ).rejects.toThrow('nope')
-    // Reverse declaration order, and every plugin whose init resolved is in the list — which is all of
-    // them now, because they all ran. Declaration order is what the dispose sequence reverses, not
+    // Reverse declaration order, and every plugin whose init resolved is in the list, which is all of
+    // them, because they all ran. Declaration order is what the dispose sequence reverses, not
     // completion order: a later plugin may depend on an earlier one's resources.
     expect(disposed).toEqual(['last', 'second', 'first'])
   })
@@ -421,9 +420,9 @@ describe('plugin host', () => {
     }
   })
 
-  // The twin of the case above, and the one whose absence let a bug through: the context dropped the
-  // host's memoizing wrapper for this tier (server/pluginHost/context.ts), so the `opened` map never saw a
-  // loaded handle, closing was a no-op, and a WAL handle outlived the data-root lock release.
+  // The twin of the case above. If the context drops the host's memoizing wrapper for this tier, the
+  // `opened` map never sees a loaded handle, closing is a no-op, and a WAL handle outlives the data-root
+  // lock release.
   it("opens, reuses and closes a LOADED plugin's database from the manifest chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-loaded-storage-'))
     try {

@@ -37,9 +37,8 @@ import type { TelemetrySummary } from '@acorn/protocol/api.ts'
 import { currentTelemetryContext, runWithTelemetryContext, type TelemetryContext } from './context'
 import { scrub, scrubAttrs, scrubLine } from './scrub'
 
-/** The developer switch that predates all of this. With it on, the collector runs with no sink
- *  subscribed and prints to stderr, which is what `ACORN_PERF=1` has always meant
- *  (docs/local-development/profiling.md § Timing a cold start). */
+/** The developer switch. With `ACORN_PERF=1`, the collector runs with no sink subscribed and prints
+ *  to stderr (docs/local-development/profiling.md § Timing a cold start). */
 export const PERF = process.env.ACORN_PERF === '1'
 
 /** Enough records that a burst survives a flush window, and small enough that a node nobody is
@@ -348,8 +347,8 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
 /**
  * One sample into a histogram, aggregated over the flush window.
  *
- * This is the seam `perf.ts` used to be. A seam firing thousands of times a second is a metric and
- * never a span (docs/telemetry/model.md § Hot seams are metrics), and pre-aggregating here is what makes
+ * A seam firing thousands of times a second is a metric and never a span
+ * (docs/telemetry/model.md § Hot seams are metrics), and pre-aggregating here is what makes
  * the difference between one record per window and a thousand records a sink has to throw away.
  */
 export function recordDuration(owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void {
@@ -388,7 +387,7 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
  * Time one call and hand back its own result untouched. Promise-aware, and timed to settlement
  * rather than to the call that started it, which for a git spawn is the whole of the duration.
  *
- * The replacement for `perf.ts`'s `timed`. A caller with nothing better to say than `'core'` gets
+ * A caller with nothing better to say than `'core'` gets
  * the ambient owner, so `git.ts` and `sqlite.ts` name the plugin whose request they are serving
  * without either file learning anything about its callers (docs/telemetry/runtimes.md § Ambient attribution).
  */

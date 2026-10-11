@@ -21,7 +21,7 @@ const nodeLog = createLogger('node')
 // Dev data root: the repo-local apps/node/.acorn (gitignored). It belongs to apps/node because the node
 // owns SQLite, blobs and the node identity (../storage/paths.ts). Only valid while running from a checkout:
 // a packaged app's module dir is inside the read-only bundle, so the desktop shell passes an
-// application-data root into bootstrap() instead.
+// application-data root instead.
 export { devDataDir }
 
 // What the listener bound, plus the certificate identity it bound it with. The endpoint is reported after
@@ -73,8 +73,8 @@ export function startListener(
   mark: (label: string) => void = () => {},
 ): Promise<Listener> {
   // Every bridge, pure-Node domain bridges and the stateful harness and context bridges, is installed by
-  // the composition root (apps/node's service/runtime.ts under the desktop shell, server/standalone.ts otherwise)
-  // before this is called. Core no longer imports plugin bridge wiring (docs/plugins.md).
+  // the composition root (`bootNode` in apps/node) before this is called. Core does not import plugin
+  // bridge wiring (docs/plugins.md).
   const app = createApp()
 
   // No static assets and no SPA fallback: the node serves API and event traffic only. The renderer ships
@@ -189,10 +189,8 @@ export function startListener(
 // Stop accepting, then reap every socket this listener still owns. Both composition roots call it as the
 // first teardown step, and it lives here rather than in either of them because it is the only place that
 // knows what `startListener` attached: an upgrade handler with its own socket set, which `server.close()`
-// can't see.
-//
-// Both composition roots call this shared helper so the listener and its upgraded connections stop before
-// plugin and database teardown begins.
+// can't see. Running first means the listener and its upgraded connections stop before plugin and
+// database teardown begins.
 export function closeListener(server: ServerType | null): Promise<void> {
   if (!server) return Promise.resolve()
   const httpServer = server as unknown as import('node:http').Server
@@ -242,8 +240,8 @@ export async function drainWithDeadline(
   }
 }
 
-// One definition of the on-disk app-data layout under a data root (DB, blobs). Both composition roots
-// build their runtime through it: the supervised service peer and the plain-Node `dev:node` entry.
+// One definition of the on-disk app-data layout under a data root (DB, blobs). Every composition root
+// builds its runtime through it, by way of `bootNode`.
 //
 // It takes an already-opened DataRoot rather than a path because the root carries the nodeId and the
 // exclusive lock. The lock's lifetime is the process's, so acquiring it belongs to whoever owns teardown
@@ -270,8 +268,8 @@ export function makeRuntime(
 }
 
 // Open the data root, build the runtime and start listening in one call. Kept in core (pure engine); the
-// standalone entry lives in apps/node (server/standalone.ts) because choosing to auto-start and
-// registering plugin providers is composition, not engine.
+// standalone entry lives in apps/node (apps/node/src/entries/standalone.ts) because choosing to
+// auto-start and registering plugin providers is composition, not engine.
 export function startServer(dataDir: string = devDataDir()): Promise<Listener> {
   const root = openDataRoot(dataDir)
   return startListener(makeRuntime(root), root)

@@ -1,11 +1,7 @@
 // One `git status` per worktree per two seconds, however many callers ask. The changes pane's other
 // reads of the same tree, its line counts and where the git directory is, share the same window
-// through `worktreeGitText`.
-//
-// Before this, a status ping spawned `git status --porcelain=v2` plus two `git diff --numstat` in the
-// changes plugin's local-changes read, and `worktrees.ts` spawned a second and third `git status` for
-// the same worktree from a different caller. Every connected client asked independently, so two
-// clients and four worktrees was twelve processes per ping.
+// through `worktreeGitText`. Every connected client asks independently, so without this a status ping
+// costs processes per client per worktree.
 //
 // Built on the dedup shape server/sync/engine.ts already uses for provider mirrors: an in-flight map
 // so concurrent callers join one run, and a time-to-live so a caller just behind one gets the answer
@@ -122,8 +118,7 @@ const run = async (path: string, args: readonly string[], timeoutMs: number): Pr
  *
  *  Reads only, and only reads whose answer moves when a file under the worktree moves: the node's own
  *  writers invalidate on exactly that, and nothing else. The changes pane's `git diff --numstat` pair
- *  and its `rev-parse --git-dir` come through here; before, two clients on one task cost four
- *  numstat processes a poll where the status beside them cost one. */
+ *  and its `rev-parse --git-dir` come through here. */
 export async function worktreeGitText(
   path: string,
   args: readonly string[],
@@ -201,8 +196,8 @@ export function parseWorktreeStatus(text: string): WorktreeStatus {
  *  (docs/workspaces-and-tasks.md). Pass `fresh: true` from anything that decides whether to refuse. */
 export async function worktreeStatus(path: string, opts?: { fresh?: boolean }): Promise<WorktreeStatus> {
   const text = await worktreeStatusText(path, opts)
-  // Git could not answer. Reported as clean-and-unknown, which is what both callers did before this
-  // file existed; the removal guard is safe because it reads `dirty` from a `fresh` run and a
+  // Git could not answer. Reported as clean-and-unknown; the removal guard is safe because it reads
+  // `dirty` from a `fresh` run and a
   // directory git cannot see is a directory `git worktree remove` will refuse on its own.
   return text === null ? { dirty: false, count: 0, branch: null, head: null } : parseWorktreeStatus(text)
 }

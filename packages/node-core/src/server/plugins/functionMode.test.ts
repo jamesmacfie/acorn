@@ -6,9 +6,9 @@ const async = async () => 'value'
 
 describe('pluginFunctionMode', () => {
   it('keeps the synchronous reference contracts synchronous', () => {
-    // The regression this file exists for. Both are objects of methods, so the path ends at the
-    // method and a rule naming the container matched nothing. `externalRefForConnection` consumes
-    // `parse` synchronously, read a promise as a reference, and refused every link it stamped.
+    // Both are objects of methods, so the path ends at the method and a rule naming the container
+    // matches nothing. `externalRefForConnection` consumes `parse` synchronously, and a promise there
+    // reads as a broken reference that refuses every link it stamps.
     expect(pluginFunctionMode('context.providers.integration.externalIds.parse', sync)).toBe('sync')
     expect(pluginFunctionMode('context.providers.integration.externalIds.fromDisplay', sync)).toBe('sync')
     expect(pluginFunctionMode('context.providers.integration.refs.detectRefs', sync)).toBe('sync')
@@ -24,7 +24,7 @@ describe('pluginFunctionMode', () => {
   it('crosses everything else as a promise', () => {
     expect(pluginFunctionMode('context.routes.fetch', sync)).toBe('async')
     expect(pluginFunctionMode('context.providers.integration.resources[0].read', sync)).toBe('async')
-    // A container is not a method, and classifying one as sync is what started this.
+    // A container is not a method, so it is not classified as sync.
     expect(pluginFunctionMode('context.providers.integration.externalIds', sync)).toBe('async')
   })
 

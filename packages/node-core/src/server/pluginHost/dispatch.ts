@@ -1,13 +1,11 @@
 // Calling one of this node's own plugin routes with no client and no request in sight.
 //
-// Two callers need it: a manifest-declared schedule firing (./scheduleRun.ts) and the measure
-// sampler reading a data source, and they needed the same six steps, so
-// the steps live here once. It dispatches in process rather than over loopback HTTP: the listener is
-// TLS with a self-signed certificate and its origin is a property of the composition root, so a
-// self-call would mean teaching this module about certificates and ports to reach a handler sitting
-// in the same heap. What the HTTP path contributes, the auth gate, the mount stripping, the request
-// context, is reproduced here exactly, from the same two functions the route uses, so there is one
-// plugin-route contract and not two.
+// Two callers need it: a manifest-declared schedule firing and the measure sampler reading a data
+// source. It dispatches in process rather than over loopback HTTP: the listener is TLS with a
+// self-signed certificate and its origin is a property of the composition root, so a self-call would
+// mean teaching this module about certificates and ports to reach a handler in the same heap. What the
+// HTTP path contributes, the auth gate, the mount stripping, the request context, is reproduced here
+// from the same two functions the route uses, so there is one plugin-route contract and not two.
 //
 // The principal is the node's own: 'internal' with the 'service' scope, which is what every other
 // loopback caller presents and what `requireProviderAccess` already admits (docs/security/credentials.md §

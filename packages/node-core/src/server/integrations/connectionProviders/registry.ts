@@ -37,7 +37,7 @@ const positiveInteger = (value: number): boolean => Number.isInteger(value) && v
 
 export class ConnectionProviderRegistry {
   readonly #providers = new Map<string, ConnectionProviderContribution>()
-  readonly #owners = new Map<string, string>() // providerId → owning plugin; see registry.ts's header
+  readonly #owners = new Map<string, string>() // providerId → owning plugin; see `IntegrationProviderRegistry`
 
   register(provider: ConnectionProviderContribution, owner?: string): Disposable {
     if (!provider.id.trim()) throw new Error('Connection provider id must not be empty.')

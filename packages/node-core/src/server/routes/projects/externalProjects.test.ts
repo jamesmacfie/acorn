@@ -25,7 +25,7 @@ import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 // edit one provider's selection without disturbing anyone else's rows.
 //
 // The same rows are also read and written from the connection's side, which is what Settings →
-// Integrations does now: one connection's whole map at once, including the links narrowed to a single
+// Integrations does: one connection's whole map at once, including the links narrowed to a single
 // project rather than a whole workspace.
 //
 // Written at the route level because the map itself is a component and vitest here cannot render one.

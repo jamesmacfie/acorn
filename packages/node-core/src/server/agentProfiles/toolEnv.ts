@@ -1,7 +1,7 @@
 // What an agent CLI legitimately needs from the node's environment beyond the broker's base allowlist
 // (../core/proc.ts § brokerEnv).
 //
-// In core rather than in the agents plugin, because core spawns an agent CLI itself now: a one-shot
+// In core rather than in the agents plugin, because core spawns an agent CLI itself: a one-shot
 // text generate through a harness backend builds its child environment from this list
 // (../modelProviders/harnessRuntime.ts), and core may not import a plugin. The agents plugin's
 // drivers read it back through @acorn/plugin-api/node, which is the only door they have.

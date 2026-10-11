@@ -1,8 +1,7 @@
 // Headless step runner (docs/workflows.md): run an agent CLI to completion in a worktree and capture a
-// structured result, modelled on the term:previewUrl capture of run, timeout and parse. Interactive
-// sessions stay spawnOne's job.
+// structured result: run, time out, and parse. Interactive sessions are the terminal's job.
 //
-// Argv templates per profile. Flags verified against the CLIs installed on this machine (2026-07-03):
+// Argv templates per profile, with the flags each CLI takes:
 //   claude: -p --output-format stream-json --verbose --json-schema <schema> --model <m>
 //           --permission-mode <mode>, plus --resume <session_id> for continuity
 //   codex:  exec --json --output-schema <FILE> -m <m>, where the schema is a file path, not inline

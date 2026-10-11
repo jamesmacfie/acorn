@@ -71,8 +71,7 @@ const handlers = new Map<string, HookHandlerRegistration>()
  * Core's own points, declared here because core has no manifest to declare them in
  * (@acorn/protocol/extensionPoints.ts § CORE_HOOK_POINTS).
  *
- * `core:worktree-created` is the generalisation of the old single-slot `WORKTREE_CREATED` capability:
- * one plugin used to be able to run setup after a worktree appeared, and now any number can, in the
+ * `core:worktree-created` lets any number of plugins run setup after a worktree appears, in the
  * owner's order, with a timeout each and a roster row when one fails. It allows `observe` and
  * `transform` and not `veto`: the worktree exists by the time this runs, so there is nothing left to
  * refuse, and a handler that wants to change what happens next changes the payload.
@@ -126,7 +125,7 @@ const CORE_POINTS: readonly HookPointRegistration[] = [
   },
   {
     // The gate in front of every agent tool call, wherever the call came from: an MCP client, a managed
-    // harness, or the renderer's own typed projection all land on one route (../routes/agentTools.ts).
+    // harness, or the renderer's own typed projection all land on one route (`agentTools`).
     // Core's rather than the agents plugin's, because core owns the tool registry and the route; the
     // plugin owns sessions.
     //
@@ -245,8 +244,8 @@ export const hookHandlers = (): (HookHandlerRegistration & { matched: boolean; l
 type HookRun = { started: number; traceId: string; spanId: string }
 const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, spanId: traceId ? newSpanId() : '' })
 
-// The developer view's record of one handler, and its span. Both from the same three facts, because
-// `note` was already a span in all but name: a start, an end and a closed outcome set. The owner is
+// The developer view's record of one handler, and its span. Both come from the same three facts: a
+// start, an end, and a closed outcome set. The owner is
 // the handler's plugin, stamped from the registration and never read off the handler's answer, the
 // same rule the verdict's `by` follows.
 const note = (
@@ -318,7 +317,7 @@ async function callOne(
  * stalled — resolves to a verdict, because every caller is a code path that was about to do something
  * and "the interceptor is broken" must not be the thing that stops it.
  *
- * The chain rules, all of them, are these thirty lines:
+ * The chain rules, all of them:
  *
  *   - Handlers never see each other. Each is called with the payload as it stands when its turn comes.
  *   - Observers run alongside and cannot affect anything, so their answers are dropped unread.

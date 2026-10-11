@@ -38,7 +38,7 @@ import './dataSources/localGitRegistration'
 
 // One server, one namespace: /v1. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v1/core. Every plugin-owned router arrives through the
-// route registry, populated by app/server/routes.ts before this runs, and mounts under /v1/p/<plugin>.
+// route registry, populated by each plugin's init before this runs, and mounts under /v1/p/<plugin>.
 // Core imports no product route module directly (docs/plugins.md).
 export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
@@ -199,7 +199,7 @@ export function createApp() {
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
 
   // Plugin-owned routes, projected from the registry after the auth gate above and still inside the
-  // authMiddleware/requireUser envelope. See app/server/routes.ts for the contributions.
+  // authMiddleware/requireUser envelope. Plugins contribute them through `ctx.routes` at init.
   //
   // Built-ins only. A Hono instance is a live object, so mounting it is the only thing to do with it,
   // and a built-in is compiled into this binary and cannot change without a restart.

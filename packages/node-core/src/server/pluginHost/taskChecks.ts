@@ -11,8 +11,8 @@ const log = createLogger('task-check')
 /** How long one check may take before the fan-out gives up on it (docs/plugins/task-checks.md § Task checks). */
 export const CHECK_TIMEOUT_MS = 2_000
 
-/** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). An order
- *  of magnitude below server/storage/archive.ts's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
+/** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). Half
+ *  the archive's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
 export const APPLY_TIMEOUT_MS = 60_000
 
 /** How much of a plugin's own text reaches the dialog. Display-only strings, capped by the node, the

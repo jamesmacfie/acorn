@@ -91,7 +91,7 @@ export type LoadedPluginBinding = {
   dataSources?: readonly import('@acorn/protocol/dataSources.ts').DataSourceRegistration[]
   dataSourceDiscoveries?: readonly import('@acorn/protocol/dataSources.ts').DataSourceDiscovery[]
   // And its commands, of which the host reads one thing: which are `runNodeAction`, so a person can put
-  // one on a schedule (../nodeActions/registry.ts). A command's palette entry, keybinding and category
+  // one on a schedule (`registerNodeAction`). A command's palette entry, keybinding and category
   // are the client's business and never reach here.
   commands?: readonly PluginCommandDescriptor[]
   // And what it declared as archive checks, by the same route as schedules: the registration is
@@ -319,8 +319,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
             return writeWorkflowDataset(options.env.DB, taskId, input)
           },
         },
-    // Owner-bound. This is the list anything unattended picks an action from — a person arming a
-    // schedule today, and whatever asks next — and the tier beside each entry drives the confirmation
+    // Owner-bound. This is the list anything unattended picks an action from, such as a person arming a
+    // schedule, and the tier beside each entry drives the confirmation
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for
     // your own route.
     nodeActions: {
@@ -422,7 +422,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         ...new Set(hookHandlersFor(qualifiedExtensionPointId(plugin, id)).map((handler) => handler.pluginId)),
       ],
     },
-    // Owner-bound on both halves, like the extension points below: `declare` qualifies the verb with
+    // Owner-bound on both halves, like the extension points above: `declare` qualifies the verb with
     // this plugin's id, and `record` refuses anything outside what this plugin declared. Writing goes
     // straight to core's table because the trail is core's — a plugin owning its own audit rows would
     // be a second trail nobody reviews.
@@ -517,15 +517,15 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // `ctx.core.telemetry` and it is a token (../plugins/permissions.ts).
     telemetry: telemetryFor(plugin),
     log: createLogger(plugin, plugin, (level, line) => recordPluginLog(plugin, level, line)),
-    // The broadcast surface, projected rather than re-implemented: these are server/notify.ts and
-    // server/transport/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
+    // The broadcast surface, projected rather than re-implemented: these are the notify and wsHub
+    // functions, reached through the context so a plugin does not deep-import them. `channel` and
     // `streams` return disposers, which the host records like any other contribution.
     events: {
       // Confined to the plugin's own channel namespace for a loaded plugin, unrestricted for a
       // built-in. A built-in owns real prefixes through `channel` below and is compiled into this
       // binary. An unconfined `send` lets a loaded package post frames on `term:` or `workflow:` and
       // impersonate core's own streams. `plugin:<id>:*` is also the namespace its frames may subscribe
-      // to and the one a push invalidates its chrome from (client-core/host/plugins/pluginChannel.ts).
+      // to and the one a push invalidates its chrome from (client-core's pluginChannel).
       //
       // A throw rather than a silent drop, because a broadcast that goes nowhere is invisible and leaves
       // the author debugging the renderer.
@@ -539,8 +539,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
             wsBroadcast(frame)
           }
         : wsBroadcast,
-      // Bound to the caller's own id, which is the whole fix for the chrome sweep: `bumpChrome` has
-      // held a per-plugin revision map all along and this was the one caller that told it nothing.
+      // Bound to the caller's own id, so the client's `bumpChrome` refetches only this plugin's chrome.
       status: () => broadcastStatus(plugin),
       worktreeStatus: (taskId) => broadcastWorktreeStatusChanged({ taskId }),
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
@@ -595,7 +594,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       },
       // Never present for a loaded plugin, whatever its manifest says. PTY stream ownership and WS
       // channel prefixes are infrastructure exactly one plugin may own, and neither survives a
-      // message-passing boundary (README § Two tiers).
+      // message-passing boundary (docs/extensibility.md § Two tiers, permanently).
       channel: permissions
         ? (undefined as never)
         : (prefix, handler) => {

@@ -64,9 +64,8 @@ export type RuntimeBindings = {
   SERVICE_INSTANCE_ID?: string
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
-  // Use-scoped credential access (server/core/secrets.ts). It replaces the raw SESSION_ENC_KEY that
-  // used to sit here directly, and it is the seam that scrubs a credential out of a provider error
-  // before it reaches a log or a client.
+  // Use-scoped credential access (server/core/secrets.ts), rather than the raw SESSION_ENC_KEY. It is
+  // the seam that scrubs a credential out of a provider error before it reaches a log or a client.
   SECRETS: SecretService
   // The key that signs internal tokens (server/auth/internalTokens.ts). Spawned children get a token
   // signed with it as ACORN_API_TOKEN, never the key itself (docs/mcp.md § Launch environment).
@@ -113,10 +112,8 @@ export function diskBlobCache(dir: string): BlobCache {
   // keys create flat regular files, so anything else is outside this cache's contract.
   //
   // Only a file whose mode is actually wrong is chmodded, and the mode comes off the `lstat` this loop
-  // already does. `put` below has written 0600 for a long time, so on a real cache every entry is
-  // already right and every chmod was a syscall that changed nothing: 2,975 blobs cost 102 ms of the
-  // node's boot, in front of the listener, for zero files fixed. The stat pass is 13 ms
-  // (measured 2026-09-03).
+  // already does. `put` below writes 0600, so on a real cache every entry is already right, and a
+  // chmod per blob would cost boot time in front of the listener for zero files fixed.
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry)
     try {
@@ -186,7 +183,7 @@ export function openDb(dbPath: string): AppDatabase {
   // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
   // No foreign_keys pragma: the schema declares no FK constraints (docs/data-layer.md), so
   // enabling enforcement would be a misleading no-op. server/storage/sqlite.ts holds it off explicitly,
-  // because node:sqlite would otherwise enable it by default where better-sqlite3 did not.
+  // because node:sqlite would otherwise enable it by default where better-sqlite3 does not.
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
 
@@ -266,9 +263,8 @@ export function makeBindings({
   // (server/sessionKey.ts). Never both: a supervised Node doesn't fall back to the files.
   const encKey = keys?.sessionKey ?? ensureSessionKey(dataDir)
   const activeIdentity = activeIdentityStore(dataDir)
-  // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows. Before this ran at
-  // boot, the identity was bound as a side effect of connecting GitHub, and every internal caller
-  // (MCP, agents) failed closed until then.
+  // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows, so every internal caller
+  // (MCP, agents) has an identity from the first request instead of failing closed.
   ensureBoundIdentity(db, activeIdentity)
   // A plugin model call an earlier process admitted can no longer settle, and may have spent.
   chargeInterruptedModelCalls(db)

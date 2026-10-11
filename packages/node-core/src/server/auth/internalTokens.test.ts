@@ -33,9 +33,9 @@ describe('scoped internal tokens', () => {
   })
 
   it('survives payloads whose base64 contains the separator-adjacent characters', () => {
-    // The bug this pins: base64url's alphabet is [A-Za-z0-9_-], so a payload routinely contains '_'.
-    // The first implementation split the token on '_' and every such token failed to verify. Ids long
-    // enough to force padding-free base64 with both '-' and '_' are the interesting case.
+    // base64url's alphabet is [A-Za-z0-9_-], so a payload routinely contains '_', and a token split on
+    // '_' would fail to verify. Ids long enough to force padding-free base64 with both '-' and '_' are
+    // the interesting case.
     for (const taskId of [
       'a'.repeat(1),
       'ø-task_id/with+chars',

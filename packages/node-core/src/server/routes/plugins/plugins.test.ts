@@ -101,7 +101,7 @@ type WireOptions = {
   roster?: PluginRosterEntry[]
   // Why a package on disk produced no plugin at this boot. Defaults to none, which is every test here
   // except the one about a package that would not load.
-  // Unstamped. The helper adds the clock, as in pluginState.test.ts.
+  // Unstamped. The helper adds the clock, as in the pluginHost state tests.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   pendingReview?: { reviewId: string; requestId: string; fingerprint: string; stagedAt: number }
   grants?: InputGrantsStore
@@ -123,7 +123,7 @@ const memoryGrants = (): InputGrantsStore => {
   }
 }
 
-// The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
+// The bridge the composition roots fill (apps/node's `bootNode`). The
 // roster is the running process's view and never changes here. `disabled` is the persisted list, which
 // a PUT does change. That gap is why `restartRequired` exists.
 const wire = (initial: readonly string[], options: WireOptions = {}) => {
@@ -612,8 +612,8 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
   })
 
   it('gives a client-only package a row the plugin host never produced', async () => {
-    // No node entrypoint, so it never entered initPlugins and has no roster entry, but its bundle is
-    // what this phase distributes, so the device has to be told about it.
+    // No node entrypoint, so it never entered initPlugins and has no roster entry, but its bundle goes
+    // to devices, so the device has to be told about it.
     // ['rollbar'] so the shared roster fixture is quiet: it was disabled at boot, so naming it keeps
     // the file and the process in agreement and leaves restartRequired to speak about the row under
     // test.

@@ -4,9 +4,9 @@ import type { IntegrationProviderContribution, ProviderRouteContribution } from 
 // A module singleton, like the HTTP route registry and unlike the capability registry, because a provider
 // contribution is a static descriptor rather than a per-boot object bound to a database handle. It
 // is written by plugin init rather than by a one-time side-effect import, and that matters because
-// `startServiceRuntime` can run several times in one process (its own test does it four times), so a
-// second boot would hit the duplicate-id guards below and fail the whole boot. Hence the undo each
-// registration hands back, which the plugin host runs on teardown.
+// `bootNode` can run several times in one process (its tests do), so a second boot would hit the
+// duplicate-id guards below and fail the whole boot. Hence the undo each registration hands back,
+// which the plugin host runs on teardown.
 //
 // Owner is tracked rather than inferred from the id: a plugin may contribute several providers
 // (model-providers registers two), and the ids are not derived from the plugin name.
@@ -102,7 +102,7 @@ class IntegrationProviderRegistry {
 
   registerRoute(route: ProviderRouteContribution): Disposable {
     this.validateContribution(route.providerId, 'Provider route')
-    // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
+    // Keyed by (providerId, prefix): the prefix is namespace-relative, so two providers may both
     // contribute the empty prefix. Only the same provider doing it twice is a collision.
     if (
       this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)

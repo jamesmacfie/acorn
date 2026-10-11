@@ -1,5 +1,5 @@
 import { taskScripts } from '../taskScripts/service'
-// Task-to-checkout/worktree resolution shared by every privileged main-process surface. The task
+// Task-to-checkout/worktree resolution shared by every privileged node surface. The task
 // ID, never a renderer-supplied absolute path, is the capability; paths are re-derived from the
 // database on every call.
 import { realpathSync, statSync } from 'node:fs'
@@ -41,7 +41,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('worktrees')
 
-// Set once by registerTerminalChannel, where workspace worktrees are created (docs/workspaces-and-tasks.md).
+// Set once at boot by `bootNode`, to the data root's worktrees folder (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
   resetTaskHeads()
@@ -115,8 +115,8 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
 }
 
 // Startup context injection toggle: opt-out, so an absent preference means on. The key mirrors
-// PrefKeys.startupContextInjection; core and client can't be imported from main, so it is a
-// literal string here.
+// PrefKeys.startupContextInjection; the client's constants can't be imported here, so it is a
+// literal string.
 export const contextInjectionEnabled = async (db: AppDatabase, userId: string): Promise<boolean> => {
   const [row] = await db
     .select()
@@ -196,8 +196,8 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
   const rows = only ? visible.filter((row) => only(row.id)) : visible
   const generations = rows.map((row) => admitTaskHead(row.id, scope))
 
-  // `git status` is async but still CPU/disk work. An unbounded Promise.all made every task start a
-  // process at once, producing a periodic resource spike that grew with the task roster.
+  // `git status` is async but still CPU/disk work. An unbounded Promise.all would make every task start
+  // a process at once, producing a periodic resource spike that grows with the task roster.
   const results = new Array<TaskStatus>(rows.length)
   let next = 0
   const worker = async () => {
@@ -243,7 +243,7 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 }
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
-// (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
+// (docs/workspaces-and-tasks.md). The session row does not denormalize repo/pull; this is the single read.
 export function taskContext(
   t: TaskRef | undefined,
   github?: { owner: string; name: string } | null,
@@ -258,14 +258,6 @@ export function taskContext(
 export async function projectForTask(db: AppDatabase, t: Pick<TaskRef, 'projectId'>): Promise<ProjectRow | null> {
   return getProject(db, t.projectId)
 }
-
-// Fired once per task, right after its worktree is first created and configured files are copied.
-//
-// A hook rather than a capability since phase 4 of the layout programme (server/pluginHost/hooks.ts,
-// docs/plugins/hooks.md § Hooks). It used to be one typed slot the terminal plugin filled, which meant one
-// plugin could run setup and a second had nowhere to say so. The choke point is still core's; what
-// changed is that any number of packages may take a turn here, in the owner's order, each bounded and
-// each recorded on its own roster row when it fails.
 
 // The task's worktree must still be a live worktree ON the task's branch. Throws rather than
 // degrading: every path that resolves a cwd is about to run something in it.
@@ -324,8 +316,8 @@ export async function resolveTaskCwd(
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
-    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks/worktrees.md §
-    // Worktrees and setup: verify rather than assume before handing a persisted path back.
+    // Verify rather than assume before handing a persisted path back (docs/workspaces-and-tasks/worktrees.md §
+    // Worktrees and setup).
     if (!isProjectRoot) await adoptBranch(db, t, t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
   }
@@ -339,8 +331,8 @@ export async function resolveTaskCwd(
     prepareTask(t.id, false, async () => {
       const { owner, repo } = projectWorktreeIdentity(project!)
       const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, t.pullNumber)
-      // Falling back to the project root here put the task in the main checkout, on whatever branch
-      // the user last left it, silently, and typically alongside whatever other task lives there.
+      // Falling back to the project root here would put the task in the main checkout, on whatever
+      // branch the user last left it, silently, and typically alongside whatever other task lives there.
       // The failures that reach this line (git refusing a branch already checked out in another
       // worktree, a stale directory) are all ones the user has to act on, so say so instead.
       if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
@@ -369,9 +361,10 @@ export async function resolveTaskCwd(
                 : undefined,
         )
         await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(db, t, checkout, wt.path))
-        // Awaited, not fired and forgotten: the hook admits the setup process before the next terminal opens.
-        // This awaits spawning, not completion; callers read task scripts for completion. The chain runner bounds each handler, so an
-        // interceptor that hangs delays this by its own timeout and no longer.
+        // Awaited, not fired and forgotten: `core:worktree-created` admits the setup process before the
+        // next terminal opens. This awaits spawning, not completion; callers read task scripts for
+        // completion. The chain runner bounds each handler, so an interceptor that hangs delays this by
+        // its own timeout and no longer.
         await prepareWorktreePhase('setup.admit', () =>
           runHook('core:worktree-created', { taskId: t.id, path: wt.path }),
         )
@@ -395,7 +388,7 @@ export async function resolveTaskCwd(
 }
 
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
-// like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
+// like the terminal), or null if the repo has no mapped checkout yet. Re-derived per call so
 // the task id, not a renderer-supplied absolute path, is the capability.
 export async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)

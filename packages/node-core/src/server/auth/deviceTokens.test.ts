@@ -101,8 +101,8 @@ describe('device tokens', () => {
     expect(await seenAt()).toBe(later)
   })
 
-  // Every authenticated request used to run this `SELECT` on the node's single event loop, which on a
-  // client holding a live socket makes it the most-executed statement in the process.
+  // Without the warm cache every authenticated request runs this `SELECT` on the node's single event
+  // loop, which on a client holding a live socket makes it the most-executed statement in the process.
   it('answers a warm token from memory, with no read of the devices table', async () => {
     const { token, device } = await devices.issue('laptop')
     expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })

@@ -112,7 +112,7 @@ describe('internal credential renewal', () => {
     credentials.dispose()
   })
 
-  // A penetration review found a released child's copied token still authenticating, for up to 48 hours.
+  // Without this, a released child's copied token keeps authenticating for up to 48 hours.
   it('revokes a child token when the child is released', () => {
     const root = mkdtempSync(join(tmpdir(), 'acorn-credentials-'))
     roots.push(root)

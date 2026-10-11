@@ -26,7 +26,8 @@ export const syncState = sqliteTable(
 // ── App-state tables: data GitHub does not have, so acorn is the source of truth ────────────────
 //
 // `user_id` on `prefs` is the single canonical user id: the node's opaque owner id, minted at boot
-// (server/core/identity.ts). Single-user app, so the column is not multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
+// (server/core/identity.ts). Single-user app, so the column is not multi-tenancy. The other app-state
+// tables (tasks, projects, and so on) are machine-scoped and have no user_id.
 
 export const prefs = sqliteTable(
   'prefs',
@@ -329,7 +330,7 @@ export const idempotency = sqliteTable(
 
 // ── Schedules: periodic work owned by the node ────────────────────────────────────────────────────
 //
-// Machine-scoped like every newer app-state table. State and definition split by owner
+// Machine-scoped like the other app-state tables. State and definition split by owner
 // (docs/schedules.md § The three declarers, one registry): a state row whose schedule is no longer registered is
 // retained unread, since disabling a plugin must not delete the owner's pause or its run history.
 // See docs/schedules.md for the reserved `'*'` global pause key.

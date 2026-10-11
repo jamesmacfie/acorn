@@ -29,9 +29,9 @@ export type InternalClaims = {
 
 const PREFIX = 'acorn_it_'
 // '.' separates payload from signature, as in a JWT, and for the same reason: base64url's alphabet is
-// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' looked fine and was wrong: a
-// payload or signature containing an underscore produced more than the expected number of parts and
-// every such token failed to verify. Caught by auth.test.ts on the first run.
+// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' would give a payload or
+// signature containing an underscore more than the expected number of parts, and the token would fail
+// to verify.
 const SEPARATOR = '.'
 export const INTERNAL_TOKEN_LIFETIME_MS = 48 * 60 * 60 * 1000
 const internalClaimsPayloadSchema = z.strictObject({
@@ -130,8 +130,8 @@ export function renewInternalToken(key: string, token: string): string | null {
 }
 
 // The environment a spawned child needs to call this node back, with a token minted for that child's
-// scope. A factory rather than the single shared record it replaces: one object meant every PTY, agent
-// session and workflow step presented the same credential, which is what made scope unrepresentable.
+// scope. A factory rather than one shared record: a shared record would have every PTY, agent session
+// and workflow step present the same credential, which makes scope unrepresentable.
 //
 // ACORN_API_URL is absent from the claims: it is a property of the listener, not the
 // caller, so the composition root closes over it and fills it in once the port is known.

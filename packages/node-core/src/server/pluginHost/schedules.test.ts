@@ -217,9 +217,9 @@ describe('plugin schedules', () => {
       await scheduler.start()
 
       expect(await host.reload(PLUGIN, { plugin: instance('v2'), binding })).toEqual({ ok: true })
-      // The second one is the case the commit path had to be taught: without handing the committed
-      // candidate's undos to the host, this reload would ask the scheduler to register 'acme:refresh'
-      // while the first reload's copy was still on it.
+      // The second reload is the one that matters: unless the commit hands the committed candidate's
+      // undos to the host, this reload asks the scheduler to register 'acme:refresh' while the first
+      // reload's copy is still on it.
       expect(await host.reload(PLUGIN, { plugin: instance('v3'), binding })).toEqual({ ok: true })
 
       await time.advance(3_600_000)

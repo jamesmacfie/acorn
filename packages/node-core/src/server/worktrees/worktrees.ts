@@ -24,9 +24,6 @@ export async function branchExists(checkout: string, branch: string): Promise<bo
   }
 }
 
-// A branch name safe to pass to git as a positional: no leading dash, so it cannot be read as a
-// flag, and only git-legal ref characters. The directory name is slugged separately. This guards the
-// git argument.
 // The branch a linked worktree has checked out, read off disk. `<dir>/.git` is a file pointing at
 // the repo's admin dir for that worktree, whose HEAD holds the ref. `null` means the directory is
 // not a live linked worktree: pruned, moved, or on a detached HEAD.
@@ -139,7 +136,7 @@ export async function ensureWorktree(
     //
     // Fetch into a private per-PR ref, never FETCH_HEAD. FETCH_HEAD lives in the repo's common dir,
     // shared by the checkout and every worktree, so any other fetch in this repo between the two
-    // commands below can rewrite it first. That created branches from another PR's head: right name,
+    // commands below can rewrite it first, and a branch would be born at another PR's head: right name,
     // clean status, no diff, wrong tree. The ref is kept afterwards, since it costs 41 bytes and
     // records what the branch came from.
     const head = `refs/acorn/pull/${pullNumber}`

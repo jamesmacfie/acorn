@@ -50,8 +50,7 @@ describe('env allowlist', () => {
   it('never lets a real child observe the node secrets', async () => {
     const result = await sh('env', { env: { PROBE: 'visible' } })
     expect(result.code).toBe(0)
-    // Against the real process env, not a fixture: this is the assertion that would have caught
-    // previewUrl passing no env at all.
+    // Against the real process env, not a fixture, so a caller that forgets the allowlist shows here.
     const seen = new Set(result.stdout.split('\n').map((line) => line.split('=')[0]))
     for (const key of [
       'SESSION_ENC_KEY',
@@ -84,11 +83,10 @@ describe('process-group kill', () => {
   it('reaps a grandchild the direct child left behind', async () => {
     const pidFile = join(dir, 'grandchild.pid')
     // The child backgrounds a long sleeper and waits, so killing only the direct pid would leave the
-    // sleeper running, exactly what held stdio pipes open before.
+    // sleeper running and holding the stdio pipes open.
     //
-    // Aborted once the grandchild has registered itself, not after a fixed timeout: a 300ms deadline
-    // raced the fork under full-suite load and the pid file did not exist yet, which failed this test
-    // intermittently for a reason that had nothing to do with process groups.
+    // Aborted once the grandchild has registered itself, not after a fixed timeout: a fixed deadline
+    // races the fork under full-suite load, before the pid file exists.
     const controller = new AbortController()
     const pending = sh(`sh -c 'echo $$ > ${pidFile}; exec sleep 30' & sleep 30`, {
       timeoutMs: 30_000,
@@ -112,10 +110,10 @@ describe('process-group kill', () => {
     // The case the test above cannot see: its grandchild dies on SIGTERM, so the escalation timer is
     // never needed. Here the grandchild traps TERM and closes its stdio, so the direct child exits,
     // 'close' fires, and the survivor is only reaped if the escalation timer is still armed. Clearing it
-    // in settle() left this process running indefinitely.
+    // in settle() would leave this process running indefinitely.
     const pidFile = join(dir, 'stubborn.pid')
-    // Abort once the grandchild has actually registered itself, rather than after a fixed timeout: a
-    // 300ms deadline raced the fork under full-suite load and the pid file did not exist yet.
+    // Abort once the grandchild has actually registered itself, rather than after a fixed timeout, for
+    // the reason the test above gives.
     const controller = new AbortController()
     const pending = sh(`sh -c 'trap "" TERM; echo $$ > ${pidFile}; exec sleep 30 >/dev/null 2>&1' & sleep 30`, {
       timeoutMs: 30_000,
@@ -159,12 +157,11 @@ describe('bounded capture', () => {
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
   })
 
-  // The existing cap test above passes on ASCII whichever way the bytes are handled, which is how the
-  // first implementation shipped decoding each pipe chunk separately. These three are the cases that
-  // distinguish it.
+  // The cap test above passes on ASCII whichever way the bytes are handled, so it cannot catch a decoder
+  // that decodes each pipe chunk separately. These three cases can.
   it('does not corrupt a multi-byte character split across pipe chunk boundaries', async () => {
     // 40 000 box-drawing characters = 120 000 bytes, comfortably more than one 64 KiB pipe read, so a
-    // 3-byte character will straddle a boundary. Decoding per chunk produced three U+FFFD here.
+    // 3-byte character will straddle a boundary. Decoding per chunk would produce three U+FFFD here.
     const count = 40_000
     const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(${count}))"`, { maxOutputBytes: 1 << 20 })
     expect(result.code).toBe(0)
@@ -174,7 +171,7 @@ describe('bounded capture', () => {
   })
 
   it('never exceeds the byte cap, even mid-character', async () => {
-    // Slicing a decoded string to a byte length overshot and left a replacement character at the
+    // Slicing a decoded string to a byte length overshoots and leaves a replacement character at the
     // end; slicing the byte stream cannot.
     const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(1000))"`, { maxOutputBytes: 20 })
     expect(result.truncated).toBe(true)
@@ -241,7 +238,7 @@ describe('failure taxonomy', () => {
   })
 })
 
-// The login-shell PATH probe runs behind the boot now, so the first spawn is what pays for it. See
+// The login-shell PATH probe runs behind the boot, so the first spawn is what pays for it. See
 // ./loginShellPath.ts and docs/node-distribution.md § Boot order.
 describe('the login-shell PATH gate', () => {
   it('holds a spawn that arrives while the probe is running, and costs nothing after', async () => {

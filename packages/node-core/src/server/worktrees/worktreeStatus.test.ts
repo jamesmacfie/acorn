@@ -165,7 +165,7 @@ describe('the coalesced worktree status read', () => {
   })
 
   // A task folder that lost its `.git` link, inside a worktrees folder that itself sits in a repository,
-  // which is the development layout. Git climbed to that repository and reported its changes as the task's.
+  // which is the development layout. Git would climb to that repository and report its changes as the task's.
   it('does not report the enclosing repository for a folder git no longer tracks', async () => {
     const root = join(checkout, 'managed')
     const stale = join(root, 'stale')
@@ -178,7 +178,7 @@ describe('the coalesced worktree status read', () => {
     expect((await worktreeStatus(worktree, { fresh: true })).branch).toBe('feat-x')
   })
 
-  // `git worktree remove` refuses a folder git no longer tracks, which left such a task impossible to archive.
+  // `git worktree remove` refuses a folder git no longer tracks, which would leave such a task impossible to archive.
   it('removes a worktree folder whose .git link is gone and frees its branch', async () => {
     rmSync(join(worktree, '.git'))
     writeFileSync(join(worktree, 'leftover.txt'), 'copied config\n')
@@ -202,7 +202,7 @@ describe('the coalesced worktree status read', () => {
     expect(git(checkout, 'worktree', 'list')).not.toContain('feat-x')
   })
 
-  // The changes pane's line counts. Two clients on one task asked for the pair twice a poll each.
+  // The changes pane's line counts. Two clients on one task ask for the pair twice a poll each.
   it('shares any other read the same way, per argument list', async () => {
     writeFileSync(join(worktree, 'a.txt'), '1\n2\n')
     const numstat = ['diff', '--numstat']

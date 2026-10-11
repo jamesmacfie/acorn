@@ -22,12 +22,9 @@ import type { CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodeKeyCustody } from '../sessionKey'
 import { realpathSync } from 'node:fs'
 
-// The three module-shaped facets, named rather than left as `typeof <module>`.
-//
-// `typeof fs` meant the plugin API, and the `fs` permission grant, widened by whatever anyone happened
-// to export from the module next — with no line in the surface snapshot and no review. Named here, an
-// added export reaches plugins only when someone adds it below too. The declarations are held to the
-// modules by the `satisfies` assertions in createCoreServices.
+// The three module-shaped facets, named rather than left as `typeof <module>`, so an export added to
+// the module reaches plugins, and the `fs` permission grant, only when someone adds it below too. The
+// declarations are held to the modules by the `satisfies` assertions in createCoreServices.
 export type CoreFsService = {
   isContainedPath: typeof fs.isContainedPath
   isValidRepoIdent: typeof fs.isValidRepoIdent
@@ -83,7 +80,7 @@ export type CoreServices = {
   // needs before it can price a token count.
   prefs: PrefService
   // The machine identity: which owner this node is bound to. Read-only for consumers. The binding is
-  // minted at boot by ensureBoundIdentity in server/bindings.ts, never by a plugin.
+  // minted at boot by ensureBoundIdentity, never by a plugin.
   identity: IdentityService
   // Narrow project identity for plugins: scope resolution, importer writes, and all mapped project
   // folders. The returned ProjectRef never exposes core config or the core SQLite handle.
@@ -238,7 +235,7 @@ export type { CompiledProjectService, ProjectService } from './projectRefs'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
 // and they carry no core config columns and no database handle.
 export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'
-// The same arrangement one entity over: what TaskService hands back and takes in. Six fields off the
+// The same arrangement one entity over: what TaskService hands back and takes in. A few fields off the
 // `tasks` row, and no database handle.
 export type { TaskRef } from '../worktrees/taskWorktree'
 export type { ContextService } from './context'
