@@ -7,9 +7,7 @@ import {
   type MouseButton,
   type WheelDirection,
 } from './events'
-import {
-  CONTROL_KEYS, KITTY_KEYS, KITTY_TEXT, LETTER_KEYS, SS3_ONLY, SS3_TEXT, TILDE_KEYS,
-} from './names'
+import { CONTROL_KEYS, KITTY_KEYS, KITTY_TEXT, LETTER_KEYS, SS3_ONLY, SS3_TEXT, TILDE_KEYS } from './names'
 
 // Bytes from a terminal, as events.
 //
@@ -26,8 +24,7 @@ import {
 // sequence being read; a completed unit advances the cursor and everything before it is dropped at
 // the end of the scan.
 //
-// **The lone-ESC timeout is 20 ms**, which is what OpenTUI's own parser waits: its
-// `DEFAULT_TIMEOUT_MS` is 20 and its renderer passes `timeoutMs: 20` explicitly at 0.5.9. An ESC byte
+// **The lone-ESC timeout is 20 ms**, which is what OpenTUI's own parser waits. An ESC byte
 // is the first byte of every escape sequence there is, so pressing Escape and pressing Down are the
 // same first byte and only time tells them apart. A terminal that answered the kitty request sends
 // `CSI 27 u` for the Escape key and never a bare ESC, which is the ambiguity that flag exists to
@@ -108,10 +105,7 @@ function actionOf(param: number | undefined): KeyAction {
 const BUTTONS: readonly MouseButton[] = ['left', 'middle', 'right', 'none']
 const WHEEL: readonly WheelDirection[] = ['up', 'down', 'left', 'right']
 
-export function createParser(
-  emit: (event: InputEvent) => void,
-  options: ParserOptions = {},
-): Parser {
+export function createParser(emit: (event: InputEvent) => void, options: ParserOptions = {}): Parser {
   const timeoutMs = options.timeoutMs ?? ESC_TIMEOUT_MS
   let pending: number[] = []
   // Where the sequence being read starts, and how far into it we have got. Both survive a chunk
@@ -176,10 +170,12 @@ export function createParser(
    *  on `:`, every one a number or undefined. Kitty puts the event type in a sub-field of the
    *  modifier field, which is the only reason the second level exists. */
   function fields(body: string): number[][] {
-    return body.split(';').map((field) => field.split(':').map((part) => {
-      const value = Number.parseInt(part, 10)
-      return Number.isNaN(value) ? -1 : value
-    }))
+    return body.split(';').map((field) =>
+      field.split(':').map((part) => {
+        const value = Number.parseInt(part, 10)
+        return Number.isNaN(value) ? -1 : value
+      }),
+    )
   }
 
   const at = (parsed: number[][], field: number, sub = 0): number | undefined => {
@@ -189,8 +185,8 @@ export function createParser(
 
   /** Kitty's `CSI <codepoint>[:shifted:base];<modifiers>[:<event>];<text> u`.
    *
-   *  **Decoded whenever it arrives, not only once the terminal has answered the query.** The phase
-   *  design gates this on the answer, and a gate here cannot fail safe: a terminal that speaks the
+   *  **Decoded whenever it arrives, not only once the terminal has answered the query.** A gate on
+   *  the answer cannot fail safe: a terminal that speaks the
    *  protocol but leaves the query unanswered would have every key it sends this way dropped, and
    *  those keys include Escape. Nothing else in any terminal's vocabulary ends a CSI sequence with
    *  `u`, so the sequence arriving *is* the answer — and it says so, which is what `kittyAnswered`
@@ -244,11 +240,9 @@ export function createParser(
       emit({ type: 'mouse', x, y, button: 'none', action: 'wheel', wheel, ...modifiers })
       return
     }
-    // Motion, with or without a button held. Which button is dragging is the hit test's business in
-    // phase 3, and it knows because it saw the press.
-    const action: MouseAction = (code & 32) !== 0
-      ? 'move'
-      : (final === 'M' ? 'press' : 'release')
+    // Motion, with or without a button held. Which button is dragging is the hit test's business,
+    // and it knows because it saw the press.
+    const action: MouseAction = (code & 32) !== 0 ? 'move' : final === 'M' ? 'press' : 'release'
     // A low field of 3 means "no button", which is the old encoding's release and a bare move here.
     const button = action === 'move' && low === 3 ? 'none' : (BUTTONS[low] ?? 'none')
     emit({ type: 'mouse', x, y, button, action, ...modifiers })
@@ -466,7 +460,7 @@ export function createParser(
   function flushTimeout(): void {
     clearTimer()
     if (state === 'ground' || state === 'paste') return
-    // A lone ESC waited its 20 ms and nothing followed, so it was the key. An unfinished CSI or SS3
+    // A lone ESC waited out the timeout and nothing followed, so it was the key. An unfinished CSI or SS3
     // is a sequence that was cut off, and there is nothing to do with half of one but forget it.
     if (state === 'esc' && pending.length === 1) key('escape', '', NO_MODIFIERS)
     state = 'ground'

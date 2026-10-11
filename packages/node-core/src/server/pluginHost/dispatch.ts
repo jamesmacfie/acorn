@@ -1,13 +1,11 @@
 // Calling one of this node's own plugin routes with no client and no request in sight.
 //
-// Two callers need it: a manifest-declared schedule firing (./scheduleRun.ts) and the measure
-// sampler reading a data source, and they needed the same six steps, so
-// the steps live here once. It dispatches in process rather than over loopback HTTP: the listener is
-// TLS with a self-signed certificate and its origin is a property of the composition root, so a
-// self-call would mean teaching this module about certificates and ports to reach a handler sitting
-// in the same heap. What the HTTP path contributes, the auth gate, the mount stripping, the request
-// context, is reproduced here exactly, from the same two functions the route uses, so there is one
-// plugin-route contract and not two.
+// Two callers need it: a manifest-declared schedule firing and the measure sampler reading a data
+// source. It dispatches in process rather than over loopback HTTP: the listener is TLS with a
+// self-signed certificate and its origin is a property of the composition root, so a self-call would
+// mean teaching this module about certificates and ports to reach a handler in the same heap. What the
+// HTTP path contributes, the auth gate, the mount stripping, the request context, is reproduced here
+// from the same two functions the route uses, so there is one plugin-route contract and not two.
 //
 // The principal is the node's own: 'internal' with the 'service' scope, which is what every other
 // loopback caller presents and what `requireProviderAccess` already admits (docs/security/credentials.md §
@@ -63,9 +61,14 @@ export async function dispatchPluginRoute(
   // Built-in plugins contribute Hono routers; loaded plugins contribute fetch handlers. Both are
   // served over HTTP, so the in-process path must resolve both carriers as well.
   const match = pluginRouteContributions()
-    .filter((route) => route.plugin === pluginId && (url.pathname === routeMountPath(route) || url.pathname.startsWith(`${routeMountPath(route)}/`)))
+    .filter(
+      (route) =>
+        route.plugin === pluginId &&
+        (url.pathname === routeMountPath(route) || url.pathname.startsWith(`${routeMountPath(route)}/`)),
+    )
     .sort((a, b) => routeMountPath(b).length - routeMountPath(a).length)[0]
-  if (!match) throw new Error(`no route serves ${url.pathname}; the plugin may be disabled or may not have registered it`)
+  if (!match)
+    throw new Error(`no route serves ${url.pathname}; the plugin may be disabled or may not have registered it`)
 
   const userId = env.ACTIVE_IDENTITY.get()
   if (!userId) throw new Error('this node has no bound identity, so an unattended run has nobody to run as')
@@ -82,7 +85,10 @@ export async function dispatchPluginRoute(
   // The one seam where the host calls a plugin's route with no HTTP request behind it, so the
   // request middleware's span cannot cover it. `path` is the declared route, which is a pattern the
   // manifest wrote down rather than a URL a caller composed (docs/telemetry/runtimes.md § Node seams).
-  const span = startSpan(pluginId, { name: 'plugin.dispatch', attrs: { seam: 'plugin.dispatch', method: init.method, path } })
+  const span = startSpan(pluginId, {
+    name: 'plugin.dispatch',
+    attrs: { seam: 'plugin.dispatch', method: init.method, path },
+  })
   try {
     // Entered for the same reason the request middleware enters it: the handler is about to run
     // arbitrary plugin code, and the git spawns and SQL statements it makes are this plugin's

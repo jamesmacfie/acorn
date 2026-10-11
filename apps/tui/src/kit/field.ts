@@ -3,23 +3,21 @@ import { fromVisual, toVisual, type Row } from '../wrap'
 
 // What a field holds and what one key does to it: a string, an offset, and a table.
 //
-// This is the model `./asking/fields.tsx`'s `Input` and `Textarea` own. It is a plain string rather than a
-// rope and it is not `@codemirror/state`: we wrote it both ways against the same 40 assertions and
-// the library saved 26 lines for 47,922 bytes in the eager graph. A keystroke on a 400-line note
-// costs 99 microseconds either way.
+// This is the model the kit's `Input` and `Textarea` own. It is a plain string rather than a rope and
+// it is not `@codemirror/state`: the library saves a few lines here at the cost of tens of KB in the
+// eager graph, and a keystroke is cheap either way.
 //
-// **Selection and undo are deliberately absent.** Shift with an arrow selected under the old
-// renderer, and nothing under `apps/tui/src` reads a selection, sets one, or asks for undo:
-// `CopyButton` is the copy path and there is no way to get a selection out again. A selection you can
-// make and cannot use is not worth the anchor it costs every operation here.
+// **Selection and undo are deliberately absent.** Nothing in this client reads a selection, sets one,
+// or asks for undo: `CopyButton` is the copy path and there is no way to get a selection out again. A
+// selection you can make and cannot use is not worth the anchor it costs every operation here.
 //
-// **One table for both fields, where two were expected.** An `Input` is a `Textarea` with
-// `height: 1` and one binding changed — Return submits instead of inserting a newline — so the whole
-// of the difference is the `newline` flag below. Two tables would have been the same twenty lines
-// written twice, and they would have drifted the first time somebody added a chord.
+// **One table for both fields.** An `Input` is a `Textarea` with `height: 1` and one binding changed —
+// Return submits instead of inserting a newline — so the whole of the difference is the `newline`
+// flag below. Two tables would be the same twenty lines written twice, and they would drift the first
+// time somebody added a chord.
 //
 // **Home and End go to the visual line's ends, not the document's**, which is a deliberate departure
-// from `defaultTextareaKeyBindings`, where they are `buffer-home` and `buffer-end` and the line
+// from OpenTUI's `defaultTextareaKeyBindings`, where they are `buffer-home` and `buffer-end` and the line
 // boundaries are on Ctrl+A and Ctrl+E. Both spellings reach the visual line here, because that is
 // what a reader in a wrapped composer means by the key and no frame here records a cursor press
 // (docs/tui/keys.md § The five key groups).
@@ -36,7 +34,7 @@ export type Field = {
   goal: number | undefined
 }
 
-/** A key as this table reads one: OpenTUI's `KeyEvent` and our parser's cut down to what a field
+/** A key as this table reads one: the keymap's `KeyEvent` and our parser's cut down to what a field
  *  looks at. `sequence` is what the key types; a key that types nothing carries a control character
  *  or an empty string, and the name is what decides what it does instead. */
 export type Press = {
@@ -50,8 +48,12 @@ export type Press = {
 
 const clamp = (value: number, limit: number): number => Math.min(Math.max(value, 0), limit)
 
-export const create = (text: string, cursor = text.length): Field =>
-  ({ text, cursor: clamp(cursor, text.length), assoc: 0, goal: undefined })
+export const create = (text: string, cursor = text.length): Field => ({
+  text,
+  cursor: clamp(cursor, text.length),
+  assoc: 0,
+  goal: undefined,
+})
 
 /** A value written in from outside, keeping the caret where it was.
  *
@@ -71,8 +73,12 @@ const change = (field: Field, from: number, to: number, insert: string): Field =
   goal: undefined,
 })
 
-const move = (field: Field, cursor: number, assoc = 0, goal?: number): Field =>
-  ({ text: field.text, cursor: clamp(cursor, field.text.length), assoc, goal })
+const move = (field: Field, cursor: number, assoc = 0, goal?: number): Field => ({
+  text: field.text,
+  cursor: clamp(cursor, field.text.length),
+  assoc,
+  goal,
+})
 
 /** Where the logical line the caret is on starts and ends. Not the visual row: `Ctrl+K` and `Ctrl+U`
  *  delete to the ends of the line the text has, which is what they do in a shell. */
@@ -165,7 +171,7 @@ const killLine: Action = (field) =>
 /**
  * Every chord a field answers, keyed the way `chordOf` below spells one.
  *
- * The set is the old painter's `defaultTextareaKeyBindings` minus selection and undo, plus the
+ * The set is OpenTUI's `defaultTextareaKeyBindings` minus selection and undo, plus the
  * Home and End departure the header names. It is written out rather than derived because a reader
  * comparing the two tables should be able to do it by eye, and because these are the keys a reader
  * already has and would notice losing.
@@ -231,15 +237,13 @@ function typedBy(key: Press): string {
  * One key against a field, or `false` for a key the field does not take.
  *
  * `rows` are the visual rows of the current text at the current width, which the component holds
- * beside the model and rebuilds when either changes rather than per keystroke: a wrap of a 400-line
- * note is 163 microseconds, which is affordable per key and wasteful per frame.
+ * beside the model and rebuilds when either changes rather than per keystroke: a wrap of a long note
+ * is affordable per key and wasteful per frame.
  *
  * `newline` is the whole of the difference between the two fields. An `Input` says no, and Return
  * then falls through to its component, which submits (./asking/fields.tsx § Input).
  */
-export function edit(
-  field: Field, key: Press, rows: readonly Row[], newline: boolean,
-): Field | false {
+export function edit(field: Field, key: Press, rows: readonly Row[], newline: boolean): Field | false {
   // A key carrying the platform's own modifier is refused outright, because that modifier is not in
   // the chord spelling below and without this it would match its Ctrl twin. A terminal emulator on
   // macOS keeps that key for itself and never delivers it; where the kitty protocol does deliver it,

@@ -23,16 +23,24 @@ export function createBoardWrite(options: {
     setRetry(undefined)
     options.onOptimistic({ rowId: intent.rowId, move: intent.move, startedAt: options.now() })
     let result: MoveOutcome
-    try { result = await options.send(intent) }
-    catch (error) {
+    try {
+      result = await options.send(intent)
+    } catch (error) {
       options.onMessage(`${intent.move.sourceLabel}: ${error instanceof Error ? error.message : 'The change failed.'}`)
       setRetry(intent)
       options.onOptimistic(undefined)
       return
     }
     if (result !== 'done') {
-      options.onMessage(`${intent.move.sourceLabel}: ${result === 'stale' ? 'This record has moved since the board loaded. Refresh and try again.'
-        : result === 'not-writable' ? 'This field is no longer writable.' : 'This source no longer accepts that value.'}`)
+      options.onMessage(
+        `${intent.move.sourceLabel}: ${
+          result === 'stale'
+            ? 'This record has moved since the board loaded. Refresh and try again.'
+            : result === 'not-writable'
+              ? 'This field is no longer writable.'
+              : 'This source no longer accepts that value.'
+        }`,
+      )
       options.onOptimistic(undefined)
       return
     }
@@ -40,13 +48,20 @@ export function createBoardWrite(options: {
       await options.refresh()
       options.onOptimistic(undefined)
       options.onMessage(`${intent.move.sourceLabel} updated.`)
-    } catch { options.onMessage(`${intent.move.sourceLabel} updated, but the board could not refresh. Use Refresh to check its current value.`) }
+    } catch {
+      options.onMessage(
+        `${intent.move.sourceLabel} updated, but the board could not refresh. Use Refresh to check its current value.`,
+      )
+    }
   }
 
   const request = (row: DashboardDisplayRow, choiceId: string): void => {
     setRetry(undefined)
     const result = options.resolve(row, choiceId)
-    if (!result.move) { options.onMessage(result.reason); return }
+    if (!result.move) {
+      options.onMessage(result.reason)
+      return
+    }
     const intent = { rowId: row.id, move: result.move, key: options.key() }
     if (result.move.risk === 'read') void send(intent)
     else setPending(intent)

@@ -3,39 +3,39 @@ import type { AgentSubagent } from '../../contract/wire.ts'
 import {
   decideAgentCommand,
   eventSubagentId,
-  evolveAgentState,
   foldSubagentRoster,
-  initialAgentMachineState,
   projectAgentEvent,
   quietedSubagents,
   touchSubagentRoster,
 } from './stateMachine'
+import type { AgentMachineState } from './stateMachine'
 
 describe('managed agent state machine', () => {
+  const initial: AgentMachineState = {
+    runtimeState: 'creating',
+    attention: 'none',
+    activeTurnId: null,
+    pendingRequestIds: [],
+  }
+
   it('dispatches only from protocol-ready state', () => {
-    const initial = initialAgentMachineState()
-    expect(decideAgentCommand(initial, { type: 'dispatch_turn', turnId: 't1' })).toMatchObject({ ok: false, code: 'not_ready' })
-    const ready = evolveAgentState(initial, { type: 'session_state', state: 'ready' }, null)
+    expect(decideAgentCommand(initial, { type: 'dispatch_turn', turnId: 't1' })).toMatchObject({
+      ok: false,
+      code: 'not_ready',
+    })
+    const ready: AgentMachineState = { ...initial, runtimeState: 'ready' }
     expect(decideAgentCommand(ready, { type: 'dispatch_turn', turnId: 't1' })).toEqual({ ok: true })
   })
 
-  it('keeps request identity and clears it exactly once', () => {
-    const ready = evolveAgentState(initialAgentMachineState(), { type: 'session_state', state: 'ready' }, null)
-    const waiting = evolveAgentState(ready, {
-      type: 'request',
-      requestId: 'permission-1',
-      kind: 'permission',
-      title: 'Run command?',
-    }, 'turn-1')
-    expect(waiting).toMatchObject({ runtimeState: 'waiting', attention: 'permission' })
+  it('resolves only a request that is still pending', () => {
+    const waiting: AgentMachineState = {
+      ...initial,
+      runtimeState: 'waiting',
+      attention: 'permission',
+      pendingRequestIds: ['permission-1'],
+    }
     expect(decideAgentCommand(waiting, { type: 'resolve_request', requestId: 'permission-1' })).toEqual({ ok: true })
-
-    const working = evolveAgentState(waiting, {
-      type: 'request_resolved',
-      requestId: 'permission-1',
-      resolution: { optionId: 'allow_once' },
-    }, 'turn-1')
-    expect(working).toMatchObject({ runtimeState: 'working', attention: 'none', pendingRequestIds: [] })
+    const working: AgentMachineState = { ...waiting, runtimeState: 'working', attention: 'none', pendingRequestIds: [] }
     expect(decideAgentCommand(working, { type: 'resolve_request', requestId: 'permission-1' })).toMatchObject({
       ok: false,
       code: 'request_not_pending',
@@ -43,9 +43,10 @@ describe('managed agent state machine', () => {
   })
 
   it('separates completion attention from runtime readiness', () => {
-    const working = evolveAgentState(initialAgentMachineState(), { type: 'user_message', text: 'Fix it' }, 'turn-1')
-    const complete = evolveAgentState(working, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1')
-    expect(complete).toMatchObject({ runtimeState: 'ready', attention: 'completed', activeTurnId: null })
+    expect(projectAgentEvent({ type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1')).toEqual({
+      runtimeState: 'ready',
+      attention: 'completed',
+    })
   })
 })
 
@@ -59,7 +60,13 @@ describe('subagent roster projection', () => {
   it('creates a row and then only fills what a later update carries', () => {
     const started = fold([], { id: 's1', title: 'Read alpha', status: 'running' })
     expect(started).toHaveLength(1)
-    expect(started[0]).toMatchObject({ id: 's1', title: 'Read alpha', status: 'running', turnId: 'turn-1', startedAt: 1_000 })
+    expect(started[0]).toMatchObject({
+      id: 's1',
+      title: 'Read alpha',
+      status: 'running',
+      turnId: 'turn-1',
+      startedAt: 1_000,
+    })
 
     const summarised = fold(started, { id: 's1', status: 'completed', model: 'opus', durationMs: 1_538 }, 2_000)
     // The title survives an update that never mentions it, which is the whole point of the convention:
@@ -112,9 +119,6 @@ describe('subagent roster projection', () => {
     // A child that settles after the parent’s turn_completed would otherwise drag the session back
     // out of ready, and Codex allows exactly that ordering.
     expect(projectAgentEvent({ type: 'subagent', subagent: { id: 's1', status: 'running' } }, 'turn-1')).toEqual({})
-    const ready = evolveAgentState(initialAgentMachineState(), { type: 'turn_completed' }, 'turn-1')
-    expect(evolveAgentState(ready, { type: 'subagent', subagent: { id: 's1', status: 'idle' } }, null))
-      .toMatchObject({ runtimeState: 'ready' })
   })
 
   it('keeps a turnless stream event out of the session’s runtime state', () => {
@@ -124,13 +128,6 @@ describe('subagent roster projection', () => {
     const stray = { type: 'assistant_message', text: 'One more thing' } as const
     expect(projectAgentEvent(stray, null)).toEqual({ attention: 'unread' })
     expect(projectAgentEvent(stray, 'turn-1')).toEqual({ runtimeState: 'working', attention: 'unread' })
-
-    const ready = evolveAgentState(initialAgentMachineState(), { type: 'turn_completed' }, 'turn-1')
-    expect(evolveAgentState(ready, stray, null)).toMatchObject({
-      runtimeState: 'ready',
-      attention: 'unread',
-      activeTurnId: null,
-    })
   })
   it('reads a background child\u2019s liveness from its own traffic', () => {
     // The only report a background child files is the work it does. Its spawning call says nothing
@@ -152,9 +149,25 @@ describe('subagent roster projection', () => {
 
   it('quiets only a background child that has gone silent', () => {
     const roster: AgentSubagent[] = [
-      { id: 'bg-quiet', turnId: null, title: 'quiet', status: 'running', background: true, startedAt: 0, updatedAt: 100 },
+      {
+        id: 'bg-quiet',
+        turnId: null,
+        title: 'quiet',
+        status: 'running',
+        background: true,
+        startedAt: 0,
+        updatedAt: 100,
+      },
       { id: 'bg-live', turnId: null, title: 'live', status: 'running', background: true, startedAt: 0, updatedAt: 900 },
-      { id: 'bg-done', turnId: null, title: 'done', status: 'completed', background: true, startedAt: 0, updatedAt: 100 },
+      {
+        id: 'bg-done',
+        turnId: null,
+        title: 'done',
+        status: 'completed',
+        background: true,
+        startedAt: 0,
+        updatedAt: 100,
+      },
       // Foreground: its spawning call always returns a real result, so silence here means the harness
       // is thinking rather than that the child is gone.
       { id: 'fg', turnId: null, title: 'fg', status: 'running', startedAt: 0, updatedAt: 100 },

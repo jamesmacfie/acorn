@@ -5,11 +5,11 @@
 // request on the page's own event target by writing one `performance.mark` whose `detail` is the
 // snapshot. The previous mark is cleared first, so a flow that asks ten thousand times leaves one
 // entry on the timeline rather than ten thousand. The same `acorn:` performance-timeline path the
-// renderer spans use (emitter.ts § setSpansOnTimeline), and nothing on `window`.
+// renderer spans use (`setSpansOnTimeline`), and nothing on `window`.
 //
 // A request is a plain event rather than a function a script can call, because the page exposes no
-// module to a script. The snapshot holds numbers only (kit/lib/telemetry/surfaceHealth.ts § sanitize), which is
-// why answering it needs no switch: anything that can dispatch the event can already read the DOM.
+// module to a script. The snapshot holds numbers only (`sanitizeSurfaceHealth`), which is why
+// answering it needs no switch: anything that can dispatch the event can already read the DOM.
 import { surfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
 
 /** The event a reader dispatches on the page's event target to ask for a fresh snapshot. */
@@ -18,7 +18,7 @@ export const SURFACE_HEALTH_REQUEST = 'acorn:surface-health'
 export const SURFACE_HEALTH_MARK = 'acorn:surface.health'
 
 /** Replace the one health mark on the performance timeline with the current snapshot. */
-export function markSurfaceHealth(): void {
+function markSurfaceHealth(): void {
   performance.clearMarks(SURFACE_HEALTH_MARK)
   performance.mark(SURFACE_HEALTH_MARK, { detail: surfaceHealthSnapshot() })
 }

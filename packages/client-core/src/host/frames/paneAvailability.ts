@@ -14,15 +14,20 @@ import { createLogger } from '../../infra/telemetry/logger'
 const log = createLogger('pane-availability')
 
 const isAnswer = (value: unknown): value is Record<string, boolean> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-  && Object.values(value).every((entry) => typeof entry === 'boolean')
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.values(value).every((entry) => typeof entry === 'boolean')
 
 const same = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const keys = Object.keys(a)
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])
 }
 
-export function paneAvailability(scheduleId: string, route: string): {
+export function paneAvailability(
+  scheduleId: string,
+  route: string,
+): {
   available: (taskId: string) => boolean
   schedule: ClientScheduleContribution
 } {

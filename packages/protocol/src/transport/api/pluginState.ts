@@ -12,8 +12,8 @@ export type NodePluginRow = {
   /** The name a person reads, such as "GitHub" or "API requests". A loaded plugin's comes from its
    * manifest `name`, and a compiled plugin's from its definition. Display text only: never key
    * anything on it. Optional so a node that predates it still parses, and so the client can fall back
-   * to the id (client-core/host/plugins/pluginLabel.ts). A loaded plugin writes its own, so trust
-   * prompts keep showing the id. */
+   * to the id (client-core's `pluginLabel`). A loaded plugin writes its own, so trust
+   * prompts keep showing the id. Mixed-version path until 2026-12-30. */
   label?: string
   /** Events this running or installed plugin declares for cross-plugin subscribers. */
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
@@ -32,7 +32,7 @@ export type NodePluginRow = {
   // persisted response type would need a bumped query key (docs/caching.md).
   //
   // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
-  // markup. The node caps it in node-core/server/pluginHost/state.ts.
+  // markup. node-core's `pluginState` caps it.
   reason?: string
   // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
   stage?: 'load' | 'init' | 'ready'
@@ -40,7 +40,8 @@ export type NodePluginRow = {
   // it the client's answer to "is this third-party?" (docs/plugins/activation.md).
   installed?: InstalledPluginRow
   /** The declaration committed with the service this process runs. `null` means this node has no
-   * active loaded runtime; omission identifies a response cached from a node predating this field. */
+   * active loaded runtime; omission identifies a response cached from a node predating this field.
+   * Mixed-version path until 2026-12-26. */
   active?: PluginRuntimeIdentity | null
   /** An agent-requested disk candidate held inert until the owner reviews these exact bytes. */
   pendingReview?: { reviewId: string; fingerprint: string; stagedAt: number } | { corrupt: true }
@@ -114,11 +115,13 @@ export type PluginSkillStatus = 'ready' | 'disabled' | 'unapproved' | 'changed'
 /** What `GET /v1/core/plugins/:id/skills` returns: each skill, its status, and the last start of each
  * harness that received it since the Node started. */
 export type PluginSkillState = {
-  skills: Array<PluginSkillLine & {
-    status: PluginSkillStatus
-    /** `native` when the harness loaded the skill with its own skill support, not from acorn's index. */
-    deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted'; native?: true }>
-  }>
+  skills: Array<
+    PluginSkillLine & {
+      status: PluginSkillStatus
+      /** `native` when the harness loaded the skill with its own skill support, not from acorn's index. */
+      deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted'; native?: true }>
+    }
+  >
 }
 
 export type PluginInputGrant = {
@@ -154,7 +157,7 @@ export type InstalledPluginRow = {
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design/icons.md § Icons.
+  // claim another's mark. See client-core's `brandMarkRegistry` and docs/ui-design/icons.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
@@ -204,9 +207,9 @@ export type PluginApprovalRequest = {
   requestedAt: number
 }
 
-// `requests` is optional so a node that predates approval-mediated install still parses, and so this
-// response type can gain the field without a query-key bump (docs/caching.md).
-export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
+// `requests` is optional so this response type could gain the field without a query-key bump
+// (docs/caching.md). Every `acorn-1` Node sends it.
+export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests: PluginApprovalRequest[] }
 
 // Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory
 // on the node's filesystem, allowed on every build and symlinked rather than copied, so it's the one
@@ -220,7 +223,12 @@ export type PluginInstallSource =
 // Always restart-required: a plugin's routes, tables and jobs are wired at init, so nothing an install
 // route does makes the plugin live in the running process.
 export type PluginInstallResult = { id: string; version: string; state: 'installed-restart-required' }
-export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: string; state: 'installed-restart-required' }
+export type PluginUpdateResult = {
+  id: string
+  fromVersion: string
+  toVersion: string
+  state: 'installed-restart-required'
+}
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
 // The one exception, and only for a plugin the node loaded from disk: a reload swaps its node half in
@@ -247,10 +255,11 @@ export const corePluginSkillGrantRoute = (id: string) => `/v1/core/plugins/${enc
 export const corePluginModelGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/model-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
-// an install route the agent can reach (client-core/host/frames/scopes.ts).
-export const corePluginRequestRoute = (requestId: string) => `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
+// an install route the agent can reach (client-core's frame route table refuses it).
+export const corePluginRequestRoute = (requestId: string) =>
+  `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
-// task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
+// task-scoped internal token can't reach it (node-core mounts `requireDevice` over both forms).
 export const corePluginBundleRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/client.js`
 export const corePluginBundleByHashRoute = (id: string, hash: string) =>
   `/v1/core/plugins/${encodeURIComponent(id)}/bundles/${encodeURIComponent(hash)}`

@@ -1,15 +1,18 @@
-// Branch-name normalisation for the task-create flow (docs/workspaces-and-tasks/task-creation.md § Task creation and
-// navigation, after verne's slugify):
-// lowercase, [a-z0-9/-] only, collapse runs, trim edge separators, ≤ 60 chars. Pure and shared: the
-// renderer derives the default branch from the task title; main validates separately
-// (worktrees.ts isValidBranch guards the git arg).
+// Branch-name normalisation for the task-create flow (docs/workspaces-and-tasks/task-creation.md
+// § Task creation and navigation): lowercase, [a-z0-9/-] only, collapse runs, trim edge separators,
+// ≤ 60 chars. Pure and shared: the renderer derives the default branch from the task title.
 
 // Whether a name can be handed to git as-is. Shared with the Node, which guards the git argument
-// with it (worktrees.ts): one character class, so a name the client accepts is one the Node accepts.
+// with it: one character class, so a name the client accepts is one the Node accepts.
 export function isValidBranch(branch: string): boolean {
-  return !branch.startsWith('-') && branch !== 'HEAD' && /^[A-Za-z0-9._/-]+$/.test(branch)
-    && !branch.includes('..') && !branch.endsWith('.')
-    && branch.split('/').every((part) => !!part && !part.startsWith('.') && !part.endsWith('.lock'))
+  return (
+    !branch.startsWith('-') &&
+    branch !== 'HEAD' &&
+    /^[A-Za-z0-9._/-]+$/.test(branch) &&
+    !branch.includes('..') &&
+    !branch.endsWith('.') &&
+    branch.split('/').every((part) => !!part && !part.startsWith('.') && !part.endsWith('.lock'))
+  )
 }
 
 export function slugifyBranch(input: string): string {

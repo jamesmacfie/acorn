@@ -2,7 +2,9 @@ import { lazy } from 'solid-js'
 import type { SettingsContribution } from '@acorn/client-core/host/registries/shell'
 import { CORE_SETTINGS_PAGES, type CoreSettingsPageId } from '@acorn/client-core/features/settings'
 
-const WorkspaceProjectAssignments = lazy(() => import('@acorn/client-core/features/workspaces/WorkspaceProjectAssignments.tsx'))
+const WorkspaceProjectAssignments = lazy(
+  () => import('@acorn/client-core/features/workspaces/WorkspaceProjectAssignments.tsx'),
+)
 const ServicesSettings = lazy(() => import('@acorn/client-core/features/settings/connections/ServicesSettings.tsx'))
 const AiModelsSettings = lazy(() => import('@acorn/client-core/features/settings/models/AiModelsSettings.tsx'))
 const WorkspaceSettings = lazy(() => import('@acorn/client-core/features/settings/WorkspaceSettings.tsx'))
@@ -37,12 +39,14 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
   shortcuts: () => <ShortcutsSettings />,
   cli: () => <CliSettings />,
   workspaces: (props) => <WorkspaceProjectAssignments navigate={props.context.navigate} />,
-  'workspace.detail': (props) => props.context.scope.workspace
-    ? <WorkspaceSettings workspace={props.context.scope.workspace} context={props.context} />
-    : null,
-  'project.detail': (props) => props.context.scope.project
-    ? <ProjectSettings project={props.context.scope.project} context={props.context} />
-    : null,
+  'workspace.detail': (props) =>
+    props.context.scope.workspace ? (
+      <WorkspaceSettings workspace={props.context.scope.workspace} context={props.context} />
+    ) : null,
+  'project.detail': (props) =>
+    props.context.scope.project ? (
+      <ProjectSettings project={props.context.scope.project} context={props.context} />
+    ) : null,
   'agent-tools': (props) => <AgentToolsSettings navigate={props.context.navigate} />,
   integrations: (props) => <ServicesSettings context={props.context} />,
   'ai-models': (props) => <AiModelsSettings context={props.context} />,
@@ -65,9 +69,16 @@ export const settingsPageContributions: SettingsContribution[] = [
   ...CORE_SETTINGS_PAGES.map((page) => ({ ...page, component: components[page.id] })),
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
-    ? [{
-      id: 'gallery', label: 'Style gallery', category: 'advanced' as const, scope: 'device' as const, icon: 'swatch-book', order: 40,
-      component: () => <StyleGallery />,
-    }]
+    ? [
+        {
+          id: 'gallery',
+          label: 'Style gallery',
+          category: 'advanced' as const,
+          scope: 'device' as const,
+          icon: 'swatch-book',
+          order: 40,
+          component: () => <StyleGallery />,
+        },
+      ]
     : []),
 ]

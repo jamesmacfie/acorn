@@ -3,12 +3,11 @@ import type { RollbarItemMetadata, RollbarOccurrenceDetail } from '../shared/api
 import type { RollbarRailTarget } from '../shared/rail'
 
 export const taskRollbarTargets = (task: Task | undefined): RollbarRailTarget[] =>
-  (task?.links ?? []).flatMap((link) => link.providerId === 'rollbar'
-    ? [{ integrationId: link.connectionId, identifier: link.identifier }]
-    : [])
+  (task?.links ?? []).flatMap((link) =>
+    link.providerId === 'rollbar' ? [{ integrationId: link.connectionId, identifier: link.identifier }] : [],
+  )
 
-export const targetKey = (target: RollbarRailTarget): string =>
-  `${target.integrationId}\u0000${target.identifier}`
+export const targetKey = (target: RollbarRailTarget): string => `${target.integrationId}\u0000${target.identifier}`
 
 export function relativeTime(at: number | null, now = Date.now()): string {
   if (!at) return 'Not reported'
@@ -25,12 +24,15 @@ export function occurrenceContext(item: RollbarItemMetadata, occurrence: Rollbar
     lines.push([occurrence.exceptionClass, occurrence.message].filter(Boolean).join(': '))
   }
   for (const frame of occurrence.frames.filter((candidate) => candidate.inProject !== false).slice(0, 15)) {
-    lines.push(`  at ${frame.filename}${frame.line == null ? '' : `:${frame.line}`}${frame.method ? ` (${frame.method})` : ''}`)
+    lines.push(
+      `  at ${frame.filename}${frame.line == null ? '' : `:${frame.line}`}${frame.method ? ` (${frame.method})` : ''}`,
+    )
   }
   const facts = [
     occurrence.environment && `environment: ${occurrence.environment}`,
     occurrence.codeVersion && `version: ${occurrence.codeVersion}`,
-    occurrence.request?.url && `request: ${[occurrence.request.method, occurrence.request.url].filter(Boolean).join(' ')}`,
+    occurrence.request?.url &&
+      `request: ${[occurrence.request.method, occurrence.request.url].filter(Boolean).join(' ')}`,
     occurrence.context && `context: ${occurrence.context}`,
     `occurrences: ${item.totalOccurrences}`,
     item.url && `link: ${item.url}`,
@@ -42,18 +44,32 @@ export function occurrenceContext(item: RollbarItemMetadata, occurrence: Rollbar
 /** The stack as one block of text: a location line per frame, with its source lines indented under
  *  it. "›" marks the line that threw. */
 export const traceText = (frames: RollbarOccurrenceDetail['frames']): string =>
-  frames.map((frame) => [
-    `${frame.filename}${frame.line == null ? '' : `:${frame.line}`}${frame.method ? ` · ${frame.method}` : ''}`,
-    ...frame.code.map((line) => `  ${line.line === frame.line ? '›' : ' '} ${String(line.line).padStart(4)}  ${line.text}`),
-  ].join('\n')).join('\n')
+  frames
+    .map((frame) =>
+      [
+        `${frame.filename}${frame.line == null ? '' : `:${frame.line}`}${frame.method ? ` · ${frame.method}` : ''}`,
+        ...frame.code.map(
+          (line) => `  ${line.line === frame.line ? '›' : ' '} ${String(line.line).padStart(4)}  ${line.text}`,
+        ),
+      ].join('\n'),
+    )
+    .join('\n')
 
 // Status is a toned badge with a word (docs/ui-design/states.md § States): a map per field, not a regex over
 // whatever string arrived. An unknown value keeps its own word, capitalised, and stays neutral.
 type Tone = 'neutral' | 'ok' | 'warn' | 'danger'
 const LEVELS: Record<string, [string, Tone]> = {
-  critical: ['Critical', 'danger'], error: ['Error', 'danger'], warning: ['Warning', 'warn'], info: ['Info', 'neutral'], debug: ['Debug', 'neutral'],
+  critical: ['Critical', 'danger'],
+  error: ['Error', 'danger'],
+  warning: ['Warning', 'warn'],
+  info: ['Info', 'neutral'],
+  debug: ['Debug', 'neutral'],
 }
-const STATUSES: Record<string, [string, Tone]> = { active: ['Active', 'neutral'], resolved: ['Resolved', 'ok'], muted: ['Muted', 'neutral'] }
+const STATUSES: Record<string, [string, Tone]> = {
+  active: ['Active', 'neutral'],
+  resolved: ['Resolved', 'ok'],
+  muted: ['Muted', 'neutral'],
+}
 const word = (table: Record<string, [string, Tone]>, value: string): { label: string; tone: Tone } => {
   const [label, tone] = table[value.toLowerCase()] ?? [value.charAt(0).toUpperCase() + value.slice(1), 'neutral']
   return { label, tone }
@@ -62,7 +78,7 @@ export const levelWord = (level: string) => word(LEVELS, level)
 export const statusWord = (status: string) => word(STATUSES, status)
 
 // What to tell a person when a route fails. The routes answer with a code and no prose
-// (server/routes/rollbar.ts), and this pane used to print the code.
+// (server/routes/rollbar.ts).
 const REASONS: Record<string, string> = {
   provider_needs_auth: "Rollbar turned down acorn's token. Reconnect Rollbar in Settings.",
   provider_rate_limited: 'Rollbar is limiting requests. Try again in a minute.',

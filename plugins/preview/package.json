@@ -1,7 +1,7 @@
 {
   "name": "@acorn/plugin-preview",
   "version": "1.0.0",
-  "description": "A live preview of what a task is building, plus the page rules the shell enforces around it.",
+  "description": "A live preview of what a task is building.",
   "private": true,
   "type": "module",
   "exports": {

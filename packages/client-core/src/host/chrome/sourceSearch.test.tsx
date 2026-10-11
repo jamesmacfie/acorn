@@ -5,14 +5,26 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
-vi.mock('../../infra/node/apiClient', () => ({ readJson: (...args: unknown[]) => readJson(...args), writeJson: vi.fn() }))
+vi.mock('../../infra/node/apiClient', () => ({
+  readJson: (...args: unknown[]) => readJson(...args),
+  writeJson: vi.fn(),
+}))
 
 const { createSourceSearch } = await import('./sourceSearch')
 type Search = ReturnType<typeof createSourceSearch>
 
-const loaded: PluginRailItem[] = [{ id: 'a:1', title: 'Login crash' }, { id: 'a:2', title: 'Slow page' }]
+const loaded: PluginRailItem[] = [
+  { id: 'a:1', title: 'Login crash' },
+  { id: 'a:2', title: 'Slow page' },
+]
 const descriptor = (search?: string) =>
-  ({ id: 'issues', label: 'Issues', order: 1, items: '/v1/p/board/items', ...(search ? { search } : {}) }) as PluginSourceDescriptor
+  ({
+    id: 'issues',
+    label: 'Issues',
+    order: 1,
+    items: '/v1/p/board/items',
+    ...(search ? { search } : {}),
+  }) as PluginSourceDescriptor
 
 let dispose = () => {}
 beforeEach(() => {
@@ -31,10 +43,24 @@ function mount(source: PluginSourceDescriptor) {
   const client = new QueryClient()
   // A component body, which is untracked, as the real hosts' are.
   const Probe = () => {
-    search = createSourceSearch({ pluginId: 'board', nodeId: 'node-1', descriptor: () => source, projectId, text, loaded: () => loaded })
+    search = createSourceSearch({
+      pluginId: 'board',
+      nodeId: 'node-1',
+      descriptor: () => source,
+      projectId,
+      text,
+      loaded: () => loaded,
+    })
     return null
   }
-  dispose = render(() => <QueryClientProvider client={client}><Probe /></QueryClientProvider>, document.body.appendChild(document.createElement('div')))
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Probe />
+      </QueryClientProvider>
+    ),
+    document.body.appendChild(document.createElement('div')),
+  )
   return { search, setText, setProjectId }
 }
 
@@ -42,7 +68,11 @@ const settle = () => vi.advanceTimersByTimeAsync(300)
 
 it('narrows the loaded rows at once, then adds the provider rows after them', async () => {
   let answer!: (value: unknown) => void
-  readJson.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+  readJson.mockReturnValueOnce(
+    new Promise((resolve) => {
+      answer = resolve
+    }),
+  )
   const { search, setText } = mount(descriptor('/v1/p/board/search'))
 
   setText('crash')
@@ -52,7 +82,13 @@ it('narrows the loaded rows at once, then adds the provider rows after them', as
   await settle()
   expect(readJson).toHaveBeenCalledTimes(1)
   expect(readJson.mock.calls[0][0]).toBe('/v1/p/board/search?project=project-1&q=crash')
-  answer({ items: [{ id: 'a:1', title: 'Login crash' }, { id: 'a:900', title: 'Crash on login' }], incomplete: true })
+  answer({
+    items: [
+      { id: 'a:1', title: 'Login crash' },
+      { id: 'a:900', title: 'Crash on login' },
+    ],
+    incomplete: true,
+  })
   await settle()
   expect(search.status()).toBe('done')
   expect(search.items().map((item) => item.id)).toEqual(['a:1', 'a:900'])
@@ -85,10 +121,14 @@ it('keeps the local matches when the provider fails', async () => {
   expect(search.items().map((item) => item.id)).toEqual(['a:2'])
 })
 
-it('never draws an earlier project\'s answer for a new one', async () => {
+it("never draws an earlier project's answer for a new one", async () => {
   readJson.mockResolvedValueOnce({ items: [{ id: 'a:900', title: 'Old project' }] })
   let answer!: (value: unknown) => void
-  readJson.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+  readJson.mockReturnValueOnce(
+    new Promise((resolve) => {
+      answer = resolve
+    }),
+  )
   const { search, setText, setProjectId } = mount(descriptor('/v1/p/board/search'))
   setText('crash')
   await settle()

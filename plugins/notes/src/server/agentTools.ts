@@ -1,8 +1,6 @@
 // The four notes_* agent tools (docs/notes-and-memory.md § Notes covers what they do and the
-// provenance they stamp). They moved here from apps/node/src/wiring/agentToolsWiring.ts once two
-// blockers cleared: the NotesStore instance is this plugin's own now (published as `notes.store`,
-// where plugins/memory built it before), and CoreServices gained the `tasks.workspaceId` seam the
-// workspace scope needs to resolve a task's membership.
+// provenance they stamp). They run over this plugin's own NotesStore (published as `notes.store`),
+// and the workspace scope resolves a task's membership through CoreServices `tasks.workspaceId`.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
@@ -17,7 +15,11 @@ const scopeArg = z.enum(['task', 'workspace', 'global']).optional()
 // A note scope becomes a directory, so the workspace case has to resolve the task's membership
 // first. It throws when the task has no workspace, surfaced as a tool error rather than a 500,
 // because "this task is not in a workspace" is an answer the agent can act on.
-async function noteLocationFor(core: NotesToolCoreServices, taskId: string, scope: NoteScope = 'task'): Promise<NoteLocation> {
+async function noteLocationFor(
+  core: NotesToolCoreServices,
+  taskId: string,
+  scope: NoteScope = 'task',
+): Promise<NoteLocation> {
   if (scope === 'task') return { scope, taskId }
   if (scope === 'global') return { scope }
   try {
@@ -35,7 +37,8 @@ export function notesAgentTools(notes: NotesStoreCapability, core: NotesToolCore
       input: z.object({ scope: scopeArg }),
       scope: 'task',
       risk: 'read',
-      handler: async (a, ctx) => notes.list(await noteLocationFor(core, ctx.taskId, (a as { scope?: NoteScope }).scope)),
+      handler: async (a, ctx) =>
+        notes.list(await noteLocationFor(core, ctx.taskId, (a as { scope?: NoteScope }).scope)),
     },
     {
       name: 'notes_read',

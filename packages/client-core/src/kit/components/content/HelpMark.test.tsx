@@ -20,16 +20,23 @@ afterEach(() => {
   host.remove()
 })
 
-const text = (ids: string | null) => (ids ?? '').split(' ').map((id) => document.getElementById(id)?.textContent).join(' ')
+const text = (ids: string | null) =>
+  (ids ?? '')
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent)
+    .join(' ')
 
 describe('HelpMark', () => {
   it('opens the help text as a help tip, and reads as "About" and the title', () => {
-    dispose = render(() => (
-      <>
-        <span id="title">Stop idle agents after</span>
-        <HelpMark text="An idle agent can hold hundreds of megabytes." titleId="title" />
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <span id="title">Stop idle agents after</span>
+          <HelpMark text="An idle agent can hold hundreds of megabytes." titleId="title" />
+        </>
+      ),
+      host,
+    )
     const mark = host.querySelector<HTMLButtonElement>('button.ui-help')!
     expect(mark.type).toBe('button')
     expect(mark.dataset.tip).toBe('An idle agent can hold hundreds of megabytes.')
@@ -48,22 +55,34 @@ describe('HelpMark', () => {
 
 describe('the hosts that draw one', () => {
   it('draw nothing extra without help', () => {
-    dispose = render(() => (
-      <>
-        <SettingsSection id="a" label="Idle agents"><span /></SettingsSection>
-        <SectionHeader>Definitions</SectionHeader>
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <SettingsSection id="a" label="Idle agents">
+            <span />
+          </SettingsSection>
+          <SectionHeader>Definitions</SectionHeader>
+        </>
+      ),
+      host,
+    )
     expect(host.querySelector('.ui-help, .ui-titled')).toBeNull()
   })
 
   it('keep the mark outside the heading that names a section', () => {
-    dispose = render(() => (
-      <>
-        <SettingsSection id="a" label="New sessions" help="Each new session starts with these."><span /></SettingsSection>
-        <SectionHeader count={3} help="A workflow is a list of steps.">Definitions</SectionHeader>
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <SettingsSection id="a" label="New sessions" help="Each new session starts with these.">
+            <span />
+          </SettingsSection>
+          <SectionHeader count={3} help="A workflow is a list of steps.">
+            Definitions
+          </SectionHeader>
+        </>
+      ),
+      host,
+    )
     const section = host.querySelector('section')!
     expect(text(section.getAttribute('aria-labelledby'))).toBe('New sessions')
     const [first, second] = host.querySelectorAll<HTMLButtonElement>('.ui-help')
@@ -77,31 +96,51 @@ describe('the hosts that draw one', () => {
 
 describe('Field', () => {
   it('names its control by the caption alone and describes it with the hint, error, and help', () => {
-    dispose = render(() => (
-      <Field label="Port" hint="The port the server listens on." error="Taken." help="Only this computer can reach it.">
-        <Input value="4000" />
-      </Field>
-    ), host)
+    dispose = render(
+      () => (
+        <Field
+          label="Port"
+          hint="The port the server listens on."
+          error="Taken."
+          help="Only this computer can reach it."
+        >
+          <Input value="4000" />
+        </Field>
+      ),
+      host,
+    )
     const input = host.querySelector('input')!
     const caption = host.querySelector<HTMLLabelElement>('label.ui-field-label')!
     expect(caption.htmlFor).toBe(input.id)
     expect(caption.textContent).toBe('Port')
     expect(host.querySelector('.ui-field')!.tagName).toBe('DIV')
-    expect(text(input.getAttribute('aria-describedby'))).toBe('The port the server listens on. Taken. Only this computer can reach it.')
+    expect(text(input.getAttribute('aria-describedby'))).toBe(
+      'The port the server listens on. Taken. Only this computer can reach it.',
+    )
   })
 
   it('keeps the id a caller gave its control', () => {
-    dispose = render(() => <Field label="Name"><Input id="name-box" /></Field>, host)
+    dispose = render(
+      () => (
+        <Field label="Name">
+          <Input id="name-box" />
+        </Field>
+      ),
+      host,
+    )
     expect(host.querySelector<HTMLLabelElement>('label.ui-field-label')!.htmlFor).toBe('name-box')
   })
 
   it('as a group, names the group and leaves each control its own label', () => {
-    dispose = render(() => (
-      <Field label="Size" group>
-        <Input label="Width" />
-        <Input label="Height" />
-      </Field>
-    ), host)
+    dispose = render(
+      () => (
+        <Field label="Size" group>
+          <Input label="Width" />
+          <Input label="Height" />
+        </Field>
+      ),
+      host,
+    )
     const group = host.querySelector('[role="group"]')!
     expect(text(group.getAttribute('aria-labelledby'))).toBe('Size')
     expect([...host.querySelectorAll('input')].every((input) => !input.id)).toBe(true)

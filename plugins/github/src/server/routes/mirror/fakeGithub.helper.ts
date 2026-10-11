@@ -1,9 +1,19 @@
-import type { GitHubFile, GqlComment, GqlCommit, GqlContext, GqlLabel, GqlReview, GqlReviewRequest, GqlThread, PullScalars } from './prFetch'
+import type {
+  GitHubFile,
+  GqlComment,
+  GqlCommit,
+  GqlContext,
+  GqlLabel,
+  GqlReview,
+  GqlReviewRequest,
+  GqlThread,
+  PullScalars,
+} from './prFetch'
 
-// A deterministic GitHub for one pull request, answering the requests prFetch.ts makes: the GraphQL
-// first page, every cursor continuation, the REST files pages with their `Link` header, and the pull
-// itself. It paginates the way GitHub documents: 100 nodes a page, files capped at 3,000. Tests
-// stub `fetch` with `fake.fetch` and read back what was asked for.
+// A deterministic GitHub for one pull request, answering the requests the prFetch module makes: the
+// GraphQL first page, every cursor continuation, the REST files pages with their `Link` header, and
+// the pull itself. It paginates the way GitHub documents: 100 nodes a page, files capped at 3,000.
+// Tests stub `fetch` with `fake.fetch` and read back what was asked for.
 
 export type FakePull = PullScalars & {
   labels: GqlLabel[]
@@ -30,18 +40,20 @@ const FILES_CAP = 3000
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i)
 
-export function makeFakePull(counts: {
-  labels?: number
-  reviews?: number
-  comments?: number
-  commits?: number
-  threads?: number
-  commentsPerThread?: (thread: number) => number
-  checks?: number
-  files?: number
-  changedFiles?: number | null
-  patch?: (file: number) => string | undefined
-} = {}): FakePull {
+export function makeFakePull(
+  counts: {
+    labels?: number
+    reviews?: number
+    comments?: number
+    commits?: number
+    threads?: number
+    commentsPerThread?: (thread: number) => number
+    checks?: number
+    files?: number
+    changedFiles?: number | null
+    patch?: (file: number) => string | undefined
+  } = {},
+): FakePull {
   const files = counts.files ?? 0
   return {
     id: 'PR_node',
@@ -60,10 +72,28 @@ export function makeFakePull(counts: {
     mergeStateStatus: 'CLEAN',
     autoMergeRequest: null,
     labels: range(counts.labels ?? 0).map((i) => ({ name: `label-${i}`, color: 'ffffff' })),
-    reviews: range(counts.reviews ?? 0).map((i) => ({ id: `review-${i}`, author: { login: 'rev' }, state: 'COMMENTED', bodyHTML: `r${i}`, submittedAt: '2026-09-26T00:00:00Z' })),
+    reviews: range(counts.reviews ?? 0).map((i) => ({
+      id: `review-${i}`,
+      author: { login: 'rev' },
+      state: 'COMMENTED',
+      bodyHTML: `r${i}`,
+      submittedAt: '2026-09-26T00:00:00Z',
+    })),
     reviewRequests: [],
-    comments: range(counts.comments ?? 0).map((i) => ({ id: `comment-${i}`, author: { login: 'ada' }, bodyHTML: `c${i}`, createdAt: '2026-09-26T00:00:00Z' })),
-    commits: range(counts.commits ?? 0).map((i) => ({ commit: { oid: `commit-${i}`, messageHeadline: `m${i}`, committedDate: '2026-09-26T00:00:00Z', author: { name: 'Ada', user: { login: 'ada' } } } })),
+    comments: range(counts.comments ?? 0).map((i) => ({
+      id: `comment-${i}`,
+      author: { login: 'ada' },
+      bodyHTML: `c${i}`,
+      createdAt: '2026-09-26T00:00:00Z',
+    })),
+    commits: range(counts.commits ?? 0).map((i) => ({
+      commit: {
+        oid: `commit-${i}`,
+        messageHeadline: `m${i}`,
+        committedDate: '2026-09-26T00:00:00Z',
+        author: { name: 'Ada', user: { login: 'ada' } },
+      },
+    })),
     threads: range(counts.threads ?? 0).map((t) => ({
       id: `thread-${t}`,
       isResolved: false,
@@ -72,9 +102,23 @@ export function makeFakePull(counts: {
       line: 1,
       originalLine: 1,
       diffSide: 'RIGHT',
-      comments: range(counts.commentsPerThread?.(t) ?? 1).map((c) => ({ id: `thread-${t}-comment-${c}`, databaseId: t * 1000 + c, author: { login: 'rev' }, bodyHTML: `t${t}c${c}`, createdAt: '2026-09-26T00:00:00Z' })),
+      comments: range(counts.commentsPerThread?.(t) ?? 1).map((c) => ({
+        id: `thread-${t}-comment-${c}`,
+        databaseId: t * 1000 + c,
+        author: { login: 'rev' },
+        bodyHTML: `t${t}c${c}`,
+        createdAt: '2026-09-26T00:00:00Z',
+      })),
     })),
-    checks: range(counts.checks ?? 0).map((i) => ({ __typename: 'CheckRun', id: `check-${i}`, name: `check-${i}`, status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: null, checkSuite: null })),
+    checks: range(counts.checks ?? 0).map((i) => ({
+      __typename: 'CheckRun',
+      id: `check-${i}`,
+      name: `check-${i}`,
+      status: 'COMPLETED',
+      conclusion: 'SUCCESS',
+      detailsUrl: null,
+      checkSuite: null,
+    })),
     rollupId: 'rollup-node',
     files: range(files).map((i) => ({
       filename: `src/file-${i}.ts`,
@@ -82,13 +126,17 @@ export function makeFakePull(counts: {
       additions: 1,
       deletions: 1,
       sha: `blob-${i}`,
-      ...(counts.patch ? (counts.patch(i) === undefined ? {} : { patch: counts.patch(i) }) : { patch: `@@ -1 +1 @@\n-old ${i}\n+new ${i}` }),
+      ...(counts.patch
+        ? counts.patch(i) === undefined
+          ? {}
+          : { patch: counts.patch(i) }
+        : { patch: `@@ -1 +1 @@\n-old ${i}\n+new ${i}` }),
     })),
     changedFiles: counts.changedFiles === undefined ? files : counts.changedFiles,
   }
 }
 
-const connection = <T,>(items: T[], after: string | null) => {
+const connection = <T>(items: T[], after: string | null) => {
   const start = after ? Number(after) : 0
   const nodes = items.slice(start, start + PAGE)
   const end = start + nodes.length
@@ -122,14 +170,37 @@ export function fakeGithub(
         data: {
           repository: {
             pullRequest: {
-              ...Object.fromEntries(Object.entries(pull).filter(([key]) => !['labels', 'reviews', 'reviewRequests', 'comments', 'commits', 'threads', 'checks', 'rollupId', 'files', 'changedFiles'].includes(key))),
+              ...Object.fromEntries(
+                Object.entries(pull).filter(
+                  ([key]) =>
+                    ![
+                      'labels',
+                      'reviews',
+                      'reviewRequests',
+                      'comments',
+                      'commits',
+                      'threads',
+                      'checks',
+                      'rollupId',
+                      'files',
+                      'changedFiles',
+                    ].includes(key),
+                ),
+              ),
               labels: connection(pull.labels, null),
               reviews: connection(pull.reviews, null),
               reviewRequests: connection(pull.reviewRequests, null),
               comments: connection(pull.comments, null),
               commits: connection(pull.commits, null),
-              reviewThreads: { ...connection(pull.threads, null), nodes: connection(pull.threads, null).nodes.map(threadNode) },
-              latestCommit: { nodes: [{ commit: { statusCheckRollup: { id: pull.rollupId, contexts: connection(pull.checks, null) } } }] },
+              reviewThreads: {
+                ...connection(pull.threads, null),
+                nodes: connection(pull.threads, null).nodes.map(threadNode),
+              },
+              latestCommit: {
+                nodes: [
+                  { commit: { statusCheckRollup: { id: pull.rollupId, contexts: connection(pull.checks, null) } } },
+                ],
+              },
             },
           },
         },
@@ -142,7 +213,13 @@ export function fakeGithub(
         const c = connection(pull.threads, after)
         page = { ...c, nodes: c.nodes.map(threadNode) }
       } else if (ownerType === 'PullRequest') {
-        const lists: Record<string, unknown[]> = { labels: pull.labels, reviews: pull.reviews, reviewRequests: pull.reviewRequests, comments: pull.comments, commits: pull.commits }
+        const lists: Record<string, unknown[]> = {
+          labels: pull.labels,
+          reviews: pull.reviews,
+          reviewRequests: pull.reviewRequests,
+          comments: pull.comments,
+          commits: pull.commits,
+        }
         page = connection(lists[field]!, after)
       } else if (ownerType === 'PullRequestReviewThread') {
         page = connection(pull.threads.find((t) => t.id === id)!.comments, after)
@@ -158,7 +235,12 @@ export function fakeGithub(
       const more = start + PAGE < served.length
       return json(body, more ? { link: `<https://api.github.com/x?page=${request.page + 1}>; rel="next"` } : {})
     }
-    return json({ base: { sha: pull.baseRefOid }, head: { sha: pull.headRefOid }, updated_at: pull.updatedAt, ...(pull.changedFiles === null ? {} : { changed_files: pull.changedFiles }) })
+    return json({
+      base: { sha: pull.baseRefOid },
+      head: { sha: pull.headRefOid },
+      updated_at: pull.updatedAt,
+      ...(pull.changedFiles === null ? {} : { changed_files: pull.changedFiles }),
+    })
   }
 
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -168,7 +250,13 @@ export function fakeGithub(
       const body = JSON.parse(String(init?.body)) as { query: string; variables: Record<string, string> }
       const continuation = /on (\w+) \{ page: (\w+)\(/.exec(body.query)
       request = continuation
-        ? { kind: 'graphql-page', ownerType: continuation[1]!, field: continuation[2]!, id: body.variables.id!, after: body.variables.after! }
+        ? {
+            kind: 'graphql-page',
+            ownerType: continuation[1]!,
+            field: continuation[2]!,
+            id: body.variables.id!,
+            after: body.variables.after!,
+          }
         : { kind: 'graphql-first' }
     } else if (url.pathname.endsWith('/files')) {
       request = { kind: 'files', page: Number(url.searchParams.get('page') ?? '1') }

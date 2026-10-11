@@ -14,14 +14,22 @@ export function workflowRefreshQueue(read: () => Promise<void>) {
           do {
             dirty = false
             failure = undefined
-            try { await read() }
-            catch (error) { failure = error }
+            try {
+              await read()
+            } catch (error) {
+              failure = error
+            }
           } while (dirty && !stopped)
           if (failure !== undefined) throw failure
-        } finally { pending = undefined }
+        } finally {
+          pending = undefined
+        }
       })()
       return pending
     },
-    stop(): void { stopped = true; dirty = false },
+    stop(): void {
+      stopped = true
+      dirty = false
+    },
   }
 }

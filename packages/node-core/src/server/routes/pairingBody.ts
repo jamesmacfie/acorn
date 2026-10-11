@@ -2,7 +2,9 @@
 // escaping. Count wire bytes before decoding or allocating a parsed object.
 export const MAX_PAIR_REQUEST_BYTES = 4 * 1024
 
-export async function readPairingBody(request: Request): Promise<{ oversized: true } | { oversized: false; value: unknown }> {
+export async function readPairingBody(
+  request: Request,
+): Promise<{ oversized: true } | { oversized: false; value: unknown }> {
   const declared = request.headers.get('content-length')
   if (declared && /^\d+$/.test(declared) && BigInt(declared) > BigInt(MAX_PAIR_REQUEST_BYTES)) {
     void request.body?.cancel().catch(() => {})

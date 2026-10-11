@@ -19,6 +19,7 @@ import {
 } from './commands'
 import { buildCommandGraph, type CommandGraph, type CommandNode } from './graph'
 import { setCommandPresenter } from './presenter'
+import { latestSignal } from '../../../kit/lib/state/latestSignal'
 import { ROOT, SETTING_LOADING, frameFor, instructionState, minQueryOf } from './sessionFrames'
 import { groupRows, inputRows, rootRows, searchRows, settingRows } from './sessionRows'
 
@@ -29,7 +30,7 @@ import { groupRows, inputRows, rootRows, searchRows, settingRows } from './sessi
 
 /** What activating a row does. Owned by whoever produced the row, so the session never switches on
  *  what kind of thing a row is about. */
-export type SessionRowAction =
+type SessionRowAction =
   /** Push this command's own frame. A group, a search, an input or a setting. */
   | { effect: 'enter'; commandId: string }
   /** Run something. A leaf action, a search result and a setting choice are all this. */
@@ -52,14 +53,14 @@ export type SessionRow = {
   readonly action: SessionRowAction
 }
 
-export const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
+const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
 
 /** What the top frame is for. The root, a group and a setting list rows; the other two own the field
  *  above the list rather than filtering it. */
 export type SessionFrameKind = 'root' | 'group' | 'search' | 'input' | 'setting'
 
 /** Where a search frame is between "nothing typed" and "here are the rows". */
-export type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
+type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
 
 /** One row a provider answered with, and the world it answered in. */
 export type SessionSearchResult = {
@@ -98,7 +99,7 @@ export type SessionSearchState = {
 }
 
 /** Where a setting frame is between "asking the owner what it is" and "here are the choices". */
-export type SessionSettingPhase = 'loading' | 'ready' | 'error'
+type SessionSettingPhase = 'loading' | 'ready' | 'error'
 
 /**
  * A setting frame's current value.
@@ -243,17 +244,16 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const [frames, setFrames] = createSignal<readonly SessionFrame[]>([])
   const [pending, setPending] = createSignal(false)
 
-  // A generation per request. Abort is the optimisation and the generation is the correctness: a
-  // provider that ignores its signal still cannot write into a session that has moved on
-  // (docs/command-palette-and-shortcuts.md).
-  let generation = 0
-
   // Two lifetimes, because there are two kinds of work. `whileOpen` lasts as long as the palette is
   // open and is what a setting write runs under: typing does not cancel a write, and closing does.
   // `work` is whatever the top frame has in flight — one search, or one submission, never both — and
   // a keystroke that cancels a search must not reach the other one.
+  //
+  // Every path back into the frame checks its request's `signal.aborted`, not just the provider. A
+  // provider that ignores its signal still cannot write into a session that has moved on
+  // (docs/command-palette-and-shortcuts.md).
   let whileOpen: AbortController | null = null
-  let work: AbortController | null = null
+  const work = latestSignal()
   let timer: ReturnType<typeof setTimeout> | null = null
   // Not a signal: nothing renders from it, and it is read only when a keystroke asks whether to
   // schedule.
@@ -265,16 +265,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       clearTimeout(timer)
       timer = null
     }
-    work?.abort()
-    work = null
-    generation++
+    work.abort()
   }
 
   // The graph is projected against the identity this session captured, so a command about a task is
   // simply not in a session that opened over no task (./graph.ts). Closed, there is no world to hold
   // the scopes against and the projection is the plain one.
-  const graph = createMemo<CommandGraph>(() =>
-    buildCommandGraph(commandRegistry.entries(), captured() ?? undefined))
+  const graph = createMemo<CommandGraph>(() => buildCommandGraph(commandRegistry.entries(), captured() ?? undefined))
   const frame = (): SessionFrame | null => frames()[frames().length - 1] ?? null
 
   const patchFrame = (patch: Partial<SessionFrame>): void => {
@@ -288,7 +285,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   /** The command a frame is showing, when it is the kind the frame says it is. A frame outlives
    *  nothing — a disposed contribution simply stops answering — so every reader checks. */
   type InteractiveKind = { search: SearchCommand; input: InputCommand; setting: SettingCommand }
-  const commandFor = <K extends keyof InteractiveKind>(frameAt: SessionFrame | null, kind: K): InteractiveKind[K] | null => {
+  const commandFor = <K extends keyof InteractiveKind>(
+    frameAt: SessionFrame | null,
+    kind: K,
+  ): InteractiveKind[K] | null => {
     if (!frameAt?.commandId || frameAt.kind !== kind) return null
     const command = commandRegistry.get(frameAt.commandId)
     if (!command || command.kind !== kind) return null
@@ -301,7 +301,11 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     return command ? command.select(result.item, result.context) : undefined
   }
 
-  const writeSetting = async (command: SettingCommand, option: CommandSettingOption, context: CommandExecutionContext): Promise<CommandOutcome> => {
+  const writeSetting = async (
+    command: SettingCommand,
+    option: CommandSettingOption,
+    context: CommandExecutionContext,
+  ): Promise<CommandOutcome> => {
     // A write has the session lifetime: typing does not cancel it, closing does.
     const signal = whileOpen?.signal ?? new AbortController().signal
     const canonical = await command.write(option.value, context, signal)
@@ -319,7 +323,11 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     if (current.kind === 'input') return inputRows(pending())
     if (current.kind === 'setting') {
       const command = commandFor(current, 'setting')
-      return command && current.setting ? settingRows(command, current.setting, current.query, (option, context) => writeSetting(command, option, context)) : []
+      return command && current.setting
+        ? settingRows(command, current.setting, current.query, (option, context) =>
+            writeSetting(command, option, context),
+          )
+        : []
     }
     return current.commandId === null
       ? rootRows(graph(), current.query, executeCommand)
@@ -363,7 +371,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   // ── Searching ───────────────────────────────────────────────────────────────────────────────────
 
   /** Which worlds one query is asked in: the captured one, or one per capable node under `fleet`. */
-  const searchTargets = (command: SearchCommand, base: CommandExecutionContext): readonly { context: CommandExecutionContext; label?: string }[] => {
+  const searchTargets = (
+    command: SearchCommand,
+    base: CommandExecutionContext,
+  ): readonly { context: CommandExecutionContext; label?: string }[] => {
     if (commandScope(command) !== 'fleet') return [{ context: base }]
     const fleet = options.fleet?.() ?? []
     if (!fleet.length) return [{ context: base }]
@@ -375,7 +386,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   /**
    * Ask, once the reader has stopped typing.
    *
-   * The generation is taken here rather than when the answer lands, and every path back into the frame
+   * The signal is taken here rather than when the answer lands, and every path back into the frame
    * checks it. A provider that ignores its signal — a fetch already past the network, a cache that
    * resolves from memory — still cannot write rows for `ro` into a frame that now says `rol`.
    */
@@ -383,23 +394,22 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     const base = untrack(captured)
     if (!base) return
     abortWork()
-    const controllerForQuery = new AbortController()
-    work = controllerForQuery
-    const mine = generation
+    const signal = work.next()
     const targets = searchTargets(command, base)
     // A fan-out is what carries node labels, and it is what namespaces a row id — including a fleet of
     // one, so the id a row has does not depend on how many machines happen to be paired today.
     const fleet = targets.some((target) => target.label !== undefined)
-    void Promise.all(targets.map(async (target) => {
-      try {
-        return { target, items: await command.query(text, target.context, controllerForQuery.signal) }
-      } catch (error) {
-        return { target, error }
-      }
-    })).then((settled) => {
-      // Both, and in this order: a stale generation means somebody else owns the frame now, and an
-      // aborted controller means this answer was already given up on.
-      if (mine !== generation || controllerForQuery.signal.aborted) return
+    void Promise.all(
+      targets.map(async (target) => {
+        try {
+          return { target, items: await command.query(text, target.context, signal) }
+        } catch (error) {
+          return { target, error }
+        }
+      }),
+    ).then((settled) => {
+      // Aborted means somebody else owns the frame now, or this answer was already given up on.
+      if (signal.aborted) return
       const results: SessionSearchResult[] = []
       const errors: { source: string | null; message: string }[] = []
       for (const outcome of settled) {
@@ -450,10 +460,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     // Mid-character. The composition's end schedules once, with whatever the field says then.
     if (composing) return applySearch({ ...instructionState(command), message: '' })
     applySearch({ phase: 'loading', message: 'Searching…', results: [], errors: [] })
-    const mine = generation
+    const scheduled = work.next()
     timer = setTimeout(() => {
       timer = null
-      if (mine !== generation) return
+      if (scheduled.aborted) return
       runSearch(command, text)
     }, debounceOf(command))
   }
@@ -475,7 +485,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
    * Ask the owner what the setting currently is.
    *
    * Once on entry and again on a retry, and never on a keystroke: the query on a setting frame narrows
-   * the choices the owner already declared, so typing costs nothing. Guarded by the same generation the
+   * the choices the owner already declared, so typing costs nothing. Guarded by the same `work` signal the
    * interactive frames use, so an answer that arrives after a pop has nowhere to land.
    */
   const loadSetting = (): void => {
@@ -484,21 +494,19 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     const context = untrack(captured)
     if (!current || !command || !context) return
     abortWork()
-    const controllerForRead = new AbortController()
-    work = controllerForRead
-    const mine = generation
+    const signal = work.next()
     patchFrame({ setting: SETTING_LOADING, selectedId: null })
     void Promise.resolve()
-      .then(() => command.read(context, controllerForRead.signal))
+      .then(() => command.read(context, signal))
       .then((value) => {
-        if (mine !== generation || controllerForRead.signal.aborted) return
+        if (signal.aborted) return
         // A value none of the choices names leaves the list unmarked rather than empty: the choices are
         // still the choices, and "not one of these" is a true thing to show.
         const known = command.options.some((option) => option.value === value)
         patchFrame({ setting: { phase: 'ready', message: '', value: known ? value : null } })
       })
       .catch((error: unknown) => {
-        if (mine !== generation) return
+        if (signal.aborted) return
         if (isAbort(error)) return
         patchFrame({ setting: { phase: 'error', message: messageOf(error), value: null } })
       })
@@ -525,24 +533,22 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     const context = untrack(captured)
     if (!context) return
     abortWork()
-    const controllerForSubmit = new AbortController()
-    work = controllerForSubmit
-    const mine = generation
+    const signal = work.next()
     patchFrame({ status: '' })
     setPending(true)
     // Called now, not on the next microtask: the reader pressed Enter, and the request, its signal and
     // the pending row all have to exist by the time the second Enter arrives.
     void (async (): Promise<void> => {
       try {
-        const outcome = await command.submit(text, context, controllerForSubmit.signal)
+        const outcome = await command.submit(text, context, signal)
         // Somebody else owns the frame now — a pop, a close, the world moving. Whatever this was going
         // to say, there is nowhere to say it.
-        if (mine !== generation) return
+        if (signal.aborted) return
         setPending(false)
         if (!outcome || outcome.effect === 'close') return close()
         patchFrame({ status: outcome.status ?? '' })
       } catch (error) {
-        if (mine !== generation) return
+        if (signal.aborted) return
         setPending(false)
         if (isAbort(error)) return
         patchFrame({ status: messageOf(error) })
@@ -614,7 +620,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const back = (): boolean => {
     if (untrack(frames).length > 1) {
       // Whatever the frame being left had in flight goes with it. A search whose answer arrives after
-      // Escape has nowhere to put it, and the generation makes sure it cannot find one. The pending
+      // Escape has nowhere to put it, and its aborted signal makes sure it cannot find one. The pending
       // flag goes with it too, or the frame underneath would refuse the next Enter forever.
       abortWork()
       setPending(false)
@@ -654,8 +660,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
         patchFrame({ status: outcome.status ?? '' })
       })
       .catch((error: unknown) => {
-        // An error keeps the frame open with the message on it. Before this the palette closed first
-        // and set the message afterwards, into a surface nobody could see any more.
+        // An error keeps the frame open with the message on it. Closing first and setting the message
+        // afterwards would put it into a surface nobody can see.
         setPending(false)
         patchFrame({ status: messageOf(error) })
       })
@@ -701,15 +707,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     breadcrumb: () => {
       const current = frame()
       if (!current) return []
-      return current.kind === 'search' && current.placeholder
-        ? current.breadcrumb.slice(0, -1)
-        : current.breadcrumb
+      return current.kind === 'search' && current.placeholder ? current.breadcrumb.slice(0, -1) : current.breadcrumb
     },
     kind: () => frame()?.kind ?? 'root',
     query: () => frame()?.query ?? '',
     placeholder: () => {
       const value = frame()?.placeholder
-      return typeof value === 'function' ? value() : value ?? ''
+      return typeof value === 'function' ? value() : (value ?? '')
     },
     status: () => frame()?.status ?? '',
     // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.

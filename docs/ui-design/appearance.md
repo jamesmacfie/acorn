@@ -96,5 +96,5 @@ theme.
 `match` is the one text role for a run inside a line. It means "this is what you searched for", for
 the diff's find bar and the editor's find in files. In a terminal it's reverse video.
 
-So a theme is about 40 colors, and in a terminal it's 16 plus bold. Most of a style pack is shape and
-padding a terminal has no answer for, and density is the one style axis it keeps.
+So a theme is about 40 colors, and in a terminal it's 16 plus bold. A style pack is shape, padding,
+and density, which the terminal doesn't draw.

@@ -18,7 +18,8 @@ export async function readRepoDockerConfig(checkout: string): Promise<string> {
   const file = await open(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0))
   try {
     const stat = await file.stat()
-    if (!stat.isFile() || stat.size > MAX_DOCKER_CONFIG_BYTES) throw new Error('Invalid Docker repository configuration')
+    if (!stat.isFile() || stat.size > MAX_DOCKER_CONFIG_BYTES)
+      throw new Error('Invalid Docker repository configuration')
     const bytes = Buffer.alloc(MAX_DOCKER_CONFIG_BYTES + 1)
     let length = 0
     while (length < bytes.length) {

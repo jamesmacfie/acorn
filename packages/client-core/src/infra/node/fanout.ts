@@ -67,7 +67,12 @@ export function cachedFleet<T>(queryKey: readonly unknown[], options: FleetQuery
     if (wanted && !wanted.has(node.nodeId)) continue
     const data = clientFor(node.nodeId).client.getQueryData<T>(queryKey)
     if (data !== undefined) {
-      rows.push({ nodeId: node.nodeId, node, data, freshness: freshnessOf(nodeState(node.nodeId), { isFetching: true }) })
+      rows.push({
+        nodeId: node.nodeId,
+        node,
+        data,
+        freshness: freshnessOf(nodeState(node.nodeId), { isFetching: true }),
+      })
     }
   }
   return { rows, unavailable: [] }
@@ -125,7 +130,8 @@ async function fetchOne<T>(
     return { row: { nodeId: node.nodeId, node, data, freshness: freshnessOf(state) } }
   } catch (error) {
     const cached = client.getQueryData<T>(queryKey)
-    if (cached === undefined) return { unavailable: { nodeId: node.nodeId, label: node.label, reason: reasonOf(error) } }
+    if (cached === undefined)
+      return { unavailable: { nodeId: node.nodeId, label: node.label, reason: reasonOf(error) } }
     // `isStale`, not `isError`. A row served from cache has data, so the honest label is `stale`, or
     // `offline` when the connection state says the node is gone (docs/ui-design/states.md § States).
     // `isError` would paint an error badge over a readable row.
@@ -160,7 +166,7 @@ export async function fetchFleet<T>(
 export function createFleetQuery<T, D = void>(
   queryKey: (dep: D) => readonly unknown[],
   fetch: (nodeId: string, dep: D, signal: AbortSignal) => Promise<T>,
-  deps: Accessor<D> = (() => undefined as D),
+  deps: Accessor<D> = () => undefined as D,
   options: FleetQueryOptions = {},
   // Initialized, so a consumer never handles `undefined`. Whatever the per-node caches hold is the
   // pre-answer state, and an empty one renders as no rows rather than a spinner with no deadline.
@@ -168,7 +174,12 @@ export function createFleetQuery<T, D = void>(
   const resource = createResource(
     // The fleet is part of the source, so pairing, unpairing or a node coming back re-runs the fan-out.
     // The ids are joined into a string, because an array literal compares by identity and never matches.
-    () => ({ dep: deps(), fleet: nodes().map((node) => `${node.nodeId}:${nodeStatus(node.nodeId)?.state ?? ''}`).join(',') }),
+    () => ({
+      dep: deps(),
+      fleet: nodes()
+        .map((node) => `${node.nodeId}:${nodeStatus(node.nodeId)?.state ?? ''}`)
+        .join(','),
+    }),
     ({ dep }) => fetchFleet(queryKey(dep), (nodeId, signal) => fetch(nodeId, dep, signal), options),
     { initialValue: cachedFleet<T>(queryKey(deps()), options) },
   )
@@ -217,9 +228,15 @@ const RETRY_DELAYS_MS = [2_000, 5_000, 10_000]
 // Only the `invalidate` action, so the fan-out's own `fetchQuery` writes cannot loop into a refetch.
 export function onFleetInvalidation(queryKey: readonly unknown[], run: () => void): () => void {
   const wanted = hashKey(queryKey)
-  const off = nodes().map((node) => clientFor(node.nodeId).client.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action.type !== 'invalidate') return
-    if (hashKey(event.query.queryKey) === wanted) run()
-  }))
-  return () => { for (const unsubscribe of off) unsubscribe() }
+  const off = nodes().map((node) =>
+    clientFor(node.nodeId)
+      .client.getQueryCache()
+      .subscribe((event) => {
+        if (event.type !== 'updated' || event.action.type !== 'invalidate') return
+        if (hashKey(event.query.queryKey) === wanted) run()
+      }),
+  )
+  return () => {
+    for (const unsubscribe of off) unsubscribe()
+  }
 }

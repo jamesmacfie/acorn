@@ -1,25 +1,19 @@
-// The client's telemetry emitter: the same five record kinds and the same verbs as the node's
-// collector, and one thing the node does not have, a trace that spans an interaction.
+// The client's telemetry emitter: the same record kinds and verbs as the node's collector, plus a
+// trace that spans an interaction. docs/telemetry.md owns the model and
+// docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
 //
-// docs/telemetry.md owns the model and docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
-// Three shape decisions belong here.
+// **The verbs match the node's, argument for argument,** owner first, as the node collector's do. The
+// terminal client reuses this file and changes only the poster, so a second copy would be two
+// vocabularies for one record model. The desktop helper is a Node process and uses the node's collector.
 //
-// **The verbs match the node's, argument for argument.** `measure`, `recordDuration`, `startSpan`
-// and the four emits all take the owner first, exactly as `node-core/server/telemetry/collector.ts`
-// does. The terminal client reuses this file and changes only the poster, so a second copy of the
-// verbs would be two vocabularies for one record model. The desktop helper reuses the node's
-// collector instead, because it is a Node process that already depends on node-core and cannot
-// reach a package that draws (docs/shell/node-child.md § What the helper reports).
-//
-// **There is no scrubber here.** A browser cannot know this machine's home directory or its data
-// root, which are the two prefixes worth collapsing, so the node re-scrubs every posted record at
-// the door (`ingestTelemetry`). One scrubber, in the process that knows the paths.
+// **There is no scrubber here.** A browser cannot know this machine's home directory or its data root,
+// which are the two prefixes worth collapsing, so the node re-scrubs every posted record at the door
+// (`ingestTelemetry`).
 //
 // **The interaction trace is a module variable, not an async context.** A command or a page change
 // opens one; every request `apiClient.send()` makes while it is open hangs under it, so the node's
 // `http.request` span is a child of the click that caused it. Work that continues after the span
-// ends gets no parent. That is a known imprecision, and it is written down rather than fixed with
-// an async-context polyfill the renderer does not have.
+// ends gets no parent, because the renderer has no async context to carry one.
 //
 // Nothing here can fail the thing it measures. Every verb is wrapped and every verb starts with one
 // boolean read.
@@ -31,13 +25,25 @@ import type {
   TelemetrySpan,
   PostedTelemetryRuntime,
 } from '@acorn/protocol/telemetry.ts'
-import { telemetryHistogramKey, ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
+import {
+  telemetryHistogramKey,
+  ATTRS_MAX,
+  ATTR_KEY_MAX,
+  ATTR_VALUE_MAX,
+  LOG_BODY_MAX,
+} from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/telemetry/workTelemetry'
 import { setScrollPlaceHandler } from '../../kit/lib/telemetry/scrollPlace'
 import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
-import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
+import {
+  beginInteractionWork,
+  clearInteractionWork,
+  recordInteractionWork,
+  takeInteractionWork,
+} from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
+import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 
 /** Same numbers as the node's collector, for the same reasons: enough that a burst survives one
  *  window, small enough that a flush is one modest request. */
@@ -88,7 +94,9 @@ type EmitterState = {
   trace: { traceId: string; spanId: string } | null
   truncated: number
   refused: number
-  generation: number
+  // One stretch of collection. Turning collection on or off, or a reset, ends it, so a span, a
+  // measure, or a failed post from before can't report into the next one.
+  collection: LatestSignal
 }
 
 const state: EmitterState = {
@@ -102,7 +110,7 @@ const state: EmitterState = {
   trace: null,
   truncated: 0,
   refused: 0,
-  generation: 0,
+  collection: latestSignal(),
 }
 
 /** The one boolean read every verb below starts with. Off means no record is built at all. */
@@ -118,9 +126,13 @@ export const telemetryEnabled = (): boolean => state.enabled
  */
 export function setTelemetryEnabled(on: boolean): void {
   if (state.enabled === on) return
-  state.generation += 1
+  state.collection.next()
   slowSamples = 0
-  if (!on) { activity = null; clearInteractionWork(); renderBatches.clear() }
+  if (!on) {
+    activity = null
+    clearInteractionWork()
+    renderBatches.clear()
+  }
   state.enabled = on
   notifyActivity()
   if (on) return arm()
@@ -192,7 +204,10 @@ function push(record: TelemetryRecord): void {
 
 const hex = (bytes: number): string => {
   let out = ''
-  for (let index = 0; index < bytes; index += 1) out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+  for (let index = 0; index < bytes; index += 1)
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0')
   return out
 }
 export const newTraceId = (): string => hex(16)
@@ -203,15 +218,10 @@ export const newSpanId = (): string => hex(8)
 /** The span every request made right now should hang under, or null between interactions. */
 export const currentTrace = (): { traceId: string; spanId: string } | null => state.trace
 
-/** The `traceparent` header value for the open interaction, or nothing when there is none. A request
- *  outside an interaction starts its own trace on the node rather than joining a stale one. */
-export const currentTraceparent = (): string | undefined =>
-  state.trace ? formatTraceparent(state.trace.traceId, state.trace.spanId) : undefined
-
 /**
  * Open a span and make it the parent of everything the renderer does until it ends.
  *
- * Two seams call this: `executeCommand` and the page-change wrapper. A second interaction opening
+ * Core opens one from `executeCommand` and the page-change wrapper. A second interaction opening
  * over the first replaces it, which is what a person clicking twice looks like, and ending an
  * interaction that is no longer the current one leaves the current one alone.
  */
@@ -255,11 +265,13 @@ export function startOperation(owner: string, input: SpanInput): SpanHandle {
 export type TelemetryActivity = { owner: string; operation: string; traceId: string; spanId: string }
 let activity: TelemetryActivity | null = null
 const activityListeners = new Set<() => void>()
-export const currentActivity = (): TelemetryActivity | null => state.enabled ? activity : null
+export const currentActivity = (): TelemetryActivity | null => (state.enabled ? activity : null)
 /** Hosts forward only bounded operation names and correlation IDs, never span attributes. */
 export const onTelemetryActivity = (listener: () => void): (() => void) => {
   activityListeners.add(listener)
-  return () => { activityListeners.delete(listener) }
+  return () => {
+    activityListeners.delete(listener)
+  }
 }
 function notifyActivity(): void {
   for (const listener of activityListeners) safely(listener)
@@ -273,18 +285,20 @@ let spansOnTimeline = false
  * Also write every span to this page's performance timeline, as a `performance.measure` named
  * `acorn:<span name>` with the attributes as its `detail`.
  *
- * The local reader for span durations. Sinks are the only other one, and the one shipped posts to
- * Sentry, so without this a developer timing a task switch had no way to see `nav.change` or
- * `pane.region` on their own machine. The devtools performance panel draws these, and a script reads
- * them with `performance.getEntriesByType('measure')`. The desktop turns it on with the `acorn.perf`
- * switch (`apps/desktop/src/client/boot.ts`). Nothing clears the entries, which is fine for a switch a
- * developer flips for a session and is why it is not on by default.
+ * The local reader for span durations: the shipped sink posts to Sentry, so this is how a developer
+ * sees `nav.change` or `pane.region` on their own machine. The devtools performance panel draws these,
+ * and a script reads them with `performance.getEntriesByType('measure')`. The desktop turns it on with
+ * the `acorn.perf` switch (`apps/desktop/src/client/boot.ts`). Nothing clears the entries, which is
+ * fine for a switch a developer flips for a session and is why it is not on by default.
  */
 export function setSpansOnTimeline(on: boolean): void {
   spansOnTimeline = on
 }
 
-export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
+export function emitSpan(
+  owner: string,
+  span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
   safely(() => {
     const attrs = cleanAttrs(span.attrs, owner)
@@ -292,14 +306,20 @@ export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attr
     if (spansOnTimeline) {
       // `start` is wall-clock milliseconds, so the entry's start is to the millisecond; its duration is exact.
       const start = span.start - performance.timeOrigin
-      performance.measure(`acorn:${span.name}`, { start, duration: span.durationMs, detail: { status: span.status, ...attrs } })
+      performance.measure(`acorn:${span.name}`, {
+        start,
+        duration: span.durationMs,
+        detail: { status: span.status, ...attrs },
+      })
     }
   })
 }
 
 export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
   if (!telemetryEnabled()) return
-  safely(() => push({ ...log, kind: 'log', body: log.body.slice(0, LOG_BODY_MAX), attrs: cleanAttrs(log.attrs, owner) }))
+  safely(() =>
+    push({ ...log, kind: 'log', body: log.body.slice(0, LOG_BODY_MAX), attrs: cleanAttrs(log.attrs, owner) }),
+  )
 }
 
 export function emitEvent(owner: string, name: string, attrs?: TelemetryAttrs): void {
@@ -307,7 +327,10 @@ export function emitEvent(owner: string, name: string, attrs?: TelemetryAttrs): 
   safely(() => push({ kind: 'event', at: Date.now(), name, attrs: cleanAttrs(attrs, owner) }))
 }
 
-export function emitMetric(owner: string, metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs }): void {
+export function emitMetric(
+  owner: string,
+  metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
   safely(() => push({ ...metric, kind: 'metric', at: metric.at ?? Date.now(), attrs: cleanAttrs(metric.attrs, owner) }))
 }
@@ -342,7 +365,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   const spanId = newSpanId()
   const started = Date.now()
   const from = performance.now()
-  const generation = state.generation
+  const collection = state.collection.signal
   let ended = false
   return {
     traceId,
@@ -350,7 +373,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
     end: (status = 'ok', attrs) => {
       if (ended) return
       ended = true
-      if (generation !== state.generation) return
+      if (collection.aborted) return
       emitSpan(owner, {
         traceId,
         spanId,
@@ -437,7 +460,9 @@ export function startRenderTransition(
   })
 
   return {
-    update: (next) => { attrs = { ...attrs, ...next } },
+    update: (next) => {
+      attrs = { ...attrs, ...next }
+    },
     cancel: () => finish('cancelled'),
   }
 }
@@ -456,12 +481,7 @@ const renderBatches = new Map<string, RenderBatch>()
  * count, time inside the wrapped factories, and wall time from the first factory to the microtask
  * checkpoint. Outside an interaction it is the original call with no allocation or scheduling.
  */
-export function measureRenderBatch<T>(
-  owner: string,
-  operation: string,
-  run: () => T,
-  attrs?: TelemetryAttrs,
-): T {
+export function measureRenderBatch<T>(owner: string, operation: string, run: () => T, attrs?: TelemetryAttrs): T {
   const trace = currentTrace()
   if (!telemetryEnabled() || !trace) return run()
   const key = `${trace.spanId}\u0000${owner}\u0000${operation}`
@@ -517,7 +537,13 @@ export function recordSample(owner: string, seam: string, ms: number, unit = '1'
       return
     }
     if (!slot) {
-      slot = { owner, seam, unit, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
+      slot = {
+        owner,
+        seam,
+        unit,
+        attrs: { ...attrs, seam },
+        histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] },
+      }
       state.histograms.set(key, slot)
     }
     const h = slot.histogram
@@ -535,18 +561,23 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
   const from = performance.now()
   const started = Date.now()
   const trace = currentTrace()
-  const generation = state.generation
+  const collection = state.collection.signal
   const finish = (status: 'ok' | 'error' = 'ok') => {
-    if (generation !== state.generation) return
+    if (collection.aborted) return
     const durationMs = performance.now() - from
     recordDuration(owner, seam, durationMs, attrs)
     // Detailed exemplars are bounded; the histogram still counts every call, including fast ones.
     if (durationMs >= 100 && slowSamples < 20) {
       slowSamples++
       emitSpan(owner, {
-        traceId: trace?.traceId ?? newTraceId(), spanId: newSpanId(),
+        traceId: trace?.traceId ?? newTraceId(),
+        spanId: newSpanId(),
         ...(trace ? { parentSpanId: trace.spanId } : {}),
-        name: seam, start: started, durationMs, status, attrs: { ...attrs, slow: true },
+        name: seam,
+        start: started,
+        durationMs,
+        status,
+        attrs: { ...attrs, slow: true },
       })
     }
   }
@@ -558,10 +589,17 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
     throw error
   }
   // Both outcomes are counted; a rejection also marks a slow exemplar as failed.
-  if (result instanceof Promise) return result.then(
-    (value) => { finish(); return value },
-    (error: unknown) => { finish('error'); throw error },
-  ) as T
+  if (result instanceof Promise)
+    return result.then(
+      (value) => {
+        finish()
+        return value
+      },
+      (error: unknown) => {
+        finish('error')
+        throw error
+      },
+    ) as T
   finish()
   return result
 }
@@ -601,21 +639,42 @@ export async function flushTelemetry(): Promise<void> {
   if (state.refused > 0) {
     const refused = state.refused
     state.refused = 0
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.histogram.refused', type: 'count', value: refused, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.histogram.refused',
+      type: 'count',
+      value: refused,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   slowSamples = 0
   const dropped = state.queue.takeDropped()
   if (dropped > 0) {
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.dropped',
+      type: 'count',
+      value: dropped,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   if (state.truncated > 0) {
     const truncated = state.truncated
     state.truncated = 0
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.truncated', type: 'count', value: truncated, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.truncated',
+      type: 'count',
+      value: truncated,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   const post = state.post
   if (!post || state.queue.size() === 0) return
-  const generation = state.generation
+  const collection = state.collection.signal
   const records = state.queue.take()
   state.posting = true
   try {
@@ -623,7 +682,7 @@ export async function flushTelemetry(): Promise<void> {
   } catch {
     // The node is offline, restarting, or refusing. Keep the records: the queue's cap is what stops
     // an unreachable node turning into an unbounded buffer.
-    if (state.enabled && generation === state.generation) state.queue.putBack(records)
+    if (state.enabled && !collection.aborted) state.queue.putBack(records)
   } finally {
     state.posting = false
   }
@@ -661,9 +720,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
   })
   state.runtime = options.runtime
   state.post = options.post
-  // A contribution that throws while rendering, reported through the seam `kit/` has for it
-  // (kit/lib/telemetry/contributionErrors.ts). Installed here rather than imported there, because `kit/` may
-  // not import this module and a plugin's UI bundle re-exports `kit/`.
+  // A contribution that throws while rendering, reported through the seam `kit/` has for it.
+  // Installed here rather than imported there, because `kit/` may not import this module and a
+  // plugin's UI bundle re-exports `kit/`.
   setContributionErrorHandler(({ contributionId, owner, error }) => {
     emitError(owner ?? 'core', {
       name: error instanceof Error ? error.name || 'Error' : 'Error',
@@ -673,9 +732,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       attrs: { seam: 'contribution.render', 'contribution.id': contributionId },
     })
   })
-  // Where a followed timeline put the reader, through the seam `kit/` has for it
-  // (kit/lib/telemetry/scrollPlace.ts). An event rather than a log: it is a fact worth counting and correlating,
-  // and it rides along as a breadcrumb on any error raised near it.
+  // Where a followed timeline put the reader, through the seam `kit/` has for it. An event rather than
+  // a log: it is a fact worth counting and correlating, and it rides along as a breadcrumb on any
+  // error raised near it.
   setScrollPlaceHandler((place) => {
     emitEvent('core', 'ui.scroll.place', {
       cause: place.cause,
@@ -687,10 +746,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       following: place.following,
     })
   })
-  // What a large diff or timeline said about itself when it became ready and when it went away
-  // (kit/lib/telemetry/surfaceHealth.ts). A fixed handful of its numbers, as samples, so the label set stays one
-  // row per surface kind and checkpoint. The full snapshot is a local read
-  // (./surfaceHealth.ts), not a telemetry record.
+  // What a large diff or timeline said about itself when it became ready and when it went away. A
+  // fixed handful of its numbers, as samples, so the label set stays one row per surface kind and
+  // checkpoint. The full snapshot is a local read (./surfaceHealth.ts), not a telemetry record.
   setSurfaceHealthHandler((entry, checkpoint) => {
     for (const [seam, value, unit] of surfaceSamples(entry)) {
       recordSample('core', seam, value, unit, { surface: entry.kind, checkpoint })
@@ -719,7 +777,7 @@ export function _resetClientTelemetry(): void {
   setScrollPlaceHandler(null)
   setSurfaceHealthHandler(null)
   disarm()
-  state.generation += 1
+  state.collection.next()
   state.enabled = false
   state.post = null
   state.posting = false

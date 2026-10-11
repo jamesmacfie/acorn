@@ -1,17 +1,30 @@
 import { z } from 'zod'
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type {
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginExtensionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
 import { pluginCustomAgentGrantSchema, pluginExtensionGrantSchema } from './grantSchemas'
 import { bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 
-export const installSchema = z.strictObject({ source: z.union([
-  z.strictObject({ github: z.string().min(1), tag: z.string().optional() }),
-  z.strictObject({ npm: z.string().min(1), version: z.string().optional() }),
-  z.strictObject({ url: z.string().min(1) }),
-  z.strictObject({ path: z.string().min(1) }),
-]), expectedPluginId: z.string().min(1).optional() })
+export const installSchema = z.strictObject({
+  source: z.union([
+    z.strictObject({ github: z.string().min(1), tag: z.string().optional() }),
+    z.strictObject({ npm: z.string().min(1), version: z.string().optional() }),
+    z.strictObject({ url: z.string().min(1) }),
+    z.strictObject({ path: z.string().min(1) }),
+  ]),
+  expectedPluginId: z.string().min(1).optional(),
+})
 export const removeSchema = z.strictObject({ pluginId: z.string().min(1) })
 
 // What the renderer may say about a third-party plugin bundle, and what it gets back. These schemas
@@ -47,7 +60,7 @@ export const putSchema = z.strictObject({
 // A plain object rather than a strict one, because both halves are parsed out of the same payload and
 // each would otherwise reject the other's keys. Nothing reads the raw payload after this, so
 // stripping an unknown key is as safe as refusing it and lets a newer renderer add a field without
-// wedging an older main.
+// wedging an older helper.
 export const decisionSchema = z.object({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -63,71 +76,112 @@ export const decisionSchema = z.object({
 // @acorn/protocol/plugin/contract.ts.
 //
 // Parsed separately, because a node running a newer manifest schema than this shell can produce a
-// grant this schema refuses. With one combined schema the whole handler threw, so neither accept nor
-// reject could be recorded and the prompt re-queued on every boot.
+// grant this schema refuses. With one combined schema the whole handler would throw, so neither accept
+// nor reject could be recorded and the prompt would re-queue on every boot.
 export const disclosureSchema = z.object({
   declaration: z.string().min(1).max(1_000_000),
   permissions: pluginPermissionsSchema,
-  webviews: z.array(z.strictObject({
-    surface: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    hosts: z.array(z.string().min(1).max(253)).min(1).max(32),
-  })).max(32) as z.ZodType<PluginWebviewGrant[]>,
-  keyClaims: z.array(z.strictObject({
-    surface: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    chords: z.array(z.string().min(1).max(64)).min(1).max(32),
-  })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
-  navigationDestinations: z.array(z.strictObject({
-    surface: z.string().min(1).max(64),
-    label: z.string().min(1).max(120),
-    destination: z.string().min(1).max(64),
-    targetKind: z.string().min(1).max(64),
-    noticeKind: z.string().min(1).max(64).optional(),
-  })).max(64).default([]) as z.ZodType<PluginNavigationDestinationGrant[]>,
-  // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
-  // disclosure with no such field, and refusing it would put a decision beyond recording, which is
-  // the re-queueing loop this schema was split up to escape.
+  webviews: z
+    .array(
+      z.strictObject({
+        surface: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        hosts: z.array(z.string().min(1).max(253)).min(1).max(32),
+      }),
+    )
+    .max(32) as z.ZodType<PluginWebviewGrant[]>,
+  keyClaims: z
+    .array(
+      z.strictObject({
+        surface: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        chords: z.array(z.string().min(1).max(64)).min(1).max(32),
+      }),
+    )
+    .max(32) as z.ZodType<PluginKeyClaimGrant[]>,
+  navigationDestinations: z
+    .array(
+      z.strictObject({
+        surface: z.string().min(1).max(64),
+        label: z.string().min(1).max(120),
+        destination: z.string().min(1).max(64),
+        targetKind: z.string().min(1).max(64),
+        noticeKind: z.string().min(1).max(64).optional(),
+      }),
+    )
+    .max(64)
+    .default([]) as z.ZodType<PluginNavigationDestinationGrant[]>,
+  // Defaulted, not required. Every `acorn-1` Node sends it, but refusing a disclosure without it would
+  // put a decision beyond recording, which is the re-queueing loop the split exists to prevent.
   extensions: z.array(pluginExtensionGrantSchema).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
   // Defaulted for the same reason `extensions` is.
-  schedules: z.array(z.strictObject({
-    id: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    cadence: cadenceSchema,
-  })).max(4).default([]) as z.ZodType<PluginScheduleGrant[]>,
+  schedules: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        cadence: cadenceSchema,
+      }),
+    )
+    .max(4)
+    .default([]) as z.ZodType<PluginScheduleGrant[]>,
   // Defaulted for the same reason the two above are.
-  taskChecks: z.array(z.strictObject({
-    id: z.string().min(1).max(64),
-    cleansUp: z.boolean(),
-  })).max(4).default([]) as z.ZodType<PluginTaskCheckGrant[]>,
+  taskChecks: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        cleansUp: z.boolean(),
+      }),
+    )
+    .max(4)
+    .default([]) as z.ZodType<PluginTaskCheckGrant[]>,
   // Defaulted for the same reason the three above are.
-  harnesses: z.array(z.strictObject({
-    id: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    kind: z.enum(['command', 'entry']),
-    run: z.string().min(1).max(512),
-    env: z.array(z.string().min(1).max(64)).max(32),
-  })).max(4).default([]) as z.ZodType<PluginHarnessGrant[]>,
-  agentTools: z.array(z.strictObject({
-    id: z.string().min(1).max(64),
-    description: z.string().min(1).max(500),
-    risk: z.enum(['read', 'write', 'execute']),
-    requiresSession: z.boolean(),
-    maxOutputBytes: z.number().int().positive(),
-  })).max(16).default([]) as z.ZodType<PluginAgentToolGrant[]>,
-  contextSections: z.array(z.strictObject({
-    id: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    defaultIncluded: z.boolean(),
-    maxBytes: z.number().int().positive(),
-    maxTokens: z.number().int().positive(),
-  })).max(8).default([]) as z.ZodType<PluginContextSectionGrant[]>,
+  harnesses: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        kind: z.enum(['command', 'entry']),
+        run: z.string().min(1).max(512),
+        env: z.array(z.string().min(1).max(64)).max(32),
+      }),
+    )
+    .max(4)
+    .default([]) as z.ZodType<PluginHarnessGrant[]>,
+  agentTools: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        description: z.string().min(1).max(500),
+        risk: z.enum(['read', 'write', 'execute']),
+        requiresSession: z.boolean(),
+        maxOutputBytes: z.number().int().positive(),
+      }),
+    )
+    .max(16)
+    .default([]) as z.ZodType<PluginAgentToolGrant[]>,
+  contextSections: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        defaultIncluded: z.boolean(),
+        maxBytes: z.number().int().positive(),
+        maxTokens: z.number().int().positive(),
+      }),
+    )
+    .max(8)
+    .default([]) as z.ZodType<PluginContextSectionGrant[]>,
   customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
 export const NO_DISCLOSURE = {
-  permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+  permissions: {
+    api: [],
+    events: [],
+    node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+  },
   webviews: [],
   keyClaims: [],
   navigationDestinations: [],
@@ -143,7 +197,19 @@ export const NO_DISCLOSURE = {
 export type PluginsState = {
   // Hash to what this device holds. The renderer diffs a node's listing against it to decide what to
   // fetch.
-  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
+  cached: Record<
+    string,
+    {
+      pluginId: string
+      version: string
+      bytes: number
+      source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+      installSource?: import('@acorn/protocol/api.ts').PluginInstallSource
+      sourceLabel?: string
+      manifest?: unknown
+      nodeIds?: string[]
+    }
+  >
   acks: PluginAck[]
   devGrants: PluginDevGrant[]
 }

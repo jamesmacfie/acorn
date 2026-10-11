@@ -22,8 +22,9 @@ const defaultServices: DescriptorPromotionServices = {
   link: addTaskLink,
   ownsConnection: async (pluginId, connectionId) => {
     const response = await readJson<IntegrationsResponse>(integrationsRoute)
-    return response.integrations.some((connection) =>
-      connection.id === connectionId && connection.providerId === pluginId)
+    return response.integrations.some(
+      (connection) => connection.id === connectionId && connection.providerId === pluginId,
+    )
   },
 }
 
@@ -42,7 +43,7 @@ export function descriptorPromotion(
     const link = item.task?.link
     if (!link) return undefined
     if (!validated.has(item)) {
-      if (!await services.ownsConnection(pluginId, link.connectionId)) {
+      if (!(await services.ownsConnection(pluginId, link.connectionId))) {
         throw new Error(`Plugin '${pluginId}' returned a task link for a connection it does not own.`)
       }
       validated.add(item)

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PLUGIN_API_MAJOR, type NodePluginPermissions, type NodePluginRow, type PluginContributions } from '@acorn/protocol/api.ts'
+import {
+  PLUGIN_API_MAJOR,
+  type NodePluginPermissions,
+  type NodePluginRow,
+  type PluginContributions,
+} from '@acorn/protocol/api.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginAckRecord } from '../../infra/platform'
 
@@ -10,7 +15,11 @@ const recordPluginTrust = vi.fn(async (decision: unknown) => {
 vi.mock('../plugins/host', () => ({
   recordPluginTrust: (decision: unknown) => recordPluginTrust(decision),
   pluginHostAvailable: () => true,
-  readPluginHostState: async () => ({ cached: { ['a'.repeat(64)]: { pluginId: 'board', version: '2.0.0', bytes: 12 } }, acks: hostAcks, devGrants: [] }),
+  readPluginHostState: async () => ({
+    cached: { ['a'.repeat(64)]: { pluginId: 'board', version: '2.0.0', bytes: 12 } },
+    acks: hostAcks,
+    devGrants: [],
+  }),
   cachePluginBundle: async () => ({ error: 'unreachable' }),
 }))
 
@@ -19,7 +28,14 @@ vi.mock('../plugins/syncContributions', () => ({ syncPluginContributions: () => 
 
 vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
 
-const { bundleAccepted, pendingTrust, onPluginDistributionCommit, _resetPluginDistribution, _seedPluginDistribution, _seedPendingTrust } = await import('../plugins/distribution')
+const {
+  bundleAccepted,
+  pendingTrust,
+  onPluginDistributionCommit,
+  _resetPluginDistribution,
+  _seedPluginDistribution,
+  _seedPendingTrust,
+} = await import('../plugins/distribution')
 const { recordNodeDecision, recordTrustDecision, trustTiers } = await import('./trustModel')
 const { writeJson } = await import('../../infra/node/apiClient')
 
@@ -45,12 +61,14 @@ const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermi
   ...over,
 })
 
-const request = (over: {
-  permissions?: NodePluginPermissions
-  contributions?: Partial<PluginContributions>
-  previous?: Partial<PluginAckRecord>
-  version?: string
-} = {}) => ({
+const request = (
+  over: {
+    permissions?: NodePluginPermissions
+    contributions?: Partial<PluginContributions>
+    previous?: Partial<PluginAckRecord>
+    version?: string
+  } = {},
+) => ({
   row: {
     name: 'board',
     required: false,
@@ -59,7 +77,8 @@ const request = (over: {
     state: 'active',
     installed: {
       version: over.version ?? '2.0.0',
-      baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
       permissions: over.permissions ?? permissions(),
       contributions: { frames: [], ...over.contributions },
       client: { hash: HASH, bytes: 12 },
@@ -71,21 +90,21 @@ const request = (over: {
   relation: 'active' as const,
   ...(over.previous
     ? {
-      previous: {
-        pluginId: 'board',
-        hash: 'b'.repeat(64),
-        nodeId: 'node-a',
-        version: '1.0.0',
-        decision: 'accepted' as const,
-        decidedAt: 1,
-        permissions: permissions(),
-        webviews: [],
-        keyClaims: [],
-        navigationDestinations: [],
-        extensions: [],
-        ...over.previous,
-      } as PluginAckRecord,
-    }
+        previous: {
+          pluginId: 'board',
+          hash: 'b'.repeat(64),
+          nodeId: 'node-a',
+          version: '1.0.0',
+          decision: 'accepted' as const,
+          decidedAt: 1,
+          permissions: permissions(),
+          webviews: [],
+          keyClaims: [],
+          navigationDestinations: [],
+          extensions: [],
+          ...over.previous,
+        } as PluginAckRecord,
+      }
     : {}),
 })
 
@@ -116,16 +135,43 @@ describe('trustTiers', () => {
     // Under `enforced`, and that is a claim about what the host does: it delivers only to points a
     // manifest declared, draws only descriptor shapes it knows, and never puts a replacement on screen
     // the owner did not pick. None of it depends on the plugin behaving.
-    const tiers = trustTiers(request({
-      contributions: {
-        frames: [
-          { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
-          { target: 'coreSlot', id: 'board-rail', label: 'Board task list', glyph: 'puzzle', order: 500, formFactor: ['desktop'], coreSlot: 'rail.taskList' },
-        ],
-        extensionPoints: [{ id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 }],
-        extensions: [{ id: 'tracker-rows', point: 'tracker:issues', label: 'Board cards', order: 500, items: '/v1/p/board/rows' }],
-      },
-    }))
+    const tiers = trustTiers(
+      request({
+        contributions: {
+          frames: [
+            { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
+            {
+              target: 'coreSlot',
+              id: 'board-rail',
+              label: 'Board task list',
+              glyph: 'puzzle',
+              order: 500,
+              formFactor: ['desktop'],
+              coreSlot: 'rail.taskList',
+            },
+          ],
+          extensionPoints: [
+            {
+              id: 'card-links',
+              label: 'Linked items',
+              kind: 'rows',
+              location: 'pane.footer',
+              surface: 'board',
+              max: 4,
+            },
+          ],
+          extensions: [
+            {
+              id: 'tracker-rows',
+              point: 'tracker:issues',
+              label: 'Board cards',
+              order: 500,
+              items: '/v1/p/board/rows',
+            },
+          ],
+        },
+      }),
+    )
     expect(keysIn(tiers, 'enforced')).toEqual([
       'extension:extends:rows:tracker:issues',
       'extension:hosts:rows:board:card-links',
@@ -142,53 +188,93 @@ describe('trustTiers', () => {
     // The whole reason the grants are recorded as well as shown. A constant key, or no key at all,
     // would let a package quietly change which plugin it reaches into between versions, which is the
     // one growth an owner has least ability to reason about.
-    const tiers = trustTiers(request({
-      contributions: {
-        extensions: [{ id: 'rows', point: 'linear:issues', label: 'Board cards', order: 500, items: '/v1/p/board/rows' }],
-      },
-      previous: { extensions: [{ kind: 'extends', target: 'tracker:issues', label: 'Board cards' }] },
-    }))
+    const tiers = trustTiers(
+      request({
+        contributions: {
+          extensions: [
+            { id: 'rows', point: 'linear:issues', label: 'Board cards', order: 500, items: '/v1/p/board/rows' },
+          ],
+        },
+        previous: { extensions: [{ kind: 'extends', target: 'tracker:issues', label: 'Board cards' }] },
+      }),
+    )
     const enforced = tiers.find((tier) => tier.key === 'enforced')!.lines
     expect(enforced.map((line) => [line.key, line.added])).toEqual([['extension:extends:rows:linear:issues', true]])
   })
 
   it('records and diffs loaded tool and context reach', () => {
     const tool = {
-      id: 'record', description: 'Record a finding.', inputSchema: { type: 'object' as const },
-      risk: 'write' as const, scope: 'task' as const, handler: '/v1/p/board/tools/record',
-      requiresSession: true, timeoutMs: 5000, maxOutputBytes: 4096,
+      id: 'record',
+      description: 'Record a finding.',
+      inputSchema: { type: 'object' as const },
+      risk: 'write' as const,
+      scope: 'task' as const,
+      handler: '/v1/p/board/tools/record',
+      requiresSession: true,
+      timeoutMs: 5000,
+      maxOutputBytes: 4096,
     }
     const section = {
-      id: 'findings', label: 'Findings', scope: 'task' as const, order: 40,
-      read: '/v1/p/board/context/findings', defaultIncluded: true, timeoutMs: 5000,
-      maxBytes: 8192, maxTokens: 1024,
+      id: 'findings',
+      label: 'Findings',
+      scope: 'task' as const,
+      order: 40,
+      read: '/v1/p/board/context/findings',
+      defaultIncluded: true,
+      timeoutMs: 5000,
+      maxBytes: 8192,
+      maxTokens: 1024,
     }
-    const tiers = trustTiers(request({
-      contributions: { agentTools: [tool], contextSections: [section] },
-      previous: { agentTools: [], contextSections: [] },
-    }))
+    const tiers = trustTiers(
+      request({
+        contributions: { agentTools: [tool], contextSections: [section] },
+        previous: { agentTools: [], contextSections: [] },
+      }),
+    )
     expect(keysIn(tiers, 'enforced')).toContain('agent-tool:record:write:true:4096')
     expect(keysIn(tiers, 'declared')).toContain('context-section:findings:true:8192:1024')
-    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key))
-      .toEqual(expect.arrayContaining(['agent-tool:record:write:true:4096', 'context-section:findings:true:8192:1024']))
+    expect(
+      tiers
+        .flatMap((tier) => tier.lines)
+        .filter((line) => line.added)
+        .map((line) => line.key),
+    ).toEqual(expect.arrayContaining(['agent-tool:record:write:true:4096', 'context-section:findings:true:8192:1024']))
   })
 
   it('keeps the enforced, declared and web claims in three separate lists', () => {
     // They may never be rendered as one: `Enforced` is checked by the UI bridge and Node worker,
     // `Declared` describes plugin-authored unattended behavior, and `Web pages` reaches the
     // live internet. A reader who cannot tell them apart is being misled about the first one.
-    const tiers = trustTiers(request({
-      permissions: permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: true, exec: false, net: [], sockets: false } }),
-      contributions: {
-        frames: [{
-          target: 'webview', id: 'board-web', label: 'Board', glyph: 'puzzle', order: 500,
-          formFactor: ['desktop'], url: 'https://board.example/', hosts: ['board.example'],
-          claimsKeys: ['meta+shift+b'],
-        }],
-      },
-    }))
+    const tiers = trustTiers(
+      request({
+        permissions: permissions({
+          api: ['core.tasks:read'],
+          node: { core: ['git'], capabilities: [], secrets: true, exec: false, net: [], sockets: false },
+        }),
+        contributions: {
+          frames: [
+            {
+              target: 'webview',
+              id: 'board-web',
+              label: 'Board',
+              glyph: 'puzzle',
+              order: 500,
+              formFactor: ['desktop'],
+              url: 'https://board.example/',
+              hosts: ['board.example'],
+              claimsKeys: ['meta+shift+b'],
+            },
+          ],
+        },
+      }),
+    )
     expect(tiers.map((tier) => tier.key)).toEqual(['reads', 'provides', 'enforced', 'declared', 'web'])
-    expect(keysIn(tiers, 'enforced')).toEqual(['core.tasks:read', 'node.secrets', 'node.core:git', 'keys:board-web:meta+shift+b'])
+    expect(keysIn(tiers, 'enforced')).toEqual([
+      'core.tasks:read',
+      'node.secrets',
+      'node.core:git',
+      'keys:board-web:meta+shift+b',
+    ])
     expect(keysIn(tiers, 'declared')).toEqual([])
     expect(keysIn(tiers, 'web')).toEqual(['webview:board-web:board.example'])
   })
@@ -199,42 +285,75 @@ describe('trustTiers', () => {
   })
 
   it('flags only what the last approved version did not have', () => {
-    const tiers = trustTiers(request({
-      permissions: permissions({ api: ['core.tasks:read', 'core.tasks:write'] }),
-      previous: { permissions: permissions({ api: ['core.tasks:read'] }) },
-    }))
-    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key))
-      .toEqual(['core.tasks:write'])
+    const tiers = trustTiers(
+      request({
+        permissions: permissions({ api: ['core.tasks:read', 'core.tasks:write'] }),
+        previous: { permissions: permissions({ api: ['core.tasks:read'] }) },
+      }),
+    )
+    expect(
+      tiers
+        .flatMap((tier) => tier.lines)
+        .filter((line) => line.added)
+        .map((line) => line.key),
+    ).toEqual(['core.tasks:write'])
   })
 
   it('diffs the grant key, so rewording a sentence is not a fleet-wide “asks for more”', () => {
     // The whole reason PermissionLine carries a key at all. A copy edit that read as a new grant would
     // teach every owner in a fleet that the "asks for more" banner means nothing.
-    const same = permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })
+    const same = permissions({
+      api: ['core.tasks:read'],
+      node: { core: ['git'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    })
     const tiers = trustTiers(request({ permissions: same, previous: { permissions: same } }))
     expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added)).toEqual([])
   })
 
   it('treats a key claim the previous version lacked as new', () => {
     const claims: Partial<PluginContributions> = {
-      frames: [{
-        target: 'pane', id: 'board-pane', label: 'Board', glyph: 'puzzle', order: 500,
-        formFactor: ['desktop'], claimsKeys: ['meta+shift+b'],
-      }],
+      frames: [
+        {
+          target: 'pane',
+          id: 'board-pane',
+          label: 'Board',
+          glyph: 'puzzle',
+          order: 500,
+          formFactor: ['desktop'],
+          claimsKeys: ['meta+shift+b'],
+        },
+      ],
     }
     const tiers = trustTiers(request({ contributions: claims, previous: { keyClaims: [] } }))
     expect(keysIn(tiers, 'enforced')).toEqual(['keys:board-pane:meta+shift+b'])
-    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key)).toEqual(['keys:board-pane:meta+shift+b'])
+    expect(
+      tiers
+        .flatMap((tier) => tier.lines)
+        .filter((line) => line.added)
+        .map((line) => line.key),
+    ).toEqual(['keys:board-pane:meta+shift+b'])
   })
 
   it('treats a cooperative destination the previous version lacked as new', () => {
     const contributions: Partial<PluginContributions> = {
-      frames: [{
-        target: 'pane', id: 'findings', label: 'Findings', glyph: 'puzzle', order: 500,
-        formFactor: ['desktop'], destinations: [{
-          id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
-        }],
-      }],
+      frames: [
+        {
+          target: 'pane',
+          id: 'findings',
+          label: 'Findings',
+          glyph: 'puzzle',
+          order: 500,
+          formFactor: ['desktop'],
+          destinations: [
+            {
+              id: 'memory-review',
+              label: 'Review in Memory',
+              targetKind: 'findings-candidate',
+              noticeKind: 'memory-proposal',
+            },
+          ],
+        },
+      ],
     }
     const tiers = trustTiers(request({ contributions, previous: { navigationDestinations: [] } }))
     expect(keysIn(tiers, 'enforced')).toEqual(['destination:findings:memory-review:findings-candidate:memory-proposal'])
@@ -244,11 +363,27 @@ describe('trustTiers', () => {
 
 describe('what a plugin reads', () => {
   const READINESS: Partial<PluginContributions> = {
-    dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/board/board' }],
+    dataSources: [
+      {
+        sourceId: 'board',
+        name: 'Release readiness',
+        singular: 'Issue',
+        plural: 'Issues',
+        identityScope: 'issue',
+        handler: '/v1/p/board/board',
+      },
+    ],
   }
   const input = (name: string, over: Partial<NonNullable<NodePluginRow['inputs']>['inputs'][number]> = {}) => ({
-    sourceId: 'board', name, source: `github:${name}`, optional: false, label: `My ${name}`, plural: name === 'pulls' ? 'Pull requests' : 'Checks',
-    provider: 'GitHub', approved: false, ...over,
+    sourceId: 'board',
+    name,
+    source: `github:${name}`,
+    optional: false,
+    label: `My ${name}`,
+    plural: name === 'pulls' ? 'Pull requests' : 'Checks',
+    provider: 'GitHub',
+    approved: false,
+    ...over,
   })
   const reading = (inputs: NonNullable<NodePluginRow['inputs']>) => {
     const base = request({ contributions: READINESS })
@@ -259,16 +394,26 @@ describe('what a plugin reads', () => {
     const tiers = trustTiers(reading({ granted: false, inputs: [input('pulls'), input('checks', { optional: true })] }))
     expect(tiers.map((tier) => tier.key).slice(0, 3)).toEqual(['reads', 'provides', 'enforced'])
     const reads = tiers.find((tier) => tier.key === 'reads')!.lines
-    expect(reads.map((line) => line.text)).toEqual(['Read pull requests from GitHub', 'Read checks from GitHub, if you choose an account'])
+    expect(reads.map((line) => line.text)).toEqual([
+      'Read pull requests from GitHub',
+      'Read checks from GitHub, if you choose an account',
+    ])
     // The plugin's own label for the input never reaches the sentence.
     expect(reads.some((line) => line.text.includes('My '))).toBe(false)
-    expect(tiers.find((tier) => tier.key === 'provides')!.lines.map((line) => line.text)).toEqual(['A data source, Release readiness'])
+    expect(tiers.find((tier) => tier.key === 'provides')!.lines.map((line) => line.text)).toEqual([
+      'A data source, Release readiness',
+    ])
     expect(tiers.flatMap((tier) => tier.lines).some((line) => line.added)).toBe(false)
   })
 
   it('leads an update with only the input the grant does not cover', () => {
     const tiers = trustTiers(reading({ granted: true, inputs: [input('pulls', { approved: true }), input('checks')] }))
-    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.text)).toEqual(['Read checks from GitHub'])
+    expect(
+      tiers
+        .flatMap((tier) => tier.lines)
+        .filter((line) => line.added)
+        .map((line) => line.text),
+    ).toEqual(['Read checks from GitHub'])
   })
 
   it('accepts by posting the exact list shown, and rejects by turning the plugin off on its node', async () => {
@@ -278,7 +423,14 @@ describe('what a plugin reads', () => {
     const [url, init] = vi.mocked(writeJson).mock.calls[0]!
     expect(url).toBe('/v1/core/plugins/board/input-grant')
     expect(init).toMatchObject({ method: 'POST', nodeId: 'node-a' })
-    expect(JSON.parse(String(init!.body))).toEqual({ sources: { board: { pulls: { source: 'github:pulls', optional: false }, checks: { source: 'github:checks', optional: true } } } })
+    expect(JSON.parse(String(init!.body))).toEqual({
+      sources: {
+        board: {
+          pulls: { source: 'github:pulls', optional: false },
+          checks: { source: 'github:checks', optional: true },
+        },
+      },
+    })
 
     vi.mocked(writeJson).mockClear()
     await recordNodeDecision(asked, 'rejected')
@@ -290,7 +442,13 @@ describe('what a plugin reads', () => {
 
 describe('the skills a plugin supplies', () => {
   const skill = (name: string, over: Partial<NonNullable<NodePluginRow['skills']>['skills'][number]> = {}) => ({
-    name: `board:${name}`, title: name, description: `Do ${name}.`, digest: name[0]!.repeat(64), approved: false, enabled: true, ...over,
+    name: `board:${name}`,
+    title: name,
+    description: `Do ${name}.`,
+    digest: name[0]!.repeat(64),
+    approved: false,
+    enabled: true,
+    ...over,
   })
   const supplying = (skills: NonNullable<NodePluginRow['skills']>) => {
     const base = request()
@@ -298,16 +456,34 @@ describe('the skills a plugin supplies', () => {
   }
 
   it('discloses them as one ordinary declared line with every name', () => {
-    const lines = trustTiers(supplying({ granted: false, skills: [skill('review'), skill('migrate')] })).flatMap((tier) => tier.lines)
+    const lines = trustTiers(supplying({ granted: false, skills: [skill('review'), skill('migrate')] })).flatMap(
+      (tier) => tier.lines,
+    )
     const line = lines.find((entry) => entry.key.startsWith('skills:'))!
-    expect([line.tier, line.high, line.text]).toEqual(['declared', false, 'Adds 2 procedures your agents can load: migrate, review'])
+    expect([line.tier, line.high, line.text]).toEqual([
+      'declared',
+      false,
+      'Adds 2 procedures your agents can load: migrate, review',
+    ])
   })
 
   it('marks the line new when one body changed since the owner approved it', () => {
-    const changed = supplying({ granted: true, skills: [skill('review', { approved: true }), skill('migrate', { digest: 'z'.repeat(64) })] })
-    expect(trustTiers(changed).flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key.slice(0, 7))).toEqual(['skills:'])
+    const changed = supplying({
+      granted: true,
+      skills: [skill('review', { approved: true }), skill('migrate', { digest: 'z'.repeat(64) })],
+    })
+    expect(
+      trustTiers(changed)
+        .flatMap((tier) => tier.lines)
+        .filter((line) => line.added)
+        .map((line) => line.key.slice(0, 7)),
+    ).toEqual(['skills:'])
     const unchanged = supplying({ granted: true, skills: [skill('review', { approved: true })] })
-    expect(trustTiers(unchanged).flatMap((tier) => tier.lines).some((line) => line.added)).toBe(false)
+    expect(
+      trustTiers(unchanged)
+        .flatMap((tier) => tier.lines)
+        .some((line) => line.added),
+    ).toBe(false)
   })
 
   it('accepts by posting the digests shown to the plugin’s node', async () => {
@@ -330,11 +506,19 @@ describe('recordTrustDecision', () => {
     const off = onPluginDistributionCommit(syncPluginContributions)
     await recordTrustDecision(current, 'accepted')
     off()
-    expect(recordPluginTrust).toHaveBeenCalledWith(expect.objectContaining({
-      pluginId: 'board', hash: HASH, nodeId: 'node-a', version: '2.0.0', decision: 'accepted',
-      declaration: clientDeclaration(current.row.installed!),
-      navigationDestinations: [], agentTools: [], contextSections: [],
-    }))
+    expect(recordPluginTrust).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginId: 'board',
+        hash: HASH,
+        nodeId: 'node-a',
+        version: '2.0.0',
+        decision: 'accepted',
+        declaration: clientDeclaration(current.row.installed!),
+        navigationDestinations: [],
+        agentTools: [],
+        contextSections: [],
+      }),
+    )
     // The projection catches up so a just-accepted plugin's surfaces do not wait for the next boot.
     expect(bundleAccepted('board', HASH)).toBe(true)
     expect(syncPluginContributions).toHaveBeenCalledTimes(1)

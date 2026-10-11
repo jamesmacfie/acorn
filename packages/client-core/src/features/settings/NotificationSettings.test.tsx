@@ -10,7 +10,10 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({}),
 }))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
-vi.mock('./savePref', () => ({ saveJsonPref: mocks.saveJsonPref, withFailuresThrown: (write: () => unknown) => write() }))
+vi.mock('./savePref', () => ({
+  saveJsonPref: mocks.saveJsonPref,
+  withFailuresThrown: (write: () => unknown) => write(),
+}))
 vi.mock('../notifications/deliver', () => ({ defaultDeliveryContext: {}, deliverNotice: vi.fn() }))
 vi.mock('../tasks/tasks', () => ({ activeTaskId: () => 't1' }))
 
@@ -58,7 +61,9 @@ describe('Settings → Notifications', () => {
   it('saves the whole blob when one switch moves', () => {
     toggle('Play a sound')
     expect(mocks.saveJsonPref).toHaveBeenCalledWith(expect.anything(), 'notifications', {
-      sound: false, system: true, badge: true,
+      sound: false,
+      system: true,
+      badge: true,
       events: { blocked: true, finished: true, error: true },
     })
   })
@@ -68,7 +73,9 @@ describe('Settings → Notifications', () => {
     mount()
     toggle('An agent finishes')
     expect(mocks.saveJsonPref).toHaveBeenCalledWith(expect.anything(), 'notifications', {
-      sound: true, system: false, badge: true,
+      sound: true,
+      system: false,
+      badge: true,
       events: { blocked: true, finished: false, error: true },
     })
   })

@@ -22,14 +22,19 @@ export class McpReviewManager {
   readonly #live = new Map<string, McpReviewProxy>()
   readonly #seen = new Map<string, McpCatalogue>()
 
-  constructor(store: AgentMcpServerStore, secrets: () => readonly string[]) { this.#store = store; this.#secrets = secrets }
+  constructor(store: AgentMcpServerStore, secrets: () => readonly string[]) {
+    this.#store = store
+    this.#secrets = secrets
+  }
 
   async prepare(server: AgentDriverMcpServer, sessionId: string, revision: string): Promise<AgentDriverMcpServer> {
     const key = `${sessionId}/${server.name}`
     await this.#live.get(key)?.close()
     const proxy = new McpReviewProxy(server, sessionId, revision, {
       approved: () => this.#store.approvedCatalogue(server.name, revision),
-      observed: (catalogue) => { this.#seen.set(key, catalogue) },
+      observed: (catalogue) => {
+        this.#seen.set(key, catalogue)
+      },
       closed: () => {
         if (this.#live.get(key) === proxy) this.#live.delete(key)
         this.#seen.delete(key)
@@ -51,11 +56,16 @@ export class McpReviewManager {
       const proxy = this.#live.get(key)
       if (!proxy) continue
       const approved = await this.#store.approvedCatalogue(proxy.name, proxy.revision)
-      if (!proxy.needsApproval() && approved?.digest === catalogue.digest && approved.version === catalogue.version) continue
+      if (!proxy.needsApproval() && approved?.digest === catalogue.digest && approved.version === catalogue.version)
+        continue
       const previous = await this.#store.previousCatalogue(proxy.name)
       const tools = presentMcpTools(catalogue.tools, this.#secrets())
-      out.push({ name: proxy.name, sessionId: proxy.sessionId, revision: proxy.revision,
-        digest: catalogue.digest, version: catalogue.version,
+      out.push({
+        name: proxy.name,
+        sessionId: proxy.sessionId,
+        revision: proxy.revision,
+        digest: catalogue.digest,
+        version: catalogue.version,
         tools,
         previousTools: presentMcpTools(previous?.tools ?? [], this.#secrets()),
         findings: mcpReviewFindings(tools),
@@ -70,8 +80,9 @@ export class McpReviewManager {
     const { catalogue, generation } = await proxy.approvalSnapshot()
     if (catalogue.digest !== digest) throw new Error('The MCP catalogue changed before approval.')
     const saved = await this.#store.approveCatalogue(name, revision, catalogue)
-    try { await proxy.announceApproval(generation, digest) }
-    catch (error) {
+    try {
+      await proxy.announceApproval(generation, digest)
+    } catch (error) {
       await this.#store.revokeCatalogue(name, revision, digest)
       throw error
     }
@@ -79,8 +90,12 @@ export class McpReviewManager {
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    await Promise.allSettled([...this.#live.values()].filter((proxy) => proxy.sessionId === sessionId).map((proxy) => proxy.close()))
+    await Promise.allSettled(
+      [...this.#live.values()].filter((proxy) => proxy.sessionId === sessionId).map((proxy) => proxy.close()),
+    )
   }
 
-  async close(): Promise<void> { await Promise.allSettled([...this.#live.values()].map((proxy) => proxy.close())) }
+  async close(): Promise<void> {
+    await Promise.allSettled([...this.#live.values()].map((proxy) => proxy.close()))
+  }
 }

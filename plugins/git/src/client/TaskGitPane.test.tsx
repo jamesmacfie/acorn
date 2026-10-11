@@ -8,16 +8,32 @@ import type { GitTaskPaneModel } from './paneContribution'
 // Every Git read waits until the test settles it, so a test can hold one tab's request open.
 const reads: { url: string; settle: (value: unknown) => void }[] = []
 const worktreeEvents = new Set<() => void>()
-vi.mock('@acorn/plugin-api/client', () => ({
-  activeNodeId: () => 'node', nodeReady: () => true, onScopeEvicted: () => () => {},
-  featureUsable: vi.fn(), setSelectedSource: vi.fn(), consumePaneIntent: () => undefined,
-  clientEvents: { on: () => () => {} }, wsOnReconnect: () => () => {},
-  wsOnNodeEvent: (_channel: string, callback: () => void) => { worktreeEvents.add(callback); return () => worktreeEvents.delete(callback) },
-  readJson: (url: string) => new Promise((settle) => { reads.push({ url, settle }) }),
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
+  activeNodeId: () => 'node',
+  nodeReady: () => true,
+  onScopeEvicted: () => () => {},
+  featureUsable: vi.fn(),
+  setSelectedSource: vi.fn(),
+  consumePaneIntent: () => undefined,
+  clientEvents: { on: () => () => {} },
+  wsOnReconnect: () => () => {},
+  wsOnNodeEvent: (_channel: string, callback: () => void) => {
+    worktreeEvents.add(callback)
+    return () => worktreeEvents.delete(callback)
+  },
+  readJson: (url: string) =>
+    new Promise((settle) => {
+      reads.push({ url, settle })
+    }),
 }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 vi.mock('./changes/ChangesPane', () => ({ ChangesList: () => <p>Changes ready</p> }))
-vi.mock('./HistoryRows', () => ({ HistoryRows: (props: { model: { first: { data?: HistoryPage } } }) => <p>{props.model.first.data?.commits.length} commits</p> }))
+vi.mock('./HistoryRows', () => ({
+  HistoryRows: (props: { model: { first: { data?: HistoryPage } } }) => (
+    <p>{props.model.first.data?.commits.length} commits</p>
+  ),
+}))
 vi.mock('./StashBrowse', () => ({}))
 vi.mock('./RevisionView', () => ({}))
 vi.mock('./OperationBanner', () => ({}))
@@ -26,25 +42,42 @@ vi.mock('./ConflictResolver', () => ({}))
 const { createGitPaneModel } = await import('./paneModel')
 const { GitPaneList } = await import('./TaskGitPane')
 const task = { id: 'task', projectId: 'project', branch: null } as never
-const inventory = { projectId: 'project', repository: '/repo', error: null, observedAt: 1,
-  worktrees: [{ id: 'main', branch: 'main', path: '/repo', owners: [] }] } as unknown as WorktreeInventory
+const inventory = {
+  projectId: 'project',
+  repository: '/repo',
+  error: null,
+  observedAt: 1,
+  worktrees: [{ id: 'main', branch: 'main', path: '/repo', owners: [] }],
+} as unknown as WorktreeInventory
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 const readsOf = (route: string) => reads.filter((read) => read.url.startsWith(route))
 let dispose = () => {}
 let host: HTMLDivElement | undefined
-afterEach(() => { dispose(); host?.remove(); reads.length = 0 })
+afterEach(() => {
+  dispose()
+  host?.remove()
+  reads.length = 0
+})
 
 // The list region as the host mounts it: lazy, behind its own loading boundary, building the model.
 function mount() {
   let model!: GitTaskPaneModel
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  host = document.createElement('div'); document.body.append(host)
-  dispose = render(() => <QueryClientProvider client={client}>
-    <Suspense fallback={<p>Loading Git…</p>}>{(() => {
-      model = { ...createGitPaneModel(task, createSignal(true)[0]), changes: {} } as GitTaskPaneModel
-      return <GitPaneList task={task} model={model} />
-    })()}</Suspense>
-  </QueryClientProvider>, host)
+  host = document.createElement('div')
+  document.body.append(host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Suspense fallback={<p>Loading Git…</p>}>
+          {(() => {
+            model = { ...createGitPaneModel(task, createSignal(true)[0]), changes: {} } as GitTaskPaneModel
+            return <GitPaneList task={task} model={model} />
+          })()}
+        </Suspense>
+      </QueryClientProvider>
+    ),
+    host,
+  )
   return { model, text: () => host!.textContent ?? '' }
 }
 

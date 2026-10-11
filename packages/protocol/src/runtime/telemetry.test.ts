@@ -15,10 +15,26 @@ const SPAN = 'b'.repeat(16)
 describe('the record shapes', () => {
   it('parses one of each kind', () => {
     const records = [
-      { kind: 'span', traceId: TRACE, spanId: SPAN, name: 'http.request', start: 1, durationMs: 2, status: 'ok', attrs: { route: '/v1/core/tasks/:id' } },
+      {
+        kind: 'span',
+        traceId: TRACE,
+        spanId: SPAN,
+        name: 'http.request',
+        start: 1,
+        durationMs: 2,
+        status: 'ok',
+        attrs: { route: '/v1/core/tasks/:id' },
+      },
       { kind: 'log', at: 1, level: 'info', logger: 'server', body: 'listening', attrs: {} },
       { kind: 'event', at: 1, name: 'ws.shed', attrs: { channel: 'term' } },
-      { kind: 'metric', at: 1, name: 'git.status', type: 'histogram', value: { count: 3, sum: 9, min: 1, max: 5, p50: 3, p95: 5 }, attrs: {} },
+      {
+        kind: 'metric',
+        at: 1,
+        name: 'git.status',
+        type: 'histogram',
+        value: { count: 3, sum: 9, min: 1, max: 5, p50: 3, p95: 5 },
+        attrs: {},
+      },
       { kind: 'error', at: 1, name: 'ApiError', message: 'not_found', level: 'error', handled: true, attrs: {} },
     ]
     for (const record of records) expect(telemetryRecordSchema.safeParse(record).success, record.kind).toBe(true)
@@ -34,7 +50,16 @@ describe('the record shapes', () => {
   })
 
   it('refuses an id that is not the W3C size', () => {
-    const short = { kind: 'span', traceId: 'abc', spanId: SPAN, name: 'x', start: 1, durationMs: 1, status: 'ok', attrs: {} }
+    const short = {
+      kind: 'span',
+      traceId: 'abc',
+      spanId: SPAN,
+      name: 'x',
+      start: 1,
+      durationMs: 1,
+      status: 'ok',
+      attrs: {},
+    }
     expect(telemetryRecordSchema.safeParse(short).success).toBe(false)
   })
 
@@ -53,7 +78,11 @@ describe('parseTraceparent', () => {
   })
 
   it('round-trips what it formats', () => {
-    expect(parseTraceparent(formatTraceparent(TRACE, SPAN))).toEqual({ traceId: TRACE, parentSpanId: SPAN, sampled: true })
+    expect(parseTraceparent(formatTraceparent(TRACE, SPAN))).toEqual({
+      traceId: TRACE,
+      parentSpanId: SPAN,
+      sampled: true,
+    })
   })
 
   it('rejects everything else', () => {
@@ -95,12 +124,21 @@ describe('the batch a runtime posts to the node', () => {
   })
 })
 
-
 it('splits multibyte telemetry on wire bytes and counts oversized records', async () => {
   const { encodeTelemetryBatches, TELEMETRY_BATCH_MAX_BYTES } = await import('./telemetry')
-  const record = { kind: 'log' as const, at: 1, level: 'info' as const, logger: 'test', body: '界'.repeat(2_000), attrs: {} }
+  const record = {
+    kind: 'log' as const,
+    at: 1,
+    level: 'info' as const,
+    logger: 'test',
+    body: '界'.repeat(2_000),
+    attrs: {},
+  }
   const records = Array.from({ length: 500 }, () => record)
-  const bodies = encodeTelemetryBatches('renderer', [...records, { ...record, body: 'x'.repeat(TELEMETRY_BATCH_MAX_BYTES) }])
+  const bodies = encodeTelemetryBatches('renderer', [
+    ...records,
+    { ...record, body: 'x'.repeat(TELEMETRY_BATCH_MAX_BYTES) },
+  ])
   expect(bodies.length).toBeGreaterThan(1)
   const decoded = bodies.flatMap((body) => {
     expect(new TextEncoder().encode(body).byteLength).toBeLessThanOrEqual(TELEMETRY_BATCH_MAX_BYTES)

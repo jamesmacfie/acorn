@@ -1,6 +1,11 @@
 import { coreNodeLifecycleRoute, coreNodeProvidersRoute } from '@acorn/protocol/api.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
-import type { NodeLifecycleVerb, NodeProviderDescriptor, NodeProvidersResponse, ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
+import type {
+  NodeLifecycleVerb,
+  NodeProviderDescriptor,
+  NodeProvidersResponse,
+  ProvidedNode,
+} from '@acorn/protocol/nodeProviders.ts'
 import { readJson, sendJson } from './apiClient'
 import { fleetBridge } from '../platform'
 import { createFleetQuery, type FleetResult } from './fanout'
@@ -10,10 +15,9 @@ import { refreshFleet } from './fleet'
 // providers). The client half of the fleet's second door.
 //
 // Read by fanning out over every reachable node and unioning the answers, not by asking the local
-// node. Today one node usually holds the cloud connection, so the two are indistinguishable — which
-// is exactly why the shortcut is worth refusing. The day the account credential moves off the local
-// node, or a second machine signs into the same account, the fan-out is already what the surface
-// does, and `providerNodeId` is stable across whoever answered, so nothing renumbers.
+// node. One node usually holds the cloud connection, so the two look the same, but only the fan-out
+// stays right when the account credential lives off the local node or a second machine signs into the
+// same account. `providerNodeId` is stable across whoever answered, so nothing renumbers.
 
 const PROVIDED_KEY = ['provided-nodes'] as const
 
@@ -59,7 +63,9 @@ export function mergeProvidedNodes(
 ): ProvidedNodeRow[] {
   const merged = new Map<string, ProvidedNodeRow>()
   for (const answer of result.rows) {
-    const byId = new Map<string, NodeProviderDescriptor>(answer.data.providers.map((provider) => [provider.id, provider]))
+    const byId = new Map<string, NodeProviderDescriptor>(
+      answer.data.providers.map((provider) => [provider.id, provider]),
+    )
     for (const node of answer.data.nodes) {
       const key = dedupeKey(node.providerId, node.providerNodeId)
       if (merged.has(key)) continue
@@ -143,7 +149,10 @@ export async function runNodeLifecycle(verb: 'destroy' | 'start' | 'stop', row: 
   })
 }
 
-export async function createProvidedNode(target: { providerId: string; sourceNodeId: string }, label: string): Promise<void> {
+export async function createProvidedNode(
+  target: { providerId: string; sourceNodeId: string },
+  label: string,
+): Promise<void> {
   await sendJson(coreNodeLifecycleRoute('create'), {
     method: 'POST',
     ...jsonBody({ providerId: target.providerId, label, options: {} }),

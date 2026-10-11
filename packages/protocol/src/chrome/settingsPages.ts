@@ -8,13 +8,26 @@
 
 /** Every rail group, in the order the rail draws them. */
 export const SETTINGS_CATEGORIES = [
-  'general', 'workspaces', 'agents', 'connections', 'features', 'automation', 'machines', 'plugins', 'advanced',
+  'general',
+  'workspaces',
+  'agents',
+  'connections',
+  'features',
+  'automation',
+  'machines',
+  'plugins',
+  'advanced',
 ] as const
 export type SettingsCategory = (typeof SETTINGS_CATEGORIES)[number]
 
 /** The groups a plugin may place a page in. A page that names none lands in `features`. */
 export const PLUGIN_SETTINGS_CATEGORIES = [
-  'general', 'agents', 'connections', 'features', 'automation', 'machines',
+  'general',
+  'agents',
+  'connections',
+  'features',
+  'automation',
+  'machines',
 ] as const satisfies readonly SettingsCategory[]
 export type PluginSettingsCategory = (typeof PLUGIN_SETTINGS_CATEGORIES)[number]
 

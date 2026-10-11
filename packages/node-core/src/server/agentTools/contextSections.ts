@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import type { Disposable } from '../pluginHost/capabilities'
 import { runHook } from '../pluginHost/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
@@ -13,7 +14,14 @@ import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
 type TaskRow = typeof schema.tasks.$inferSelect
-type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; github: { owner: string; name: string } | null; workflowRunId?: string }
+type AssembleArgs = {
+  db: AppDatabase
+  userLogin: string
+  task: TaskRow
+  repo: string
+  github: { owner: string; name: string } | null
+  workflowRunId?: string
+}
 type ContextDraft = {
   items: ContextItem[]
   // A descriptor may carry already-formatted reference text. Compiled contributions normally leave
@@ -26,7 +34,10 @@ type ContextDraft = {
 }
 
 export class ContextSectionAssemblyError extends Error {
-  constructor(readonly reason: 'unavailable' | 'timeout' | 'invalid-response', message: string) {
+  constructor(
+    readonly reason: 'unavailable' | 'timeout' | 'invalid-response',
+    message: string,
+  ) {
     super(message)
     this.name = 'ContextSectionAssemblyError'
   }
@@ -134,9 +145,23 @@ export const linkedIssuesSection: ContextSectionContribution = {
       const [row] = await db
         .select()
         .from(schema.issues)
-        .where(and(eq(schema.issues.userId, userLogin), eq(schema.issues.integrationId, link.integrationId), eq(schema.issues.identifier, link.identifier)))
+        .where(
+          and(
+            eq(schema.issues.userId, userLogin),
+            eq(schema.issues.integrationId, link.integrationId),
+            eq(schema.issues.identifier, link.identifier),
+          ),
+        )
       const parsed = row && provider?.codec ? parseCached(provider.codec, row.data, ref) : null
-      const state = !row ? 'missing' : !parsed?.ok ? 'malformed' : parsed.value.deletedAt ? 'deleted' : row.fetchedAt + (provider?.resources[0]?.ttlMs ?? 0) < Date.now() ? 'stale' : 'fresh'
+      const state = !row
+        ? 'missing'
+        : !parsed?.ok
+          ? 'malformed'
+          : parsed.value.deletedAt
+            ? 'deleted'
+            : row.fetchedAt + (provider?.resources[0]?.ttlMs ?? 0) < Date.now()
+              ? 'stale'
+              : 'fresh'
       if (state === 'missing' || state === 'malformed') missing++
       const item = provider?.taskContext?.summarize(ref, parsed?.ok ? parsed.value : null, state) ?? {
         id: `${link.provider}:${link.integrationId}:${link.identifier}`,
@@ -148,12 +173,20 @@ export const linkedIssuesSection: ContextSectionContribution = {
     }
     return {
       items,
-      absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
+      absent: missing
+        ? {
+            reason: 'missing-cache',
+            detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.`,
+          }
+        : undefined,
     }
   },
   format(items, omitted, absent) {
     if (!items.length && !absent) return ''
-    const lines = ['## Linked issues', ...items.map((item) => `- [${item.kind}] ${item.label}${item.details?.[0] ? ` (${item.details[0]})` : ''}`)]
+    const lines = [
+      '## Linked issues',
+      ...items.map((item) => `- [${item.kind}] ${item.label}${item.details?.[0] ? ` (${item.details[0]})` : ''}`),
+    ]
     if (absent) lines.push(`- ⚠ ${absent.detail}`)
     const hint = trackerToolsHint(items)
     return lines.join('\n') + formatOmitted(omitted) + (hint ? `\n${hint}` : '')
@@ -176,7 +209,9 @@ export function trackerToolsHint(items: readonly ContextItem[]): string {
   const uses = [
     `issue_detail to read a ${names(providers, 'disjunction')} item in full`,
     ...(commenters.length ? [`issue_comment to reply on a ${names(commenters, 'disjunction')} item`] : []),
-    ...(imageReaders.length ? [`issue_image to see an image attached to a ${names(imageReaders, 'disjunction')} item`] : []),
+    ...(imageReaders.length
+      ? [`issue_image to see an image attached to a ${names(imageReaders, 'disjunction')} item`]
+      : []),
   ]
   return `Use ${new Intl.ListFormat('en', { type: 'conjunction' }).format(uses)}. These go through acorn's own ${names(providers, 'conjunction')} connections, so you don't need a ${names(providers, 'disjunction')} MCP server for them.`
 }
@@ -190,10 +225,20 @@ type Registration = { owner: string; section: ContextSectionContribution }
 class ContextSectionRegistry {
   readonly #registrations: Registration[] = []
 
-  register(owner: string, section: ContextSectionContribution): void {
+  register(owner: string, section: ContextSectionContribution): Disposable {
     const clash = this.#registrations.find((r) => r.section.id === section.id)
-    if (clash) throw new Error(`Duplicate context section '${section.id}': already registered by '${clash.owner}', now by '${owner}'.`)
-    this.#registrations.push({ owner, section })
+    if (clash)
+      throw new Error(
+        `Duplicate context section '${section.id}': already registered by '${clash.owner}', now by '${owner}'.`,
+      )
+    const registration = { owner, section }
+    this.#registrations.push(registration)
+    return {
+      dispose: () => {
+        const index = this.#registrations.indexOf(registration)
+        if (index >= 0) this.#registrations.splice(index, 1)
+      },
+    }
   }
 
   remove(owner: string): void {
@@ -211,7 +256,6 @@ class ContextSectionRegistry {
   }
 }
 
-
 const registry = new ContextSectionRegistry()
 
 // Widen a plugin's `db`-less section to the registry's shape by dropping the handle. One helper rather
@@ -222,23 +266,35 @@ export const asContextSection = (section: PluginContextSection): ContextSectionC
   assemble: ({ db: _db, ...rest }) => section.assemble(rest),
 })
 
-export const registerContextSection = (owner: string, section: ContextSectionContribution): void =>
+export const registerContextSection = (owner: string, section: ContextSectionContribution): Disposable =>
   registry.register(owner, section)
 export const removeContextSections = (owner: string): void => registry.remove(owner)
 export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()
 
 registerContextSection('core', linkedIssuesSection)
 registerContextSection('core', {
-  id: 'task-scripts', order: 5, label: 'Task scripts', defaultIncluded: true,
+  id: 'task-scripts',
+  order: 5,
+  label: 'Task scripts',
+  defaultIncluded: true,
   budget: { maxItems: 2, maxBytesPerItem: 256, overflow: 'omit-with-marker' },
   async assemble({ db, task }) {
     const status = taskScripts(db).status(task.id)
-    return { items: [status.setup, status.teardown].map(snapshot => ({ id: snapshot.phase, kind: 'task-script',
-      label: `${snapshot.phase}: ${snapshot.state} (${snapshot.reason})`, details: [`generation ${snapshot.generation}; attempt ${snapshot.attemptId ?? 'none'}`] })) }
+    return {
+      items: [status.setup, status.teardown].map((snapshot) => ({
+        id: snapshot.phase,
+        kind: 'task-script',
+        label: `${snapshot.phase}: ${snapshot.state} (${snapshot.reason})`,
+        details: [`generation ${snapshot.generation}; attempt ${snapshot.attemptId ?? 'none'}`],
+      })),
+    }
   },
   format(items) {
-    return ['## Task scripts (snapshot)', ...items.map(item => `- ${item.label}; ${item.details?.[0]}`),
-      'Reread task_scripts_status for current authority. Use task_scripts_wait before dependency-dependent work and task_scripts_logs for diagnostics. Reads never start scripts; running setup may still be installing dependencies.'].join('\n')
+    return [
+      '## Task scripts (snapshot)',
+      ...items.map((item) => `- ${item.label}; ${item.details?.[0]}`),
+      'Reread task_scripts_status for current authority. Use task_scripts_wait before dependency-dependent work and task_scripts_logs for diagnostics. Reads never start scripts; running setup may still be installing dependencies.',
+    ].join('\n')
   },
 })
 
@@ -246,7 +302,12 @@ export function parseInclude(raw: string | undefined): Set<string> {
   const sections = registry.list()
   if (raw === '*') return new Set(sections.map((section) => section.id))
   if (!raw?.trim()) return new Set(sections.filter((section) => section.defaultIncluded).map((section) => section.id))
-  const tokens = new Set(raw.split(',').map((token) => token.trim()).filter(Boolean))
+  const tokens = new Set(
+    raw
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean),
+  )
   return new Set(sections.map((section) => section.id).filter((id) => tokens.has(id)))
 }
 
@@ -259,13 +320,27 @@ export async function assembleContext(
 ): Promise<TaskContext | null> {
   const [task] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, taskId))
   if (!task) return null
-  const project = await db.select().from(schema.projects).where(eq(schema.projects.id, task.projectId)).limit(1).then((rows) => rows[0] ?? null)
+  const project = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.id, task.projectId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null)
   if (!project) return null
   const projectId = project.id
-  const github = project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
+  const github =
+    project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
   const repo = github ? `${github.owner}/${github.name}` : ''
   const ctx: TaskContext = {
-    task: { id: task.id, title: task.title, projectId, repo: repo || undefined, branch: task.branch, worktreePath: task.worktreePath, pullNumber: task.pullNumber },
+    task: {
+      id: task.id,
+      title: task.title,
+      projectId,
+      repo: repo || undefined,
+      branch: task.branch,
+      worktreePath: task.worktreePath,
+      pullNumber: task.pullNumber,
+    },
     sections: [],
   }
   // Budget shaping and PII stripping, as somebody else's plugin (server/pluginHost/hooks.ts,
@@ -289,9 +364,12 @@ export async function assembleContext(
       draft = {
         items: [],
         absent: {
-          reason: error instanceof ContextSectionAssemblyError
-            ? error.reason
-            : error instanceof DOMException && error.name === 'TimeoutError' ? 'timeout' : 'unavailable',
+          reason:
+            error instanceof ContextSectionAssemblyError
+              ? error.reason
+              : error instanceof DOMException && error.name === 'TimeoutError'
+                ? 'timeout'
+                : 'unavailable',
           detail: error instanceof Error ? error.message : 'This context section is unavailable.',
         },
       }

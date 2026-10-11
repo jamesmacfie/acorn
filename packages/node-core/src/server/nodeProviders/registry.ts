@@ -1,18 +1,21 @@
-import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescriptor, type ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
+import {
+  NODE_LIFECYCLE_VERBS,
+  type NodeLifecycleVerb,
+  type NodeProviderDescriptor,
+  type ProvidedNode,
+} from '@acorn/protocol/nodeProviders.ts'
+import type { Disposable } from '../pluginHost/capabilities'
 
 // Node providers: a plugin that knows about nodes, and optionally can make and remove them
 // (docs/plugins/node-providers.md § Node providers). The second door into the fleet, beside probe-then-pair.
 //
 // **A provider runs on some node, not necessarily the one the person is sitting at, and with no
-// client necessarily attached.** Write nothing into a provider that assumes otherwise. That sentence
-// is a contract term rather than advice: the client reads this registry by fanning out over every
-// reachable node and unioning the answers, so a provider registered on a headless node in a data
-// centre is exactly as visible as one on the laptop, and a provider that only works while somebody is
-// looking is broken in the case this seam exists for.
+// client necessarily attached.** Write nothing into a provider that assumes otherwise. The client reads
+// this registry by fanning out over every reachable node and unioning the answers, so a provider on a
+// headless node in a data centre is exactly as visible as one on the laptop.
 //
-// Node-side, and staying that way. A renderer-side provider would put the cloud account credential in
-// the renderer, the one place the architecture has always kept credentials out of. The credential is the thing that may
-// move later; the provider is not.
+// Node-side, because a renderer-side provider would put the cloud account credential in the renderer,
+// the one place the architecture keeps credentials out of.
 
 /** What `list` answers with. The wire projection (`providedNodeSchema`) is strict and has no
  *  `enrollment` member, so the credential cannot reach a client by forgetting to strip it: it has to
@@ -34,9 +37,9 @@ export type NodeProviderContribution = {
   id: string
   label: string
   list(signal: AbortSignal): Promise<ProvidedNodeRecord[]>
-  /** Declaring `create` makes this a machine provider, and the host then requires `destroy`. Stolen
-   *  verbatim from DevPod's provider model, and validated at registration: a provider that can make
-   *  nodes but not remove them is a load error rather than a support ticket. */
+  /** Declaring `create` makes this a machine provider, and the host then requires `destroy`, as DevPod's
+   *  provider model does. Validated at registration: a provider that can make nodes but not remove them
+   *  is a load error rather than a support ticket. */
   create?(spec: NodeSpec, signal: AbortSignal): Promise<ProvidedNodeRecord>
   destroy?(providerNodeId: string, signal: AbortSignal): Promise<void>
   start?(providerNodeId: string, signal: AbortSignal): Promise<void>
@@ -53,12 +56,12 @@ const verbsOf = (provider: NodeProviderContribution): NodeLifecycleVerb[] =>
   NODE_LIFECYCLE_VERBS.filter((verb) => typeof provider[verb] === 'function')
 
 // A module singleton, like the route, source, node-action and audit registries beside it, with the
-// same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/pluginHost/host.ts § clearRegistrations).
+// same lifecycle answer: each registration hands back its own undo, and the plugin host runs it on
+// teardown (server/pluginHost/host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredNodeProvider>()
 
 /** Register one provider for a plugin. The host binds `pluginId`; a plugin never passes it. */
-export function registerNodeProvider(pluginId: string, provider: NodeProviderContribution): void {
+export function registerNodeProvider(pluginId: string, provider: NodeProviderContribution): Disposable {
   if (!provider.id.trim()) throw new Error(`Plugin '${pluginId}' registered a node provider with an empty id.`)
   if (provider.id.includes(':')) {
     throw new Error(`Node provider id '${provider.id}' must not contain ':': the host qualifies it with the plugin id.`)
@@ -71,7 +74,13 @@ export function registerNodeProvider(pluginId: string, provider: NodeProviderCon
   }
   const qualifiedId = `${pluginId}:${provider.id}`
   if (providers.has(qualifiedId)) throw new Error(`Duplicate node provider '${qualifiedId}'.`)
-  providers.set(qualifiedId, { ...provider, qualifiedId, pluginId })
+  const registered = { ...provider, qualifiedId, pluginId }
+  providers.set(qualifiedId, registered)
+  return {
+    dispose: () => {
+      if (providers.get(qualifiedId) === registered) providers.delete(qualifiedId)
+    },
+  }
 }
 
 export function clearNodeProviders(pluginId: string): void {

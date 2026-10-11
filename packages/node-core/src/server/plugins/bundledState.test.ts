@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { writePrivateAtomic } from '../storage/dataRoot'
-import { bundledPluginStatePath, markBundledPluginInstalled, markPluginRemoved, markPluginUserManaged, readBundledPluginState } from './bundledState'
+import {
+  bundledPluginStatePath,
+  markBundledPluginInstalled,
+  markPluginRemoved,
+  markPluginUserManaged,
+  readBundledPluginState,
+} from './bundledState'
 
 vi.mock('../storage/dataRoot', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../storage/dataRoot')>()
@@ -54,6 +60,11 @@ describe('bundled ownership writes', () => {
     markBundledPluginInstalled(root, 'example', '1', HASH, installedAt)
 
     expect(writePrivateAtomic).toHaveBeenCalledTimes(1)
-    expect(readBundledPluginState(root, 'example')).toEqual({ status: 'installed', version: '1', fingerprint: HASH, installedAt })
+    expect(readBundledPluginState(root, 'example')).toEqual({
+      status: 'installed',
+      version: '1',
+      fingerprint: HASH,
+      installedAt,
+    })
   })
 })

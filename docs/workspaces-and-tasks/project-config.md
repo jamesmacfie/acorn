@@ -1,14 +1,14 @@
 # Project configuration
 
-A project's scripts, run targets, preview, database, and browser settings live on its `projects`
+A project's scripts, run targets, preview, and database settings live on its `projects`
 row, and a `.acorn/config.toml` can override most of them. This page covers the layers, the run
-target merge, and layout recipes. `loadRepoConfig` in `packages/node-core/src/server/runConfig.ts`
+target merge, and layout recipes. `loadRepoConfig` in `packages/node-core/src/server/projects/runConfig.ts`
 does the merge.
 
 ## The project row
 
 The `projects` row holds the machine-local values: setup, dev, dev restart, teardown, and database
-scripts, the setup trigger, preview mode and value, run targets, browser rules, and the branch
+scripts, the setup trigger, preview mode and value, run targets, and the branch
 prefix. The project's settings page edits them.
 
 `GET /v1/core/projects/:id/config` returns the row as `config`. When the project folder has a
@@ -24,8 +24,7 @@ A value comes from the first layer that sets it, in this order:
 2. The personal `~/.acorn/config.toml`.
 3. The project row.
 
-Browser rules come from the project row only, because autofill selectors are personal. The `copy`
-list comes whole from one layer ([copy files](./worktrees.md#copy-files-into-a-worktree)).
+The `copy` list comes whole from one layer ([copy files](./worktrees.md#copy-files-into-a-worktree)).
 
 Run targets and layouts merge by ID, and the later layer wins for each ID. The `dev` target merges in
 this order, each step overriding the last:

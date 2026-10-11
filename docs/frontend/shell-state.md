@@ -69,7 +69,7 @@ mounting, highlighting, diff preparation, tree backlog, and terminal write compl
 host-installed callback in `kit/lib/telemetry/workTelemetry.ts` and never imports the collector. The
 desktop installs responsiveness monitoring in the renderer entry, not the preload bridge, so it sees
 the same consent and interaction state as the app
-([diagnosing an unresponsive view](../telemetry.md#diagnosing-an-unresponsive-view)).
+([diagnosing an unresponsive view](../telemetry/diagnosis.md#diagnosing-an-unresponsive-view)).
 
 ## Node shell navigation lifetime
 

@@ -5,8 +5,8 @@ import PullDetail from './PullDetail'
 import { _resetPrModels } from './pullDetail/prModel'
 
 // The browse detail follows the routed pull all the way into its diff column. `Sections` renders the
-// diff once and `DiffForPull` reads its route once, so without a keyed mount the column kept the
-// first pull's diff while the navigator moved on.
+// diff once and `DiffForPull` reads its route once, so without a keyed mount the column keeps the
+// first pull's diff while the navigator moves on.
 
 const route = vi.hoisted(() => ({ params: undefined as unknown as { projectId: string; number: string } }))
 vi.mock('@solidjs/router', () => ({
@@ -22,8 +22,21 @@ vi.mock('@tanstack/solid-query', () => ({
       if (key[0] === 'projects') return [{ id: 'p1', name: 'acorn', github: { owner: 'runn-fast', name: 'acorn' } }]
       if (key[0] === 'pull') {
         return {
-          pull: { number: Number(key[3]), title: `Pull ${String(key[3])}`, state: 'open', draft: false, body: null, headSha: null },
-          labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [],
+          pull: {
+            number: Number(key[3]),
+            title: `Pull ${String(key[3])}`,
+            state: 'open',
+            draft: false,
+            body: null,
+            headSha: null,
+          },
+          labels: [],
+          reviews: [],
+          requestedReviewers: [],
+          comments: [],
+          commits: [],
+          checks: [],
+          threads: [],
         }
       }
       return undefined
@@ -36,7 +49,7 @@ vi.mock('@tanstack/solid-query', () => ({
 }))
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   onPluginFrame: () => () => {},
 }))
 

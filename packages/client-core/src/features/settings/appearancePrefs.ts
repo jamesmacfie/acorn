@@ -7,12 +7,9 @@ import { resolveStyle, STYLES } from './uiStyles'
 
 // The five appearance choices, as one reader and one writer each.
 //
-// The rule this file exists for: a setting a person can change from two places has one accessor, and
-// both places call it (docs/command-palette-and-shortcuts.md). Settings →
-// Appearance had all five inline, so a palette command would have been a second copy of the defaulting
-// (`terminal` when nothing is stored, follow-the-OS until a theme is picked), a second copy of
-// `resolveTheme`, and a second `savePref` call to keep in step. Two persistence paths for one value is
-// how a setting quietly starts disagreeing with itself.
+// A setting a person can change from two places, here Settings → Appearance and the palette, has one
+// accessor, and both places call it (docs/command-palette-and-shortcuts.md). Two persistence paths for
+// one value is how a setting quietly starts disagreeing with itself.
 //
 // The two axes stay disjoint (docs/ui-design/tokens.md § Token axes): style owns shape, typography, spacing
 // and density; theme owns colour. Theme additionally has a follow-the-OS mode with one pick per mode,
@@ -36,7 +33,7 @@ export const saveThemeFollowsSystem = (qc: QueryClient, follow: boolean): Promis
   savePref(qc, PrefKeys.themeFollowSystem, follow ? 'true' : 'false')
 
 // All three reads go through `resolveTheme`, so what is shown is the theme that is actually on screen
-// rather than a stored id whose plugin has gone away (./builtInThemes.ts says why the pref is left
+// rather than a stored id whose plugin has gone away (`resolveTheme` says why the pref is left
 // alone in that case).
 export const fixedTheme = (prefs: AppearancePrefs): string => resolveTheme(prefs?.[PrefKeys.theme], 'light')
 export const saveFixedTheme = (qc: QueryClient, id: string): Promise<boolean> => savePref(qc, PrefKeys.theme, id)

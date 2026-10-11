@@ -5,13 +5,17 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ open: vi.fn() }))
 vi.mock('node:fs/promises', async (importOriginal) => ({
-  ...await importOriginal<typeof import('node:fs/promises')>(),
+  ...(await importOriginal<typeof import('node:fs/promises')>()),
   open: mocks.open,
 }))
 const { scanInstructions } = await import('./instructionSnapshot')
 
 let dir: string | null = null
-afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }); dir = null; mocks.open.mockReset() })
+afterEach(() => {
+  if (dir) rmSync(dir, { recursive: true, force: true })
+  dir = null
+  mocks.open.mockReset()
+})
 
 it('stops reading when a regular file grows beyond its fstat size', async () => {
   dir = mkdtempSync(join(tmpdir(), 'instruction-growth-'))
@@ -23,7 +27,9 @@ it('stops reading when a regular file grows beyond its fstat size', async () => 
     return { bytesRead: count, buffer }
   })
   mocks.open.mockResolvedValue({
-    stat: async () => ({ isFile: () => true, size: 5 }), read, close: async () => {},
+    stat: async () => ({ isFile: () => true, size: 5 }),
+    read,
+    close: async () => {},
   })
 
   await expect(scanInstructions(dir, [])).rejects.toThrow(/byte limit/)
@@ -36,7 +42,9 @@ it('rejects a special file swapped in before the opened-handle check', async () 
   writeFileSync(join(dir, 'AGENTS.md'), 'small')
   const read = vi.fn()
   mocks.open.mockResolvedValue({
-    stat: async () => ({ isFile: () => false, size: 0 }), read, close: async () => {},
+    stat: async () => ({ isFile: () => false, size: 0 }),
+    read,
+    close: async () => {},
   })
 
   await expect(scanInstructions(dir, [])).rejects.toThrow(/not a regular file/)

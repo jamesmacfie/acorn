@@ -3,12 +3,19 @@ import { registerNoticeTargetHandler, setTerminalOpen, type ClientPlugin } from 
 import { terminalAgentContextContribution } from './agentContextContribution'
 import { terminalDrawerContribution } from './drawerContribution'
 import { terminalCommands } from './commands'
-import { activeTerminal, initSessions, refreshSessions, rememberActiveTerminal, requestTerminalFocus, sessionNode, sessions } from './sessionStore'
+import {
+  activeTerminal,
+  initSessions,
+  refreshSessions,
+  rememberActiveTerminal,
+  requestTerminalFocus,
+  sessionNode,
+  sessions,
+} from './sessionStore'
 import { terminalApi } from './terminalClient'
 import { initPtyChannel } from './wsChannel'
 import { installTerminalHostClient } from '../contract/hostClient'
 import { TERMINAL_TOOLBAR_ACTIONS_MAX } from '../contract/toolbarActions'
-
 
 const TerminalSettings = lazy(() => import('./TerminalSettings'))
 
@@ -20,20 +27,28 @@ export const terminalClientPlugin: ClientPlugin = {
     // Other plugins' controls beside the terminal's own, drawn by the desktop drawer and the terminal
     // client's sessions view. One action, Interrupt, and no PTY access (docs/plugins/toolbar-actions.md).
     ctx.extensionPoints.register({
-      id: 'toolbar-actions', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: TERMINAL_TOOLBAR_ACTIONS_MAX,
+      id: 'toolbar-actions',
+      label: 'Terminal toolbar',
+      kind: 'remote',
+      mode: 'stack',
+      max: TERMINAL_TOOLBAR_ACTIONS_MAX,
       actions: ['interrupt'],
     })
     // The task's run targets, layout recipes and live terminals, as three searches under one group
-    // (./commands.ts). A `paletteRows` source until 2026-09-03.
+    // (./commands.ts).
     for (const contribution of terminalCommands) ctx.commands.register(contribution)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({
-      id: 'terminal', label: 'Terminal', category: 'features', scope: 'device', icon: 'terminal', order: 10, requires: { plugin: 'terminal' },
+      id: 'terminal',
+      label: 'Terminal',
+      category: 'features',
+      scope: 'device',
+      icon: 'terminal',
+      order: 10,
+      requires: { plugin: 'terminal' },
       // The page's sections and rows, for search (TerminalSettings.tsx draws the same ones).
       keywords: ['shell', 'pty', 'font'],
-      sections: [
-        { id: 'drawer', label: 'Drawer', rows: ['When the terminal button is clicked, open', 'Text size'] },
-      ],
+      sections: [{ id: 'drawer', label: 'Drawer', rows: ['When the terminal button is clicked, open', 'Text size'] }],
       component: TerminalSettings,
     })
   },
@@ -43,8 +58,12 @@ export const terminalClientPlugin: ClientPlugin = {
     const stopPty = initPtyChannel()
     const stop = initSessions()
     const stopHost = installTerminalHostClient({
-      api: terminalApi(), sessions, sessionNode, refreshSessions,
-      activeTerminal, rememberActiveTerminal,
+      api: terminalApi(),
+      sessions,
+      sessionNode,
+      refreshSessions,
+      activeTerminal,
+      rememberActiveTerminal,
     })
     const stopNotice = registerNoticeTargetHandler('terminal-session', (taskId, target) => {
       setTerminalOpen(taskId, true)
@@ -52,15 +71,36 @@ export const terminalClientPlugin: ClientPlugin = {
       requestTerminalFocus(taskId, target.resourceId)
     })
     ctx.sessionSources.register({
-      summaries: () => sessions().flatMap((session) => sessionNode() === null ? [] : [{
-        nodeId: sessionNode()!, sessionId: session.id, taskId: session.taskId,
-        title: session.title, running: session.status === 'running', createdAt: session.createdAt,
-        agent: session.kind === 'agent', idle: session.idle,
-      }]),
+      summaries: () =>
+        sessions().flatMap((session) =>
+          sessionNode() === null
+            ? []
+            : [
+                {
+                  nodeId: sessionNode()!,
+                  sessionId: session.id,
+                  taskId: session.taskId,
+                  title: session.title,
+                  running: session.status === 'running',
+                  createdAt: session.createdAt,
+                  agent: session.kind === 'agent',
+                  idle: session.idle,
+                },
+              ],
+        ),
       send: (id, text, submit) => terminalApi().send(id, text, submit),
       refresh: refreshSessions,
-      focus: (id, taskId) => { setTerminalOpen(taskId, true); rememberActiveTerminal(taskId, id); requestTerminalFocus(taskId, id) },
-      dispose: () => { stopNotice(); stopHost(); stop(); stopPty() },
+      focus: (id, taskId) => {
+        setTerminalOpen(taskId, true)
+        rememberActiveTerminal(taskId, id)
+        requestTerminalFocus(taskId, id)
+      },
+      dispose: () => {
+        stopNotice()
+        stopHost()
+        stop()
+        stopPty()
+      },
     })
   },
 }

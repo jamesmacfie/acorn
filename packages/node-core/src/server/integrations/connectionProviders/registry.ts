@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
 import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import type { Disposable } from '../../pluginHost/capabilities'
 import type { ConnectionProviderContribution } from '../types'
 
 const publicCredentialField = (field: CredentialField): CredentialField => ({
@@ -22,9 +23,7 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
     fields: provider.connection.fields.map(publicCredentialField),
     connectable: provider.connection.connectable,
     disconnectable: provider.connection.disconnectable,
-    ...(provider.connection.maxConnections === undefined
-      ? {}
-      : { maxConnections: provider.connection.maxConnections }),
+    ...(provider.connection.maxConnections === undefined ? {} : { maxConnections: provider.connection.maxConnections }),
   },
   capabilities: provider.capabilities,
   // Derived from the contribution; see docs/integrations/project-sources.md § Project sources for why a provider
@@ -38,9 +37,9 @@ const positiveInteger = (value: number): boolean => Number.isInteger(value) && v
 
 export class ConnectionProviderRegistry {
   readonly #providers = new Map<string, ConnectionProviderContribution>()
-  readonly #owners = new Map<string, string>() // providerId → owning plugin; see registry.ts's header
+  readonly #owners = new Map<string, string>() // providerId → owning plugin; see `IntegrationProviderRegistry`
 
-  register(provider: ConnectionProviderContribution, owner?: string): void {
+  register(provider: ConnectionProviderContribution, owner?: string): Disposable {
     if (!provider.id.trim()) throw new Error('Connection provider id must not be empty.')
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate connection provider '${provider.id}'.`)
 
@@ -59,10 +58,7 @@ export class ConnectionProviderRegistry {
     if (!positiveInteger(provider.budgets.maxConcurrentRequestsPerConnection)) {
       throw new Error(`Provider '${provider.id}' has an invalid connection request limit.`)
     }
-    if (
-      provider.connection.maxConnections !== undefined &&
-      !positiveInteger(provider.connection.maxConnections)
-    ) {
+    if (provider.connection.maxConnections !== undefined && !positiveInteger(provider.connection.maxConnections)) {
       throw new Error(`Provider '${provider.id}' has an invalid connection count limit.`)
     }
 
@@ -73,6 +69,13 @@ export class ConnectionProviderRegistry {
 
     this.#providers.set(provider.id, provider)
     if (owner) this.#owners.set(provider.id, owner)
+    return {
+      dispose: () => {
+        if (this.#providers.get(provider.id) !== provider) return
+        this.#providers.delete(provider.id)
+        this.#owners.delete(provider.id)
+      },
+    }
   }
 
   removeForPlugin(plugin: string): void {
@@ -106,7 +109,8 @@ export class ConnectionProviderRegistry {
    * registry would refuse a plugin the use of its own connection.
    */
   assertOwnedBy(id: string, plugin: string): void {
-    if (!this.#providers.has(id)) throw new Error(`Plugin provider runtime names unregistered connection provider '${id}'.`)
+    if (!this.#providers.has(id))
+      throw new Error(`Plugin provider runtime names unregistered connection provider '${id}'.`)
     if (this.#owners.get(id) !== plugin) {
       throw new Error(`Plugin '${plugin}' cannot use connection provider '${id}' because it does not own it.`)
     }

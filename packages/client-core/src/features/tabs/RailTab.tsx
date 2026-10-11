@@ -8,8 +8,8 @@ import './tabrail.css'
 
 /* The square icon control both rails are made of: the workspace rail down the left and the task
    pane switcher down the right. Deliberately not a Button. A rail control hovers by changing its
-   icon and background only, while `.ui-btn:hover` also moves `border-color`, which lit up the
-   control's own dividers on the right-hand rail and made the two sides look unrelated.
+   icon and background only, while `.ui-btn:hover` also moves `border-color`, which would light up
+   the control's own dividers on the right-hand rail.
 
    It is presentation only. It takes a glyph, a state, and already-resolved status markers; it never
    reads task state, asks a registry anything, or knows which rail it is in. See
@@ -36,13 +36,25 @@ export type RailTabProps = Omit<ComponentProps<'button'>, 'children' | 'color'> 
 
 export function RailTab(props: RailTabProps) {
   const [own, rest] = splitProps(props, [
-    'class', 'children', 'label', 'glyph', 'active', 'tone', 'accent',
-    'busy', 'busyLabel', 'sublabel', 'markers', 'onClick', 'style', 'classList',
+    'class',
+    'children',
+    'label',
+    'glyph',
+    'active',
+    'tone',
+    'accent',
+    'busy',
+    'busyLabel',
+    'sublabel',
+    'markers',
+    'onClick',
+    'style',
+    'classList',
   ])
   const tipLabel = () => (own.busy && own.busyLabel ? own.busyLabel : own.label)
   // Holds its value while the markers say the same thing. Contributors build fresh marker objects on
-  // every read, and `For` below keys on identity, so each re-render rebuilt every marker element. A
-  // spinning marker restarted its turn each time, which was 25 times a second while an agent streamed.
+  // every read, and `For` below keys on identity, so each re-render would rebuild every marker element
+  // and restart a spinning marker's turn, many times a second while an agent streams.
   const resolved = createMemo(() => resolveRailMarkers(own.markers ?? []), undefined, { equals: sameRailMarkers })
   const legend = () => resolved().legend
   const describedBy = createUniqueId()
@@ -62,7 +74,9 @@ export function RailTab(props: RailTabProps) {
       type={props.type ?? 'button'}
       class={cx('tabrail-tab', own.class)}
       classList={{ active: !!own.active, ...(own.classList ?? {}) }}
-      style={own.accent ? { '--rail-accent': own.accent, ...(typeof own.style === 'object' ? own.style : {}) } : own.style}
+      style={
+        own.accent ? { '--rail-accent': own.accent, ...(typeof own.style === 'object' ? own.style : {}) } : own.style
+      }
       data-tone={own.tone && own.tone !== 'neutral' ? own.tone : undefined}
       data-tip={tipLabel()}
       data-tip-legend={legend().length ? JSON.stringify(legend()) : undefined}
@@ -81,13 +95,15 @@ export function RailTab(props: RailTabProps) {
           so they never steal the click. */}
       <For each={resolved().placed}>
         {(marker) => (
-          <span
-            class="tabrail-marker"
-            data-pos={marker.position}
-            data-tone={marker.tone}
-            aria-hidden="true"
-          >
-            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} pulse={marker.busy} />}</Show>}>
+          <span class="tabrail-marker" data-pos={marker.position} data-tone={marker.tone} aria-hidden="true">
+            <Show
+              when={marker.icon}
+              fallback={
+                <Show when={marker.dotTone}>
+                  {(tone) => <StatusDot {...railDotProps(tone())} pulse={marker.busy} />}
+                </Show>
+              }
+            >
               {(name) => <Icon name={name()} spin={marker.busy} />}
             </Show>
           </span>
@@ -95,7 +111,11 @@ export function RailTab(props: RailTabProps) {
       </For>
       {/* The states, in words, without changing the button's accessible name. */}
       <Show when={legend().length}>
-        <span id={describedBy} class="sr-only">{legend().map((item) => item.l).join('. ')}</span>
+        <span id={describedBy} class="sr-only">
+          {legend()
+            .map((item) => item.l)
+            .join('. ')}
+        </span>
       </Show>
     </button>
   )

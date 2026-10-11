@@ -2,10 +2,9 @@ import type { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 
-
-// These mirror the persisted rows (plugins/workflows/main/workflowContracts.ts derives its own from
-// drizzle) but are declared structurally so the renderer never imports a node-side module. They live
-// in core/shared because both the workflows and agents features read them.
+// These mirror the persisted rows (`workflowContracts` in shared/ derives its own from the schema) but
+// are declared structurally so a client never imports a node-side module. The agents and terminal
+// plugins read them too.
 
 // A committed/user workflow definition as loadWorkflowFiles returns it (docs/workflows.md): what the
 // palette launches and the settings inspector lists. `source` is the layer it was found in.
@@ -23,7 +22,14 @@ export type WorkflowDefSummary = {
   source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
   inputs?: WorkflowInput[]
-  steps: { id?: string; name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+  steps: {
+    id?: string
+    name: string
+    kind?: string
+    after?: string[]
+    isolation?: 'shared' | 'worktree'
+    inputs?: 'append' | 'template' | 'none'
+  }[]
   // The project this definition belongs to: the one whose checkout holds the file, or the one a row
   // is bound to. Null on a row that any project in the workspace may run.
   projectId?: string | null
@@ -85,14 +91,21 @@ export type WorkflowRunRow = {
   id: string
   taskId: string
   name: string
-  status: 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled'
+  status:
+    | 'running'
+    | 'gated'
+    | 'cancelling'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'safety-rail'
+    | 'cancelled'
   posture: string
   error: string | null
   createdAt: number
   updatedAt: number
-  // The definition this run froze at start, as JSON. On the wire since the runs route answered with
-  // the row; declared here because the run pane draws its nodes in graph order, and only the
-  // definition knows what each step waits on.
+  // The definition this run froze at start, as JSON. The run pane draws its nodes in graph order, and
+  // only the definition knows what each step waits on.
   defJson?: string
 }
 
@@ -105,7 +118,17 @@ export type WorkflowStepRow = {
   mode: string
   profileId: string | null
   model: string | null
-  status: 'pending' | 'running' | 'waiting-gate' | 'waiting-children' | 'done' | 'completed-with-failures' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
+  status:
+    | 'pending'
+    | 'running'
+    | 'waiting-gate'
+    | 'waiting-children'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'skipped'
+    | 'safety-rail'
+    | 'cancelled'
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null
@@ -119,8 +142,8 @@ export type WorkflowStepRow = {
   // The bundle handed to the step: the rendered prompt, and `childTaskId` for a step the runner gave
   // its own task and checkout. The run pane reads the second to link to that task.
   inputsJson?: string | null
-  // An agent step's completion condition state (`AgentExecuteGoalSummary` from
-  // @acorn/plugin-agents/contract/sessionExecute.ts). Host metadata: no binding reads it.
+  // An agent step's completion condition state (`AgentExecuteGoalSummary` in the agents contract).
+  // Host metadata: no binding reads it.
   goalJson?: string | null
   // Which dispatch step spawned this one, when one did. The run pane draws a child under its parent.
   parentStepId?: string | null

@@ -3,17 +3,28 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { DiffThread } from '../../kit/diff/diffModel'
-import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
+import {
+  _resetSurfaceHealth,
+  surfaceHealthSnapshot,
+  type SurfaceHealthEntry,
+} from '../../kit/lib/telemetry/surfaceHealth'
 import { largeDiffFiles, largeDiffSource, largeDiffSummary, type LargeDiffFile } from '../../testkit/largeDiff'
 import { installDiffLayout } from './layout.helper'
 
-// The diff's health reading against the real pane and the generated fixture (./diffHealth.ts). jsdom
-// has no layout, so the scroller is given a height and every other element a row's, which is enough
-// for the virtualizer to mount a window of rows; coverage by rect is the real window's to check.
+// The diff's health reading against the real pane and the generated fixture. jsdom has no layout, so the
+// scroller is given a height and every other element a row's, which is enough for the virtualizer to mount a
+// window of rows; coverage by rect is the real window's to check.
 
 vi.mock('../../infra/highlight/worker', () => {
-  const tokenizeDocument = async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
-  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: false }) }
+  const tokenizeDocument = async (_path: string, code: string) =>
+    code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
+  return {
+    tokenizeDocument,
+    highlightDocument: async (path: string, code: string) => ({
+      lines: await tokenizeDocument(path, code),
+      timedOut: false,
+    }),
+  }
 })
 
 const { DiffPane } = await import('./DiffPane')
@@ -25,7 +36,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanups.splice(0).reverse().forEach((dispose) => dispose())
+  cleanups
+    .splice(0)
+    .reverse()
+    .forEach((dispose) => dispose())
   _resetSurfaceHealth()
 })
 
@@ -33,9 +47,14 @@ const mount = (files: LargeDiffFile[], threads?: () => DiffThread[]) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => (
-    <QueryClientProvider client={client}><DiffPane source={largeDiffSource(files, { threads })} /></QueryClientProvider>
-  ), host)
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <DiffPane source={largeDiffSource(files, { threads })} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
   let disposed = false
   const unmount = () => {
     if (disposed) return
@@ -47,7 +66,8 @@ const mount = (files: LargeDiffFile[], threads?: () => DiffThread[]) => {
   return unmount
 }
 
-const diff = (): SurfaceHealthEntry | undefined => surfaceHealthSnapshot().surfaces.find((entry) => entry.kind === 'diff')
+const diff = (): SurfaceHealthEntry | undefined =>
+  surfaceHealthSnapshot().surfaces.find((entry) => entry.kind === 'diff')
 
 describe('the diff health probe', () => {
   it('reports the whole topology once ready, a mounted window, and nothing left behind on teardown', async () => {
@@ -65,14 +85,17 @@ describe('the diff health probe', () => {
     expect(ready.topology.segments).toBeGreaterThan(summary.files)
 
     // Only the segments near the viewport load, and once they have, nothing more is owed.
-    await vi.waitFor(() => {
-      const now = diff()!
-      expect(now.resident.rows).toBeGreaterThan(0)
-      expect(now.work.queuedSegments).toBe(0)
-      expect(now.measurement.activeObservers).toBeGreaterThan(0)
-      // The first measure pass runs on a frame, which a loaded machine can put after the rows land.
-      expect(now.measurement.candidates).toBeGreaterThan(0)
-    }, { timeout: 5_000 })
+    await vi.waitFor(
+      () => {
+        const now = diff()!
+        expect(now.resident.rows).toBeGreaterThan(0)
+        expect(now.work.queuedSegments).toBe(0)
+        expect(now.measurement.activeObservers).toBeGreaterThan(0)
+        // The first measure pass runs on a frame, which a loaded machine can put after the rows land.
+        expect(now.measurement.candidates).toBeGreaterThan(0)
+      },
+      { timeout: 5_000 },
+    )
     const mounted = diff()!
     expect(mounted.resident.estimatedBytes).toBeGreaterThan(0)
     expect(mounted.mounted.segments).toBeGreaterThan(0)

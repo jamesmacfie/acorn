@@ -13,7 +13,7 @@ import { mintInternalToken } from '../auth/internalTokens'
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
 // anywhere: in that mode Node skips checkServerIdentity entirely, so a pin would silently never be
-// checked), and the loopback Host guard still uses the port it actually bound now that the port is
+// checked), and the loopback Host guard uses the port it actually bound, because the port is
 // ephemeral.
 
 type Probe = { status: number; body: string }
@@ -55,7 +55,7 @@ describe('the loopback TLS listener', () => {
   const opened: Array<{ close(): void }> = []
 
   beforeEach(() => {
-    // No ACORN_PORT: the point of this suite is the ephemeral-port path the app now uses.
+    // No ACORN_PORT: the point of this suite is the ephemeral-port path the app uses.
     delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-listener-'))
@@ -95,7 +95,7 @@ describe('the loopback TLS listener', () => {
     expect(started.endpoint.origin).toBe(`https://127.0.0.1:${started.endpoint.port}`)
     expect(started.endpoint.port).toBeGreaterThan(0)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
-    // GET /v1/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
+    // GET /v1/node is the pre-auth route a client that has never paired uses (docs/api-reference/transport.md
     // § Pairing), so it is reachable without a bearer, which makes it the right shape probe here. It
     // advertises the same fingerprint the handshake above just presented.
     const response = await probe(started, '/v1/node')

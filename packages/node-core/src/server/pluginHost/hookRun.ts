@@ -23,7 +23,13 @@ export async function runPluginHookRoute(
   payload: HookPayload,
   signal: AbortSignal,
 ): Promise<unknown> {
-  const response = await dispatchPluginRoute(env, pluginId, route, { method: 'POST', body: JSON.stringify(payload) }, signal)
+  const response = await dispatchPluginRoute(
+    env,
+    pluginId,
+    route,
+    { method: 'POST', body: JSON.stringify(payload) },
+    signal,
+  )
   if (!response.ok) {
     log.warn(`${pluginId} answered ${response.status} from ${route}`)
     return null

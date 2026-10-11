@@ -20,7 +20,11 @@ describe('home tab verbs', () => {
   })
 
   it('renames one tab and reorders by swapping with the neighbour', () => {
-    const tabs = [{ id: '', name: 'Home' }, { id: 'a', name: 'Reviews' }, { id: 'b', name: 'Ops' }]
+    const tabs = [
+      { id: '', name: 'Home' },
+      { id: 'a', name: 'Reviews' },
+      { id: 'b', name: 'Ops' },
+    ]
     expect(renameTab(tabs, 'a', 'Triage')[1].name).toBe('Triage')
     expect(shiftTab(tabs, 'b', -1).map((tab) => tab.id)).toEqual(['', 'b', 'a'])
     // Off either end, or a tab that is not there: the list comes back as it went in.

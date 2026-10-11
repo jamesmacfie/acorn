@@ -8,12 +8,8 @@
 // keys with a note. This keeps unknown `with` keys from passing through without validation.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../../shared/api'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
-import type {
-  WorkflowCatalog,
-  WorkflowDef,
-  WorkflowInput,
-  WorkflowStepDef,
-} from '../../shared/workflowContracts'
+import { isRecord } from '@acorn/plugin-api/node'
+import type { WorkflowCatalog, WorkflowDef, WorkflowInput, WorkflowStepDef } from '../../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generate/forbiddenKeys'
 import { groundWorkflowDispatch } from './groundDispatch'
 import { gateFormDefinitionProblems } from '../workflowGateForm'
@@ -30,11 +26,46 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
  *  model writes is a key acorn never reads, so it is dropped rather than carried around looking
  *  meaningful. The forbidden ones stay in these lists and are caught by the set below, so this
  *  reads as the type it mirrors. */
-const DEF_KEYS = ['baseline', 'maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
+const DEF_KEYS = [
+  'baseline',
+  'maxDescendants',
+  'maxConcurrency',
+  'formatVersion',
+  'name',
+  'posture',
+  'trigger',
+  'tools',
+  'budget',
+  'inputs',
+  'outputs',
+  'steps',
+]
 const STEP_KEYS = [
-  'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt', 'goal',
-  'schema', 'policy', 'maxIterations', 'requiresRun', 'agent', 'childWorkflow', 'items', 'itemKey',
-  'title', 'form', 'branches', 'with', 'tools', 'budget',
+  'id',
+  'name',
+  'kind',
+  'after',
+  'isolation',
+  'inputs',
+  'configOptions',
+  'profileId',
+  'model',
+  'prompt',
+  'goal',
+  'schema',
+  'policy',
+  'maxIterations',
+  'requiresRun',
+  'agent',
+  'childWorkflow',
+  'items',
+  'itemKey',
+  'title',
+  'form',
+  'branches',
+  'with',
+  'tools',
+  'budget',
 ]
 const INPUT_KEYS = ['name', 'label', 'schema', 'description', 'required', 'default']
 
@@ -45,15 +76,14 @@ const FORBIDDEN_TOP_KEYS = new Set<string>(FORBIDDEN_KEYS.filter((key) => !key.i
 /** The forbidden keys that sit inside a `tools` ceiling, off the same list. That is `allow` and
  *  nothing else, and reading it from the list rather than writing it out here is what stops a sixth
  *  forbidden key being added in one file and missed in this one. */
-const FORBIDDEN_TOOL_KEYS = FORBIDDEN_KEYS.filter((key) => key.startsWith('tools.')).map((key) => key.slice('tools.'.length))
+const FORBIDDEN_TOOL_KEYS = FORBIDDEN_KEYS.filter((key) => key.startsWith('tools.')).map((key) =>
+  key.slice('tools.'.length),
+)
 
 /** How many objects to try before giving up on a reply. A preamble mentioning `${inputs.issue}`
  *  holds a balanced pair of braces, so the first object a brace count finds is not always the
  *  definition. */
 const MAX_OBJECT_CANDIDATES = 8
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const without = <T extends object>(record: T, key: string): T =>
   Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) as T
@@ -141,7 +171,8 @@ export function parseGeneratedWorkflow(text: string): ParsedWorkflow {
   const parsed = readJson(stripJsonFences(text))
   if (parsed === undefined) return { error: 'The model did not answer with JSON.' }
   if (!isRecord(parsed)) return { error: "The model's answer is not a JSON object." }
-  if (typeof parsed.name !== 'string' || !parsed.name.trim()) return { error: 'The workflow the model wrote has no name.' }
+  if (typeof parsed.name !== 'string' || !parsed.name.trim())
+    return { error: 'The workflow the model wrote has no name.' }
   const written = parsed.steps
   if (!Array.isArray(written) || !written.length) return { error: 'The workflow the model wrote has no steps.' }
 
@@ -160,14 +191,22 @@ export function parseGeneratedWorkflow(text: string): ParsedWorkflow {
   if (!steps.length) return { error: 'The workflow the model wrote has no steps.' }
   // A plain step binding names exactly the same source. Fallbacks and conversions have no map
   // equivalent, so leave those and other malformed sources intact for validation and repair.
-  const normalized = steps.map(step => {
-    if (step.kind !== 'workflow-map' || !isRecord(step.items)
-      || Object.keys(step.items).length !== 1 || !Object.hasOwn(step.items, 'address')) return step
+  const normalized = steps.map((step) => {
+    if (
+      step.kind !== 'workflow-map' ||
+      !isRecord(step.items) ||
+      Object.keys(step.items).length !== 1 ||
+      !Object.hasOwn(step.items, 'address')
+    )
+      return step
     const binding = dataBindingSchema.safeParse(step.items)
     if (!binding.success || binding.data.address.from !== 'step') return step
     const address = binding.data.address
-    notes.push({ code: 'normalized-map-source', step: step.name,
-      message: `Step '${step.name}' items was converted from a step binding to a map source, preserving its step ID and pointer.` })
+    notes.push({
+      code: 'normalized-map-source',
+      step: step.name,
+      message: `Step '${step.name}' items was converted from a step binding to a map source, preserving its step ID and pointer.`,
+    })
     return { ...step, items: { step: address.stepId, pointer: address.pointer } }
   })
   const changed = normalized.length !== written.length || normalized.some((step, index) => step !== written[index])
@@ -216,7 +255,12 @@ function hoistPrompt(step: WorkflowStepDef): { step: WorkflowStepDef; hoisted: b
 type KindEntry = WorkflowCatalog['kinds'][number]
 
 /** The identifiers on one step, against what this node can run. */
-function groundStep(step: WorkflowStepDef, catalog: WorkflowCatalog, kinds: Map<string, KindEntry>, notes: Notes): WorkflowStepDef {
+function groundStep(
+  step: WorkflowStepDef,
+  catalog: WorkflowCatalog,
+  kinds: Map<string, KindEntry>,
+  notes: Notes,
+): WorkflowStepDef {
   let next = step
   const label = step.name
   const kindId = next.kind == null ? 'agent' : String(next.kind)
@@ -226,19 +270,36 @@ function groundStep(step: WorkflowStepDef, catalog: WorkflowCatalog, kinds: Map<
     const hoist = hoistPrompt(next)
     next = without(without(hoist.step, 'kind'), 'with')
     const ending = hoist.hoisted ? ' with the prompt from its `with` table' : ''
-    add(notes, 'unknown-kind', `Step '${label}' asked for the kind '${kindId}', which this node cannot run, so it is now an ordinary agent step${ending}.`, label)
+    add(
+      notes,
+      'unknown-kind',
+      `Step '${label}' asked for the kind '${kindId}', which this node cannot run, so it is now an ordinary agent step${ending}.`,
+      label,
+    )
   } else if (described && described.pluginId === null && next.with !== undefined) {
     // Only a kind that runs an agent has a prompt to hoist into. A `with.prompt` on a gate is text
     // for nobody, and moving it onto the step would leave a key the gate never reads.
     const hoist = described.describe?.runsAgent ? hoistPrompt(next) : { step: next, hoisted: false }
     next = without(hoist.step, 'with')
-    const ending = hoist.hoisted ? ', so its prompt moved onto the step and the rest was dropped' : ', so it was dropped'
-    add(notes, 'with-on-builtin', `Step '${label}' carried a \`with\` table, which the built-in '${kindId}' kind does not read${ending}.`, label)
+    const ending = hoist.hoisted
+      ? ', so its prompt moved onto the step and the rest was dropped'
+      : ', so it was dropped'
+    add(
+      notes,
+      'with-on-builtin',
+      `Step '${label}' carried a \`with\` table, which the built-in '${kindId}' kind does not read${ending}.`,
+      label,
+    )
   } else if (described && described.pluginId !== null && isRecord(next.with)) {
     const fields = new Set((described.describe?.fields ?? []).map((field) => field.id))
     const drop = fields.size ? Object.keys(next.with).filter((key) => !fields.has(key)) : []
     for (const key of drop) {
-      add(notes, 'unknown-with-key', `Step '${label}' set '${key}' inside \`with\`, which the '${kindId}' kind does not take, so it was dropped.`, label)
+      add(
+        notes,
+        'unknown-with-key',
+        `Step '${label}' set '${key}' inside \`with\`, which the '${kindId}' kind does not take, so it was dropped.`,
+        label,
+      )
     }
     if (drop.length) {
       const table = Object.fromEntries(Object.entries(next.with).filter(([key]) => !drop.includes(key)))
@@ -250,13 +311,23 @@ function groundStep(step: WorkflowStepDef, catalog: WorkflowCatalog, kinds: Map<
     const offered = catalog.policies.length
       ? `This node has: ${catalog.policies.map((policy) => policy.id).join(', ')}.`
       : 'This node has no policies at all.'
-    add(notes, 'unknown-policy', `Step '${label}' named the policy '${next.policy}', which this node does not have, so the step has no policy. ${offered}`, label)
+    add(
+      notes,
+      'unknown-policy',
+      `Step '${label}' named the policy '${next.policy}', which this node does not have, so the step has no policy. ${offered}`,
+      label,
+    )
     next = without(next, 'policy')
   }
 
   const knownProfile = (id: unknown): boolean => catalog.profiles.some((profile) => profile.id === id)
   if (typeof next.profileId === 'string' && !knownProfile(next.profileId)) {
-    add(notes, 'unknown-profile', `Step '${label}' named the profile '${next.profileId}', which this node does not have, so the step runs on the default.`, label)
+    add(
+      notes,
+      'unknown-profile',
+      `Step '${label}' named the profile '${next.profileId}', which this node does not have, so the step runs on the default.`,
+      label,
+    )
     next = without(next, 'profileId')
   }
   if (next.schema !== undefined && !isRecord(next.schema)) {
@@ -278,7 +349,11 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
   })
 
   const ceiling = pruneCeiling(next.tools, (key) => {
-    add(notes, 'forbidden-key', `The workflow set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`)
+    add(
+      notes,
+      'forbidden-key',
+      `The workflow set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`,
+    )
   })
   if (ceiling !== next.tools) next = ceiling ? { ...next, tools: ceiling } : without(next, 'tools')
 
@@ -286,12 +361,15 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
     add(notes, 'unknown-key', 'The workflow set `inputs` to something that is not a list, so it was dropped.')
     next = without(next, 'inputs')
   } else if (next.inputs?.length) {
-    const inputs = next.inputs.map((input) => (isRecord(input)
-      ? pruneKeys(input as WorkflowInput, INPUT_KEYS, (key, code) => {
-        const why = code === 'forbidden-key' ? 'which a generated workflow cannot set' : 'which is not part of an input'
-        add(notes, code, `Input '${String(input.name ?? '')}' set '${key}', ${why}, so it was dropped.`)
-      })
-      : input))
+    const inputs = next.inputs.map((input) =>
+      isRecord(input)
+        ? pruneKeys(input as WorkflowInput, INPUT_KEYS, (key, code) => {
+            const why =
+              code === 'forbidden-key' ? 'which a generated workflow cannot set' : 'which is not part of an input'
+            add(notes, code, `Input '${String(input.name ?? '')}' set '${key}', ${why}, so it was dropped.`)
+          })
+        : input,
+    )
     if (inputs.some((input, index) => input !== next.inputs?.[index])) next = { ...next, inputs }
   }
 
@@ -301,16 +379,34 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
       add(notes, code, `Step '${step.name}' set '${key}', ${why}, so it was dropped.`, step.name)
     })
     if (isRecord(ahead.agent)) {
-      ahead = { ...ahead, agent: pruneKeys(ahead.agent, ['prompt', 'goal', 'profileId', 'schema', 'onFailure'], (key, code) => {
-        add(notes, code, `Step '${step.name}' agent set '${key}', which a generated workflow cannot set, so it was dropped.`, step.name)
-      }) }
+      ahead = {
+        ...ahead,
+        agent: pruneKeys(ahead.agent, ['prompt', 'goal', 'profileId', 'schema', 'onFailure'], (key, code) => {
+          add(
+            notes,
+            code,
+            `Step '${step.name}' agent set '${key}', which a generated workflow cannot set, so it was dropped.`,
+            step.name,
+          )
+        }),
+      }
     }
     if (ahead.after !== undefined && !Array.isArray(ahead.after)) {
-      add(notes, 'unknown-key', `Step '${step.name}' set \`after\` to something that is not a list, so it was dropped.`, step.name)
+      add(
+        notes,
+        'unknown-key',
+        `Step '${step.name}' set \`after\` to something that is not a list, so it was dropped.`,
+        step.name,
+      )
       ahead = without(ahead, 'after')
     }
     const stepCeiling = pruneCeiling(ahead.tools, (key) => {
-      add(notes, 'forbidden-key', `Step '${step.name}' set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`, step.name)
+      add(
+        notes,
+        'forbidden-key',
+        `Step '${step.name}' set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`,
+        step.name,
+      )
     })
     if (stepCeiling !== ahead.tools) ahead = stepCeiling ? { ...ahead, tools: stepCeiling } : without(ahead, 'tools')
 
@@ -326,18 +422,36 @@ function groundGateForms(def: WorkflowDef, catalog: WorkflowCatalog, notes: Note
   const indexes = new Map(def.steps.map((step, index) => [stepIdentity(step), index]))
   const declaredInputs = new Set((def.inputs ?? []).map((input) => input.name))
   const edges = workflowEdges(def.steps)
-  const precedes = (candidate: string, owner: string): boolean => workflowAncestors(edges, owner)?.has(candidate) ?? false
+  const precedes = (candidate: string, owner: string): boolean =>
+    workflowAncestors(edges, owner)?.has(candidate) ?? false
   const structured = (name: string): boolean => {
     const source = def.steps.find((step) => stepIdentity(step) === name)
-    return !!source && !!declaredOutputSchema(source, catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema)
+    return (
+      !!source &&
+      !!declaredOutputSchema(
+        source,
+        catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema,
+      )
+    )
   }
   const steps = def.steps.map((step, index) => {
     if (step.form === undefined) return step
     const problems = gateFormDefinitionProblems({
-      label: `step '${step.name || index + 1}'`, step, posture: def.posture, declaredInputs, indexes, precedes, structured,
+      label: `step '${step.name || index + 1}'`,
+      step,
+      posture: def.posture,
+      declaredInputs,
+      indexes,
+      precedes,
+      structured,
     })
     if (!problems.length) return step
-    add(notes, 'dropped-form', `Step '${step.name}' had a form that would not load (${problems[0]}), so the form was dropped and the step still waits for a person.`, step.name)
+    add(
+      notes,
+      'dropped-form',
+      `Step '${step.name}' had a form that would not load (${problems[0]}), so the form was dropped and the step still waits for a person.`,
+      step.name,
+    )
     return without(step, 'form')
   })
   return steps.some((step, index) => step !== def.steps[index]) ? { ...def, steps } : def

@@ -19,8 +19,10 @@ export const createAttachments = () =>
     (nodeId, _dep, signal) => readJson<NodeAttachmentState>(coreAttachmentRoute, { nodeId, signal }),
   )
 
-export const attachmentOf = (result: FleetResult<NodeAttachmentState>, nodeId: string): NodeAttachmentState | undefined =>
-  result.rows.find((row) => row.nodeId === nodeId)?.data
+export const attachmentOf = (
+  result: FleetResult<NodeAttachmentState>,
+  nodeId: string,
+): NodeAttachmentState | undefined => result.rows.find((row) => row.nodeId === nodeId)?.data
 
 /** Drop the attachment. The node revokes the control plane's device row and keeps working standalone,
  *  which is the promise the whole enrollment design rests on. */

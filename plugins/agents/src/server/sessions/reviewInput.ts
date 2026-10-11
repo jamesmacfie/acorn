@@ -16,17 +16,28 @@ const bytes = (text: string) => Buffer.byteLength(text, 'utf8')
  * cut, and every part after it is dropped. Files, attachments, and images are left out: a path or a
  * byte is not something a reviewer reads.
  */
-export function reviewUserText(turn: Pick<AgentTurn, 'source' | 'input'>, maxBytes = MAX_REVIEW_USER_TEXT_BYTES): {
+export function reviewUserText(
+  turn: Pick<AgentTurn, 'source' | 'input'>,
+  maxBytes = MAX_REVIEW_USER_TEXT_BYTES,
+): {
   userText: AgentReviewText[]
   userTextTruncated: boolean
 } {
-  const parts = turn.input.flatMap((part: AgentInputPart): Array<{ text: string; provenance: AgentReviewProvenance }> => {
-    if (part.type === 'text') {
-      return [{ text: part.text, provenance: turn.source === 'interactive' ? { kind: 'person' } : { kind: 'turn', source: turn.source } }]
-    }
-    if (part.type === 'context') return [{ text: part.content, provenance: { kind: 'context', source: part.source, label: part.label } }]
-    return []
-  }).filter((part) => part.text.trim())
+  const parts = turn.input
+    .flatMap((part: AgentInputPart): Array<{ text: string; provenance: AgentReviewProvenance }> => {
+      if (part.type === 'text') {
+        return [
+          {
+            text: part.text,
+            provenance: turn.source === 'interactive' ? { kind: 'person' } : { kind: 'turn', source: turn.source },
+          },
+        ]
+      }
+      if (part.type === 'context')
+        return [{ text: part.content, provenance: { kind: 'context', source: part.source, label: part.label } }]
+      return []
+    })
+    .filter((part) => part.text.trim())
   const userText: AgentReviewText[] = []
   let left = maxBytes
   for (const part of parts) {
@@ -45,7 +56,10 @@ type AssistantEvent = { text?: unknown; append?: unknown; messageId?: unknown; s
  * The last top-level assistant message, folded from the ledger's append-only deltas. A subagent's
  * message is its own conversation, not the agent's answer.
  */
-export function finalAssistantText(events: readonly AssistantEvent[], maxBytes = MAX_REVIEW_FINAL_TEXT_BYTES): {
+export function finalAssistantText(
+  events: readonly AssistantEvent[],
+  maxBytes = MAX_REVIEW_FINAL_TEXT_BYTES,
+): {
   finalText: string
   finalTextTruncated: boolean
 } {

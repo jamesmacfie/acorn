@@ -1,4 +1,14 @@
-import { ErrorBoundary, For, Show, createEffect, createMemo, createSignal, onCleanup, type Component, type JSX } from 'solid-js'
+import {
+  ErrorBoundary,
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { RemoteTree } from './RemoteTree'
@@ -96,7 +106,10 @@ export type SlotProps = {
 }
 
 export function Slot(props: SlotProps) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -131,12 +144,14 @@ export function Slot(props: SlotProps) {
         <For each={outcome()!.occupants}>
           {(contribution) => (
             <Show when={!failed().includes(contribution.id)}>
-              <ErrorBoundary fallback={(error) => {
-                reportContributionError({ contributionId: contribution.id, owner: contribution.pluginId, error })
-                recordTreeFailure(contribution.id, error instanceof Error ? error.message : String(error))
-                setFailed((ids) => [...ids, contribution.id])
-                return null
-              }}>
+              <ErrorBoundary
+                fallback={(error) => {
+                  reportContributionError({ contributionId: contribution.id, owner: contribution.pluginId, error })
+                  recordTreeFailure(contribution.id, error instanceof Error ? error.message : String(error))
+                  setFailed((ids) => [...ids, contribution.id])
+                  return null
+                }}
+              >
                 <Show
                   when={contribution.carrier === 'component' && contribution.component}
                   fallback={
@@ -209,7 +224,12 @@ function CompiledWithHost(props: {
   onCleanup(() => unwatch())
   const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: gestures.recent })
   return (
-    <span style={{ display: 'contents' }} ref={(element) => { unwatch = gestures.watch(element) }}>
+    <span
+      style={{ display: 'contents' }}
+      ref={(element) => {
+        unwatch = gestures.watch(element)
+      }}
+    >
       <Dynamic component={props.component} {...props.props()} host={host} />
     </span>
   )

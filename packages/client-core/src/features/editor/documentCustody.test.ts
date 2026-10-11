@@ -11,8 +11,12 @@ describe('document custody', () => {
     const stored = new Map<string, string>()
     const storage = {
       getItem: (key: string) => stored.get(key) ?? null,
-      setItem: (key: string, value: string) => { stored.set(key, value) },
-      removeItem: (key: string) => { stored.delete(key) },
+      setItem: (key: string, value: string) => {
+        stored.set(key, value)
+      },
+      removeItem: (key: string) => {
+        stored.delete(key)
+      },
     }
     vi.stubGlobal('localStorage', storage)
     try {
@@ -30,20 +34,26 @@ describe('document custody', () => {
       expect(reloaded.viewState).toEqual(document.viewState)
       stored.set(key, JSON.stringify({ text: 'legacy draft', acknowledged: 'old disk' }))
       expect(new DocumentCustody(key, 'new disk', 'new-revision').acknowledgedRevision).toBeUndefined()
-      storage.setItem = () => { throw new Error('quota') }
+      storage.setItem = () => {
+        throw new Error('quota')
+      }
       document.edit(text(full + '\nlatest'))
       release()
       expect(document.error).toContain('Recovery storage is unavailable')
       expect(documentCustody(address, 'external')).toBe(document)
       expect(document.current.toString()).toBe(full + '\nlatest')
       await document.flush(async (value) => ({ text: value }))
-    } finally { vi.unstubAllGlobals() }
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('joins repeated flushes and writes only the latest requested follow-up', async () => {
     const document = owner()
     const held: { text: string; resolve: (value: { text: string }) => void }[] = []
-    const write = vi.fn((value: string) => new Promise<{ text: string }>((resolve) => held.push({ text: value, resolve })))
+    const write = vi.fn(
+      (value: string) => new Promise<{ text: string }>((resolve) => held.push({ text: value, resolve })),
+    )
     document.edit(text('first'))
     const first = document.flush(write)
     expect(document.flush(write)).toBe(first)
@@ -83,7 +93,12 @@ describe('document custody', () => {
     const writing: boolean[] = []
     const unsubscribe = document.subscribe(() => writing.push(document.writing))
     let resolve!: (value: { text: string; revision: string }) => void
-    const saving = document.flush(() => new Promise((done) => { resolve = done }))
+    const saving = document.flush(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
     expect(writing).toContain(true)
     document.edit(text('later edit'))
     resolve({ text: 'formatted', revision: 'exact-file-revision' })
@@ -107,7 +122,14 @@ describe('document custody', () => {
   it('writes an undo back to acknowledged content after a held write lands', async () => {
     const document = owner()
     let resolve!: (value: { text: string }) => void
-    const write = vi.fn().mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    const write = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            resolve = done
+          }),
+      )
       .mockResolvedValue({ text: 'loaded' })
     document.edit(text('edit'))
     const saving = document.flush(write)
@@ -126,7 +148,12 @@ describe('document custody', () => {
     a.edit(text('a'))
     b.edit(text('b'))
     let resolve!: (value: {}) => void
-    const saving = a.flush(() => new Promise((done) => { resolve = done }))
+    const saving = a.flush(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
     await b.flush(async () => ({}))
     expect(b.dirty).toBe(false)
     expect(a.dirty).toBe(true)
@@ -137,7 +164,12 @@ describe('document custody', () => {
   it('suspends queued follow-up writes until a file operation releases custody', async () => {
     const document = owner()
     let finish!: (value: { text: string; revision: string }) => void
-    const writer = vi.fn((_value: string) => new Promise<{ text: string; revision: string }>((resolve) => { finish = resolve }))
+    const writer = vi.fn(
+      (_value: string) =>
+        new Promise<{ text: string; revision: string }>((resolve) => {
+          finish = resolve
+        }),
+    )
     document.editText('first')
     const admitted = document.flush(writer)
     const suspended = document.suspendWrites()
@@ -155,7 +187,12 @@ describe('document custody', () => {
   it('keeps overlapping suspension holders independent while an admitted write settles', async () => {
     const document = owner()
     let finish!: (value: { text: string; revision: string }) => void
-    const writer = vi.fn((_value: string) => new Promise<{ text: string; revision: string }>((resolve) => { finish = resolve }))
+    const writer = vi.fn(
+      (_value: string) =>
+        new Promise<{ text: string; revision: string }>((resolve) => {
+          finish = resolve
+        }),
+    )
     document.editText('first')
     const admitted = document.flush(writer)
     const firstHolder = document.suspendWrites()
@@ -192,8 +229,12 @@ describe('document custody', () => {
     const stored = new Map<string, string>()
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => stored.get(key) ?? null,
-      setItem: (key: string, value: string) => { stored.set(key, value) },
-      removeItem: (key: string) => { stored.delete(key) },
+      setItem: (key: string, value: string) => {
+        stored.set(key, value)
+      },
+      removeItem: (key: string) => {
+        stored.delete(key)
+      },
     })
     try {
       const oldAddress = ['node-a', 'file', 'task', `old-${++serial}`]
@@ -206,7 +247,12 @@ describe('document custody', () => {
       resume()
       expect(documentCustody(newAddress, 'other')).toBe(document)
       expect(stored.has(`acorn.document.recovery.${JSON.stringify(oldAddress)}`)).toBe(false)
-      expect(JSON.parse(stored.get(`acorn.document.recovery.${JSON.stringify(newAddress)}`)!)).toMatchObject({ text: 'draft', acknowledgedRevision: 'disk-revision' })
-    } finally { vi.unstubAllGlobals() }
+      expect(JSON.parse(stored.get(`acorn.document.recovery.${JSON.stringify(newAddress)}`)!)).toMatchObject({
+        text: 'draft',
+        acknowledgedRevision: 'disk-revision',
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

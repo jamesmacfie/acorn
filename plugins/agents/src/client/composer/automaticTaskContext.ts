@@ -15,8 +15,12 @@ export function automaticTaskContextPayload(context: AgentContextSnapshot): stri
 
 export function latestAutomaticTaskContext(turns: AgentTurn[]): AgentContextSnapshot | undefined {
   for (const turn of [...turns].sort((left, right) => right.ordinal - left.ordinal)) {
-    const context = [...turn.input].reverse().find((part): part is AgentContextSnapshot =>
-      part.type === 'context' && part.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+    const context = [...turn.input]
+      .reverse()
+      .find(
+        (part): part is AgentContextSnapshot =>
+          part.type === 'context' && part.source === AUTOMATIC_TASK_CONTEXT_SOURCE,
+      )
     if (context) return context
   }
   return undefined

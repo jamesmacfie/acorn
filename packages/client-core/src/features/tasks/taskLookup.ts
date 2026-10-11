@@ -3,10 +3,9 @@ import type { Task } from '../../infra/queries'
 // One task, by id, from module-level code.
 //
 // The task list is a TanStack query and `useQueryClient` is a hook, usable only while a component is
-// being set up. So module-level callers holding a task id had no way to reach the entity, and the
-// visible cost was a silent dead click: `openPluginContentTarget` couldn't evaluate a pane's
-// `when(task)` predicate, so a content link naming a stopped plugin's pane claimed the event and
-// rendered nothing.
+// being set up, so a module-level caller holding a task id needs this to reach the entity. Without
+// it `openPluginContentTarget` can't evaluate a pane's `when(task)` predicate, and a content link
+// naming a stopped plugin's pane claims the event and renders nothing.
 //
 // The composition root installs the reader once, because it's the one place that holds the QueryClient
 // and knows the app is mounted. Not reactive: every caller is a click handler answering "can this go

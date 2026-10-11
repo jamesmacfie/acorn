@@ -1,11 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentDailyUsage, AgentDailyUsagePeriod } from '../../shared/usage'
-import {
-  claudeModelPrice,
-  emptyAgentPricingPreferences,
-  type AgentPricingPreferences,
-} from '../../shared/pricing'
+import { claudeModelPrice, emptyAgentPricingPreferences, type AgentPricingPreferences } from '../../shared/pricing'
 
 const MAX_FILE_BYTES = 32 * 1024 * 1024
 const MAX_FILES = 2_000
@@ -27,7 +23,9 @@ type TokenUsageRecord = {
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
 }
 
 function finiteToken(value: unknown): number {
@@ -73,9 +71,7 @@ export function deduplicateClaudeUsage(records: readonly TokenUsageRecord[]): To
   let unkeyed = 0
   for (const record of records) {
     const key =
-      record.messageId && record.requestId
-        ? `${record.messageId}\u0000${record.requestId}`
-        : `unkeyed:${unkeyed++}`
+      record.messageId && record.requestId ? `${record.messageId}\u0000${record.requestId}` : `unkeyed:${unkeyed++}`
     if (!keyed.has(key)) order.push(key)
     keyed.set(key, record)
   }

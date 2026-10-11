@@ -12,7 +12,8 @@ const COLOUR = /\x1b\[[0-9;:]*m/g
 // is not a colour, any other escape such as the charset select `ESC ( B` that `tput sgr0` writes,
 // and finally a lone ESC. The third excludes `[` and `]` as a final byte, so it cannot eat the
 // start of a colour code the second one declined.
-const NOT_COLOUR = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b\[[0-?]*[ -/]*[@-ln-~]|\x1b[ -/]*[0-Z\\^-~]|\x1b(?!\[[0-9;:]*m)/g
+const NOT_COLOUR =
+  /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b\[[0-?]*[ -/]*[@-ln-~]|\x1b[ -/]*[0-Z\\^-~]|\x1b(?!\[[0-9;:]*m)/g
 
 // Control bytes other than tab, newline, and carriage return, which a <pre> also draws as boxes.
 const CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1a\x1c-\x1f\x7f]/g

@@ -80,8 +80,6 @@ result rendering against disposable data. Verify Linear reference panels and HTT
 The overlay carrier has manifest, host, and companion-overlay implementations. Confirm whether a
 loaded package exercises the complete flow before retaining the earlier first-consumer gap.
 
-<a id="open-items-from-the-loaded-plugin-migrations"></a>
-
 ## Scope boundaries
 
 Bare references without a confirming URL need a separate bounded host parser and provider

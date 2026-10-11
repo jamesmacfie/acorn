@@ -25,7 +25,7 @@ does not write the source file during ordinary draft editing.
 project. Workspace originals remain intact. Published saved queries and typed parameter declarations
 are embedded inline, database child references become repository references, and repository references
 are reused only within the export scope. Cycles, unresolved references, user-file dependencies, and
-occupied destination paths are refused. The obsolete `save-to-repo` route refuses destructive export.
+occupied destination paths are refused.
 
 Connection selections become required string inputs with a `connection.source` constraint. Export
 removes Acorn workspace/project scope IDs, while retaining provider project/state IDs in the review.

@@ -27,18 +27,18 @@ export function Select(props: SelectProps) {
         <For each={props.options}>
           {(option, index) => (
             <>
-            <Show when={option.group && (index() === 0 || props.options[index() - 1]?.group !== option.group)}>
-              <Line role="muted">{option.group}</Line>
-            </Show>
-            <Option
-              label={option.label}
-              chosen={option.value === props.value}
-              disabled={option.disabled}
-              onPress={() => {
-                props.onChange?.(option.value)
-                context.close()
-              }}
-            />
+              <Show when={option.group && (index() === 0 || props.options[index() - 1]?.group !== option.group)}>
+                <Line role="muted">{option.group}</Line>
+              </Show>
+              <Option
+                label={option.label}
+                chosen={option.value === props.value}
+                disabled={option.disabled}
+                onPress={() => {
+                  props.onChange?.(option.value)
+                  context.close()
+                }}
+              />
             </>
           )}
         </For>
@@ -54,9 +54,13 @@ export function Select(props: SelectProps) {
  *  through a list needs to see where they are more than what they had. */
 function Option(props: { label: string; chosen?: boolean; disabled?: boolean; onPress: () => void }) {
   const control = stop({ onPress: () => props.onPress(), disabled: () => !!props.disabled })
-  const lit = () => (control.focused()
-    ? { role: 'strong' as const, tone: 'accent' as const }
-    : { role: props.chosen ? 'match' as const : 'body' as const, tone: props.disabled ? 'muted' as const : undefined })
+  const lit = () =>
+    control.focused()
+      ? { role: 'strong' as const, tone: 'accent' as const }
+      : {
+          role: props.chosen ? ('match' as const) : ('body' as const),
+          tone: props.disabled ? ('muted' as const) : undefined,
+        }
   return (
     <box flexDirection="row" flexShrink={0} ref={control.ref}>
       <Line {...lit()}>{props.label}</Line>
@@ -88,8 +92,12 @@ export function Checkbox(props: {
   return (
     <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
       <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{mark()}</Line>
-      <Show when={props.label}><Line>{props.label}</Line></Show>
-      <Show when={props.hint}><Line role="muted">{props.hint!}</Line></Show>
+      <Show when={props.label}>
+        <Line>{props.label}</Line>
+      </Show>
+      <Show when={props.hint}>
+        <Line role="muted">{props.hint!}</Line>
+      </Show>
     </box>
   )
 }
@@ -103,7 +111,9 @@ export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedC
   })
   return (
     <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
-      <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{props.pressed ? '[x]' : '[ ]'}</Line>
+      <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>
+        {props.pressed ? '[x]' : '[ ]'}
+      </Line>
       <Line {...litControl({ focused: control.focused(), disabled: props.disabled, tone: props.tone })}>
         {flatten(props.children) || props.label || ''}
       </Line>
@@ -120,7 +130,8 @@ export function SegmentedControl<T extends string>(props: {
   size?: Extract<Size, 'sm' | 'md'>
   ariaLabel: string
 }) {
-  const body = () => `( ${props.options.map((option) => (option.value === props.value ? `[${option.label}]` : option.label)).join(' | ')} )`
+  const body = () =>
+    `( ${props.options.map((option) => (option.value === props.value ? `[${option.label}]` : option.label)).join(' | ')} )`
   // `NODE_FOCUS` calls `Grid` a collection, but its options are text with no renderable to focus.
   // The strip holds the keys. Shared collection intents move its value with arrows and paging keys.
   const keys = createCollectionIntents({
@@ -136,8 +147,9 @@ export function SegmentedControl<T extends string>(props: {
     onItem: () => false,
   })
   const control = stop({
-    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as
-      Partial<Record<Intent, () => boolean>>,
+    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as Partial<
+      Record<Intent, () => boolean>
+    >,
   })
   return (
     <box flexDirection="row" flexShrink={0} ref={control.ref}>
@@ -185,10 +197,15 @@ export function Picker<T>(props: PickerProps<T>) {
     >
       {(context) => (
         <box flexDirection="column">
-          <Input kind="filter" placeholder={props.placeholder} value={query()} onInput={(value) => {
-            setQuery(value)
-            props.onSearch?.(value)
-          }} />
+          <Input
+            kind="filter"
+            placeholder={props.placeholder}
+            value={query()}
+            onInput={(value) => {
+              setQuery(value)
+              props.onSearch?.(value)
+            }}
+          />
           {slot(props.tools)}
           {slot(props.status)}
           <Show when={rows().length} fallback={<Line role="muted">{props.emptyText}</Line>}>
@@ -232,7 +249,9 @@ export function PickerRow(props: {
       <Line tone="accent">{control.focused() || props.active ? '›' : ' '}</Line>
       {slot(props.leading)}
       <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{props.label}</Line>
-      <Show when={props.description}><Line role="muted">{props.description!}</Line></Show>
+      <Show when={props.description}>
+        <Line role="muted">{props.description!}</Line>
+      </Show>
     </box>
   )
 }

@@ -16,7 +16,7 @@ import { sessionCredentialPath } from '../server/auth/credentialFile'
 // is covered at the registry/route layer.
 //
 // The stub is HTTPS with a real acorn certificate, and the child gets ACORN_DATA_DIR and
-// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/runtime.ts): resolve
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/boot.ts): resolve
 // the port from node.json, trust the node's certificate as a CA, and validate fully.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -27,13 +27,28 @@ const MCP_ENTRY = resolve(appRoot, '../../apps/node/src/entries/mcp.ts')
 // A tiny fixture manifest projected as JSON schema by the registry.
 const MANIFEST = {
   tools: [
-    { name: 'task_current', description: 'the task', risk: 'read', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-    { name: 'retry_tool', description: 'retry once', risk: 'execute', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    {
+      name: 'task_current',
+      description: 'the task',
+      risk: 'read',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
+    {
+      name: 'retry_tool',
+      description: 'retry once',
+      risk: 'execute',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    },
     {
       name: 'notes_append',
       description: 'append a note',
       risk: 'write',
-      inputSchema: { type: 'object', properties: { slug: { type: 'string' }, text: { type: 'string' } }, required: ['slug', 'text'], additionalProperties: false },
+      inputSchema: {
+        type: 'object',
+        properties: { slug: { type: 'string' }, text: { type: 'string' } },
+        required: ['slug', 'text'],
+        additionalProperties: false,
+      },
     },
   ],
 }
@@ -48,12 +63,16 @@ class McpClient {
   constructor(env: Record<string, string | undefined>) {
     // Start from an environment with acorn's own variables stripped, then apply the test's. A
     // developer working on acorn runs this suite from inside an acorn task, where ACORN_DATA_DIR and
-    // NODE_EXTRA_CA_CERTS are already set. Inheriting them pointed the child at the live node, and
-    // the "acorn is not running" case connected to a real one and got a 401 instead.
+    // NODE_EXTRA_CA_CERTS are already set. Inheriting them would point the child at the live node, and
+    // the "acorn is not running" case would connect to a real one and get a 401 instead.
     const ambient = Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !key.startsWith('ACORN_') && key !== 'NODE_EXTRA_CA_CERTS'),
     )
-    this.child = spawn(process.execPath, ['--import', 'tsx', MCP_ENTRY], { cwd: appRoot, env: { ...ambient, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
+    this.child = spawn(process.execPath, ['--import', 'tsx', MCP_ENTRY], {
+      cwd: appRoot,
+      env: { ...ambient, ...env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
     this.child.stdout!.on('data', (chunk: Buffer) => {
       this.buffer += chunk.toString()
       let i: number
@@ -75,8 +94,8 @@ class McpClient {
   send(method: string, params: Record<string, unknown> = {}): Promise<{ result?: unknown; error?: unknown }> {
     const id = this.nextId++
     const p = new Promise<{ result?: unknown; error?: unknown }>((resolvePromise, reject) => {
-      // Matches the 30s each test declares. At 15s this timer fired first, so a slow tsx startup
-      // read as a hung request.
+      // Matches the 30s each test declares. A shorter timer fires first, and a slow tsx startup reads
+      // as a hung request.
       const timer = setTimeout(() => reject(new Error(`timeout waiting for ${method}`)), 30_000)
       this.pending.set(id, (msg) => {
         clearTimeout(timer)
@@ -92,7 +111,11 @@ class McpClient {
   }
 
   async init(): Promise<void> {
-    const res = await this.send('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'acorn-test', version: '0' } })
+    const res = await this.send('initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'acorn-test', version: '0' },
+    })
     expect(res.error).toBeUndefined()
     this.notify('notifications/initialized')
   }
@@ -102,7 +125,8 @@ class McpClient {
   }
 }
 
-const toolText = (res: { result?: unknown }): unknown => JSON.parse((res.result as { content: { text: string }[] }).content[0].text)
+const toolText = (res: { result?: unknown }): unknown =>
+  JSON.parse((res.result as { content: { text: string }[] }).content[0].text)
 
 describe('acorn MCP server projects the agent-tool registry over stdio (docs/agent-tools.md)', () => {
   let stub: Server
@@ -120,7 +144,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     body: unknown
     internal: string
     session: string
-    ceiling: string
     callId: string
     server: 'primary' | 'retry'
   }[] = []
@@ -149,18 +172,26 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
             body: raw ? JSON.parse(raw) : null,
             internal: String(req.headers['x-acorn-internal'] ?? ''),
             session: String(req.headers['x-acorn-session-id'] ?? ''),
-            ceiling: String(req.headers['x-acorn-tool-ceiling'] ?? ''),
             callId: String(req.headers['x-acorn-tool-call-id'] ?? ''),
             server,
           })
           // Simulate the old node disappearing after it received the request. apiCall re-reads
           // node.json and sends the same logical MCP call to the replacement node.
           if (server === 'primary' && url.endsWith('/tools/retry_tool')) {
-            writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port: retryPort }))
+            writeFileSync(
+              join(dataDir, 'node.json'),
+              JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port: retryPort }),
+            )
             req.socket.destroy()
             return
           }
-          if (url.endsWith('/tools/task_current')) return json({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813, links: [{ id: 'linear:ENG-42', kind: 'linear', label: 'ENG-42', details: ['In Progress'] }] })
+          if (url.endsWith('/tools/task_current'))
+            return json({
+              repo: 'acme/api',
+              branch: 'fix/null-token',
+              pullNumber: 813,
+              links: [{ id: 'linear:ENG-42', kind: 'linear', label: 'ENG-42', details: ['In Progress'] }],
+            })
           json({ ok: true })
         })
         return
@@ -177,13 +208,19 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     retryPort = (retryStub.address() as { port: number }).port
     // What openDataRoot writes, and the only current thing a reattached child can read: the URL it was
     // spawned with is from a previous boot, the port in here is from this one.
-    writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
+    writeFileSync(
+      join(dataDir, 'node.json'),
+      JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }),
+    )
   })
 
   beforeEach(() => {
     posts.length = 0
     manifest = MANIFEST
-    writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
+    writeFileSync(
+      join(dataDir, 'node.json'),
+      JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }),
+    )
   })
 
   afterAll(() => {
@@ -203,7 +240,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       NODE_EXTRA_CA_CERTS: caPath,
       ACORN_API_TOKEN: 'internal-token',
       ACORN_SESSION_ID: 'sess-42',
-      ACORN_TOOL_CEILING: 'encoded-scope',
     })
     try {
       await client.init()
@@ -213,7 +249,9 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       // Sorted by name whatever order the registry lists them in, so a harness prompt stays stable.
       expect(tools.map((t) => t.name)).toEqual(['notes_append', 'retry_tool', 'task_current'])
       // The registry's JSON schema rides through unchanged.
-      expect(tools.find((t) => t.name === 'notes_append')?.inputSchema).toMatchObject({ properties: { slug: { type: 'string' } } })
+      expect(tools.find((t) => t.name === 'notes_append')?.inputSchema).toMatchObject({
+        properties: { slug: { type: 'string' } },
+      })
 
       const current = toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))
       expect(current).toMatchObject({ repo: 'acme/api', pullNumber: 813 })
@@ -224,7 +262,6 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(post?.body).toEqual({ slug: 'plan', text: 'Done.' })
       expect(post?.internal).toBe('internal-token')
       expect(post?.session).toBe('sess-42')
-      expect(post?.ceiling).toBe('encoded-scope')
       expect(post?.callId).toMatch(/^[0-9a-f-]{36}$/)
     } finally {
       client.kill()
@@ -235,8 +272,11 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     const tokenFile = join(dataDir, 'current-token')
     writeFileSync(tokenFile, 'first-token')
     const client = new McpClient({
-      ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath,
-      ACORN_API_TOKEN: 'expired-launch-token', ACORN_API_TOKEN_FILE: tokenFile,
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'expired-launch-token',
+      ACORN_API_TOKEN_FILE: tokenFile,
     })
     try {
       await client.init()
@@ -246,7 +286,9 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       rmSync(tokenFile)
       await client.send('tools/call', { name: 'task_current', arguments: {} })
       expect(posts.map((post) => post.internal)).toEqual(['first-token', 'renewed-token', ''])
-    } finally { client.kill() }
+    } finally {
+      client.kill()
+    }
   }, 30_000)
 
   it('finds a migrated tmux session file from its existing task and session environment', async () => {
@@ -254,8 +296,11 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     mkdirSync(dirname(tokenFile), { recursive: true })
     rmSync(tokenFile, { force: true })
     const client = new McpClient({
-      ACORN_TASK_ID: 't1', ACORN_SESSION_ID: 'old-session', ACORN_DATA_DIR: dataDir,
-      NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'old-launch-token',
+      ACORN_TASK_ID: 't1',
+      ACORN_SESSION_ID: 'old-session',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'old-launch-token',
     })
     try {
       await client.init()
@@ -263,17 +308,28 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       writeFileSync(tokenFile, 'renewed-token')
       await client.send('tools/call', { name: 'task_current', arguments: {} })
       expect(posts.map((post) => post.internal)).toEqual(['old-launch-token', 'renewed-token'])
-    } finally { client.kill() }
+    } finally {
+      client.kill()
+    }
   }, 30_000)
 
   it('announces a changed description even when the tool names stay the same', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'internal-token' })
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'internal-token',
+    })
     try {
       await client.init()
       await client.send('tools/list') // the server has taken its first manifest snapshot by now
-      manifest = { tools: MANIFEST.tools.map((t) => (t.name === 'task_current' ? { ...t, description: 'the current task' } : t)) }
+      manifest = {
+        tools: MANIFEST.tools.map((t) => (t.name === 'task_current' ? { ...t, description: 'the current task' } : t)),
+      }
       // The server polls every 10 s.
-      await expect.poll(() => client.notifications, { timeout: 15_000, interval: 250 }).toContain('notifications/tools/list_changed')
+      await expect
+        .poll(() => client.notifications, { timeout: 15_000, interval: 250 })
+        .toContain('notifications/tools/list_changed')
     } finally {
       client.kill()
     }
@@ -302,7 +358,12 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   }, 30_000)
 
   it('without ACORN_TASK_ID → empty list and a structured no-active-task, not an error', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: '', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'x' })
+    const client = new McpClient({
+      ACORN_TASK_ID: '',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'x',
+    })
     try {
       await client.init()
       expect((await client.send('tools/list')).result).toMatchObject({ tools: [] })
@@ -318,7 +379,9 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_API_URL: 'https://127.0.0.1:1', ACORN_API_TOKEN: 'x' })
     try {
       await client.init()
-      expect(toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))).toMatchObject({ status: 'acorn-not-running' })
+      expect(toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))).toMatchObject({
+        status: 'acorn-not-running',
+      })
     } finally {
       client.kill()
     }
@@ -328,7 +391,12 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   // must degrade to the same structured 'acorn-not-running' it uses for "nothing is listening", not
   // connect anyway, and not die with a TLS stack trace an agent would surface as a tool crash.
   it('with a certificate it does not trust → the same structured acorn-not-running', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: strangerCaPath, ACORN_API_TOKEN: 'x' })
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: strangerCaPath,
+      ACORN_API_TOKEN: 'x',
+    })
     try {
       await client.init()
       expect((await client.send('tools/list')).result).toMatchObject({ tools: [] })

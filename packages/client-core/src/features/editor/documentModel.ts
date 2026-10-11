@@ -11,12 +11,10 @@ import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 // one place to read them from.
 export type {
   PluginCompletionItem,
-  PluginCompletionKind,
   PluginCompletionRequest,
-  PluginCompletionResponse,
   PluginDocumentBody,
 } from '@acorn/protocol/documentSurface.ts'
-export { COMPLETION_KINDS, MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
+export { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
 
 /** A document big enough to wedge the renderer is refused rather than truncated: half a file in an
  * editor that will happily save it back is data loss. Declared on the wire
@@ -34,7 +32,6 @@ export type DocumentHandle = {
   write(text: string): void
   flush(): Promise<void>
 }
-
 
 // The only two parameters the host substitutes, because they are the two values it holds about the
 // pane it is drawing. Anything else in a path is left alone and the route 404s honestly.
@@ -95,8 +92,8 @@ export function clearDocumentViewStates(): void {
   viewStates.clear()
 }
 
-// Registered beside the signal it clears (registries/scopeEviction.ts). View state does not clear
-// on a node switch, because it is keyed by node, so switching back restores where the reader was.
+// Registered beside the signal it clears. View state does not clear on a node switch, because it is keyed by
+// node, so switching back restores where the reader was.
 onScopeEvicted((eviction) => {
   if (eviction.scope === 'task') evictDocumentViewStates(eviction.taskId)
   else if (eviction.scope === 'workspace') evictDocumentViewStates(eviction.workspaceId)

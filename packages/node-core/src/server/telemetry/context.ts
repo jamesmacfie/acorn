@@ -1,15 +1,14 @@
 // The node's ambient telemetry context: which trace is open and who is on the stack.
 //
-// This is the first `AsyncLocalStorage` in the codebase, and it earns that on one argument.
+// An `AsyncLocalStorage`, for one reason.
 // `core/git.ts` and `storage/sqlite.ts` are reached from every plugin and every route and know
 // nothing about their caller, so their histograms all read `owner: core` and answer "the node spent
 // four seconds in git" without answering whose four seconds. Threading an owner down to them would
 // change hundreds of signatures. Entering one store at the five seams that already know touches
 // five (docs/telemetry/runtimes.md § Ambient attribution).
 //
-// **It holds three fields and no more.** A request-scoped logger or a per-request deadline could
-// ride the same store later; a bag of whatever a caller felt like adding could not be reasoned
-// about, and this one runs under every request.
+// **It holds three fields and no more.** A bag of whatever a caller felt like adding could not be
+// reasoned about, and this one runs under every request.
 //
 // **It imports nothing from the collector.** The collector reads `currentTelemetryContext()` on the
 // git and SQL paths, so the dependency runs one way and there is no cycle to reason about. The
@@ -28,8 +27,8 @@ export type TelemetryContext = {
 
 const storage = new AsyncLocalStorage<TelemetryContext>()
 
-/** What is on the stack, or `undefined` outside every entered seam. About 8 nanoseconds a call, so
- *  a caller on the SQL path can ask per statement. */
+/** What is on the stack, or `undefined` outside every entered seam. Cheap enough that a caller on the
+ *  SQL path can ask per statement. */
 export const currentTelemetryContext = (): TelemetryContext | undefined => storage.getStore()
 
 /**

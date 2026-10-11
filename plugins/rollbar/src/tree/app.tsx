@@ -1,7 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import {
-  Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row,
-} from '@acorn/plugin-api/ui/tree'
+import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import {
@@ -27,10 +25,8 @@ export type RollbarPaneProps = { taskId?: string; item?: string }
 /**
  * The Rollbar pane, as a tree.
  *
- * The bridge is still this plugin's only data and I/O seam, exactly as it was in the frame. What
- * changed is the other direction: the pane's own brand header is gone, because the pane switcher
- * already draws the name and the mark, and an iframe drew its own only because it had no chrome to
- * borrow.
+ * The bridge is this plugin's only data and I/O seam. The pane draws no brand header of its own,
+ * because the pane switcher already draws the name and the mark.
  */
 export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [linkedTargets, setLinkedTargets] = createSignal<RollbarRailTarget[]>([])
@@ -42,17 +38,22 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [latest, setLatest] = createSignal<OccurrenceState>({ kind: 'empty' })
   const [refreshing, setRefreshing] = createSignal(false)
   const [refreshError, setRefreshError] = createSignal('')
-  let itemLoad = 0
-  let occurrenceLoad = 0
+  // The item read, and the occurrence read inside it. A newer read aborts its own kind, and a new
+  // item aborts the occurrence read too.
+  let itemRead = new AbortController()
+  let occurrenceRead = new AbortController()
 
   const load = async (target: RollbarRailTarget, refresh = false): Promise<void> => {
     if (refresh && refreshing()) return
-    const request = ++itemLoad
+    itemRead.abort()
+    itemRead = new AbortController()
+    const request = itemRead.signal
     const keepView = refresh && view() !== null && targetKey(view()!.target) === targetKey(target)
     setRefreshError('')
     if (keepView) setRefreshing(true)
     else {
-      occurrenceLoad += 1
+      occurrenceRead.abort()
+      occurrenceRead = new AbortController()
       setRefreshing(false)
       setView(null)
       setOccurrence({ kind: 'empty' })
@@ -69,9 +70,13 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
           rollbarOccurrencesRoute(target.integrationId, target.identifier, refresh),
         ),
       ])
-      if (request !== itemLoad) return
+      if (request.aborted) return
       const currentOccurrence = occurrence()
-      if (!keepView || currentOccurrence.kind !== 'ready' || !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)) {
+      if (
+        !keepView ||
+        currentOccurrence.kind !== 'ready' ||
+        !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)
+      ) {
         setOccurrence({ kind: 'empty' })
       }
       setView({ target, item, occurrences: occurrences.occurrences })
@@ -79,40 +84,53 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       if (newest) void loadLatest(target, newest.id, request, keepView)
       else setLatest({ kind: 'empty' })
     } catch (error) {
-      if (request !== itemLoad) return
+      if (request.aborted) return
       if (keepView) setRefreshError(failureReason(error))
-      else setPage({ kind: 'error', title: "Couldn't load this error", detail: failureReason(error), retry: () => void load(target) })
+      else
+        setPage({
+          kind: 'error',
+          title: "Couldn't load this error",
+          detail: failureReason(error),
+          retry: () => void load(target),
+        })
     } finally {
-      if (request === itemLoad) setRefreshing(false)
+      if (!request.aborted) setRefreshing(false)
     }
   }
 
   // The same cached occurrence route the Occurrences tab reads, so Overview adds no new request shape.
   // A refresh keeps the old one on screen until the new one lands.
-  const loadLatest = async (target: RollbarRailTarget, id: string, request: number, keep: boolean): Promise<void> => {
+  const loadLatest = async (
+    target: RollbarRailTarget,
+    id: string,
+    request: AbortSignal,
+    keep: boolean,
+  ): Promise<void> => {
     if (!keep) setLatest({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
         rollbarOccurrenceRoute(target.integrationId, target.identifier, id),
       )
-      if (request === itemLoad) setLatest({ kind: 'ready', detail })
+      if (!request.aborted) setLatest({ kind: 'ready', detail })
     } catch (error) {
-      if (request === itemLoad && !keep) setLatest({ kind: 'error', id, detail: failureReason(error) })
+      if (!request.aborted && !keep) setLatest({ kind: 'error', id, detail: failureReason(error) })
     }
   }
 
   const loadOccurrence = async (id: string): Promise<void> => {
     const current = view()
     if (!current) return
-    const request = ++occurrenceLoad
+    occurrenceRead.abort()
+    occurrenceRead = new AbortController()
+    const request = occurrenceRead.signal
     setOccurrence({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
         rollbarOccurrenceRoute(current.target.integrationId, current.target.identifier, id),
       )
-      if (request === occurrenceLoad && view() === current) setOccurrence({ kind: 'ready', detail })
+      if (!request.aborted && view() === current) setOccurrence({ kind: 'ready', detail })
     } catch (error) {
-      if (request === occurrenceLoad && view() === current) {
+      if (!request.aborted && view() === current) {
         setOccurrence({ kind: 'error', id, detail: failureReason(error) })
       }
     }
@@ -179,20 +197,22 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 
   // `split` with two column nodes rather than ListDetail's `list` prop: a tree's props are JSON on a
   // message port, so an element cannot be one of them (docs/plugins/tree-contract.md § The tree contract). The
-  // column only appears when there is more than one linked item, as it did before.
+  // column only appears when there is more than one linked item.
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>
       <ListDetail split listWidth="narrow">
         <ListColumn label="Linked Rollbar errors">
-          <For each={linkedTargets()}>{(target) => (
-            <Row
-              density="compact"
-              selected={view() ? targetKey(view()!.target) === targetKey(target) : false}
-              onPress={() => void load(target)}
-            >
-              #{target.identifier}
-            </Row>
-          )}</For>
+          <For each={linkedTargets()}>
+            {(target) => (
+              <Row
+                density="compact"
+                selected={view() ? targetKey(view()!.target) === targetKey(target) : false}
+                onPress={() => void load(target)}
+              >
+                #{target.identifier}
+              </Row>
+            )}
+          </For>
         </ListColumn>
         <DetailColumn scroll>{body()}</DetailColumn>
       </ListDetail>
@@ -201,8 +221,8 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 }
 
 // `Show`s, not a bare ternary. A component body runs once, so a ternary there stays on whichever
-// branch the first state picked: the pane mounts loading, the fetch fails, and the error had nowhere
-// to draw. What was left was the EmptyState with its text removed, which reads as a blank pane.
+// branch the first state picked: the pane mounts loading, the fetch fails, and the error has nowhere
+// to draw, leaving the EmptyState with its text removed, which reads as a blank pane.
 //
 // Loading is the start-aligned busy line; nothing to show and a failure are the centred state a detail
 // column uses, the failure with its reason and **Try again** (linear/src/tree/app.tsx says why).
@@ -210,17 +230,35 @@ function PageStatus(props: { state: PageState }) {
   const failure = () => (props.state.kind === 'error' ? props.state : undefined)
   const empty = () => (props.state.kind === 'empty' ? props.state : undefined)
   return (
-    <Show when={failure()} fallback={(
-      <Show when={empty()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
-        {(state) => <EmptyState title={state().title} />}
-      </Show>
-    )}
+    <Show
+      when={failure()}
+      fallback={
+        <Show
+          when={empty()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading…
+            </EmptyState>
+          }
+        >
+          {(state) => <EmptyState title={state().title} />}
+        </Show>
+      }
     >
       {(error) => (
         <EmptyState title={error().title}>
           {error().detail}
           {/* A child, not `action`: a tree's props are JSON, so an element-valued prop never arrives. */}
-          <Show when={error().retry}>{(retry) => <> <Button size="sm" variant="ghost" onPress={retry()}>Try again</Button></>}</Show>
+          <Show when={error().retry}>
+            {(retry) => (
+              <>
+                {' '}
+                <Button size="sm" variant="ghost" onPress={retry()}>
+                  Try again
+                </Button>
+              </>
+            )}
+          </Show>
         </EmptyState>
       )}
     </Show>

@@ -1,11 +1,10 @@
 import type { AgentTurn } from '../../contract/wire.ts'
 
 // Who a turn came from. An owner's turn on its delegated child and a child's report back to its owner
-// each carry a context part of the same source naming the other agent
-// (server/delegation/reports.ts). A workflow step's prompt comes from the workflow, and the nudge a
-// step sends when a turn ends without its result comes from acorn
-// (server/sessions/sessionExecute.ts). A plugin's note names the plugin the host stamped in `sentBy`
-// (server/sessions/sessionMessages.ts). Anything else is the reader's own turn.
+// each carry a context part of the same source naming the other agent (`DelegationReports`). A
+// workflow step's prompt comes from the workflow, and the nudge a step sends when a turn ends without
+// its result comes from acorn. A plugin's note names the plugin the host stamped in `sentBy`
+// (`SessionMessages`). Anything else is the reader's own turn.
 export const senderLabel = (turn: AgentTurn | undefined): string => {
   if (turn?.source === 'goal') return 'Goal'
   if (turn?.source === 'workflow') return turn.effectivePolicy.continuationOf ? 'Acorn' : 'Workflow'

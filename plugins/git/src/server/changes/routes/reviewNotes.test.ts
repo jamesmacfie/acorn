@@ -29,7 +29,10 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/tasks', reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }, (frame) => frames.push(frame)))
+    app.route(
+      '/api/tasks',
+      reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }, (frame) => frames.push(frame)),
+    )
     const now = Date.now()
     await t.db.insert(schema.tasks).values({
       id: 'task1',
@@ -52,7 +55,8 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     t.cleanup()
   })
 
-  const list = async (): Promise<ReviewNote[]> => (await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'GET'), {} as Env)).json()
+  const list = async (): Promise<ReviewNote[]> =>
+    (await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'GET'), {} as Env)).json()
 
   const create = async (over: Record<string, unknown> = {}): Promise<ReviewNote> => {
     const res = await app.fetch(
@@ -79,28 +83,54 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     expect(await list()).toHaveLength(0)
   })
 
-  it('send stamps sentAt; edit clears it', async () => {
+  it('send stamps sentAt', async () => {
     const a = await create()
     const b = await create({ startLine: 80, endLine: 80, body: 'This log line leaks the token — drop it.' })
     const res = await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [a.id, b.id] }), {} as Env)
     expect(res.status).toBe(200)
-    let all = await list()
-    expect(all.every((n) => n.sentAt != null)).toBe(true)
-
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${a.id}`, 'PATCH', { body: 'Edited — resend me.' }), {} as Env)
-    all = await list()
-    expect(all.find((n) => n.id === a.id)?.sentAt).toBeNull()
-    expect(all.find((n) => n.id === a.id)?.body).toBe('Edited — resend me.')
-    expect(all.find((n) => n.id === b.id)?.sentAt).not.toBeNull()
+    expect((await list()).every((n) => n.sentAt != null)).toBe(true)
   })
 
   it('validates the anchor + body; unknown task 404s', async () => {
-    expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'left', startLine: 1, body: 'x' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 5, endLine: 3, body: 'x' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(jsonReq('/api/tasks/nope/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 1, endLine: 1, body: 'x' }), {} as Env)).status).toBe(404)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'left', startLine: 1, body: 'x' }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/task1/review-notes', 'POST', {
+            path: 'a.ts',
+            side: 'additions',
+            startLine: 5,
+            endLine: 3,
+            body: 'x',
+          }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/nope/review-notes', 'POST', {
+            path: 'a.ts',
+            side: 'additions',
+            startLine: 1,
+            endLine: 1,
+            body: 'x',
+          }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(404)
   })
 
-  it('announces current counts only after real create, delivery, edit, and delete writes', async () => {
+  it('announces current counts only after real create, delivery, and delete writes', async () => {
     const note = await create()
     expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
 
@@ -109,12 +139,6 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     const afterSent = frames.length
     await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [note.id] }), {} as Env)
     expect(frames).toHaveLength(afterSent)
-
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
-    expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
-    const afterEdit = frames.length
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
-    expect(frames).toHaveLength(afterEdit)
 
     await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'DELETE'), {} as Env)
     expect(frames.at(-1)).toEqual({ channel: 'plugin:git:review-notes-changed', taskId: 'task1', total: 0, unsent: 0 })

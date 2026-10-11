@@ -10,17 +10,18 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 
 // Driving the agent pane, rather than reading it.
 //
-// `panes.test.tsx` already asks whether the four things an agents transcript is for are on the first
-// screen. This file asks the other question: can a reader at a terminal actually run an agent — open
-// a run, answer what it is blocked on, say something back, and start another one. Each case ends at a
-// recorded POST, because what a pane draws and what it sends are different claims and only the second
-// one is the feature (./controls.test.tsx § posts a comment typed into the composer).
+// `panes.test.tsx` asks whether an agents transcript has what it needs on the first screen. This file
+// asks whether a reader at a terminal can run an agent: open a run, answer what it is blocked on, say
+// something back, and start another one. Each case ends at a recorded POST, because what a pane sends
+// is the feature, and what it draws is not proof of that.
 //
 // 120 by 40 throughout. Below 80 cells `list-detail` draws one column at a time, so the composer and
-// the approval are behind the layout's group switch and a case about them would be a case about the
-// switch (../layouts/ListDetail.tsx).
+// the approval sit behind the layout's group switch (./layouts/ListDetail.tsx).
 
-const posts = () => recordedRequests().filter((request) => request.method === 'POST').map((request) => request.path)
+const posts = () =>
+  recordedRequests()
+    .filter((request) => request.method === 'POST')
+    .map((request) => request.path)
 
 describe('running an agent from a terminal', () => {
   it('can activate the completed Codex plan without treating a planning answer as implementation', async () => {
@@ -57,7 +58,9 @@ describe('running an agent from a terminal', () => {
   it('shows the sessions for the newly opened task', async () => {
     const other = { ...TASK, id: 'task-2', title: 'other-task', branch: 'other-task', sort: 1 }
     const screen = await renderFixture({
-      pane: 'agents', width: 120, height: 40,
+      pane: 'agents',
+      width: 120,
+      height: 40,
       cache: (client) => client.setQueryData(tasksKey, [TASK, other]),
     })
     try {
@@ -100,7 +103,7 @@ describe('running an agent from a terminal', () => {
 
   // Where the keys go when a reader opens a run. A chat surface is one you arrive at to write, so the
   // message box is what the column hands them to, and everything else is a step away from it
-  // (../keys/regions.ts § markEntry).
+  // (./keys/regions.ts § markEntry).
   it('puts the keys in the message box when the run opens', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -111,7 +114,7 @@ describe('running an agent from a terminal', () => {
       // box. What is being claimed is that the keys are in the message box, and the kind says it.
       expect(focusedRenderable()?.kind).toBe('textarea')
       // And the header above it is still a walk away, because an arrow at the field's first line
-      // leaves the field rather than being swallowed (../keys/install.ts § typeInto).
+      // leaves the field rather than being swallowed (./keys/install.ts § typeInto).
       await stopSaying(screen, 'New')
       expect((await screen.caret()).text).toContain('New')
     } finally {
@@ -119,9 +122,9 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // `onSubmit` on the shared props is documented as "Enter without a modifier. Absent leaves Enter as
-  // a newline", and the DOM half reads exactly that. This host had it on the `commit` chord alone, so
-  // the composer's own hint — "Shift+Enter for newline" — described a keyboard nobody had.
+  // `onSubmit` on the shared props means "Enter without a modifier. Absent leaves Enter as a newline",
+  // and the composer's own hint says "Shift+Enter for newline". Binding it to the `commit` chord alone
+  // would make that hint describe a keyboard nobody has.
   it('sends on Enter and keeps Shift+Enter for a newline', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -152,11 +155,10 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // The create-a-run control, and the reason this file exists. `New` is a `Picker`, which on this host
-  // is a `Menu` with a filter field over provider rows — and inside the header's `Toolbar` its panel
-  // used to be laid out in the few cells the trigger was given, so `Claude Code` and `Available`
-  // collided into `ClaAv` and a reader could not tell what they were choosing
-  // (../kit/grouping/blocks.tsx § Toolbar).
+  // The create-a-run control. `New` is a `Picker`, which on this host is a `Menu` with a filter field
+  // over provider rows. Inside the header's `Toolbar`, a panel laid out in the few cells the trigger
+  // has runs `Claude Code` and `Available` together, and a reader can't tell what they are choosing
+  // (./kit/grouping/blocks.tsx § Toolbar).
   it('starts a new run from the header, and the provider row is readable', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -177,8 +179,8 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // The whole session-actions menu, which is the same clipping bug and the same fix: six rows that
-  // read as words rather than as the first six cells of one.
+  // The session-actions menu has the same clipping trap: its rows must read as words rather than as
+  // the first few cells of one.
   it('offers the session actions as whole words', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -205,7 +207,9 @@ describe('running an agent from a terminal', () => {
 describe('other plugins’ rows on a transcript', () => {
   it('files a message from the response’s Copy menu', async () => {
     const fileNote = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote }])
+    const rows = registerContextMenuItems([
+      { id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await openFirstSession(screen)
@@ -215,10 +219,18 @@ describe('other plugins’ rows on a transcript', () => {
       expect(await screen.until('File as note')).toContain('Copy as JSON')
       await stopSaying(screen, 'File as note')
       await screen.press('RETURN')
-      expect(fileNote).toHaveBeenCalledWith(expect.objectContaining({
-        location: 'agent.message', sessionId: 'session-1', taskId: 'task-1', projectId: 'project-1', turnId: 'turn-1',
-        role: 'assistant', status: 'completed', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
-      }))
+      expect(fileNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: 'agent.message',
+          sessionId: 'session-1',
+          taskId: 'task-1',
+          projectId: 'project-1',
+          turnId: 'turn-1',
+          role: 'assistant',
+          status: 'completed',
+          text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
+        }),
+      )
       expect(posts()).toEqual([])
     } finally {
       rows.dispose()
@@ -230,7 +242,9 @@ describe('other plugins’ rows on a transcript', () => {
   // explicit menu after it.
   it('offers a message’s whole text to a selection action', async () => {
     const explain = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain }])
+    const rows = registerContextMenuItems([
+      { id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await openFirstSession(screen)
@@ -240,11 +254,18 @@ describe('other plugins’ rows on a transcript', () => {
       await screen.until('Explain')
       await stopSaying(screen, 'Explain')
       await screen.press('RETURN')
-      expect(explain).toHaveBeenCalledWith(expect.objectContaining({
-        location: 'content.selection', taskId: 'task-1', projectId: 'project-1', ownerId: 'agents', contentKind: 'markdown',
-        readOnly: true, text: 'The reset writes a new hash but signIn still checks the one it was passed.',
-        resource: expect.objectContaining({ kind: 'message', sessionId: 'session-1' }),
-      }))
+      expect(explain).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: 'content.selection',
+          taskId: 'task-1',
+          projectId: 'project-1',
+          ownerId: 'agents',
+          contentKind: 'markdown',
+          readOnly: true,
+          text: 'The reset writes a new hash but signIn still checks the one it was passed.',
+          resource: expect.objectContaining({ kind: 'message', sessionId: 'session-1' }),
+        }),
+      )
       expect(posts()).toEqual([])
     } finally {
       rows.dispose()
@@ -255,7 +276,9 @@ describe('other plugins’ rows on a transcript', () => {
   it('acts on a finished turn from its closing line', async () => {
     process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
     const review = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review }])
+    const rows = registerContextMenuItems([
+      { id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await screen.until('Implement plan')
@@ -266,7 +289,9 @@ describe('other plugins’ rows on a transcript', () => {
       await screen.until('Review turn')
       await stopSaying(screen, 'Review turn')
       await screen.press('RETURN')
-      expect(review).toHaveBeenCalledWith(expect.objectContaining({ location: 'agent.turn', turnId: 'turn-1', status: 'completed' }))
+      expect(review).toHaveBeenCalledWith(
+        expect.objectContaining({ location: 'agent.turn', turnId: 'turn-1', status: 'completed' }),
+      )
     } finally {
       rows.dispose()
       screen.done()

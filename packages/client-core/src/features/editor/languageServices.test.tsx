@@ -35,7 +35,9 @@ const editor = (doc: string, routes: () => DocumentServiceRoutes, onUnavailable?
       doc,
       extensions: [
         languageServices({ nodeId: 'node-a', routes, revision: () => revision, onUnavailable }),
-        EditorView.updateListener.of((update) => { if (update.docChanged) revision++ }),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) revision++
+        }),
       ],
     }),
     parent: document.body,
@@ -52,11 +54,17 @@ const marks = (view: EditorView): Diagnostic[] => {
 
 describe('hover', () => {
   it('sends the live text, a one-based position, and the revision, and draws the answer with its credit', async () => {
-    answer = async (_route, body) => ({ revision: body.revision, contents: { kind: 'plaintext', value: 'a number' },
-      range: { start: { line: 2, column: 3 }, end: { line: 2, column: 4 } } })
+    answer = async (_route, body) => ({
+      revision: body.revision,
+      contents: { kind: 'plaintext', value: 'a number' },
+      range: { start: { line: 2, column: 3 }, end: { line: 2, column: 4 } },
+    })
     const { view } = editor('{\n😀1}', () => hover)
     const tooltip = await hoverSource({ nodeId: 'node-a', routes: () => hover, revision: () => 1 })(view, 4)
-    expect(sent[0]).toEqual({ route: '/v1/p/lint/hover', body: { text: '{\n😀1}', position: { line: 2, column: 3 }, revision: 1 } })
+    expect(sent[0]).toEqual({
+      route: '/v1/p/lint/hover',
+      body: { text: '{\n😀1}', position: { line: 2, column: 3 }, revision: 1 },
+    })
     expect(tooltip).toMatchObject({ pos: 4, end: 5 })
     const dom = tooltip!.create(view).dom
     expect(dom.textContent).toBe('a numberFrom Lint')
@@ -68,15 +76,28 @@ describe('hover', () => {
     const { view } = editor('select 1', () => hover)
     answer = async () => ({ revision: 2, contents: { kind: 'plaintext', value: 'old' } })
     expect(await hoverSource(source)(view, 1)).toBeNull()
-    answer = async () => ({ revision: 3, contents: { kind: 'plaintext', value: 'x' }, range: { start: { line: 1, column: 1 }, end: { line: 1, column: 99 } } })
+    answer = async () => ({
+      revision: 3,
+      contents: { kind: 'plaintext', value: 'x' },
+      range: { start: { line: 1, column: 1 }, end: { line: 1, column: 99 } },
+    })
     expect(await hoverSource(source)(view, 1)).toBeNull()
-    answer = async () => { revision = 4; return { revision: 3, contents: { kind: 'plaintext', value: 'late' } } }
+    answer = async () => {
+      revision = 4
+      return { revision: 3, contents: { kind: 'plaintext', value: 'late' } }
+    }
     expect(await hoverSource(source)(view, 1)).toBeNull()
   })
 
-  it('draws a provider\'s Markdown inert', async () => {
-    answer = async (_route, body) => ({ revision: body.revision, contents: { kind: 'markdown',
-      value: '**bold** <img src=x onerror=alert(1)> ![t](https://evil.example/p.png) [x](javascript:alert(1)) <script>alert(1)</script>' } })
+  it("draws a provider's Markdown inert", async () => {
+    answer = async (_route, body) => ({
+      revision: body.revision,
+      contents: {
+        kind: 'markdown',
+        value:
+          '**bold** <img src=x onerror=alert(1)> ![t](https://evil.example/p.png) [x](javascript:alert(1)) <script>alert(1)</script>',
+      },
+    })
     const { view } = editor('x', () => hover)
     const tooltip = await hoverSource({ nodeId: 'node-a', routes: () => hover, revision: () => 1 })(view, 0)
     const dom = tooltip!.create(view).dom
@@ -94,15 +115,30 @@ describe('hover', () => {
 })
 
 describe('diagnostics', () => {
-  const error = (body: Record<string, unknown>) => ({ revision: body.revision, items: [
-    { range: { start: { line: 1, column: 2 }, end: { line: 1, column: 3 } }, severity: 'error', message: 'Unexpected', source: 'json', code: 'E1' },
-  ] })
+  const error = (body: Record<string, unknown>) => ({
+    revision: body.revision,
+    items: [
+      {
+        range: { start: { line: 1, column: 2 }, end: { line: 1, column: 3 } },
+        severity: 'error',
+        message: 'Unexpected',
+        source: 'json',
+        code: 'E1',
+      },
+    ],
+  })
 
   it('asks at once, draws credited marks, then asks again 500 ms after an edit and clears on an empty answer', async () => {
     answer = async (_route, body) => error(body)
     const { view } = editor('{,}', () => lint)
     await vi.waitFor(() => expect(marks(view)).toHaveLength(1))
-    expect(marks(view)[0]).toMatchObject({ from: 1, to: 2, severity: 'error', message: 'Unexpected', source: 'Lint · json · E1' })
+    expect(marks(view)[0]).toMatchObject({
+      from: 1,
+      to: 2,
+      severity: 'error',
+      message: 'Unexpected',
+      source: 'Lint · json · E1',
+    })
     expect(sent[0]!.body).toEqual({ text: '{,}', revision: 1 })
 
     vi.useFakeTimers()
@@ -124,7 +160,9 @@ describe('diagnostics', () => {
     answer = async (_route, body) => error(body)
     const { view } = editor('{,}', () => routes)
     await vi.waitFor(() => expect(marks(view)).toHaveLength(1))
-    answer = async () => { throw new Error('offline') }
+    answer = async () => {
+      throw new Error('offline')
+    }
     view.dispatch({ effects: refreshLanguageServices.of(null) })
     await vi.waitFor(() => expect(marks(view)).toEqual([]))
 
@@ -147,7 +185,10 @@ describe('diagnostics', () => {
 
   it('drops an answer for text the person has since changed', async () => {
     let release!: () => void
-    answer = (_route, body) => new Promise((resolve) => { release = () => resolve(error(body)) })
+    answer = (_route, body) =>
+      new Promise((resolve) => {
+        release = () => resolve(error(body))
+      })
     const { view } = editor('{,}', () => lint)
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     view.dispatch({ changes: { from: 0, insert: ' ' } })
@@ -158,7 +199,11 @@ describe('diagnostics', () => {
 
   it('reports an oversized buffer instead of sending it', async () => {
     const reasons: (string | null)[] = []
-    editor('a'.repeat(1024 * 1024 + 1), () => lint, (reason) => reasons.push(reason))
+    editor(
+      'a'.repeat(1024 * 1024 + 1),
+      () => lint,
+      (reason) => reasons.push(reason),
+    )
     await vi.waitFor(() => expect(reasons.at(-1)).toContain('larger than 1 MiB'))
     expect(sent).toEqual([])
   })

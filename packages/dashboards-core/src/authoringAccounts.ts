@@ -24,11 +24,17 @@ function chosenAccounts(plan: PanelPlan | undefined): Set<string> {
 }
 
 /** The candidate's account problems, each as `<pointer>: <sentence>` for the model to fix. */
-export function authoringAccountProblems(candidate: PanelPlan, base: PanelPlan | undefined, catalog: readonly CatalogSource[], accounts: readonly Account[]): string[] {
+export function authoringAccountProblems(
+  candidate: PanelPlan,
+  base: PanelPlan | undefined,
+  catalog: readonly CatalogSource[],
+  accounts: readonly Account[],
+): string[] {
   const chosen = chosenAccounts(base)
-  const find = (pluginId: string, sourceId: string) => catalog.find(entry => entry.pluginId === pluginId && entry.sourceId === sourceId)
+  const find = (pluginId: string, sourceId: string) =>
+    catalog.find((entry) => entry.pluginId === pluginId && entry.sourceId === sourceId)
   const allowed = (provider: string, connectionId: string | undefined): boolean => {
-    const eligible = accounts.filter(account => account.provider === provider)
+    const eligible = accounts.filter((account) => account.provider === provider)
     return !!connectionId && (chosen.has(connectionId) || (eligible.length === 1 && eligible[0]!.id === connectionId))
   }
   const problems: string[] = []
@@ -37,16 +43,23 @@ export function authoringAccountProblems(candidate: PanelPlan, base: PanelPlan |
     const query = source.reference.content.query
     const entry = find(query.source.pluginId, query.source.sourceId)
     if (entry?.providerId && !allowed(entry.providerId, query.scope.connectionId)) {
-      problems.push(`/sources/${index}/reference: Choose one of the person's real ${entry.providerId} accounts before using it.`)
+      problems.push(
+        `/sources/${index}/reference: Choose one of the person's real ${entry.providerId} accounts before using it.`,
+      )
     }
     for (const [name, input] of Object.entries(entry?.inputs ?? {})) {
       const binding = query.scope.inputs?.[name]
       const [pluginId = '', sourceId = ''] = input.source.split(':')
       const provider = find(pluginId, sourceId)?.providerId
       if (!binding) {
-        if (!input.optional) problems.push(`${inputBindingPath(index, name)}: Bind the required input ${name} (${input.label}) in scope.inputs.`)
+        if (!input.optional)
+          problems.push(
+            `${inputBindingPath(index, name)}: Bind the required input ${name} (${input.label}) in scope.inputs.`,
+          )
       } else if (provider && !allowed(provider, binding.connectionId)) {
-        problems.push(`${inputBindingPath(index, name)}: Choose one of the person's real ${provider} accounts for ${input.label} before using it.`)
+        problems.push(
+          `${inputBindingPath(index, name)}: Choose one of the person's real ${provider} accounts for ${input.label} before using it.`,
+        )
       }
     }
   }

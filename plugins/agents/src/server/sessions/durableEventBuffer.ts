@@ -15,20 +15,20 @@ export const isAppendDelta = (event: AgentNormalizedEvent): event is DeltaEvent 
   (event.type === 'assistant_message' || event.type === 'reasoning') && event.append === true
 
 // Two events are one streamed message when both are append deltas of the same kind, turn and message id.
-// The buffer coalesces on this, and the repository indexes each such message once for search
-// (sessionRepository.ts § recordEvent).
+// The buffer coalesces on this, and AgentStore.recordEvent indexes each such message once for search.
 export const continuesStream = (
   previous: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
   next: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
 ): boolean =>
-  isAppendDelta(previous.event)
-  && isAppendDelta(next.event)
-  && previous.turnId === next.turnId
-  && previous.generation === next.generation
-  && previous.event.type === next.event.type
-  && previous.event.messageId === next.event.messageId
+  isAppendDelta(previous.event) &&
+  isAppendDelta(next.event) &&
+  previous.turnId === next.turnId &&
+  previous.generation === next.generation &&
+  previous.event.type === next.event.type &&
+  previous.event.messageId === next.event.messageId
 
-const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta => continuesStream(left, right)
+const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta =>
+  continuesStream(left, right)
 
 const takeUtf8Prefix = (text: string, maxBytes: number): [prefix: string, rest: string] => {
   let bytes = 0

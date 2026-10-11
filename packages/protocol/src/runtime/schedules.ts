@@ -10,7 +10,7 @@ export const CADENCE_MIN_SECONDS = 60
 /** A plugin's floor is higher than core's: its work hits someone else's rate budget, not ours. */
 export const CADENCE_MIN_SECONDS_PLUGIN = 300
 /** A week. Past this, "when" is a calendar question the three forms cannot answer honestly. */
-export const CADENCE_MAX_SECONDS = 604_800
+const CADENCE_MAX_SECONDS = 604_800
 
 const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)
 
@@ -25,7 +25,7 @@ export const cadenceSchema = z.union([
 
 export type Cadence = z.infer<typeof cadenceSchema>
 
-export type ScheduleOwner = 'core' | 'plugin' | 'user'
+type ScheduleOwner = 'core' | 'plugin' | 'user'
 export type ScheduleStatus = 'ok' | 'error' | 'timeout' | 'skipped'
 
 /** One row of the merged view: a registry entry, a user row, or a retained state row whose
@@ -83,13 +83,15 @@ export type SchedulesResponse = {
  *  `risk` is the tier the host draws the arming confirmation from and stamps onto the row. It is
  *  never absent: an action that declares nothing is reported as `execute`, the strongest, because the
  *  direction that cannot be wrong in a way that matters is the safe one. */
-export type ScheduleTargetOption = {
-  kind: 'node-action'
-  pluginId: string
-  actionId: string
-  name: string
-  risk: ToolRisk
-} | { kind: 'dataset-capture'; datasetId: string; name: string; risk: ToolRisk }
+export type ScheduleTargetOption =
+  | {
+      kind: 'node-action'
+      pluginId: string
+      actionId: string
+      name: string
+      risk: ToolRisk
+    }
+  | { kind: 'dataset-capture'; datasetId: string; name: string; risk: ToolRisk }
 
 export type ScheduleTargetsResponse = { targets: ScheduleTargetOption[] }
 

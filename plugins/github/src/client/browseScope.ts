@@ -1,10 +1,10 @@
 // What both halves of the browse surface need to know: which project is routed, and whether it has a
 // GitHub remote to list pulls from.
 //
-// Extracted when the surface split into a `list` and a `detail` region so a terminal shell could draw
-// them in two different panels (client-core § SourceContribution.regions). Both halves ask the same
-// three questions and must never answer them differently — a list that thinks the project is linked
-// beside a detail that thinks it is not is worse than either error alone.
+// The surface is a `list` and a `detail` region that a terminal shell draws in two different panels
+// (client-core § SourceContribution.regions). Both halves ask the same three questions and must never
+// answer them differently: a list that thinks the project is linked beside a detail that thinks it is
+// not is worse than either error alone.
 //
 // A function rather than a context: each half calls it in its own scope, and the queries underneath
 // are the same cached ones, so there is nothing to share but the derivation.
@@ -37,7 +37,8 @@ export function createBrowseScope(): BrowseScope {
     emptyMessage: () => {
       if (!projects.data) return undefined
       const selected = project()
-      if (!selected) return { title: 'Choose a project', body: 'Pick one in the project menu to see its pull requests.' }
+      if (!selected)
+        return { title: 'Choose a project', body: 'Pick one in the project menu to see its pull requests.' }
       return {
         title: `${selected.name} isn't on GitHub`,
         body: 'Its folder has no GitHub remote, so there are no pull requests to show.',

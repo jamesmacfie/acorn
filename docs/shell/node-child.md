@@ -56,7 +56,7 @@ graph and the same reconciliation and drain plan.
 ## Service protocol
 
 `packages/protocol/src/device/serviceProtocol.ts` defines the versioned lifecycle messages between the
-helper and its Node: `service.start`, `service.stop`, and `service.preview-rules`. Both ends validate
+helper and its Node: `service.start` and `service.stop`. Both ends validate
 messages with Zod, and pending calls reject on timeout or peer exit. Every method is one the helper
 calls on the Node, and the Node receives no window, webview, or shell object. Product requests use
 `/v1` over the broker.
@@ -123,4 +123,4 @@ The optional `reportResponsiveness` platform capability sends `renderer-pulse` o
 The renderer decides consent, visibility, and focus, and supplies its current operation name, owner,
 and trace IDs. The helper keeps a watchdog per socket, removed on close. It runs outside the renderer,
 so a stuck render span isn't the only evidence of a frozen UI
-([diagnosing an unresponsive view](../telemetry.md#diagnosing-an-unresponsive-view)).
+([diagnosing an unresponsive view](../telemetry/diagnosis.md#diagnosing-an-unresponsive-view)).

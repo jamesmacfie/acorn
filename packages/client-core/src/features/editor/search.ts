@@ -35,7 +35,7 @@ export const MAX_COUNTED_MATCHES = 1000
 type Matches = { ranges: { from: number; to: number }[]; more: boolean }
 
 /** Every match of a query, using the engine's own cursor so the semantics cannot drift from its own. */
-export function findMatches(state: EditorState, query: SearchQuery): Matches {
+function findMatches(state: EditorState, query: SearchQuery): Matches {
   const ranges: Matches['ranges'] = []
   const cursor = query.getCursor(state)
   for (let next = cursor.next(); !next.done; next = cursor.next()) {
@@ -62,7 +62,10 @@ function currentMatch(state: EditorState, ranges: Matches['ranges']): number {
 
 let view: typeof import('./FindPanel') | undefined
 let loading: Promise<unknown> | undefined
-const loadView = () => (loading ??= import('./FindPanel').then((loaded) => { view = loaded }))
+const loadView = () =>
+  (loading ??= import('./FindPanel').then((loaded) => {
+    view = loaded
+  }))
 
 // Each view's open panel, so a Replace command can show the replace row of the panel it just opened.
 const replaceOpeners = new WeakMap<EditorView, () => void>()
@@ -86,7 +89,8 @@ function createFindPanel(editor: EditorView): Panel {
     const base = { query, readOnly: state.readOnly }
     if (!query.search) return base
     if (!query.valid) return { ...base, error: 'Invalid regular expression' }
-    if (counted?.doc !== state.doc || !counted.query.eq(query)) counted = { doc: state.doc, query, matches: findMatches(state, query) }
+    if (counted?.doc !== state.doc || !counted.query.eq(query))
+      counted = { doc: state.doc, query, matches: findMatches(state, query) }
     const { ranges, more } = counted.matches
     return { ...base, count: { current: currentMatch(state, ranges), total: ranges.length, more } }
   }
@@ -94,24 +98,32 @@ function createFindPanel(editor: EditorView): Panel {
 
   const change = (patch: Partial<ConstructorParameters<typeof SearchQuery>[0]>) => {
     const query = getSearchQuery(editor.state)
-    editor.dispatch({ effects: setSearchQuery.of(new SearchQuery({
-      search: query.search,
-      caseSensitive: query.caseSensitive,
-      literal: query.literal,
-      regexp: query.regexp,
-      wholeWord: query.wholeWord,
-      replace: query.replace,
-      test: query.test,
-      ...patch,
-    })) })
+    editor.dispatch({
+      effects: setSearchQuery.of(
+        new SearchQuery({
+          search: query.search,
+          caseSensitive: query.caseSensitive,
+          literal: query.literal,
+          regexp: query.regexp,
+          wholeWord: query.wholeWord,
+          replace: query.replace,
+          test: query.test,
+          ...patch,
+        }),
+      ),
+    })
   }
 
   const props: FindPanelProps = {
     snapshot: current,
     replacing,
     setReplacing,
-    field: (element) => { field = element },
-    replaceField: (element) => { replaceField = element },
+    field: (element) => {
+      field = element
+    },
+    replaceField: (element) => {
+      replaceField = element
+    },
     change,
     next: () => findNext(editor),
     previous: () => findPrevious(editor),
@@ -159,11 +171,12 @@ function createFindPanel(editor: EditorView): Panel {
     },
     update: (update: ViewUpdate) => {
       if (
-        update.docChanged
-        || update.selectionSet
-        || update.startState.readOnly !== update.state.readOnly
-        || getSearchQuery(update.startState) !== getSearchQuery(update.state)
-      ) setCurrent(snapshot(update.state))
+        update.docChanged ||
+        update.selectionSet ||
+        update.startState.readOnly !== update.state.readOnly ||
+        getSearchQuery(update.startState) !== getSearchQuery(update.state)
+      )
+        setCurrent(snapshot(update.state))
     },
     destroy: () => {
       destroyed = true

@@ -38,8 +38,13 @@ afterEach(() => {
 
 const gauges = async (): Promise<Record<string, number>> => {
   await flushTelemetry()
-  return Object.fromEntries(posted.flatMap((record) =>
-    record.kind === 'metric' && record.type === 'gauge' && typeof record.value === 'number' ? [[record.name, record.value]] : []))
+  return Object.fromEntries(
+    posted.flatMap((record) =>
+      record.kind === 'metric' && record.type === 'gauge' && typeof record.value === 'number'
+        ? [[record.name, record.value]]
+        : [],
+    ),
+  )
 }
 
 it('counts the page every thirty seconds, and not before', async () => {
@@ -59,11 +64,15 @@ it('counts the page every thirty seconds, and not before', async () => {
 
 it("reports the active client's diff cache in rows and bytes", async () => {
   setTelemetryEnabled(true)
-  segmentCaches.set(client, { stats: () => ({ rows: 120, plainBytes: 4_000, enrichmentBytes: 1_000 }) } as unknown as SegmentCache)
+  segmentCaches.set(client, {
+    stats: () => ({ rows: 120, plainBytes: 4_000, enrichmentBytes: 1_000 }),
+  } as unknown as SegmentCache)
   stop = startPageFacts(() => client)
   vi.advanceTimersByTime(PAGE_FACTS_MS)
   expect(await gauges()).toMatchObject({ 'ui.page.diff_cache.rows': 120, 'ui.page.diff_cache.bytes': 5_000 })
-  expect(posted.find((record) => record.kind === 'metric' && record.name === 'ui.page.diff_cache.bytes')).toMatchObject({ unit: 'byte' })
+  expect(posted.find((record) => record.kind === 'metric' && record.name === 'ui.page.diff_cache.bytes')).toMatchObject(
+    { unit: 'byte' },
+  )
 })
 
 it('counts nothing while the window is hidden, and nothing while collection is off', async () => {

@@ -3,13 +3,18 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import type { CommandExecutionContext } from './commands'
 import { localSearch } from './localSearch'
 
-// The load-once adapter, which is what the last two `paletteRows` contributions became.
+// The load-once adapter for compiled searches whose rows are already on this machine.
 // What is worth pinning is the thing that makes it worth having: one fetch per session, whatever the
 // reader types.
 
 const CONTEXT: CommandExecutionContext = {
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 't-1',
+  paneId: null,
+  surfaceId: null,
 }
 
 const item = (id: string, over: Partial<CommandSearchItem> = {}): CommandSearchItem => ({ id, title: id, ...over })

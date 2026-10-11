@@ -32,7 +32,13 @@ it('keeps loaded worker calls in their declared modes across registration and di
   const root = mkdtempSync(join(tmpdir(), 'acorn-host-modes-'))
   roots.push(root)
   const fixture = fileURLToPath(new URL('./__fixtures__/hostModesPlugin.mjs', import.meta.url))
-  const parsed = pluginManifestSchema.parse({ id: 'host-modes', name: 'Host modes', version: '1', baseline: 'acorn-1', apiVersion: '1' })
+  const parsed = pluginManifestSchema.parse({
+    id: 'host-modes',
+    name: 'Host modes',
+    version: '1',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+  })
   let listener: ((frame: unknown) => unknown) | undefined
   let modelAdapter: ModelProviderAdapter | undefined
   let integrationRoute: PluginFetchHandler | undefined
@@ -44,7 +50,13 @@ it('keeps loaded worker calls in their declared modes across registration and di
     contextSections: { register: registered },
     nodeActions: { register: registered },
     harnesses: { register: registered },
-    routes: { fetch: (route: PluginFetchHandler) => { registered(); fetchRoute = route }, register: registered },
+    routes: {
+      fetch: (route: PluginFetchHandler) => {
+        registered()
+        fetchRoute = route
+      },
+      register: registered,
+    },
     schedules: { register: registered, registerTarget: registered },
     dataSources: { register: registered },
     taskChecks: { register: registered },
@@ -54,8 +66,12 @@ it('keeps loaded worker calls in their declared modes across registration and di
     hooks: { declare: registered },
     providers: {
       connection: registered,
-      integration: (_provider: unknown, route: PluginFetchHandler) => { integrationRoute = route },
-      model: (adapter: ModelProviderAdapter) => { modelAdapter = adapter },
+      integration: (_provider: unknown, route: PluginFetchHandler) => {
+        integrationRoute = route
+      },
+      model: (adapter: ModelProviderAdapter) => {
+        modelAdapter = adapter
+      },
     },
     capabilities: {
       provide: () => ({ dispose: disposed }),
@@ -93,10 +109,13 @@ it('keeps loaded worker calls in their declared modes across registration and di
     expect(registered).toHaveBeenCalled()
     expect(disposed).toHaveBeenCalledTimes(3)
     expect(await listener?.({ event: 'tasks:changed' })).toBe('heard')
-    expect(await modelAdapter?.generateText({
-      secret: 'credential', config: {},
-      input: { system: '', prompt: 'hello', maxOutputTokens: 10 },
-    })).toEqual({ text: 'credential:hello', modelId: 'probe-model' })
+    expect(
+      await modelAdapter?.generateText({
+        secret: 'credential',
+        config: {},
+        input: { system: '', prompt: 'hello', maxOutputTokens: 10 },
+      }),
+    ).toEqual({ text: 'credential:hello', modelId: 'probe-model' })
     const response = await integrationRoute?.(new Request('https://acorn.invalid/issues'), {
       userId: 'owner',
       principal: { kind: 'device', userId: 'owner' },
@@ -107,9 +126,15 @@ it('keeps loaded worker calls in their declared modes across registration and di
     expect(await response?.json()).toEqual(['ENG-42'])
     // A derived source's input handle crosses as an async call on the request context.
     const query = vi.fn(async (request: unknown) => ({ records: [], echo: request }))
-    const derived = await fetchRoute?.(new Request('https://acorn.invalid/derived'), invocationOwned({
-      userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {}, inputs: { records: { query } },
-    }) as never)
+    const derived = await fetchRoute?.(
+      new Request('https://acorn.invalid/derived'),
+      invocationOwned({
+        userId: 'owner',
+        principal: { kind: 'device', userId: 'owner' },
+        providers: {},
+        inputs: { records: { query } },
+      }) as never,
+    )
     expect(await derived?.json()).toEqual({ records: [], echo: { take: 1, sort: [] } })
   } finally {
     await plugin.dispose?.()

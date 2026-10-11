@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 
 export const repoRoot = resolve(import.meta.dirname, '../../../..')
 export const desktopRoot = resolve(import.meta.dirname, '../..')
-export const sessionsRoot = join(repoRoot, '.acorn', 'agent-dev')
+const sessionsRoot = join(repoRoot, '.acorn', 'agent-dev')
 
 export function validateSessionName(name) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)) {

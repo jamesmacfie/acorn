@@ -15,7 +15,9 @@ export function WithNestedChromeSlots(props: { slots: readonly NestedSlot[]; chi
 export function NestedChromeSlot(props: { slotRef: SlotRef }) {
   const slots = useContext(NestedSlotContext)
   const slot = () => slots?.find((entry) => entry.ref === props.slotRef)
-  return <NestedSlotContext.Provider value={undefined}>
-    <ExclusiveSlotFailureContext.Provider value={undefined}>{slot()?.render()}</ExclusiveSlotFailureContext.Provider>
-  </NestedSlotContext.Provider>
+  return (
+    <NestedSlotContext.Provider value={undefined}>
+      <ExclusiveSlotFailureContext.Provider value={undefined}>{slot()?.render()}</ExclusiveSlotFailureContext.Provider>
+    </NestedSlotContext.Provider>
+  )
 }

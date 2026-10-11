@@ -4,7 +4,7 @@ import { gh, ghError } from './githubApi'
 type GithubViewer = { login: string; name: string | null; avatar_url: string | null }
 type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] }
 
-// GitHub is an ordinary stored provider connection. Its encrypted token is read by githubToken.ts and
+// GitHub is an ordinary stored provider connection. Its encrypted token is read by `githubToken` and
 // can be rotated or disconnected like any other connection.
 //
 // `fields` is empty and `connectable` can still be true, which looks contradictory but is right: the
@@ -18,53 +18,54 @@ type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] 
 // connection leaves GitHub out. A stored connection keeps working, because reading the token never
 // consults this flag. The node passes the answer in at init; tests and the testkit use the
 // connectable `githubProvider`.
-export const createGithubProvider = (options: { connectable: boolean }) => publicProvider({
-  id: 'github',
-  label: 'GitHub',
-  glyph: 'brand:github',
-  kind: 'identity',
-  connection: {
-    authKind: 'oauth',
-    kind: 'device-flow',
-    fields: [],
-    connectable: options.connectable,
-    disconnectable: true,
-    // One GitHub account at a time: the mirror tables are scoped by login, so a second account would
-    // need a scope selector everywhere before it would mean anything.
-    maxConnections: 1,
-    async validate(credentials): Promise<GithubValidated> {
-      const secret = typeof credentials.accessToken === 'string' ? credentials.accessToken.trim() : ''
-      if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
-      const response = await gh(secret, '/user')
-      if (ghError(response)) throw new ProviderOperationError('provider_needs_auth', 401)
-      // GitHub reports the granted scopes on the response, not in the token: it is the only place we
-      // can see what the owner actually approved.
-      const scopes = (response.headers.get('x-oauth-scopes') ?? '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-      return { secret, viewer: (await response.json()) as GithubViewer, scopes }
+export const createGithubProvider = (options: { connectable: boolean }) =>
+  publicProvider({
+    id: 'github',
+    label: 'GitHub',
+    glyph: 'brand:github',
+    kind: 'identity',
+    connection: {
+      authKind: 'oauth',
+      kind: 'device-flow',
+      fields: [],
+      connectable: options.connectable,
+      disconnectable: true,
+      // One GitHub account at a time: the mirror tables are scoped by login, so a second account would
+      // need a scope selector everywhere before it would mean anything.
+      maxConnections: 1,
+      async validate(credentials): Promise<GithubValidated> {
+        const secret = typeof credentials.accessToken === 'string' ? credentials.accessToken.trim() : ''
+        if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
+        const response = await gh(secret, '/user')
+        if (ghError(response)) throw new ProviderOperationError('provider_needs_auth', 401)
+        // GitHub reports the granted scopes on the response, not in the token: it is the only place we
+        // can see what the owner actually approved.
+        const scopes = (response.headers.get('x-oauth-scopes') ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        return { secret, viewer: (await response.json()) as GithubViewer, scopes }
+      },
+      normalize(_credentials, validated: GithubValidated) {
+        return {
+          secret: validated.secret,
+          label: validated.viewer.login,
+          account: { id: validated.viewer.login, label: validated.viewer.login, type: 'user' },
+          scopes: validated.scopes,
+          config: {},
+          capabilities: {},
+        }
+      },
+      async test(secret) {
+        const response = await gh(secret, '/user')
+        return ghError(response) ? { ok: false, error: 'provider_needs_auth' } : { ok: true }
+      },
     },
-    normalize(_credentials, validated: GithubValidated) {
-      return {
-        secret: validated.secret,
-        label: validated.viewer.login,
-        account: { id: validated.viewer.login, label: validated.viewer.login, type: 'user' },
-        scopes: validated.scopes,
-        config: {},
-        capabilities: {},
-      }
-    },
-    async test(secret) {
-      const response = await gh(secret, '/user')
-      return ghError(response) ? { ok: false, error: 'provider_needs_auth' } : { ok: true }
-    },
-  },
-  externalIds: externalIdsFor('github'),
-  capabilities: { repoAffinity: 'intrinsic' },
-  resources: [],
-  budgets: defaultBudgets,
-  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none', acceptedWrites: false },
-})
+    externalIds: externalIdsFor('github'),
+    capabilities: { repoAffinity: 'intrinsic' },
+    resources: [],
+    budgets: defaultBudgets,
+    memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none', acceptedWrites: false },
+  })
 
 export const githubProvider = createGithubProvider({ connectable: true })

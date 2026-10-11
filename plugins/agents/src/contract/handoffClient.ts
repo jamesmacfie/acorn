@@ -4,7 +4,9 @@ let returnHandler: ((sessionId: string) => Promise<void>) | null = null
 
 export function installManagedHandoff(handler: (sessionId: string) => Promise<void>): () => void {
   returnHandler = handler
-  return () => { if (returnHandler === handler) returnHandler = null }
+  return () => {
+    if (returnHandler === handler) returnHandler = null
+  }
 }
 
 export function returnToManagedMode(sessionId: string): Promise<void> {

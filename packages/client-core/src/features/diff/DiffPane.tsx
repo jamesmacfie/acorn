@@ -6,6 +6,7 @@ import { segmentContentKey, type DiffDocumentTopology, type DiffSearchMatch } fr
 import { highlightDocument, tokenizeDocument, type TokenizeDocument } from '../../infra/highlight/worker'
 import { diffWordsDocument } from '../../infra/highlight/wordDiffWorker'
 import { readDraft, writeDraft } from '../../kit/lib/state/draftState'
+import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { prefsOptions } from '../../infra/queries'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
@@ -43,7 +44,14 @@ import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, diffFileFilter, diffScopeKey, rememberDiffCollapsed, rememberDiffFileFilter } from './viewState'
 import { createDiffHealth } from './diffHealth'
 import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type DiffBlockInputs } from './diffLayout'
-import { createDocumentView, overlayKey, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
+import {
+  createDocumentView,
+  overlayKey,
+  threadAnchor,
+  type DiffItem,
+  type GapOverlay,
+  type SegmentRef,
+} from './documentView'
 import { createSegmentLoader, type SegmentAddress } from './segmentLoader'
 import { segmentCacheFor } from './segmentCache'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -57,7 +65,7 @@ const log = createLogger('diff')
 //
 // The list is of segments, not rows. The source's topology lays out every file and segment exactly
 // before any row exists; the segment loader fetches the rows of the segments near the reader and
-// nothing else, paints them plain, and colours them after (./segmentLoader.ts). A row object exists
+// nothing else, paints them plain, and colours them after (`createSegmentLoader`). A row object exists
 // only for a segment that is on screen or about to be.
 //
 // Everything specific to a provider arrives through DiffSource, so this component names no product:
@@ -89,8 +97,7 @@ export function DiffPane(props: {
    */
   annotations?: string
 }) {
-  // First, so its cleanup runs after every other one here and its final reading sees them done
-  // (./diffHealth.ts).
+  // First, so its cleanup runs after every other one here and its final reading sees them done.
   const health = createDiffHealth()
   onCleanup(health.dispose)
   const queryClient = useQueryClient()
@@ -105,13 +112,26 @@ export function DiffPane(props: {
   const threads = () => source().threads?.()
   const mentionsList = () => source().mentions?.() ?? []
   const canComment = () => source().canComment()
-  const invalidate = createMemo(() => { const origin = source(); return () => origin.invalidate() })
+  const invalidate = createMemo(() => {
+    const origin = source()
+    return () => origin.invalidate()
+  })
   let ownerLive = true
-  let composerEpoch = 0
-  let gapEpoch = 0
-  const gapFileEpochs = new Map<string, number>()
-  let gapFileSequence = 0
-  onCleanup(() => { ownerLive = false; gapEpoch++; composerEpoch++ })
+  // The line composer slot, and every gap read. A new source, scope, or file set ends both.
+  const composerSlot = latestSignal()
+  const gapReads = latestSignal()
+  // Each file's gap reads. A file whose patch moved, or that left the diff, aborts its own.
+  const gapFileReads = new Map<string, LatestSignal>()
+  const gapFileRead = (path: string): LatestSignal => {
+    let read = gapFileReads.get(path)
+    if (!read) gapFileReads.set(path, (read = latestSignal()))
+    return read
+  }
+  onCleanup(() => {
+    ownerLive = false
+    gapReads.abort()
+    composerSlot.abort()
+  })
   let lastTarget = ''
 
   const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
@@ -171,17 +191,19 @@ export function DiffPane(props: {
       recordSample('core', 'diff.segments.requested', requests.length)
       return measure('core', 'diff.segments.load', () => source().loadSegments(requests, signal))
     },
-    enrich: (rows) => measure('core', 'diff.segments.enrich', async () => {
-      let timedOut = false
-      const tokenize: TokenizeDocument = async (path, code) => {
-        const result = await highlightDocument(path, code)
-        if (result.timedOut) timedOut = true
-        return result.lines
-      }
-      return { rows: await enrichDiffRows(rows, tokenize, diffWordsDocument), provisional: timedOut }
-    }),
+    enrich: (rows) =>
+      measure('core', 'diff.segments.enrich', async () => {
+        let timedOut = false
+        const tokenize: TokenizeDocument = async (path, code) => {
+          const result = await highlightDocument(path, code)
+          if (result.timedOut) timedOut = true
+          return result.lines
+        }
+        return { rows: await enrichDiffRows(rows, tokenize, diffWordsDocument), provisional: timedOut }
+      }),
     prepared: health.prepared,
-    firstPlain: (outcome) => recordDuration('core', 'diff.first_plain', performance.now() - mountedAt, { cache: outcome }),
+    firstPlain: (outcome) =>
+      recordDuration('core', 'diff.first_plain', performance.now() - mountedAt, { cache: outcome }),
   })
   onCleanup(loader.dispose)
 
@@ -212,8 +234,10 @@ export function DiffPane(props: {
     for (const row of rows) {
       out.push(row)
       if (!isCodeRow(row)) continue
-      if (row.newNo != null) for (const thread of byLine.get(lineKey(row.path, 'new', row.newNo)) ?? []) out.push(threadRow(thread))
-      if (row.oldNo != null) for (const thread of byLine.get(lineKey(row.path, 'old', row.oldNo)) ?? []) out.push(threadRow(thread))
+      if (row.newNo != null)
+        for (const thread of byLine.get(lineKey(row.path, 'new', row.newNo)) ?? []) out.push(threadRow(thread))
+      if (row.oldNo != null)
+        for (const thread of byLine.get(lineKey(row.path, 'old', row.oldNo)) ?? []) out.push(threadRow(thread))
     }
     return out
   }
@@ -226,10 +250,14 @@ export function DiffPane(props: {
 
   // What the source draws under a line, known up front, plus any other plugin's marks. As a
   // fingerprint, because whether a line's block can reuse a height measured earlier depends on it.
-  const extraLines = createMemo(() => new Set([
-    ...(source().lineExtra?.anchors() ?? []),
-    ...(source().inlineChat?.anchors() ?? []),
-  ].map((anchor) => lineKey(anchor.path, anchor.side, anchor.line))))
+  const extraLines = createMemo(
+    () =>
+      new Set(
+        [...(source().lineExtra?.anchors() ?? []), ...(source().inlineChat?.anchors() ?? [])].map((anchor) =>
+          lineKey(anchor.path, anchor.side, anchor.line),
+        ),
+      ),
+  )
   const lineExtraPrint = (row: CodeRow): string | null => {
     const side = row.kind === 'delete' ? 'old' : 'new'
     const line = side === 'old' ? row.oldNo : row.newNo
@@ -242,10 +270,14 @@ export function DiffPane(props: {
   const lineExtra = (row: CodeRow) => {
     const point = props.annotations
     const chat = source().inlineChat?.render(row)
-    return [source().lineExtra?.render(row), chat ? <div class="diff-inline-chat">{chat}</div> : null, point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null]
+    return [
+      source().lineExtra?.render(row),
+      chat ? <div class="diff-inline-chat">{chat}</div> : null,
+      point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null,
+    ]
   }
 
-  // The dynamic blocks: threads, and whatever a line draws under itself (./diffLayout.ts).
+  // The dynamic blocks: threads, and whatever a line draws under itself.
   const openComposer = createMemo(() => lineComposer()?.key ?? null)
   const blockInputs: DiffBlockInputs = {
     extra: lineExtraPrint,
@@ -268,7 +300,9 @@ export function DiffPane(props: {
     // Not loaded yet: the segment's threads, known from their line numbers, reserved at its end until
     // its rows say where each one goes.
     const at = view.fixedHeight(item, mode)
-    return (view.threadsIn().get(item.key) ?? []).map((thread) => threadBlock(thread, at, blockInputs.collapsed(thread)))
+    return (view.threadsIn().get(item.key) ?? []).map((thread) =>
+      threadBlock(thread, at, blockInputs.collapsed(thread)),
+    )
   }
   const sourceItems = createMemo(() => [...view.threadsIn().keys()])
 
@@ -285,33 +319,40 @@ export function DiffPane(props: {
     scrollEl,
   })
 
-  createEffect(on(() => [source(), scopeKey()] as const, () => {
-    composerEpoch++
-    gapEpoch++
-    gapFileEpochs.clear()
-    setLineComposer(null)
-    setOverlays(new Map())
-  }))
+  createEffect(
+    on(
+      () => [source(), scopeKey()] as const,
+      () => {
+        composerSlot.next()
+        gapReads.next()
+        gapFileReads.clear()
+        setLineComposer(null)
+        setOverlays(new Map())
+      },
+    ),
+  )
 
   // A different set of files: nothing about the old view survives.
-  createEffect(on(signature, (next, previous) => {
-    lastTarget = ''
-    composerEpoch++
-    gapEpoch++
-    gapFileEpochs.clear()
-    health.reset()
-    loader.reset()
-    layout.reset()
-    setOverlays(new Map())
-    // Restore the scope's collapsed files if they were saved against this same file set; a changed
-    // signature means a different diff, and a collapse decision about the old one does not carry over.
-    const savedCollapsed = diffCollapsed(source().scope)
-    setCollapsedFiles(new Set(savedCollapsed?.filesSignature === next ? savedCollapsed.paths : []))
-    setLineComposer(null)
-    // The empty → populated transition is initial query hydration, not a changed diff. A genuine
-    // signature change invalidates the old pixel position because the diff's geometry changed.
-    if (previous && next !== previous) resetScrollPosition(true)
-  }))
+  createEffect(
+    on(signature, (next, previous) => {
+      lastTarget = ''
+      composerSlot.next()
+      gapReads.next()
+      gapFileReads.clear()
+      health.reset()
+      loader.reset()
+      layout.reset()
+      setOverlays(new Map())
+      // Restore the scope's collapsed files if they were saved against this same file set; a changed
+      // signature means a different diff, and a collapse decision about the old one does not carry over.
+      const savedCollapsed = diffCollapsed(source().scope)
+      setCollapsedFiles(new Set(savedCollapsed?.filesSignature === next ? savedCollapsed.paths : []))
+      setLineComposer(null)
+      // The empty → populated transition is initial query hydration, not a changed diff. A genuine
+      // signature change invalidates the old pixel position because the diff's geometry changed.
+      if (previous && next !== previous) resetScrollPosition(true)
+    }),
+  )
   // The same files, saying something new: a new revision. Requests for the old one stop; any segment
   // whose content key survived keeps its rows, so an agent saving one file reloads that file's
   // segments and leaves the reader where they were. When the file set is the same, a file whose patch
@@ -319,32 +360,39 @@ export function DiffPane(props: {
   // cache: nothing will ask for them again. A new file set, such as a pull request's next commit,
   // leaves them for the budget, because another view may still show that revision.
   let shown: { signature: string; topology: DiffDocumentTopology } | null = null
-  createEffect(on(revision, (_next, previous) => {
-    if (previous !== undefined) loader.reset()
-    const next = topology()
-    if (shown && next && shown.signature === signature()) {
-      const now = new Map(next.files.map((file) => [file.path, file.patchKey]))
-      for (const file of shown.topology.files) {
-        if (file.patchKey && now.get(file.path) !== file.patchKey) {
-          gapFileEpochs.set(file.path, ++gapFileSequence)
-          if (now.has(file.path)) loader.supersede(file.path, file.patchKey)
+  createEffect(
+    on(revision, (_next, previous) => {
+      if (previous !== undefined) loader.reset()
+      const next = topology()
+      if (shown && next && shown.signature === signature()) {
+        const now = new Map(next.files.map((file) => [file.path, file.patchKey]))
+        for (const file of shown.topology.files) {
+          if (file.patchKey && now.get(file.path) !== file.patchKey) {
+            gapFileRead(file.path).next()
+            if (now.has(file.path)) loader.supersede(file.path, file.patchKey)
+          }
         }
       }
-    }
-    const currentPaths = new Set(next?.files.map((file) => file.path) ?? [])
-    for (const path of gapFileEpochs.keys()) if (!currentPaths.has(path)) gapFileEpochs.delete(path)
-    for (const path of currentPaths) if (!gapFileEpochs.has(path)) gapFileEpochs.set(path, ++gapFileSequence)
-    shown = next ? { signature: signature(), topology: next } : null
-  }))
+      const currentPaths = new Set(next?.files.map((file) => file.path) ?? [])
+      for (const [path, read] of gapFileReads)
+        if (!currentPaths.has(path)) {
+          read.abort()
+          gapFileReads.delete(path)
+        }
+      shown = next ? { signature: signature(), topology: next } : null
+    }),
+  )
   createEffect(() => {
     if (topology() && !source().loading()) health.ready()
   })
-  createEffect(on(revision, () => {
-    const totals = topology()?.totals
-    if (!totals) return
-    recordSample('core', 'diff.files', totals.files)
-    recordSample('core', 'diff.document.segments', totals.segments)
-  }))
+  createEffect(
+    on(revision, () => {
+      const totals = topology()?.totals
+      if (!totals) return
+      recordSample('core', 'diff.files', totals.files)
+      recordSample('core', 'diff.document.segments', totals.segments)
+    }),
+  )
   createEffect(() => health.threads(threads()))
 
   const toggleFileCollapse = (path: string) => {
@@ -397,7 +445,8 @@ export function DiffPane(props: {
   // reader opened.
   const maxCols = createMemo(() => {
     let widest = topology()?.totals.columns ?? 0
-    for (const opened of overlays().values()) for (const overlay of opened) widest = Math.max(widest, maxLineCols(overlay.rows))
+    for (const opened of overlays().values())
+      for (const overlay of opened) widest = Math.max(widest, maxLineCols(overlay.rows))
     return widest
   })
 
@@ -405,8 +454,8 @@ export function DiffPane(props: {
   // gap sat at the edge of. A source with no fileText renders the gap inert.
   const handleExpand = async (gap: GapRow) => {
     const origin = source()
-    const epoch = gapEpoch
-    const fileEpoch = gapFileEpochs.get(gap.path) ?? 0
+    const gapsCurrent = gapReads.signal
+    const fileCurrent = gapFileRead(gap.path).signal
     const scope = scopeKey()
     const fileSet = signature()
     const fileText = origin.fileText
@@ -414,9 +463,15 @@ export function DiffPane(props: {
     if (gap.sha == null || !fileText || !file?.patchKey) return
     const at = gapPosition(gap)
     if (!at) return
-    const current = () => ownerLive && source() === origin && gapEpoch === epoch && (gapFileEpochs.get(gap.path) ?? 0) === fileEpoch && scopeKey() === scope
-      && signature() === fileSet && view.fileByPath().get(gap.path)?.patchKey === file.patchKey
-      && !!loader.rows(at.segment)
+    const current = () =>
+      ownerLive &&
+      source() === origin &&
+      !gapsCurrent.aborted &&
+      !fileCurrent.aborted &&
+      scopeKey() === scope &&
+      signature() === fileSet &&
+      view.fileByPath().get(gap.path)?.patchKey === file.patchKey &&
+      !!loader.rows(at.segment)
     try {
       const body = await fileText({ path: gap.path, sha: gap.sha })
       if (!current()) return
@@ -441,7 +496,14 @@ export function DiffPane(props: {
     for (let ordinal = 0; ordinal < file.segments.length; ordinal++) {
       const segment = { file, contentKey: segmentContentKey(file.patchKey, ordinal) }
       const rows = loader.rows(segment)
-      const index = rows?.findIndex((row) => row.kind === 'gap' && row.side === gap.side && row.oldStart === gap.oldStart && row.newStart === gap.newStart) ?? -1
+      const index =
+        rows?.findIndex(
+          (row) =>
+            row.kind === 'gap' &&
+            row.side === gap.side &&
+            row.oldStart === gap.oldStart &&
+            row.newStart === gap.newStart,
+        ) ?? -1
       if (index >= 0) return { segment, edge: index === 0 ? 'first' : 'last' }
     }
     return null
@@ -452,12 +514,21 @@ export function DiffPane(props: {
     const commands = registerCommands([
       { id: find.commandId, title: find.description, category: 'navigation', run: findController.openFind },
     ])
-    const bindings = registerKeybindings([{
-      id: find.commandId, command: find.commandId, description: find.description, category: find.category,
-      defaultChord: 'meta+f', when: find.pane ? 'pane' : 'typing-exempt',
-      ...(find.pane ? { pane: find.pane } : {}),
-    }])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    const bindings = registerKeybindings([
+      {
+        id: find.commandId,
+        command: find.commandId,
+        description: find.description,
+        category: find.category,
+        defaultChord: 'meta+f',
+        when: find.pane ? 'pane' : 'typing-exempt',
+        ...(find.pane ? { pane: find.pane } : {}),
+      },
+    ])
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   // Take the reader to a match: its segment's item, then the row inside it by the fixed row heights,
@@ -498,7 +569,11 @@ export function DiffPane(props: {
     }
     return px
   }
-  const findController = createDiffFindController({ search: (request, signal) => source().search(request, signal), revision, reveal: revealMatch })
+  const findController = createDiffFindController({
+    search: (request, signal) => source().search(request, signal),
+    revision,
+    reveal: revealMatch,
+  })
   const findHighlight = (row: CodeRow) => {
     const place = loader.place(row)
     return place ? findController.findHighlight(place.path, place.contentKey, place.index) : undefined
@@ -521,7 +596,12 @@ export function DiffPane(props: {
     <Show when={stickyFile()}>
       {(f) => (
         <div class="diff-sticky-file">
-          <FileHead file={f()} collapsed={collapsedFiles().has(f().path)} onToggleCollapse={toggleFileCollapse} marks={fileMarks(f().path)} />
+          <FileHead
+            file={f()}
+            collapsed={collapsedFiles().has(f().path)}
+            onToggleCollapse={toggleFileCollapse}
+            marks={fileMarks(f().path)}
+          />
         </div>
       )}
     </Show>
@@ -617,8 +697,8 @@ export function DiffPane(props: {
   const composerFor = (key: string): LineComposerController => {
     const draftKey = lineDraftKey(key)
     const origin = props.source
-    const epoch = composerEpoch
-    const ownsVisibleSlot = () => ownerLive && props.source === origin && composerEpoch === epoch
+    const slot = composerSlot.signal
+    const ownsVisibleSlot = () => ownerLive && props.source === origin && !slot.aborted
     return {
       isOpen: () => ownsVisibleSlot() && lineComposer()?.key === key,
       body: () => {
@@ -635,14 +715,14 @@ export function DiffPane(props: {
       setBody: (body) => {
         writeDraft(draftKey, body)
         if (!ownsVisibleSlot()) return
-        setLineComposer((current) => current?.key === key ? { key, body } : current)
+        setLineComposer((current) => (current?.key === key ? { key, body } : current))
       },
       acknowledge: (originalBody) => {
         // Compare the captured namespace even when another line or source owns the visible slot.
         if (readDraft(draftKey) !== originalBody) return
         writeDraft(draftKey, '')
         if (!ownsVisibleSlot()) return
-        setLineComposer((current) => current?.key === key && current.body === originalBody ? null : current)
+        setLineComposer((current) => (current?.key === key && current.body === originalBody ? null : current))
       },
     }
   }
@@ -655,11 +735,19 @@ export function DiffPane(props: {
   return (
     <Show
       when={topology()?.files.length}
-      fallback={<Show when={source().loading()} fallback={<EmptyState title="No changes" />}>
-        <EmptyState busy>Loading…</EmptyState>
-      </Show>}
+      fallback={
+        <Show when={source().loading()} fallback={<EmptyState title="No changes" />}>
+          <EmptyState busy>Loading…</EmptyState>
+        </Show>
+      }
     >
-      <DiffToolbar find={findController} viewMode={viewMode} setViewMode={setViewMode} fileQuery={fileQuery} setFileQuery={setFileQuery} />
+      <DiffToolbar
+        find={findController}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        fileQuery={fileQuery}
+        setFileQuery={setFileQuery}
+      />
       {/* Instead of the canvas, not beside it. The canvas remounts when the filter clears, the same way
           it does on a switch between unified and split, so the scroller and layout re-attach. */}
       <Show
@@ -667,47 +755,52 @@ export function DiffPane(props: {
         fallback={
           <EmptyState
             title={`No files match "${fileQuery().trim()}"`}
-            action={<Button variant="ghost" size="sm" onPress={() => setFileQuery('')}>Clear filter</Button>}
+            action={
+              <Button variant="ghost" size="sm" onPress={() => setFileQuery('')}>
+                Clear filter
+              </Button>
+            }
           />
         }
       >
-      <DiffCanvas
-        viewMode={viewMode}
-        items={items}
-        layout={layout}
-        stickyHead={stickyHead}
-        publishScrollEl={(element) => scrollRestoration.publish(element)}
-        onScroll={(element) => scrollRestoration.onScroll(element)}
-        maxCols={maxCols}
-        itemRows={itemRows}
-        segmentStatus={loader.status}
-        retrySegment={loader.retry}
-        fileCollapsed={(path) => collapsedFiles().has(path)}
-        onToggleFileCollapse={toggleFileCollapse}
-        fileMarks={fileMarks}
-        rows={{
-          onMutated: invalidate(),
-          resolveThread: (threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported(),
-          replyReview: (databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported(),
-          expandGap: handleExpand,
-          mentions: mentionsList,
-          threadCollapse: threadCollapseFor,
-          lineComment,
-          addComment: (body, row, side, lineNo) => source().addComment?.(body, { row, side, lineNo }) ?? rejectUnsupported(),
-          composerFor,
-          splitComposer,
-          canComment,
-          findHighlight,
-          hasLineExtra,
-          lineExtra,
-          lineAction: source().lineAction,
-          openLine: source().openLine,
-          askAgent: source().inlineChat?.open,
-          lineBlock: (row, itemKey) => lineBlock(row, blockInputs, itemKey)?.id ?? null,
-          bandBlock: (left, right, itemKey) => bandBlock(left, right, blockInputs, itemKey)?.id ?? null,
-          observeBlock: layout.observeBlock,
-        }}
-      />
+        <DiffCanvas
+          viewMode={viewMode}
+          items={items}
+          layout={layout}
+          stickyHead={stickyHead}
+          publishScrollEl={(element) => scrollRestoration.publish(element)}
+          onScroll={(element) => scrollRestoration.onScroll(element)}
+          maxCols={maxCols}
+          itemRows={itemRows}
+          segmentStatus={loader.status}
+          retrySegment={loader.retry}
+          fileCollapsed={(path) => collapsedFiles().has(path)}
+          onToggleFileCollapse={toggleFileCollapse}
+          fileMarks={fileMarks}
+          rows={{
+            onMutated: invalidate(),
+            resolveThread: (threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported(),
+            replyReview: (databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported(),
+            expandGap: handleExpand,
+            mentions: mentionsList,
+            threadCollapse: threadCollapseFor,
+            lineComment,
+            addComment: (body, row, side, lineNo) =>
+              source().addComment?.(body, { row, side, lineNo }) ?? rejectUnsupported(),
+            composerFor,
+            splitComposer,
+            canComment,
+            findHighlight,
+            hasLineExtra,
+            lineExtra,
+            lineAction: source().lineAction,
+            openLine: source().openLine,
+            askAgent: source().inlineChat?.open,
+            lineBlock: (row, itemKey) => lineBlock(row, blockInputs, itemKey)?.id ?? null,
+            bandBlock: (left, right, itemKey) => bandBlock(left, right, blockInputs, itemKey)?.id ?? null,
+            observeBlock: layout.observeBlock,
+          }}
+        />
       </Show>
     </Show>
   )

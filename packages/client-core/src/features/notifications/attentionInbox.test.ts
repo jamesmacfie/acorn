@@ -4,8 +4,15 @@ import type { AttentionItem } from '../../host/registries/rail/attention'
 import { evictScope } from '../../host/registries/shell/scopeEviction'
 import { attentionIsAcknowledged, markAttentionSeen } from './attentionInbox'
 
-const item = (over: Partial<AttentionItem>): AttentionItem =>
-  ({ id: 'agents.sessions:s1', taskId: 't1', title: 'claude finished', severity: 'info', at: 7, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
+const item = (over: Partial<AttentionItem>): AttentionItem => ({
+  id: 'agents.sessions:s1',
+  taskId: 't1',
+  title: 'claude finished',
+  severity: 'info',
+  at: 7,
+  target: { kind: 'managed-agent', resourceId: 's1' },
+  ...over,
+})
 
 describe('acknowledge on view', () => {
   it('retires a nudge the owner has acknowledged, and nothing else', () => {
@@ -21,10 +28,9 @@ describe('acknowledge on view', () => {
     expect(attentionIsAcknowledged('n2', completed)).toBe(false)
   })
 
-  // The bug this file exists to hold shut: the row's `at` is the session's `updatedAt`, and the node
-  // bumps that on every event it records — a usage report after the turn ended, a controller change on
-  // reconnect. An ack that keyed on it stopped matching, so every row the owner had just cleared came
-  // back with the next frame, and the bell's number climbed past where it started.
+  // The row's `at` is the session's `updatedAt`, and the node bumps that on every event it records: a
+  // usage report after the turn ended, a controller change on reconnect. An ack keyed on it would stop
+  // matching, so every row the owner had just cleared would come back with the next frame.
   it('survives the row being touched for no news', () => {
     const first = item({ id: 'agents.sessions:s2', at: 1 })
     markAttentionSeen('n1', first.id)

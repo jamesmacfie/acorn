@@ -9,15 +9,14 @@ import { retainScroll } from '../../lib/layout/retainScroll'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
-// `Row` has always been "an item in a collection" (docs/ui-design/closed-kit.md § The closed kit), and until now the
-// collection was whatever `<div>` the pane happened to wrap it in — which is why arrow keys worked in
-// three lists and nowhere else. This is that container, and it is the only thing a pane has to write
-// to get arrows, Home, End, the page keys, type-ahead, `aria-activedescendant` and a selection that
-// survives a refetch. The pane writes no key handling at all.
+// `Row` is "an item in a collection" (docs/ui-design/closed-kit.md § The closed kit), and this is the
+// collection. It is the only thing a pane has to write to get arrows, Home, End, the page keys,
+// type-ahead, `aria-activedescendant` and a selection that survives a refetch. The pane writes no key
+// handling at all.
 //
 // Items are data rather than children, because the collection needs the keys before the rows are
 // drawn: roving focus, type-ahead and the stored place are all keyed by the item's own key, not by
-// its position. See ../keys/collection.ts.
+// its position. See `createCollection`.
 //
 // At 80×24: the rows on successive lines, the active one marked.
 
@@ -39,7 +38,7 @@ export function Rows<T extends CollectionItem>(props: {
    * The list a pane writes does not change: the same `items`, the same body. What changes is that the
    * body is called for the rows in view and is handed each one's placement to pass to `Row`. Roving
    * focus still walks the whole list, because the keys are the collection's and the scroller is asked
-   * to reach a row before it is focused (../keys/collection.ts § scrollToKey).
+   * to reach a row before it is focused (`scrollToKey`).
    */
   virtual?: boolean
   /** Virtual rows in a collapsed sidebar are square with the surrounding icon rails. */
@@ -72,19 +71,27 @@ export function Rows<T extends CollectionItem>(props: {
   // an open menu inside a row. Held only while every field matches: an item whose `label` or
   // `disabled` changed is a different row and must redraw.
   const cache = new Map<string, T>()
-  const items = createMemo<readonly T[]>(() => measureWork('rows.reconcile', () => {
-    const present = new Set<string>()
-    const next = props.items.map((item: T) => {
-      present.add(item.key)
-      const held = cache.get(item.key)
-      const same = held && Object.keys(item).length === Object.keys(held).length
-        && Object.entries(item).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
-      if (!same) cache.set(item.key, item)
-      return same ? held! : item
-    })
-    for (const key of cache.keys()) if (!present.has(key)) cache.delete(key)
-    return next
-  }, { items: props.items.length }))
+  const items = createMemo<readonly T[]>(() =>
+    measureWork(
+      'rows.reconcile',
+      () => {
+        const present = new Set<string>()
+        const next = props.items.map((item: T) => {
+          present.add(item.key)
+          const held = cache.get(item.key)
+          const same =
+            held &&
+            Object.keys(item).length === Object.keys(held).length &&
+            Object.entries(item).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
+          if (!same) cache.set(item.key, item)
+          return same ? held! : item
+        })
+        for (const key of cache.keys()) if (!present.has(key)) cache.delete(key)
+        return next
+      },
+      { items: props.items.length },
+    ),
+  )
 
   const collection = createCollection({
     id: () => props.id,
@@ -92,14 +99,14 @@ export function Rows<T extends CollectionItem>(props: {
     role: props.tree ? 'tree' : 'listbox',
     ...(virtual
       ? {
-        scrollToKey: (key: string) => {
-          const index = items().findIndex((item) => item.key === key)
-          if (index >= 0) {
-            setPendingReveal(key)
-            virt?.scrollToIndex(index)
-          }
-        },
-      }
+          scrollToKey: (key: string) => {
+            const index = items().findIndex((item) => item.key === key)
+            if (index >= 0) {
+              setPendingReveal(key)
+              virt?.scrollToIndex(index)
+            }
+          },
+        }
       : {}),
     ...(props.selected !== undefined ? { selected: () => props.selected } : {}),
     ...(props.onSelect ? { onSelect: props.onSelect } : {}),
@@ -112,7 +119,11 @@ export function Rows<T extends CollectionItem>(props: {
     return (
       <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
         <For each={items()}>
-          {(item) => measureWork('rows.item.mount', () => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE))}
+          {(item) =>
+            measureWork('rows.item.mount', () =>
+              props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE),
+            )
+          }
         </For>
       </div>
     )
@@ -122,11 +133,13 @@ export function Rows<T extends CollectionItem>(props: {
   const [scrollOffset, setScrollOffset] = createSignal(0)
   // Row height comes from --row-h-virt so a style pack's density reaches the list. The virtualizer
   // writes its answer back as an inline height, which beats any stylesheet rule, so a number read from
-  // the token is the only way density is real here (./metrics.ts).
-  const measuredRowHeight = () => props.rowHeight === 'rail' ? railRowHeight() : rowHeight()
+  // the token is the only way density is real here (`rowHeight`).
+  const measuredRowHeight = () => (props.rowHeight === 'rail' ? railRowHeight() : rowHeight())
   const [rowH, setRowH] = createSignal(measuredRowHeight())
   virt = createVirtualizer({
-    get count() { return items().length },
+    get count() {
+      return items().length
+    },
     getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => rowH(),
     overscan: 12,
@@ -144,7 +157,10 @@ export function Rows<T extends CollectionItem>(props: {
 
   let frame = 0
   let publishFrame = 0
-  onCleanup(() => { cancelAnimationFrame(frame); cancelAnimationFrame(publishFrame) })
+  onCleanup(() => {
+    cancelAnimationFrame(frame)
+    cancelAnimationFrame(publishFrame)
+  })
   const measureSoon = () => {
     cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => virt?.measure())
@@ -170,18 +186,19 @@ export function Rows<T extends CollectionItem>(props: {
     const slots = virt!.getVirtualItems()
     // WebKit can expose a scrollable element before the virtualizer has its viewport or scroll
     // offset. Derive a bounded window from the element while its slots still describe the top.
-    const stale = !slots.length || slots[slots.length - 1]!.end < offset
-      || slots[0]!.start > offset + height
+    const stale = !slots.length || slots[slots.length - 1]!.end < offset || slots[0]!.start > offset + height
     if (height > 0 && (!virt!.scrollRect?.height || stale)) {
       const size = rowH()
       const start = Math.max(0, Math.floor(offset / size) - 4)
       const end = Math.min(rows.length, Math.ceil((offset + height) / size) + 4)
       return new Map(rows.slice(start, end).map((row, index) => [row.key, (start + index) * size] as const))
     }
-    return new Map(slots.flatMap((slot) => {
-      const row = rows[slot.index]
-      return row ? [[row.key, slot.start] as const] : []
-    }))
+    return new Map(
+      slots.flatMap((slot) => {
+        const row = rows[slot.index]
+        return row ? [[row.key, slot.start] as const] : []
+      }),
+    )
   })
   const visible = createMemo(() => {
     const positions = placements()
@@ -199,13 +216,21 @@ export function Rows<T extends CollectionItem>(props: {
   return (
     // The offset goes in the collection's stored state beside `active` and `selected`, so a sidebar
     // that is left and opened again comes back where the reader was rather than at the top.
-    <div class="ui-rows-scroll" ref={(element) => {
-      retainScroll(element, { key: () => props.id, read: (id) => collectionState(id).offset, write: setCollectionOffset })
-      publish(element)
-    }} onScroll={(event) => {
-      setScrollOffset(event.currentTarget.scrollTop)
-      setViewportHeight(event.currentTarget.clientHeight)
-    }}>
+    <div
+      class="ui-rows-scroll"
+      ref={(element) => {
+        retainScroll(element, {
+          key: () => props.id,
+          read: (id) => collectionState(id).offset,
+          write: setCollectionOffset,
+        })
+        publish(element)
+      }}
+      onScroll={(event) => {
+        setScrollOffset(event.currentTarget.scrollTop)
+        setViewportHeight(event.currentTarget.clientHeight)
+      }}
+    >
       <div
         class="ui-rows"
         aria-label={props.ariaLabel}
@@ -213,15 +238,18 @@ export function Rows<T extends CollectionItem>(props: {
         style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}
       >
         <For each={visible()}>
-          {(item) => measureWork('rows.item.mount', () => props.children(
-            item,
-            collection.itemProps(item.key),
-            () => collection.selected() === item.key,
-            {
-              get offset() { return placements().get(item.key) ?? items().indexOf(item) * rowH() },
-              get height() { return rowH() },
-            },
-          ))}
+          {(item) =>
+            measureWork('rows.item.mount', () =>
+              props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, {
+                get offset() {
+                  return placements().get(item.key) ?? items().indexOf(item) * rowH()
+                },
+                get height() {
+                  return rowH()
+                },
+              }),
+            )
+          }
         </For>
       </div>
     </div>

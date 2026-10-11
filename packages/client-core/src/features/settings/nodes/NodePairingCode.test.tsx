@@ -11,7 +11,10 @@ vi.mock('../../../infra/node/fleetActions', () => ({
 import { createNodePairing, NodePairingButton, NodePairingPanel } from './NodePairingCode'
 
 const node: NodeRecord = {
-  nodeId: 'node-a', label: 'This computer', endpoint: 'https://127.0.0.1:4317', local: true,
+  nodeId: 'node-a',
+  label: 'This computer',
+  endpoint: 'https://127.0.0.1:4317',
+  local: true,
   fingerprint: 'a1'.repeat(32),
 }
 let host: HTMLElement
@@ -24,7 +27,12 @@ beforeEach(() => {
   document.body.append(host)
   dispose = render(() => {
     const pairingState = createNodePairing(() => node.nodeId)
-    return <><NodePairingButton pairing={pairingState} /><NodePairingPanel node={node} pairing={pairingState} /></>
+    return (
+      <>
+        <NodePairingButton pairing={pairingState} />
+        <NodePairingPanel node={node} pairing={pairingState} />
+      </>
+    )
   }, host)
 })
 
@@ -40,7 +48,9 @@ describe('Settings → Nodes pairing', () => {
     expect(pairing.open).toHaveBeenCalledWith('node-a')
     expect(host.querySelector('.node-fingerprint-words')?.textContent?.split(' ')).toHaveLength(6)
 
-    const closeButton = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Close pairing')!
+    const closeButton = Array.from(host.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Close pairing',
+    )!
     closeButton.click()
     await vi.waitFor(() => expect(host.textContent).not.toContain('pairing-secret'))
     expect(pairing.close).toHaveBeenCalledWith('node-a')

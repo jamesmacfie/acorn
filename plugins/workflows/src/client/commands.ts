@@ -17,23 +17,17 @@ import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 
 // "Run a workflow", as one search over the definitions this task can run: the files its repository
 // commits, the user layer, and the rows the owner saved for this workspace
-// (docs/workflows/starting-runs.md § From the command palette).
+// (docs/workflows/starting-runs.md § From the command palette). It is a `localSearch`: one fetch when
+// the frame opens, then filtering on this machine.
 //
-// A `paletteRows` source until 2026-09-03, which put one row per definition into the palette root and
-// fetched them on every ⌘K. It is a `search` command now: one named row at the root, one fetch when the
-// frame is entered, and local filtering after that
-// (client-core/host/registries/commands/localSearch.ts).
-//
-// Beside it, "Find a run": the same shape over this task's runs, opening each in the run pane
-// (./runs/paneContribution.ts). Approving, cancelling and killing a run stay in that pane, for the
-// reason they always did (docs/command-palette-and-shortcuts.md).
+// Beside it, "Find a run": the same shape over this task's runs, opening each in the run pane.
+// Approving, cancelling and killing a run stay in that pane (docs/command-palette-and-shortcuts.md).
 
 /** A parse or cycle error from `.acorn/workflows/*.toml`, as a row.
  *
- *  The flat palette floated every source's errors to the top of the list, because an error explains why
- *  a row somebody expected is missing. A frame has no separate error channel for a compiled provider,
- *  so the explanation is a row: first, badged, and carrying no `ref`, which is how `select` knows it is
- *  not a definition. Enter on one restates it and stays. */
+ *  An error explains why a row somebody expected is missing, so it goes first. A frame has no separate
+ *  error channel for a compiled provider, so the explanation is a row: badged, and carrying no `ref`,
+ *  which is how `select` knows it is not a definition. Enter on one restates it and stays. */
 const problemItem = (error: { source: string; message: string }, at: number): CommandSearchItem => ({
   id: `problem:${at}`,
   title: `${error.source}: ${error.message}`,
@@ -45,7 +39,9 @@ const problemItem = (error: { source: string; message: string }, at: number): Co
  *  session over another task cannot reach this map at all. */
 const loaded = new WeakMap<CommandExecutionContext, Promise<WorkflowDefSummary[]>>()
 
-const readDefs = (context: CommandExecutionContext): Promise<{ workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }> =>
+const readDefs = (
+  context: CommandExecutionContext,
+): Promise<{ workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }> =>
   workflowApi.defs(context.taskId ?? '')
 
 export const workflowsCommands: readonly ContributedCommand[] = [
@@ -59,13 +55,15 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     palette: true,
     scope: 'task',
     order: 320,
-    // The runner is a node engine, so these routes 503 on a node that does not run terminals. The gate
-    // the row source declared, unchanged.
+    // The runner is a node engine, so these routes 503 on a node that does not run terminals.
     requires: { plugin: 'terminal' },
     placeholder: 'Find a workflow…',
     ...localSearch(async (context) => {
       const pending = readDefs(context)
-      loaded.set(context, pending.then((defs) => defs.workflows))
+      loaded.set(
+        context,
+        pending.then((defs) => defs.workflows),
+      )
       const defs = await pending.catch((error: unknown) => {
         loaded.delete(context)
         throw error
@@ -90,11 +88,11 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       const def = workflows?.find((candidate) => candidate.id === item.ref)
       if (!def) throw new Error(`'${item.ref}' is no longer a workflow of this task`)
       // The id, not the definition: the node resolves it and, for a committed file, checks the repo
-      // trust snapshot against the bytes on disk (./workflowsClient.ts).
+      // trust snapshot against the bytes on disk.
       const defId = def.source === 'database' ? def.id : `${def.source}:${def.id}`
       // A definition that asks for something opens the dialog that collects the values; one that asks
       // for nothing starts where it stands. `needsStartDialog` is that rule, and it lives with the
-      // dialog so this row cannot answer it differently (./editor/startRequest.ts).
+      // dialog so this row cannot answer it differently.
       //
       // The rail goes to Workflows first, because that is where the dialog is drawn: one mount, in the
       // source's list region, so the editor's Run and this row cannot put two of them on screen.
@@ -112,8 +110,7 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     },
   },
   {
-    // Deferred until the run pane existed, because a row that cannot say where it goes is worse than
-    // no row. Task scope: a run belongs to a task, and the pane is that task's.
+    // Task scope: a run belongs to a task, and the pane is that task's.
     id: 'workflows.runs.find',
     kind: 'search',
     title: 'Find a run',
@@ -159,7 +156,10 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       if (!workspaceId || !projectId) return { effect: 'stay', status: 'Choose a project first.' }
       // The editor's modules load here rather than at startup: this command is registered before the
       // first draw, and the editor is where it goes next anyway.
-      const [{ emptyDefinition }, { defRefKey }] = await Promise.all([import('./editor/draft'), import('./editor/draftStore')])
+      const [{ emptyDefinition }, { defRefKey }] = await Promise.all([
+        import('./editor/draft'),
+        import('./editor/draftStore'),
+      ])
       const row = await workflowApi.createDef({ workspaceId, projectId, def: emptyDefinition() })
       navigate?.(workflowsSurfacePath(projectId, defRefKey({ source: 'database', id: row.id })))
       return COMMAND_CLOSED

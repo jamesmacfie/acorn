@@ -12,12 +12,14 @@ describe('delegation agent tools', () => {
       read: vi.fn(),
       cancel: vi.fn(),
     } as unknown as AgentDelegationService
-    expect(delegationTools(service).map(({ name, scope, risk, requiresSession }) => ({
-      name,
-      scope,
-      risk,
-      requiresSession,
-    }))).toEqual([
+    expect(
+      delegationTools(service).map(({ name, scope, risk, requiresSession }) => ({
+        name,
+        scope,
+        risk,
+        requiresSession,
+      })),
+    ).toEqual([
       { name: 'agent_spawn', scope: 'task', risk: 'execute', requiresSession: true },
       { name: 'agent_prompt', scope: 'task', risk: 'execute', requiresSession: true },
       { name: 'agent_wait', scope: 'task', risk: 'execute', requiresSession: true },
@@ -26,7 +28,8 @@ describe('delegation agent tools', () => {
     ])
 
     const spawn = delegationTools(service).find((tool) => tool.name === 'agent_spawn')!
-    expect(spawn.input.parse({ title: 'Child', prompt: 'Work independently.', isolation: 'worktree' }))
-      .toMatchObject({ isolation: 'worktree' })
+    expect(spawn.input.parse({ title: 'Child', prompt: 'Work independently.', isolation: 'worktree' })).toMatchObject({
+      isolation: 'worktree',
+    })
   })
 })

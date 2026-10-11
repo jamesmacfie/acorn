@@ -6,8 +6,7 @@ import { Toolbar } from '../layout/Toolbar'
 import { Button } from './Button'
 import { Textarea } from './Textarea'
 
-// The comment box: textarea, submit, error line, and the Cmd+Enter chord, which github documented only
-// inside a placeholder string.
+// The comment box: textarea, submit, error line, and the Cmd+Enter chord.
 //
 // `mentions` decides which textarea renders. The mention data sources are host-side, so a frame leaves
 // the prop unset and gets a plain Textarea. Making that a prop rather than a runtime check keeps the
@@ -38,7 +37,12 @@ export function Composer(props: {
   // Seeded from the prop and re-seeded whenever it changes, so a caller that does hold the value stays
   // the source of truth and a caller that does not still has a working field.
   const [live, setLive] = createSignal(props.value)
-  createEffect(on(() => props.value, (value) => setLive(value)))
+  createEffect(
+    on(
+      () => props.value,
+      (value) => setLive(value),
+    ),
+  )
   const type = (value: string): void => {
     setLive(value)
     props.onInput?.(value)
@@ -61,11 +65,8 @@ export function Composer(props: {
 
   return (
     // The composer owns its keys while focused, except for `commit`: Cmd+Enter on macOS and
-    // Ctrl+Enter elsewhere, which is one row of ../keys/keymap.ts rather than a chord spelled here.
-    <div
-      class="ui-composer"
-      ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}
-    >
+    // Ctrl+Enter elsewhere, which is one row of `intentKeys` rather than a chord spelled here.
+    <div class="ui-composer" ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}>
       <Show
         when={props.mentions}
         fallback={
@@ -88,9 +89,13 @@ export function Composer(props: {
           />
         )}
       </Show>
-      <Show when={props.error}><Alert>{props.error}</Alert></Show>
+      <Show when={props.error}>
+        <Alert>{props.error}</Alert>
+      </Show>
       <Toolbar variant="actions">
-        <Show when={hint()}><span class="ui-composer-hint muted">{hint()}</span></Show>
+        <Show when={hint()}>
+          <span class="ui-composer-hint muted">{hint()}</span>
+        </Show>
         <Toolbar.Spacer />
         <Show when={secondary()}>{secondary()}</Show>
         <Button

@@ -49,12 +49,21 @@ and make and verify a routine change without tracing unrelated code or relying o
 Explain any complexity or workflow burden the change adds and why it is needed. Flag broader cleanup
 separately when it falls outside the task's scope.
 
+## Comments
+
+Keep a comment that explains why, or names a constraint, trap, or invariant the code can't show. Cut
+one that restates the code, tells history (what the code used to do or replaced), names a phase,
+programme, review finding, or date, or quotes a measurement nobody can rerun from the comment. Name a
+symbol rather than its file. To cite a doc, follow [writing-docs.md](./docs/writing-docs.md).
+`tools/arch/commentPaths.test.ts` checks that every file path in a comment exists.
+
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | Installs dependencies. A fresh worktree needs this first. |
-| `pnpm lint` | Runs oxlint, then `tsc --noEmit` in every package. |
+| `pnpm lint` | Runs oxlint, the formatter check, the unused-export check, then `tsc --noEmit` in every package. |
+| `pnpm format [<file>...]` | Formats the given TypeScript files, or every one when you name none. |
 | `pnpm test:focus <package> <file> [-t <name>]` | Runs one file or test. Use it while you iterate. |
 | `pnpm test --filter=<package>` | Runs one package's full suite through Turborepo. |
 | `pnpm --filter @acorn/arch-tests test` | Runs the repo-wide architecture rules, including doc links. |
@@ -98,3 +107,12 @@ For details, see [local development](./docs/local-development.md).
 
 The oxlint config only checks dead code and the `node:` import prefix. It stays narrow on purpose,
 because a linter that argues about style gets ignored.
+
+oxfmt sets the layout of every TypeScript file, configured in `.oxfmtrc.json`. `pnpm lint` fails on
+a file it would change. Run `pnpm format <file>` to fix one file, or `pnpm format` for the whole tree.
+Don't hand-format around it, and don't reformat files your change doesn't touch.
+
+knip fails `pnpm lint` on an export nothing imports, configured in `knip.jsonc`. A test counts as an
+importer. Delete the export, or drop the `export` keyword when the file still uses it. Run
+`pnpm lint:exports` to check on its own. A public surface or a name read by a build tool goes in
+`knip.jsonc` with its reason, not in an ignore comment.

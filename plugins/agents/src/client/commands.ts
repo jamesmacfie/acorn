@@ -14,30 +14,30 @@ import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession, requestComposerFocus } from './sessions/managedSelection'
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
-import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
+import {
+  choiceDescription,
+  choiceGlyph,
+  choiceLabel,
+  newSessionChoices,
+  type NewSessionChoice,
+} from './sessions/newSessionChoices'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
 // task, and one search over that task's managed sessions
-// (docs/managed-agents/palette.md § From the command palette).
+// (docs/managed-agents/palette.md § From the command palette). The harness terminals are in
+// `harnessTerminalCommands`, and the palette settings in `agentCommandsSlotContribution`, which is
+// mounted because it needs a query client.
 //
-// The two harness terminals are next door in ./terminalProfileCommands.ts, and the settings the
-// catalogue admits are in ./AgentCommands.tsx, which needs a query client and so has to be mounted
-// rather than registered at boot.
-//
-// **Why the search is task-scoped.** The route behind it takes a workspace as happily as a task, and
-// Agent Center already asks it that way. But a row from another task can only be opened by activating
-// that task first, and activating a task is a navigation this plugin cannot perform: the desktop's
-// route change belongs to a router that a plugin has no handle on. A search whose rows cannot all be
-// opened is worse than a narrower one, so the palette asks about the task the session captured and
-// Agent Center remains the surface that spans them
-// (docs/command-palette-and-shortcuts.md).
+// The search is task-scoped although its route takes a workspace too: a row from another task opens
+// only after that task is activated, and that is a router navigation a plugin cannot perform. Agent
+// Center is the surface that spans tasks.
 //
 // Stopping is deliberately absent: it is the one destructive verb here, and it needs the runtime
-// state a low-context row cannot carry (docs/command-palette-and-shortcuts/palette-data.md § What the palette
-// refuses). The rest of the open session's menu is at the bottom of this file, registered by the pane
-// while it is on screen rather than at boot.
+// state a low-context row cannot carry
+// (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses). The rest of the
+// open session's menu is at the bottom of this file, registered by the pane while it is on screen.
 
 /** The rows the open New agent session frame listed, by row id, so a pick can name the custom agent
  *  behind it. A row carries display facts and one `ref`, and an agent needs the harness too. */
@@ -63,8 +63,13 @@ const MAX_SESSION_ROWS = 50
 
 export const agentsCommands: readonly ContributedCommand[] = [
   {
-    id: 'agents.goal.set', title: 'Set session goal', category: 'action', palette: true,
-    scope: 'task', requires: { plugin: 'agents' }, run: (context) => requestSessionGoalEditor(context.taskId),
+    id: 'agents.goal.set',
+    title: 'Set session goal',
+    category: 'action',
+    palette: true,
+    scope: 'task',
+    requires: { plugin: 'agents' },
+    run: (context) => requestSessionGoalEditor(context.taskId),
   },
   {
     id: 'agents.sessions.new',
@@ -81,8 +86,8 @@ export const agentsCommands: readonly ContributedCommand[] = [
     placeholder: 'Pick a harness or an agent…',
     // The pane's New picker as a palette row: the providers this node runs and then the custom agents,
     // read once when the frame opens and filtered here, because that list does not move while somebody
-    // types (client-core localSearch.ts). Only installed harnesses, and only agents on one — an absent
-    // CLI cannot start a session, and the pane's cards are where the diagnostic that says why belongs.
+    // types. Only installed harnesses, and only agents on one: an absent CLI cannot start a session,
+    // and the pane's cards are where the diagnostic that says why belongs.
     ...localSearch(async () => {
       const [providers, agents] = await Promise.all([
         managedAgentApi.providers(),
@@ -90,22 +95,24 @@ export const agentsCommands: readonly ContributedCommand[] = [
         readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
       ])
       pickedRows.clear()
-      return newSessionChoices(providers.filter((provider) => provider.installed), agents)
-        .map((choice): CommandSearchItem => {
-          const glyph = choiceGlyph(choice)
-          const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
-          pickedRows.set(id, choice)
-          return {
-            id,
-            title: choiceLabel(choice),
-            subtitle: choiceDescription(choice),
-            ...(glyph ? { icon: glyph } : {}),
-            ...(choice.agent ? { badge: 'Agent' } : {}),
-            // The profile the session runs under. The row carries it because a picked row is all
-            // `select` gets, and the two ids differ for a provider that ships more than one profile.
-            ref: choice.provider.profileId,
-          }
-        })
+      return newSessionChoices(
+        providers.filter((provider) => provider.installed),
+        agents,
+      ).map((choice): CommandSearchItem => {
+        const glyph = choiceGlyph(choice)
+        const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
+        pickedRows.set(id, choice)
+        return {
+          id,
+          title: choiceLabel(choice),
+          subtitle: choiceDescription(choice),
+          ...(glyph ? { icon: glyph } : {}),
+          ...(choice.agent ? { badge: 'Agent' } : {}),
+          // The profile the session runs under. The row carries it because a picked row is all
+          // `select` gets, and the two ids differ for a provider that ships more than one profile.
+          ref: choice.provider.profileId,
+        }
+      })
     }),
     select: async (item, context) => {
       const taskId = context.taskId
@@ -175,7 +182,7 @@ export const agentsCommands: readonly ContributedCommand[] = [
       const taskId = item.taskId ?? context.taskId
       if (!taskId) return COMMAND_CLOSED
       // The retained selection path the notice targets and Agent Center both use: remember the pick,
-      // clear the focused request, and show the pane (./sessions/managedSelection.ts).
+      // clear the focused request, and show the pane.
       openManagedSession(taskId, item.id)
       return COMMAND_CLOSED
     },
@@ -190,25 +197,20 @@ const SESSION_GROUP = 'agents.session'
 /**
  * Mirror the open session's `•••` menu into the palette for as long as the pane is on screen.
  *
- * Registered from the detail region rather than at boot, and that is the whole point of it. These
- * actions need a selected session, which only the pane model has; two of them — rename and archive —
- * are dialogs that region draws, so a row offered while it is unmounted would run and show nothing.
- * Mounted is therefore the honest gate: you can reach these when you are looking at the run they are
- * about (docs/managed-agents/palette.md § From the command palette).
+ * Registered from the detail region rather than at boot: these actions need a selected session, which
+ * only the pane model has, and rename and archive are dialogs that region draws, so a row offered while
+ * it is unmounted would run and show nothing.
  *
- * The pane model stays the only place the roster is written. Nothing is enumerated here — the labels,
- * the availability and the work are all read back out of `sessionActions()` at the moment the row is
- * drawn or picked, so a session that gains an action gains a command with it.
+ * Nothing is enumerated here. Labels, availability and the work are read from `sessionActions()` when
+ * the row is drawn or picked, so a session that gains an action gains a command with it.
  */
 export function registerSessionActionCommands(model: AgentPaneModel): void {
-  const live = (id: string): SessionAction | undefined =>
-    model.sessionActions().find((action) => action.id === id)
+  const live = (id: string): SessionAction | undefined => model.sessionActions().find((action) => action.id === id)
   // Which actions exist changes with the session, the provider and the last turn; their labels and
   // their disabled flag do not need a re-registration, because a command reads both through `live`.
   // So this notifies on the id set alone, and typing in the palette does not race a re-register.
   const roster = createMemo(() => model.sessionActions(), [] as readonly SessionAction[], {
-    equals: (before, after) =>
-      before.map((action) => action.id).join() === after.map((action) => action.id).join(),
+    equals: (before, after) => before.map((action) => action.id).join() === after.map((action) => action.id).join(),
   })
   createEffect(() => {
     const actions = roster()

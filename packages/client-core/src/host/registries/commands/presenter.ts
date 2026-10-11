@@ -4,7 +4,7 @@ import type { Disposable } from '../../../kit/lib/state/registry'
 //
 // A leaf action has an executor and `executeCommand` calls it. A group has none, and neither will a
 // search, an input or a setting: they are entered at a frame, and the thing that draws frames is the
-// palette session (./session.ts). So a shortcut aimed at one has to reach whichever host is drawing,
+// palette session (`createCommandSession`). So a shortcut aimed at one has to reach whichever host is drawing,
 // and this is the one wire between them.
 //
 // A registry of one rather than the usual `Registry`, because there is exactly one palette per

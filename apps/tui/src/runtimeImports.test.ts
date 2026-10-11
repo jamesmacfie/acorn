@@ -18,7 +18,9 @@ const run = (dist: string): { code: number; output: string } => {
 describe('check-runtime-imports', () => {
   let dist: string
 
-  beforeEach(() => { dist = mkdtempSync(join(tmpdir(), 'tui-runtime-imports-')) })
+  beforeEach(() => {
+    dist = mkdtempSync(join(tmpdir(), 'tui-runtime-imports-'))
+  })
   afterEach(() => rmSync(dist, { recursive: true, force: true }))
 
   it('accepts installed packages and Node builtins', () => {
@@ -34,7 +36,10 @@ describe('check-runtime-imports', () => {
   })
 
   it('checks every static import and re-export on a minified line', () => {
-    writeFileSync(join(dist, 'main.js'), 'import{readFileSync as r}from"node:fs";import"acorn-missing-static";export{x}from"acorn-missing-export";')
+    writeFileSync(
+      join(dist, 'main.js'),
+      'import{readFileSync as r}from"node:fs";import"acorn-missing-static";export{x}from"acorn-missing-export";',
+    )
     const result = run(dist)
     expect(result.code).toBe(1)
     expect(result.output).toContain('acorn-missing-static (imported by main.js)')

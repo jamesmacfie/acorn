@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginSourceEmptyState } from '@acorn/protocol/api.ts'
+import {
+  PLUGIN_API_MAJOR,
+  type NodePluginRow,
+  type PluginContributions,
+  type PluginSourceEmptyState,
+} from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
@@ -38,7 +43,11 @@ const HASH = 'a'.repeat(64)
 
 const contributions = (over: Partial<PluginContributions> = {}): PluginContributions => ({ frames: [], ...over })
 
-const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<PluginContributions> = {}): NodePluginRow => ({
+const row = (
+  name: string,
+  over: Partial<NodePluginRow> = {},
+  declared: Partial<PluginContributions> = {},
+): NodePluginRow => ({
   name,
   required: false,
   disabled: false,
@@ -48,7 +57,11 @@ const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<
     version: '1.0.0',
     // The real constant: a literal here fails the day PLUGIN_API_MAJOR moves, for no reason this file is about.
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+    permissions: {
+      api: [],
+      events: [],
+      node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    },
     contributions: contributions(declared),
     client: null,
   },
@@ -61,29 +74,57 @@ const CHROME: Partial<PluginContributions> = {
     { id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge' },
     { id: 'board-status', slot: 'topbar', data: '/v1/p/board/status' },
   ],
-  contextMenus: [{
-    id: 'board-open', location: 'task.row', label: 'Open the board card', order: 500,
-    action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
-  }],
-  commands: [{ id: 'board.new', kind: 'action', title: 'Board: new card', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v1/p/board/new' } }],
+  contextMenus: [
+    {
+      id: 'board-open',
+      location: 'task.row',
+      label: 'Open the board card',
+      order: 500,
+      action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
+    },
+  ],
+  commands: [
+    {
+      id: 'board.new',
+      kind: 'action',
+      title: 'Board: new card',
+      category: 'action',
+      palette: true,
+      action: { verb: 'runNodeAction', path: '/v1/p/board/new' },
+    },
+  ],
   attention: [{ id: 'board-stuck', order: 500, items: '/v1/p/board/attention' }],
   nodeStats: [{ id: 'board-count', order: 500, label: ['card stuck', 'cards stuck'], data: '/v1/p/board/stat' }],
-  agentContexts: [{
-    id: 'board-context',
-    label: 'Board cards',
-    options: '/v1/p/board/context-options',
-    capture: '/v1/p/board/context-capture',
-  }],
+  agentContexts: [
+    {
+      id: 'board-context',
+      label: 'Board cards',
+      options: '/v1/p/board/context-options',
+      capture: '/v1/p/board/context-capture',
+    },
+  ],
   refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v1/p/board/refs' }],
 }
 
 const ids = () => ({
   sources: sourceRegistry.entries().map((entry) => entry.id),
-  slots: uiSlotRegistry.entries().filter(isTaskSlot).map((entry) => entry.id),
-  shellSlots: uiSlotRegistry.entries().filter((entry) => !isTaskSlot(entry)).map((entry) => entry.id),
+  slots: uiSlotRegistry
+    .entries()
+    .filter(isTaskSlot)
+    .map((entry) => entry.id),
+  shellSlots: uiSlotRegistry
+    .entries()
+    .filter((entry) => !isTaskSlot(entry))
+    .map((entry) => entry.id),
   contextMenus: contextMenuRegistry.entries().map((entry) => entry.id),
-  commands: commandRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
-  keybindings: keybindingRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
+  commands: commandRegistry
+    .entries()
+    .filter((entry) => entry.id.startsWith('plugin.'))
+    .map((entry) => entry.id),
+  keybindings: keybindingRegistry
+    .entries()
+    .filter((entry) => entry.id.startsWith('plugin.'))
+    .map((entry) => entry.id),
   attention: attentionRegistry.entries().map((entry) => entry.id),
   nodeStats: nodeStatRegistry.entries().map((entry) => entry.id),
   agentContexts: agentContextRegistry.entries().map((entry) => entry.id),
@@ -122,11 +163,24 @@ describe('syncChromeContributions', () => {
   })
 
   it('registers a file-language provider with its own routes, and drops one this device cannot use', () => {
-    _seedPluginDistribution([['node-a', [row('lint', {}, { documentServices: [
-      { id: 'json', label: 'JSON check', languageId: 'json', diagnostics: { route: '/v1/p/lint/check' } },
-      { id: 'stolen', label: 'Stolen', languageId: 'yaml', hover: { route: '/v1/p/other/hover' } },
-      { id: 'cobol', label: 'COBOL', languageId: 'cobol', hover: { route: '/v1/p/lint/hover' } },
-    ] })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row(
+            'lint',
+            {},
+            {
+              documentServices: [
+                { id: 'json', label: 'JSON check', languageId: 'json', diagnostics: { route: '/v1/p/lint/check' } },
+                { id: 'stolen', label: 'Stolen', languageId: 'yaml', hover: { route: '/v1/p/other/hover' } },
+                { id: 'cobol', label: 'COBOL', languageId: 'cobol', hover: { route: '/v1/p/lint/hover' } },
+              ],
+            },
+          ),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(documentServiceRegistry.entries().map((entry) => entry.id)).toEqual(['lint:json'])
     expect(resolveDocumentServices('node-a', 'json', undefined)).toEqual({
@@ -141,8 +195,11 @@ describe('syncChromeContributions', () => {
     // is: the node's parse is not evidence about the bytes that arrived. Dropping the action rather
     // than the whole state is deliberate: the sentence is the part the rail was missing.
     const message = 'No boards linked yet.'
-    const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
-      ({ message, action, actionLabel: 'Link one' })
+    const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState => ({
+      message,
+      action,
+      actionLabel: 'Link one',
+    })
     const panes = {
       panes: new Set(['board']),
       projectPanes: new Set<string>(),
@@ -151,9 +208,13 @@ describe('syncChromeContributions', () => {
     }
 
     // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
-    expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v1/p/other/go' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v1/p/other/go' }))).toEqual({
+      message,
+    })
     expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'ghost' }))).toEqual({ message })
-    expect(usableEmptyState('board', panes, authored({ verb: 'openUrl', url: 'http://example.com' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'openUrl', url: 'http://example.com' }))).toEqual({
+      message,
+    })
     expect(usableEmptyState('board', panes, authored({ verb: 'createTask' } as never))).toEqual({ message })
     // An overlay is its own set: `openPane` cannot name one, and `openOverlay` cannot name a pane.
     expect(usableEmptyState('board', panes, authored({ verb: 'openOverlay', overlay: 'board' }))).toEqual({ message })
@@ -169,23 +230,47 @@ describe('syncChromeContributions', () => {
 
   it('registers host-owned promotion for a createTask source', () => {
     const promotable: Partial<PluginContributions> = {
-      sources: [{
-        id: 'board', label: 'Board', glyph: 'kanban', order: 60,
-        items: '/v1/p/board/rail-items', onSelect: { verb: 'createTask' },
-      }],
+      sources: [
+        {
+          id: 'board',
+          label: 'Board',
+          glyph: 'kanban',
+          order: 60,
+          items: '/v1/p/board/rail-items',
+          onSelect: { verb: 'createTask' },
+        },
+      ],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
     syncChromeContributions()
     expect(sourceRegistry.get('board')?.promotion).toBeDefined()
   })
 
-  it('carries a loaded source\'s status-mark consent, and nothing for a source that did not give it', () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, {
-      sources: [
-        { id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items', statusAnnotations: true },
-        { id: 'board-quiet', label: 'Quiet', glyph: 'kanban', order: 61, items: '/v1/p/board/rail-items' },
+  it("carries a loaded source's status-mark consent, and nothing for a source that did not give it", () => {
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row(
+            'board',
+            {},
+            {
+              sources: [
+                {
+                  id: 'board',
+                  label: 'Board',
+                  glyph: 'kanban',
+                  order: 60,
+                  items: '/v1/p/board/rail-items',
+                  statusAnnotations: true,
+                },
+                { id: 'board-quiet', label: 'Quiet', glyph: 'kanban', order: 61, items: '/v1/p/board/rail-items' },
+              ],
+            },
+          ),
+        ],
       ],
-    })]]])
+    ])
     syncChromeContributions()
     expect(sourceRegistry.get('board')?.statusAnnotations).toBe(true)
     expect(sourceRegistry.get('board-quiet')?.statusAnnotations).toBeUndefined()
@@ -193,11 +278,19 @@ describe('syncChromeContributions', () => {
 
   it('registers host-owned promotion independently of the row selection action', () => {
     const promotable: Partial<PluginContributions> = {
-      frames: [{ target: 'pane', id: 'board-pane', label: 'Board', glyph: 'kanban', order: 60, formFactor: ['desktop'] }],
-      sources: [{
-        id: 'board', label: 'Board', glyph: 'kanban', order: 60,
-        items: '/v1/p/board/rail-items', onSelect: { verb: 'openPane', pane: 'board-pane' },
-      }],
+      frames: [
+        { target: 'pane', id: 'board-pane', label: 'Board', glyph: 'kanban', order: 60, formFactor: ['desktop'] },
+      ],
+      sources: [
+        {
+          id: 'board',
+          label: 'Board',
+          glyph: 'kanban',
+          order: 60,
+          items: '/v1/p/board/rail-items',
+          onSelect: { verb: 'openPane', pane: 'board-pane' },
+        },
+      ],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
     syncChromeContributions()
@@ -207,12 +300,14 @@ describe('syncChromeContributions', () => {
   it('registers declarative content links in manifest order and disposes them with the plugin', () => {
     const links = (id: string): Partial<PluginContributions> => ({
       frames: [{ target: 'pane', id: `${id}-pane`, label: id, glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],
-      contentLinks: [{
-        id: `${id}.card`,
-        match: 'https://tracker.example/cards/{key}',
-        openPane: `${id}-pane`,
-        item: 'key',
-      }],
+      contentLinks: [
+        {
+          id: `${id}.card`,
+          match: 'https://tracker.example/cards/{key}',
+          openPane: `${id}-pane`,
+          item: 'key',
+        },
+      ],
     })
     _seedPluginDistribution([['node-a', [row('first', {}, links('first')), row('second', {}, links('second'))]]])
     syncChromeContributions()
@@ -221,7 +316,11 @@ describe('syncChromeContributions', () => {
     // `providerId` is stamped from the plugin id, which is what lets a link resolve into that plugin's own
     // reference panel. A manifest never states it, so it cannot point at another plugin's panel.
     expect(parseInAppTarget('https://tracker.example/cards/ENG-42')).toEqual({
-      kind: 'first.card', key: 'ENG-42', pane: 'first-pane', item: 'ENG-42', providerId: 'first',
+      kind: 'first.card',
+      key: 'ENG-42',
+      pane: 'first-pane',
+      item: 'ENG-42',
+      providerId: 'first',
     })
 
     _seedPluginDistribution([['node-a', []]])
@@ -233,23 +332,52 @@ describe('syncChromeContributions', () => {
     // A plugin can have items worth glancing at and no task pane at all. `openPane` is optional for exactly
     // that shape, and the target it produces carries no `pane`, so the host's pane rung declines it and the
     // panel rung, resolved by the stamped provider, takes it.
-    _seedPluginDistribution([['node-a', [row('board', {}, {
-      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', glyph: 'puzzle', order: 500, formFactor: ['desktop'], providerId: 'board' }],
-      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row(
+            'board',
+            {},
+            {
+              frames: [
+                {
+                  target: 'refPanel',
+                  id: 'board-ref',
+                  label: 'Card',
+                  glyph: 'puzzle',
+                  order: 500,
+                  formFactor: ['desktop'],
+                  providerId: 'board',
+                },
+              ],
+              contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+            },
+          ),
+        ],
+      ],
+    ])
     syncChromeContributions()
 
     expect(parseInAppTarget('https://board.example/cards/ENG-42')).toEqual({
-      kind: 'board.card', key: 'ENG-42', item: 'ENG-42', providerId: 'board',
+      kind: 'board.card',
+      key: 'ENG-42',
+      item: 'ENG-42',
+      providerId: 'board',
     })
   })
 
   it('contributes no content recogniser when this device rejected the plugin bundle', () => {
     const declared: Partial<PluginContributions> = {
       frames: [{ target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],
-      contentLinks: [{
-        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'key',
-      }],
+      contentLinks: [
+        {
+          id: 'board.card',
+          match: 'https://board.example/cards/{key}',
+          openPane: 'board',
+          item: 'key',
+        },
+      ],
     }
     const withBundle = row('board', {}, declared)
     withBundle.installed!.client = { hash: HASH, bytes: 12 }
@@ -289,7 +417,10 @@ describe('syncChromeContributions', () => {
   })
 
   it('gates a topbar chip on the plugin running on the node being looked at', () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', {}, CHROME)]],
+      ['node-b', []],
+    ])
     syncChromeContributions()
     const chip = uiSlotRegistry.get('board-status') as ShellSlot
     expect(chip.when!({} as never)).toBe(true)
@@ -300,7 +431,12 @@ describe('syncChromeContributions', () => {
   describe('context menus', () => {
     const target = {
       location: 'task.row' as const,
-      id: 'task-42', title: 'Ship it', origin: 'github', projectId: 'p1', pinned: false, branch: 'me/ship',
+      id: 'task-42',
+      title: 'Ship it',
+      origin: 'github',
+      projectId: 'p1',
+      pinned: false,
+      branch: 'me/ship',
     }
 
     it('offers the row on the declared location, namespaced by its owner', () => {
@@ -314,10 +450,15 @@ describe('syncChromeContributions', () => {
       // fail. The plugin keeps its other contributions.
       const bad: Partial<PluginContributions> = {
         ...CHROME,
-        contextMenus: [{
-          id: 'board-open', location: 'task.row', label: 'Open', order: 500,
-          action: { verb: 'openPane', pane: 'never-declared' },
-        }],
+        contextMenus: [
+          {
+            id: 'board-open',
+            location: 'task.row',
+            label: 'Open',
+            order: 500,
+            action: { verb: 'openPane', pane: 'never-declared' },
+          },
+        ],
       }
       _seedPluginDistribution([['node-a', [row('board', {}, bad)]]])
       syncChromeContributions()
@@ -329,8 +470,21 @@ describe('syncChromeContributions', () => {
       const bad: Partial<PluginContributions> = {
         ...CHROME,
         contextMenus: [
-          { id: 'from-the-future', location: 'task.footer', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
-          { id: 'bad-when', location: 'task.row', label: 'Open', order: 500, when: { branch: 'main' }, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
+          {
+            id: 'from-the-future',
+            location: 'task.footer',
+            label: 'Open',
+            order: 500,
+            action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
+          },
+          {
+            id: 'bad-when',
+            location: 'task.row',
+            label: 'Open',
+            order: 500,
+            when: { branch: 'main' },
+            action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
+          },
         ],
       }
       _seedPluginDistribution([['node-a', [row('board', {}, bad)]]])
@@ -340,7 +494,10 @@ describe('syncChromeContributions', () => {
     })
 
     it('hides the row on a node that does not run the plugin', () => {
-      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      _seedPluginDistribution([
+        ['node-a', [row('board', {}, CHROME)]],
+        ['node-b', []],
+      ])
       syncChromeContributions()
       expect(contextMenuItems('task.row', target)).toHaveLength(1)
       setActiveNode('node-b')
@@ -371,7 +528,10 @@ describe('syncChromeContributions', () => {
   })
 
   it('gates the rail source on the plugin running on the node being looked at', () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', {}, CHROME)]],
+      ['node-b', []],
+    ])
     syncChromeContributions()
     const source = sourceRegistry.get('board')!
     expect(source.when!()).toBe(true)
@@ -380,7 +540,10 @@ describe('syncChromeContributions', () => {
   })
 
   it('asks a node that does not run the plugin for nothing', async () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', {}, CHROME)]],
+      ['node-b', []],
+    ])
     syncChromeContributions()
     const signal = new AbortController().signal
     expect(await attentionRegistry.get('board-stuck')!.fetch('node-b', signal)).toEqual([])
@@ -404,7 +567,13 @@ describe('syncChromeContributions', () => {
     // inbox row that swallows the click teaches the reader the section is decorative
     // (registries/rail/attention.ts).
     expect(items).toEqual([
-      { id: 'board-stuck:card-1', title: 'Stuck', severity: 'warn', at: 5, target: { kind: 'source', resourceId: 'board' } },
+      {
+        id: 'board-stuck:card-1',
+        title: 'Stuck',
+        severity: 'warn',
+        at: 5,
+        target: { kind: 'source', resourceId: 'board' },
+      },
     ])
   })
 
@@ -414,18 +583,26 @@ describe('syncChromeContributions', () => {
     syncChromeContributions()
     // The node's parser already rejected this, but the manifest reaches the device as a roster row,
     // and a roster row is bytes a node sent.
-    await expect(attentionRegistry.get('a')!.fetch('node-a', new AbortController().signal)).rejects.toThrow(/may not read/)
+    await expect(attentionRegistry.get('a')!.fetch('node-a', new AbortController().signal)).rejects.toThrow(
+      /may not read/,
+    )
     expect(readJson).not.toHaveBeenCalled()
   })
 
   it('registers a declared command and gates it on the active node', async () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', {}, CHROME)]],
+      ['node-b', []],
+    ])
     syncChromeContributions()
     const command = commandRegistry.get('plugin.board.board.new')!
     expect(command.palette).toBe(true)
     expect(commandAvailable(command)).toBe(true)
     await executeCommand(command.id)
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/new', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/board/new',
+      expect.objectContaining({ method: 'POST', nodeId: 'node-a' }),
+    )
     setActiveNode('node-b')
     expect(commandAvailable(command)).toBe(false)
   })
@@ -433,12 +610,26 @@ describe('syncChromeContributions', () => {
   it('registers commands and keybindings with host-qualified ids and preserves them while disabled', () => {
     const declared: Partial<PluginContributions> = {
       commands: [
-        { id: 'search', title: 'Board: search', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v1/p/board/search' } },
-        { id: 'quiet', title: 'Board: quiet action', category: 'action', palette: false, action: { verb: 'openUrl', url: 'https://example.com' } },
+        {
+          id: 'search',
+          title: 'Board: search',
+          category: 'action',
+          palette: true,
+          action: { verb: 'runNodeAction', path: '/v1/p/board/search' },
+        },
+        {
+          id: 'quiet',
+          title: 'Board: quiet action',
+          category: 'action',
+          palette: false,
+          action: { verb: 'openUrl', url: 'https://example.com' },
+        },
       ],
       keybindings: [{ command: 'search', defaultChord: 'meta+shift+f', when: 'task' }],
     }
-    _seedPluginDistribution([['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]],
+    ])
     syncChromeContributions()
     expect(ids().commands).toEqual(['plugin.board.search', 'plugin.board.quiet'])
     expect(commandRegistry.get('plugin.board.quiet')?.palette).toBe(false)
@@ -457,38 +648,77 @@ describe('syncChromeContributions', () => {
       commands: [
         { id: 'issues', title: 'Board: issues', category: 'navigation', palette: true, kind: 'group' },
         {
-          id: 'find', title: 'Board: find a card', category: 'action', palette: true, kind: 'search',
-          scope: 'task', route: '/v1/p/board/search', parentId: 'issues',
+          id: 'find',
+          title: 'Board: find a card',
+          category: 'action',
+          palette: true,
+          kind: 'search',
+          scope: 'task',
+          route: '/v1/p/board/search',
+          parentId: 'issues',
           onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
         },
         {
-          id: 'ask', title: 'Board: new card', category: 'action', palette: true, kind: 'input',
-          scope: 'project', route: '/v1/p/board/new-card',
+          id: 'ask',
+          title: 'Board: new card',
+          category: 'action',
+          palette: true,
+          kind: 'input',
+          scope: 'project',
+          route: '/v1/p/board/new-card',
           onSuccess: { verb: 'runNodeAction', path: '/v1/p/board/open' },
         },
         {
-          id: 'theme', title: 'Board: theme', category: 'action', palette: true, kind: 'setting',
-          scope: 'project', readRoute: '/v1/p/board/theme', writeRoute: '/v1/p/board/theme',
-          options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+          id: 'theme',
+          title: 'Board: theme',
+          category: 'action',
+          palette: true,
+          kind: 'setting',
+          scope: 'project',
+          readRoute: '/v1/p/board/theme',
+          writeRoute: '/v1/p/board/theme',
+          options: [
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ],
         },
         // A kind a newer node knows about. Skipped rather than coerced into an action.
         { id: 'later', title: 'Board: a sixth kind', category: 'action', palette: true, kind: 'toggle' },
         // A route outside the plugin's own namespace, refused here as well as at parse time.
         {
-          id: 'core', title: 'Board: core search', category: 'action', palette: true, kind: 'search',
-          scope: 'none', route: '/v1/tasks', onSelect: { verb: 'openTask' },
+          id: 'core',
+          title: 'Board: core search',
+          category: 'action',
+          palette: true,
+          kind: 'search',
+          scope: 'none',
+          route: '/v1/tasks',
+          onSelect: { verb: 'openTask' },
         },
       ] as PluginContributions['commands'],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
     syncChromeContributions()
-    expect(ids().commands).toEqual(['plugin.board.issues', 'plugin.board.find', 'plugin.board.ask', 'plugin.board.theme'])
+    expect(ids().commands).toEqual([
+      'plugin.board.issues',
+      'plugin.board.find',
+      'plugin.board.ask',
+      'plugin.board.theme',
+    ])
     expect(commandRegistry.get('plugin.board.find')).toMatchObject({
-      kind: 'search', ownerId: 'board', parentId: 'plugin.board.issues', scope: 'task',
+      kind: 'search',
+      ownerId: 'board',
+      parentId: 'plugin.board.issues',
+      scope: 'task',
     })
     expect(commandRegistry.get('plugin.board.ask')).toMatchObject({ kind: 'input', scope: 'project' })
     expect(commandRegistry.get('plugin.board.theme')).toMatchObject({
-      kind: 'setting', scope: 'project', options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      kind: 'setting',
+      scope: 'project',
+      options: [
+        { value: 'light', label: 'Light' },
+        { value: 'dark', label: 'Dark' },
+      ],
     })
   })
 
@@ -498,19 +728,36 @@ describe('syncChromeContributions', () => {
   // it parsed the manifest and this checks again because a roster row is bytes a node sent.
   it('honours a search that navigates to its own project surface, and refuses one that does not', () => {
     const declared: Partial<PluginContributions> = {
-      frames: [{
-        target: 'pane', id: 'board-card', label: 'Card', glyph: 'puzzle', order: 500,
-        formFactor: ['desktop'], scope: 'project',
-      }],
+      frames: [
+        {
+          target: 'pane',
+          id: 'board-card',
+          label: 'Card',
+          glyph: 'puzzle',
+          order: 500,
+          formFactor: ['desktop'],
+          scope: 'project',
+        },
+      ],
       commands: [
         {
-          id: 'find', title: 'Board: find a card', category: 'navigation', palette: true, kind: 'search',
-          scope: 'project', route: '/v1/p/board/search',
+          id: 'find',
+          title: 'Board: find a card',
+          category: 'navigation',
+          palette: true,
+          kind: 'search',
+          scope: 'project',
+          route: '/v1/p/board/search',
           onSelect: { verb: 'navigate', surface: 'board-card' },
         },
         {
-          id: 'stray', title: 'Board: find a stray', category: 'navigation', palette: true, kind: 'search',
-          scope: 'project', route: '/v1/p/board/search',
+          id: 'stray',
+          title: 'Board: find a stray',
+          category: 'navigation',
+          palette: true,
+          kind: 'search',
+          scope: 'project',
+          route: '/v1/p/board/search',
           onSelect: { verb: 'navigate', surface: 'not-declared' },
         },
       ] as PluginContributions['commands'],
@@ -529,19 +776,50 @@ describe('syncChromeContributions', () => {
     const declared: Partial<PluginContributions> = {
       frames: [
         {
-          target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'],
-          scope: 'task', layout: 'list-detail', regions: { list: region, detail: region },
+          target: 'pane',
+          id: 'board',
+          label: 'Board',
+          glyph: 'puzzle',
+          order: 500,
+          formFactor: ['desktop'],
+          scope: 'task',
+          layout: 'list-detail',
+          regions: { list: region, detail: region },
         },
         {
-          target: 'pane', id: 'notes', label: 'Notes', glyph: 'puzzle', order: 500, formFactor: ['desktop'],
-          scope: 'task', layout: 'single',
+          target: 'pane',
+          id: 'notes',
+          label: 'Notes',
+          glyph: 'puzzle',
+          order: 500,
+          formFactor: ['desktop'],
+          scope: 'task',
+          layout: 'single',
           regions: { body: { kind: 'document', languageId: 'plaintext', read: '/v1/p/board/doc' } },
         },
       ] as PluginContributions['frames'],
       commands: [
-        { id: 'run', title: 'Board: run', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'board' } },
-        { id: 'stray', title: 'Board: stray', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'notes' } },
-        { id: 'ghost', title: 'Board: ghost', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'nope' } },
+        {
+          id: 'run',
+          title: 'Board: run',
+          category: 'action',
+          palette: true,
+          action: { verb: 'surfaceAction', surface: 'board' },
+        },
+        {
+          id: 'stray',
+          title: 'Board: stray',
+          category: 'action',
+          palette: true,
+          action: { verb: 'surfaceAction', surface: 'notes' },
+        },
+        {
+          id: 'ghost',
+          title: 'Board: ghost',
+          category: 'action',
+          palette: true,
+          action: { verb: 'surfaceAction', surface: 'nope' },
+        },
       ],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
@@ -549,28 +827,46 @@ describe('syncChromeContributions', () => {
     expect(ids().commands).toEqual(['plugin.board.run'])
   })
 
-  // The fixture the phase asks for: a loaded plugin's setting, driven through the real registration
-  // pass rather than through a hand-built contribution
-  // (docs/plugins/commands.md § Command kinds).
+  // A loaded plugin's setting, driven through the real registration pass rather than through a
+  // hand-built contribution (docs/plugins/commands.md § Command kinds).
   //
   // Two non-secret choices, because that is what a setting command may be: a bounded, visible choice
-  // with its current value shown. Deliberately a fixture and not a real plugin's setting — none of the
-  // four adopting plugins has a two-choice preference, and inventing one to be covered would be a
-  // product decision made by a test.
+  // with its current value shown. A fixture rather than a real plugin's setting, because inventing a
+  // preference for a real plugin just to cover it would be a product decision made by a test.
   describe('a loaded plugin’s setting, end to end', () => {
     const declared: Partial<PluginContributions> = {
-      commands: [{
-        id: 'grouping', title: 'Board: group cards by', category: 'action', palette: true, kind: 'setting',
-        scope: 'project', readRoute: '/v1/p/board/prefs/grouping', writeRoute: '/v1/p/board/prefs/grouping',
-        options: [{ value: 'status', label: 'Status' }, { value: 'assignee', label: 'Assignee' }],
-      }] as PluginContributions['commands'],
+      commands: [
+        {
+          id: 'grouping',
+          title: 'Board: group cards by',
+          category: 'action',
+          palette: true,
+          kind: 'setting',
+          scope: 'project',
+          readRoute: '/v1/p/board/prefs/grouping',
+          writeRoute: '/v1/p/board/prefs/grouping',
+          options: [
+            { value: 'status', label: 'Status' },
+            { value: 'assignee', label: 'Assignee' },
+          ],
+        },
+      ] as PluginContributions['commands'],
     }
-    const context = { host: 'desktop' as const, nodeId: 'node-a', workspaceId: null, projectId: 'p-1', taskId: 't-1', paneId: null, surfaceId: null }
-    const setting = () => commandRegistry.get('plugin.board.grouping') as unknown as {
-      options: readonly { value: string; label: string }[]
-      read: (context: unknown, signal: AbortSignal) => Promise<string>
-      write: (value: string, context: unknown, signal: AbortSignal) => Promise<string>
+    const context = {
+      host: 'desktop' as const,
+      nodeId: 'node-a',
+      workspaceId: null,
+      projectId: 'p-1',
+      taskId: 't-1',
+      paneId: null,
+      surfaceId: null,
     }
+    const setting = () =>
+      commandRegistry.get('plugin.board.grouping') as unknown as {
+        options: readonly { value: string; label: string }[]
+        read: (context: unknown, signal: AbortSignal) => Promise<string>
+        write: (value: string, context: unknown, signal: AbortSignal) => Promise<string>
+      }
 
     beforeEach(() => {
       _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
@@ -582,22 +878,30 @@ describe('syncChromeContributions', () => {
       expect(await setting().read(context, new AbortController().signal)).toBe('assignee')
       // The project the session captured rides along, and the task it also captured does not: the
       // descriptor declared project scope, and the host sends that scope's identifier and no other.
-      expect(readJson).toHaveBeenCalledWith('/v1/p/board/prefs/grouping?projectId=p-1', expect.objectContaining({ nodeId: 'node-a' }))
+      expect(readJson).toHaveBeenCalledWith(
+        '/v1/p/board/prefs/grouping?projectId=p-1',
+        expect.objectContaining({ nodeId: 'node-a' }),
+      )
     })
 
     it('writes the chosen value and takes the canonical one the route answers with', async () => {
       writeJson.mockResolvedValueOnce({ value: 'status' })
       expect(await setting().write('status', context, new AbortController().signal)).toBe('status')
-      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/prefs/grouping', expect.objectContaining({
-        method: 'PUT',
-        nodeId: 'node-a',
-        body: JSON.stringify({ value: 'status', projectId: 'p-1' }),
-      }))
+      expect(writeJson).toHaveBeenCalledWith(
+        '/v1/p/board/prefs/grouping',
+        expect.objectContaining({
+          method: 'PUT',
+          nodeId: 'node-a',
+          body: JSON.stringify({ value: 'status', projectId: 'p-1' }),
+        }),
+      )
     })
 
     it('refuses a value that is not one of the manifest’s own choices, on the way out and back', async () => {
       // On the way out, before any request is made.
-      await expect(setting().write('colour', context, new AbortController().signal)).rejects.toThrow('not one of the choices')
+      await expect(setting().write('colour', context, new AbortController().signal)).rejects.toThrow(
+        'not one of the choices',
+      )
       expect(writeJson).not.toHaveBeenCalled()
       // And on the way back: a route that starts answering with something new cannot quietly add a
       // choice nobody reviewed. The manifest's copy is the only copy.
@@ -626,7 +930,9 @@ describe('syncChromeContributions', () => {
     })
 
     it('stays registered but unavailable while the plugin is disabled', () => {
-      _seedPluginDistribution([['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]]])
+      _seedPluginDistribution([
+        ['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]],
+      ])
       syncChromeContributions()
       expect(ids().commands).toEqual(['plugin.board.grouping'])
       expect(commandAvailable(commandRegistry.get('plugin.board.grouping')!)).toBe(false)
@@ -651,7 +957,10 @@ describe('syncChromeContributions', () => {
   describe('agent contexts', () => {
     const scope = { taskId: 'task-1' }
     const snapshot = (over: Record<string, unknown> = {}) => ({
-      contextId: 'board:card-1', label: 'Card 1', content: '# Card 1', ...over,
+      contextId: 'board:card-1',
+      label: 'Card 1',
+      content: '# Card 1',
+      ...over,
     })
 
     beforeEach(() => {
@@ -663,28 +972,36 @@ describe('syncChromeContributions', () => {
       readJson.mockResolvedValue([{ id: 'card-1', label: 'Card 1' }])
       const options = await agentContextRegistry.get('board-context')!.options(scope)
       expect(options).toEqual([{ id: 'card-1', label: 'Card 1' }])
-      expect(readJson).toHaveBeenCalledWith('/v1/p/board/context-options?taskId=task-1', expect.objectContaining({ nodeId: 'node-a' }))
+      expect(readJson).toHaveBeenCalledWith(
+        '/v1/p/board/context-options?taskId=task-1',
+        expect.objectContaining({ nodeId: 'node-a' }),
+      )
     })
 
     it('captures over POST and binds source, capture time and byte size host-side', async () => {
       // Everything a plugin should not be trusted with, supplied by the plugin: another plugin's
       // namespace, a pane it never declared, and a byte count that would walk past the composer's
       // ceiling if it were believed.
-      writeJson.mockResolvedValue([snapshot({
-        source: 'context.task',
-        byteSize: 1,
-        estimatedTokens: 1,
-        capturedAt: 1,
-        deepLink: { pane: 'someone-elses-pane' },
-        resourceId: 'card-1',
-        sensitivity: 'private',
-      })])
+      writeJson.mockResolvedValue([
+        snapshot({
+          source: 'context.task',
+          byteSize: 1,
+          estimatedTokens: 1,
+          capturedAt: 1,
+          deepLink: { pane: 'someone-elses-pane' },
+          resourceId: 'card-1',
+          sensitivity: 'private',
+        }),
+      ])
       const captured = await agentContextRegistry.get('board-context')!.capture(scope, ['card-1'])
-      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/context-capture', expect.objectContaining({
-        method: 'POST',
-        nodeId: 'node-a',
-        body: JSON.stringify({ taskId: 'task-1', optionIds: ['card-1'] }),
-      }))
+      expect(writeJson).toHaveBeenCalledWith(
+        '/v1/p/board/context-capture',
+        expect.objectContaining({
+          method: 'POST',
+          nodeId: 'node-a',
+          body: JSON.stringify({ taskId: 'task-1', optionIds: ['card-1'] }),
+        }),
+      )
       expect(captured).toHaveLength(1)
       expect(captured[0]).toMatchObject({
         type: 'context',
@@ -708,13 +1025,19 @@ describe('syncChromeContributions', () => {
     })
 
     it('rejects a capture over the shared context ceiling rather than trimming it to fit', async () => {
-      writeJson.mockResolvedValue([snapshot({ content: 'x'.repeat(MAX_AGENT_CONTEXT_BYTES) }), snapshot({ contextId: 'board:card-2' })])
+      writeJson.mockResolvedValue([
+        snapshot({ content: 'x'.repeat(MAX_AGENT_CONTEXT_BYTES) }),
+        snapshot({ contextId: 'board:card-2' }),
+      ])
       await expect(agentContextRegistry.get('board-context')!.capture(scope)).rejects.toThrow(/512 KiB of context/)
     })
 
     it('asks a node that does not run the plugin for nothing', async () => {
       setActiveNode('node-b')
-      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      _seedPluginDistribution([
+        ['node-a', [row('board', {}, CHROME)]],
+        ['node-b', []],
+      ])
       syncChromeContributions()
       expect(agentContextRegistry.get('board-context')).toBeUndefined()
       expect(readJson).not.toHaveBeenCalled()
@@ -723,7 +1046,11 @@ describe('syncChromeContributions', () => {
   })
 
   describe('ref resolvers', () => {
-    const row1 = { identifier: 'ENG-1', label: 'Ship the thing', state: { name: 'In Progress', color: '#f2c94c', kind: 'started' } }
+    const row1 = {
+      identifier: 'ENG-1',
+      label: 'Ship the thing',
+      state: { name: 'In Progress', color: '#f2c94c', kind: 'started' },
+    }
 
     beforeEach(() => {
       _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
@@ -735,11 +1062,14 @@ describe('syncChromeContributions', () => {
       // resolver naming another provider is how its rows would end up behind that provider's panel.
       writeJson.mockResolvedValue([{ ...row1, providerId: 'linear', url: 'https://board.example/c/ENG-1' }])
       const resolved = await refResolverRegistry.get('board-refs')!.resolve(['ENG-1'])
-      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/refs', expect.objectContaining({
-        method: 'POST',
-        nodeId: 'node-a',
-        body: JSON.stringify({ identifiers: ['ENG-1'] }),
-      }))
+      expect(writeJson).toHaveBeenCalledWith(
+        '/v1/p/board/refs',
+        expect.objectContaining({
+          method: 'POST',
+          nodeId: 'node-a',
+          body: JSON.stringify({ identifiers: ['ENG-1'] }),
+        }),
+      )
       expect(resolved).toEqual([{ ...row1, url: 'https://board.example/c/ENG-1', providerId: 'board' }])
     })
 
@@ -754,7 +1084,10 @@ describe('syncChromeContributions', () => {
 
     it('asks a node that does not run the plugin for nothing', async () => {
       setActiveNode('node-b')
-      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      _seedPluginDistribution([
+        ['node-a', [row('board', {}, CHROME)]],
+        ['node-b', []],
+      ])
       syncChromeContributions()
       expect(refResolverRegistry.get('board-refs')).toBeUndefined()
       expect(writeJson).not.toHaveBeenCalled()
@@ -763,7 +1096,15 @@ describe('syncChromeContributions', () => {
 
   it('takes all of a plugin’s chrome away when it stops being offered', () => {
     const shortcutChrome: Partial<PluginContributions> = {
-      commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v1/p/board/search' } }],
+      commands: [
+        {
+          id: 'search',
+          title: 'Board: search',
+          category: 'action',
+          palette: false,
+          action: { verb: 'runNodeAction', path: '/v1/p/board/search' },
+        },
+      ],
       keybindings: [{ command: 'search', defaultChord: 'meta+alt+b', when: 'global' }],
     }
     const overrideId = 'plugin.board.search'
@@ -775,7 +1116,18 @@ describe('syncChromeContributions', () => {
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], shellSlots: [], contextMenus: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [] })
+    expect(ids()).toEqual({
+      sources: [],
+      slots: [],
+      shellSlots: [],
+      contextMenus: [],
+      commands: [],
+      keybindings: [],
+      attention: [],
+      nodeStats: [],
+      agentContexts: [],
+      refResolvers: [],
+    })
     expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

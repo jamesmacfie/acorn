@@ -15,10 +15,7 @@ import type {
   WorkflowCatalogTarget,
   WorkflowStepDef,
 } from '../../shared/workflowContracts'
-import {
-  RUNTIME_WORKFLOW_KINDS,
-  workflowDispatchProblems,
-} from '../dispatch/validation'
+import { RUNTIME_WORKFLOW_KINDS, workflowDispatchProblems } from '../dispatch/validation'
 import { narrowsToolCeiling } from '../steps/tools'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { stepKindPluginId, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
@@ -36,8 +33,8 @@ const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
 
 /**
  * The edges, derived and never stored. A step with an `after` list waits on exactly those steps; a
- * step without one waits on the step declared before it, which is what a plain list always meant.
- * `after = []` is an explicit root.
+ * step without one waits on the step declared before it, so a plain list is a chain. `after = []` is
+ * an explicit root.
  */
 export function workflowEdges(steps: readonly WorkflowStepDef[]): Map<string, string[]> {
   const edges = new Map<string, string[]>()
@@ -112,12 +109,12 @@ export class WorkflowValidationError extends Error {
   }
 }
 
-export function templateReferences(prompt: string | undefined): string[] {
+function templateReferences(prompt: string | undefined): string[] {
   if (!prompt) return []
   return [...prompt.matchAll(TEMPLATE_RE)].map((match) => match[1])
 }
 
-export function inputReferences(prompt: string | undefined): string[] {
+function inputReferences(prompt: string | undefined): string[] {
   if (!prompt) return []
   return [...prompt.matchAll(INPUT_RE)].map((match) => match[1])
 }
@@ -133,8 +130,11 @@ function invalidTemplateExpressions(prompt: string | undefined): string[] {
 /** Every string a definition may hold a reference in: the prompt, the child prompt, and one level of
  *  `with`. Anywhere else, a `${...}` is just text. */
 function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
-  return [step.prompt, typeof step.goal === 'string' ? step.goal : undefined,
-    ...Object.values(step.with ?? {}).filter((value): value is string => typeof value === 'string')]
+  return [
+    step.prompt,
+    typeof step.goal === 'string' ? step.goal : undefined,
+    ...Object.values(step.with ?? {}).filter((value): value is string => typeof value === 'string'),
+  ]
 }
 
 /**
@@ -142,18 +142,22 @@ function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
  * conditions). The step runs as a managed session, and the check runs through the same harness's
  * one-shot mode. The length is checked again after rendering, when bindings have been filled in.
  */
-export function goalProblems(
+function goalProblems(
   label: string,
   goal: unknown,
   profileId: string,
   catalog: Pick<WorkflowValidationCatalog, 'profiles' | 'managedProfiles' | 'structuredProfiles'>,
 ): string[] {
   if (goal === undefined) return []
-  if (typeof goal !== 'string' || !goal.trim()) return [`${label} goal must be text that says when the step is finished`]
-  if (goal.trim().length > MAX_AGENT_GOAL_CHARS) return [`${label} goal is longer than ${MAX_AGENT_GOAL_CHARS} characters`]
+  if (typeof goal !== 'string' || !goal.trim())
+    return [`${label} goal must be text that says when the step is finished`]
+  if (goal.trim().length > MAX_AGENT_GOAL_CHARS)
+    return [`${label} goal is longer than ${MAX_AGENT_GOAL_CHARS} characters`]
   if (!catalog.profiles.has(profileId)) return []
-  if (!catalog.managedProfiles.has(profileId)) return [`${label} goal needs a managed harness, and '${profileId}' has no managed session driver`]
-  if (!catalog.structuredProfiles.has(profileId)) return [`${label} goal needs a harness with a one-shot mode to check it, and '${profileId}' has none`]
+  if (!catalog.managedProfiles.has(profileId))
+    return [`${label} goal needs a managed harness, and '${profileId}' has no managed session driver`]
+  if (!catalog.structuredProfiles.has(profileId))
+    return [`${label} goal needs a harness with a one-shot mode to check it, and '${profileId}' has none`]
   return []
 }
 
@@ -192,14 +196,17 @@ function fieldProblems(label: string, step: WorkflowStepDef, kind: string, field
       continue
     }
     if (field.type === 'number') {
-      if (typeof value !== 'number' || !Number.isFinite(value)) errors.push(`${label} ${field.label.toLowerCase()} must be a number`)
+      if (typeof value !== 'number' || !Number.isFinite(value))
+        errors.push(`${label} ${field.label.toLowerCase()} must be a number`)
       else if ((field.min != null && value < field.min) || (field.max != null && value > field.max)) {
         errors.push(`${label} ${field.label.toLowerCase()} must be between ${field.min ?? '-'} and ${field.max ?? '-'}`)
       }
     } else if (field.type === 'boolean' && typeof value !== 'boolean') {
       errors.push(`${label} ${field.label.toLowerCase()} must be true or false`)
     } else if (field.type === 'select' && field.options && !field.options.some((option) => option.value === value)) {
-      errors.push(`${label} ${field.label.toLowerCase()} must be one of ${field.options.map((option) => option.value).join(', ')}`)
+      errors.push(
+        `${label} ${field.label.toLowerCase()} must be one of ${field.options.map((option) => option.value).join(', ')}`,
+      )
     }
   }
   return errors
@@ -207,13 +214,15 @@ function fieldProblems(label: string, step: WorkflowStepDef, kind: string, field
 
 function budgetNarrows(parent: WorkflowBudget | undefined, child: WorkflowBudget | undefined): boolean {
   if (!child) return true
-  return BUDGET_FIELDS.every((field) =>
-    child[field] == null || parent?.[field] == null || child[field]! <= parent[field]!)
+  return BUDGET_FIELDS.every(
+    (field) => child[field] == null || parent?.[field] == null || child[field]! <= parent[field]!,
+  )
 }
 
 export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCatalog): string[] {
   const errors: string[] = []
-  if (def.formatVersion !== 1 || def.baseline !== ACORN_BASELINE) errors.push(`Incompatible workflow. Set formatVersion to 1 and baseline to ${ACORN_BASELINE}.`)
+  if (def.formatVersion !== 1 || def.baseline !== ACORN_BASELINE)
+    errors.push(`Incompatible workflow. Set formatVersion to 1 and baseline to ${ACORN_BASELINE}.`)
   if (!def.name?.trim()) errors.push('workflow has no name')
   if (!Array.isArray(def.steps) || !def.steps.length) return [...errors, 'workflow has no steps']
   errors.push(...workflowValueProblems(def))
@@ -221,9 +230,13 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     errors.push(`workflow '${def.name}' is autonomous but has no tool allowlist or risk ceiling`)
   }
   errors.push(...validateBudget(`workflow '${def.name}' budget`, def.budget))
-  for (const [field, ceiling] of [['maxDescendants', 500], ['maxConcurrency', 4]] as const) {
+  for (const [field, ceiling] of [
+    ['maxDescendants', 500],
+    ['maxConcurrency', 4],
+  ] as const) {
     const value = def[field]
-    if (value != null && (!Number.isSafeInteger(value) || value < 1 || value > ceiling)) errors.push(`${field} must be an integer from 1 to ${ceiling}`)
+    if (value != null && (!Number.isSafeInteger(value) || value < 1 || value > ceiling))
+      errors.push(`${field} must be an integer from 1 to ${ceiling}`)
   }
   const indexes = new Map<string, number>()
   for (const [index, step] of def.steps.entries()) {
@@ -243,10 +256,17 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!INPUT_NAME_RE.test(name)) errors.push(`input ${index + 1} has an invalid name '${name}'`)
     else if (declaredInputs.has(name)) errors.push(`input '${name}' is declared more than once`)
     else declaredInputs.add(name)
-    if (input.description != null && typeof input.description !== 'string') errors.push(`input '${name}' description must be a string`)
-    if (input.required != null && typeof input.required !== 'boolean') errors.push(`input '${name}' required must be true or false`)
-    if (input.connection && (input.schema?.type !== 'string' || !dataSourceRefSchema.safeParse(input.connection.source).success)) errors.push(`input '${name}' needs a string schema and a valid connection source`)
-    if (!input.schema && input.default != null && typeof input.default !== 'string') errors.push(`input '${name}' default must be a string`)
+    if (input.description != null && typeof input.description !== 'string')
+      errors.push(`input '${name}' description must be a string`)
+    if (input.required != null && typeof input.required !== 'boolean')
+      errors.push(`input '${name}' required must be true or false`)
+    if (
+      input.connection &&
+      (input.schema?.type !== 'string' || !dataSourceRefSchema.safeParse(input.connection.source).success)
+    )
+      errors.push(`input '${name}' needs a string schema and a valid connection source`)
+    if (!input.schema && input.default != null && typeof input.default !== 'string')
+      errors.push(`input '${name}' default must be a string`)
   }
 
   // The graph. `after` is checked before the cycle walk, because a dangling name would send the walk
@@ -261,7 +281,10 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
   const cycle = errors.length ? null : findCycle(edges)
   if (cycle) errors.push(`workflow '${def.name}' has a cycle: ${cycle.join(' → ')}`)
   const predecessors = new Map<string, Set<string>>(
-    def.steps.map((step) => [stepIdentity(step), (cycle ? null : workflowAncestors(edges, stepIdentity(step))) ?? new Set<string>()]),
+    def.steps.map((step) => [
+      stepIdentity(step),
+      (cycle ? null : workflowAncestors(edges, stepIdentity(step))) ?? new Set<string>(),
+    ]),
   )
   const after = (name: string): readonly string[] => edges.get(name) ?? []
   const precedes = (candidate: string, step: string): boolean => predecessors.get(step)?.has(candidate) ?? false
@@ -275,16 +298,20 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
   for (const [index, step] of def.steps.entries()) {
     const kind = step.kind ?? 'agent'
     const label = `step '${step.name || index + 1}'`
-    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(stepKindPluginId(kind)
-      ? `${label} cannot run. ${unavailableStepKindMessage(kind)}`
-      : `${label} has unknown kind '${kind}'`)
+    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind))
+      errors.push(
+        stepKindPluginId(kind)
+          ? `${label} cannot run. ${unavailableStepKindMessage(kind)}`
+          : `${label} has unknown kind '${kind}'`,
+      )
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     errors.push(...validateBudget(`${label} budget`, step.budget))
     if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)
     if (step.agent) {
       const profile = step.agent.profileId ?? DEFAULT_PROFILE_ID
       if (!catalog.profiles.has(profile)) errors.push(`${label} agent names unknown profile '${profile}'`)
-      else if (!catalog.managedProfiles.has(profile)) errors.push(`${label} agent profile '${profile}' has no managed session driver`)
+      else if (!catalog.managedProfiles.has(profile))
+        errors.push(`${label} agent profile '${profile}' has no managed session driver`)
       else errors.push(...goalProblems(`${label} agent`, step.agent.goal, profile, catalog))
     }
     // Other kinds finish on rules of their own, so only the plain agent step takes a goal.
@@ -303,19 +330,47 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     const fieldErrors = described ? fieldProblems(label, step, kind, described.fields) : []
     errors.push(...fieldErrors)
     if (!fieldErrors.length) {
-      errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }) ?? []))
+      errors.push(
+        ...(catalog.validateStepKind?.(kind, step, {
+          label,
+          index,
+          indexes,
+          stepAt,
+          policies: catalog.policies,
+          after,
+          precedes,
+        }) ?? []),
+      )
     }
-    errors.push(...workflowDispatchProblems({
-      label,
-      step,
-      targets: catalog.workflowTargets,
-      declaredInputs,
-      indexes,
-      precedes,
-      structured,
-    }))
-    errors.push(...gateFormDefinitionProblems({ label, step, posture: def.posture, declaredInputs, indexes, precedes, structured }))
-    errors.push(...workflowDataProblems(step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }, declaredInputs))
+    errors.push(
+      ...workflowDispatchProblems({
+        label,
+        step,
+        targets: catalog.workflowTargets,
+        declaredInputs,
+        indexes,
+        precedes,
+        structured,
+      }),
+    )
+    errors.push(
+      ...gateFormDefinitionProblems({
+        label,
+        step,
+        posture: def.posture,
+        declaredInputs,
+        indexes,
+        precedes,
+        structured,
+      }),
+    )
+    errors.push(
+      ...workflowDataProblems(
+        step,
+        { label, index, indexes, stepAt, policies: catalog.policies, after, precedes },
+        declaredInputs,
+      ),
+    )
     if (!(catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       for (const field of ['isolation', 'inputs', 'configOptions'] as const) {
         if (step[field] != null) errors.push(`${label} is a '${kind}' step, which cannot take ${field}`)
@@ -331,7 +386,8 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
       // A transitive predecessor, not "declared earlier": two roots are not ordered, so a step
       // beside this one may well have run first and still be the wrong thing to read.
       if (!indexes.has(reference)) errors.push(`${label} has invalid template reference '${reference}'`)
-      else if (!precedes(reference, stepIdentity(step))) errors.push(`${label} references '${reference}', which is not one of its predecessors`)
+      else if (!precedes(reference, stepIdentity(step)))
+        errors.push(`${label} references '${reference}', which is not one of its predecessors`)
     }
     for (const reference of strings.flatMap(inputReferences)) {
       if (!declaredInputs.has(reference)) errors.push(`${label} references undeclared input '${reference}'`)
@@ -345,7 +401,12 @@ export function assertValidWorkflow(def: WorkflowDef, catalog: WorkflowValidatio
   if (problems.length) throw new WorkflowValidationError(problems)
 }
 
-export type WorkflowStepOutputRow = { name: string; status: string; structuredJson: string | null; resultJson: string | null }
+export type WorkflowStepOutputRow = {
+  name: string
+  status: string
+  structuredJson: string | null
+  resultJson: string | null
+}
 
 /** What `${steps.<name>.output}` stands for: the structured JSON if the step produced one, its final
  *  text otherwise. */
@@ -369,7 +430,8 @@ export function renderWorkflowPrompt(
     .replace(TEMPLATE_RE, (_match, name: string) => {
       const row = rows.find((candidate) => candidate.name === name)
       if (!row) throw new WorkflowValidationError([`invalid template reference '${name}'`])
-      if (row.status !== 'done') throw new WorkflowValidationError([`template reference '${name}' points to a ${row.status} step`])
+      if (row.status !== 'done')
+        throw new WorkflowValidationError([`template reference '${name}' points to a ${row.status} step`])
       return stepOutput(row)
     })
     .replace(INPUT_RE, (_match, name: string) => {
@@ -387,14 +449,20 @@ export function renderWith(
 ): Record<string, unknown> | undefined {
   if (!table) return undefined
   return Object.fromEntries(
-    Object.entries(table).map(([key, value]) => [key, typeof value === 'string' ? renderWorkflowPrompt(value, rows, inputs) : value]),
+    Object.entries(table).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? renderWorkflowPrompt(value, rows, inputs) : value,
+    ]),
   )
 }
 
 /** The values a run starts with: the declared default unless the caller supplied one. Refuses a
  *  missing required input and a name the definition does not declare, so a bad start is a refusal
  *  rather than a prompt with a hole in it. */
-export function resolveWorkflowInputs(def: WorkflowDef, supplied: Record<string, DataValue> | undefined): Record<string, DataValue> {
+export function resolveWorkflowInputs(
+  def: WorkflowDef,
+  supplied: Record<string, DataValue> | undefined,
+): Record<string, DataValue> {
   const declared = def.inputs ?? []
   const problems: string[] = []
   for (const name of Object.keys(supplied ?? {})) {
@@ -407,8 +475,11 @@ export function resolveWorkflowInputs(def: WorkflowDef, supplied: Record<string,
       if (value === undefined) {
         if (input.required) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
       } else {
-        try { resolved[input.name] = validateDataValue(value, input.schema, WORKFLOW_VALUE_BYTES) }
-        catch (error) { problems.push(`input '${input.name}': ${String(error)}`) }
+        try {
+          resolved[input.name] = validateDataValue(value, input.schema, WORKFLOW_VALUE_BYTES)
+        } catch (error) {
+          problems.push(`input '${input.name}': ${String(error)}`)
+        }
       }
     } else if (value == null || (input.required && typeof value === 'string' && !value.trim())) {
       if (input.required) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
@@ -421,5 +492,11 @@ export function resolveWorkflowInputs(def: WorkflowDef, supplied: Record<string,
 
 /** The values a started run froze into its own copy of the definition. */
 export function frozenWorkflowInputs(def: WorkflowDef): Record<string, DataValue> {
-  return Object.fromEntries((def.inputs ?? []).flatMap((input) => input.default === undefined && input.schema ? [] : [[input.name, input.default === undefined ? '' : input.default]]))
+  return Object.fromEntries(
+    (def.inputs ?? []).flatMap((input) =>
+      input.default === undefined && input.schema
+        ? []
+        : [[input.name, input.default === undefined ? '' : input.default]],
+    ),
+  )
 }

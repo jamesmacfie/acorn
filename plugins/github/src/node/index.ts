@@ -4,7 +4,6 @@ import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
-import { pins } from '../server/routes/pulls/pins'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
@@ -34,8 +33,8 @@ export const githubPlugin = (): NodePlugin => {
       { verb: 'pulls-changed', description: 'A repository’s open pull request list was refreshed' },
       { verb: 'repos-changed', description: 'The repository mirror changed' },
     ],
-    // This module's own URL, so the host can walk from here for the migration chain (docs/plugins.md
-    // § Data ownership).
+    // This module's own URL, so the host can walk from here for the migration chain
+    // (docs/plugins/data-ownership.md § Data ownership).
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
@@ -49,53 +48,66 @@ export const githubPlugin = (): NodePlugin => {
       // Only the routers that write the PR mirror take it.
       const emit = githubEmitter(ctx.events.send)
 
-      // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Runs
-      // before any route registers, matching where the composition root used to call it.
+      // Bounded startup repair of parent-only mirror evictions. Runs before any route registers.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)
       if (removedPulls) ctx.log.info(`pruned ${removedPulls} orphaned mirrored pull requests`)
 
       // Registers the provider in both the connection and integration registries. Required:
       // connectProvider looks github up in the connection registry, so without it the device-flow
-      // poll fails provider_bad_config and github can never connect. An already-authenticated
-      // machine keeps working, because githubToken() reads the stored row and never consults the
-      // registry, so only a fresh data root reveals the break.
+      // poll fails provider_bad_config and github can never connect. A machine that is already signed
+      // in hides the break, because githubToken() reads the stored row and never consults the registry.
       //
       // The device-flow router registers separately below because github's routes share a namespace
-      // with the mirror routers, whose order is load-bearing (server/routes/mirrorRoutes.ts).
+      // with the mirror routers, whose order is load-bearing (`mirrorRoutes`).
       ctx.providers.integration(createGithubProvider({ connectable: githubClientId() !== '' }))
-      // The three source handlers load on their first request (docs/plugin-authoring/the-node-half.md
-      // § Load a route on first use). The descriptors register now, so the sources exist before then.
-      ctx.routes.fetch(lazyFetch(async () =>
-        (await import('../server/data/pullSourceHandler')).createPullSourceHandler()), { prefix: '/data/pulls' })
+      // The three source handlers load on their first request
+      // (docs/plugin-authoring/the-node-half.md § Load a route on first use). The descriptors register
+      // now, so the sources exist before then.
+      ctx.routes.fetch(
+        lazyFetch(async () => (await import('../server/data/pullSourceHandler')).createPullSourceHandler()),
+        { prefix: '/data/pulls' },
+      )
       ctx.dataSources.register(pullSource)
-      ctx.routes.fetch(lazyFetch(async () =>
-        (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke)), { prefix: '/data/branches' })
+      ctx.routes.fetch(
+        lazyFetch(async () =>
+          (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke),
+        ),
+        { prefix: '/data/branches' },
+      )
       ctx.dataSources.register(branchSource)
-      ctx.routes.fetch(lazyFetch(async () =>
-        (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()), { prefix: '/data/actions' })
+      ctx.routes.fetch(
+        lazyFetch(async () => (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()),
+        { prefix: '/data/actions' },
+      )
       ctx.dataSources.register(actionsSource)
 
-      // /v1/p/github/repos/* is the mirror: thirteen routers, about 39 KB of the node's minified boot
-      // graph, that serve nothing until a client asks for GitHub data. They load on that first request,
-      // in the order server/routes/mirrorRoutes.ts keeps.
-      ctx.routes.register(lazyRouter(async () =>
-        (await import('../server/routes/mirrorRoutes')).mirrorRoutes(store, ctx.core, emit)), { prefix: '/repos', note: 'repository and pull request mirror' })
+      // /v1/p/github/repos/* is the mirror. Its routers serve nothing until a client asks for GitHub
+      // data, so they load on that first request, in the order `mirrorRoutes` keeps.
+      ctx.routes.register(
+        lazyRouter(async () => (await import('../server/routes/mirrorRoutes')).mirrorRoutes(store, ctx.core, emit)),
+        { prefix: '/repos', note: 'repository and pull request mirror' },
+      )
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
-      // `pinned_repos` moved out of core, so /v1/core/pins became /v1/p/github/pins. The repo
-      // selector is the only caller.
-      ctx.routes.register(pins(store), { prefix: '/pins' })
       // The device-flow connect writes core's own `integrations` row through connectProvider
       // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
       // takes no handle.
-      ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
-      ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
+      ctx.routes.register(githubDeviceAuth(githubClientId), {
+        prefix: '',
+        note: '/auth/device/* — OAuth device-flow connect',
+      })
+      ctx.routes.register(githubImport(store, ctx.core), {
+        prefix: '',
+        note: 'POST /import — import mirrored repositories into core projects',
+      })
 
-      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit)) ctx.tools.register(tool)
+      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit))
+        ctx.tools.register(tool)
       discovery = startPullDiscovery(ctx)
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
-        pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
+        pullRequest: (userId, repoOwner, repoName, pullNumber) =>
+          mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
         // Resolving the task itself is core's job (`tasks` is core's table and this plugin has no
         // handle to it), so the taskId round-trips through CoreServices before the mirror is consulted.
         failingChecks: (userId, taskId) => failingChecksFor(store, ctx.core, userId, taskId),
@@ -107,10 +119,11 @@ export const githubPlugin = (): NodePlugin => {
       // its own capability out of the registry would be a plugin asking the graph about itself.
       // Contribution semantics, including what an absent section renders as, are core's
       // (docs/agent-tools/context-sections.md § Context sections).
-      ctx.contextSections.register(pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
-        mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
-      ))
-
+      ctx.contextSections.register(
+        pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
+          mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
+        ),
+      )
     },
     dispose: async () => {
       await discovery?.dispose()

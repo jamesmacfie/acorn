@@ -1,6 +1,16 @@
 import { expect, it, vi } from 'vitest'
 import { clientEvents } from '@acorn/plugin-api/client'
-import { historyIsCurrent, historyStep, navigate, nextClosed, noteActivated, noteClosed, recentFiles, reconcileEditorMetadata, takeClosedIfCurrent } from './editorNavigation'
+import {
+  historyIsCurrent,
+  historyStep,
+  navigate,
+  nextClosed,
+  noteActivated,
+  noteClosed,
+  recentFiles,
+  reconcileEditorMetadata,
+  takeClosedIfCurrent,
+} from './editorNavigation'
 
 const place = (path: string, line = 1) => ({ path, line, column: 1, scroll: 0 })
 const takeClosed = (node: string, task: string) => {
@@ -10,7 +20,8 @@ const takeClosed = (node: string, task: string) => {
 }
 
 it('branches navigation after back and reconciles closed references through a folder rename', () => {
-  const node = 'navigation-test-node'; const task = 'navigation-test-task'
+  const node = 'navigation-test-node'
+  const task = 'navigation-test-task'
   navigate(node, task, place('src/a.ts'), place('src/b.ts'))
   navigate(node, task, place('src/b.ts'), place('src/c.ts'))
   expect(historyStep(node, task, -1)).toEqual(place('src/b.ts'))
@@ -27,7 +38,8 @@ it('branches navigation after back and reconciles closed references through a fo
 })
 
 it('bounds recency and close metadata independently by Node and task', () => {
-  const node = 'bounded-test-node'; const task = 'bounded-test-task'
+  const node = 'bounded-test-node'
+  const task = 'bounded-test-task'
   for (let index = 0; index < 60; index++) {
     noteActivated(node, task, `file-${index}`)
     noteClosed(node, task, { path: `file-${index}`, index })
@@ -40,7 +52,8 @@ it('bounds recency and close metadata independently by Node and task', () => {
 })
 
 it('invalidates pending replay and reopen references when their paths move', () => {
-  const node = 'pending-mutation-node'; const task = 'pending-mutation-task'
+  const node = 'pending-mutation-node'
+  const task = 'pending-mutation-task'
   navigate(node, task, place('src/a.ts'), place('src/b.ts'))
   const oldPlace = historyStep(node, task, -1)!
   noteClosed(node, task, { path: 'src/a.ts', index: 0 })
@@ -55,9 +68,15 @@ it('writes device recency under the Node/task address and prunes it on archive',
   const values = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value) },
-    removeItem: (key: string) => { values.delete(key) },
-    get length() { return values.size },
+    setItem: (key: string, value: string) => {
+      values.set(key, value)
+    },
+    removeItem: (key: string) => {
+      values.delete(key)
+    },
+    get length() {
+      return values.size
+    },
     key: (index: number) => [...values.keys()][index] ?? null,
   })
   try {
@@ -72,5 +91,7 @@ it('writes device recency under the Node/task address and prunes it on archive',
     expect([...values.keys()]).toEqual(['acorn:editor:recent:v1:retained-editor-node:first'])
     reconcileEditorMetadata(null, 'archived-editor-task', 'src', 'moved')
     expect(values.has('acorn:editor:recent:v1::archived-editor-task')).toBe(false)
-  } finally { vi.unstubAllGlobals() }
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })

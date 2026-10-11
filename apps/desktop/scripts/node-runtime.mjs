@@ -7,10 +7,8 @@ import { dirname, resolve } from 'node:path'
 // The pinned Node runtime that rides in the bundle, fetched from nodejs.org and verified against that
 // release's SHASUMS256.txt (docs/shell/packaging.md § Build and packaging).
 //
-// Phase 2 copied whichever Node was running the staging script, which was enough for a developer build
-// and refused to run when the developer's runtime was not the pinned one. There is one path now, and it
-// is the release path: every machine and every CI run bundles the same bytes, verified, and no developer
-// has to switch runtimes to stage a build. A machine pays one download per pin, then hits the cache.
+// Every machine and every CI run bundles the same verified bytes, so no developer has to switch
+// runtimes to stage a build. A machine pays one download per pin, then hits the cache.
 
 const CACHE = resolve(homedir(), '.cache/acorn/node-runtime')
 

@@ -14,8 +14,24 @@ describe('no-projects screen gate', () => {
     const [count, setCount] = createSignal<number | undefined>()
     const [error, setError] = createSignal(false)
     const overlay = ownOnboardingVisibility()
-    dispose = () => { unmount(); overlay.dispose() }
-    const unmount = render(() => <Show when={noProjectsScreenVisible({ projectCount: count(), projectsError: error(), wizardVisible: onboardingWizardVisible() })}><main>Add a project</main></Show>, host)
+    dispose = () => {
+      unmount()
+      overlay.dispose()
+    }
+    const unmount = render(
+      () => (
+        <Show
+          when={noProjectsScreenVisible({
+            projectCount: count(),
+            projectsError: error(),
+            wizardVisible: onboardingWizardVisible(),
+          })}
+        >
+          <main>Add a project</main>
+        </Show>
+      ),
+      host,
+    )
 
     expect(host.textContent).toBe('')
     setCount(0)

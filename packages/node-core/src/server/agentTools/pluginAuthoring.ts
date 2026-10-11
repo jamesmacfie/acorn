@@ -1,6 +1,7 @@
 // Teaching the agent to write a plugin: the third piece of the dev loop. For the two doors, why the
-// vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
-// § plugin_authoring, docs/plugins/agent-install.md § Teaching the agent, and docs/plugin-authoring.md.
+// vocabulary below is derived rather than written, and what it leaves out, see
+// docs/agent-tools/plugin-tools.md § plugin_authoring, docs/plugins/agent-install.md § Teaching the
+// agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
@@ -46,7 +47,11 @@ type JsonSchema = {
 
 let cached: JsonSchema | null = null
 const manifestJsonSchema = (): JsonSchema =>
-  (cached ??= z.toJSONSchema(pluginManifestShape, { target: 'draft-7', io: 'input', unrepresentable: 'any' }) as JsonSchema)
+  (cached ??= z.toJSONSchema(pluginManifestShape, {
+    target: 'draft-7',
+    io: 'input',
+    unrepresentable: 'any',
+  }) as JsonSchema)
 
 const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | undefined =>
   path.reduce<JsonSchema | undefined>((node, key) => node?.properties?.[key], schema)
@@ -54,19 +59,22 @@ const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | und
 /**
  * One field off a descriptor's items, where the items may be a union of kinds.
  *
- * A command is five shapes now — action, group, search, input, setting — so `items.properties` is only there
+ * A command is five shapes (action, group, search, input, setting), so `items.properties` is only there
  * for the descriptors that are one shape. The first member carrying the field is the answer, because a
  * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
  */
 const field = (items: JsonSchema | undefined, name: string): JsonSchema | undefined =>
-  items?.properties?.[name]
-  ?? (items?.anyOf ?? items?.oneOf ?? []).map((member) => member.properties?.[name]).find(Boolean)
+  items?.properties?.[name] ??
+  (items?.anyOf ?? items?.oneOf ?? []).map((member) => member.properties?.[name]).find(Boolean)
 
 // A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. zod emits
 // `oneOf` for a discriminated union under draft-7, and `anyOf` is the fallback if that changes. The
 // test asserts the result is non-empty, so a silent [] cannot ship.
 const verbs = (schema: JsonSchema | undefined): string[] =>
-  (schema?.oneOf ?? schema?.anyOf ?? []).map((option) => option.properties?.verb?.const ?? '').filter(Boolean).sort()
+  (schema?.oneOf ?? schema?.anyOf ?? [])
+    .map((option) => option.properties?.verb?.const ?? '')
+    .filter(Boolean)
+    .sort()
 
 // ── Derived from the bridge wire union ────────────────────────────────────────────────────────────
 //
@@ -75,22 +83,24 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v1/p/<id>/ namespace always passes",
-  'api.bytes': `the same call for a route whose body is bytes: bridge.api.getBytes / postBytes, GET and POST only, `
-    + `capped at ${MAX_PLUGIN_BYTES} bytes each way. Same permission decision as \`api\`, made before the body is `
-    + `looked at. Reach for it instead of base64 whenever you are moving a file`,
+  'api.bytes':
+    `the same call for a route whose body is bytes: bridge.api.getBytes / postBytes, GET and POST only, ` +
+    `capped at ${MAX_PLUGIN_BYTES} bytes each way. Same permission decision as \`api\`, made before the body is ` +
+    `looked at. Reach for it instead of base64 whenever you are moving a file`,
   subscribe:
-    'subscribe to a channel the manifest declared in `permissions.events`: one of the shell\'s own, or your own '
-    + '`plugin:<id>:<verb>`, which your node half broadcasts on with `ctx.events.send`. That second one is how a frame '
-    + 'gets live data without polling; another plugin\'s is refused like its routes are',
+    "subscribe to a channel the manifest declared in `permissions.events`: one of the shell's own, or your own " +
+    '`plugin:<id>:<verb>`, which your node half broadcasts on with `ctx.events.send`. That second one is how a frame ' +
+    "gets live data without polling; another plugin's is refused like its routes are",
   'state.get': `read durable host-kept state, keyed (pluginId, key)`,
   'state.set': `write it; values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`,
   ui: 'the closed host-effect set (see uiOps)',
   document: 'the host editor of a document-over-frame pane (see documentOps); denied from every other surface',
   webview: 'controller verbs for a webview surface (see webviewOps); you cannot read the page or type into it',
   cancel: 'abandon an in-flight request by id',
-  telemetry: 'one telemetry record about your own frame: an event, a count, a gauge, a finished span, a log line '
-    + 'or an error, as `{ kind: "telemetry", record }`. No id and no reply, and the host stamps the owner from '
-    + 'the binding, so you never pass a plugin id. Counts against the same message budget as everything else',
+  telemetry:
+    'one telemetry record about your own frame: an event, a count, a gauge, a finished span, a log line ' +
+    'or an error, as `{ kind: "telemetry", record }`. No id and no reply, and the host stamps the owner from ' +
+    'the binding, so you never pass a plugin id. Counts against the same message budget as everything else',
   keydown: 'forward a chord this frame did not claim back to the shell',
   connected: 'the ack. Post it (or anything) or the host replaces the frame after 10s',
 } satisfies Record<PluginBridgeRequest['kind'], string>
@@ -100,16 +110,23 @@ const UI_OPS = {
   copy: 'write text to the clipboard — `navigator.clipboard` does not work in a frame',
   openPane: 'open a pane by id',
   openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
-  openTask: 'go to a task by id. Needs core.tasks:read, a focused frame, and shares openUrl\'s once-a-second budget',
+  openTask: "go to a task by id. Needs core.tasks:read, a focused frame, and shares openUrl's once-a-second budget",
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
-  'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '
-    + 'JSON result under 64 KiB, which resolves that tree\'s openOverlay call',
+  'importer.close':
+    'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a ' +
+    "JSON result under 64 KiB, which resolves that tree's openOverlay call",
 } satisfies Record<PluginBridgeUiRequest['op'], string>
 
 const DOCUMENT_OPS = { read: 1, write: 1, flush: 1 } satisfies Record<PluginBridgeDocumentRequest['op'], 1>
-const WEBVIEW_OPS = { navigate: 1, back: 1, forward: 1, reload: 1 } satisfies Record<PluginBridgeWebviewRequest['op'], 1>
-const API_METHODS = { GET: 1, POST: 1, PUT: 1, PATCH: 1, DELETE: 1 } satisfies Record<PluginBridgeApiRequest['method'], 1>
+const WEBVIEW_OPS = { navigate: 1, back: 1, forward: 1, reload: 1 } satisfies Record<
+  PluginBridgeWebviewRequest['op'],
+  1
+>
+const API_METHODS = { GET: 1, POST: 1, PUT: 1, PATCH: 1, DELETE: 1 } satisfies Record<
+  PluginBridgeApiRequest['method'],
+  1
+>
 
 // ── The projection ────────────────────────────────────────────────────────────────────────────────
 
@@ -147,13 +164,17 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
   const schema = manifestJsonSchema()
   const contributions = at(schema, 'contributions')
   const required = schema.required ?? []
-  const caps = Object.entries(contributions?.properties ?? {}).map(([key, value]) => [key, value.maxItems ?? 0] as const)
+  const caps = Object.entries(contributions?.properties ?? {}).map(
+    ([key, value]) => [key, value.maxItems ?? 0] as const,
+  )
   return {
     apiMajor: PLUGIN_API_MAJOR,
     manifest: {
       file: 'acorn-plugin.json',
       required: [...required].sort(),
-      optional: Object.keys(schema.properties ?? {}).filter((key) => !required.includes(key)).sort(),
+      optional: Object.keys(schema.properties ?? {})
+        .filter((key) => !required.includes(key))
+        .sort(),
       contributionCaps: Object.fromEntries(caps),
       frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
       slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
@@ -182,7 +203,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the node
       // cannot import it (docs/agent-tools/plugin-tools.md § plugin_authoring). The `note` below says what makes an
       // unknown scope survivable instead.
-      note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v1/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
+      note: "permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v1/p/<id>/ namespace needs no scope and is always allowed; another plugin's namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.",
     },
     bridge: {
       version: PLUGIN_BRIDGE_VERSION,
@@ -335,13 +356,16 @@ const table = (rows: [string, string][]): string => rows.map(([key, value]) => `
 
 /** One line per point: what to write in `matches`, what the tree or route gets, and any host gap. */
 const describePoint = (point: PublicExtensionPoint): string => {
-  const parts = point.kind === 'remote'
-    ? [
-      `\`${point.id}\` — remote, \`${point.mode}\`${point.mode === 'stack' ? ` up to ${point.max}` : ''}`
-        + `${point.matches ? `, keyed by ${point.matches}` : ''}. Props \`${point.props}\``,
-      ...(point.actions ? [`actions ${point.actions.map((action) => `\`${action}\``).join(', ')}`] : []),
-    ]
-    : [`\`${point.id}\` \`{ ${point.key.join(', ')} }\` — annotation${point.acceptedMarks ? `, ${point.acceptedMarks} marks kept` : ''}`]
+  const parts =
+    point.kind === 'remote'
+      ? [
+          `\`${point.id}\` — remote, \`${point.mode}\`${point.mode === 'stack' ? ` up to ${point.max}` : ''}` +
+            `${point.matches ? `, keyed by ${point.matches}` : ''}. Props \`${point.props}\``,
+          ...(point.actions ? [`actions ${point.actions.map((action) => `\`${action}\``).join(', ')}`] : []),
+        ]
+      : [
+          `\`${point.id}\` \`{ ${point.key.join(', ')} }\` — annotation${point.acceptedMarks ? `, ${point.acceptedMarks} marks kept` : ''}`,
+        ]
   return `- ${[...parts, point.note, point.terminal && `terminal: ${point.terminal}`].filter(Boolean).join('; ')}.`
 }
 
@@ -361,7 +385,9 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '**Contributions, and the cap on each.** The cap is the point past which a contribution stops being an',
     "integration and starts being an app inside someone else's chrome.",
     '',
-    Object.entries(manifest.contributionCaps).map(([key, cap]) => `- \`${key}\` — max ${cap}`).join('\n'),
+    Object.entries(manifest.contributionCaps)
+      .map(([key, cap]) => `- \`${key}\` — max ${cap}`)
+      .join('\n'),
     '',
     '**Loaded agent tools and context.** `agentTools` entries are task scoped and become',
     '`<pluginId>_<localId>`. They carry `{ id, description, inputSchema, risk, handler, scope?,',
@@ -376,10 +402,10 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'The host supplies the verified task/session principal. Body IDs cannot widen it. It never retries a',
     'plugin handler, and reload/unload removes every registration.',
     '',
-    `Frame targets: ${manifest.frameTargets.map((value) => `\`${value}\``).join(', ')}. `
-      + `Host slots: ${manifest.slots.map((value) => `\`${value}\``).join(', ')}. `
-      + `Context-menu locations: ${manifest.contextMenuLocations.map((value) => `\`${value}\``).join(', ')}. `
-      + `Command categories: ${manifest.commandCategories.map((value) => `\`${value}\``).join(', ')}.`,
+    `Frame targets: ${manifest.frameTargets.map((value) => `\`${value}\``).join(', ')}. ` +
+      `Host slots: ${manifest.slots.map((value) => `\`${value}\``).join(', ')}. ` +
+      `Context-menu locations: ${manifest.contextMenuLocations.map((value) => `\`${value}\``).join(', ')}. ` +
+      `Command categories: ${manifest.commandCategories.map((value) => `\`${value}\``).join(', ')}.`,
     '',
     '**Commands come in five kinds.** Omit `kind`, or say `action`, and your command is one verb the host',
     'runs — which is what every command has always been. `group` holds children: a command may name a',
@@ -402,18 +428,18 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'draw a 20px badge, and do not try to draw a pane out of descriptors.',
     '',
     '**Context menus.** A `contextMenus` entry is `{ id, location, label, icon?, order?, when?, action }`.',
-    '`when` is a map of literals that must ALL equal the target\'s own facts — not an expression — and a',
+    "`when` is a map of literals that must ALL equal the target's own facts — not an expression — and a",
     'fact the location does not have is a parse error. The action takes the same context-free verb set a',
-    'command does, and receives the id of the thing that was right-clicked. Core\'s own rows share the',
-    'registry, so yours appear in the same menu, after them by default. `file.row` (Editor\'s file tree)',
-    'and `document.tab` (an open document\'s tab) take rows from any plugin and no `surface`; `when` may',
+    "command does, and receives the id of the thing that was right-clicked. Core's own rows share the",
+    "registry, so yours appear in the same menu, after them by default. `file.row` (Editor's file tree)",
+    "and `document.tab` (an open document's tab) take rows from any plugin and no `surface`; `when` may",
     'name `projectId`, `extension` (lowercase, no dot, `""` for a folder), `directory`, and `readOnly`. Their',
     '`runNodeAction` body is `{ resource: { kind: "file", taskId, projectId, path, directory, readOnly,',
-    'revision? } }`, with `path` relative to the task\'s worktree. It never carries bytes: to read the file,',
-    'your Node half declares and calls Editor\'s `editor.files` capability. `agent.message` (a user or',
+    "revision? } }`, with `path` relative to the task's worktree. It never carries bytes: to read the file,",
+    "your Node half declares and calls Editor's `editor.files` capability. `agent.message` (a user or",
     'assistant message in an agent transcript) and `agent.turn` (a finished turn) also take rows from any',
-    'plugin and no `surface`. A message\'s `when` may name `projectId`, `role` (`user` or `assistant`), and',
-    '`status` (its turn\'s); a turn\'s may name `projectId` and `status`. The bodies are `{ message: { taskId,',
+    "plugin and no `surface`. A message's `when` may name `projectId`, `role` (`user` or `assistant`), and",
+    "`status` (its turn's); a turn's may name `projectId` and `status`. The bodies are `{ message: { taskId,",
     'projectId, sessionId, itemId, turnId, role, status, text, textTruncated?, revision } }`, with the text',
     'the card shows cut to 64 KiB, and `{ turn: { taskId, projectId, sessionId, turnId, status, revision } }`.',
     'A row is not a grant: it cannot send, answer, retry or edit anything in the session.',
@@ -426,11 +452,11 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'Editor, or `{ kind: "message", sessionId, itemId }` in an agent transcript. Where it can be invoked:',
     'on the desktop, right-click or Shift+F10 on a selection in a transcript message (a selection inside one',
     'code fence is `code`), in Editor, or in a plugin document editor; the terminal has no text selection,',
-    'so it offers a transcript message\'s whole text from an explicit menu, and nothing in Editor. The row',
+    "so it offers a transcript message's whole text from an explicit menu, and nothing in Editor. The row",
     'is read-only: it cannot replace the text, save, send, or read the rest of the document.',
     '',
     '**Document hover and diagnostics.** A `document` region may add `hover: { route }` and `diagnostics:',
-    '{ route }`, and only its own routes are asked about its text. For Editor\'s files, declare',
+    "{ route }`, and only its own routes are asked about its text. For Editor's files, declare",
     '`documentServices: [{ id, label, languageId, hover?, diagnostics? }]`; on a tie the person picks one per',
     'Node, and until then neither runs. Routes are YOUR namespace and get POSTs: hover `{ text, position,',
     'revision }` answers `{ revision, contents: { kind: "plaintext" | "markdown", value }, range? }` or `null`;',
@@ -442,25 +468,25 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '**Cooperative extension points.** You may open one of YOUR panes to other plugins, and you may add',
     'rows to a point another plugin opened. Both sides are manifest keys, and there is no third way:',
     'nothing lets you touch a plugin that did not declare a point, and nothing lets you run code inside',
-    'another plugin\'s realm. If a point cannot express what you need, the answer is to ask for a wider',
+    "another plugin's realm. If a point cannot express what you need, the answer is to ask for a wider",
     'descriptor vocabulary, not for access.',
     `- \`extensionPoints\`: \`{ id, label, location, surface }\` — \`location\` from ${manifest.extensionPointLocations.map((value) => `\`${value}\``).join(', ')},`,
     '  `surface` a `pane` YOUR manifest declares. The host draws the strip; you write no code for it.',
     '- `extensions`: `{ id, point, label, order?, items, onSelect?, refresh? }` — `point` is',
     '  `<ownerPluginId>:<pointId>`, and `items` is a GET on YOUR OWN namespace answering',
     '  `{ items: [{ id, title, subtitle?, icon?, badge? }] }`. `onSelect` takes the context-free verb set',
-    '  and receives the clicked row\'s id. The host stamps your plugin id beside the rows, always.',
+    "  and receives the clicked row's id. The host stamps your plugin id beside the rows, always.",
     'A contribution to a point that is not there — owner not installed, disabled, or it dropped the point —',
     'delivers nothing, silently. That is the designed outcome, not a failure to report.',
     '',
     '**Points you can fill.** A `remote` point takes `{ id, point, label, remote, matches?, overlay? }`:',
     '`remote` names an entry your client bundle passed to `mountTree`, and `matches` takes exact keys,',
-    '`prefix*` and `*suffix`. A `replace` point draws one contributor, and on a tie the owner\'s default',
+    "`prefix*` and `*suffix`. A `replace` point draws one contributor, and on a tie the owner's default",
     'until the person picks one; a `stack` point draws up to its cap. An `annotation` point takes',
     '`{ id, point, label, items }`: the host POSTs `{ keys: [...] }` for what it draws, and your route',
     'answers `{ items: [{ key, severity: "info" | "warn" | "danger", text, icon? }] }`, text cut at 200',
-    'characters. Unless a line says otherwise, the terminal draws a tree wherever it draws the owner\'s',
-    'view, and a companion overlay answers `unsupported_host` there. This node\'s list:',
+    "characters. Unless a line says otherwise, the terminal draws a tree wherever it draws the owner's",
+    "view, and a companion overlay answers `unsupported_host` there. This node's list:",
     '',
     points.map(describePoint).join('\n'),
     '',
@@ -478,17 +504,17 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'A loaded owner can reserve a detail region: a `remote` point with `mounts: [{ surface, region }]`,',
     `  \`region\` ${DETAIL_REGIONS.map((value) => `\`${value}\``).join(' or ')}, \`surface\` one of YOUR \`scope: "project"\` panes or \`refPanel\`s, up to`,
     '  eight. The host draws the point above or below that view, outside your tree, so you write no `Slot`.',
-    '  Contributors get the view\'s identity, never your data.',
+    "  Contributors get the view's identity, never your data.",
     '',
-    `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
-      + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `
-      + '`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. Registering SEIZES NOTHING —'
-      + ' the user picks the provider in Settings, and acorn draws its own again the moment your plugin is'
-      + ' disabled or your surface throws.',
+    `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: ` +
+      `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare ` +
+      '`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. Registering SEIZES NOTHING —' +
+      ' the user picks the provider in Settings, and acorn draws its own again the moment your plugin is' +
+      ' disabled or your surface throws.',
     '',
     '**Themes.** A `themes` entry is `{ id, label, dark?, tokens }`, and `tokens` must carry exactly these',
-    `${manifest.themeTokens.length} names — all of them, none else: `
-      + `${manifest.themeTokens.map((token) => `\`${token}\``).join(', ')}.`,
+    `${manifest.themeTokens.length} names — all of them, none else: ` +
+      `${manifest.themeTokens.map((token) => `\`${token}\``).join(', ')}.`,
     'Each value is a hex colour or a flat colour function (`#1e1e2e`, `rgba(0, 0, 0, 0.42)`,',
     '`oklch(0.7 0.15 250)`); named colours, `var()` and nested functions are refused. You write no CSS —',
     'the host generates the `:root[data-theme="plugin:<your-id>:<theme-id>"]` block itself, and writes',
@@ -497,13 +523,13 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '',
     '**Action verbs.** Descriptors do not run plugin code; they hand the host a verb from a closed set.',
     `A rail source's \`onSelect\` takes the full set: ${actions.railOnSelect.map((verb) => `\`${verb}\``).join(', ')}.`,
-    `Commands, slot badges and a source's \`emptyState\` take the context-free subset: `
-      + `${actions.commandsAndBadges.map((verb) => `\`${verb}\``).join(', ')} — the rest need a selected row or a routed project.`,
+    `Commands, slot badges and a source's \`emptyState\` take the context-free subset: ` +
+      `${actions.commandsAndBadges.map((verb) => `\`${verb}\``).join(', ')} — the rest need a selected row or a routed project.`,
     '',
-    `**Permissions.** \`permissions.node\` keys: ${permissions.node.map((key) => `\`${key}\``).join(', ')}. `
-      + `\`permissions.node.core\` tokens: ${permissions.core.map((token) => `\`${token}\``).join(', ')} `
-      + '(the project grants nest: `config` and `write` each imply `read`). '
-      + permissions.note,
+    `**Permissions.** \`permissions.node\` keys: ${permissions.node.map((key) => `\`${key}\``).join(', ')}. ` +
+      `\`permissions.node.core\` tokens: ${permissions.core.map((token) => `\`${token}\``).join(', ')} ` +
+      '(the project grants nest: `config` and `write` each imply `read`). ' +
+      permissions.note,
     '',
     `**The frame bridge** (\`acornBridge: ${bridge.version}\`). Requests are \`{ id, kind, ... }\`; replies are`,
     '`{ id, ok: true, status, body }` or `{ id, ok: false, error: { code, message, requestId, retryable } }`.',
@@ -514,7 +540,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '',
     table(Object.entries(bridge.uiOps).map(([op, note]) => [`ui.${op}`, note])),
     '',
-    `\`document\` ops: ${bridge.documentOps.map((op) => `\`${op}\``).join(', ')}. `
-      + `\`webview\` ops: ${bridge.webviewOps.map((op) => `\`${op}\``).join(', ')}.`,
+    `\`document\` ops: ${bridge.documentOps.map((op) => `\`${op}\``).join(', ')}. ` +
+      `\`webview\` ops: ${bridge.webviewOps.map((op) => `\`${op}\``).join(', ')}.`,
   ].join('\n')
 }

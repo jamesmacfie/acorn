@@ -10,12 +10,18 @@ import { claudeCodeProfile } from './claudeCode'
 describe('the claude-code profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
     // `id` is persisted; see docs/managed-agents/harnesses.md § Harnesses.
-    expect(claudeCodeProfile).toMatchObject({ id: 'claude-code', label: 'Claude Code', kind: 'agent', command: 'claude', transport: 'pty' })
+    expect(claudeCodeProfile).toMatchObject({
+      id: 'claude-code',
+      label: 'Claude Code',
+      kind: 'agent',
+      command: 'claude',
+      transport: 'pty',
+    })
   })
 
-  // Asserts the whole array, not `toContain` per flag. A per-flag check missed a dropped `-p`, which
+  // Asserts the whole array, not `toContain` per flag. A per-flag check misses a dropped `-p`, which
   // leaves the headless runner waiting forever on a prompt, and a dropped `--verbose`, which
-  // `-p --output-format stream-json` requires. It also let an inserted
+  // `-p --output-format stream-json` requires. It also lets an inserted
   // `--dangerously-skip-permissions --add-dir /` through, widening what a headless agent may do.
   //
   // Only the no-options invocation gets full equality, because it is the one case with a fixed answer.
@@ -25,20 +31,42 @@ describe('the claude-code profile', () => {
     expect(file).toBe('claude')
     // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; `auto` is why
     // a headless agent neither blocks on the first tool approval with nobody there to answer it nor has every
-    // acorn tool denied out from under it, which is what `dontAsk` did. The prompt is last and positional; a
+    // acorn tool denied out from under it, which is what `dontAsk` does. The prompt is last and positional; a
     // flag inserted after it would be read as part of it.
-    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'do the thing'])
+    expect(args).toEqual([
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'auto',
+      'do the thing',
+    ])
   })
 
   it('resumes a headless turn by prepending --resume, leaving the rest of the invocation identical', () => {
     // The one branch the no-options equality above cannot cover, and it comes first: after `-p`
     // claude reads the session ref as part of the prompt.
     const { args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'again', resumeSessionId: 'sess-1' })
-    expect(args).toEqual(['--resume', 'sess-1', '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'again'])
+    expect(args).toEqual([
+      '--resume',
+      'sess-1',
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'auto',
+      'again',
+    ])
   })
 
   it('threads an optional model and schema through, and omits them when absent', () => {
-    const withBoth = claudeCodeProfile.headlessArgv!('claude', { prompt: 'p', model: 'opus', schema: { type: 'object' } })
+    const withBoth = claudeCodeProfile.headlessArgv!('claude', {
+      prompt: 'p',
+      model: 'opus',
+      schema: { type: 'object' },
+    })
     expect(withBoth.args).toContain('--model')
     expect(withBoth.args).toContain('opus')
     expect(withBoth.args).toContain('--json-schema')
@@ -49,8 +77,8 @@ describe('the claude-code profile', () => {
   })
 
   it('resumes by session reference, which is what the terminal handoff spawns', () => {
-    // plugins/agents' handoff runs this in a real PTY (contract/sessionsClient.ts § create), so the shape has
-    // a second consumer beyond the headless runner.
+    // plugins/agents' handoff runs this in a real PTY through the terminal plugin's sessions client, so
+    // the shape has a second consumer beyond the headless runner.
     expect(claudeCodeProfile.resumeArgv!('claude', 'sess-1')).toEqual({ file: 'claude', args: ['--resume', 'sess-1'] })
   })
 
@@ -63,7 +91,18 @@ describe('the claude-code profile', () => {
     // `--tools` or an inserted `--add-dir` appended later. This is also the one path that keeps
     // `dontAsk`: with no tools to call, denying is the right answer for anything that tries.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
-    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', '--strict-mcp-config', 'decide'])
+    expect(args).toEqual([
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'dontAsk',
+      '--tools',
+      '',
+      '--strict-mcp-config',
+      'decide',
+    ])
   })
 
   it('replaces the CLI persona with the caller system prompt, and omits the flag without one', () => {
@@ -72,8 +111,18 @@ describe('the claude-code profile', () => {
     // last and positional.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'write it', system: 'Answer with SQL only.' })
     expect(args).toEqual([
-      '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '',
-      '--strict-mcp-config', '--system-prompt', 'Answer with SQL only.', 'write it',
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'dontAsk',
+      '--tools',
+      '',
+      '--strict-mcp-config',
+      '--system-prompt',
+      'Answer with SQL only.',
+      'write it',
     ])
     expect(claudeCodeProfile.aiArgv!('claude', { prompt: 'p' }).args).not.toContain('--system-prompt')
   })

@@ -6,10 +6,24 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { schema } from '../db'
 import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import { makeTestDb, type TestDb } from '../../testkit/db'
-import { computeTaskStatuses, loadTask, requireTaskRoot, resolveTaskCwd, setWorktreesRoot, taskRoot } from './taskWorktree'
+import {
+  computeTaskStatuses,
+  loadTask,
+  requireTaskRoot,
+  resolveTaskCwd,
+  setWorktreesRoot,
+  taskRoot,
+} from './taskWorktree'
 import { _resetWorktreeStatus, invalidateWorktreeStatus } from './worktreeStatus'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, runWithTelemetry, startTelemetry, telemetryEnabled } from '../telemetry/collector'
+import {
+  flushTelemetry,
+  onTelemetryBatch,
+  resetTelemetryForTest,
+  runWithTelemetry,
+  startTelemetry,
+  telemetryEnabled,
+} from '../telemetry/collector'
 
 const broadcasts: Record<string, unknown>[] = []
 vi.mock('../transport/wsHub', async (importOriginal) => ({
@@ -58,13 +72,36 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     // worktrees these tests create are still real.
     cpSync(join(template, 'checkout'), checkout, { recursive: true })
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-web', name: 'web', path: checkout, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'web', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-web',
+      name: 'web',
+      path: checkout,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'web',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
-    await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', projectId: 'project-web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.tasks).values({
+      id: TASK,
+      title: 'T',
+      origin: 'local',
+      projectId: 'project-web',
+      branch: 'feat-x',
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
     setWorktreesRoot(join(dir, 'worktrees'))
     created = []
     clearHooks('setup')
@@ -109,18 +146,39 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
       await vi.waitFor(() => expect(telemetryEnabled()).toBe(true))
       const task = await loadTask(t.db, TASK)
       await Promise.all([
-        runWithTelemetry({ traceId: '1'.repeat(32), spanId: '1'.repeat(16), owner: 'preview' }, () => resolveTaskCwd(t.db, task, checkout)),
-        runWithTelemetry({ traceId: '2'.repeat(32), spanId: '2'.repeat(16), owner: 'database' }, () => resolveTaskCwd(t.db, task, checkout)),
+        runWithTelemetry({ traceId: '1'.repeat(32), spanId: '1'.repeat(16), owner: 'preview' }, () =>
+          resolveTaskCwd(t.db, task, checkout),
+        ),
+        runWithTelemetry({ traceId: '2'.repeat(32), spanId: '2'.repeat(16), owner: 'database' }, () =>
+          resolveTaskCwd(t.db, task, checkout),
+        ),
       ])
       flushTelemetry()
       const spans = records.filter((record) => record.kind === 'span')
       const creator = spans.find((span) => span.name === 'task.prepare')!
       const waiter = spans.find((span) => span.name === 'task.prepare.wait')!
-      expect(creator).toMatchObject({ traceId: '1'.repeat(32), parentSpanId: '1'.repeat(16), status: 'ok', attrs: { 'task.id': TASK, owner: 'preview', shared: false } })
-      expect(waiter).toMatchObject({ traceId: '2'.repeat(32), parentSpanId: '2'.repeat(16), status: 'ok', attrs: { 'task.id': TASK, owner: 'database', shared: true } })
+      expect(creator).toMatchObject({
+        traceId: '1'.repeat(32),
+        parentSpanId: '1'.repeat(16),
+        status: 'ok',
+        attrs: { 'task.id': TASK, owner: 'preview', shared: false },
+      })
+      expect(waiter).toMatchObject({
+        traceId: '2'.repeat(32),
+        parentSpanId: '2'.repeat(16),
+        status: 'ok',
+        attrs: { 'task.id': TASK, owner: 'database', shared: true },
+      })
       const phases = spans.filter((span) => span.name === 'task.prepare.phase')
-      expect(phases.map((span) => span.attrs.phase)).toEqual(['git.worktree.add', 'worktree.validate', 'files.copy', 'setup.admit'])
-      expect(phases.every((span) => span.traceId === creator.traceId && span.parentSpanId === creator.spanId)).toBe(true)
+      expect(phases.map((span) => span.attrs.phase)).toEqual([
+        'git.worktree.add',
+        'worktree.validate',
+        'files.copy',
+        'setup.admit',
+      ])
+      expect(phases.every((span) => span.traceId === creator.traceId && span.parentSpanId === creator.spanId)).toBe(
+        true,
+      )
       expect(created).toHaveLength(1)
       expect(JSON.stringify(records)).not.toContain(checkout)
     } finally {
@@ -206,7 +264,14 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     const [second] = await computeTaskStatuses(t.db)
     expect(second!.head).not.toBe(first!.head)
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([
-      { channel: 'head:changed', projectId: expect.any(String), taskId: TASK, branch: second!.branch, head: second!.head, dirty: false },
+      {
+        channel: 'head:changed',
+        projectId: expect.any(String),
+        taskId: TASK,
+        branch: second!.branch,
+        head: second!.head,
+        dirty: false,
+      },
     ])
 
     broadcasts.length = 0
@@ -214,10 +279,10 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
   })
 
-  // A path persisted once was trusted forever, so a worktree that drifted kept serving the task
-  // another branch's files, which is what put an agent in a tree that wasn't its task's. HEAD is now
-  // the fact and the row follows it, because work that needs a second pull request switches branch
-  // in the one worktree and the task has to survive that.
+  // A persisted path is verified, not trusted: a worktree that drifted would otherwise serve the task
+  // another branch's files and put an agent in a tree that isn't its task's. HEAD is the fact and the
+  // row follows it, because work that needs a second pull request switches branch in the one worktree
+  // and the task has to survive that.
   it('adopts the branch its worktree has drifted onto', async () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     git(res.cwd, 'checkout', '-b', 'second-pr')
@@ -226,7 +291,9 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     const again = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     expect(again).toMatchObject({ cwd: res.cwd, isWorktree: true, created: false })
     expect((await loadTask(t.db, TASK))?.branch).toBe('second-pr')
-    expect(broadcasts.filter((f) => f.channel === 'tasks:changed')).toEqual([{ channel: 'tasks:changed', taskId: TASK }])
+    expect(broadcasts.filter((f) => f.channel === 'tasks:changed')).toEqual([
+      { channel: 'tasks:changed', taskId: TASK },
+    ])
   })
 
   // A detached HEAD has no branch to adopt, and a null branch means something else entirely: run in
@@ -235,7 +302,9 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     git(res.cwd, 'checkout', '--detach')
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(/no longer a live git worktree/)
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(
+      /no longer a live git worktree/,
+    )
     expect((await loadTask(t.db, TASK))?.branch).toBe('feat-x')
   })
 
@@ -263,11 +332,32 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     mkdirSync(plain)
     const now = Date.now()
     await t.db.insert(schema.projects).values({
-      id: 'project-plain', name: 'plain', path: plain, workspaceId: 'workspace-1', sort: 1, hidden: false,
-      vcs: null, defaultBranch: null, remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-plain',
+      name: 'plain',
+      path: plain,
+      workspaceId: 'workspace-1',
+      sort: 1,
+      hidden: false,
+      vcs: null,
+      defaultBranch: null,
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
-    await t.db.insert(schema.tasks).values({ id: 'plain-task', title: 'Plain', origin: 'local', projectId: 'project-plain', branch: null, status: 'active', sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.tasks).values({
+      id: 'plain-task',
+      title: 'Plain',
+      origin: 'local',
+      projectId: 'project-plain',
+      branch: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
     const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain)
     expect(result).toEqual({ cwd: plain, isWorktree: false, created: false })
     expect(created).toEqual([])

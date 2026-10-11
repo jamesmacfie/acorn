@@ -14,7 +14,9 @@ export function ProjectOrderHandle(props: {
       class="ws-project-reorder"
       data-project-id={props.project.id}
       data-dragging={props.order.dragId() === props.project.id ? '' : undefined}
-      data-drop-position={props.order.dropTarget()?.id === props.project.id ? props.order.dropTarget()?.position : undefined}
+      data-drop-position={
+        props.order.dropTarget()?.id === props.project.id ? props.order.dropTarget()?.position : undefined
+      }
       onPointerDown={(event) => props.order.begin(event, props.project.id)}
       onKeyDown={(event) => {
         if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
@@ -35,14 +37,28 @@ export function ProjectOrderHandle(props: {
             disabled={props.order.busy() || (props.first && props.last)}
             opens="menu"
             expanded={open()}
-            onPress={() => { if (!props.order.consumeClick(props.project.id)) toggle() }}
+            onPress={() => {
+              if (!props.order.consumeClick(props.project.id)) toggle()
+            }}
           />
         )}
       >
         {(menu) => (
           <>
-            <Menu.Item context={menu} disabled={props.order.busy() || props.first} onSelect={() => props.order.shift(props.project.id, -1)}>Move up</Menu.Item>
-            <Menu.Item context={menu} disabled={props.order.busy() || props.last} onSelect={() => props.order.shift(props.project.id, 1)}>Move down</Menu.Item>
+            <Menu.Item
+              context={menu}
+              disabled={props.order.busy() || props.first}
+              onSelect={() => props.order.shift(props.project.id, -1)}
+            >
+              Move up
+            </Menu.Item>
+            <Menu.Item
+              context={menu}
+              disabled={props.order.busy() || props.last}
+              onSelect={() => props.order.shift(props.project.id, 1)}
+            >
+              Move down
+            </Menu.Item>
           </>
         )}
       </Menu>

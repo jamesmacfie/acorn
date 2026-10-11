@@ -38,7 +38,7 @@ export type WorkflowSchedulePreparation = {
   changes: Array<{ kind: 'workflow' | 'query' | 'field' | 'source'; label: string }>
 }
 
-export type WorkflowScheduleOccurrenceSummary = {
+type WorkflowScheduleOccurrenceSummary = {
   kind: 'scheduled' | 'manual' | 'baseline'
   state: 'active' | 'completed' | 'skipped' | 'blocked'
   taskId: string

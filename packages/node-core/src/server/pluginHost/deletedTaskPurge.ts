@@ -28,7 +28,9 @@ export function registerDeletedTaskPurge(
     mode: 'observe',
     // The hook's own timeout only marks the run slow. The purge carries on, and the daily run finishes
     // anything it leaves.
-    run: async (payload) => { await purgeAll(payload.taskIds as string[], new AbortController().signal) },
+    run: async (payload) => {
+      await purgeAll(payload.taskIds as string[], new AbortController().signal)
+    },
   })
   ctx.schedules.register({
     scheduleId: 'deleted-task-purge',

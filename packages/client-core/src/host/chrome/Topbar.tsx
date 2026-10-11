@@ -24,28 +24,63 @@ export default function Topbar(own: { value?: unknown }) {
         <Show when={props().workspacesMode && props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
             size="sm"
-            label={<span class="workspace-identity-label"><Show when={props().workspace}>{(workspace) => <WorkspaceIdentity name={workspace().label} appearance={workspace().appearance} nodeId={props().node?.id} />}</Show>{props().workspace?.label ?? (props().workspacesMode === 'off' ? 'Select a project' : 'Select a workspace')}</span>}
+            label={
+              <span class="workspace-identity-label">
+                <Show when={props().workspace}>
+                  {(workspace) => (
+                    <WorkspaceIdentity
+                      name={workspace().label}
+                      appearance={workspace().appearance}
+                      nodeId={props().node?.id}
+                    />
+                  )}
+                </Show>
+                {props().workspace?.label ??
+                  (props().workspacesMode === 'off' ? 'Select a project' : 'Select a workspace')}
+              </span>
+            }
             ariaLabel={props().workspacesMode === 'off' ? 'Project' : 'Workspace'}
             placeholder={props().workspacesMode === 'off' ? 'Filter projects…' : 'Filter workspaces…'}
             emptyText={props().workspacesMode === 'off' ? 'No projects.' : 'No workspaces.'}
             results={workspaceResults}
-            leading={(entry) => <WorkspaceIdentity name={entry.label} appearance={entry.appearance} nodeId={entry.nodeId} />}
+            leading={(entry) => (
+              <WorkspaceIdentity name={entry.label} appearance={entry.appearance} nodeId={entry.nodeId} />
+            )}
             rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}`}
-            rowDescription={(entry) => props().workspacesMode === 'off' ? undefined : entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
+            rowDescription={(entry) =>
+              props().workspacesMode === 'off'
+                ? undefined
+                : entry.projectCount
+                  ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}`
+                  : undefined
+            }
             isActive={(entry) => entry.id === props().workspace?.id && entry.nodeId === props().node?.id}
             onSelect={(entry) => props().pickWorkspace(entry.id, entry.nodeId)}
-            footer={props().canAddProject
-              ? (close) => (
-                <Button variant="ghost" size="sm" onPress={() => { close(); props().addProject() }}>Add project…</Button>
-              )
-              : undefined}
+            footer={
+              props().canAddProject
+                ? (close) => (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => {
+                        close()
+                        props().addProject()
+                      }}
+                    >
+                      Add project…
+                    </Button>
+                  )
+                : undefined
+            }
           />
         </Show>
         <Show when={props().workspacesMode === 'on' && props().projectPickerVisible}>
           <Picker
             size="sm"
             label={props().project?.label ?? 'Select a project'}
-            ariaLabel="Project" placeholder="Filter projects…" emptyText="No projects."
+            ariaLabel="Project"
+            placeholder="Filter projects…"
+            emptyText="No projects."
             results={projectResults}
             rowLabel={(entry) => entry.label}
             isActive={(entry) => entry.id === props().project?.id}
@@ -59,9 +94,15 @@ export default function Topbar(own: { value?: unknown }) {
           <For each={props().breadcrumb}>
             {(crumb, index) => (
               <>
-                <Show when={index() > 0}><span class="crumb-sep">/</span></Show>
+                <Show when={index() > 0}>
+                  <span class="crumb-sep">/</span>
+                </Show>
                 <Show when={crumb.route} fallback={<span class="crumb crumb-num">{crumb.label}</span>}>
-                  {(route) => <Button variant="ghost" size="sm" onPress={() => props().navigate(route())}>{crumb.label}</Button>}
+                  {(route) => (
+                    <Button variant="ghost" size="sm" onPress={() => props().navigate(route())}>
+                      {crumb.label}
+                    </Button>
+                  )}
                 </Show>
               </>
             )}
@@ -70,13 +111,23 @@ export default function Topbar(own: { value?: unknown }) {
       </div>
       <div class="topbar-side topbar-end">
         <Show when={props().nodes.length > 1 || import.meta.env.DEV}>
-          <Select width="auto" label="Active node" value={props().node?.id ?? ''}
+          <Select
+            width="auto"
+            label="Active node"
+            value={props().node?.id ?? ''}
             onChange={(value) => props().pickNode(value)}
-            options={props().nodes.map((node) => ({ value: node.id, label: node.label }))} />
+            options={props().nodes.map((node) => ({ value: node.id, label: node.label }))}
+          />
         </Show>
-        <Show when={props().node}>{(node) => <NodeChip nodeId={node().id} compact={props().nodes.length <= 1} query={{}} />}</Show>
+        <Show when={props().node}>
+          {(node) => <NodeChip nodeId={node().id} compact={props().nodes.length <= 1} query={{}} />}
+        </Show>
         <NestedChromeSlot slotRef={props().slots.right} />
-        <OverflowMenu onSettings={props().openSettings} onClearCache={props().clearCache} onCopyLink={props().copyLink} />
+        <OverflowMenu
+          onSettings={props().openSettings}
+          onClearCache={props().clearCache}
+          onCopyLink={props().copyLink}
+        />
       </div>
     </div>
   )

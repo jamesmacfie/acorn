@@ -11,8 +11,22 @@ describe('inspectMcpConfig (docs/mcp.md)', () => {
       },
     })
     expect(inspectMcpConfig(text)).toEqual([
-      { name: 'playwright', transport: 'stdio', status: 'enabled', command: 'npx @playwright/mcp', url: undefined, env: undefined },
-      { name: 'sentry', transport: 'http', status: 'enabled', command: undefined, url: 'https://mcp.sentry.dev/sse', env: { SENTRY_TOKEN: 'sntr••••' } },
+      {
+        name: 'playwright',
+        transport: 'stdio',
+        status: 'enabled',
+        command: 'npx @playwright/mcp',
+        url: undefined,
+        env: undefined,
+      },
+      {
+        name: 'sentry',
+        transport: 'http',
+        status: 'enabled',
+        command: undefined,
+        url: 'https://mcp.sentry.dev/sse',
+        env: { SENTRY_TOKEN: 'sntr••••' },
+      },
       { name: 'broken', transport: 'unknown', status: 'invalid' },
     ])
   })
@@ -21,7 +35,9 @@ describe('inspectMcpConfig (docs/mcp.md)', () => {
     expect(inspectMcpConfig(text)[0]).toMatchObject({ name: 'fs', transport: 'stdio', status: 'disabled' })
   })
   it('invalid JSON → a visible invalid row, not a throw; empty/foreign JSON → []', () => {
-    expect(inspectMcpConfig('{oops')).toEqual([{ name: '(unparseable config)', transport: 'unknown', status: 'invalid' }])
+    expect(inspectMcpConfig('{oops')).toEqual([
+      { name: '(unparseable config)', transport: 'unknown', status: 'invalid' },
+    ])
     expect(inspectMcpConfig('{"otherTool": true}')).toEqual([])
   })
 })

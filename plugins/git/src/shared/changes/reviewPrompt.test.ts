@@ -20,7 +20,13 @@ describe('formatReviewPrompt (docs/panes.md)', () => {
   it('matches the doc format: numbered, path:range, quoted snippet, body', () => {
     const out = formatReviewPrompt([
       note({}),
-      note({ id: 'n2', startLine: 80, endLine: 80, snippet: 'console.log(token)', body: 'This log line leaks the token — drop it.' }),
+      note({
+        id: 'n2',
+        startLine: 80,
+        endLine: 80,
+        snippet: 'console.log(token)',
+        body: 'This log line leaks the token — drop it.',
+      }),
     ])
     expect(out).toBe(
       `Please address these review notes on the current changes:
@@ -35,7 +41,10 @@ describe('formatReviewPrompt (docs/panes.md)', () => {
     )
   })
   it('handles multi-line snippets and missing snippets', () => {
-    const out = formatReviewPrompt([note({ snippet: 'a\nb' }), note({ id: 'n2', snippet: null, startLine: 1, endLine: 1 })])
+    const out = formatReviewPrompt([
+      note({ snippet: 'a\nb' }),
+      note({ id: 'n2', snippet: null, startLine: 1, endLine: 1 }),
+    ])
     expect(out).toContain('   > a\n   > b\n')
     expect(out).toContain('2. src/auth/login.ts:1\n   Handle')
   })

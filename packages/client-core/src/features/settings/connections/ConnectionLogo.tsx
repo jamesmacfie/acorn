@@ -6,7 +6,9 @@ import { brandStyle } from '../../../kit/tokens/brandMarks'
 export function ConnectionLogo(props: { glyph: string }) {
   return (
     <span class="integration-logo" style={brandStyle(props.glyph)}>
-      <span class="integration-logo-mono"><Icon name={props.glyph} /></span>
+      <span class="integration-logo-mono">
+        <Icon name={props.glyph} />
+      </span>
     </span>
   )
 }

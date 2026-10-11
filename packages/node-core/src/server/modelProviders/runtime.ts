@@ -7,10 +7,7 @@ import {
   type ConnectionProviderRegistry,
 } from '../integrations/connectionProviders/registry'
 import { connectionHasCapability, getConnection } from '../integrations/connections'
-import {
-  ProviderRequestScheduler,
-  providerRequestScheduler,
-} from '../integrations/budgetRuntime'
+import { ProviderRequestScheduler, providerRequestScheduler } from '../integrations/budgetRuntime'
 import { isProviderOperationError, ProviderOperationError } from '../integrations/types'
 import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
@@ -54,7 +51,11 @@ const badConfig = (): never => {
 export const validateInput = (input: GenerateTextInput, timeoutMs: number): void => {
   if (!input.system.trim() || input.system.length > MAX_SYSTEM_CHARS) badConfig()
   if (!input.prompt.trim() || input.prompt.length > MAX_PROMPT_CHARS) badConfig()
-  if (!Number.isInteger(input.maxOutputTokens) || input.maxOutputTokens < 1 || input.maxOutputTokens > MAX_OUTPUT_TOKENS) {
+  if (
+    !Number.isInteger(input.maxOutputTokens) ||
+    input.maxOutputTokens < 1 ||
+    input.maxOutputTokens > MAX_OUTPUT_TOKENS
+  ) {
     badConfig()
   }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > DEFAULT_TIMEOUT_MS) badConfig()
@@ -75,7 +76,7 @@ const raceWithAbort = <T>(operation: Promise<T>, signal: AbortSignal): Promise<T
   if (signal.aborted) {
     // Claim the operation's outcome even though nobody reads it. A caller that aborts while its call
     // is still queued lands here, and the queued call throws its own abort error once the scheduler
-    // admits it. With no handler attached that surfaced as an unhandled rejection in the node.
+    // admits it. With no handler attached that would surface as an unhandled rejection in the node.
     operation.catch(() => undefined)
     return Promise.reject(abortError())
   }
@@ -125,10 +126,12 @@ export async function generateTextForConnection(
   // raced, and bracketing all of it inside a secret scope would tie the credential's lifetime to a
   // promise race rather than to the call that needs it. The scrub is applied explicitly at the one
   // place a provider error escapes (see the catch below).
-  const secret = await args.secrets.reveal(connection.encryptedCredentials, `${connection.provider}: generate text`).catch((error: unknown) => {
-    if (error instanceof SecretUnavailableError) return null
-    throw error
-  })
+  const secret = await args.secrets
+    .reveal(connection.encryptedCredentials, `${connection.provider}: generate text`)
+    .catch((error: unknown) => {
+      if (error instanceof SecretUnavailableError) return null
+      throw error
+    })
   if (!secret) {
     await markNeedsAuth(args.db, connection, 'provider_secret_unreadable')
     throw new ProviderOperationError('provider_secret_unreadable', 400)
@@ -142,19 +145,14 @@ export async function generateTextForConnection(
   const modelId = args.input.modelId?.trim() || adapter.recommendedModelId
 
   try {
-    const operation = dependencies.scheduler.run(
-      provider.id,
-      connection.id,
-      provider.budgets,
-      async () => {
-        if (controller.signal.aborted) throw abortError()
-        return adapter.generateText({
-          secret,
-          config: parseConfig(connection.config),
-          input: { ...args.input, modelId, signal: controller.signal },
-        })
-      },
-    )
+    const operation = dependencies.scheduler.run(provider.id, connection.id, provider.budgets, async () => {
+      if (controller.signal.aborted) throw abortError()
+      return adapter.generateText({
+        secret,
+        config: parseConfig(connection.config),
+        input: { ...args.input, modelId, signal: controller.signal },
+      })
+    })
     const generated = await raceWithAbort(operation, controller.signal)
     if (!generated.text.trim() || !generated.modelId.trim()) {
       throw new ProviderOperationError('provider_unavailable', 502)

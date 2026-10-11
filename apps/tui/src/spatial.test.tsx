@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
-const caretLine = (frame: string): string =>
-  frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
+const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
 
 describe('spatial focus', () => {
   it('enters main from rail shortcuts, restores rail, and lets h/l walk detail tabs', async () => {
@@ -29,7 +28,7 @@ describe('spatial focus', () => {
 
     // Ctrl+Option+Right is the shared next-pane chord. On this host the main content is spatially to
     // the right of every rail section, so it must enter detail before the task-pane cycler gets a
-    // chance to answer. This was the dead shortcut: a source view has no active task to cycle.
+    // chance to answer: a source view has no active task to cycle.
     await screen.press('ARROW_RIGHT', { ctrl: true, meta: true })
     expect(focusedRegion()?.regionId).toBe('source')
 
@@ -42,7 +41,7 @@ describe('spatial focus', () => {
     const returned = await screen.frame()
 
     expect(focusedRegion()?.regionId).toBe('browse')
-    // Compare the rail half only: the right half now deliberately still shows Description, so the
+    // Compare the rail half only: the right half deliberately still shows Description, so the
     // whole terminal line is different even though column memory restored the same Browse row.
     expect(caretLine(returned).split('│').slice(0, 2)).toEqual(browseCaret.split('│').slice(0, 2))
 
@@ -69,14 +68,11 @@ describe('spatial focus', () => {
   }, 120_000)
 
   it('crosses between the two halves of a list-detail pane', async () => {
-    // The rail-to-pane edge and the list-to-detail edge are one rule, and for a while they were not.
-    // A region's column was a pair, `rail | main`, and no `regionFocus` call in `layouts/` passed
-    // one, so every region a layout registered was `main`. In a `list-detail` pane, two frames
-    // literally side by side, Right had nothing to cross to: it returned false and did nothing, while
-    // Left jumped past both frames to the rail. A column is an integer counted left to right now and
-    // the layout declares both of its own (./keys/regions.ts § moveColumn).
+    // The rail-to-pane edge and the list-to-detail edge are one rule. A column is an integer counted
+    // left to right and the layout declares both of its own, so in a `list-detail` pane Right crosses
+    // to the detail and Left to the list before either reaches the rail (./keys/regions.ts § moveColumn).
     //
-    // The git pane, on its Changes tab, rather than the pull request pane the report named. `github`'s PR surface is a
+    // The git pane, on its Changes tab, rather than the pull request pane. `github`'s PR surface is a
     // `single` layout holding one kit node, because "the halves are one surface", as `PrPane.tsx`
     // says, so it has one region and no two frames for a key to cross between. The panes that really
     // are `list-detail` are git, notes and agents.

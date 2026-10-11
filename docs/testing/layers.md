@@ -31,8 +31,8 @@ those are part of the behavior under test.
 
 Tests that need populated plugin registries go under `apps/node/test/integration/` or the desktop
 integration tree. Test route protection through the real `createApp()` factory, not by mounting
-middleware in the test. Standalone parity tests check that `dev:node` wires the same pure-Node
-capabilities as the supervised Node.
+middleware in the test. The standalone parity tests boot through `bootNode` with each host's options
+and check what the drain did, then the inputs each host still passes differently.
 
 The integration tree is grouped by what a suite boots:
 
@@ -57,6 +57,9 @@ imports one. `makeTestNodeContext` and `makeTestRequestContext` build a real hos
 - `testSecretEnv()` and `TEST_ENCRYPTION_KEY` mint the session key and the `SecretService` that seals
   with it, as a pair. A test that sets only one compiles, then fails at its first credential read.
   Every test uses the same 64-hex key, so a test can seal a credential with the key its `Env` uses.
+- `testCoreSeams()` supplies the two `createCoreServices` inputs a Node takes from its boot: a key
+  custody report that says the keys are sealed, and an empty capability registry. A test that reads
+  `pluginSecurity` passes its own registry with `PLUGIN_STATE` provided.
 - `workspacePluginMigrations()` and `makeTestPluginDb()` resolve a plugin's Drizzle migration chain
   from its id, as `<checkout>/plugins/<id>/migrations`. This works only from a source checkout, so a
   plugin developed elsewhere passes its migrations folder explicitly. The path names the `plugins/<id>/`

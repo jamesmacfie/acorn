@@ -6,20 +6,13 @@ import type { InputEvent, InputListener } from './events'
 // Everything a terminal has to be *asked* for is here: the alternate screen, raw mode, the kitty
 // keyboard protocol, SGR mouse reporting, DEC 1004 focus reporting and bracketed paste. It is here
 // rather than beside the cell buffer because a request has a reply and the reply arrives as bytes on
-// stdin, so whoever asks the question has to be the one reading the answer — `../paint/screen.ts`
-// deliberately writes cells and nothing else.
+// stdin, so whoever asks the question has to be the one reading the answer. `openScreen` deliberately
+// writes cells and nothing else.
 //
 // **The two halves compose rather than nest.** This module owns the modes and the reading; the screen
-// owns the cells. A boot is:
-//
-//     const terminal = openTerminal()
-//     const { cols, rows } = terminal.size()
-//     const screen = openScreen({ cols, rows, write: terminal.write })
-//     terminal.on((event) => { if (event.type === 'resize') screen.resize(event.cols, event.rows) })
-//
-// and a shutdown is `screen.close()` then `terminal.close()`, in that order, so the last frame is
-// written while the alternate screen is still ours. Nothing in this slice does that wiring: the
-// dispatcher is phase 3 and the switch that boots either painter is the next slice.
+// owns the cells. `openTerminalRenderer` wires them, and a shutdown is `screen.close()` then
+// `terminal.close()`, in that order, so the last frame is written while the alternate screen is
+// still ours.
 //
 // **Every request is popped on the way out, in the reverse order.** A process that leaves mouse
 // reporting on hands the reader a shell that prints `<35;80;24M` when they move the mouse, and one
@@ -37,11 +30,8 @@ const CSI = '\x1b['
  * that sends what is in the composer — does not exist to be bound. It settles a lone Escape the same
  * way (docs/tui/keys.md § The adapter).
  *
- * 2 is an addition to what `../main.tsx` asks for today, and it is deliberate. OpenTUI's
- * `useKittyKeyboard: { disambiguate: true }` builds the flags 1 and 4 and never 2 (its
- * `buildKittyKeyboardFlags` at 0.5.9), so no terminal has ever sent this app a key release, and a
- * `release` in our event shape would be a case that cannot happen. Asking for 2 is what makes the
- * third value of `KeyAction` real.
+ * 2 is what makes the `release` value of `KeyAction` real: without it no terminal sends a key
+ * release.
  *
  * 8, report all keys as escape codes, is not asked for: it would route every letter through `CSI u`
  * and leave us decoding text we currently get as text, for the benefit of knowing that somebody let
@@ -53,8 +43,8 @@ const KITTY_FLAGS = 1 | 2 | 4
 const ENTER = [
   // The alternate screen first, so nothing below is drawn over the reader's scrollback.
   `${CSI}?1049h`,
-  // No cursor. There is nothing for it to sit on until phase 3 draws a field, and left visible it
-  // parks wherever the last run of the frame ended.
+  // No cursor until a frame places one on a field (../paint/flush.ts § SHOW). Left visible, it parks
+  // wherever the last run of the frame ended.
   `${CSI}?25l`,
   // A paste arrives bracketed, so a hundred lines are one event rather than a hundred Returns.
   `${CSI}?2004h`,

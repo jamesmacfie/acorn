@@ -12,11 +12,9 @@ import { directPreferenceSlices } from '@acorn/client-core/infra/persistence'
 import { persistedStateRegistry } from '@acorn/client-core/infra/persistence'
 import { coreStateSlices } from '@acorn/client-core/infra/persistence'
 import { noticeKindRegistry } from '@acorn/client-core/host/registries/rail'
-import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell'
 import { settingsRegistry } from '@acorn/client-core/host/registries/shell'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
-import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { taskStatusScheduleContribution } from '@acorn/client-core/features/tasks'
+import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 import { settingsPageContributions } from './pageContributions'
 import { createPluginStartup } from './pluginStartup'
 import { activateScopedStateEviction } from './scopedEviction'
@@ -28,7 +26,7 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
 const log = createLogger('client:boot')
 
 // The one WS prefix core claims on every loaded plugin's behalf, since a loaded plugin cannot claim one
-// itself (plugins/pluginChannel.ts). Claimed here with core's own three so the set is fixed at boot and
+// itself. Claimed here with core's own three so the set is fixed at boot and
 // the prefix test can pin it; the socket still opens on the first subscriber, not now.
 ensurePluginChannel()
 
@@ -38,10 +36,8 @@ for (const contribution of shellSlotContributions) uiSlotRegistry.register(contr
 // Core's home is the stable default; Fleet is hidden by its own `when` until a second node is paired.
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
-// direct preference slices. Which features persist state is each plugin's own declaration now,
-// through ctx.persistedStateSlices. The app no longer holds a list of four plugin slices it does not own.
+// direct preference slices. Each plugin declares its own through ctx.persistedStateSlices.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
-clientScheduleRegistry.register(taskStatusScheduleContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
@@ -82,13 +78,20 @@ const startup = createPluginStartup({
 
 /** Resolves false when the roster failed. The startup screen shows and reports that failure
  *  (./startupStage.ts), so it is not also an unhandled rejection. */
-export const startClientPlugins = (): Promise<boolean> => startup.initialize().then(() => true, () => false)
+export const startClientPlugins = (): Promise<boolean> =>
+  startup.initialize().then(
+    () => true,
+    () => false,
+  )
 
 /** The startup screen's Try again. Imports and registers the roster afresh, then applies the node. */
 export function retryClientPlugins(): void {
   if (clientPlugins().kind !== 'failed') return
   setClientPlugins({ kind: 'pending' })
-  void startup.retry().then(() => applyNodePlugins(), () => {})
+  void startup.retry().then(
+    () => applyNodePlugins(),
+    () => {},
+  )
 }
 
 export async function applyNodePlugins(nodeId?: string): Promise<void> {

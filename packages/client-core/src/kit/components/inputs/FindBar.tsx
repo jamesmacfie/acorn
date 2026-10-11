@@ -4,16 +4,15 @@ import { Toolbar } from '../layout/Toolbar'
 import { formatChord } from '../../lib/rendering/formatChord'
 import { Input } from './Input'
 
-// The in-content search strip. Three surfaces had one and all three disagreed on the keyboard
-// contract; this owns it so they finally agree:
+// The in-content search strip. It owns the keyboard contract so every surface agrees:
 //
 //   Enter        next match
 //   Shift+Enter  previous match
 //   Escape       close
 //
-// Matching and highlighting stay entirely at the call site; the bar is chrome. What it also
-// standardises is the highlight class: `.ui-find-mark` (plus `[data-current]`) replaces three
-// separate vocabularies, and callers put it on their own <mark> elements.
+// Matching and highlighting stay entirely at the call site; the bar is chrome. It also owns the
+// highlight class: `.ui-find-mark` (plus `[data-current]`), which callers put on their own <mark>
+// elements.
 /** "3/17", "17 matches" when the selection is on none of them, "1000+" when counting stopped. */
 function findCountText(count: { current: number; total: number; more?: boolean }): string {
   if (!count.total) return 'No matches'
@@ -69,9 +68,15 @@ export function FindBar(props: {
       </div>
       {/* Polite, not assertive: the count changes on every keystroke. */}
       <Show when={props.error ?? (props.count && findCountText(props.count))}>
-        {(text) => <span class="ui-findbar-count" data-error={props.error ? '' : undefined} aria-live="polite">{text()}</span>}
+        {(text) => (
+          <span class="ui-findbar-count" data-error={props.error ? '' : undefined} aria-live="polite">
+            {text()}
+          </span>
+        )}
       </Show>
-      <Show when={status()}><span class="ui-findbar-status muted">{status()}</span></Show>
+      <Show when={status()}>
+        <span class="ui-findbar-status muted">{status()}</span>
+      </Show>
       <Toolbar.Group>
         <IconButton
           icon="chevron-up"
@@ -92,7 +97,13 @@ export function FindBar(props: {
       </Toolbar.Group>
       <Show when={toggles()}>{toggles()}</Show>
       <Show when={props.onClose}>
-        <IconButton icon="x" tip="Close find" tipKey={formatChord('escape')} label="Close find" onPress={() => props.onClose?.()} />
+        <IconButton
+          icon="x"
+          tip="Close find"
+          tipKey={formatChord('escape')}
+          label="Close find"
+          onPress={() => props.onClose?.()}
+        />
       </Show>
     </Toolbar>
   )

@@ -2,12 +2,6 @@
 // reach it and for the row types' structural contract).
 import { lineColumns, parsePatch, type PlainDiffRow } from '@acorn/diff-document/document'
 import { wordDiff, type DiffWordsDocument, type WordDiffInput, type WordDiffOutput, type WordTok } from './wordDiff'
-import type { getHighlighter } from '../../infra/highlight/shiki'
-// From `langs.ts` rather than from `shiki.ts`, which re-exports it: the re-export is a value import
-// and pulls the main-thread highlighter and its regex engine into every graph this module is in.
-// `highlighter.worker.ts` splits the vocabulary out for the same reason, and the terminal host is the
-// second caller that wants the row model and has no use for shiki at all.
-import { langFor } from '../../infra/highlight/langs'
 // Type-only, so the worker client's module graph, including its dynamic `?worker` import, stays out
 // of this module. Several plugin tests load it in a node environment where that import cannot
 // resolve.
@@ -26,7 +20,7 @@ export type DiffFile = {
   patch: string | null
 }
 
-export type DiffThreadComment = {
+type DiffThreadComment = {
   id: string
   databaseId: number | null
   author: string | null
@@ -45,9 +39,8 @@ export type DiffThread = {
   comments: DiffThreadComment[]
 }
 
+type Tok = { content: string; light: string; dark: string }
 
-export type Tok = { content: string; light: string; dark: string }
-export type { WordTok } from './wordDiff'
 export { wordDiff } from './wordDiff'
 export type CodeRow = {
   kind: 'normal' | 'insert' | 'delete'
@@ -60,7 +53,7 @@ export type CodeRow = {
 }
 export type HunkRow = { kind: 'hunk'; text: string }
 export type FileRow = { kind: 'file'; file: DiffFile }
-export type NoDiffRow = { kind: 'nodiff' }
+type NoDiffRow = { kind: 'nodiff' }
 export type LoadDiffStatus = 'loading' | 'error'
 export type LoadDiffRow = { kind: 'load'; file: DiffFile; status: LoadDiffStatus }
 export type ThreadRowT = { kind: 'thread'; thread: DiffThread }
@@ -80,7 +73,8 @@ export type Row = HunkRow | CodeRow | FileRow | NoDiffRow | LoadDiffRow | Thread
 export type DiffRow = HunkRow | CodeRow | GapRow | LoadDiffRow
 export type ParsedFile = { file: DiffFile; diff: DiffRow[] }
 
-export const gapId = (gap: Pick<GapRow, 'path' | 'side' | 'oldStart' | 'newStart'>) => `${gap.path}:${gap.side}:${gap.oldStart}:${gap.newStart}`
+export const gapId = (gap: Pick<GapRow, 'path' | 'side' | 'oldStart' | 'newStart'>) =>
+  `${gap.path}:${gap.side}:${gap.oldStart}:${gap.newStart}`
 
 export type ViewMode = 'unified' | 'split'
 export type SplitBand =
@@ -108,45 +102,7 @@ export const maxLineCols = (rows: readonly Row[]) => {
   return widest
 }
 
-const UNKNOWN_FILE_KEY = '<unknown>'
-
-const countedKey = (base: string, counts: Map<string, number>) => {
-  const count = counts.get(base) ?? 0
-  counts.set(base, count + 1)
-  return count === 0 ? base : `${base}:${count}`
-}
-
-const codeRowIdentity = (row: CodeRow) => `code:${row.path}:${row.kind}:${row.oldNo ?? ''}:${row.newNo ?? ''}`
-
-const rowIdentityBase = (row: Row, currentFilePath: string) => {
-  if (row.kind === 'file') return `file:${row.file.path}`
-  if (row.kind === 'hunk') return `hunk:${currentFilePath}:${row.text}`
-  if (row.kind === 'gap') return `gap:${gapId(row)}`
-  if (row.kind === 'load') return `load:${row.file.path}:${row.status}`
-  if (row.kind === 'nodiff') return `nodiff:${currentFilePath}`
-  if (row.kind === 'thread') return `thread:${row.thread.threadId}`
-  return codeRowIdentity(row)
-}
-
-export function rowIdentityKeys(rows: readonly Row[]): string[] {
-  const counts = new Map<string, number>()
-  let currentFilePath = UNKNOWN_FILE_KEY
-  return rows.map((row) => {
-    if (row.kind === 'file') currentFilePath = row.file.path
-    return countedKey(rowIdentityBase(row, currentFilePath), counts)
-  })
-}
-
 export const plainTokenize: TokenizeLine = (_path, content) => [{ content, light: '', dark: '' }]
-
-export function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter>>): TokenizeLine {
-  return (path, content) => {
-    const lang = langFor(path)
-    if (lang === 'text') return plainTokenize(path, content)
-    const [line] = hl.codeToTokensWithThemes(content, { lang: lang as never, themes: { light: 'github-light', dark: 'github-dark' } })
-    return (line ?? []).map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' }))
-  }
-}
 
 /**
  * Plain rows as the renderer's rows: the path and the new-side key put back, and every code line
@@ -157,7 +113,14 @@ export function diffRowsFromPlain(path: string, sha: string | null, plain: reado
   return plain.map((row): DiffRow => {
     if (row.kind === 'hunk') return { kind: 'hunk', text: row.text }
     if (row.kind === 'gap') return { ...row, path, sha }
-    return { kind: row.kind, path, oldNo: row.oldNo, newNo: row.newNo, raw: row.raw, toks: [{ content: row.raw, light: '', dark: '' }] }
+    return {
+      kind: row.kind,
+      path,
+      oldNo: row.oldNo,
+      newNo: row.newNo,
+      raw: row.raw,
+      toks: [{ content: row.raw, light: '', dark: '' }],
+    }
   })
 }
 
@@ -222,7 +185,11 @@ export async function buildDiffRowsAsync(
   tokenizeDoc: TokenizeDocument,
   diffWords?: DiffWordsDocument,
 ): Promise<DiffRow[]> {
-  return enrichDiffRows(diffRowsFromPlain(file.path, file.sha, parsePatch(file.path, file.patch)), tokenizeDoc, diffWords)
+  return enrichDiffRows(
+    diffRowsFromPlain(file.path, file.sha, parsePatch(file.path, file.patch)),
+    tokenizeDoc,
+    diffWords,
+  )
 }
 
 /**
@@ -233,7 +200,11 @@ export async function buildDiffRowsAsync(
  * Never rejects. A tokenizer that fails answers plain text, and a grammar that returns fewer lines
  * than it was sent leaves those rows with their raw text rather than empty.
  */
-export async function enrichDiffRows(rows: readonly DiffRow[], tokenizeDoc: TokenizeDocument, diffWords?: DiffWordsDocument): Promise<DiffRow[]> {
+export async function enrichDiffRows(
+  rows: readonly DiffRow[],
+  tokenizeDoc: TokenizeDocument,
+  diffWords?: DiffWordsDocument,
+): Promise<DiffRow[]> {
   const out = rows.map((row) => (isCodeRow(row) ? { ...row } : row))
   for (const batch of tokenBatches(out)) {
     const path = batch.targets[0]!.path
@@ -288,7 +259,12 @@ function gapRows(gap: GapRow, body: string): CodeRow[] {
   return rows
 }
 
-export function buildRenderableRows(parsed: ParsedFile[], threads: DiffThread[] | undefined, expanded?: Map<string, CodeRow[]>, collapsed?: Set<string>): Row[] {
+export function buildRenderableRows(
+  parsed: ParsedFile[],
+  threads: DiffThread[] | undefined,
+  expanded?: Map<string, CodeRow[]>,
+  collapsed?: Set<string>,
+): Row[] {
   const threadsByPath = new Map<string, DiffThread[]>()
   for (const thread of threads ?? []) {
     if (!thread.path) continue
@@ -330,7 +306,7 @@ function pushCodeRow(out: Row[], row: CodeRow, fileThreads: DiffThread[]) {
   }
 }
 
-export function attachWordDiffs(rows: DiffRow[]) {
+function attachWordDiffs(rows: DiffRow[]) {
   const targets = wordDiffTargets(rows)
   for (const target of targets) applyWordDiff(target, wordDiff(target.input.oldText, target.input.newText))
 }
@@ -383,7 +359,14 @@ export function toBands(rows: Row[]): SplitBand[] {
   let i = 0
   while (i < rows.length) {
     const row = rows[i]!
-    if (row.kind === 'hunk' || row.kind === 'thread' || row.kind === 'file' || row.kind === 'nodiff' || row.kind === 'load' || row.kind === 'gap') {
+    if (
+      row.kind === 'hunk' ||
+      row.kind === 'thread' ||
+      row.kind === 'file' ||
+      row.kind === 'nodiff' ||
+      row.kind === 'load' ||
+      row.kind === 'gap'
+    ) {
       out.push({ kind: 'full', row })
       i++
       continue

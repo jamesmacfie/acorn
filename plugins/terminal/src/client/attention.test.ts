@@ -4,16 +4,25 @@ import type { AgentState } from '@acorn/protocol/sessionActivity.ts'
 import type { TerminalSession } from '../contract/wire'
 import { fromTerminalSession } from './attention'
 
-const pty = (over: Partial<TerminalSession>): TerminalSession => ({
-  id: 's1', taskId: 't1', title: 'codex', kind: 'agent', status: 'running', idle: false,
-  agentState: 'working', exitCode: null, ...over,
-} as TerminalSession)
+const pty = (over: Partial<TerminalSession>): TerminalSession =>
+  ({
+    id: 's1',
+    taskId: 't1',
+    title: 'codex',
+    kind: 'agent',
+    status: 'running',
+    idle: false,
+    agentState: 'working',
+    exitCode: null,
+    ...over,
+  }) as TerminalSession
 
 describe('the PTY adapter', () => {
   const state = (over: Partial<TerminalSession>) => fromTerminalSession(pty(over), 'n1')?.state
 
   it('maps status, agent state, idle and exit code', () => {
-    for (const blocked of ['blocked', 'permission'] as AgentState[]) expect(state({ agentState: blocked })).toBe('blocked')
+    for (const blocked of ['blocked', 'permission'] as AgentState[])
+      expect(state({ agentState: blocked })).toBe('blocked')
     expect(state({ idle: false })).toBe('working')
     expect(state({ idle: true })).toBe('finished')
     // A blocked agent that has also gone quiet is blocked, not finished.

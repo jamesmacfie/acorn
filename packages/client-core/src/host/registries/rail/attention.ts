@@ -40,10 +40,9 @@ export type AttentionItem = {
   // (notifications/notifications.ts), since "open the thing this is about" is the same problem
   // already solved.
   //
-  // Required, and that is the point. A row in the inbox is an invitation to go and deal with
-  // something; a row that swallows the click and does nothing teaches the reader that the whole
-  // section is decorative. Plugin failures shipped without one for exactly that reason, so the rule
-  // is a type rather than a convention. A source with nowhere to send the reader has no row to draw.
+  // Required, and that is the point. A row in the inbox is an invitation to go and deal with something; a row that
+  // swallows the click and does nothing teaches the reader that the whole section is decorative. So the rule is a type
+  // rather than a convention. A source with nowhere to send the reader has no row to draw.
   target: { kind: string; resourceId: string; subresourceId?: string }
 }
 

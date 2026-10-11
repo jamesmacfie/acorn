@@ -7,7 +7,11 @@ import { canPickFolder, pickFolder } from '../../infra/platform'
 import { deleteProject, patchProject } from '../workspaces/workspaceMutations'
 import { ProjectColorInput } from '../workspaces/ProjectColorInput'
 import {
-  settingsDetailTabs, settingsPagesInOrder, settingsRegistry, workspaceSettingsTarget, type SettingsPageContext,
+  settingsDetailTabs,
+  settingsPagesInOrder,
+  settingsRegistry,
+  workspaceSettingsTarget,
+  type SettingsPageContext,
 } from '../../host/registries/shell/settings'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
@@ -18,7 +22,14 @@ import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { TabPanel, Tabs } from '../../kit/components/layout/Tabs'
-import { BranchPrefixRow, createProjectConfig, DatabaseTab, PreviewTab, SetupTab, type ProjectConfigStore } from './ProjectConfigTabs'
+import {
+  BranchPrefixRow,
+  createProjectConfig,
+  DatabaseTab,
+  PreviewTab,
+  SetupTab,
+  type ProjectConfigStore,
+} from './ProjectConfigTabs'
 import { ProjectConnections } from './ProjectConnections'
 import { createSettingSave, createTextSetting } from './settingSave'
 import { createWorkspacesMode } from '../workspaces/workspacesMode'
@@ -44,10 +55,7 @@ const pluginTab = (pageId: string) => `plugin-${pageId}`
 export default function ProjectSettings(props: { project: Project; context: SettingsPageContext }) {
   const store = createProjectConfig(() => props.project.id)
   const plugins = createMemo(() => settingsDetailTabs(settingsPagesInOrder(), 'project'))
-  const tabs = () => [
-    ...TABS,
-    ...plugins().map((page) => ({ id: pluginTab(page.id), label: page.label })),
-  ]
+  const tabs = () => [...TABS, ...plugins().map((page) => ({ id: pluginTab(page.id), label: page.label }))]
   const [tab, setTab] = createSignal('general')
   // A plugin that goes away takes its tab, and the page shows General rather than nothing.
   const active = () => (tabs().some((entry) => entry.id === tab()) ? tab() : 'general')
@@ -57,13 +65,20 @@ export default function ProjectSettings(props: { project: Project; context: Sett
       <Stack gap="section">{children()}</Stack>
     </TabPanel>
   )
-  // The config tabs wait for the first read, because the page-rules editor takes its list once.
   const loaded = (children: () => JSX.Element) => (
     <Show
       when={store.response()}
-      fallback={store.failed()
-        ? <Text tone="danger" wrap>Couldn't load this project's settings.</Text>
-        : <EmptyState busy align="start" size="sm">Loading…</EmptyState>}
+      fallback={
+        store.failed() ? (
+          <Text tone="danger" wrap>
+            Couldn't load this project's settings.
+          </Text>
+        ) : (
+          <EmptyState busy align="start" size="sm">
+            Loading…
+          </EmptyState>
+        )
+      }
     >
       {children()}
     </Show>
@@ -71,26 +86,44 @@ export default function ProjectSettings(props: { project: Project; context: Sett
 
   return (
     <>
-      <Tabs tabs={tabs()} active={active()} onChange={setTab} idPrefix={ID_PREFIX} ariaLabel={`Settings for ${props.project.name}`} />
-      {panel('general', () => <GeneralTab project={props.project} store={store} context={props.context} />)}
+      <Tabs
+        tabs={tabs()}
+        active={active()}
+        onChange={setTab}
+        idPrefix={ID_PREFIX}
+        ariaLabel={`Settings for ${props.project.name}`}
+      />
+      {panel('general', () => (
+        <GeneralTab project={props.project} store={store} context={props.context} />
+      ))}
       {panel('setup', () => loaded(() => <SetupTab store={store} />))}
       {panel('web-preview', () => loaded(() => <PreviewTab store={store} />))}
       {panel('sql', () => loaded(() => <DatabaseTab store={store} />))}
-      {panel('connections', () => <ProjectConnections project={props.project} navigate={props.context.navigate} />)}
+      {panel('connections', () => (
+        <ProjectConnections project={props.project} navigate={props.context.navigate} />
+      ))}
       <For each={plugins()}>
-        {(page) => panel(pluginTab(page.id), () => (
-          <>
-            {/* A plugin's tab gets the same strip as its page would, above and outside its content. */}
-            <Show when={settingsRegistry.ownerOf(page.id)}>
-              {(owner) => <PluginStrip pluginId={owner()} railSources={page.railSourceVisibility} navigate={props.context.navigate} />}
-            </Show>
-            <div class="settings-plugin-content">
-              <ContributionBoundary contributionId={`settings:${page.id}`} owner={settingsRegistry.ownerOf(page.id)}>
-                <Dynamic component={page.component} context={props.context} />
-              </ContributionBoundary>
-            </div>
-          </>
-        ))}
+        {(page) =>
+          panel(pluginTab(page.id), () => (
+            <>
+              {/* A plugin's tab gets the same strip as its page would, above and outside its content. */}
+              <Show when={settingsRegistry.ownerOf(page.id)}>
+                {(owner) => (
+                  <PluginStrip
+                    pluginId={owner()}
+                    railSources={page.railSourceVisibility}
+                    navigate={props.context.navigate}
+                  />
+                )}
+              </Show>
+              <div class="settings-plugin-content">
+                <ContributionBoundary contributionId={`settings:${page.id}`} owner={settingsRegistry.ownerOf(page.id)}>
+                  <Dynamic component={page.component} context={props.context} />
+                </ContributionBoundary>
+              </div>
+            </>
+          ))
+        }
       </For>
     </>
   )
@@ -107,10 +140,8 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   const taskCount = () => (tasks.data ?? []).filter((task) => task.projectId === props.project.id).length
   // The page's project comes from the projects query, so awaiting its refetch is what lets a field show
   // the stored value again.
-  const refresh = () => Promise.all([
-    qc.invalidateQueries({ queryKey: projectsKey }),
-    qc.invalidateQueries({ queryKey: workspacesKey }),
-  ])
+  const refresh = () =>
+    Promise.all([qc.invalidateQueries({ queryKey: projectsKey }), qc.invalidateQueries({ queryKey: workspacesKey })])
   const patch = async (change: Parameters<typeof patchProject>[1]) => {
     await patchProject(props.project.id, change)
     await refresh()
@@ -146,9 +177,12 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
     const confirmed = await confirmAction({
       title: 'Delete project',
       actionLabel: count ? `Delete project and ${count} task${count === 1 ? '' : 's'}` : 'Delete project',
-      goes: currentMode === 'off'
-        ? `${taskLoss} Its project scope, links, and datasets are removed. You will lose access to its Home boards, notes, saved queries, and workflow definitions; those records remain stored.`
-        : count ? `${props.project.name} is removed from acorn, with its ${count} task${count === 1 ? '' : 's'} and their history.` : taskLoss,
+      goes:
+        currentMode === 'off'
+          ? `${taskLoss} Its project scope, links, and datasets are removed. You will lose access to its Home boards, notes, saved queries, and workflow definitions; those records remain stored.`
+          : count
+            ? `${props.project.name} is removed from acorn, with its ${count} task${count === 1 ? '' : 's'} and their history.`
+            : taskLoss,
       stays: `Nothing on disk is removed. The folder${count ? ' and any task worktrees remain where they are' : ' remains where it is'}.`,
       danger: true,
     })
@@ -169,7 +203,13 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
     <>
       <SettingsSection id="general" label="General">
         <SettingRow label="Name" savedAt={name.savedAt()} error={name.error()}>
-          <Input label="Name" maxLength={120} value={name.value()} onInput={name.input} onChange={(value) => void name.commit(value)} />
+          <Input
+            label="Name"
+            maxLength={120}
+            value={name.value()}
+            onInput={name.input}
+            onChange={(value) => void name.commit(value)}
+          />
         </SettingRow>
         <SettingRow
           label="Folder"
@@ -177,28 +217,42 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
           layout="stacked"
           error={folder.error()}
         >
-          <Show when={props.project.path}>{(path) => <Text emphasis="mono" wrap>{path()}</Text>}</Show>
+          <Show when={props.project.path}>
+            {(path) => (
+              <Text emphasis="mono" wrap>
+                {path()}
+              </Text>
+            )}
+          </Show>
           <Show when={canPickFolder()}>
             <div>
-              <Button onPress={() => void changeFolder()}>{props.project.path ? 'Change folder…' : 'Add folder…'}</Button>
+              <Button onPress={() => void changeFolder()}>
+                {props.project.path ? 'Change folder…' : 'Add folder…'}
+              </Button>
             </div>
           </Show>
         </SettingRow>
-        <SettingRow label="Rail colour" help="The coloured strip beside this project's tasks in the rail." error={colour.error()}>
+        <SettingRow
+          label="Rail colour"
+          help="The coloured strip beside this project's tasks in the rail."
+          error={colour.error()}
+        >
           <ProjectColorInput
             name={props.project.name}
             color={props.project.color}
             onChange={(color) => colour.run(() => patch({ color }))}
           />
         </SettingRow>
-        <Show when={mode() === 'on'}><SettingRow label="Workspace" error={workspace.error()}>
-          <Select
-            label="Workspace"
-            value={props.project.workspaceId}
-            options={(workspaces.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
-            onChange={(workspaceId) => void workspace.run(() => patch({ workspaceId }))}
-          />
-        </SettingRow></Show>
+        <Show when={mode() === 'on'}>
+          <SettingRow label="Workspace" error={workspace.error()}>
+            <Select
+              label="Workspace"
+              value={props.project.workspaceId}
+              options={(workspaces.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
+              onChange={(workspaceId) => void workspace.run(() => patch({ workspaceId }))}
+            />
+          </SettingRow>
+        </Show>
         <SettingRow
           label="Hidden"
           description="Its tasks don't show in the rail, and new tasks can't use it."
@@ -215,8 +269,14 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
       </SettingsSection>
 
       <SettingsSection id="danger" label="Danger zone" tone="danger">
-        <SettingRow label="Delete project" description="Its tasks go with it. Nothing on disk is removed." error={removal.error()}>
-          <Button tone="danger" disabled={busy() || !mode()} onPress={() => void remove()}>Delete project</Button>
+        <SettingRow
+          label="Delete project"
+          description="Its tasks go with it. Nothing on disk is removed."
+          error={removal.error()}
+        >
+          <Button tone="danger" disabled={busy() || !mode()} onPress={() => void remove()}>
+            Delete project
+          </Button>
         </SettingRow>
       </SettingsSection>
     </>

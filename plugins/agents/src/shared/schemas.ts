@@ -1,31 +1,7 @@
 import { z } from 'zod'
 import type { AgentTurnSource } from '../contract/wire.ts'
 
-export const agentRuntimeStateSchema = z.enum([
-  'creating',
-  'connecting',
-  'replaying',
-  'ready',
-  'working',
-  'waiting',
-  'cancelling',
-  'reconnecting',
-  'stopped',
-  'failed',
-  'archived',
-])
-
-export const agentAttentionReasonSchema = z.enum([
-  'permission',
-  'question',
-  'workflow_gate',
-  'completed',
-  'error',
-  'unread',
-  'none',
-])
-
-export const agentInputPartSchema = z.discriminatedUnion('type', [
+const agentInputPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().max(1_000_000) }),
   z.object({ type: z.literal('attachment'), attachmentId: z.string().min(1).max(200) }),
   z.object({
@@ -42,72 +18,93 @@ export const agentInputPartSchema = z.discriminatedUnion('type', [
     source: z.string().min(1).max(200),
     resourceId: z.string().max(1_000).optional(),
     provenance: z.string().max(2_000).optional(),
-    deepLink: z.object({
-      pane: z.string().min(1).max(200),
-      intent: z.record(z.string(), z.unknown()).optional(),
-    }).optional(),
+    deepLink: z
+      .object({
+        pane: z.string().min(1).max(200),
+        intent: z.record(z.string(), z.unknown()).optional(),
+      })
+      .optional(),
     byteSize: z.number().int().nonnegative().optional(),
     estimatedTokens: z.number().int().nonnegative().optional(),
     freshness: z.enum(['live', 'cached', 'stale', 'unknown']).optional(),
     sensitivity: z.enum(['public', 'workspace', 'private', 'secret']).optional(),
     capturedAt: z.number().int().nonnegative(),
   }),
-  z.object({ type: z.literal('image'), attachmentId: z.string().min(1).max(200), alt: z.string().max(1_000).optional() }),
+  z.object({
+    type: z.literal('image'),
+    attachmentId: z.string().min(1).max(200),
+    alt: z.string().max(1_000).optional(),
+  }),
 ])
 
-export const createAgentSessionSchema = z.object({
-  taskId: z.string().uuid(),
-  providerId: z.string().min(1).max(100),
-  profileId: z.string().min(1).max(100),
-  title: z.string().trim().min(1).max(500).optional(),
-  kind: z.enum(['interactive', 'workflow', 'delegated', 'imported']).default('interactive'),
-  origin: z.object({
-    kind: z.literal('inline-diff'),
-    source: z.enum(['changes', 'pull-request']),
+export const createAgentSessionSchema = z
+  .object({
     taskId: z.string().uuid(),
-    path: z.string().min(1).max(4096),
-    side: z.enum(['old', 'new']),
-    line: z.number().int().positive(),
-    patchKey: z.string().min(1).max(200),
-    quote: z.string().max(2000),
-    access: z.enum(['read-only', 'full']).optional(),
-    scope: z.enum(['staged', 'unstaged']).optional(),
-    pull: z.object({ owner: z.string().min(1), repo: z.string().min(1), number: z.string().min(1) }).optional(),
-  }).optional(),
-  resumeProviderSessionRef: z.string().min(1).max(2_000).optional(),
-  parentSessionId: z.string().uuid().optional(),
-  parentTurnId: z.string().uuid().optional(),
-  // Start from a saved custom agent. The node reads it and copies what the session keeps onto `config`,
-  // so a caller names the agent and never sends its instructions (docs/managed-agents/custom-agents.md § Custom agents).
-  customAgentId: z.string().min(1).max(200).optional(),
-  config: z.record(z.string(), z.unknown()).default({}),
-}).superRefine((input, context) => {
-  if (!input.origin) return
-  if (input.kind !== 'interactive' || input.origin.taskId !== input.taskId) {
-    context.addIssue({ code: 'custom', message: 'Inline diff chats must be interactive sessions in the same task.' })
-  }
-  if ((input.origin.source === 'changes') !== !!input.origin.scope ||
-      (input.origin.source === 'pull-request') !== !!input.origin.pull) {
-    context.addIssue({ code: 'custom', message: 'Inline diff origin must identify its source.' })
-  }
-})
+    providerId: z.string().min(1).max(100),
+    profileId: z.string().min(1).max(100),
+    title: z.string().trim().min(1).max(500).optional(),
+    kind: z.enum(['interactive', 'workflow', 'delegated', 'imported']).default('interactive'),
+    origin: z
+      .object({
+        kind: z.literal('inline-diff'),
+        source: z.enum(['changes', 'pull-request']),
+        taskId: z.string().uuid(),
+        path: z.string().min(1).max(4096),
+        side: z.enum(['old', 'new']),
+        line: z.number().int().positive(),
+        patchKey: z.string().min(1).max(200),
+        quote: z.string().max(2000),
+        access: z.enum(['read-only', 'full']).optional(),
+        scope: z.enum(['staged', 'unstaged']).optional(),
+        pull: z.object({ owner: z.string().min(1), repo: z.string().min(1), number: z.string().min(1) }).optional(),
+      })
+      .optional(),
+    resumeProviderSessionRef: z.string().min(1).max(2_000).optional(),
+    parentSessionId: z.string().uuid().optional(),
+    parentTurnId: z.string().uuid().optional(),
+    // Start from a saved custom agent. The node reads it and copies what the session keeps onto `config`,
+    // so a caller names the agent and never sends its instructions
+    // (docs/managed-agents/custom-agents.md § Custom agents).
+    customAgentId: z.string().min(1).max(200).optional(),
+    config: z.record(z.string(), z.unknown()).default({}),
+  })
+  .superRefine((input, context) => {
+    if (!input.origin) return
+    if (input.kind !== 'interactive' || input.origin.taskId !== input.taskId) {
+      context.addIssue({ code: 'custom', message: 'Inline diff chats must be interactive sessions in the same task.' })
+    }
+    if (
+      (input.origin.source === 'changes') !== !!input.origin.scope ||
+      (input.origin.source === 'pull-request') !== !!input.origin.pull
+    ) {
+      context.addIssue({ code: 'custom', message: 'Inline diff origin must identify its source.' })
+    }
+  })
 
 export const importAgentTranscriptSchema = z.object({
   taskId: z.string().uuid(),
   providerId: z.string().min(1).max(100),
   profileId: z.string().min(1).max(100),
   title: z.string().trim().min(1).max(500).optional(),
-  content: z.string().min(1).max(10 * 1024 * 1024),
+  content: z
+    .string()
+    .min(1)
+    .max(10 * 1024 * 1024),
 })
 
 export const enqueueAgentTurnSchema = z.object({
   input: z.array(agentInputPartSchema).min(1).max(32),
-  source: z.enum(['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import']).default('interactive'),
-  effectivePolicy: z.record(z.string(), z.unknown()).default({}).superRefine((policy, context) => {
-    for (const key of ['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture']) {
-      if (Object.hasOwn(policy, key)) context.addIssue({ code: 'custom', message: `${key} is resolved by the host.` })
-    }
-  }),
+  source: z
+    .enum(['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import'])
+    .default('interactive'),
+  effectivePolicy: z
+    .record(z.string(), z.unknown())
+    .default({})
+    .superRefine((policy, context) => {
+      for (const key of ['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture']) {
+        if (Object.hasOwn(policy, key)) context.addIssue({ code: 'custom', message: `${key} is resolved by the host.` })
+      }
+    }),
   idempotencyKey: z.string().min(8).max(200),
 })
 
@@ -139,6 +136,5 @@ export const agentWaitQuerySchema = z.object({
 export type CreateAgentSessionInput = z.infer<typeof createAgentSessionSchema>
 export type ImportAgentTranscriptInput = z.infer<typeof importAgentTranscriptSchema>
 // `plugin` is the one source no HTTP caller may claim. Only the session messenger writes it, with the
-// host's `sentBy` (server/sessions/sessionMessages.ts), so the schema above leaves it out.
+// host's `sentBy` (`SessionMessages`), so the schema above leaves it out.
 export type EnqueueAgentTurnInput = Omit<z.infer<typeof enqueueAgentTurnSchema>, 'source'> & { source: AgentTurnSource }
-export type ResolveAgentRequestInput = z.infer<typeof resolveAgentRequestSchema>

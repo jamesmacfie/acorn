@@ -6,7 +6,11 @@ import { removePluginFromDevice } from '../../../host/plugins/host'
 import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import { readDevicePrefs, removeDevicePluginPrefs } from '../../../infra/persistence/devicePrefs'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
-import { CORE_SLOT_PROVIDER, exclusiveSlotChoices, withExclusiveSlotChoice } from '../../../host/registries/extensionPoints/exclusiveSlots'
+import {
+  CORE_SLOT_PROVIDER,
+  exclusiveSlotChoices,
+  withExclusiveSlotChoice,
+} from '../../../host/registries/extensionPoints/exclusiveSlots'
 import { savePref } from '../savePref'
 import { nextDisabledList } from './pluginToggle'
 
@@ -15,9 +19,13 @@ import { nextDisabledList } from './pluginToggle'
 // device plugin. Each writes where the plugin is kept today and nowhere else.
 
 /** On or off at the node's next start. The route takes the whole disabled list, so it is recomputed from
- *  the rows the caller is looking at (./pluginToggle.ts). */
-export const setNodePluginEnabled = (rows: readonly NodePluginRow[], id: string, enabled: boolean, nodeId?: string): Promise<NodePluginState> =>
-  saveDisabledNodePlugins(nextDisabledList(rows, id, !enabled), nodeId)
+ *  the rows the caller is looking at (`nextDisabledList`). */
+export const setNodePluginEnabled = (
+  rows: readonly NodePluginRow[],
+  id: string,
+  enabled: boolean,
+  nodeId?: string,
+): Promise<NodePluginState> => saveDisabledNodePlugins(nextDisabledList(rows, id, !enabled), nodeId)
 
 const deviceDisabled = (): string[] => {
   try {
@@ -43,11 +51,15 @@ export async function removeDevicePlugin(qc: QueryClient, id: string): Promise<v
   await removePluginFromDevice(id)
   removeDevicePluginPrefs(id)
   if (readDevicePrefs()[PrefKeys.devicePluginsDisabled] !== undefined) {
-    await savePref(qc, PrefKeys.devicePluginsDisabled, JSON.stringify(deviceDisabled().filter((candidate) => candidate !== id)))
+    await savePref(
+      qc,
+      PrefKeys.devicePluginsDisabled,
+      JSON.stringify(deviceDisabled().filter((candidate) => candidate !== id)),
+    )
   }
-  qc.setQueryData<Record<string, string>>(prefsKey, (previous) => Object.fromEntries(
-    Object.entries(previous ?? {}).filter(([key]) => !key.startsWith(`plugin:${id}:`)),
-  ))
+  qc.setQueryData<Record<string, string>>(prefsKey, (previous) =>
+    Object.fromEntries(Object.entries(previous ?? {}).filter(([key]) => !key.startsWith(`plugin:${id}:`))),
+  )
   const stored = readDevicePrefs()[PrefKeys.exclusiveSlots]
   let slots = stored
   for (const slot of CORE_EXCLUSIVE_SLOTS) {

@@ -18,16 +18,16 @@ import type { DockerScope } from '../shared/model'
 // **One search over all four scopes, not four searches.** A reader looking for `postgres` does not
 // know or care whether they are about to find a container, an image or a volume, and a badge says
 // which one a row is. The four lists are loaded once when the frame opens and filtered here, which is
-// what the browse surface itself does per section (client-core/host/registries/commands/localSearch.ts).
+// what the browse surface itself does per section (client-core's `localSearch`).
 //
 // **Where a row goes.** The rail source, not the pane. The Docker pane draws the containers of one
 // task and only appears on a task that has some (./paneContribution.ts); an image, a volume and a
 // network belong to the daemon and have nowhere in a task to be shown. So selection selects the rail
 // source and leaves a reveal for the browse surface to land on (./dockerViewStore.ts).
 //
-// Starting, stopping, removing, pruning and compose-down are all absent. Each is either a result
-// action this programme deliberately stops before, or a confirmed operation that belongs where the
-// consequences are visible (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
+// Starting, stopping, removing, pruning and compose-down are all absent. Each is an operation that
+// belongs where its consequences are visible (docs/command-palette-and-shortcuts/palette-data.md § What
+// the palette refuses).
 
 const badge: Record<DockerScope, string> = {
   containers: 'container',
@@ -79,15 +79,21 @@ export const dockerCommands: readonly ContributedCommand[] = [
       // socket; the other three are read here, because nothing keeps them resident.
       await refreshDocker()
       if (!owner.current()) return []
-      const [images, volumes, networks] = await Promise.all([fetchImages(owner.nodeId), fetchVolumes(owner.nodeId), fetchNetworks(owner.nodeId)])
+      const [images, volumes, networks] = await Promise.all([
+        fetchImages(owner.nodeId),
+        fetchVolumes(owner.nodeId),
+        fetchNetworks(owner.nodeId),
+      ])
       if (!owner.current()) return []
       const items = [
-        ...containers().map((container) => resourceItem(
-          'containers',
-          container.id,
-          container.name,
-          [container.image, container.composeProject].filter(Boolean).join(' · ') || undefined,
-        )),
+        ...containers().map((container) =>
+          resourceItem(
+            'containers',
+            container.id,
+            container.name,
+            [container.image, container.composeProject].filter(Boolean).join(' · ') || undefined,
+          ),
+        ),
         ...images.map((image) => resourceItem('images', image.id, `${image.repository}:${image.tag}`, image.size)),
         // A volume has no id of its own; its name is the key the daemon addresses it by.
         ...volumes.map((volume) => resourceItem('volumes', volume.name, volume.name, volume.driver)),

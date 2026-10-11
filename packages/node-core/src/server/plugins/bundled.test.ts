@@ -18,9 +18,17 @@ const packageAt = (parent: string, version: string, marker = version): string =>
   const dir = join(parent, 'rollbar')
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(join(dir, 'dist'), { recursive: true })
-  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id: 'rollbar', name: 'Rollbar', version, baseline: ACORN_BASELINE, apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-  }))
+  writeFileSync(
+    join(dir, 'acorn-plugin.json'),
+    JSON.stringify({
+      id: 'rollbar',
+      name: 'Rollbar',
+      version,
+      baseline: ACORN_BASELINE,
+      apiVersion: PLUGIN_API_MAJOR,
+      node: './dist/node.js',
+    }),
+  )
   writeFileSync(join(dir, 'dist/node.js'), `export default ${JSON.stringify(marker)}\n`)
   return dir
 }
@@ -75,20 +83,39 @@ describe('bundled plugin reconciliation', () => {
     expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'user' })
   })
 
-  it('updates only the app-owned package while preserving an old profile\'s Rollbar records', async () => {
+  it("updates only the app-owned package while preserving an old profile's Rollbar records", async () => {
     const db = openDb(join(root, 'core.sqlite'))
     const now = Date.now()
-    await db.insert(schema.workspaces).values({ id: 'workspace', name: 'Work', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-    await db.insert(schema.projects).values({ id: 'project', name: 'App', workspaceId: 'workspace', createdAt: now, updatedAt: now })
+    await db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace', name: 'Work', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await db
+      .insert(schema.projects)
+      .values({ id: 'project', name: 'App', workspaceId: 'workspace', createdAt: now, updatedAt: now })
     await db.insert(schema.integrations).values({
-      id: 'rollbar-connection', userId: 'owner', provider: 'rollbar', label: 'Production', encryptedCredentials: 'encrypted-secret',
-      createdAt: now, updatedAt: now,
+      id: 'rollbar-connection',
+      userId: 'owner',
+      provider: 'rollbar',
+      label: 'Production',
+      encryptedCredentials: 'encrypted-secret',
+      createdAt: now,
+      updatedAt: now,
     })
     await db.insert(schema.tasks).values({
-      id: 'task', title: 'Checkout failed', origin: 'rollbar', projectId: 'project', status: 'active', createdAt: now, updatedAt: now,
+      id: 'task',
+      title: 'Checkout failed',
+      origin: 'rollbar',
+      projectId: 'project',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
     })
     await db.insert(schema.taskLinks).values({
-      taskId: 'task', integrationId: 'rollbar-connection', provider: 'rollbar', identifier: '142', createdAt: now,
+      taskId: 'task',
+      integrationId: 'rollbar-connection',
+      provider: 'rollbar',
+      identifier: '142',
+      createdAt: now,
     })
     db.close()
 
@@ -102,11 +129,20 @@ describe('bundled plugin reconciliation', () => {
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('2.0.0')
     expect(readFileSync(pluginDbPath(root, 'rollbar'), 'utf8')).toBe('plugin data')
     const reopened = openDb(join(root, 'core.sqlite'))
-    expect(await reopened.select({ provider: schema.integrations.provider, encryptedCredentials: schema.integrations.encryptedCredentials }).from(schema.integrations))
-      .toEqual([{ provider: 'rollbar', encryptedCredentials: 'encrypted-secret' }])
+    expect(
+      await reopened
+        .select({
+          provider: schema.integrations.provider,
+          encryptedCredentials: schema.integrations.encryptedCredentials,
+        })
+        .from(schema.integrations),
+    ).toEqual([{ provider: 'rollbar', encryptedCredentials: 'encrypted-secret' }])
     expect(await reopened.select({ origin: schema.tasks.origin }).from(schema.tasks)).toEqual([{ origin: 'rollbar' }])
-    expect(await reopened.select({ provider: schema.taskLinks.provider, identifier: schema.taskLinks.identifier }).from(schema.taskLinks))
-      .toEqual([{ provider: 'rollbar', identifier: '142' }])
+    expect(
+      await reopened
+        .select({ provider: schema.taskLinks.provider, identifier: schema.taskLinks.identifier })
+        .from(schema.taskLinks),
+    ).toEqual([{ provider: 'rollbar', identifier: '142' }])
     reopened.close()
   })
 
@@ -147,7 +183,7 @@ describe('bundled plugin reconciliation', () => {
   it('replaces a developer’s own build:plugin output, and keeps doing so after the first time', () => {
     // Byte-for-byte the case above, an unrecorded directory in the data root, except for the marker
     // `build:plugin` leaves when it writes there. Without it the two are indistinguishable, so a dev
-    // build was marked `user` and then survived every app rebuild: a feature that reads as missing.
+    // build would be marked `user` and then survive every app rebuild.
     const devBuild = () => {
       const dir = packageAt(join(root, 'plugins'), '1.0.0', 'dev version')
       writeFileSync(join(dir, DEV_BUILD_MARKER), '2026-01-01T00:00:00.000Z\n')
@@ -161,8 +197,8 @@ describe('bundled plugin reconciliation', () => {
     // `place` replaced the directory, so the marker went with it: an ordinary bundled package again.
     expect(existsSync(join(pluginDir(root, 'rollbar'), DEV_BUILD_MARKER))).toBe(false)
 
-    // The second dev build is the one a state-row-only fix would miss: there is a row now, saying
-    // 'installed' with a fingerprint the rebuild invalidated, which is the same trap one step later.
+    // The second dev build is the harder case: there is a row now, saying 'installed' with a
+    // fingerprint the rebuild invalidated, which is the same trap one step later.
     devBuild()
     packageAt(resources, '3.0.0', 'newer app version')
     expect(reconcileBundledPlugins(root, resources)).toMatchObject({ updated: ['rollbar'], preserved: [] })

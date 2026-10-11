@@ -10,19 +10,85 @@ import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { renderCells, type Cells, type Frame } from './render'
 import { fixtureDocument } from '../fixture'
 import {
-  Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
-  Toolbar, FilterBar,
+  Card,
+  DetailColumn,
+  DocumentTabs,
+  Fold,
+  Inline,
+  ListColumn,
+  ListDetail,
+  Menu,
+  Modal,
+  ModalActions,
+  ModalBody,
+  Popover,
+  Section,
+  SectionHeader,
+  Sections,
+  SettingRow,
+  SettingsSection,
+  SplitHandle,
+  Stack,
+  TabPanel,
+  Tabs,
+  Timeline,
+  Toolbar,
+  FilterBar,
   ToolbarSpacer,
 } from './grouping'
 import {
-  Alert, Badge, Chip, ChipRow, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
-  FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Alert,
+  Badge,
+  Chip,
+  ChipRow,
+  CodeBlock,
+  DescriptionList,
+  DiffLine,
+  DiffPane,
+  EmptyState,
+  Facts,
+  FileHead,
+  Grid,
+  Heading,
+  Icon,
+  Kbd,
+  Link,
+  Log,
+  Markdown,
+  Meter,
+  NonCodeRow,
+  Row,
+  RowActions,
+  Rows,
+  Spinner,
+  SplitCell,
+  StackedDiff,
+  StatusDot,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+  Text,
+  TreeRow,
+  UserAvatar,
 } from './showing'
 import {
-  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
-  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  Button,
+  Checkbox,
+  Composer,
+  ConfirmButton,
+  CopyButton,
+  Field,
+  FindBar,
+  Input,
+  KeyValueEditor,
+  MentionTextarea,
+  ModelBackendPicker,
+  Picker,
+  PickerRow,
+  SegmentedControl,
+  Select,
+  Textarea,
   IconButton,
   ToggleButton,
 } from './asking'
@@ -67,7 +133,12 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
 /** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
  *  field's own border inside it (./asking/fields.tsx § Textarea). */
 const fieldLines = (frame: Frame, count: number): string[] =>
-  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/(?:\s*[│█])+\s*$/, '').trimEnd())
+  frame.lines.slice(2, 2 + count).map((line) =>
+    line
+      .replace(/^│+/, '')
+      .replace(/(?:\s*[│█])+\s*$/, '')
+      .trimEnd(),
+  )
 
 const noteFile = {
   path: 'src/login.ts',
@@ -84,19 +155,33 @@ const CASES: Case[] = [
   {
     node: 'Stack',
     draws: 'children on successive lines',
-    render: () => <Stack><Text>one</Text><Text>two</Text></Stack>,
+    render: () => (
+      <Stack>
+        <Text>one</Text>
+        <Text>two</Text>
+      </Stack>
+    ),
     check: (frame) => expect(rowOf(frame, 'two')).toBe(rowOf(frame, 'one') + 1),
   },
   {
     node: 'Inline',
     draws: 'children on one line separated by a space',
-    render: () => <Inline><Text>one</Text><Text>two</Text></Inline>,
+    render: () => (
+      <Inline>
+        <Text>one</Text>
+        <Text>two</Text>
+      </Inline>
+    ),
     check: (frame) => expect(lineWith(frame, 'one')).toContain('two'),
   },
   {
     node: 'Section',
     draws: 'label in dim uppercase, children below',
-    render: () => <Section label="notes" count={3} help="what they are for"><Text>body</Text></Section>,
+    render: () => (
+      <Section label="notes" count={3} help="what they are for">
+        <Text>body</Text>
+      </Section>
+    ),
     check: (frame) => {
       has(frame, 'NOTES')
       expect(rowOf(frame, 'what they are for')).toBe(rowOf(frame, 'NOTES') + 1)
@@ -108,9 +193,15 @@ const CASES: Case[] = [
     draws: '▸ label closed, ▾ label open, children indented two cells, a leading control before the label',
     render: () => (
       <Stack>
-        <Fold label="shut"><Text>hidden</Text></Fold>
-        <Fold label="open" defaultOpen><Text>shown</Text></Fold>
-        <Fold label="picked" leading={<Text>[x]</Text>}><Text>hidden</Text></Fold>
+        <Fold label="shut">
+          <Text>hidden</Text>
+        </Fold>
+        <Fold label="open" defaultOpen>
+          <Text>shown</Text>
+        </Fold>
+        <Fold label="picked" leading={<Text>[x]</Text>}>
+          <Text>hidden</Text>
+        </Fold>
       </Stack>
     ),
     check: (frame) => {
@@ -124,7 +215,11 @@ const CASES: Case[] = [
   {
     node: 'Card',
     draws: 'a box-drawing frame',
-    render: () => <Card><Text>inside</Text></Card>,
+    render: () => (
+      <Card>
+        <Text>inside</Text>
+      </Card>
+    ),
     check: (frame) => {
       has(frame, '─')
       has(frame, 'inside')
@@ -133,7 +228,12 @@ const CASES: Case[] = [
   {
     node: 'Timeline',
     draws: 'cards in sequence',
-    render: () => <Timeline><Text>first</Text><Text>second</Text></Timeline>,
+    render: () => (
+      <Timeline>
+        <Text>first</Text>
+        <Text>second</Text>
+      </Timeline>
+    ),
     check: (frame) => expect(rowOf(frame, 'second')).toBe(rowOf(frame, 'first') + 1),
   },
   {
@@ -145,7 +245,10 @@ const CASES: Case[] = [
         ariaLabel="Tabs"
         active="b"
         onChange={() => {}}
-        tabs={[{ id: 'a', label: 'one', icon: 'git-branch' }, { id: 'b', label: 'two' }]}
+        tabs={[
+          { id: 'a', label: 'one', icon: 'git-branch' },
+          { id: 'b', label: 'two' },
+        ]}
       />
     ),
     check: (frame) => {
@@ -156,17 +259,24 @@ const CASES: Case[] = [
   {
     node: 'Toolbar',
     draws: 'children on one line',
-    render: () => <Toolbar><Text>left</Text><Text>right</Text></Toolbar>,
+    render: () => (
+      <Toolbar>
+        <Text>left</Text>
+        <Text>right</Text>
+      </Toolbar>
+    ),
     check: (frame) => expect(lineWith(frame, 'left')).toContain('right'),
   },
   {
     node: 'FilterBar',
     draws: 'an inset control row with a dropdown, input, and filter action',
-    render: () => <FilterBar ariaLabel="Filter history">
-      <Select label="Ref" value="all" options={[{ value: 'all', label: 'All refs' }]} />
-      <Input label="Search history" value="fix" />
-      <Button onPress={() => {}}>Options</Button>
-    </FilterBar>,
+    render: () => (
+      <FilterBar ariaLabel="Filter history">
+        <Select label="Ref" value="all" options={[{ value: 'all', label: 'All refs' }]} />
+        <Input label="Search history" value="fix" />
+        <Button onPress={() => {}}>Options</Button>
+      </FilterBar>
+    ),
     check: (frame) => {
       has(frame, 'All refs')
       expect(lineWith(frame, 'All refs')).toContain('fix')
@@ -177,13 +287,23 @@ const CASES: Case[] = [
   {
     node: 'ToolbarSpacer',
     draws: 'the padding that pushes what follows to the right edge',
-    render: () => <Toolbar><Text>left</Text><ToolbarSpacer /><Text>end</Text></Toolbar>,
+    render: () => (
+      <Toolbar>
+        <Text>left</Text>
+        <ToolbarSpacer />
+        <Text>end</Text>
+      </Toolbar>
+    ),
     check: (frame) => expect(lineWith(frame, 'left').trimEnd().endsWith('end')).toBe(true),
   },
   {
     node: 'Modal',
     draws: 'a centred box with its title',
-    render: () => <Modal onDismiss={() => {}} title="Rename"><Text>body</Text></Modal>,
+    render: () => (
+      <Modal onDismiss={() => {}} title="Rename">
+        <Text>body</Text>
+      </Modal>
+    ),
     check: (frame) => {
       has(frame, 'Rename')
       has(frame, 'body')
@@ -193,13 +313,22 @@ const CASES: Case[] = [
   {
     node: 'ModalBody',
     draws: 'the lines between the title rule and the actions line',
-    render: () => <ModalBody><Text>middle</Text></ModalBody>,
+    render: () => (
+      <ModalBody>
+        <Text>middle</Text>
+      </ModalBody>
+    ),
     check: (frame) => has(frame, 'middle'),
   },
   {
     node: 'ModalActions',
     draws: 'the buttons on one line, at the far end of the box',
-    render: () => <ModalActions><Button label="Cancel" /><Button label="Save" /></ModalActions>,
+    render: () => (
+      <ModalActions>
+        <Button label="Cancel" />
+        <Button label="Save" />
+      </ModalActions>
+    ),
     check: (frame) => {
       const line = lineWith(frame, '[Save]')
       expect(line).toContain('[Cancel]')
@@ -223,7 +352,11 @@ const CASES: Case[] = [
   {
     node: 'Popover',
     draws: 'reduced: a full-width block under its anchor rather than a floating panel',
-    render: () => <Popover trigger={() => <Text>anchor</Text>}><Text>panel</Text></Popover>,
+    render: () => (
+      <Popover trigger={() => <Text>anchor</Text>}>
+        <Text>panel</Text>
+      </Popover>
+    ),
     check: (frame) => {
       has(frame, 'anchor')
       // Shut until something opens it, which is the same state the DOM popover starts in.
@@ -233,7 +366,11 @@ const CASES: Case[] = [
   {
     node: 'ListDetail',
     draws: 'reduced: two columns above 80 cells',
-    render: () => <ListDetail list={<Text>the list</Text>}><Text>the detail</Text></ListDetail>,
+    render: () => (
+      <ListDetail list={<Text>the list</Text>}>
+        <Text>the detail</Text>
+      </ListDetail>
+    ),
     size: { width: 100, height: 6 },
     check: (frame) => {
       const line = lineWith(frame, 'the list')
@@ -270,7 +407,11 @@ const CASES: Case[] = [
   {
     node: 'ListColumn',
     draws: 'reduced: the left column, with its label',
-    render: () => <ListColumn label="notes"><Text>a note</Text></ListColumn>,
+    render: () => (
+      <ListColumn label="notes">
+        <Text>a note</Text>
+      </ListColumn>
+    ),
     check: (frame) => {
       has(frame, 'NOTES')
       has(frame, 'a note')
@@ -279,13 +420,23 @@ const CASES: Case[] = [
   {
     node: 'DetailColumn',
     draws: 'the right column',
-    render: () => <DetailColumn><Text>detail</Text></DetailColumn>,
+    render: () => (
+      <DetailColumn>
+        <Text>detail</Text>
+      </DetailColumn>
+    ),
     check: (frame) => has(frame, 'detail'),
   },
   {
     node: 'SplitHandle',
     draws: 'absent: a terminal split moves by a key, not a grip',
-    render: () => <Stack><Text>above</Text><SplitHandle axis="x" drag={{}} /><Text>below</Text></Stack>,
+    render: () => (
+      <Stack>
+        <Text>above</Text>
+        <SplitHandle axis="x" drag={{}} />
+        <Text>below</Text>
+      </Stack>
+    ),
     check: (frame) => expect(rowOf(frame, 'below')).toBe(rowOf(frame, 'above') + 1),
   },
   {
@@ -298,7 +449,10 @@ const CASES: Case[] = [
         active="b"
         onActivate={() => {}}
         onClose={() => {}}
-        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+        tabs={[
+          { id: 'a', label: 'one' },
+          { id: 'b', label: 'two' },
+        ]}
       />
     ),
     check: (frame) => expect(lineWith(frame, 'one')).toContain('two ×'),
@@ -306,7 +460,11 @@ const CASES: Case[] = [
   {
     node: 'SectionHeader',
     draws: 'a bold heading, its help in grey under it, then its actions',
-    render: () => <SectionHeader help="what the files are" actions={<Button label="New" />}>Files</SectionHeader>,
+    render: () => (
+      <SectionHeader help="what the files are" actions={<Button label="New" />}>
+        Files
+      </SectionHeader>
+    ),
     check: (frame) => {
       expect(rowOf(frame, 'what the files are')).toBe(rowOf(frame, 'Files') + 1)
       expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 2)
@@ -328,15 +486,26 @@ const CASES: Case[] = [
   },
   {
     node: 'SettingRow',
-    draws: 'the label then the control on one line, Saved after it, the error and the help under it; a value set elsewhere draws where instead of a control; a device row says so',
+    draws:
+      'the label then the control on one line, Saved after it, the error and the help under it; a value set elsewhere draws where instead of a control; a device row says so',
     size: { width: 60, height: 8 },
     render: () => (
       <Stack>
-        <SettingRow label="Port" savedAt={Date.now()} error={undefined}><Text>4000</Text></SettingRow>
-        <SettingRow label="Command" error="Could not save"><Text>pnpm dev</Text></SettingRow>
-        <SettingRow label="Setup" from=".acorn/config.toml"><Text>machine value</Text></SettingRow>
-        <SettingRow label="Tool call display" scope="device"><Text>Folded</Text></SettingRow>
-        <SettingRow label="Idle stop" help="Frees memory"><Text>30 minutes</Text></SettingRow>
+        <SettingRow label="Port" savedAt={Date.now()} error={undefined}>
+          <Text>4000</Text>
+        </SettingRow>
+        <SettingRow label="Command" error="Could not save">
+          <Text>pnpm dev</Text>
+        </SettingRow>
+        <SettingRow label="Setup" from=".acorn/config.toml">
+          <Text>machine value</Text>
+        </SettingRow>
+        <SettingRow label="Tool call display" scope="device">
+          <Text>Folded</Text>
+        </SettingRow>
+        <SettingRow label="Idle stop" help="Frees memory">
+          <Text>30 minutes</Text>
+        </SettingRow>
       </Stack>
     ),
     check: (frame) => {
@@ -354,8 +523,12 @@ const CASES: Case[] = [
     draws: 'the rows under the tab strip, and nothing for a panel that is not current',
     render: () => (
       <Stack>
-        <TabPanel idPrefix="t" id="a" active="a"><Text>current</Text></TabPanel>
-        <TabPanel idPrefix="t" id="b" active="a"><Text>other</Text></TabPanel>
+        <TabPanel idPrefix="t" id="a" active="a">
+          <Text>current</Text>
+        </TabPanel>
+        <TabPanel idPrefix="t" id="b" active="a">
+          <Text>other</Text>
+        </TabPanel>
       </Stack>
     ),
     check: (frame) => {
@@ -380,7 +553,11 @@ const CASES: Case[] = [
   {
     node: 'Heading',
     draws: 'eyebrow in dim uppercase, heading in bold, help in grey under it',
-    render: () => <Heading eyebrow="task" help="what it fixes">fix login</Heading>,
+    render: () => (
+      <Heading eyebrow="task" help="what it fixes">
+        fix login
+      </Heading>
+    ),
     check: (frame) => {
       has(frame, 'TASK')
       expect(rowOf(frame, 'fix login')).toBe(rowOf(frame, 'TASK') + 1)
@@ -391,7 +568,13 @@ const CASES: Case[] = [
     node: 'Rows',
     draws: 'its items on successive lines',
     render: () => (
-      <Rows id="list" items={[{ key: 'a', label: 'alpha' }, { key: 'b', label: 'beta' }]}>
+      <Rows
+        id="list"
+        items={[
+          { key: 'a', label: 'alpha' },
+          { key: 'b', label: 'beta' },
+        ]}
+      >
         {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
       </Rows>
     ),
@@ -400,7 +583,11 @@ const CASES: Case[] = [
   {
     node: 'Row',
     draws: 'one line: status glyph, title, meta at the far end',
-    render: () => <Row leading={<StatusDot tone="ok" />} meta="2m">a title</Row>,
+    render: () => (
+      <Row leading={<StatusDot tone="ok" />} meta="2m">
+        a title
+      </Row>
+    ),
     check: (frame) => {
       const line = lineWith(frame, 'a title')
       expect(line).toContain('●')
@@ -410,7 +597,11 @@ const CASES: Case[] = [
   {
     node: 'TreeRow',
     draws: 'Row indented depth cells with ▸ or ▾',
-    render: () => <TreeRow depth={1} expandable expanded={false}>src</TreeRow>,
+    render: () => (
+      <TreeRow depth={1} expandable expanded={false}>
+        src
+      </TreeRow>
+    ),
     check: (frame) => {
       const line = lineWith(frame, 'src')
       expect(line).toContain('▸')
@@ -420,7 +611,11 @@ const CASES: Case[] = [
   {
     node: 'RowActions',
     draws: "the row's labeled actions, always drawn, never on hover",
-    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <IconButton icon="x" label="Close" />}</RowActions>}>a row</Row>,
+    render: () => (
+      <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <IconButton icon="x" label="Close" />}</RowActions>}>
+        a row
+      </Row>
+    ),
     check: (frame) => expect(lineWith(frame, 'a row')).toContain('Close'),
   },
   {
@@ -438,13 +633,23 @@ const CASES: Case[] = [
   {
     node: 'ChipRow',
     draws: 'chips on one line',
-    render: () => <ChipRow><Chip>one</Chip><Chip>two</Chip></ChipRow>,
+    render: () => (
+      <ChipRow>
+        <Chip>one</Chip>
+        <Chip>two</Chip>
+      </ChipRow>
+    ),
     check: (frame) => expect(lineWith(frame, '(one)')).toContain('(two)'),
   },
   {
     node: 'StatusDot',
     draws: '● in colour, ○ for muted',
-    render: () => <Inline><StatusDot tone="ok" /><StatusDot tone="muted" /></Inline>,
+    render: () => (
+      <Inline>
+        <StatusDot tone="ok" />
+        <StatusDot tone="muted" />
+      </Inline>
+    ),
     check: (frame) => {
       has(frame, '●')
       has(frame, '○')
@@ -453,7 +658,14 @@ const CASES: Case[] = [
   {
     node: 'Facts',
     draws: 'two columns, labels dim',
-    render: () => <Facts items={[{ label: 'branch', value: 'main' }, { label: 'by', value: 'you' }]} />,
+    render: () => (
+      <Facts
+        items={[
+          { label: 'branch', value: 'main' },
+          { label: 'by', value: 'you' },
+        ]}
+      />
+    ),
     check: (frame) => {
       expect(lineWith(frame, 'branch')).toContain('main')
       // Padded to the widest label, so the values line up.
@@ -479,7 +691,10 @@ const CASES: Case[] = [
           <TableHead priority="high">name</TableHead>
           <TableHead priority="low">when</TableHead>
         </TableRow>
-        <TableRow><TableCell>lint</TableCell><TableCell>2m</TableCell></TableRow>
+        <TableRow>
+          <TableCell>lint</TableCell>
+          <TableCell>2m</TableCell>
+        </TableRow>
       </Table>
     ),
     size: { width: 10, height: 6 },
@@ -496,7 +711,10 @@ const CASES: Case[] = [
     draws: "reduced: the column's label in the bold header line",
     render: () => (
       <Table>
-        <TableRow head><TableHead>name</TableHead><TableHead>when</TableHead></TableRow>
+        <TableRow head>
+          <TableHead>name</TableHead>
+          <TableHead>when</TableHead>
+        </TableRow>
       </Table>
     ),
     check: (frame) => expect(lineWith(frame, 'name')).toContain('when'),
@@ -506,8 +724,14 @@ const CASES: Case[] = [
     draws: 'reduced: one line per row',
     render: () => (
       <Table>
-        <TableRow><TableCell>lint</TableCell><TableCell>2m</TableCell></TableRow>
-        <TableRow><TableCell>test</TableCell><TableCell>4m</TableCell></TableRow>
+        <TableRow>
+          <TableCell>lint</TableCell>
+          <TableCell>2m</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>test</TableCell>
+          <TableCell>4m</TableCell>
+        </TableRow>
       </Table>
     ),
     check: (frame) => expect(rowOf(frame, 'test')).toBe(rowOf(frame, 'lint') + 1),
@@ -517,7 +741,9 @@ const CASES: Case[] = [
     draws: "reduced: the cell's text in its column's width, ellipsised where it does not fit",
     render: () => (
       <Table>
-        <TableRow><TableCell>a very long cell indeed</TableCell></TableRow>
+        <TableRow>
+          <TableCell>a very long cell indeed</TableCell>
+        </TableRow>
       </Table>
     ),
     size: { width: 12, height: 4 },
@@ -530,7 +756,11 @@ const CASES: Case[] = [
       <Grid
         ariaLabel="Runs"
         columns={['name', 'when']}
-        rows={[['lint', '2m'], ['test', '4m'], ['build', '9m']]}
+        rows={[
+          ['lint', '2m'],
+          ['test', '4m'],
+          ['build', '9m'],
+        ]}
         selected={0}
       />
     ),
@@ -547,7 +777,10 @@ const CASES: Case[] = [
       <Graph
         id="graph"
         ariaLabel="Steps"
-        nodes={[{ id: 'a', label: 'investigate' }, { id: 'b', label: 'review' }]}
+        nodes={[
+          { id: 'a', label: 'investigate' },
+          { id: 'b', label: 'review' },
+        ]}
         edges={[{ from: 'a', to: 'b' }]}
       />
     ),
@@ -555,14 +788,17 @@ const CASES: Case[] = [
     check: (frame) => {
       expect(rowOf(frame, 'review')).toBe(rowOf(frame, 'investigate') + 1)
       // The rank is the picture, so the child has to start further in than the card it waits on.
-      expect(lineWith(frame, 'review').indexOf('review'))
-        .toBeGreaterThan(lineWith(frame, 'investigate').indexOf('investigate'))
+      expect(lineWith(frame, 'review').indexOf('review')).toBeGreaterThan(
+        lineWith(frame, 'investigate').indexOf('investigate'),
+      )
     },
   },
   {
     node: 'HistoryMark',
     draws: 'reduced: a commit dot, optional lane number, and continuation mark',
-    render: () => <HistoryMark slot={{ id: 'commit', lane: 1, lanes: 2, edges: [], continuation: true, disconnected: false }} />,
+    render: () => (
+      <HistoryMark slot={{ id: 'commit', lane: 1, lanes: 2, edges: [], continuation: true, disconnected: false }} />
+    ),
     size: { width: 12, height: 2 },
     check: (frame) => has(frame, '●⋯ 2'),
   },
@@ -617,7 +853,9 @@ const CASES: Case[] = [
     draws: 'reduced: unified only',
     render: () => {
       const { topology, segments } = fixtureDocument([noteFile])
-      return <DiffPane source={{ topology: () => topology, loading: () => false, loadSegments: async () => segments }} />
+      return (
+        <DiffPane source={{ topology: () => topology, loading: () => false, loadSegments: async () => segments }} />
+      )
     },
     size: { width: 40, height: 10 },
     check: (frame) => {
@@ -629,9 +867,7 @@ const CASES: Case[] = [
   {
     node: 'DiffLine',
     draws: 'reduced: one line, +/-/space in the gutter',
-    render: () => (
-      <DiffLine r={{ kind: 'insert', path: 'a.ts', oldNo: null, newNo: 3, toks: [], raw: 'added' }} />
-    ),
+    render: () => <DiffLine r={{ kind: 'insert', path: 'a.ts', oldNo: null, newNo: 3, toks: [], raw: 'added' }} />,
     check: (frame) => has(frame, '+added'),
   },
   {
@@ -660,7 +896,9 @@ const CASES: Case[] = [
   {
     node: 'NonCodeRow',
     draws: 'reduced: a dim line saying what is not being shown',
-    render: () => <NonCodeRow row={{ kind: 'gap', path: 'a.ts', sha: null, side: 'mid', oldStart: 1, newStart: 1, count: 12 }} />,
+    render: () => (
+      <NonCodeRow row={{ kind: 'gap', path: 'a.ts', sha: null, side: 'mid', oldStart: 1, newStart: 1, count: 12 }} />
+    ),
     check: (frame) => has(frame, '12 unchanged lines'),
   },
   {
@@ -711,7 +949,12 @@ const CASES: Case[] = [
   {
     node: 'Icon',
     draws: 'a mapped one-cell mark; an unknown name takes no space',
-    render: () => <Inline><Icon name="circle-check" title="Ready" /><Icon name="not-a-real-icon" /></Inline>,
+    render: () => (
+      <Inline>
+        <Icon name="circle-check" title="Ready" />
+        <Icon name="not-a-real-icon" />
+      </Inline>
+    ),
     check: (frame) => {
       lacks(frame, 'Ready')
       has(frame, '✓')
@@ -738,12 +981,16 @@ const CASES: Case[] = [
   {
     node: 'ConfirmButton',
     draws: 'the label at rest even with an icon child; the armed button is the prompt',
-    render: () => <ConfirmButton label="Delete" onConfirm={() => {}}><Icon name="trash-2" /></ConfirmButton>,
+    render: () => (
+      <ConfirmButton label="Delete" onConfirm={() => {}}>
+        <Icon name="trash-2" />
+      </ConfirmButton>
+    ),
     check: (frame) => {
       has(frame, '[Delete]')
       lacks(frame, '[object Object]')
-      // Arming is a press, and a button becomes a focus stop in phase 2. The armed label is
-      // `createArmedConfirm`'s, which client-core tests directly.
+      // Arming is a press, and nothing here presses. The armed label is `createArmedConfirm`'s,
+      // which client-core tests directly.
       lacks(frame, 'Delete?')
     },
   },
@@ -768,7 +1015,13 @@ const CASES: Case[] = [
     node: 'Select',
     draws: '[ value ▾ ], opening a Menu',
     render: () => (
-      <Select value="b" options={[{ value: 'a', label: 'one' }, { value: 'b', label: 'two' }]} />
+      <Select
+        value="b"
+        options={[
+          { value: 'a', label: 'one' },
+          { value: 'b', label: 'two' },
+        ]}
+      />
     ),
     check: (frame) => has(frame, '[ two ▾ ]'),
   },
@@ -786,7 +1039,10 @@ const CASES: Case[] = [
         ariaLabel="View"
         value="b"
         onChange={() => {}}
-        options={[{ value: 'a' as const, label: 'a' }, { value: 'b' as const, label: 'b' }]}
+        options={[
+          { value: 'a' as const, label: 'a' },
+          { value: 'b' as const, label: 'b' },
+        ]}
       />
     ),
     check: (frame) => has(frame, '( a | [b] )'),
@@ -859,7 +1115,11 @@ const CASES: Case[] = [
   {
     node: 'Field',
     draws: 'the label above its child',
-    render: () => <Field label="Title" help="shown in the list"><Text>a note</Text></Field>,
+    render: () => (
+      <Field label="Title" help="shown in the list">
+        <Text>a note</Text>
+      </Field>
+    ),
     check: (frame) => {
       expect(rowOf(frame, 'a note')).toBe(rowOf(frame, 'Title') + 1)
       expect(rowOf(frame, 'shown in the list')).toBe(rowOf(frame, 'a note') + 1)
@@ -892,12 +1152,16 @@ const CASES: Case[] = [
     render: () => (
       <Stack>
         <Rectangle kind="pty" label="Terminal" />
-        <Rectangle kind="webview" label="Preview"><Fallback forNode="Rectangle"><Text>open it in a browser</Text></Fallback></Rectangle>
+        <Rectangle kind="webview" label="Preview">
+          <Fallback forNode="Rectangle">
+            <Text>open it in a browser</Text>
+          </Fallback>
+        </Rectangle>
       </Stack>
     ),
     // Taller than most cases: a `pty` rectangle is a real emulator with a real screen in it and grows
     // to fill what it is given, so two rectangles stacked in ten lines leave the second one no interior
-    // at all — and since the pane sweep nothing in the kit shrinks to make room, it clips instead.
+    // at all — and nothing in the kit shrinks to make room, so it clips instead.
     size: { width: 40, height: 30 },
     check: (frame) => {
       has(frame, 'Terminal')
@@ -912,8 +1176,12 @@ const CASES: Case[] = [
     draws: 'children on the named hosts and nowhere else',
     render: () => (
       <Stack>
-        <Only hosts={['tui']}><Text>here</Text></Only>
-        <Only hosts={['dom']}><Text>elsewhere</Text></Only>
+        <Only hosts={['tui']}>
+          <Text>here</Text>
+        </Only>
+        <Only hosts={['dom']}>
+          <Text>elsewhere</Text>
+        </Only>
       </Stack>
     ),
     check: (frame) => {
@@ -926,8 +1194,12 @@ const CASES: Case[] = [
     draws: 'what to draw where this host cannot draw the node it is inside',
     render: () => (
       <Stack>
-        <Fallback forNode="SplitHandle"><Text>no grip here</Text></Fallback>
-        <Fallback forNode="Badge"><Text>never</Text></Fallback>
+        <Fallback forNode="SplitHandle">
+          <Text>no grip here</Text>
+        </Fallback>
+        <Fallback forNode="Badge">
+          <Text>never</Text>
+        </Fallback>
       </Stack>
     ),
     check: (frame) => {
@@ -938,23 +1210,22 @@ const CASES: Case[] = [
 ]
 
 /**
- * What the new painter cannot draw yet, case by case, and what each is waiting for.
+ * What this painter cannot draw yet, case by case, and what each is waiting for.
  *
- * Two entries are left and neither is a widget, because all five widgets are built. Both are the
- * same measured Yoga-build difference, recorded below with everything that was tried, and neither is
- * above the layout pass.
+ * Both entries are the same Yoga difference, recorded below with everything that was tried, and
+ * neither is above the layout pass.
  *
  * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
  */
 const HELD: Readonly<Record<string, string>> = {
-  // Not a widget's fault, and not the painter's either: the two Yoga builds disagree about what a
-  // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
-  // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
-  // contributes the child's content, so the same tree comes out one row tall. No `Config` knob in
-  // yoga-layout 3.2.1 reproduces it — web defaults, every errata and the web-flex-basis feature were
-  // each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the app does:
-  // every viewport it draws is inside a `Panel` or a grown column, where the two agree.
+  // Not a widget's fault, and not the painter's either: the cases expect OpenTUI's Yoga build, which
+  // disagrees with yoga-layout about what a `flexBasis: 0` child contributes to a parent whose own
+  // height is `auto`. Ours contributes the basis, so the box is nought tall and nothing inside it is
+  // drawn; OpenTUI's contributes the child's content, so the same tree comes out one row tall. No
+  // yoga-layout `Config` knob reproduces it — web defaults, every errata and the web-flex-basis
+  // feature were each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the
+  // app does: every viewport it draws is inside a `Panel` or a grown column, where the two agree.
   'TabPanel: the rows under the tab strip, and nothing for a panel that is not current':
     'a viewport in a parent with no height of its own',
   'is a parent stop: Down enters the panel it is showing, Escape comes back':
@@ -973,13 +1244,25 @@ const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [strin
 
 describe('the kit in cells', () => {
   it('keeps three bare selects on one narrow row', async () => {
-    const screen = await renderCells(() => (
-      <Inline wrap>
-        <Inline><Text>Mode</Text><Select kind="bare" value="default" options={[{ value: 'default', label: 'Default' }]} /></Inline>
-        <Inline><Text>Model</Text><Select kind="bare" value="fixture" options={[{ value: 'fixture', label: 'Fixture model' }]} /></Inline>
-        <Inline><Text>Effort</Text><Select kind="bare" value="high" options={[{ value: 'high', label: 'high' }]} /></Inline>
-      </Inline>
-    ), { width: 52, height: 3 })
+    const screen = await renderCells(
+      () => (
+        <Inline wrap>
+          <Inline>
+            <Text>Mode</Text>
+            <Select kind="bare" value="default" options={[{ value: 'default', label: 'Default' }]} />
+          </Inline>
+          <Inline>
+            <Text>Model</Text>
+            <Select kind="bare" value="fixture" options={[{ value: 'fixture', label: 'Fixture model' }]} />
+          </Inline>
+          <Inline>
+            <Text>Effort</Text>
+            <Select kind="bare" value="high" options={[{ value: 'high', label: 'high' }]} />
+          </Inline>
+        </Inline>
+      ),
+      { width: 52, height: 3 },
+    )
     try {
       expect(screen.lines[0]).toContain('Mode Default▾ Model Fixture model▾ Effort high▾')
     } finally {
@@ -1031,24 +1314,38 @@ describe('the kit in cells', () => {
 
   it.each(drawable(cases))('%s', drawCase, 20_000)
   it.each([80, 120])('shows status essentials and details at %i columns', async (width) => {
-    const frame = await renderCells(() => <Toolbar variant="status" ariaLabel="File status"
-      primary={<Text>src/deep/example.ts</Text>}
-      secondary={<Text>TypeScript Spaces: 2</Text>}
-      essential={<Text>Ln 12, Col 4 Saved</Text>}
-      actions={<Button onPress={() => {}}>Details</Button>}
-    />, { width, height: 4 })
+    const frame = await renderCells(
+      () => (
+        <Toolbar
+          variant="status"
+          ariaLabel="File status"
+          primary={<Text>src/deep/example.ts</Text>}
+          secondary={<Text>TypeScript Spaces: 2</Text>}
+          essential={<Text>Ln 12, Col 4 Saved</Text>}
+          actions={<Button onPress={() => {}}>Details</Button>}
+        />
+      ),
+      { width, height: 4 },
+    )
     try {
       for (const fact of ['src/deep/example.ts', 'Ln 12, Col 4', 'Saved', 'Details', 'Spaces: 2']) has(frame, fact)
-    } finally { frame.done() }
+    } finally {
+      frame.done()
+    }
   })
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
   // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
 
   it('keeps a striped card inside a narrow pane and colors its left edge on every row', async () => {
-    const frame = await renderCells(() => (
-      <Card stripe="ok"><Text wrap>One long agent message that wraps across several rows.</Text></Card>
-    ), { width: 28, height: 9 })
+    const frame = await renderCells(
+      () => (
+        <Card stripe="ok">
+          <Text wrap>One long agent message that wraps across several rows.</Text>
+        </Card>
+      ),
+      { width: 28, height: 9 },
+    )
     try {
       const cardLines = frame.lines.filter((line) => line.startsWith('▍'))
       expect(cardLines.length).toBeGreaterThan(3)
@@ -1063,19 +1360,35 @@ describe('the kit in cells', () => {
   })
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
-    // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare
-    // string anywhere is a text node nobody thinks about, so `<Stack>{count()}</Stack>` is correct kit
-    // that used to throw — out of `insertNode`, inside a signal write, which aborts the update pass
-    // and stops the screen following with nothing to say why.
+    // The class, not an instance. On the DOM a bare string anywhere is a text node nobody thinks about,
+    // so `<Stack>{count()}</Stack>` is correct kit. Here it has to draw rather than throw out of
+    // `insertNode` inside a signal write, which would abort the update pass and stop the screen
+    // following with nothing to say why.
     //
-    // Every case below is one that reached a reader before the reconciler patch answered it in one
-    // place. They stay together because what is being tested is the boundary, not the six components.
+    // Every case below is a shape that has reached a reader. They stay together because what is being
+    // tested is the boundary, not the six components.
     const [count, setCount] = createSignal(7)
     const cases: [string, () => JSX.Element][] = [
       ['loose text in a Stack', () => <Stack>hello</Stack>],
       ['a dynamic string in a Stack', () => <Stack>{count()}</Stack>],
-      ['a node beside a dynamic string', () => <Line><Icon name="copy" />{count()}</Line>],
-      ['a node beside text in an Inline', () => <Inline><Icon name="copy" />{'x'}</Inline>],
+      [
+        'a node beside a dynamic string',
+        () => (
+          <Line>
+            <Icon name="copy" />
+            {count()}
+          </Line>
+        ),
+      ],
+      [
+        'a node beside text in an Inline',
+        () => (
+          <Inline>
+            <Icon name="copy" />
+            {'x'}
+          </Inline>
+        ),
+      ],
       ['an empty string in a Card', () => <Card>{''}</Card>],
     ]
     for (const [, render] of cases) {
@@ -1088,16 +1401,22 @@ describe('the kit in cells', () => {
 
   it('draws a node beside a value that changes, and keeps drawing it when it does', async () => {
     // The shape every element-typed prop and every mixed line is: one node and one dynamic string.
-    // Solid compiles the string half to an accessor, and `slot` used to hand that straight back — so
-    // the renderer inserted a bare string into a box, which is the one structure a cell host refuses.
-    // It threw from inside whatever signal had just moved, which on a row holding a count meant the
-    // whole update pass died and the screen stopped following (./cells.tsx § slot).
+    // Solid compiles the string half to an accessor, and `slot` reads it and wraps the string, so the
+    // renderer never puts a bare string loose in a box (./cells.tsx § slot).
     //
     // Reactive, not just first paint: reading the accessor inside `slot` has to be a tracked read, or
-    // the fix trades a crash for a number that never changes.
+    // the number never changes.
     _resetCollections()
     const [count, setCount] = createSignal(7)
-    const frame = await renderCells(() => <Line><Icon name="copy" />{count()}</Line>, { width: 20, height: 3 })
+    const frame = await renderCells(
+      () => (
+        <Line>
+          <Icon name="copy" />
+          {count()}
+        </Line>
+      ),
+      { width: 20, height: 3 },
+    )
     try {
       expect(frame.text).toContain('7')
       setCount(8)
@@ -1110,12 +1429,20 @@ describe('the kit in cells', () => {
   it('an absent node draws nothing at all, rather than a placeholder', async () => {
     // The difference that makes `absent` a level rather than a bug: a node this host refuses draws a
     // labelled placeholder, and a node the matrix says is absent draws nothing and takes no room.
-    const absent = Object.entries(NODE_SUPPORT).filter(([, row]) => row.tui === 'absent').map(([node]) => node)
+    const absent = Object.entries(NODE_SUPPORT)
+      .filter(([, row]) => row.tui === 'absent')
+      .map(([node]) => node)
     expect(absent.sort()).toEqual(['Rectangle', 'SplitCell', 'SplitHandle'])
     _resetCollections()
-    const frame = await renderCells(() => (
-      <Stack><SplitHandle axis="x" drag={{}} /><SplitCell r={null} gutter={null} /></Stack>
-    ), { width: 30, height: 4 })
+    const frame = await renderCells(
+      () => (
+        <Stack>
+          <SplitHandle axis="x" drag={{}} />
+          <SplitCell r={null} gutter={null} />
+        </Stack>
+      ),
+      { width: 30, height: 4 },
+    )
     try {
       expect(frame.lines.filter((line) => line.trim().length)).toEqual([])
     } finally {
@@ -1190,7 +1517,9 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'ConfirmButton',
     does: 'arms on the first press and confirms on the second',
-    render: (record) => <ConfirmButton label="Delete" onArm={() => record('arm')} onConfirm={() => record('confirm')} />,
+    render: (record) => (
+      <ConfirmButton label="Delete" onArm={() => record('arm')} onConfirm={() => record('confirm')} />
+    ),
     drive: async (screen, pressed) => {
       const armed = await screen.press('RETURN')
       expect(armed.text).toContain('Delete?')
@@ -1202,7 +1531,9 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'ConfirmButton',
     does: 'shows a written prompt as it is, with one question mark',
-    render: (record) => <ConfirmButton label="Delete" confirmLabel="Delete note?" onConfirm={() => record('confirm')} />,
+    render: (record) => (
+      <ConfirmButton label="Delete" confirmLabel="Delete note?" onConfirm={() => record('confirm')} />
+    ),
     drive: async (screen) => {
       const armed = await screen.press('RETURN')
       expect(armed.text).toContain('[Delete note?]')
@@ -1255,8 +1586,8 @@ const BEHAVIOURS: Behaviour[] = [
     does: 'toggles on Space and on Enter, because both are activate',
     render: (record) => <Checkbox label="Include" onChange={(checked) => record(String(checked))} />,
     drive: async (screen, pressed) => {
-      // A literal space, because `KeyCodes` has no name for it — a named key there is one with an
-      // escape sequence, and space is a character.
+      // A literal space, because the harness names only keys with an escape sequence, and space is a
+      // character (../keyEvent.ts § pressedKey).
       const spaced = await screen.press(' ')
       expect(pressed).toEqual(['true'])
       await spaced.press('RETURN')
@@ -1278,7 +1609,9 @@ const BEHAVIOURS: Behaviour[] = [
     node: 'Chip',
     does: 'presses on Enter and removes on Delete',
     render: (record) => (
-      <Chip onPress={() => record('press')} onRemove={() => record('remove')}>bug</Chip>
+      <Chip onPress={() => record('press')} onRemove={() => record('remove')}>
+        bug
+      </Chip>
     ),
     drive: async (screen, pressed) => {
       const after = await screen.press('RETURN')
@@ -1290,7 +1623,11 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'Fold',
     does: 'opens on Enter with the header keeping the keys',
-    render: () => <Fold label="notes"><Text>shown</Text></Fold>,
+    render: () => (
+      <Fold label="notes">
+        <Text>shown</Text>
+      </Fold>
+    ),
     drive: async (screen) => {
       expect(screen.text).toContain('▸ notes')
       lit(screen, 'notes')
@@ -1302,7 +1639,11 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'Card',
     does: 'presses on Enter where it was given a handler',
-    render: (record) => <Card onPress={() => record('press')}><Text>inside</Text></Card>,
+    render: (record) => (
+      <Card onPress={() => record('press')}>
+        <Text>inside</Text>
+      </Card>
+    ),
     drive: async (screen, pressed) => {
       await screen.press('RETURN')
       expect(pressed).toEqual(['press'])
@@ -1313,7 +1654,9 @@ const BEHAVIOURS: Behaviour[] = [
     does: 'presses on Enter, marking the focused row at its end',
     render: (record) => (
       <Table>
-        <TableRow onPress={() => record('press')}><TableCell>lint</TableCell></TableRow>
+        <TableRow onPress={() => record('press')}>
+          <TableCell>lint</TableCell>
+        </TableRow>
       </Table>
     ),
     size: { width: 30, height: 4 },
@@ -1332,8 +1675,14 @@ const BEHAVIOURS: Behaviour[] = [
         <SegmentedControl
           ariaLabel="View"
           value={value()}
-          options={[{ value: 'a' as const, label: 'a' }, { value: 'b' as const, label: 'b' }]}
-          onChange={(next) => { setValue(next); record(next) }}
+          options={[
+            { value: 'a' as const, label: 'a' },
+            { value: 'b' as const, label: 'b' },
+          ]}
+          onChange={(next) => {
+            setValue(next)
+            record(next)
+          }}
         />
       )
     },
@@ -1355,7 +1704,10 @@ const BEHAVIOURS: Behaviour[] = [
           columns={['name']}
           rows={[['lint'], ['test']]}
           selected={selected()}
-          onSelect={(index) => { setSelected(index); record(String(index)) }}
+          onSelect={(index) => {
+            setSelected(index)
+            record(String(index))
+          }}
         />
       )
     },
@@ -1379,7 +1731,10 @@ const BEHAVIOURS: Behaviour[] = [
             { id: 'b', label: 'review', selected: chosen() === 'b' },
           ]}
           edges={[{ from: 'a', to: 'b' }]}
-          onSelect={(id) => { setChosen(id); record(id) }}
+          onSelect={(id) => {
+            setChosen(id)
+            record(id)
+          }}
         />
       )
     },
@@ -1395,7 +1750,9 @@ const BEHAVIOURS: Behaviour[] = [
     render: (record) => (
       <Menu ariaLabel="Menu" trigger={() => <Line>open me</Line>}>
         {(context) => (
-          <Menu.Item context={context} onSelect={() => record('chosen')}>choice</Menu.Item>
+          <Menu.Item context={context} onSelect={() => record('chosen')}>
+            choice
+          </Menu.Item>
         )}
       </Menu>
     ),
@@ -1415,9 +1772,13 @@ const BEHAVIOURS: Behaviour[] = [
       <Menu ariaLabel="Menu" trigger={() => <Line>open me</Line>}>
         {(context) => (
           <>
-            <Menu.Item context={context} kind="radio" checked onSelect={() => record('list')}>List</Menu.Item>
+            <Menu.Item context={context} kind="radio" checked onSelect={() => record('list')}>
+              List
+            </Menu.Item>
             <Menu.Separator />
-            <Menu.Item context={context} kind="checkbox" checked={false} onSelect={() => record('amend')}>Amend</Menu.Item>
+            <Menu.Item context={context} kind="checkbox" checked={false} onSelect={() => record('amend')}>
+              Amend
+            </Menu.Item>
           </>
         )}
       </Menu>
@@ -1441,8 +1802,14 @@ const BEHAVIOURS: Behaviour[] = [
       return (
         <Select
           value={value()}
-          options={[{ value: 'a', label: 'one' }, { value: 'b', label: 'two' }]}
-          onChange={(next) => { setValue(next); record(next) }}
+          options={[
+            { value: 'a', label: 'one' },
+            { value: 'b', label: 'two' },
+          ]}
+          onChange={(next) => {
+            setValue(next)
+            record(next)
+          }}
         />
       )
     },
@@ -1467,7 +1834,10 @@ const BEHAVIOURS: Behaviour[] = [
         label="Repo"
         placeholder="Find…"
         emptyText="Nothing"
-        items={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+        items={[
+          { id: 'a', label: 'one' },
+          { id: 'b', label: 'two' },
+        ]}
         onPick={record}
       />
     ),
@@ -1512,9 +1882,7 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'MentionTextarea',
     does: 'completes the word being typed from the list under the field',
-    render: (record) => (
-      <MentionTextarea value="ping @ad" onInput={record} mentions={['ada', 'bob']} />
-    ),
+    render: (record) => <MentionTextarea value="ping @ad" onInput={record} mentions={['ada', 'bob']} />,
     size: { width: 40, height: 8 },
     drive: async (screen, pressed) => {
       expect(screen.text).toContain('ada')
@@ -1541,9 +1909,8 @@ const BEHAVIOURS: Behaviour[] = [
     size: { width: 30, height: 5 },
     drive: async (screen, pressed) => {
       await screen.press('a')
-      // The last value, not the only one: an OpenTUI textarea raises one content change as it mounts,
-      // with the text it was built with. Harmless — the value it reports is the value it was given —
-      // and pre-existing, so it is not this phase's to change.
+      // The last value, not the only one: a textarea may report the text it was built with as it
+      // mounts. Harmless — the value it reports is the value it was given.
       expect(pressed.at(-1)).toBe('a')
     },
   },
@@ -1570,8 +1937,14 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'MentionTextarea',
     does: 'toggles its size with Control-Shift-Enter without submitting or editing the draft',
-    render: (record) => <MentionTextarea value="question" onInput={record}
-      onSubmit={() => record('sent')} onToggleExpand={() => record('expanded')} />,
+    render: (record) => (
+      <MentionTextarea
+        value="question"
+        onInput={record}
+        onSubmit={() => record('sent')}
+        onToggleExpand={() => record('expanded')}
+      />
+    ),
     size: { width: 30, height: 5 },
     drive: async (screen, pressed) => {
       pressed.length = 0
@@ -1582,9 +1955,7 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'Textarea',
     does: 'moves the caret up and down over the visual lines of a wrapped value',
-    render: () => (
-      <Textarea value={'alpha bravo charlie delta'} grow />
-    ),
+    render: () => <Textarea value={'alpha bravo charlie delta'} grow />,
     // Ten cells of text: fourteen less the panel's border and the field's own. The value wraps into
     // four rows so the arrows have rows to move between rather than one line to sit on, and four is
     // also what fits, so no scroll bar is drawn over the last column of them
@@ -1641,11 +2012,16 @@ const BEHAVIOURS: Behaviour[] = [
         backendId="connection:c1"
         modelId="m1"
         onChange={(pick) => record(pick.modelId)}
-        backends={[{
-          id: 'connection:c1',
-          label: 'Anthropic',
-          models: [{ id: 'm1', label: 'Opus' }, { id: 'm2', label: 'Sonnet' }],
-        }]}
+        backends={[
+          {
+            id: 'connection:c1',
+            label: 'Anthropic',
+            models: [
+              { id: 'm1', label: 'Opus' },
+              { id: 'm2', label: 'Sonnet' },
+            ],
+          },
+        ]}
       />
     ),
     size: { width: 40, height: 8 },
@@ -1665,10 +2041,15 @@ const BEHAVIOURS: Behaviour[] = [
         backendId="harness:codex"
         modelId="gpt-one"
         onChange={(pick) => record(pick.modelId)}
-        backends={[{
-          id: 'harness:codex', kind: 'harness', label: 'Codex', defaultModelId: '',
-          models: [{ id: 'gpt-one', label: 'GPT One' }],
-        }]}
+        backends={[
+          {
+            id: 'harness:codex',
+            kind: 'harness',
+            label: 'Codex',
+            defaultModelId: '',
+            models: [{ id: 'gpt-one', label: 'GPT One' }],
+          },
+        ]}
       />
     ),
     size: { width: 42, height: 8 },
@@ -1690,7 +2071,10 @@ const BEHAVIOURS: Behaviour[] = [
         active="a"
         onActivate={(id) => record(`open ${id}`)}
         onClose={(id) => record(`close ${id}`)}
-        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+        tabs={[
+          { id: 'a', label: 'one' },
+          { id: 'b', label: 'two' },
+        ]}
       />
     ),
     drive: async (screen, pressed) => {
@@ -1726,17 +2110,34 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
 }
 
 /** Every renderable under one, for a case that has to reach past what the store will hand it. */
-const every = (from: Renderable): Renderable[] =>
-  from.getChildren().flatMap((child) => [child, ...every(child)])
+const every = (from: Renderable): Renderable[] => from.getChildren().flatMap((child) => [child, ...every(child)])
 
 it('keeps terminal Git status text and the unsaved dot distinct in document tabs', async () => {
-  const screen = await renderCells(() => <DocumentTabs idPrefix="status" ariaLabel="Open files" active="a" onActivate={() => {}}
-    tabs={[{ id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified — Staged and unstaged', tone: 'muted' } }]} />,
-  { width: 80, height: 4 })
+  const screen = await renderCells(
+    () => (
+      <DocumentTabs
+        idPrefix="status"
+        ariaLabel="Open files"
+        active="a"
+        onActivate={() => {}}
+        tabs={[
+          {
+            id: 'a',
+            label: 'a.ts',
+            dirty: true,
+            fileStatus: { letter: 'M', label: 'Modified — Staged and unstaged', tone: 'muted' },
+          },
+        ]}
+      />
+    ),
+    { width: 80, height: 4 },
+  )
   try {
     expect(screen.text).toContain('a.ts [M] ●')
     expect(screen.text).toContain('Modified — Staged and unstaged')
-  } finally { screen.done() }
+  } finally {
+    screen.done()
+  }
 })
 
 it('draws up to three mark dots on a terminal document tab and every mark in the legend', async () => {
@@ -1746,42 +2147,109 @@ it('draws up to three mark dots on a terminal document tab and every mark in the
     { tone: 'muted' as const, label: 'Covered — coverage' },
     { tone: 'warn' as const, label: 'Fourth — review' },
   ]
-  const screen = await renderCells(() => <DocumentTabs idPrefix="marks" ariaLabel="Open files" active="a" onActivate={() => {}}
-    tabs={[{ id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified', tone: 'muted' }, marks }]} />,
-  { width: 120, height: 4 })
+  const screen = await renderCells(
+    () => (
+      <DocumentTabs
+        idPrefix="marks"
+        ariaLabel="Open files"
+        active="a"
+        onActivate={() => {}}
+        tabs={[
+          { id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified', tone: 'muted' }, marks },
+        ]}
+      />
+    ),
+    { width: 120, height: 4 },
+  )
   try {
     expect(screen.text).toContain('a.ts [M] ● ● ○ ●')
-    expect(screen.text).toContain('Modified · Needs review — review · Generated — codegen · Covered — coverage · Fourth — review')
-  } finally { screen.done() }
+    expect(screen.text).toContain(
+      'Modified · Needs review — review · Generated — codegen · Covered — coverage · Fourth — review',
+    )
+  } finally {
+    screen.done()
+  }
 })
 
 it('keeps terminal-session tab clicks and arrows activating once', async () => {
   const activated: string[] = []
   const [active, setActive] = createSignal('a')
-  const screen = await renderCells(() => <HeaderBodyFooter stateKey="terminal-tabs" label="Terminal"
-    regions={{ body: () => <DocumentTabs idPrefix="terminal-tabs" ariaLabel="Sessions" active={active()}
-      onActivate={(id) => { activated.push(id); setActive(id) }} tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]} /> }} />,
-  { width: 80, height: 8 })
+  const screen = await renderCells(
+    () => (
+      <HeaderBodyFooter
+        stateKey="terminal-tabs"
+        label="Terminal"
+        regions={{
+          body: () => (
+            <DocumentTabs
+              idPrefix="terminal-tabs"
+              ariaLabel="Sessions"
+              active={active()}
+              onActivate={(id) => {
+                activated.push(id)
+                setActive(id)
+              }}
+              tabs={[
+                { id: 'a', label: 'one' },
+                { id: 'b', label: 'two' },
+              ]}
+            />
+          ),
+        }}
+      />
+    ),
+    { width: 80, height: 8 },
+  )
   try {
     await screen.click(...cellOf(screen, 'two'))
     expect(activated).toEqual(['b'])
     await screen.press('ARROW_LEFT')
     expect(activated).toEqual(['b', 'a'])
-  } finally { screen.done() }
+  } finally {
+    screen.done()
+  }
 })
 
 it('targets an inactive editor tab menu without activating that document', async () => {
   const opened: string[] = []
   const targeted: string[] = []
-  const screen = await renderCells(() => <HeaderBodyFooter stateKey="editor-menu-target" label="Editor"
-    regions={{ body: () => <DocumentTabs idPrefix="editor-menu" ariaLabel="Open files" active="a"
-      onActivate={(id) => opened.push(id)} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
-        open={control?.open} onOpenChange={control?.onOpenChange}
-        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
-        {(menu) => <Menu.Item context={menu} onSelect={() => targeted.push(id)}>Reveal {id}</Menu.Item>}
-      </Menu>}
-      tabs={[{ id: 'a', label: 'a.ts' }, { id: 'b', label: 'b.ts' }]} /> }} />,
-  { width: 80, height: 24 })
+  const screen = await renderCells(
+    () => (
+      <HeaderBodyFooter
+        stateKey="editor-menu-target"
+        label="Editor"
+        regions={{
+          body: () => (
+            <DocumentTabs
+              idPrefix="editor-menu"
+              ariaLabel="Open files"
+              active="a"
+              onActivate={(id) => opened.push(id)}
+              menu={(id, control) => (
+                <Menu
+                  ariaLabel={`Actions for ${id}`}
+                  open={control?.open}
+                  onOpenChange={control?.onOpenChange}
+                  trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}
+                >
+                  {(menu) => (
+                    <Menu.Item context={menu} onSelect={() => targeted.push(id)}>
+                      Reveal {id}
+                    </Menu.Item>
+                  )}
+                </Menu>
+              )}
+              tabs={[
+                { id: 'a', label: 'a.ts' },
+                { id: 'b', label: 'b.ts' },
+              ]}
+            />
+          ),
+        }}
+      />
+    ),
+    { width: 80, height: 24 },
+  )
   try {
     expect(screen.text).not.toContain('Actions for a')
     const moved = await screen.press('ARROW_RIGHT')
@@ -1804,28 +2272,64 @@ it('targets an inactive editor tab menu without activating that document', async
     const action = await clicked.click(clicked.lines[row]!.indexOf('⋯') + 1, row)
     expect(action.text).toContain('Reveal a')
     expect(opened).toEqual(['b'])
-  } finally { screen.done() }
+  } finally {
+    screen.done()
+  }
 })
 
 it('reveals late tab-menu actions when the detail has only a few rows', async () => {
   const chosen: string[] = []
-  const screen = await renderCells(() => <HeaderBodyFooter stateKey="short-tab-menu" label="Editor"
-    regions={{ body: () => <DocumentTabs idPrefix="short-tab-menu" ariaLabel="Open files" active="a"
-      onActivate={() => {}} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
-        maxVisibleRows={9} open={control?.open} onOpenChange={control?.onOpenChange}
-        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
-        {(menu) => <>{Array.from({ length: 7 }, (_, index) =>
-          <Menu.Item context={menu} onSelect={() => chosen.push(`early ${index}`)}>Early {index}</Menu.Item>)}
-          <Menu.Item context={menu} onSelect={() => chosen.push(id)}>Reveal {id}</Menu.Item></>}
-      </Menu>} tabs={[{ id: 'a', label: 'a.ts' }]} /> }} />,
-  { width: 80, height: 8 })
+  const screen = await renderCells(
+    () => (
+      <HeaderBodyFooter
+        stateKey="short-tab-menu"
+        label="Editor"
+        regions={{
+          body: () => (
+            <DocumentTabs
+              idPrefix="short-tab-menu"
+              ariaLabel="Open files"
+              active="a"
+              onActivate={() => {}}
+              menu={(id, control) => (
+                <Menu
+                  ariaLabel={`Actions for ${id}`}
+                  maxVisibleRows={9}
+                  open={control?.open}
+                  onOpenChange={control?.onOpenChange}
+                  trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}
+                >
+                  {(menu) => (
+                    <>
+                      {Array.from({ length: 7 }, (_, index) => (
+                        <Menu.Item context={menu} onSelect={() => chosen.push(`early ${index}`)}>
+                          Early {index}
+                        </Menu.Item>
+                      ))}
+                      <Menu.Item context={menu} onSelect={() => chosen.push(id)}>
+                        Reveal {id}
+                      </Menu.Item>
+                    </>
+                  )}
+                </Menu>
+              )}
+              tabs={[{ id: 'a', label: 'a.ts' }]}
+            />
+          ),
+        }}
+      />
+    ),
+    { width: 80, height: 8 },
+  )
   try {
     let frame = await screen.press('F10', { shift: true })
     for (let index = 0; index < 7; index++) frame = await frame.press('ARROW_DOWN')
     expect(frame.text).toContain('Reveal a')
     await frame.press('RETURN')
     expect(chosen).toEqual(['a'])
-  } finally { screen.done() }
+  } finally {
+    screen.done()
+  }
 })
 
 describe('every control is a stop', () => {
@@ -1852,137 +2356,148 @@ describe('every control is a stop', () => {
   it.each(drawable(behaviours))('%s', driveCase, 30_000)
   if (held(behaviours).length) it.skip.each(held(behaviours))('%s', driveCase)
 
-  it.skipIf(owed('puts the keys on the control a click lands on, and Enter presses that one'))('puts the keys on the control a click lands on, and Enter presses that one', async () => {
-    // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
-    // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
-    // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
-    const pressed: string[] = []
-    const screen = await renderCells(
-      () => (
-        <HeaderBodyFooter
-          stateKey="clicking"
-          label="Clicking"
-          regions={{
-            body: () => (
-              <Stack>
-                <Button label="First" onPress={() => pressed.push('first')} />
-                <Button label="Second" onPress={() => pressed.push('second')} />
-              </Stack>
-            ),
-          }}
-        />
-      ),
-      { width: 40, height: 8 },
-    )
-    try {
-      // The pane opens on its first stop, because nothing pressed Tab and this host has no pointer to
-      // land the keys with (../keys/regions.ts § regionFocus).
-      lit(screen, '[First]')
-      const clicked = await screen.click(...cellOf(screen, '[Second]'))
-      lit(clicked, '[Second]')
-      // A click focuses and presses, which is the whole of this host's pointer model
-      // (docs/tui/rectangles.md § What the TUI never does). Enter then presses the one under the caret, which is
-      // the half that says the click moved the keys and not only the highlight.
-      expect(pressed).toEqual(['second'])
-      await clicked.press('RETURN')
-      expect(pressed).toEqual(['second', 'second'])
-    } finally {
-      screen.done()
-    }
-  }, 30_000)
+  it.skipIf(owed('puts the keys on the control a click lands on, and Enter presses that one'))(
+    'puts the keys on the control a click lands on, and Enter presses that one',
+    async () => {
+      // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
+      // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
+      // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
+      const pressed: string[] = []
+      const screen = await renderCells(
+        () => (
+          <HeaderBodyFooter
+            stateKey="clicking"
+            label="Clicking"
+            regions={{
+              body: () => (
+                <Stack>
+                  <Button label="First" onPress={() => pressed.push('first')} />
+                  <Button label="Second" onPress={() => pressed.push('second')} />
+                </Stack>
+              ),
+            }}
+          />
+        ),
+        { width: 40, height: 8 },
+      )
+      try {
+        // The pane opens on its first stop, because nothing pressed Tab and this host has no pointer to
+        // land the keys with (../keys/regions.ts § regionFocus).
+        lit(screen, '[First]')
+        const clicked = await screen.click(...cellOf(screen, '[Second]'))
+        lit(clicked, '[Second]')
+        // A click focuses and presses, which is the whole of this host's pointer model
+        // (docs/tui/rectangles.md § What the TUI never does). Enter then presses the one under the caret, which is
+        // the half that says the click moved the keys and not only the highlight.
+        expect(pressed).toEqual(['second'])
+        await clicked.press('RETURN')
+        expect(pressed).toEqual(['second', 'second'])
+      } finally {
+        screen.done()
+      }
+    },
+    30_000,
+  )
 
-  it.skipIf(owed('types into the field that has the keys, wherever the renderer is drawing its caret'))('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
-    // The sentence the typing hand-off rests on, as a regression test: a field's `handleKeyPress`
-    // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
-    // hand it a key without anything else having focused it. If that stopped being true, typing would
-    // quietly start depending on the caret mirror agreeing with the store
-    // (docs/tui/keys.md § The five key groups, ../keys/install.ts § typeInto).
-    const typed: string[] = []
-    const screen = await renderCells(
-      () => (
-        <HeaderBodyFooter
-          stateKey="typing"
-          label="Typing"
-          regions={{
-            body: () => (
-              <Stack>
-                <Input value="" onInput={(value) => typed.push(value)} />
-                <Button label="Elsewhere" onPress={() => {}} />
-              </Stack>
-            ),
-          }}
-        />
-      ),
-      { width: 40, height: 8 },
-    )
-    try {
-      // The pane opens on the field, which is its first stop.
-      const field = focusedRenderable()
-      expect(field, 'the field did not take the keys').not.toBe(null)
+  it.skipIf(owed('types into the field that has the keys, wherever the renderer is drawing its caret'))(
+    'types into the field that has the keys, wherever the renderer is drawing its caret',
+    async () => {
+      // The sentence the typing hand-off rests on, as a regression test: a field's `handleKeyPress`
+      // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
+      // hand it a key without anything else having focused it. If that stopped being true, typing would
+      // quietly start depending on the caret mirror agreeing with the store
+      // (docs/tui/keys.md § The five key groups, ../keys/install.ts § typeInto).
+      const typed: string[] = []
+      const screen = await renderCells(
+        () => (
+          <HeaderBodyFooter
+            stateKey="typing"
+            label="Typing"
+            regions={{
+              body: () => (
+                <Stack>
+                  <Input value="" onInput={(value) => typed.push(value)} />
+                  <Button label="Elsewhere" onPress={() => {}} />
+                </Stack>
+              ),
+            }}
+          />
+        ),
+        { width: 40, height: 8 },
+      )
+      try {
+        // The pane opens on the field, which is its first stop.
+        const field = focusedRenderable()
+        expect(field, 'the field did not take the keys').not.toBe(null)
 
-      // Now call `focus()` on something else, behind the store's back. It is the mirror and the
-      // mirror is a no-op — a node has no focus of its own to move and a field asks the store
-      // whether it has the keys rather than being told (../tree/compat.ts § focus). So this is the
-      // half of the case that survives having one owner: the call happens and nothing about who has
-      // the keys changes.
-      const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
-      expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
-      elsewhere!.focus()
+        // Now call `focus()` on something else, behind the store's back. It is the mirror and the
+        // mirror is a no-op — a node has no focus of its own to move and a field asks the store
+        // whether it has the keys rather than being told (../tree/compat.ts § focus). So this is the
+        // half of the case that survives having one owner: the call happens and nothing about who has
+        // the keys changes.
+        const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
+        expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
+        elsewhere!.focus()
 
-      // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
-      // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
-      // and the hand-off types it. A letter would only prove the last of those three
-      // (../keys/tiers.ts § TYPING).
-      const one = await screen.press('h')
-      expect(typed).toEqual(['h'])
-      expect(one.text).toContain('h')
-      expect(focusedRenderable()).toBe(field)
-    } finally {
-      screen.done()
-    }
-  }, 30_000)
+        // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
+        // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
+        // and the hand-off types it. A letter would only prove the last of those three
+        // (../keys/tiers.ts § TYPING).
+        const one = await screen.press('h')
+        expect(typed).toEqual(['h'])
+        expect(one.text).toContain('h')
+        expect(focusedRenderable()).toBe(field)
+      } finally {
+        screen.done()
+      }
+    },
+    30_000,
+  )
 
-  it.skipIf(owed('lets go of the keys when the control holding them goes disabled'))('lets go of the keys when the control holding them goes disabled', async () => {
-    // The flag is the store's declaration of what can hold the keys, so a control that loses it while
-    // it has them is a node the landing pass has to leave. It used to be worse than a stuck caret:
-    // `blur()` refuses a node that is not focusable, so the keys stayed for the rest of the run and
-    // every box above went on reporting a focused descendant, and the reader saw a dialog whose
-    // buttons were lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
-    const [off, setOff] = createSignal(false)
-    const pressed: string[] = []
-    const screen = await renderCells(
-      () => (
-        <HeaderBodyFooter
-          stateKey="disabling"
-          label="Disabling"
-          regions={{
-            body: () => (
-              <Stack>
-                <Button label="Risky" disabled={off()} onPress={() => pressed.push('risky')} />
-                <Button label="Safe" onPress={() => pressed.push('safe')} />
-              </Stack>
-            ),
-          }}
-        />
-      ),
-      { width: 40, height: 8 },
-    )
-    try {
-      lit(screen, '[Risky]')
-      const risky = focusedRenderable()
-      setOff(true)
-      const disabled = await screen.frame()
-      expect(focusedRenderable(), 'the disabled control is still holding the keys').not.toBe(risky)
+  it.skipIf(owed('lets go of the keys when the control holding them goes disabled'))(
+    'lets go of the keys when the control holding them goes disabled',
+    async () => {
+      // The flag is the store's declaration of what can hold the keys, so a control that loses it while
+      // it has them is a node the landing pass has to leave. Otherwise the keys stay for the rest of the
+      // run, every box above reports a focused descendant, and the reader sees a dialog whose buttons
+      // are lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
+      const [off, setOff] = createSignal(false)
+      const pressed: string[] = []
+      const screen = await renderCells(
+        () => (
+          <HeaderBodyFooter
+            stateKey="disabling"
+            label="Disabling"
+            regions={{
+              body: () => (
+                <Stack>
+                  <Button label="Risky" disabled={off()} onPress={() => pressed.push('risky')} />
+                  <Button label="Safe" onPress={() => pressed.push('safe')} />
+                </Stack>
+              ),
+            }}
+          />
+        ),
+        { width: 40, height: 8 },
+      )
+      try {
+        lit(screen, '[Risky]')
+        const risky = focusedRenderable()
+        setOff(true)
+        const disabled = await screen.frame()
+        expect(focusedRenderable(), 'the disabled control is still holding the keys').not.toBe(risky)
 
-      // And they can still land somewhere, which is the half a wedge makes impossible.
-      const moved = await disabled.click(...cellOf(disabled, '[Safe]'))
-      lit(moved, '[Safe]')
-      await moved.press('RETURN')
-      expect(pressed).toEqual(['safe', 'safe'])
-    } finally {
-      screen.done()
-    }
-  }, 30_000)
+        // And they can still land somewhere, which is the half a wedge makes impossible.
+        const moved = await disabled.click(...cellOf(disabled, '[Safe]'))
+        lit(moved, '[Safe]')
+        await moved.press('RETURN')
+        expect(pressed).toEqual(['safe', 'safe'])
+      } finally {
+        screen.done()
+      }
+    },
+    30_000,
+  )
 
   it('lands the keys somewhere when the only control on screen goes disabled', async () => {
     // The other half of the same wedge, and the half a click cannot rescue. Losing the flag blurs the
@@ -2010,7 +2525,7 @@ describe('every control is a stop', () => {
       expect(held, 'nothing holds the keys').not.toBe(null)
       expect(held!.isDestroyed).toBe(false)
       // And what holds them can give them up, which is the whole point of not clearing the flag on a
-      // node that has the keys (./regions.ts § paintCaret).
+      // node that has the keys (../keys/regions.ts § paintCaret).
       expect(held!.focusable, 'the keys are on a node that cannot be blurred').toBe(true)
     } finally {
       screen.done()
@@ -2051,7 +2566,10 @@ function TwoPanels() {
         ariaLabel="Fixture"
         active={tab()}
         onChange={setTab}
-        tabs={[{ id: 'a', label: 'One' }, { id: 'b', label: 'Two' }]}
+        tabs={[
+          { id: 'a', label: 'One' },
+          { id: 'b', label: 'Two' },
+        ]}
       />
       <TabPanel idPrefix="fixture" id="a" active={tab()}>
         <Button label="Inside one" onPress={() => {}} />
@@ -2073,43 +2591,54 @@ function FilterAndRows() {
         ariaLabel="Filter"
         active={tab()}
         onChange={setTab}
-        tabs={[{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed' }]}
+        tabs={[
+          { id: 'open', label: 'Open' },
+          { id: 'closed', label: 'Closed' },
+        ]}
       />
-      <Rows id="pulls" items={[{ key: 'first', label: 'first pull' }, { key: 'second', label: 'second pull' }]}>
+      <Rows
+        id="pulls"
+        items={[
+          { key: 'first', label: 'first pull' },
+          { key: 'second', label: 'second pull' },
+        ]}
+      >
         {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
       </Rows>
     </Stack>
   )
 }
 
-const inPane = (body: () => JSX.Element, height: number) => renderCells(
-  () => <HeaderBodyFooter stateKey="strip" label="Strip" regions={{ body }} />,
-  { width: 60, height },
-)
+const inPane = (body: () => JSX.Element, height: number) =>
+  renderCells(() => <HeaderBodyFooter stateKey="strip" label="Strip" regions={{ body }} />, { width: 60, height })
 
 describe('a tab strip with panels', () => {
-  it.skipIf(owed('is a parent stop: Down enters the panel it is showing, Escape comes back'))('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
-    const screen = await inPane(() => <TwoPanels />, 12)
-    try {
-      // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`
-      // prefers — and the proof is that the arrows are the strip's.
-      const second = await screen.press('ARROW_RIGHT')
-      expect(second.text).toContain('[Two]')
-      expect(second.text).toContain('Inside two')
+  it.skipIf(owed('is a parent stop: Down enters the panel it is showing, Escape comes back'))(
+    'is a parent stop: Down enters the panel it is showing, Escape comes back',
+    async () => {
+      const screen = await inPane(() => <TwoPanels />, 12)
+      try {
+        // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`
+        // prefers — and the proof is that the arrows are the strip's.
+        const second = await screen.press('ARROW_RIGHT')
+        expect(second.text).toContain('[Two]')
+        expect(second.text).toContain('Inside two')
 
-      // Down into the panel this strip is showing. The button inside it draws in the focused form.
-      const inside = await second.press('ARROW_DOWN')
-      lit(inside, '[Inside two]')
+        // Down into the panel this strip is showing. The button inside it draws in the focused form.
+        const inside = await second.press('ARROW_DOWN')
+        lit(inside, '[Inside two]')
 
-      // Escape climbs to the strip, and the arrows are the strip's again.
-      const back = await inside.press('ESCAPE')
-      const first = await back.press('ARROW_LEFT')
-      expect(first.text).toContain('[One]')
-      expect(first.text).toContain('Inside one')
-    } finally {
-      screen.done()
-    }
-  }, 30_000)
+        // Escape climbs to the strip, and the arrows are the strip's again.
+        const back = await inside.press('ESCAPE')
+        const first = await back.press('ARROW_LEFT')
+        expect(first.text).toContain('[One]')
+        expect(first.text).toContain('Inside one')
+      } finally {
+        screen.done()
+      }
+    },
+    30_000,
+  )
 
   it('is an ordinary stop with no panels, so a region enters on the list below it', async () => {
     const screen = await inPane(() => <FilterAndRows />, 12)
@@ -2134,12 +2663,15 @@ describe('a toolbar', () => {
   it('does not re-run a narrowed Show when a sibling changes', async () => {
     const [label, setLabel] = createSignal('one')
     const [detail, setDetail] = createSignal<string | undefined>('here')
-    const screen = await renderCells(() => (
-      <Toolbar ariaLabel="Bar">
-        <Text>{label()}</Text>
-        <Show when={detail()}>{(text) => <Text>{text()}</Text>}</Show>
-      </Toolbar>
-    ), { width: 40, height: 4 })
+    const screen = await renderCells(
+      () => (
+        <Toolbar ariaLabel="Bar">
+          <Text>{label()}</Text>
+          <Show when={detail()}>{(text) => <Text>{text()}</Text>}</Show>
+        </Toolbar>
+      ),
+      { width: 40, height: 4 },
+    )
     try {
       expect(screen.text).toContain('here')
       // The narrowed value goes away and a sibling changes in the same update. Re-scoped children

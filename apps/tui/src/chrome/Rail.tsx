@@ -40,9 +40,9 @@ import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/fe
 // (client-core/host/registries/sources/sources.ts § regions).
 //
 // The marks on a task or source row are the same ones the desktop draws around a rail control
-// (`core:task`, `core:source`, features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the placement is dropped and
-// the glyphs sit in the row's trailing slot in the order the allocator put them — same data, same
-// order, one dimension fewer.
+// (`core:task`, `core:source`, features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the
+// placement is dropped and the glyphs sit in the row's trailing slot in the order the allocator put
+// them — same data, same order, one dimension fewer.
 
 /** Cells across, from the shell's own width: about a third of it, between a floor and a ceiling.
  *
@@ -85,10 +85,12 @@ function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number })
 
 /** Every marker's words for one row, opened from its menu key: the terminal's hover legend. */
 function MarkerLegend(props: { title: string; id: string; target: RailMarkerTarget; onDismiss: () => void }) {
-  const rows = createMemo(() => resolveRailMarkers(markersFor(props.target)).legend.map((marker, index) => ({
-    key: String(index),
-    label: marker.l,
-  })))
+  const rows = createMemo(() =>
+    resolveRailMarkers(markersFor(props.target)).legend.map((marker, index) => ({
+      key: String(index),
+      label: marker.l,
+    })),
+  )
   return (
     <Modal onDismiss={props.onDismiss} title={props.title} size="sm">
       <ModalBody>
@@ -112,10 +114,10 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
   // them (../kit/showing/collection.tsx § keyedRows).
-  const hierarchy = createMemo(() => workflowTaskHierarchy(props.model.tasks(), expandedWorkflowRoots(), activeTaskId()))
-  const depthByTask = createMemo(() => new Map(
-    hierarchy().map((entry) => [entry.task.id, entry.depth]),
-  ))
+  const hierarchy = createMemo(() =>
+    workflowTaskHierarchy(props.model.tasks(), expandedWorkflowRoots(), activeTaskId()),
+  )
+  const depthByTask = createMemo(() => new Map(hierarchy().map((entry) => [entry.task.id, entry.depth])))
   // Cache against the original task row, not the hierarchy wrapper. `taskHierarchy` returns fresh
   // wrappers when the roster changes, while TanStack preserves every unchanged task object. The
   // getter keeps depth correct when a parent appears or disappears without rebuilding the child row.
@@ -124,51 +126,60 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
     (task) => ({
       key: task.id,
       task,
-      get depth() { return depthByTask().get(task.id) ?? 0 },
-      get group() { return hierarchy().find(entry => entry.task.id === task.id) },
+      get depth() {
+        return depthByTask().get(task.id) ?? 0
+      },
+      get group() {
+        return hierarchy().find((entry) => entry.task.id === task.id)
+      },
     }),
   )
 
   return (
     <>
-    <Rows
-      virtual
-      id="chrome.rail.tasks"
-      ariaLabel="Tasks"
-      items={rows()}
-      onSelect={setHighlightedTaskId}
-      onMenu={(id) => {
-        if (hasMarkers({ kind: 'task', id })) setInspecting(id)
-      }}
-      onActivate={(id) => {
-        const task = props.model.tasks().find((row) => row.id === id)
-        const group = hierarchy().find(entry => entry.task.id === id)
-        if (task && id === activeTaskId() && group?.workflowDescendants) toggleWorkflowRoot(id)
-        else if (task) activateTaskSignals(task)
-      }}
-    >
-      {/* The task title carries the identity. The count at the right exposes annotations; the
+      <Rows
+        virtual
+        id="chrome.rail.tasks"
+        ariaLabel="Tasks"
+        items={rows()}
+        onSelect={setHighlightedTaskId}
+        onMenu={(id) => {
+          if (hasMarkers({ kind: 'task', id })) setInspecting(id)
+        }}
+        onActivate={(id) => {
+          const task = props.model.tasks().find((row) => row.id === id)
+          const group = hierarchy().find((entry) => entry.task.id === id)
+          if (task && id === activeTaskId() && group?.workflowDescendants) toggleWorkflowRoot(id)
+          else if (task) activateTaskSignals(task)
+        }}
+      >
+        {/* The task title carries the identity. The count at the right exposes annotations; the
           marker modal contains their labels. Neither needs a replacement for a Lucide icon. */}
-      {(row, item) => (
-        <Row
-          item={item}
-          selected={!selectedSource() && row.task.id === activeTaskId()}
-          keepTrailing
-          trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} cells={props.markerCells} />}
-        >
-          {row.depth
-            ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}`
-            : row.group?.workflowDescendants
-              ? `${row.group.expanded ? '▾' : '▸'} ${row.task.title} · ${row.group.workflowDescendants}`
-              : row.task.title}
-        </Row>
-      )}
-    </Rows>
-    <Show when={inspecting()}>
-      {(taskId) => (
-        <MarkerLegend title="Task markers" id="chrome.rail.task-markers" target={{ kind: 'task', id: taskId() }} onDismiss={() => setInspecting(null)} />
-      )}
-    </Show>
+        {(row, item) => (
+          <Row
+            item={item}
+            selected={!selectedSource() && row.task.id === activeTaskId()}
+            keepTrailing
+            trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} cells={props.markerCells} />}
+          >
+            {row.depth
+              ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}`
+              : row.group?.workflowDescendants
+                ? `${row.group.expanded ? '▾' : '▸'} ${row.task.title} · ${row.group.workflowDescendants}`
+                : row.task.title}
+          </Row>
+        )}
+      </Rows>
+      <Show when={inspecting()}>
+        {(taskId) => (
+          <MarkerLegend
+            title="Task markers"
+            id="chrome.rail.task-markers"
+            target={{ kind: 'task', id: taskId() }}
+            onDismiss={() => setInspecting(null)}
+          />
+        )}
+      </Show>
     </>
   )
 }
@@ -195,7 +206,12 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
   const source = () => sourceRegistry.get(selectedSource() ?? '')
   // `core:source`, for the sources this Menu lists and the routed project. Only consenting owners are
   // asked about (client-core host/annotations/statusAnnotations.ts).
-  createEffect(() => requestSourceAnnotations(sources().map((entry) => entry.id), routedProjectId()))
+  createEffect(() =>
+    requestSourceAnnotations(
+      sources().map((entry) => entry.id),
+      routedProjectId(),
+    ),
+  )
   const [inspecting, setInspecting] = createSignal<string | null>(null)
 
   return (
@@ -203,11 +219,7 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
       <Panel
         title="Menu"
         rows={MENU_ROWS}
-        onBox={regionFocus(
-          MENU,
-          MENU_ORDER,
-          { x: RAIL, enterMainOnActivate: true, pickOnEnter: true },
-        )}
+        onBox={regionFocus(MENU, MENU_ORDER, { x: RAIL, enterMainOnActivate: true, pickOnEnter: true })}
       >
         {/* Empty while the provider and workspace-link gates are still loading, which is a rendering
             decision and not a focus one: a partial Menu draws a row that is about to move
@@ -224,14 +236,18 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
             selected={selectedSource()}
             onSelect={setSelectedSource}
             onActivate={setSelectedSource}
-            onMenu={(id) => { if (hasMarkers({ kind: 'source', id })) setInspecting(id) }}
+            onMenu={(id) => {
+              if (hasMarkers({ kind: 'source', id })) setInspecting(id)
+            }}
           >
             {(entry, item) => (
               <Row
                 item={item}
                 selected={selectedSource() === entry.id}
                 keepTrailing
-                trailing={<Marks markers={markersFor({ kind: 'source', id: entry.id })} cells={Math.max(2, props.cells - 14)} />}
+                trailing={
+                  <Marks markers={markersFor({ kind: 'source', id: entry.id })} cells={Math.max(2, props.cells - 14)} />
+                }
               >
                 {entry.label}
               </Row>
@@ -240,7 +256,12 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
         </Show>
         <Show when={inspecting()}>
           {(sourceId) => (
-            <MarkerLegend title="Source markers" id="chrome.rail.source-markers" target={{ kind: 'source', id: sourceId() }} onDismiss={() => setInspecting(null)} />
+            <MarkerLegend
+              title="Source markers"
+              id="chrome.rail.source-markers"
+              target={{ kind: 'source', id: sourceId() }}
+              onDismiss={() => setInspecting(null)}
+            />
           )}
         </Show>
       </Panel>
@@ -248,8 +269,8 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
           that has not declared regions keeps its whole surface in the main panel and this panel says
           so, which is the honest answer and not an error. */}
       {/* `scroll`, because a source's list is as long as the source says and the rail is one column
-          of a fixed screen: without a viewport the rows past the fold were drawn nowhere and the
-          caret walked off the bottom of the panel (../kit/scrolling.tsx,
+          of a fixed screen: without a viewport the rows past the fold are drawn nowhere and the
+          caret walks off the bottom of the panel (../kit/scrolling.tsx,
           docs/tui/scrolling.md § Scrolling viewports). */}
       <Panel title="Browse" grow scroll>
         <Show
@@ -266,16 +287,13 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
             <box
               flexDirection="column"
               flexGrow={1}
-              ref={regionFocus(
-                BROWSE,
-                BROWSE_ORDER,
-                { x: RAIL, enterMainOnActivate: true, pickOnEnter: true },
-              )}
+              ref={regionFocus(BROWSE, BROWSE_ORDER, { x: RAIL, enterMainOnActivate: true, pickOnEnter: true })}
             >
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
-                  panel draws for each of those rather than the blank frame both used to leave
-                  (../panel.tsx). */}
-              <PanelBody name="browse" nodeId={props.nodeId}><Dynamic component={list()} /></PanelBody>
+                  panel draws for each of those rather than a blank frame (../panel.tsx). */}
+              <PanelBody name="browse" nodeId={props.nodeId}>
+                <Dynamic component={list()} />
+              </PanelBody>
             </box>
           )}
         </Show>
@@ -285,11 +303,7 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
       <Panel
         title="Tasks"
         rows={TASKS_ROWS}
-        onBox={regionFocus(
-          TASKS,
-          TASKS_ORDER,
-          { x: RAIL, enterMainOnActivate: true },
-        )}
+        onBox={regionFocus(TASKS, TASKS_ORDER, { x: RAIL, enterMainOnActivate: true })}
       >
         <ExclusiveSlot
           slot="rail.taskList"

@@ -61,12 +61,19 @@ export function Graph(props: {
         // Delete and Backspace on the card the caret is on. One layer on the list rather than one per
         // row, in `focus-within` mode, because the row is where the keys land and the list is what
         // knows which card that is.
-        onCleanup(registerIntentLayer(element, ['delete'], () => {
-          const id = selected()
-          if (!id || !props.onRemove) return false
-          props.onRemove(id)
-          return true
-        }, { priority: STOP, mode: 'focus-within' }))
+        onCleanup(
+          registerIntentLayer(
+            element,
+            ['delete'],
+            () => {
+              const id = selected()
+              if (!id || !props.onRemove) return false
+              props.onRemove(id)
+              return true
+            },
+            { priority: STOP, mode: 'focus-within' },
+          ),
+        )
       }}
     >
       <Rows
@@ -89,12 +96,14 @@ export function Graph(props: {
               density="compact"
               variant="tree"
               leading={<Show when={card()?.glyph}>{(glyph) => <Icon name={glyph()} tone={card()?.tone} />}</Show>}
-              meta={(
+              meta={
                 <>
-                  <Show when={waits() > 1}><Badge size="xs">{`⇐ ${waits()}`}</Badge></Show>
+                  <Show when={waits() > 1}>
+                    <Badge size="xs">{`⇐ ${waits()}`}</Badge>
+                  </Show>
                   <Show when={card()?.detail}>{(detail) => <Text emphasis="muted">{detail()}</Text>}</Show>
                 </>
-              )}
+              }
             >
               {card()?.label ?? item.key}
             </Row>

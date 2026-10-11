@@ -21,8 +21,10 @@ export class BrowserDiagnostics {
   #bytes = 0
 
   constructor(private readonly limits: DiagnosticLimits = LIMITS) {
-    if (!Object.values(limits).every((value) => Number.isSafeInteger(value) && value > 0) ||
-        Math.min(limits.entryBytes, limits.totalBytes) < Buffer.byteLength(TRUNCATED)) {
+    if (
+      !Object.values(limits).every((value) => Number.isSafeInteger(value) && value > 0) ||
+      Math.min(limits.entryBytes, limits.totalBytes) < Buffer.byteLength(TRUNCATED)
+    ) {
       throw new Error('Invalid browser diagnostic limits')
     }
   }
@@ -32,9 +34,12 @@ export class BrowserDiagnostics {
     // Kinds come from Playwright, but keep their contribution bounded as well.
     const prefix = `[${prefixWithinBytes(kind, 32)}] `
     const fullBytes = Buffer.byteLength(prefix) + Buffer.byteLength(text)
-    const line = fullBytes <= budget ? prefix + text :
-      prefixWithinBytes(prefix, budget - Buffer.byteLength(TRUNCATED)) +
-      prefixWithinBytes(text, Math.max(0, budget - Buffer.byteLength(prefix) - Buffer.byteLength(TRUNCATED))) + TRUNCATED
+    const line =
+      fullBytes <= budget
+        ? prefix + text
+        : prefixWithinBytes(prefix, budget - Buffer.byteLength(TRUNCATED)) +
+          prefixWithinBytes(text, Math.max(0, budget - Buffer.byteLength(prefix) - Buffer.byteLength(TRUNCATED))) +
+          TRUNCATED
     const bytes = Buffer.byteLength(line)
     this.#lines.push(line)
     this.#bytes += bytes
@@ -43,5 +48,7 @@ export class BrowserDiagnostics {
     }
   }
 
-  lines(): string[] { return [...this.#lines] }
+  lines(): string[] {
+    return [...this.#lines]
+  }
 }

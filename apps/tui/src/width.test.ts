@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { clusterWidth, graphemes, sliceToWidth, stringWidth } from './width'
 
-// The corpus is the one that chose the measure in `./width.ts`, held as the column it chose. Every
-// row here was measured against what the old renderer actually drew, `string-width`, and
-// `@xterm/headless`, so a change to the table that moves one of these is a change that has to be
-// argued against those three answers rather than against a preference.
-//
-// No OpenTUI anywhere in this file, so it runs on the Node the repo pins with no flag.
+// The corpus that chose the measure in `./width.ts`, held as the column it chose. Every row here was
+// checked against `string-width` and `@xterm/headless`, so a change to the table that moves one of
+// these has to be argued against those answers rather than against a preference.
 
 describe('the width measure', () => {
   it('counts one cell per character on the ASCII fast path', () => {
-    // Every one of the fixture's twenty strings is ASCII, which is why the drawing tests do not depend on
-    // this choice at all and why nobody has seen the faults below.
+    // The fixture's strings are ASCII, which is why the drawing tests don't depend on this choice and
+    // don't catch the cases below.
     expect(stringWidth('Draft the release notes')).toBe(23)
     expect(stringWidth('')).toBe(0)
     expect(stringWidth(' ')).toBe(1)
@@ -19,35 +16,32 @@ describe('the width measure', () => {
   })
 
   it('gives the six glyphs OpenTUI drew two cells wide the width the standard gives them', () => {
-    // OpenTUI widens the astral pictographs whatever East Asian Width says, over 279 contiguous code
-    // points. We take the answer xterm, `string-width` and the standard agree on, because phase 3
-    // puts an xterm-measured rectangle on the same screen as these.
-    expect(stringWidth('🗀')).toBe(1) // archive, folder, folder-plus, folder-tree, folder-x
-    expect(stringWidth('🗎')).toBe(1) // file-text, file-diff, file-cog
-    expect(stringWidth('🖵')).toBe(1) // monitor, app-window
-    expect(stringWidth('🗒')).toBe(1) // notepad-text
-    expect(stringWidth('🗃')).toBe(1) // database
+    // Some renderers widen the astral pictographs whatever East Asian Width says, over 279 contiguous
+    // code points. We take the answer xterm, `string-width` and the standard agree on, because an
+    // xterm-measured rectangle draws on the same screen as these.
+    expect(stringWidth('🗀')).toBe(1)
+    expect(stringWidth('🗎')).toBe(1)
+    expect(stringWidth('🖵')).toBe(1)
+    expect(stringWidth('🗒')).toBe(1)
+    expect(stringWidth('🗃')).toBe(1)
     // The one that goes the other way. Unicode 16 moved U+2630 to `W`, so the standard and our table
     // say two cells and any terminal with an older width table draws one. It is a glyph whose width
     // the layout cannot predict.
-    expect(stringWidth('☰')).toBe(2) // list
+    expect(stringWidth('☰')).toBe(2)
   })
 
   it('does not double the seven glyphs `string-width` doubles', () => {
     // `string-width` asks `emoji-regex` before it looks at East Asian Width, and that regex matches a
-    // bare text-presentation emoji. These examples remain useful width checks even though Lucide
-    // names no longer map to terminal marks.
+    // bare text-presentation emoji.
     for (const glyph of ['▶', '☑', '⚠', '⌨', '☺', '👁', '🏷']) {
       expect(stringWidth(glyph), glyph).toBe(1)
     }
   })
 
   it('counts a combining mark as nothing and keeps it with its base', () => {
-    // OpenTUI's two answers disagree here: its layout measures clusters and its paint writes a cell
-    // per code point, so an accented name draws a column too wide per mark and clobbers the cell
-    // beside it. We take the layout answer, which is the one both spike candidates gave.
-    // Spelled with combining acutes rather than the precomposed letters, because that is the shape
-    // real data arrives in and the shape OpenTUI's paint wrote a cell per code point of.
+    // Clusters, not code points: a cell per code point draws an accented name a column too wide per
+    // mark and clobbers the cell beside it. Spelled with combining acutes rather than the precomposed
+    // letters, because that is the shape real data arrives in.
     const accented = 'Jose\u0301 Marti\u0301nez'
     expect(accented.length).toBe(15)
     expect(stringWidth(accented)).toBe(13)
@@ -61,7 +55,6 @@ describe('the width measure', () => {
     expect(stringWidth('नमस्ते')).toBe(3)
     expect(graphemes('नमस्ते')).toEqual(['न', 'म', 'स्ते'])
     // A regional-indicator pair is one cluster and neither indicator is East Asian wide, so one cell.
-    // OpenTUI laid this out at 2 and painted it at 4.
     expect(stringWidth('🇳🇿')).toBe(1)
   })
 

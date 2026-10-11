@@ -7,7 +7,7 @@ import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 
 /** The three groups the list draws, top to bottom. Conflicts, tracked edits and untracked files are
  *  three different situations for the reader, and only the middle one is a staging question. */
-export type ChangeGroup = 'conflicted' | 'tracked' | 'untracked'
+type ChangeGroup = 'conflicted' | 'tracked' | 'untracked'
 
 /** One file as the list draws it: one row per path, whichever of its two halves git reported.
  *
@@ -88,7 +88,8 @@ export const stageableRows = (groups: ChangesGroups): FileRow[] => [...groups.tr
 
 /** The paths a group's checkbox sends. Checked means "stage what is not staged", and unchecking a
  *  fully staged group unstages all of it. */
-export const unstagedPathsOf = (rows: readonly FileRow[]): string[] => rows.filter((row) => !row.staged).map((row) => row.path)
+export const unstagedPathsOf = (rows: readonly FileRow[]): string[] =>
+  rows.filter((row) => !row.staged).map((row) => row.path)
 
 /** Tri-state for a group's or the header's checkbox: every row staged, some of them, or none. */
 export function stagedState(rows: readonly FileRow[]): 'all' | 'some' | 'none' {
@@ -183,14 +184,16 @@ export type PickedBackend = Pick<ModelBackend, 'kind' | 'label'>
  *
  *  Matched on the error envelope's `code` rather than on an `ApiError` instance: the class is not on
  *  the plugin surface, and the code is the part of the envelope that is a contract
- *  (docs/api-reference/transport.md § Errors). Shared provider codes get a next step; everything else keeps
- *  the node's own prose, which for a refusal is the sentence the bridge wrote. */
+ *  (docs/api-reference/transport.md § Errors). Shared provider codes get a next step; everything else
+ *  keeps the node's own prose, which for a refusal is the sentence the bridge wrote. */
 export function generateReason(error: unknown, backend?: PickedBackend): string {
-  return modelProviderFailure(error, backend)
-    ?? (error instanceof Error && error.message ? error.message : 'Writing the message failed.')
+  return (
+    modelProviderFailure(error, backend) ??
+    (error instanceof Error && error.message ? error.message : 'Writing the message failed.')
+  )
 }
 
-/** How the list is drawn, remembered per device (./changesPrefs.ts). Three choices that do not
+/** How the list is drawn, remembered per device. Three choices that do not
  *  interact: the shape, the order inside a flat list, and what the rows are grouped by. */
 export type ChangeView = {
   mode: 'list' | 'tree'
@@ -198,7 +201,7 @@ export type ChangeView = {
   groupBy: 'none' | 'tracked' | 'staged'
 }
 
-/** What the pane drew before it had a menu: a flat run in path order, in three groups. */
+/** A flat run in path order, in three groups. */
 export const DEFAULT_CHANGE_VIEW: ChangeView = { mode: 'list', sort: 'path', groupBy: 'tracked' }
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -207,9 +210,11 @@ const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
  *  by its folders, and inside one folder the two orders are the same order. */
 export function sortRows(rows: readonly FileRow[], view: ChangeView): FileRow[] {
   const byName = view.mode === 'list' && view.sort === 'name'
-  return [...rows].sort((a, b) => (byName
-    ? baseName(a.path).localeCompare(baseName(b.path)) || a.path.localeCompare(b.path)
-    : a.path.localeCompare(b.path)))
+  return [...rows].sort((a, b) =>
+    byName
+      ? baseName(a.path).localeCompare(baseName(b.path)) || a.path.localeCompare(b.path)
+      : a.path.localeCompare(b.path),
+  )
 }
 
 /** One run of rows with its fold. `title` is null for the section that has no fold: grouping by
@@ -234,8 +239,16 @@ export function groupSections(groups: ChangesGroups, view: ChangeView): ChangeSe
   } else if (view.groupBy === 'staged') {
     // A file staged and then edited again is not staged, so it sits under Unstaged with the
     // indeterminate checkbox it has everywhere else.
-    add('staged', 'Staged', rest.filter((row) => row.staged))
-    add('unstaged', 'Unstaged', rest.filter((row) => !row.staged))
+    add(
+      'staged',
+      'Staged',
+      rest.filter((row) => row.staged),
+    )
+    add(
+      'unstaged',
+      'Unstaged',
+      rest.filter((row) => !row.staged),
+    )
   } else {
     add('all', null, rest)
   }
@@ -262,8 +275,15 @@ export type TreeNode = {
 
 type Bucket = { folders: Map<string, Bucket>; files: FileRow[] }
 
-const fileNode = (row: FileRow, depth: number): TreeNode =>
-  ({ key: row.key, kind: 'file', label: baseName(row.path), path: row.path, depth, children: [], row })
+const fileNode = (row: FileRow, depth: number): TreeNode => ({
+  key: row.key,
+  kind: 'file',
+  label: baseName(row.path),
+  path: row.path,
+  depth,
+  children: [],
+  row,
+})
 
 // Folders before files at every level: a folder is where a reader looks to find a file, and a run of
 // files between two folders hides one.
@@ -317,8 +337,7 @@ export const viewNodes = (rows: readonly FileRow[], view: ChangeView): TreeNode[
   view.mode === 'tree' ? buildTree(rows, view) : rows.map((row) => fileNode(row, 0))
 
 /** Every file under a node, in tree order: what a folder's checkbox acts on. */
-export const filesUnder = (node: TreeNode): FileRow[] =>
-  node.row ? [node.row] : node.children.flatMap(filesUnder)
+export const filesUnder = (node: TreeNode): FileRow[] => (node.row ? [node.row] : node.children.flatMap(filesUnder))
 
 /** Tri-state for a folder's checkbox. Derived, never stored: the status resource is the truth, and a
  *  file staged and then edited again leaves its folders indeterminate. */
@@ -341,14 +360,14 @@ export function visibleNodes(nodes: readonly TreeNode[], closed: ReadonlySet<str
 }
 
 // Stable row identity: a file can appear in both groups.
-export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string => `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
+export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string =>
+  `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
 
 // What one file's patch currently says, so the node can tell which files a poll moved
-// (../server/localDocument.ts). The node's `contentKey` is the objects and the stat behind the patch
-// (../server/localDiff.ts), so a poll that finds nothing new reads no patch. A node too old to send
-// one, or an entry it could not key, falls back to `poll`, the status read's count, which reads that
-// file again on every poll: the old behaviour, and the only safe one, since an edit can keep both
-// line counts.
+// (`localDocument`). The node's `contentKey` is the objects and the stat behind the patch, so a poll
+// that finds nothing new reads no patch. A node too old to send one, or an entry it could not key,
+// falls back to `poll`, the status read's count, which reads that file again on every poll: the only
+// safe choice, since an edit can keep both line counts.
 export const patchKey = (c: LocalChange, poll: number): string =>
   `${changeKey(c)}:${c.status}:${c.oldPath ?? ''}:${c.additions}:${c.deletions}:${c.contentKey ?? `poll ${poll}`}`
 
@@ -385,7 +404,10 @@ export function pickSelected(groups: ChangesGroups, selectedKey: string | null):
 // "which side" is the staging area (the index for staged, the file on disk for unstaged). It stays
 // null for a deletion, which is how the viewer knows to draw that file's gaps inert: there is no new
 // side of a file that is gone.
-export function documentFile(change: LocalChange, cut: Pick<DiffDocumentFile, 'patchKey' | 'segments'> | undefined): DiffDocumentFile {
+export function documentFile(
+  change: LocalChange,
+  cut: Pick<DiffDocumentFile, 'patchKey' | 'segments'> | undefined,
+): DiffDocumentFile {
   return {
     path: change.path,
     // The viewer's vocabulary has no conflict: what it is being handed is the working copy with the

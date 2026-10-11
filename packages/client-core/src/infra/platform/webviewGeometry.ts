@@ -46,5 +46,4 @@ export function visibleElementRect(element: Element): VisibleElementRect {
   }
 }
 
-export const elementRectKey = (rect: VisibleElementRect): string =>
-  `${rect.x},${rect.y},${rect.width},${rect.height}`
+export const elementRectKey = (rect: VisibleElementRect): string => `${rect.x},${rect.y},${rect.width},${rect.height}`

@@ -6,12 +6,17 @@ import { z } from 'zod'
 import { deviceConfigSchema } from '@acorn/protocol/deviceConfig.ts'
 
 const PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'acorn-device.schema.json')
-const generate = (): string => JSON.stringify({
-  $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'https://acorn.sh/schemas/acorn-device.schema.json',
-  title: 'acorn device configuration',
-  ...z.toJSONSchema(deviceConfigSchema, { io: 'input', unrepresentable: 'any' }),
-}, null, 2) + '\n'
+const generate = (): string =>
+  JSON.stringify(
+    {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $id: 'https://acorn.sh/schemas/acorn-device.schema.json',
+      title: 'acorn device configuration',
+      ...z.toJSONSchema(deviceConfigSchema, { io: 'input', unrepresentable: 'any' }),
+    },
+    null,
+    2,
+  ) + '\n'
 
 it('keeps the published device config schema generated from the parser', () => {
   const generated = generate()

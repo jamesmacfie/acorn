@@ -1,7 +1,8 @@
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import type { CachedExternalItem, CachedItemCodec, CodecResult } from './types'
 
-export const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
 
 export function parseJson(raw: string): unknown {
   try {

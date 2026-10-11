@@ -2,8 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { buildSessionEnv, childEnv } from './taskEnv'
 
 describe('buildSessionEnv', () => {
-  const baseEnv = { HOME: '/Users/x', PATH: '/usr/bin', SESSION_ENC_KEY: 'super-secret', PROVIDER_API_KEY: 'also-secret' }
-  const task = { projectId: 'project-1', projectName: 'Widget', github: { owner: 'acme', name: 'widget' }, branch: 'feat/login', title: 'Fix login' }
+  const baseEnv = {
+    HOME: '/Users/x',
+    PATH: '/usr/bin',
+    SESSION_ENC_KEY: 'super-secret',
+    PROVIDER_API_KEY: 'also-secret',
+  }
+  const task = {
+    projectId: 'project-1',
+    projectName: 'Widget',
+    github: { owner: 'acme', name: 'widget' },
+    branch: 'feat/login',
+    title: 'Fix login',
+  }
 
   it('injects all six ACORN_* vars for a task with a resolved worktree', () => {
     const env = buildSessionEnv({ taskId: 't1', cwd: '/wt/acme-widget-feat-login', task, baseEnv })
@@ -28,7 +39,13 @@ describe('buildSessionEnv', () => {
   })
 
   it('lets caller-supplied env overrides win', () => {
-    const env = buildSessionEnv({ taskId: 't1', cwd: '/wt', task, env: { ACORN_TASK_TITLE: 'Override', EXTRA: '1' }, baseEnv })
+    const env = buildSessionEnv({
+      taskId: 't1',
+      cwd: '/wt',
+      task,
+      env: { ACORN_TASK_TITLE: 'Override', EXTRA: '1' },
+      baseEnv,
+    })
     expect(env.ACORN_TASK_TITLE).toBe('Override')
     expect(env.EXTRA).toBe('1')
   })

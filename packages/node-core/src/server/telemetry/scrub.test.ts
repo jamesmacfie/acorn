@@ -38,7 +38,11 @@ describe('scrub', () => {
   })
 
   it('answers with the fallback rather than throwing', () => {
-    const hostile = { toString: () => { throw new Error('no') } }
+    const hostile = {
+      toString: () => {
+        throw new Error('no')
+      },
+    }
     expect(scrub(hostile, 'unknown')).toBe('unknown')
     expect(scrub(undefined, 'unknown')).toBe('unknown')
     expect(scrub('   ', 'unknown')).toBe('unknown')

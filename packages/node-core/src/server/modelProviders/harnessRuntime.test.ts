@@ -18,14 +18,22 @@ vi.mock('./runtime', async (importOriginal) => {
   return {
     ...actual,
     generateTextForConnection: vi.fn((args: { connectionId: string }) =>
-      Promise.resolve({ text: 'from the key', providerId: 'anthropic', backendId: `connection:${args.connectionId}`, modelId: 'm' }),
+      Promise.resolve({
+        text: 'from the key',
+        providerId: 'anthropic',
+        backendId: `connection:${args.connectionId}`,
+        modelId: 'm',
+      }),
     ),
   }
 })
 
 // The committed stand-in for an agent CLI. A real CLI is never spawned in a test; this one reports
 // back what it was handed, which is the only way to see the containment from outside.
-const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../apps/node/test/__fixtures__/fake-agent.sh')
+const FAKE_AGENT = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../../apps/node/test/__fixtures__/fake-agent.sh',
+)
 
 type Report = { cwd: string; entries: number; args: string[]; env: Record<string, string> }
 
@@ -123,8 +131,9 @@ describe('generateTextForHarness', () => {
     // whole point is that it authenticates with its own stored login.
     expect(report.env.ACORN_API_TOKEN).toBeUndefined()
     expect(report.env.ACORN_API_URL).toBeUndefined()
-    expect(report.env.ACORN_TOOL_CEILING).toBeUndefined()
-    expect(Object.keys(report.env).filter((key) => key.startsWith('ANTHROPIC_') || key.startsWith('OPENAI_'))).toEqual([])
+    expect(Object.keys(report.env).filter((key) => key.startsWith('ANTHROPIC_') || key.startsWith('OPENAI_'))).toEqual(
+      [],
+    )
     // Anti-vacuity: an environment this empty would pass the three checks above by accident.
     expect(report.env.PATH).toBeTruthy()
   })
@@ -138,47 +147,70 @@ describe('generateTextForHarness', () => {
 
   it('answers not-connected for a profile that is not installed, or has no one-shot mode', async () => {
     register(profile({ command: '/nonexistent/acorn-not-a-cli' }))
-    await expect(generateTextForHarness({ profileId: 'fixture-harness', input }, new ProviderRequestScheduler()))
-      .rejects.toMatchObject({ code: 'provider_not_connected', status: 404 })
+    await expect(
+      generateTextForHarness({ profileId: 'fixture-harness', input }, new ProviderRequestScheduler()),
+    ).rejects.toMatchObject({ code: 'provider_not_connected', status: 404 })
     // The same answer for an id nobody registered: a client holding a stale id is not an internal
     // failure, it is the case a deleted connection already has a status for.
-    await expect(generateTextForHarness({ profileId: 'ghost', input }, new ProviderRequestScheduler()))
-      .rejects.toMatchObject({ code: 'provider_not_connected', status: 404 })
+    await expect(
+      generateTextForHarness({ profileId: 'ghost', input }, new ProviderRequestScheduler()),
+    ).rejects.toMatchObject({ code: 'provider_not_connected', status: 404 })
   })
 
   it('flattens a CLI that fails to unavailable, and keeps its stderr out of the error', async () => {
     // `false` is on PATH, exits non-zero and says nothing: the shape of a CLI that refuses.
     register(profile({ command: 'false', aiArgv: (command) => ({ file: command, args: [] }) }))
-    await expect(generateTextForHarness({ profileId: 'fixture-harness', input }, new ProviderRequestScheduler()))
-      .rejects.toMatchObject({ code: 'provider_unavailable', status: 502 })
+    await expect(
+      generateTextForHarness({ profileId: 'fixture-harness', input }, new ProviderRequestScheduler()),
+    ).rejects.toMatchObject({ code: 'provider_unavailable', status: 502 })
   })
 
   it('refuses the same bounds a connection generate refuses, before spawning anything', async () => {
     register(profile())
-    await expect(generateTextForHarness({ profileId: 'fixture-harness', input: { ...input, prompt: '  ' } }, new ProviderRequestScheduler()))
-      .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
-    await expect(generateTextForHarness({ profileId: 'fixture-harness', input, timeoutMs: 600_000 }, new ProviderRequestScheduler()))
-      .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+    await expect(
+      generateTextForHarness(
+        { profileId: 'fixture-harness', input: { ...input, prompt: '  ' } },
+        new ProviderRequestScheduler(),
+      ),
+    ).rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+    await expect(
+      generateTextForHarness(
+        { profileId: 'fixture-harness', input, timeoutMs: 600_000 },
+        new ProviderRequestScheduler(),
+      ),
+    ).rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
   })
 })
 
 describe('harnessBackends', () => {
   it('projects a profile-owned catalog and marks a failed refresh', async () => {
-    const listModels = vi.fn().mockResolvedValueOnce({ models: [{ id: 'live', label: 'Live' }] })
+    const listModels = vi
+      .fn()
+      .mockResolvedValueOnce({ models: [{ id: 'live', label: 'Live' }] })
       .mockRejectedValueOnce(new Error('offline'))
     const dispose = agentProfileRegistry.register({
-      id: 'fixture-catalog', label: 'Catalog', kind: 'agent', command: FAKE_AGENT,
-      backendPreference: 'node-pty', transport: 'pty',
-      models: [{ id: 'static', label: 'Static' }], defaultModelId: '', listModels,
+      id: 'fixture-catalog',
+      label: 'Catalog',
+      kind: 'agent',
+      command: FAKE_AGENT,
+      backendPreference: 'node-pty',
+      transport: 'pty',
+      models: [{ id: 'static', label: 'Static' }],
+      defaultModelId: '',
+      listModels,
       aiArgv: (command, opts) => ({ file: command, args: [opts.prompt] }),
     })
     try {
       const first = await harnessBackends()
-      expect(first.backends.find((backend) => backend.id === 'harness:fixture-catalog'))
-        .toMatchObject({ models: [{ id: 'live', label: 'Live' }], defaultModelId: '' })
+      expect(first.backends.find((backend) => backend.id === 'harness:fixture-catalog')).toMatchObject({
+        models: [{ id: 'live', label: 'Live' }],
+        defaultModelId: '',
+      })
       const second = await harnessBackends()
-      expect(second.backends.find((backend) => backend.id === 'harness:fixture-catalog'))
-        .toMatchObject({ models: [{ id: 'static', label: 'Static' }], catalogUnavailable: true })
+      expect(second.backends.find((backend) => backend.id === 'harness:fixture-catalog')).toMatchObject({
+        models: [{ id: 'static', label: 'Static' }],
+        catalogUnavailable: true,
+      })
       expect(listModels).toHaveBeenCalledWith(FAKE_AGENT)
     } finally {
       dispose()
@@ -187,20 +219,34 @@ describe('harnessBackends', () => {
 
   it('lists an installed one-shot profile and sets the missing ones aside', async () => {
     const installed = agentProfileRegistry.register({
-      id: 'fixture-installed', label: 'Installed', kind: 'agent', command: FAKE_AGENT,
-      backendPreference: 'node-pty', transport: 'pty', glyph: 'brand:agents/claude',
-      models: [{ id: 'sonnet', label: 'Sonnet' }], defaultModelId: 'sonnet',
+      id: 'fixture-installed',
+      label: 'Installed',
+      kind: 'agent',
+      command: FAKE_AGENT,
+      backendPreference: 'node-pty',
+      transport: 'pty',
+      glyph: 'brand:agents/claude',
+      models: [{ id: 'sonnet', label: 'Sonnet' }],
+      defaultModelId: 'sonnet',
       aiArgv: (command, opts) => ({ file: command, args: [opts.prompt] }),
     })
     const gone = agentProfileRegistry.register({
-      id: 'fixture-gone', label: 'Gone', kind: 'agent', command: '/nonexistent/acorn-not-a-cli',
-      backendPreference: 'node-pty', transport: 'pty',
+      id: 'fixture-gone',
+      label: 'Gone',
+      kind: 'agent',
+      command: '/nonexistent/acorn-not-a-cli',
+      backendPreference: 'node-pty',
+      transport: 'pty',
       aiArgv: (command, opts) => ({ file: command, args: [opts.prompt] }),
     })
     // No `aiArgv`, so not a backend at all: the field is the opt-in.
     const terminalOnly = agentProfileRegistry.register({
-      id: 'fixture-terminal-only', label: 'Terminal only', kind: 'agent', command: FAKE_AGENT,
-      backendPreference: 'node-pty', transport: 'pty',
+      id: 'fixture-terminal-only',
+      label: 'Terminal only',
+      kind: 'agent',
+      command: FAKE_AGENT,
+      backendPreference: 'node-pty',
+      transport: 'pty',
     })
 
     try {
@@ -228,14 +274,18 @@ describe('the dispatch on a backend id', () => {
     const service = createModelService(null as unknown as AppDatabase, null as unknown as SecretService)
     const uuid = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
-    await expect(service.generateText({ userId: 'alice', backendId: uuid, input }))
-      .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+    await expect(service.generateText({ userId: 'alice', backendId: uuid, input })).rejects.toMatchObject({
+      code: 'provider_bad_config',
+      status: 400,
+    })
     const prefixed = await service.generateText({ userId: 'alice', backendId: `connection:${uuid}`, input })
 
     expect(prefixed.backendId).toBe(`connection:${uuid}`)
     for (const id of ['connection:', 'harness:', 'other:item']) {
-      await expect(service.generateText({ userId: 'alice', backendId: id, input }))
-        .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+      await expect(service.generateText({ userId: 'alice', backendId: id, input })).rejects.toMatchObject({
+        code: 'provider_bad_config',
+        status: 400,
+      })
     }
   })
 
@@ -243,7 +293,8 @@ describe('the dispatch on a backend id', () => {
     const service = createModelService(null as unknown as AppDatabase, null as unknown as SecretService)
     // Nothing is registered under this id, so reaching the harness runtime is what the 404 proves; the
     // connection branch is stubbed and would have answered.
-    await expect(service.generateText({ userId: 'alice', backendId: 'harness:ghost', input }))
-      .rejects.toMatchObject({ code: 'provider_not_connected' })
+    await expect(service.generateText({ userId: 'alice', backendId: 'harness:ghost', input })).rejects.toMatchObject({
+      code: 'provider_not_connected',
+    })
   })
 })

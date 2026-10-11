@@ -9,11 +9,10 @@ import { overlayKeys } from '../keys/trap'
 
 // The command palette, over the same session the desktop's runs on.
 //
-// This file used to hold a copy of the desktop's palette: the same resource over every contributed row
-// source, the same composition with the actions and the task and workspace lists, the same fuzzy
-// filter, the same row-to-source map, the same invoke. All of it is
-// `client-core/host/registries/commands/sessionStore.ts` now, which is where the two hosts were always
-// going to have to agree — a group that pushed here and not there would be two products.
+// The resource over every contributed row source, the composition with the actions and the task and
+// workspace lists, the fuzzy filter, the row-to-source map and the invoke are all
+// `client-core/host/registries/commands/sessionStore.ts`, because the two hosts have to agree: a group
+// that pushed here and not there would be two products.
 //
 // What stays is the rectangle. There is no backdrop and no dialog: the surface is a `Modal` holding a
 // filter field and a list, which is what a terminal overlay is (docs/tui/chrome.md § What is drawn bespoke).
@@ -42,9 +41,27 @@ export function Palette(props: { session: CommandSession }) {
   })
 
   overlayKeys([
-    { key: 'down', cmd: () => { props.session.move(1); return true } },
-    { key: 'up', cmd: () => { props.session.move(-1); return true } },
-    { key: 'return', cmd: () => { props.session.activate(); return true } },
+    {
+      key: 'down',
+      cmd: () => {
+        props.session.move(1)
+        return true
+      },
+    },
+    {
+      key: 'up',
+      cmd: () => {
+        props.session.move(-1)
+        return true
+      },
+    },
+    {
+      key: 'return',
+      cmd: () => {
+        props.session.activate()
+        return true
+      },
+    },
   ])
 
   return (
@@ -64,7 +81,9 @@ export function Palette(props: { session: CommandSession }) {
             onInput={(value) => props.session.setQuery(value)}
           />
         </box>
-        <Show when={props.session.status()}><Alert>{props.session.status()}</Alert></Show>
+        <Show when={props.session.status()}>
+          <Alert>{props.session.status()}</Alert>
+        </Show>
         <For
           each={window().rows}
           fallback={<Line role="muted">{props.session.busy() ? 'Loading…' : 'No matches.'}</Line>}

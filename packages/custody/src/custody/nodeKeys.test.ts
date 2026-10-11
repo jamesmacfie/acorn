@@ -72,7 +72,10 @@ describe('node key custody', () => {
 
     custody.settle(keys, 'ok')
     expect(readdirSync(dir)).toEqual([SEALED_NODE_KEYS_FILE])
-    expect(nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toEqual({ sessionKey: SESSION, signingKey: keys.signingKey })
+    expect(nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toEqual({
+      sessionKey: SESSION,
+      signingKey: keys.signingKey,
+    })
   })
 
   it('finishes the same migration after a crash between sealing and deleting', () => {
@@ -102,7 +105,9 @@ describe('node key custody', () => {
     // The keychain item was lost, or an agent damaged the file and planted its own session.key.
     // Either way, sealing whatever plain key is there would be the wrong answer.
     writeFileSync(join(dir, 'session.key'), `${'d'.repeat(64)}\n`)
-    expect(() => nodeKeyCustody(dir, cipherFor(randomBytes(32))).prepare()).toThrow(/can't be opened with this app's data key/)
+    expect(() => nodeKeyCustody(dir, cipherFor(randomBytes(32))).prepare()).toThrow(
+      /can't be opened with this app's data key/,
+    )
     writeFileSync(join(dir, SEALED_NODE_KEYS_FILE), 'damaged')
     expect(() => nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toThrow(/can't be opened with this app's data key/)
   })

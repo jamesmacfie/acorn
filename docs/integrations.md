@@ -48,37 +48,18 @@ with no cached fallback, even when the connection needs authentication or is off
 
 ## Pages
 
-<a id="settings"></a>
-<a id="naming-a-connection"></a>
-
 - [Connection settings](./integrations/settings.md): the Services and AI models pages, and naming.
-
-<a id="connection-and-integration-contributions"></a>
-<a id="item-detail"></a>
-<a id="comments-and-images"></a>
-<a id="the-row-menu"></a>
 
 - [Connection and integration contributions](./integrations/contributions.md): the two contribution
   types, item detail, comment and image hooks, and the row menu.
 
-<a id="project-sources"></a>
-<a id="the-map-itself"></a>
-
 - [Project sources](./integrations/project-sources.md): how providers list projects, and the map.
-
-<a id="linear"></a>
-<a id="rollbar"></a>
-<a id="sentry"></a>
 
 - [Linear](./integrations/linear.md), [Rollbar](./integrations/rollbar.md), and
   [Sentry](./integrations/sentry.md): the provider plugins.
 
-<a id="model-providers"></a>
-
 - [Model providers](./integrations/model-providers.md): backends for Generate controls, and the
   model grant and daily allowance a loaded plugin spends when it names no backend.
-
-<a id="provider-boundaries"></a>
 
 - [Provider boundaries](./integrations/provider-boundaries.md): credentials, errors, and the RPC
   boundary.
@@ -92,7 +73,7 @@ covers it.
 ## From the command palette
 
 Linear and Rollbar each contribute one project-scoped `search` command, declared in the plugin's
-manifest and answered by its Node half ([command kinds](./plugins.md#command-kinds)):
+manifest and answered by its Node half ([command kinds](./plugins/commands.md#command-kinds)):
 
 | Command | Route | Rows |
 | --- | --- | --- |

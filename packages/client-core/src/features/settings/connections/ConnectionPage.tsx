@@ -5,7 +5,12 @@ import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import { connectionName, MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import { integrationsKey } from '../../../infra/queries'
 import { ApiError } from '../../../infra/node/apiClient'
-import { deleteIntegration, renameIntegration, setIntegrationDisabled, testIntegration } from '../../integrations/integrationClient'
+import {
+  deleteIntegration,
+  renameIntegration,
+  setIntegrationDisabled,
+  testIntegration,
+} from '../../integrations/integrationClient'
 import { createCredentialForm } from '../../integrations/credentialForm'
 import { confirmAction } from '../../../host/registries/shell/willPhase'
 import { Alert, Button, Checkbox, Input } from '../../../kit/components/primitives'
@@ -61,10 +66,14 @@ export function ConnectionPage(props: ConnectionPageProps) {
     }
   }
 
-  const form = createCredentialForm(() => props.provider, async () => {
-    setReplacing(false)
-    await refresh()
-  }, () => props.connection.id)
+  const form = createCredentialForm(
+    () => props.provider,
+    async () => {
+      setReplacing(false)
+      await refresh()
+    },
+    () => props.connection.id,
+  )
   useUnsavedChanges(() => replacing() && form.fields().some((field) => !!form.value(field.id).trim()))
   const startReplacing = () => {
     form.reset()
@@ -87,23 +96,25 @@ export function ConnectionPage(props: ConnectionPageProps) {
   })
 
   const enabled = createSettingSave()
-  const setEnabled = (on: boolean) => enabled.run(async () => {
-    await setIntegrationDisabled(props.connection.id, !on)
-    await refresh()
-  })
+  const setEnabled = (on: boolean) =>
+    enabled.run(async () => {
+      await setIntegrationDisabled(props.connection.id, !on)
+      await refresh()
+    })
 
   // A failed test changes the connection's status, which the banner above already explains, so the
   // error line only says the test failed and keeps the node's code for the log.
-  const test = () => run(async () => {
-    try {
-      await testIntegration(props.connection.id)
-    } catch (failure) {
-      const code = failure instanceof ApiError ? failure.code : undefined
-      throw new Error(code ? `The test failed. Error code: ${code}.` : 'The test failed.')
-    } finally {
-      await refresh()
-    }
-  })
+  const test = () =>
+    run(async () => {
+      try {
+        await testIntegration(props.connection.id)
+      } catch (failure) {
+        const code = failure instanceof ApiError ? failure.code : undefined
+        throw new Error(code ? `The test failed. Error code: ${code}.` : 'The test failed.')
+      } finally {
+        await refresh()
+      }
+    })
 
   // Disconnecting runs the node's cascade (server/db/cascade.ts), so the confirmation names what that
   // takes with it.
@@ -126,13 +137,27 @@ export function ConnectionPage(props: ConnectionPageProps) {
   const fix = () => {
     switch (props.connection.status) {
       case 'needs-auth':
-        return deviceFlow()
-          ? <Button size="sm" tone="danger" disabled={busy()} onPress={() => void disconnect()}>Disconnect…</Button>
-          : <Button size="sm" disabled={busy() || replacing()} onPress={startReplacing}>Replace key</Button>
+        return deviceFlow() ? (
+          <Button size="sm" tone="danger" disabled={busy()} onPress={() => void disconnect()}>
+            Disconnect…
+          </Button>
+        ) : (
+          <Button size="sm" disabled={busy() || replacing()} onPress={startReplacing}>
+            Replace key
+          </Button>
+        )
       case 'disabled':
-        return <Button size="sm" disabled={busy()} onPress={() => void setEnabled(true)}>Turn on</Button>
+        return (
+          <Button size="sm" disabled={busy()} onPress={() => void setEnabled(true)}>
+            Turn on
+          </Button>
+        )
       case 'degraded':
-        return <Button size="sm" disabled={busy()} onPress={() => void test()}>Test</Button>
+        return (
+          <Button size="sm" disabled={busy()} onPress={() => void test()}>
+            Test
+          </Button>
+        )
       default:
         return undefined
     }
@@ -141,25 +166,53 @@ export function ConnectionPage(props: ConnectionPageProps) {
   return (
     <>
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={props.onBack}>‹ {props.listLabel}</Button></Inline>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={props.onBack}>
+            ‹ {props.listLabel}
+          </Button>
+        </Inline>
       </Show>
 
       {/* The problem and its fix first, above everything else on the page. */}
       <Show when={props.connection.status !== 'connected'}>
-        <Alert tone={props.connection.status === 'needs-auth' ? 'warn' : 'muted'} variant="banner" actions={manageable() ? fix() : undefined}>
+        <Alert
+          tone={props.connection.status === 'needs-auth' ? 'warn' : 'muted'}
+          variant="banner"
+          actions={manageable() ? fix() : undefined}
+        >
           {connectionStatusText(props.connection, props.provider)}
-          {props.connection.status === 'needs-auth' && deviceFlow() ? ' Disconnect it, then connect it again from Add connection.' : ''}
+          {props.connection.status === 'needs-auth' && deviceFlow()
+            ? ' Disconnect it, then connect it again from Add connection.'
+            : ''}
         </Alert>
       </Show>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
 
       <Show when={replacing()}>
-        <SettingsSection id="credential" label="Replace key" description={`acorn checks with ${providerLabel()} before it saves the new key.`}>
+        <SettingsSection
+          id="credential"
+          label="Replace key"
+          description={`acorn checks with ${providerLabel()} before it saves the new key.`}
+        >
           <CredentialFields form={form}>
-            <Show when={form.error()}><Alert>{form.error()}</Alert></Show>
+            <Show when={form.error()}>
+              <Alert>{form.error()}</Alert>
+            </Show>
             <Inline gap="row">
-              <Button variant="solid" tone="accent" busy={form.busy()} onPress={() => void form.submit()} disabled={!form.complete()}>Save</Button>
-              <Button variant="ghost" onPress={cancelReplacing} disabled={form.busy()}>Cancel</Button>
+              <Button
+                variant="solid"
+                tone="accent"
+                busy={form.busy()}
+                onPress={() => void form.submit()}
+                disabled={!form.complete()}
+              >
+                Save
+              </Button>
+              <Button variant="ghost" onPress={cancelReplacing} disabled={form.busy()}>
+                Cancel
+              </Button>
             </Inline>
           </CredentialFields>
         </SettingsSection>
@@ -171,7 +224,12 @@ export function ConnectionPage(props: ConnectionPageProps) {
         description={`${props.provider?.label ?? props.connection.providerId}${props.connection.account?.label ? ` · ${props.connection.account.label}` : ''}`}
       >
         <Show when={manageable()} fallback={<Text emphasis="muted">acorn manages this connection itself.</Text>}>
-          <SettingRow label="Name" description="Leave it empty to use the provider's name." savedAt={name.savedAt()} error={name.error()}>
+          <SettingRow
+            label="Name"
+            description="Leave it empty to use the provider's name."
+            savedAt={name.savedAt()}
+            error={name.error()}
+          >
             <Input
               label="Name"
               value={name.value()}
@@ -186,14 +244,28 @@ export function ConnectionPage(props: ConnectionPageProps) {
             description={`Test checks that ${providerLabel()} still accepts it.`}
           >
             <Inline>
-              <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void test()}>Test</Button>
+              <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void test()}>
+                Test
+              </Button>
               <Show when={!deviceFlow()}>
-                <Button size="sm" variant="ghost" disabled={busy() || replacing()} onPress={startReplacing}>Replace key</Button>
+                <Button size="sm" variant="ghost" disabled={busy() || replacing()} onPress={startReplacing}>
+                  Replace key
+                </Button>
               </Show>
             </Inline>
           </SettingRow>
-          <SettingRow label="Enabled" description="Turn it off to pause updates. It keeps the projects it follows." error={enabled.error()}>
-            <Checkbox switch ariaLabel={`Turn ${connectionName(props.connection)} on`} checked={props.connection.status !== 'disabled'} disabled={busy()} onChange={setEnabled} />
+          <SettingRow
+            label="Enabled"
+            description="Turn it off to pause updates. It keeps the projects it follows."
+            error={enabled.error()}
+          >
+            <Checkbox
+              switch
+              ariaLabel={`Turn ${connectionName(props.connection)} on`}
+              checked={props.connection.status !== 'disabled'}
+              disabled={busy()}
+              onChange={setEnabled}
+            />
           </SettingRow>
         </Show>
       </SettingsSection>
@@ -208,8 +280,13 @@ export function ConnectionPage(props: ConnectionPageProps) {
 
       <Show when={manageable()}>
         <SettingsSection id="danger" label="Danger zone" tone="danger">
-          <SettingRow label="Disconnect" description={`Deletes the ${deviceFlow() ? 'saved credentials' : 'saved key'} and the projects it follows. You can connect it again later.`}>
-            <Button tone="danger" disabled={busy()} onPress={() => void disconnect()}>Disconnect…</Button>
+          <SettingRow
+            label="Disconnect"
+            description={`Deletes the ${deviceFlow() ? 'saved credentials' : 'saved key'} and the projects it follows. You can connect it again later.`}
+          >
+            <Button tone="danger" disabled={busy()} onPress={() => void disconnect()}>
+              Disconnect…
+            </Button>
           </SettingRow>
         </SettingsSection>
       </Show>

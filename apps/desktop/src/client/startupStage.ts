@@ -50,26 +50,39 @@ export function startupStage(input: StartupInputs): StartupStage {
   if (input.restored) return { kind: 'ready' }
   // An offline Node can't answer, so there's no point waiting for its reads to fail.
   if (input.readsMissing && input.nodeOffline) return { kind: 'offline' }
-  if (input.readsMissing && input.readError !== undefined) return { kind: 'failed', step: 'reads', error: input.readError }
+  if (input.readsMissing && input.readError !== undefined)
+    return { kind: 'failed', step: 'reads', error: input.readError }
   return { kind: 'restoring' }
 }
 
 /** Whether the stage holds the whole window, rather than only the content region beside the rail. */
 export const stageHoldsShell = (stage: StartupStage): boolean =>
-  stage.kind === 'connecting' || stage.kind === 'starting' || stage.kind === 'unpaired' || stage.kind === 'preparing'
-  || stage.kind === 'reading-cache' || (stage.kind === 'failed' && stage.step !== 'reads')
+  stage.kind === 'connecting' ||
+  stage.kind === 'starting' ||
+  stage.kind === 'unpaired' ||
+  stage.kind === 'preparing' ||
+  stage.kind === 'reading-cache' ||
+  (stage.kind === 'failed' && stage.step !== 'reads')
 
 export function startupMessage(stage: StartupStage): string {
   switch (stage.kind) {
-    case 'connecting': return 'Connecting to your computer…'
-    case 'starting': return "Starting Acorn's services…"
-    case 'unpaired': return 'Not connected yet'
-    case 'preparing': return 'Preparing your workspace…'
+    case 'connecting':
+      return 'Connecting to your computer…'
+    case 'starting':
+      return "Starting Acorn's services…"
+    case 'unpaired':
+      return 'Not connected yet'
+    case 'preparing':
+      return 'Preparing your workspace…'
     case 'reading-cache':
-    case 'restoring': return 'Restoring your workspace…'
-    case 'offline': return 'Your computer is offline'
-    case 'failed': return "Acorn couldn't finish loading"
-    case 'ready': return ''
+    case 'restoring':
+      return 'Restoring your workspace…'
+    case 'offline':
+      return 'Your computer is offline'
+    case 'failed':
+      return "Acorn couldn't finish loading"
+    case 'ready':
+      return ''
   }
 }
 
@@ -82,21 +95,26 @@ const sameStage = (a: StartupStage, b: StartupStage): boolean =>
  * The window's one startup coordinator. It reports each failure once, with the step that failed and
  * nothing unbounded in its attributes. Detail stays in the message and stack.
  */
-export function createStartupStage(inputs: Accessor<StartupInputs>, onStopped: (step: StartupFailureStep | 'offline') => void): Accessor<StartupStage> {
+export function createStartupStage(
+  inputs: Accessor<StartupInputs>,
+  onStopped: (step: StartupFailureStep | 'offline') => void,
+): Accessor<StartupStage> {
   const stage = createMemo(() => startupStage(inputs()), undefined, { equals: sameStage })
-  createEffect(on(stage, (current) => {
-    if (current.kind === 'offline') onStopped('offline')
-    if (current.kind !== 'failed') return
-    onStopped(current.step)
-    const error = current.error
-    emitError('core', {
-      name: error instanceof Error ? error.name || 'Error' : 'StartupError',
-      message: failureText(error),
-      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
-      level: 'error',
-      handled: true,
-      attrs: { seam: 'renderer.startup', 'startup.step': current.step },
-    })
-  }))
+  createEffect(
+    on(stage, (current) => {
+      if (current.kind === 'offline') onStopped('offline')
+      if (current.kind !== 'failed') return
+      onStopped(current.step)
+      const error = current.error
+      emitError('core', {
+        name: error instanceof Error ? error.name || 'Error' : 'StartupError',
+        message: failureText(error),
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+        level: 'error',
+        handled: true,
+        attrs: { seam: 'renderer.startup', 'startup.step': current.step },
+      })
+    }),
+  )
   return stage
 }

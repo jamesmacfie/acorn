@@ -4,9 +4,14 @@ import { searchRoute } from '../../contract/api'
 import { writeJson } from '@acorn/plugin-api/client'
 import type { SearchOpts, SearchResult } from '../../shared/search'
 
-export type { FileHits, SearchHit, SearchOpts, SearchResult } from '../../shared/search'
+export type { SearchHit, SearchOpts, SearchResult } from '../../shared/search'
 
-export function findInFiles(taskId: string, query: string, opts: SearchOpts, options: { signal?: AbortSignal; nodeId?: string | null } = {}): Promise<SearchResult> {
+export function findInFiles(
+  taskId: string,
+  query: string,
+  opts: SearchOpts,
+  options: { signal?: AbortSignal; nodeId?: string | null } = {},
+): Promise<SearchResult> {
   return writeJson<SearchResult>(searchRoute(taskId), {
     method: 'POST',
     ...options,

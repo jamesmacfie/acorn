@@ -18,8 +18,6 @@ pnpm test
 [Test commands](./testing/commands.md) says what each one runs, why `pnpm test` limits concurrency,
 how the caches work, and how to measure coverage.
 
-<a id="coverage-measurement"></a>
-
 ### Focused agent runs
 
 While you edit one file, run `pnpm test:focus <package> <file>`, and add `-t 'test name'` to pick one
@@ -38,20 +36,6 @@ of `turbo run test`, because the script caps concurrency, and tests that spawn p
 without the cap.
 
 ## Topic pages
-
-<a id="test-layers"></a>
-<a id="composition-root-tests"></a>
-<a id="testkit"></a>
-<a id="non-vacuity"></a>
-<a id="the-desktop-boot-test"></a>
-<a id="the-browser-smoke-test"></a>
-<a id="large-surface-fixture"></a>
-<a id="continuous-integration"></a>
-<a id="reliability"></a>
-<a id="historical-failures"></a>
-<a id="the-smoke-checklist"></a>
-<a id="memory-acceptance"></a>
-<a id="memory-phase-3-acceptance"></a>
 
 | Page | Covers |
 | --- | --- |

@@ -35,16 +35,18 @@ describe('Codex configuration', () => {
   }
 
   it('uses the active model’s advertised efforts and active thread value', () => {
-    expect(codexReasoningOptions(models, 'gpt-deep', 'xhigh')).toEqual([{
-      id: 'reasoning',
-      label: 'Effort',
-      category: 'reasoning',
-      currentValue: 'xhigh',
-      values: [
-        { value: 'high', label: 'high', description: 'Deep reasoning' },
-        { value: 'xhigh', label: 'xhigh', description: 'Maximum reasoning' },
-      ],
-    }])
+    expect(codexReasoningOptions(models, 'gpt-deep', 'xhigh')).toEqual([
+      {
+        id: 'reasoning',
+        label: 'Effort',
+        category: 'reasoning',
+        currentValue: 'xhigh',
+        values: [
+          { value: 'high', label: 'high', description: 'Deep reasoning' },
+          { value: 'xhigh', label: 'xhigh', description: 'Maximum reasoning' },
+        ],
+      },
+    ])
   })
 
   it('falls back to the provider’s model default and omits unsupported controls', () => {
@@ -53,12 +55,15 @@ describe('Codex configuration', () => {
   })
 
   it('normalizes collaboration presets into Default and Plan while retaining their masks', () => {
-    const modes = codexCollaborationModes({
-      data: [
-        { name: 'Plan', mode: 'plan', model: null, reasoning_effort: 'medium' },
-        { name: 'Default', mode: 'default', model: null, reasoning_effort: null },
-      ],
-    }, 'plan')
+    const modes = codexCollaborationModes(
+      {
+        data: [
+          { name: 'Plan', mode: 'plan', model: null, reasoning_effort: 'medium' },
+          { name: 'Default', mode: 'default', model: null, reasoning_effort: null },
+        ],
+      },
+      'plan',
+    )
 
     expect(modes.option).toEqual({
       id: 'mode',
@@ -80,19 +85,31 @@ describe('Codex configuration', () => {
 
   it('drops malformed collaboration presets without throwing', () => {
     expect(codexCollaborationModes(null, null).option).toBeNull()
-    expect(codexCollaborationModes({ data: [
-      null,
-      { name: '', mode: 'default', model: null, reasoning_effort: null },
-      { name: 'Unknown', mode: 'execute', model: null, reasoning_effort: null },
-      { name: 'Plan', mode: 'plan', model: 42, reasoning_effort: 'medium' },
-    ] }, 'plan').option).toBeNull()
+    expect(
+      codexCollaborationModes(
+        {
+          data: [
+            null,
+            { name: '', mode: 'default', model: null, reasoning_effort: null },
+            { name: 'Unknown', mode: 'execute', model: null, reasoning_effort: null },
+            { name: 'Plan', mode: 'plan', model: 42, reasoning_effort: 'medium' },
+          ],
+        },
+        'plan',
+      ).option,
+    ).toBeNull()
   })
 
   it('expands both selections with preset fields taking precedence', () => {
-    const modes = codexCollaborationModes({ data: [
-      { name: 'Default', mode: 'default', model: null, reasoning_effort: null },
-      { name: 'Plan', mode: 'plan', model: 'gpt-plan', reasoning_effort: 'medium' },
-    ] }, 'default')
+    const modes = codexCollaborationModes(
+      {
+        data: [
+          { name: 'Default', mode: 'default', model: null, reasoning_effort: null },
+          { name: 'Plan', mode: 'plan', model: 'gpt-plan', reasoning_effort: 'medium' },
+        ],
+      },
+      'default',
+    )
 
     expect(codexCollaborationModeForTurn(modes, 'default', 'gpt-selected', 'high')).toEqual({
       mode: 'default',
@@ -117,21 +134,35 @@ describe('Codex configuration', () => {
 describe('the MCP servers acorn declares to Codex', () => {
   it('spells them as config.toml would and reads back what Codex reports', () => {
     expect(codexMcpConfig([])).toBeNull()
-    expect(codexMcpConfig([
-      { transport: 'stdio', name: 'linear', command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
-      { transport: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } },
-    ])).toEqual({ mcp_servers: {
-      linear: { command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
-      docs: { url: 'https://docs.example/mcp', http_headers: { Authorization: 'Bearer t' } },
-    } })
+    expect(
+      codexMcpConfig([
+        { transport: 'stdio', name: 'linear', command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
+        { transport: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } },
+      ]),
+    ).toEqual({
+      mcp_servers: {
+        linear: { command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
+        docs: { url: 'https://docs.example/mcp', http_headers: { Authorization: 'Bearer t' } },
+      },
+    })
 
-    const startup = new Map([['linear', { status: 'ready', error: null }], ['broken', { status: 'failed', error: 'spawn ENOENT' }]])
-    expect(codexReportedMcpServers({ data: [
-      { name: 'linear', authStatus: 'unsupported', tools: { a: {}, b: {} } },
-      { name: 'broken', authStatus: 'unsupported', tools: {} },
-      { name: 'figma', authStatus: 'notLoggedIn', tools: {} },
-      { name: 'quiet', authStatus: 'unsupported', tools: {} },
-    ] }, startup)).toEqual([
+    const startup = new Map([
+      ['linear', { status: 'ready', error: null }],
+      ['broken', { status: 'failed', error: 'spawn ENOENT' }],
+    ])
+    expect(
+      codexReportedMcpServers(
+        {
+          data: [
+            { name: 'linear', authStatus: 'unsupported', tools: { a: {}, b: {} } },
+            { name: 'broken', authStatus: 'unsupported', tools: {} },
+            { name: 'figma', authStatus: 'notLoggedIn', tools: {} },
+            { name: 'quiet', authStatus: 'unsupported', tools: {} },
+          ],
+        },
+        startup,
+      ),
+    ).toEqual([
       { name: 'linear', status: 'connected', toolCount: 2, error: null },
       { name: 'broken', status: 'failed', toolCount: 0, error: 'spawn ENOENT' },
       { name: 'figma', status: 'needs_auth', toolCount: 0, error: null },

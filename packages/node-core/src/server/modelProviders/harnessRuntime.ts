@@ -61,15 +61,20 @@ export async function harnessBackends(): Promise<{ backends: ModelBackend[]; mis
         const catalog = await profile.listModels(resolveCommand(profile))
         models = catalog.models
         catalogUnavailable = catalog.unavailable ?? false
+      } catch {
+        catalogUnavailable = true
       }
-      catch { catalogUnavailable = true }
     }
     backends.push(harnessBackend(profile, models, catalogUnavailable))
   }
   return { backends, missing }
 }
 
-const harnessBackend = (profile: ProfileDef, models = profile.models ?? [], catalogUnavailable = false): ModelBackend => ({
+const harnessBackend = (
+  profile: ProfileDef,
+  models = profile.models ?? [],
+  catalogUnavailable = false,
+): ModelBackend => ({
   id: `${HARNESS_BACKEND_PREFIX}${profile.id}`,
   kind: 'harness',
   label: profile.label,
@@ -120,7 +125,7 @@ export async function generateTextForHarness(
     const run = await scheduler.run(lane, lane, HARNESS_BUDGETS, () =>
       runHeadless(argv, {
         cwd,
-        // No `ACORN_API_URL`, no `ACORN_API_TOKEN`, no `ACORN_TOOL_CEILING`: there is no task, no MCP
+        // No `ACORN_API_URL` and no `ACORN_API_TOKEN`: there is no task, no MCP
         // server in the child, and nothing for a tool to call. `AGENT_TOOL_PASSTHROUGH` is
         // configuration only, so the CLI still authenticates with its own stored login and still works
         // behind a proxy, and no key acorn holds is anywhere in this environment.

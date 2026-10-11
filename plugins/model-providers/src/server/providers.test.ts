@@ -9,12 +9,7 @@ import {
   createAnthropicProviders,
   type AnthropicGateway,
 } from './anthropic'
-import {
-  createOpenAIProviders,
-  OPENAI_MODELS,
-  OPENAI_RECOMMENDED_MODEL_ID,
-  type OpenAIGateway,
-} from './openai'
+import { createOpenAIProviders, OPENAI_MODELS, OPENAI_RECOMMENDED_MODEL_ID, type OpenAIGateway } from './openai'
 
 const ENCRYPTION_KEY = '33'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -31,11 +26,7 @@ const openAI = {
 const anthropic = {
   listModels: vi.fn(async () => ({ data: [{ id: ANTHROPIC_RECOMMENDED_MODEL_ID }] })),
   createMessage: vi.fn(async () => ({
-    content: [
-      { type: 'thinking' },
-      { type: 'text', text: 'SELECT ' },
-      { type: 'text', text: '1;' },
-    ],
+    content: [{ type: 'thinking' }, { type: 'text', text: 'SELECT ' }, { type: 'text', text: '1;' }],
     model: ANTHROPIC_RECOMMENDED_MODEL_ID,
     usage: { input_tokens: 8, output_tokens: 3 },
   })),
@@ -64,10 +55,7 @@ describe('model provider connections', () => {
   })
 
   it('publishes one write-only API key field per provider', () => {
-    for (const provider of [
-      openAIProviders.connectionProvider,
-      anthropicProviders.connectionProvider,
-    ]) {
+    for (const provider of [openAIProviders.connectionProvider, anthropicProviders.connectionProvider]) {
       expect(provider.toPublic()).toMatchObject({
         kind: 'model-provider',
         connection: {
@@ -124,13 +112,7 @@ describe('model provider connections', () => {
       { providerId: 'anthropic', credentials: { apiKey: 'first-key' } },
       SECRETS,
     )
-    await rotateConnection(
-      testDb.db,
-      'alice',
-      connected.id,
-      { credentials: { apiKey: 'rotated-key' } },
-      SECRETS,
-    )
+    await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: 'rotated-key' } }, SECRETS)
     const summary = await testConnection(testDb.db, 'alice', connected.id, SECRETS)
 
     expect(anthropic.listModels).toHaveBeenCalledTimes(3)
@@ -148,8 +130,9 @@ describe('model provider connections', () => {
   ] as const)('maps OpenAI validation status %s to %s', async (status, code) => {
     openAI.listModels.mockRejectedValueOnce(status === undefined ? new Error('network') : { status })
 
-    await expect(openAIProviders.connectionProvider.connection.validate({ apiKey: 'key' }))
-      .rejects.toMatchObject({ code })
+    await expect(openAIProviders.connectionProvider.connection.validate({ apiKey: 'key' })).rejects.toMatchObject({
+      code,
+    })
   })
 })
 
@@ -171,13 +154,16 @@ describe('model provider adapters', () => {
       },
     })
 
-    expect(openAI.createResponse).toHaveBeenCalledWith({
-      model: OPENAI_RECOMMENDED_MODEL_ID,
-      instructions: 'Generate SQL.',
-      input: 'List users.',
-      max_output_tokens: 600,
-      store: false,
-    }, signal)
+    expect(openAI.createResponse).toHaveBeenCalledWith(
+      {
+        model: OPENAI_RECOMMENDED_MODEL_ID,
+        instructions: 'Generate SQL.',
+        input: 'List users.',
+        max_output_tokens: 600,
+        store: false,
+      },
+      signal,
+    )
     expect(result).toEqual({
       text: 'SELECT 1;\nSELECT 2;',
       modelId: OPENAI_RECOMMENDED_MODEL_ID,
@@ -199,12 +185,15 @@ describe('model provider adapters', () => {
       },
     })
 
-    expect(anthropic.createMessage).toHaveBeenCalledWith({
-      model: 'claude-explicit',
-      system: 'Generate SQL.',
-      messages: [{ role: 'user', content: 'List users.' }],
-      max_tokens: 700,
-    }, signal)
+    expect(anthropic.createMessage).toHaveBeenCalledWith(
+      {
+        model: 'claude-explicit',
+        system: 'Generate SQL.',
+        messages: [{ role: 'user', content: 'List users.' }],
+        max_tokens: 700,
+      },
+      signal,
+    )
     expect(result).toEqual({
       text: 'SELECT 1;',
       modelId: ANTHROPIC_RECOMMENDED_MODEL_ID,
@@ -219,14 +208,16 @@ describe('model provider adapters', () => {
   ] as const)('maps Anthropic generation status %s to %s', async (status, code) => {
     anthropic.createMessage.mockRejectedValueOnce({ status })
 
-    await expect(anthropicProviders.modelAdapter.generateText({
-      secret: 'anthropic-key',
-      config: {},
-      input: {
-        system: 'Generate SQL.',
-        prompt: 'List users.',
-        maxOutputTokens: 100,
-      },
-    })).rejects.toMatchObject({ code })
+    await expect(
+      anthropicProviders.modelAdapter.generateText({
+        secret: 'anthropic-key',
+        config: {},
+        input: {
+          system: 'Generate SQL.',
+          prompt: 'List users.',
+          maxOutputTokens: 100,
+        },
+      }),
+    ).rejects.toMatchObject({ code })
   })
 })

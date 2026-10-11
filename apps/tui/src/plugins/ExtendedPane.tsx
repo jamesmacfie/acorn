@@ -6,11 +6,9 @@ import { Line } from '../kit/cells'
 
 // A plugin pane that reserved part of its rectangle for somebody else, in cells.
 //
-// The fourth of this host's seams, and the one that was a crash rather than a gap: the frame registry
-// named `client-core/host/chrome/ChromeExtendedPane.tsx` directly, which is `<div class="extended-pane">`
-// and an `<aside>` holding a `PanelGrid` sized in pixels, so a loaded plugin's pane that declared a
-// footer or an aside handed the reconciler a `div` and it refused
-// (client-core/host/chrome/extendedPane.ts, docs/tui/plugins.md § Loaded plugins).
+// The DOM's `ChromeExtendedPane` is a `div` and an `aside` holding a `PanelGrid` sized in pixels, and
+// the reconciler refuses it, so this host supplies its own through the `setExtendedPane` seam
+// (docs/tui/plugins.md § Loaded plugins).
 //
 // The regions the owner reserved are drawn in reading order under the owner's own tree rather than
 // pinned around it. A terminal pane is one rectangle; there is no second column to give an aside and
@@ -18,18 +16,22 @@ import { Line } from '../kit/cells'
 export function ExtendedPane(props: ExtendedPaneProps) {
   return (
     <box flexDirection="column" flexGrow={1}>
-      <Show when={props.detail?.headerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
+      <Show when={props.detail?.headerPointId}>
+        {(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}
+      </Show>
       {props.children}
-      <Show when={props.detail?.footerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
+      <Show when={props.detail?.footerPointId}>
+        {(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}
+      </Show>
       {/* Two rectangles that need pixels, each named on one line so a reader knows the box was
-          reserved and why it is empty (../kit/host.tsx § InlineSlot, docs/tui/rectangles.md § Rectangles). */}
+          reserved and why it is empty
+          (../kit/host.tsx § InlineSlot, docs/tui/rectangles.md § Rectangles). */}
       <Show when={props.inlineBesidePointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>
       <Show when={props.inlineBelowPointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>
       {/* The `rows` kind, as a collection at the end of the pane. Draws nothing when nobody fills it. */}
       <Show when={props.footerPointId}>{(pointId) => <ExtensionRows point={pointId()} />}</Show>
       {/* `pane.aside` is a dashboard: a grid of panels sized in pixels, whose terminal projection is a
-          design rather than a port and belongs with the dashboards programme
-          (docs/dashboards.md). Named, for the same reason a rectangle is. */}
+          design rather than a port (docs/dashboards.md). Named, for the same reason a rectangle is. */}
       <Show when={props.aside}>
         {(aside) => <Line role="muted">{`${aside().pointId} is a dashboard, so it is not drawn here.`}</Line>}
       </Show>

@@ -32,15 +32,24 @@ export async function submitTurn({ origin, paths, policy, refreshContext, onSent
     const input: AgentInputPart[] = [
       ...(text ? [{ type: 'text' as const, text }] : []),
       ...parseFileMentions(text, paths),
-      ...submittedAttachments.map((attachment): AgentInputPart => attachment.mediaType.startsWith('image/')
-        ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
-        : { type: 'attachment', attachmentId: attachment.id }),
+      ...submittedAttachments.map((attachment): AgentInputPart =>
+        attachment.mediaType.startsWith('image/')
+          ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
+          : { type: 'attachment', attachmentId: attachment.id },
+      ),
       ...turnContexts,
     ]
-    await managedAgentApi.enqueue(session.id, { input, source: 'interactive', effectivePolicy: policy }, undefined, origin)
+    await managedAgentApi.enqueue(
+      session.id,
+      { input, source: 'interactive', effectivePolicy: policy },
+      undefined,
+      origin,
+    )
     state.acknowledge(revisions, submittedAttachments, turnContexts)
     if (origin.visible()) onSent()
   } catch (caught) {
     state.setError(operationError(caught, 'Unable to queue this turn.'))
-  } finally { state.setSending(false) }
+  } finally {
+    state.setSending(false)
+  }
 }

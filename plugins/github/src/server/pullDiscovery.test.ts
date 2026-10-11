@@ -5,14 +5,23 @@ import { createTaskService, makeTestDb, schema, type TestDb } from '@acorn/plugi
 import { gh } from './githubApi'
 import { startPullDiscovery } from './pullDiscovery'
 
-vi.mock('./githubApi', async (original) => ({ ...await original<typeof import('./githubApi')>(), gh: vi.fn() }))
+vi.mock('./githubApi', async (original) => ({ ...(await original<typeof import('./githubApi')>()), gh: vi.fn() }))
 
 const pull = (number = 42, branch = 'feat/task') => ({
-  number, state: 'open',
+  number,
+  state: 'open',
   head: { ref: branch, repo: { full_name: 'ACME/widget' } },
   base: { repo: { full_name: 'acme/widget' } },
 })
-const completed = { channel: 'plugin:agents:turn-changed', taskId: 'task', sessionId: 'session', turnId: 'turn', source: 'interactive', status: 'completed', attempt: 1 }
+const completed = {
+  channel: 'plugin:agents:turn-changed',
+  taskId: 'task',
+  sessionId: 'session',
+  turnId: 'turn',
+  source: 'interactive',
+  status: 'completed',
+  attempt: 1,
+}
 
 describe('pull discovery after managed agent turns', () => {
   let db: TestDb
@@ -24,14 +33,31 @@ describe('pull discovery after managed agent turns', () => {
   beforeEach(async () => {
     vi.mocked(gh).mockReset()
     db = makeTestDb()
-    await db.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
+    await db.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
     await db.db.insert(schema.projects).values({
-      id: 'project', name: 'widget', workspaceId: 'workspace', path: null, sort: 0, hidden: false,
-      githubOwner: 'acme', githubName: 'widget', createdAt: 1, updatedAt: 1,
+      id: 'project',
+      name: 'widget',
+      workspaceId: 'workspace',
+      path: null,
+      sort: 0,
+      hidden: false,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      createdAt: 1,
+      updatedAt: 1,
     })
     await db.db.insert(schema.tasks).values({
-      id: 'task', title: 'Task', projectId: 'project', branch: 'feat/task', origin: 'local',
-      status: 'active', sort: 0, createdAt: 1, updatedAt: 1,
+      id: 'task',
+      title: 'Task',
+      projectId: 'project',
+      branch: 'feat/task',
+      origin: 'local',
+      status: 'active',
+      sort: 0,
+      createdAt: 1,
+      updatedAt: 1,
     })
     const tasks = createTaskService(db.db)
     subscriptionDisposed = vi.fn()
@@ -42,11 +68,19 @@ describe('pull discovery after managed agent turns', () => {
         projects: { byId: async () => ({ github: { owner: 'acme', name: 'widget' } }) },
       },
       providers: {
-        withConnection: vi.fn(async <T>(_user: string, _provider: string, visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>) =>
-          visit({ id: 'connection' } as StoredConnection, 'token')),
+        withConnection: vi.fn(
+          async <T>(
+            _user: string,
+            _provider: string,
+            visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>,
+          ) => visit({ id: 'connection' } as StoredConnection, 'token'),
+        ),
       },
       events: {
-        on: (_channel: string, handler: typeof listener) => { listener = handler; return { dispose: subscriptionDisposed } },
+        on: (_channel: string, handler: typeof listener) => {
+          listener = handler
+          return { dispose: subscriptionDisposed }
+        },
       },
       log: { warn: vi.fn() },
     } as unknown as Parameters<typeof startPullDiscovery>[0]
@@ -58,7 +92,8 @@ describe('pull discovery after managed agent turns', () => {
     db.cleanup()
   })
 
-  const taskPull = async () => (await db.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task')))[0].pullNumber
+  const taskPull = async () =>
+    (await db.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task')))[0].pullNumber
 
   it('adopts a PR without a client PR-list read and leaves agent provenance empty', async () => {
     vi.mocked(gh).mockResolvedValue(Response.json([pull()]))
@@ -102,7 +137,12 @@ describe('pull discovery after managed agent turns', () => {
 
   it('does not overwrite a PR attached or a branch changed while GitHub answers', async () => {
     let answer!: (response: Response) => void
-    vi.mocked(gh).mockImplementation(() => new Promise((resolve) => { answer = resolve }))
+    vi.mocked(gh).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
     listener(completed)
     await vi.waitFor(() => expect(gh).toHaveBeenCalledOnce())
     await db.db.update(schema.tasks).set({ pullNumber: 99 }).where(eq(schema.tasks.id, 'task'))
@@ -120,7 +160,9 @@ describe('pull discovery after managed agent turns', () => {
   })
 
   it('logs a provider failure and retries on the next completed turn', async () => {
-    vi.mocked(gh).mockResolvedValueOnce(new Response('', { status: 429 })).mockResolvedValueOnce(Response.json([pull()]))
+    vi.mocked(gh)
+      .mockResolvedValueOnce(new Response('', { status: 429 }))
+      .mockResolvedValueOnce(Response.json([pull()]))
     listener(completed)
     await vi.waitFor(() => expect(ctx.log.warn).toHaveBeenCalledOnce())
     expect(await taskPull()).toBeNull()
@@ -130,7 +172,12 @@ describe('pull discovery after managed agent turns', () => {
 
   it('drains a pending lookup at shutdown without adopting its result', async () => {
     let answer!: (response: Response) => void
-    vi.mocked(gh).mockImplementation(() => new Promise((resolve) => { answer = resolve }))
+    vi.mocked(gh).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
     listener(completed)
     await vi.waitFor(() => expect(gh).toHaveBeenCalledOnce())
     const stop = discovery.dispose()

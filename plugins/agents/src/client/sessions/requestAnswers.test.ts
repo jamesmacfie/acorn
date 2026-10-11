@@ -27,23 +27,27 @@ const row = (resolution: unknown, status: AgentRequest['status'] = 'resolved'): 
 })
 
 describe('what the agent asked, and what it was not told', () => {
-  const question = asked([{
-    id: 'pick',
-    header: 'Package manager',
-    prompt: 'Which one should I use?',
-    options: [
-      { id: 'pnpm', label: 'pnpm', description: 'what the repo already uses' },
-      { id: 'npm', label: 'npm' },
-      { id: 'yarn', label: 'yarn' },
-    ],
-  }])
+  const question = asked([
+    {
+      id: 'pick',
+      header: 'Package manager',
+      prompt: 'Which one should I use?',
+      options: [
+        { id: 'pnpm', label: 'pnpm', description: 'what the repo already uses' },
+        { id: 'npm', label: 'npm' },
+        { id: 'yarn', label: 'yarn' },
+      ],
+    },
+  ])
 
   it('names the answer and keeps the roads not taken', () => {
-    expect(askedQuestions(question, row({ answers: { pick: 'pnpm' } }))).toEqual([{
-      prompt: 'Package manager: Which one should I use?',
-      chosen: ['pnpm'],
-      alternatives: [{ label: 'npm' }, { label: 'yarn' }],
-    }])
+    expect(askedQuestions(question, row({ answers: { pick: 'pnpm' } }))).toEqual([
+      {
+        prompt: 'Package manager: Which one should I use?',
+        chosen: ['pnpm'],
+        alternatives: [{ label: 'npm' }, { label: 'yarn' }],
+      },
+    ])
   })
 
   it('keeps every answer to a multi-select, and the rest as alternatives', () => {
@@ -64,11 +68,15 @@ describe('what the agent asked, and what it was not told', () => {
       { id: 'pick', prompt: 'Which drink?', options: [{ id: 'tea', label: 'Tea' }] },
       { id: 'pick_custom', prompt: 'Other: type your own answer (optional).' },
     ])
-    expect(askedQuestions(withOther, row({ answers: { pick: 'Tea' } })).map((entry) => entry.prompt))
-      .toEqual(['Which drink?'])
+    expect(askedQuestions(withOther, row({ answers: { pick: 'Tea' } })).map((entry) => entry.prompt)).toEqual([
+      'Which drink?',
+    ])
     // Unless they used it, in which case it is the answer.
-    expect(askedQuestions(withOther, row({ answers: { pick_custom: 'Earl Grey' } })))
-      .toContainEqual({ prompt: 'Other: type your own answer (optional).', chosen: ['Earl Grey'], alternatives: [] })
+    expect(askedQuestions(withOther, row({ answers: { pick_custom: 'Earl Grey' } }))).toContainEqual({
+      prompt: 'Other: type your own answer (optional).',
+      chosen: ['Earl Grey'],
+      alternatives: [],
+    })
   })
 
   it('keeps a skipped choice, because which options went unanswered still reads', () => {
@@ -79,11 +87,13 @@ describe('what the agent asked, and what it was not told', () => {
 
   it('keeps a secret answer out of the transcript', () => {
     const secret = asked([{ id: 'token', prompt: 'Which token?', secret: true }])
-    expect(askedQuestions(secret, row({ answers: { token: 'sk-live-4242' } }))).toEqual([{
-      prompt: 'Which token?',
-      chosen: ['Answer hidden'],
-      alternatives: [],
-    }])
+    expect(askedQuestions(secret, row({ answers: { token: 'sk-live-4242' } }))).toEqual([
+      {
+        prompt: 'Which token?',
+        chosen: ['Answer hidden'],
+        alternatives: [],
+      },
+    ])
   })
 
   it('falls back to the request itself when there are no questions, so a permission still reads', () => {
@@ -97,10 +107,12 @@ describe('what the agent asked, and what it was not told', () => {
         { id: 'deny', label: 'Reject', kind: 'reject_once' as const },
       ],
     }
-    expect(askedQuestions(permission, row({ optionId: 'allow' }))).toEqual([{
-      prompt: 'Allow the tests to run?',
-      chosen: ['Allow once'],
-      alternatives: [{ label: 'Reject' }],
-    }])
+    expect(askedQuestions(permission, row({ optionId: 'allow' }))).toEqual([
+      {
+        prompt: 'Allow the tests to run?',
+        chosen: ['Allow once'],
+        alternatives: [{ label: 'Reject' }],
+      },
+    ])
   })
 })

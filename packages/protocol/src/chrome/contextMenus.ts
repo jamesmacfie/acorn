@@ -2,7 +2,17 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab', 'agent.message', 'agent.turn', 'content.selection'] as const
+export const CONTEXT_MENU_LOCATIONS = [
+  'task.row',
+  'item.row',
+  'rail.source',
+  'rail.pane',
+  'file.row',
+  'document.tab',
+  'agent.message',
+  'agent.turn',
+  'content.selection',
+] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -43,7 +53,7 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
 }
 
 /** The kinds of content a `content.selection` target can come from. */
-export const SELECTION_CONTENT_KINDS = ['markdown', 'code', 'document'] as const
+const SELECTION_CONTENT_KINDS = ['markdown', 'code', 'document'] as const
 export type SelectionContentKind = (typeof SELECTION_CONTENT_KINDS)[number]
 
 /** The most selected text an action is handed, in UTF-8 bytes. A larger selection is refused whole,

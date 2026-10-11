@@ -8,7 +8,8 @@ const snapshot = (events: AgentSessionSnapshot['events']): AgentSessionSnapshot 
   turns: [],
   requests: [],
 })
-const message = (text: string) => ({ event: { type: 'assistant_message', text } }) as AgentSessionSnapshot['events'][number]
+const message = (text: string) =>
+  ({ event: { type: 'assistant_message', text } }) as AgentSessionSnapshot['events'][number]
 
 it('renders an empty session and wraps its reference as pasted content', () => {
   const context = sessionReferenceContext(snapshot([]))

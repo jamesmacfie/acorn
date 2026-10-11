@@ -4,8 +4,8 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { cascadeDeletePluginData } from './cascade'
 import { schema } from './index'
 
-// The purge half of an uninstall (docs/plugins/data-ownership.md § Uninstalling). This exists because
-// `dataPurged: true` used to be audited over rows that were still there.
+// The purge half of an uninstall (docs/plugins/data-ownership.md § Uninstalling). An audited
+// `dataPurged: true` is only honest if the rows are gone.
 describe('cascadeDeletePluginData', () => {
   let core: TestDb
   afterEach(() => core?.cleanup())
@@ -31,10 +31,14 @@ describe('cascadeDeletePluginData', () => {
 
     await cascadeDeletePluginData(core.db, 'ntfy')
 
-    expect((await core.db.select().from(schema.prefs)).map((row) => row.key).sort())
-      .toEqual(['core:task-layouts', pluginStateKey('ntfy-pro', 'board')])
-    expect((await core.db.select().from(schema.scheduleState)).map((row) => row.key).sort())
-      .toEqual(['core:measures', 'ntfy-pro:sweep'])
+    expect((await core.db.select().from(schema.prefs)).map((row) => row.key).sort()).toEqual([
+      'core:task-layouts',
+      pluginStateKey('ntfy-pro', 'board'),
+    ])
+    expect((await core.db.select().from(schema.scheduleState)).map((row) => row.key).sort()).toEqual([
+      'core:measures',
+      'ntfy-pro:sweep',
+    ])
     expect((await core.db.select().from(schema.scheduleRuns)).map((row) => row.key)).toEqual(['core:measures'])
   })
 })

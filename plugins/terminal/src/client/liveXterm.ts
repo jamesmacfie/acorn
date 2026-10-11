@@ -19,9 +19,16 @@ let scrollGuardInstalled = false
 function installScrollAreaGuard() {
   if (scrollGuardInstalled || typeof window === 'undefined') return
   scrollGuardInstalled = true
-  window.addEventListener('error', (e) => {
-    if (e.error?.stack?.includes('syncScrollArea')) { e.preventDefault(); e.stopImmediatePropagation() }
-  }, true)
+  window.addEventListener(
+    'error',
+    (e) => {
+      if (e.error?.stack?.includes('syncScrollArea')) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
+    },
+    true,
+  )
 }
 
 /**
@@ -39,7 +46,7 @@ export type LiveXterm = HeldTerminal & {
 }
 
 // How many terminals keep a WebGL renderer. A WebKit page gets 16 live WebGL contexts and loses the
-// oldest past that, and every terminal a reader has opened is now alive at once. The ones shown most
+// oldest past that, and every terminal a reader has opened is alive at once. The ones shown most
 // recently keep theirs, so going back to the terminal you just left draws with no new context; the
 // rest fall back to the DOM renderer while nobody looks at them and take a context again on the way
 // back. Four covers flipping between a couple of tasks with a couple of tabs each.
@@ -61,10 +68,14 @@ function takeWebgl(renderer: Renderer): void {
     // than freeze on a dead canvas; the next show asks for a new one.
     try {
       const addon = new WebglAddon()
-      addon.onContextLoss(() => { if (renderer.addon === addon) dropWebgl(renderer) })
+      addon.onContextLoss(() => {
+        if (renderer.addon === addon) dropWebgl(renderer)
+      })
       renderer.terminal.loadAddon(addon)
       renderer.addon = addon
-    } catch { /* no WebGL context (rare on a desktop) — DOM renderer still works, just fuzzier */ }
+    } catch {
+      /* no WebGL context (rare on a desktop) — DOM renderer still works, just fuzzier */
+    }
   }
   for (const oldest of gpu.slice(0, Math.max(0, gpu.length - WEBGL_TERMINALS))) {
     if (!oldest.shown) dropWebgl(oldest)
@@ -115,7 +126,15 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
   // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
   let disposed = false
-  const safeFit = () => { if (!disposed) { try { telemetry.measure('terminal.fit', () => fit.fit()) } catch { /* term detached mid-resize */ } } }
+  const safeFit = () => {
+    if (!disposed) {
+      try {
+        telemetry.measure('terminal.fit', () => fit.fit())
+      } catch {
+        /* term detached mid-resize */
+      }
+    }
+  }
   safeFit()
 
   // Follows the app theme live (manual toggle or OS preference change). The resolved theme arrives
@@ -131,41 +150,51 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
     term.options.fontFamily = monoFont()
     term.options.fontSize = fontSize
     safeFit()
-    void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
+    void xtermTheme(isAppDark()).then((t) => {
+      if (!disposed) term.options.theme = t
+    })
   }
   applyAppearance()
   const unwatchAppearance = watchAppearance(applyAppearance)
 
   let pendingOutput = 0
   // The fitted size rides on the attach. The node sizes the PTY and its screen before it serializes
-  // the snapshot, so the snapshot and later TUI redraws share this renderer's width. This used to be
-  // a resize request, with the attach sent only once it answered, and on a task switch that request
-  // queued behind every other one. A node older than the size field ignores it and reports the old
-  // size in `ready`, so a mismatch there still posts the resize. A reconnect re-attaches and lands
-  // here again.
+  // the snapshot, so the snapshot and later TUI redraws share this renderer's width. A node older than
+  // the size field ignores it and reports the old size in `ready`, so a mismatch there still posts the
+  // resize. A reconnect re-attaches and lands here again.
   //
   // The attachment lasts as long as the xterm, drawn or not, so output keeps being parsed into it
   // while the reader is on another task. What that costs is the parse and nothing else: xterm's render
   // service pauses while its element is out of view.
-  const detach = api.attach(sessionId, (m) => {
-    if (disposed) return
-    if (m.type === 'ready') {
-      if (m.session.cols !== term.cols || m.session.rows !== term.rows) void api.resize(sessionId, term.cols, term.rows)
-    }
-    else if (m.type === 'output') {
-      const size = m.data.length
-      pendingOutput += size
-      telemetry.observe('terminal.output.size', size)
-      telemetry.observe('terminal.pending.size', pendingOutput)
-      void telemetry.measure('terminal.write', () => new Promise<void>((resolve) => {
-        term.write(m.data, () => { pendingOutput -= size; resolve() })
-      }))
-    }
-    else if (m.type === 'exit') {
-      term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
-      onExit?.(m.exitCode)
-    }
-  }, { cols: term.cols, rows: term.rows })
+  const detach = api.attach(
+    sessionId,
+    (m) => {
+      if (disposed) return
+      if (m.type === 'ready') {
+        if (m.session.cols !== term.cols || m.session.rows !== term.rows)
+          void api.resize(sessionId, term.cols, term.rows)
+      } else if (m.type === 'output') {
+        const size = m.data.length
+        pendingOutput += size
+        telemetry.observe('terminal.output.size', size)
+        telemetry.observe('terminal.pending.size', pendingOutput)
+        void telemetry.measure(
+          'terminal.write',
+          () =>
+            new Promise<void>((resolve) => {
+              term.write(m.data, () => {
+                pendingOutput -= size
+                resolve()
+              })
+            }),
+        )
+      } else if (m.type === 'exit') {
+        term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
+        onExit?.(m.exitCode)
+      }
+    },
+    { cols: term.cols, rows: term.rows },
+  )
   // Shift+Enter → newline instead of submit. Terminals send CR (\r) for Enter and Claude submits
   // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
   // the event so xterm doesn't also send the CR that would submit.
@@ -182,8 +211,12 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
     if (e.type === 'keydown' && e.metaKey) return false
     return true
   })
-  term.onData((d) => { if (!disposed) api.write(sessionId, d) })
-  term.onResize(({ cols, rows }) => { if (!disposed) void api.resize(sessionId, cols, rows) })
+  term.onData((d) => {
+    if (!disposed) api.write(sessionId, d)
+  })
+  term.onResize(({ cols, rows }) => {
+    if (!disposed) void api.resize(sessionId, cols, rows)
+  })
 
   // Refit on any size change of the surface: drawer drag-resize, window resize, layout shifts. A
   // ResizeObserver catches the drawer-height change that window 'resize' would miss.
@@ -193,7 +226,9 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   return {
     nodeId,
     sessionId,
-    get mounted() { return host !== null },
+    get mounted() {
+      return host !== null
+    },
     // A different surface's element: the drawer came back, on this task or after a switch. xterm
     // opens once, so the move is its element changing parents, and the observer follows it.
     mount(next, exit) {

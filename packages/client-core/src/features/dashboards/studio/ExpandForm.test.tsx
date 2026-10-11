@@ -3,7 +3,10 @@ import { formPlan, mountStageForm } from '../../../testkit/stageForms'
 import ExpandForm from './ExpandForm'
 
 let form: ReturnType<typeof mountStageForm<'expand'>> | undefined
-afterEach(() => { form?.dispose(); form = undefined })
+afterEach(() => {
+  form?.dispose()
+  form = undefined
+})
 
 describe('ExpandForm', () => {
   it('lists only list columns and writes a bounded count per row', () => {

@@ -19,8 +19,8 @@ export type InternalClaims = {
   // The terminal/agent session, when the child belongs to one. Agent-tool contributions may require
   // this signed owner rather than accepting attribution supplied as transport metadata.
   sessionId?: string
-  // The effective ceiling this server computed for the child. Unlike ACORN_TOOL_CEILING, this value is
-  // covered by the signature and is therefore safe to enforce on the loopback tool projection.
+  // The effective ceiling this server computed for the child. It is covered by the signature, which is
+  // what makes it safe to enforce on the loopback tool projection.
   toolCeiling?: ToolCeiling
   // A task token's revocable id. Minting picks one and renewal keeps it, so a renewed file stays the
   // same credential. Authentication checks it against ActiveCredentials (./activeCredentials.ts).
@@ -29,9 +29,9 @@ export type InternalClaims = {
 
 const PREFIX = 'acorn_it_'
 // '.' separates payload from signature, as in a JWT, and for the same reason: base64url's alphabet is
-// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' looked fine and was wrong: a
-// payload or signature containing an underscore produced more than the expected number of parts and
-// every such token failed to verify. Caught by auth.test.ts on the first run.
+// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' would give a payload or
+// signature containing an underscore more than the expected number of parts, and the token would fail
+// to verify.
 const SEPARATOR = '.'
 export const INTERNAL_TOKEN_LIFETIME_MS = 48 * 60 * 60 * 1000
 const internalClaimsPayloadSchema = z.strictObject({
@@ -52,15 +52,18 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
   // Short keys keep the token out of the way in `env` output: s=scope, t=taskId, n=sessioN,
   // c=effective tool Ceiling, i=credential Id, e=expiry in milliseconds since the epoch. A service
   // token never leaves the process, so only a task token needs an id to revoke.
-  const credentialId = claims.scope === 'task' ? claims.credentialId ?? randomBytes(16).toString('base64url') : undefined
-  const payload = b64(JSON.stringify({
-    s: claims.scope,
-    ...(claims.taskId ? { t: claims.taskId } : {}),
-    ...(claims.sessionId ? { n: claims.sessionId } : {}),
-    ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
-    ...(credentialId ? { i: credentialId } : {}),
-    e: Date.now() + INTERNAL_TOKEN_LIFETIME_MS,
-  }))
+  const credentialId =
+    claims.scope === 'task' ? (claims.credentialId ?? randomBytes(16).toString('base64url')) : undefined
+  const payload = b64(
+    JSON.stringify({
+      s: claims.scope,
+      ...(claims.taskId ? { t: claims.taskId } : {}),
+      ...(claims.sessionId ? { n: claims.sessionId } : {}),
+      ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
+      ...(credentialId ? { i: credentialId } : {}),
+      e: Date.now() + INTERNAL_TOKEN_LIFETIME_MS,
+    }),
+  )
   return `${PREFIX}${payload}${SEPARATOR}${sign(key, payload)}`
 }
 
@@ -79,7 +82,9 @@ function signedClaims(key: string, token: string): (InternalClaims & { expiresAt
   const b = Buffer.from(expected)
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null
   try {
-    const decoded = internalClaimsPayloadSchema.safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')))
+    const decoded = internalClaimsPayloadSchema.safeParse(
+      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')),
+    )
     if (!decoded.success || (decoded.data.s === 'task' && !decoded.data.t)) return null
     return {
       scope: decoded.data.s,
@@ -106,7 +111,11 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
 // What HTTP and the WebSocket hub accept: a valid signature, and for a task token an id that is still
 // active. A token minted before ids existed has none, so it fails here, and the Node's renewal gives its
 // file a new token with an id at the next start.
-export function authenticateInternalToken(key: string, active: Pick<ActiveCredentials, 'isActive'>, token: string): InternalClaims | null {
+export function authenticateInternalToken(
+  key: string,
+  active: Pick<ActiveCredentials, 'isActive'>,
+  token: string,
+): InternalClaims | null {
   const claims = verifyInternalToken(key, token)
   return claims && (claims.scope === 'service' || active.isActive(claims.credentialId)) ? claims : null
 }
@@ -121,8 +130,8 @@ export function renewInternalToken(key: string, token: string): string | null {
 }
 
 // The environment a spawned child needs to call this node back, with a token minted for that child's
-// scope. A factory rather than the single shared record it replaces: one object meant every PTY, agent
-// session and workflow step presented the same credential, which is what made scope unrepresentable.
+// scope. A factory rather than one shared record: a shared record would have every PTY, agent session
+// and workflow step present the same credential, which makes scope unrepresentable.
 //
 // ACORN_API_URL is absent from the claims: it is a property of the listener, not the
 // caller, so the composition root closes over it and fills it in once the port is known.

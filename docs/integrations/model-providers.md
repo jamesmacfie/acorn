@@ -70,7 +70,7 @@ A CLI generate is contained:
   and Codex reads `AGENTS.md` from it, so a worktree would add a repository's house rules.
 - The environment is the broker's base allowlist plus `AGENT_TOOL_PASSTHROUGH`
   (`packages/node-core/src/server/agentProfiles/toolEnv.ts`): no `ACORN_API_URL`, `ACORN_API_TOKEN`,
-  `ACORN_TOOL_CEILING`, MCP server, or acorn-held key. The CLI uses its own login
+  MCP server, or acorn-held key. The CLI uses its own login
   ([credential handling](../security/credentials.md)).
 - The run goes through `providerRequestScheduler` in a lane per profile, two at once.
 - A failure logs the stderr tail, profile, status, and duration, and the client gets
@@ -151,7 +151,7 @@ but a device or the Node's service scope. A task-scoped token has no editor for 
 generate spends your key or your CLI login. Each offers `models.available(userId)` through a route of
 its own. Workflows asks twice: when the first definition fails the checker, the messages go back once,
 which is why its route has a longer timeout
-([generating and editing with AI](../workflows/authoring.md#generating-and-editing-with-ai)).
+([generating and editing with AI](../workflows/ai-authoring.md#generating-and-editing-with-ai)).
 
 The `acorn-advisor` plugin, kept in its own repository, is the one consumer of the grant path. It reviews completed interactive turns
 ([review input](../managed-agents/session-events.md#review-input)).

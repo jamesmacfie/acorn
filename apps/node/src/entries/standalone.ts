@@ -1,29 +1,16 @@
 // The entry for `pnpm dev:node` and the packaged standalone Node (docs/node-distribution.md). See
 // docs/architecture-overview.md § Runtime topology for how this differs from the supervised node the
 // desktop shell starts.
-import { join } from 'node:path'
+import { closeSync, readFileSync, writeSync } from 'node:fs'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/server/transport/listener.ts'
+import { devDataDir } from '@acorn/node-core/server/transport/listener.ts'
 import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
-import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
-import { renewingInternalEnv } from '@acorn/node-core/server/auth'
-import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
-import { disabledPluginsStore } from '@acorn/node-core/server/plugins'
-import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost'
-import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
-import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { wireAgentTools } from '@acorn/node-core/server/agentTools'
-import { buildPluginDeps } from '../composition/pluginDeps'
-import { buildPluginStateBridge, effectiveDisabled } from '../composition/pluginState'
-import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
-import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
-import { nodeKeyCustody } from '@acorn/node-core/server/bindings.ts'
-import { closeSync, readFileSync, writeSync } from 'node:fs'
+import { bootNode } from '../composition/boot'
 import { installBackgroundLog } from './background'
 
 // This file is the one place under `apps/node/src` that still calls `console.log`, and it is in the
@@ -32,15 +19,14 @@ import { installBackgroundLog } from './background'
 // and the pairing banner, which is what a person standing at this terminal is here to read.
 // Everything else in the file goes through the logger like the rest of the node.
 import { installCrashHandlers } from '../composition/crash'
-import { createLogger, installPerfSink } from '@acorn/node-core/server/telemetry'
-import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
-import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 // Before anything can throw. A crash during boot is otherwise a silent death with no record
 // (../composition/crash.ts).
 const background = process.env.ACORN_CLI_BACKGROUND === '1'
 if (background) {
-  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID) throw new Error('Missing background service configuration')
+  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID)
+    throw new Error('Missing background service configuration')
   installBackgroundLog(process.env.ACORN_CLI_LOG_PATH)
 }
 installCrashHandlers()
@@ -48,30 +34,21 @@ installCrashHandlers()
 const log = createLogger('node')
 const pluginLog = createLogger('plugins')
 
-// ACORN_DATA_DIR names the data root (docs/data-layer/data-root.md § Where it lives); service/runtime.ts's
-// internalApiEnv hands this node's own child processes the same variable, so one spelling of "which
-// root" covers the whole process tree. Opening it takes the root's exclusive lock, which is why a
-// standalone node and a running desktop app cannot share one.
+// ACORN_DATA_DIR names the data root (docs/data-layer/data-root.md § Where it lives); bootNode hands
+// this node's own child processes the same variable, so one spelling of "which root" covers the whole
+// process tree. Opening it takes the root's exclusive lock, which is why a standalone node and a
+// running desktop app cannot share one.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 // Asked once, before anything else prints (docs/node-distribution.md § Reaching a node from another
 // machine); silent under a service manager (server/transport/advertise.ts).
 await confirmAdvertiseHost(root)
-const capabilities = new CapabilityRegistry()
-const runtime = makeRuntime(root, undefined, capabilities, background ? process.env.ACORN_CLI_SERVICE_ID : undefined)
 // A standalone Node has no keychain, so its keys are files in the data root or SESSION_ENC_KEY in its
 // environment. Agents it runs share its OS user and can read both (docs/security.md § What task scope
 // does and doesn't protect against).
-log.warn(`this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`)
-const disabledPlugins = disabledPluginsStore(root.dir)
-// The disabled-plugin list a standalone node reads (docs/node-distribution.md § Plugins). There is
-// no start-config override here: only the supervised host passes one.
-const disabled = effectiveDisabled(disabledPlugins)
-// Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
-// (docs/data-layer/backup-and-retention.md § Retention).
-setWorktreesRoot(join(root.dir, 'worktrees'))
+log.warn(
+  `this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`,
+)
 
-// Same reporter as the supervised host, before the loader scans the install directory
-// (docs/node-distribution.md § Plugins).
 const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
 const development = process.env.NODE_ENV !== 'production'
 // Looks like a bug and is not one: `dev:node` with no bundled root reconciles nothing, so a
@@ -79,80 +56,29 @@ const development = process.env.NODE_ENV !== 'production'
 // is the right answer for a service-managed node. Only a developer needs
 // `ACORN_BUNDLED_PLUGINS_DIR` set.
 if (development && !bundledRoot) {
-  pluginLog.info('ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
+  pluginLog.info(
+    'ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.',
+  )
 }
-reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
-// The same deps the supervised composition root supplies (service/runtime.ts explains each one). A
-// standalone node runs a real terminal engine, not a stub, because terminal is a required plugin
-// (docs/plugins/activation.md § Activation) and this node answers /v1/core/tasks/:id/archive for a task's live
-// sessions.
-let apiUrl = ''
-const credentials = renewingInternalEnv(runtime.INTERNAL_TOKEN, root.dir, () => ({
-  ACORN_API_URL: apiUrl,
-  ACORN_NODE_ID: runtime.NODE_ID,
-  ACORN_DATA_DIR: root.dir,
-  NODE_EXTRA_CA_CERTS: join(root.dir, 'tls', 'cert.pem'),
-}), runtime.INTERNAL_CREDENTIALS)
-const internalEnv = credentials.internalEnv
-let finishReconcile!: () => void
-const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
-const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
-// Before the plugins, so one that declares the `telemetry` token can subscribe from its own init,
-// exactly as in the supervised root (../composition/runtime.ts, docs/telemetry/model.md § The switch).
-setTelemetryDataRoot(root.dir)
-startTelemetry({
-  node: root.nodeId,
-  version: NODE_PROTOCOL_VERSION.toString(),
-  readPref: async () => {
-    const userId = runtime.ACTIVE_IDENTITY.get()
-    return userId ? await core.prefs.read(userId, TELEMETRY_PREF_KEY) : null
-  },
+// The shared boot (../composition/boot.ts). This host has no start config: no app version, no
+// delivered keys, no disabled-plugin override, and no staged MCP entry. It was started from a shell or
+// a service manager, so it skips the login shell PATH probe.
+const node = await bootNode({
+  root,
+  serviceInstanceId: background ? process.env.ACORN_CLI_SERVICE_ID : undefined,
+  bundledPluginsDir: bundledRoot,
+  development,
+  loginShellPath: false,
 })
-installPerfSink()
-
-// Same plugin list, through the same builder, as the desktop-supervised root
-// (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.
-const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, internalEnv, reconciled }))
-// The node's one scheduler (docs/schedules.md § Why the node, and only the node).
-const scheduler = createScheduler(runtime.DB, { env: runtime })
-const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
-const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
-const pluginStateBridge = await buildPluginStateBridge({
-  dataDir: root.dir,
-  db: runtime.DB,
-  roster: () => plugins.roster,
-  booted: () => graph.installed,
-  loadFailures: () => graph.failures,
-  disabled,
-  setDisabled: (names) => disabledPlugins.set(names),
-  reloadHost: plugins,
-})
-const pluginStateCapability = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
-core.nodeKeys = nodeKeyCustody(root.dir, 'files')
-core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
-
-// Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
-// functions over the database; neither needs a window.
-wireAgentTools({ db: runtime.DB, secrets: runtime.SECRETS, env: runtime })
-
-// Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
-// listen failure now exits non-zero with its reason instead of leaving a process alive that answers
-// nothing.
-const listener = await startListener(runtime, root)
-apiUrl = listener.endpoint.origin
-await scheduler.start()
-
-// Re-attach sessions, repair worktree state, and sweep workflow/agent records through the shared
-// post-listener sequence (server/composition.ts's reconcileNode; docs/node-distribution.md §
-// Runtime). The listener is already live because resumed work calls the node's own authenticated
-// routes.
-const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => { core.taskScripts.reconcile(); finishReconcile() })
-await reconcileTask
+const { runtime, listener } = node
+// Awaited, unlike the supervised host: a launcher acts on the handshake below, so the node finishes
+// re-attaching sessions and repairing worktrees before it prints it.
+await node.reconciled
 
 // Unattended enrollment, if and only if the provisioner set both environment variables
 // (docs/node-enrollment.md). With neither set this returns before it reads a file, so a node nobody
-// provisioned behaves exactly as it did before this line existed.
+// provisioned behaves exactly as if this call were not here.
 //
 // Here rather than earlier because it needs the endpoint and the fingerprint, which only exist once
 // the listener has bound. Before the device count below on purpose: a node that just handed its
@@ -161,8 +87,8 @@ await reconcileTask
 //
 // The endpoint it enrolls with is the advertised one, not `listener.endpoint.origin`. That value is
 // deliberately loopback whatever `advertiseHost` says, because every child process this node spawns
-// dials it (server/transport/listener.ts), and a control plane handed `https://127.0.0.1:<port>` would vouch for an
-// address no other machine can reach. With no advertised host the loopback origin is still what goes,
+// dials it, and a control plane handed `https://127.0.0.1:<port>` would vouch for an address no
+// other machine can reach. With no advertised host the loopback origin is still what goes,
 // which is right for a control plane running on this same machine and useless for one that is not —
 // the operator's exposure decision either way (docs/node-distribution.md § Reaching a node from
 // another machine).
@@ -181,26 +107,9 @@ const alreadyPaired = (await runtime.DEVICES.list()).filter((device) => device.r
 
 // SIGINT and SIGTERM run the same bounded drain as a desktop-supervised node
 // (docs/node-distribution.md § Operations).
-let stopping = false
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-  if (stopping) return
-  stopping = true
   log.info(`${signal} — draining`)
-  const outcome = await drainNode({
-    listener: () => closeListener(listener.server),
-    reconciliation: async () => await reconcileTask,
-    schedules: async () => {
-      schedulerCapability.dispose()
-      await scheduler.stop()
-    },
-    pluginState: async () => { pluginStateCapability.dispose(); pluginStateBridge.dispose() },
-    plugins: () => plugins.dispose(),
-    sqlite: async () => runtime.DB.close(),
-    dataRoot: async () => { credentials.dispose(); root.release() },
-  })
-  if (outcome === 'timeout') log.warn('drain exceeded its deadline; exiting anyway')
-  // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms.
-  stopTelemetry()
+  await node.stop()
   process.exit(0)
 }
 
@@ -219,25 +128,27 @@ process.once('SIGTERM', (signal) => void shutdown(signal))
 
 const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE_TOKEN
 const handshake = JSON.stringify({
-    baseline: ACORN_BASELINE,
-    nodeId: root.nodeId,
-    // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
-    // node it cannot drive without pairing to it first.
-    protocolVersion: NODE_PROTOCOL_VERSION,
-    endpoint: listener.endpoint.origin,
-    fingerprint: listener.fingerprint,
-    certPem: listener.certPem,
-    deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
-  })
+  baseline: ACORN_BASELINE,
+  nodeId: root.nodeId,
+  // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
+  // node it cannot drive without pairing to it first.
+  protocolVersion: NODE_PROTOCOL_VERSION,
+  endpoint: listener.endpoint.origin,
+  fingerprint: listener.fingerprint,
+  certPem: listener.certPem,
+  deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
+})
 if (background) {
   writeSync(3, `${handshake}\n`)
   closeSync(3)
-}
-else console.log(handshake)
+} else console.log(handshake)
 
 function readPrivateToken(): string {
-  try { return readFileSync(4, 'utf8').trim() }
-  finally { closeSync(4) }
+  try {
+    return readFileSync(4, 'utf8').trim()
+  } finally {
+    closeSync(4)
+  }
 }
 
 // The first advertised host, or the loopback origin when there is none. One line, beside the banner
@@ -268,7 +179,7 @@ function printPairingBanner(code: string | null): void {
     console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  kill -USR1 ${process.pid}`)
   }
   if (reachable.length === 0) {
-    console.log('  To reach this node from another machine, set advertiseHost in this data root\'s')
+    console.log("  To reach this node from another machine, set advertiseHost in this data root's")
     console.log('  node.json (or ACORN_ADVERTISE_HOST) and restart.')
   }
   console.log('')

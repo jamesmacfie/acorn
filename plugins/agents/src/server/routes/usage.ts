@@ -1,19 +1,19 @@
 import { Hono } from 'hono'
 import type { AgentUsageSnapshot } from '../../shared/usage'
-import {
-  validateAgentPricingPreferences,
-  type AgentPricingPreferences,
-} from '../../shared/pricing'
-import {
-  validateAgentConcurrency,
-  type AgentConcurrencyLimits,
-} from '../../shared/concurrency'
-import {
-  validateAgentSessionDefaults,
-  type AgentSessionDefaults,
-} from '../../shared/sessionDefaults'
+import { validateAgentPricingPreferences, type AgentPricingPreferences } from '../../shared/pricing'
+import { validateAgentConcurrency, type AgentConcurrencyLimits } from '../../shared/concurrency'
+import { validateAgentSessionDefaults, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { customAgentInputSchema, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
-import { BridgeError, type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import {
+  BridgeError,
+  type AppEnv,
+  ownerId,
+  requireDevice,
+  respondError,
+  routeCapability,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
@@ -32,7 +32,8 @@ export type AgentUsageBridge = {
 
 export const AGENT_USAGE = routeCapability<AgentUsageBridge>('agents.usageRoute')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
-export const setAgentUsageBridge = (bridge: AgentUsageBridge | null): void => setRouteTestCapability(AGENT_USAGE, bridge)
+export const setAgentUsageBridge = (bridge: AgentUsageBridge | null): void =>
+  setRouteTestCapability(AGENT_USAGE, bridge)
 
 export const agentUsage = new Hono<AppEnv>()
   .get('/pricing', (c) => {
@@ -45,7 +46,7 @@ export const agentUsage = new Hono<AppEnv>()
   // computed against, for every task. The reads stay open: an agent asking what a turn costs is
   // reasonable, and it's the owner's own data either way.
   .put('/pricing', requireDevice, async (c) => {
-    const body = await c.req.json().catch(() => null) as unknown
+    const body = (await c.req.json().catch(() => null)) as unknown
     // Validated at the boundary, before anything is stored: the client is the less-trusted side, and
     // a malformed override would be parsed back into the built-in table on every read and look like a
     // silently discarded save.
@@ -64,7 +65,7 @@ export const agentUsage = new Hono<AppEnv>()
   // Device only, for the reason the pricing write is: `ownerId(c)` cannot tell a device from a
   // task-scoped agent, and this decides how many provider children the node will run at once.
   .put('/concurrency', requireDevice, async (c) => {
-    const body = await c.req.json().catch(() => null) as unknown
+    const body = (await c.req.json().catch(() => null)) as unknown
     const result = validateAgentConcurrency(body)
     if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
     const userId = ownerId(c)
@@ -81,7 +82,7 @@ export const agentUsage = new Hono<AppEnv>()
   // device from a task-scoped agent, and this decides which model and permission profile every later
   // session of a provider starts on.
   .put('/session-defaults', requireDevice, async (c) => {
-    const body = await c.req.json().catch(() => null) as unknown
+    const body = (await c.req.json().catch(() => null)) as unknown
     const result = validateAgentSessionDefaults(body)
     if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
     const userId = ownerId(c)
@@ -96,13 +97,25 @@ export const agentUsage = new Hono<AppEnv>()
   // says and which provider options it starts on, so a task-scoped agent must not be able to write one.
   .post('/custom-agents', requireDevice, async (c) => {
     const parsed = customAgentInputSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+    if (!parsed.success)
+      return respondError(
+        c,
+        400,
+        'bad_request',
+        parsed.error.issues.map((issue) => issue.message),
+      )
     const userId = ownerId(c)
     return viaBridge(c, AGENT_USAGE, (bridge) => bridge.saveCustomAgent(userId, null, parsed.data))
   })
   .put('/custom-agents/:id', requireDevice, async (c) => {
     const parsed = customAgentInputSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+    if (!parsed.success)
+      return respondError(
+        c,
+        400,
+        'bad_request',
+        parsed.error.issues.map((issue) => issue.message),
+      )
     const userId = ownerId(c)
     const id = c.req.param('id')
     return viaBridge(c, AGENT_USAGE, (bridge) => bridge.saveCustomAgent(userId, id, parsed.data))

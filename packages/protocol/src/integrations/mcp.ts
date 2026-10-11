@@ -1,7 +1,6 @@
 // MCP config inspector (docs/mcp.md): pure parse and secret masking over the agents' own config
-// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only. Acorn never launches or manages
-// these servers, the agent does (orca's stance). Masking happens in main before anything crosses to
-// the renderer.
+// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only: the agent launches these servers,
+// not Acorn. Masking happens on the node before anything crosses to the renderer.
 
 export type McpServerSummary = {
   name: string
@@ -17,7 +16,7 @@ export type McpServerSummary = {
 const SECRET_KEY_RE = /(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL)S?$/i
 const SECRET_VALUE_RE = /^(sk-|ghp_|gho_|ghs_|github_pat_|xox[bapsr]?-)/
 
-export const maskSecret = (value: string): string => (value.length <= 4 ? '••••' : `${value.slice(0, 4)}••••`)
+const maskSecret = (value: string): string => (value.length <= 4 ? '••••' : `${value.slice(0, 4)}••••`)
 
 export function maskSecretEnv(env: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
@@ -56,8 +55,10 @@ export function inspectMcpConfig(jsonText: string): McpServerSummary[] {
     const url = typeof s.url === 'string' ? s.url : undefined
     const command = typeof s.command === 'string' ? s.command : undefined
     const args = Array.isArray(s.args) ? s.args.filter((a): a is string => typeof a === 'string') : []
-    const typeField = typeof s.type === 'string' ? s.type : typeof s.transport === 'string' ? (s.transport as string) : undefined
-    const transport: McpServerSummary['transport'] = url || typeField === 'http' || typeField === 'sse' ? 'http' : command ? 'stdio' : 'unknown'
+    const typeField =
+      typeof s.type === 'string' ? s.type : typeof s.transport === 'string' ? (s.transport as string) : undefined
+    const transport: McpServerSummary['transport'] =
+      url || typeField === 'http' || typeField === 'sse' ? 'http' : command ? 'stdio' : 'unknown'
     const disabled = s.disabled === true || s.enabled === false
     out.push({
       name,
@@ -71,10 +72,10 @@ export function inspectMcpConfig(jsonText: string): McpServerSummary[] {
   return out
 }
 
-// The starter file the Settings button seeds (orca's touch).
+// The starter file the Settings button seeds.
 export const STARTER_MCP_JSON = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`
 
-// The known candidate files, relative to a root kind: the only paths main will read.
+// The known candidate files, relative to a root kind: the only paths the node will read.
 export const MCP_CANDIDATES: { rel: string; root: 'worktree' | 'home' }[] = [
   { rel: '.mcp.json', root: 'worktree' },
   { rel: '.cursor/mcp.json', root: 'worktree' },

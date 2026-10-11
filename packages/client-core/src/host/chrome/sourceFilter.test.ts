@@ -4,15 +4,22 @@ import { filterSourceItems } from './sourceFilter'
 
 const items: PluginRailItem[] = [
   {
-    id: 'linear-connection:ENG-42', title: 'Fix login', short: 'ENG-42', fields: ['ENG-42'],
+    id: 'linear-connection:ENG-42',
+    title: 'Fix login',
+    short: 'ENG-42',
+    fields: ['ENG-42'],
     task: { title: 'Fix login', link: { connectionId: 'linear-connection', identifier: 'ENG-42' } },
   },
   {
-    id: 'rollbar-connection:142', title: 'TypeError: cannot read length', short: '#142', fields: ['9,000'],
+    id: 'rollbar-connection:142',
+    title: 'TypeError: cannot read length',
+    short: '#142',
+    fields: ['9,000'],
     task: { title: 'TypeError: cannot read length', link: { connectionId: 'rollbar-connection', identifier: '142' } },
   },
   {
-    id: 'opaque-row-999', title: 'Refresh timeout',
+    id: 'opaque-row-999',
+    title: 'Refresh timeout',
     task: { title: 'Refresh timeout', link: { connectionId: 'connection', identifier: 'OPS-7' } },
   },
 ]

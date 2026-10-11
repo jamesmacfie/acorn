@@ -47,7 +47,8 @@ export declare class AcornBridgeError extends Error {
 /** The whole surface a sandboxed frame has. There is no second door: no `window.acorn`, no network
  * (`connect-src 'none'`), no host DOM. */
 export type AcornBridge = {
-  /** Tree authority mode; absent on frame bridges and SDKs predating this field. */
+  /** Tree authority mode; absent on frame bridges and SDKs predating this field. `legacy` names a host
+   *  without per-mount bridges. Mixed-version path until 2026-12-30. */
   readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. Throws if read before `connect()` resolves. */
   readonly context: PluginFrameContext
@@ -183,9 +184,12 @@ export declare function connect(): Promise<AcornBridge>
  * own frame you may bundle anything.
  *
  * `styles` is your stylesheet as a string, injected rather than linked: a plugin origin serves exactly
- * one file, so a frame with a separate asset is a broken frame.
+ * one file of yours, `/client.js`, so a frame with a separate asset is a broken frame.
  */
-export declare function mountFrame(options: { styles: string }, render: (bridge: AcornBridge, root: HTMLElement) => void): void
+export declare function mountFrame(
+  options: { styles: string },
+  render: (bridge: AcornBridge, root: HTMLElement) => void,
+): void
 
 /**
  * Delegated click handler for anchors inside your own rendered content. Returns whether the click was
@@ -204,7 +208,7 @@ export declare function openLinkOnClick(bridge: AcornBridge, event: MouseEvent):
 // behaviour, keyboard handling, ARIA and style pack — none of which an iframe can borrow.
 //
 // You do not build these nodes by hand unless you want to. `acorn-plugin-sdk/remote` is the Solid
-// adapter, and it is fifteen lines because the JSX preset compiles straight onto the functions below.
+// adapter, and it is small because the JSX preset compiles straight onto the functions below.
 
 /** One node in a remote tree. Opaque: build it with the functions below, or with a framework adapter. */
 export type RemoteNode = {

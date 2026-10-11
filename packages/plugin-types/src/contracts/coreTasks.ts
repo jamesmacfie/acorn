@@ -13,7 +13,13 @@ export type TaskRef = {
 
 export type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
 export type ChildTaskSeed = { title: string; branch: string; origin?: string }
-export type AttachTaskPullInput = { repoOwner: string; repoName: string; pullNumber: number; sessionId: string; requestId?: string }
+export type AttachTaskPullInput = {
+  repoOwner: string
+  repoName: string
+  pullNumber: number
+  sessionId: string
+  requestId?: string
+}
 export type TaskPullRelation = AttachTaskPullInput & {
   taskId: string
   role: 'primary' | 'related'
@@ -38,7 +44,14 @@ export type LayoutRecipe = {
 }
 // repoConfigHash identifies the captured bytes used to parse repo-authored targets.
 export type TaskRunConfig =
-  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
+  | {
+      targets: RunTarget[]
+      cwd: string
+      errors: { source: string; message: string }[]
+      layouts: LayoutRecipe[]
+      repoTargetIds: string[]
+      repoConfigHash: string | null
+    }
   | { error: string }
 
 export type CoreTaskService = {

@@ -1,29 +1,31 @@
 export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from './layout/collapseState.ts'
-export { createArmedConfirm } from './controls/confirm.ts'
 export { copyText } from './controls/clipboard.ts'
 export { debounce } from './state/debounce.ts'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from './state/deviceStorage.ts'
 export {
-  CHECK_TONE, FAILED_STATUSES, checkStatusTone, checkStatusWord, checksState, checksSummary,
-  fileStatusMeta, githubAvatarUrl, railDotProps, summarizeFileStats,
+  CHECK_TONE,
+  FAILED_STATUSES,
+  checkStatusTone,
+  checkStatusWord,
+  checksState,
+  checksSummary,
+  fileStatusMeta,
+  githubAvatarUrl,
+  railDotProps,
+  summarizeFileStats,
 } from './rendering/displayMeta.ts'
-export { persistDraft, readDraft, writeDraft } from './state/draftState.ts'
+export { persistDraft } from './state/draftState.ts'
 export { formatRelativeTime } from './rendering/formatRelativeTime.ts'
 export { formatChord } from './rendering/formatChord.ts'
-export { formatPath } from './rendering/formatPath.ts'
 export { bytesOf, formatBytes, formatSize } from './rendering/formatSize.ts'
 export { fuzzyScore } from './controls/fuzzy.ts'
-export { graphParents, graphRanks } from './layout/graphLayout.ts'
-export type { GraphEdgeRef, GraphPoint } from './layout/graphLayout.ts'
-export { latestOnly } from './state/latestOnly.ts'
-export { modelProviderFailure } from './rendering/modelProviderFailure.ts'
-export { renderMarkdown } from './rendering/markdown.ts'
-export type { MarkdownOptions } from './rendering/markdown.ts'
-export { rowHeight, rowHeightSm, termFontSize } from './layout/metrics.ts'
-export type { PtyEvent, PtyIo } from './pty.ts'
+export { latestSignal } from './state/latestSignal.ts'
+export type { LatestSignal } from './state/latestSignal.ts'
+
+export { termFontSize } from './layout/metrics.ts'
+export type { PtyIo } from './pty.ts'
 export type { ReadingPlace } from './timeline/readingPlace.ts'
 export type { Disposable } from './state/registry.ts'
 export { createSplitDrag } from './layout/split.ts'
 export type { SplitDrag, SplitDragOptions } from './layout/split.ts'
 export { createTimelineWindow } from './timeline/timelineWindow.ts'
-export type { TimelineWindow } from './timeline/timelineWindow.ts'

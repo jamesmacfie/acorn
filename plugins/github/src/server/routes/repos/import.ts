@@ -2,7 +2,14 @@ import { isAbsolute, join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, type CoreServices, ownerId, type PluginDatabase, requireDevice, respondError } from '@acorn/plugin-api/node'
+import {
+  type AppEnv,
+  type CoreServices,
+  ownerId,
+  type PluginDatabase,
+  requireDevice,
+  respondError,
+} from '@acorn/plugin-api/node'
 import type { GithubImportItem, GithubImportResponse, GithubImportResult } from '../../../shared/api'
 import { repos } from '../../../node/schema'
 
@@ -16,7 +23,11 @@ const actionSchema = z.discriminatedUnion('action', [
 const requestSchema = z.union([
   z.object({ repositories: z.array(actionSchema).min(1).max(100) }),
   z.object({ items: z.array(actionSchema).min(1).max(100) }).transform(({ items }) => ({ repositories: items })),
-  z.array(actionSchema).min(1).max(100).transform((repositories) => ({ repositories })),
+  z
+    .array(actionSchema)
+    .min(1)
+    .max(100)
+    .transform((repositories) => ({ repositories })),
 ])
 
 type ImportCore = Pick<CoreServices, 'projects' | 'git'>
@@ -32,11 +43,17 @@ const failed = (item: GithubImportItem, owner: string, name: string, error: unkn
   error: error instanceof Error ? error.message : String(error),
 })
 
-export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<AppEnv>()
-  .post('/import', requireDevice, async (c) => {
+export const githubImport = (db: PluginDatabase, core: ImportCore) =>
+  new Hono<AppEnv>().post('/import', requireDevice, async (c) => {
     const userId = ownerId(c)
     const parsed = requestSchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+    if (!parsed.success)
+      return respondError(
+        c,
+        400,
+        'bad_request',
+        parsed.error.issues.map((issue) => issue.message),
+      )
 
     const results: GithubImportResult[] = []
     for (const item of parsed.data.repositories) {
@@ -56,22 +73,29 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<A
           path = item.path
         } else {
           if (!isAbsolute(item.parentDir)) throw new Error('Clone parent directory must be absolute.')
-          await core.git.gitOrThrow(
-            ['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name],
-            { cwd: item.parentDir, env: { GIT_TERMINAL_PROMPT: '0' } },
-          )
+          await core.git.gitOrThrow(['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name], {
+            cwd: item.parentDir,
+            env: { GIT_TERMINAL_PROMPT: '0' },
+          })
           path = join(item.parentDir, repo.name)
         }
 
-        // Fills a path-less placeholder left by an older import rather than adding a rival row
-        // (docs/github-integration.md § Importing projects).
+        // Fills a deferred project, which has a GitHub facet and no path yet, rather than adding a
+        // rival row (docs/github-integration.md § Importing projects).
         const placeholder = await core.projects.byGithub(repo.owner, repo.name)
         const existingId = placeholder && placeholder.path === null ? placeholder.id : null
         const projectId = existingId ?? (await core.projects.create({ name: repo.name, path })).id
         const stamped = await core.projects.update(projectId, { path, githubRepoId: repo.id })
         if (!stamped) throw new Error(MISSING_PROJECT)
 
-        results.push({ repoId: repo.id, owner: repo.owner, name: repo.name, action: item.action, ok: true, projectId: stamped.id })
+        results.push({
+          repoId: repo.id,
+          owner: repo.owner,
+          name: repo.name,
+          action: item.action,
+          ok: true,
+          projectId: stamped.id,
+        })
       } catch (error) {
         results.push(failed(item, repo.owner, repo.name, error))
       }

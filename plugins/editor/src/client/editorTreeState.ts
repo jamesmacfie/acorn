@@ -8,17 +8,28 @@ import { movedPath, pathContains } from './editorState'
 // the nested expansion exactly as it was.
 const [expandedByTask, setExpandedByTask] = createSignal<ReadonlyMap<string, ReadonlySet<string>>>(new Map())
 const ownerKey = (taskId: string, nodeId: string | null): string => JSON.stringify([nodeId, taskId])
-export const editorTreeCollectionId = (taskId: string, nodeId: string | null): string => `editor.file-tree:${ownerKey(taskId, nodeId)}`
+export const editorTreeCollectionId = (taskId: string, nodeId: string | null): string =>
+  `editor.file-tree:${ownerKey(taskId, nodeId)}`
 
 // Only a mounted tree can admit a captured palette target. The narrow lookup reads its
 // current visible folders; it carries neither retained roving state nor a service bag.
 const folderOwners = new Map<string, (path: string) => boolean>()
-export function registerEditorTreeFolders(taskId: string, nodeId: string | null, contains: (path: string) => boolean): () => void {
+export function registerEditorTreeFolders(
+  taskId: string,
+  nodeId: string | null,
+  contains: (path: string) => boolean,
+): () => void {
   const key = ownerKey(taskId, nodeId)
   folderOwners.set(key, contains)
-  return () => { if (folderOwners.get(key) === contains) folderOwners.delete(key) }
+  return () => {
+    if (folderOwners.get(key) === contains) folderOwners.delete(key)
+  }
 }
-export function captureEditorTreeFolder(taskId: string, nodeId: string | null, path: string): (() => boolean) | undefined {
+export function captureEditorTreeFolder(
+  taskId: string,
+  nodeId: string | null,
+  path: string,
+): (() => boolean) | undefined {
   const key = ownerKey(taskId, nodeId)
   const contains = folderOwners.get(key)
   if (!contains?.(path)) return undefined
@@ -83,12 +94,6 @@ export function evictEditorTreeState(taskId: string, nodeId = activeNodeId()): v
     next.delete(key)
     return next
   })
-}
-
-// Expanded paths are session state for their captured Node and task.
-export function clearEditorTreeStates(): void {
-  folderOwners.clear()
-  setExpandedByTask(new Map())
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list

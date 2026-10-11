@@ -14,7 +14,9 @@ export class RendererConnection {
 
   constructor(private readonly broker: NodeBroker) {}
 
-  interestedIn(nodeId: string): boolean { return !this.closed && (this.activeNode === undefined || this.activeNode === nodeId) }
+  interestedIn(nodeId: string): boolean {
+    return !this.closed && (this.activeNode === undefined || this.activeNode === nodeId)
+  }
 
   async fetch(nodeId: string, request: NodeFetchRequest): Promise<unknown> {
     if (this.closed) return null
@@ -47,7 +49,10 @@ export class RendererConnection {
     if (this.closed) return
     const previous = this.activeNode
     this.activeNode = nodeId
-    if (previous && previous !== nodeId) { this.broker.closeViewer(previous, this.viewerId); this.nodes.delete(previous) }
+    if (previous && previous !== nodeId) {
+      this.broker.closeViewer(previous, this.viewerId)
+      this.nodes.delete(previous)
+    }
     if (nodeId && this.broker.openViewer(nodeId, this.viewerId)) this.nodes.add(nodeId)
   }
 

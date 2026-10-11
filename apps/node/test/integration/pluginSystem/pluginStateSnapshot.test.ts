@@ -17,10 +17,18 @@ let root = ''
 const putPackage = (version: string, bytes: string): void => {
   const dir = pluginDir(root, 'widget')
   mkdirSync(join(dir, 'dist'), { recursive: true })
-  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id: 'widget', name: 'Widget', version, baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    node: './dist/node.js', client: './dist/client.js',
-  }))
+  writeFileSync(
+    join(dir, 'acorn-plugin.json'),
+    JSON.stringify({
+      id: 'widget',
+      name: 'Widget',
+      version,
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      node: './dist/node.js',
+      client: './dist/client.js',
+    }),
+  )
   writeFileSync(join(dir, 'dist/node.js'), 'export default { name: "widget", init() {} }')
   writeFileSync(join(dir, 'dist/client.js'), bytes)
 }
@@ -50,7 +58,11 @@ describe('plugin state composition', () => {
 
     putPackage('2.0.0', newBytes)
     const updated = pluginState(bridge).plugins[0]!
-    expect(updated).toMatchObject({ state: 'pending-restart', active: { version: '1.0.0', client: { hash: hash(oldBytes) } }, installed: { version: '2.0.0', client: { hash: hash(newBytes) } } })
+    expect(updated).toMatchObject({
+      state: 'pending-restart',
+      active: { version: '1.0.0', client: { hash: hash(oldBytes) } },
+      installed: { version: '2.0.0', client: { hash: hash(newBytes) } },
+    })
     expect(new TextDecoder().decode((await bridge.clientBundle('widget', hash(oldBytes)))!.bytes)).toBe(oldBytes)
     expect(new TextDecoder().decode((await bridge.clientBundle('widget', hash(newBytes)))!.bytes)).toBe(newBytes)
 
@@ -75,7 +87,12 @@ describe('plugin state composition', () => {
       setDisabled: () => {},
       reloadHost: { reload: async () => ({ ok: false, error: 'not wired in this test' }) },
     })
-    bridge.inputGrants().set({ pluginId: 'widget', sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } }, grantedAt: 1, grantedBy: 'device:d1' })
+    bridge.inputGrants().set({
+      pluginId: 'widget',
+      sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } },
+      grantedAt: 1,
+      grantedBy: 'device:d1',
+    })
     await bridge.uninstall('widget', { purgeData: false })
     expect(inputGrantsStore(root).get('widget')).toBeUndefined()
   })

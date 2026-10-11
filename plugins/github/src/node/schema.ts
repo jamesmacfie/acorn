@@ -138,7 +138,9 @@ export const reviewThreads = sqliteTable(
     path: text('path'),
     line: integer('line'),
     originalLine: integer('original_line'),
-    outdated: integer('outdated', { mode: 'boolean' }), // null means legacy, unverified location
+    // Null on a thread mirrored before this column, so its location is unverified. A mirror refresh
+    // replaces it. Mixed-version path until 2027-01-05.
+    outdated: integer('outdated', { mode: 'boolean' }),
     side: text('side'), // RIGHT | LEFT
     resolved: integer('resolved', { mode: 'boolean' }).notNull().default(false),
     author: text('author'),

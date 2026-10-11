@@ -32,7 +32,9 @@ export function CommitModal(props: { model: ChangesModel; onDismiss: () => void 
         <Text emphasis="muted">{gitCommitLine(model())}</Text>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onPress={props.onDismiss}>Cancel</Button>
+        <Button variant="ghost" onPress={props.onDismiss}>
+          Cancel
+        </Button>
         <Button
           variant="solid"
           busy={model().committing()}
@@ -40,7 +42,13 @@ export function CommitModal(props: { model: ChangesModel; onDismiss: () => void 
           // Dismissed only once the draft is gone, which is what a commit that landed leaves
           // behind. A `before-commit` veto keeps the text, so the reader stays here with the reason
           // in the footer's alert and the message still in front of them.
-          onPress={() => void model().commit().then(() => { if (!model().draft()) props.onDismiss() })}
+          onPress={() =>
+            void model()
+              .commit()
+              .then(() => {
+                if (!model().draft()) props.onDismiss()
+              })
+          }
         >
           {commitButtonLabel(model())}
         </Button>

@@ -79,7 +79,9 @@ describe('a text setting', () => {
   })
 
   it('keeps the typed value and shows the error when the write fails', async () => {
-    const row = mount(async () => { throw new Error('The node is offline.') })
+    const row = mount(async () => {
+      throw new Error('The node is offline.')
+    })
     row.type('4100')
     await settle()
     expect(row.stored()).toBe('4000')
@@ -100,11 +102,14 @@ describe('a text setting', () => {
 
 describe('a setting row', () => {
   it('turns its control inert and says where the value comes from when it is set elsewhere', () => {
-    dispose = render(() => (
-      <SettingRow label="Setup script" from=".acorn/config.toml">
-        <Input label="Setup script" value="pnpm install" />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Setup script" from=".acorn/config.toml">
+          <Input label="Setup script" value="pnpm install" />
+        </SettingRow>
+      ),
+      host,
+    )
     expect(host.querySelector('.ui-setting-from')?.textContent).toBe('From .acorn/config.toml')
     expect(host.querySelector('fieldset')?.disabled).toBe(true)
     // The value this machine holds stays on screen underneath.
@@ -112,24 +117,32 @@ describe('a setting row', () => {
   })
 
   it('names a device row by its label and its chip, without the changed dot', () => {
-    dispose = render(() => (
-      <SettingRow label="Tool call display" scope="device" onReset={() => {}}>
-        <Input label="Tool call display" value="collapsed" />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Tool call display" scope="device" onReset={() => {}}>
+          <Input label="Tool call display" value="collapsed" />
+        </SettingRow>
+      ),
+      host,
+    )
     const group = host.querySelector('[role="group"]')!
-    const name = group.getAttribute('aria-labelledby')!.split(' ')
+    const name = group
+      .getAttribute('aria-labelledby')!
+      .split(' ')
       .map((id) => document.getElementById(id)?.textContent)
       .join(' ')
     expect(name).toBe('Tool call display This device')
   })
 
   it('keeps its help mark out of the name, and a device row still says its chip', () => {
-    dispose = render(() => (
-      <SettingRow label="Tool call display" scope="device" help="How a tool call starts out.">
-        <Input label="Tool call display" value="collapsed" />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Tool call display" scope="device" help="How a tool call starts out.">
+          <Input label="Tool call display" value="collapsed" />
+        </SettingRow>
+      ),
+      host,
+    )
     const group = host.querySelector('[role="group"]')!
     const ids = group.getAttribute('aria-labelledby')!.split(' ')
     expect(ids.map((id) => document.getElementById(id)?.textContent).join(' ')).toBe('Tool call display This device')
@@ -143,11 +156,14 @@ describe('a setting row', () => {
 
   it('labels its one control, so clicking the label flips a switch', () => {
     const flip = vi.fn()
-    dispose = render(() => (
-      <SettingRow label="Play a sound" description="On every notification.">
-        <Checkbox switch checked={false} onChange={flip} />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Play a sound" description="On every notification.">
+          <Checkbox switch checked={false} onChange={flip} />
+        </SettingRow>
+      ),
+      host,
+    )
     const label = host.querySelector<HTMLLabelElement>('label.ui-setting-label')!
     const box = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!
     expect(label.htmlFor).toBe(box.id)
@@ -157,12 +173,15 @@ describe('a setting row', () => {
   })
 
   it('leaves two controls to their own names', () => {
-    dispose = render(() => (
-      <SettingRow label="Window size">
-        <Input label="Width" value="1440" />
-        <Input label="Height" value="900" />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Window size">
+          <Input label="Width" value="1440" />
+          <Input label="Height" value="900" />
+        </SettingRow>
+      ),
+      host,
+    )
     expect(host.querySelector<HTMLLabelElement>('label.ui-setting-label')!.htmlFor).toBe('')
     expect(host.querySelector('[role="group"]')).not.toBeNull()
   })
@@ -170,11 +189,14 @@ describe('a setting row', () => {
   it('offers Reset, with the dot, only while it has somewhere to reset to', () => {
     const reset = vi.fn()
     const [changed, setChanged] = createSignal(true)
-    dispose = render(() => (
-      <SettingRow label="Concurrent agents" onReset={changed() ? reset : undefined}>
-        <Input label="Concurrent agents" value="8" />
-      </SettingRow>
-    ), host)
+    dispose = render(
+      () => (
+        <SettingRow label="Concurrent agents" onReset={changed() ? reset : undefined}>
+          <Input label="Concurrent agents" value="8" />
+        </SettingRow>
+      ),
+      host,
+    )
     const button = () => [...host.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Reset')
     expect(host.querySelector('.ui-setting-changed')).not.toBeNull()
     button()!.click()

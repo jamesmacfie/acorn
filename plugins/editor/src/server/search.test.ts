@@ -4,20 +4,31 @@ import { parseRgJson } from './search'
 // A `rg --json` line for a match. Mirrors the real event shape (see ./search.ts's RgEvent).
 const begin = (path: string) => JSON.stringify({ type: 'begin', data: { path: { text: path } } })
 const match = (path: string, line: number, text: string, start: number, end: number) =>
-  JSON.stringify({ type: 'match', data: { path: { text: path }, lines: { text }, line_number: line, submatches: [{ start, end }] } })
+  JSON.stringify({
+    type: 'match',
+    data: { path: { text: path }, lines: { text }, line_number: line, submatches: [{ start, end }] },
+  })
 const end = (path: string) => JSON.stringify({ type: 'end', data: { path: { text: path } } })
 
 describe('parseRgJson', () => {
   it('groups matches by file and maps offsets to 1-based columns', () => {
-    const out = parseRgJson([begin('./src/a.ts'), match('./src/a.ts', 12, 'const foo = 1\n', 6, 9), end('./src/a.ts')].join('\n'))
+    const out = parseRgJson(
+      [begin('./src/a.ts'), match('./src/a.ts', 12, 'const foo = 1\n', 6, 9), end('./src/a.ts')].join('\n'),
+    )
     expect(out.truncated).toBe(false)
-    expect(out.files).toEqual([{ path: 'src/a.ts', hits: [{ line: 12, col: 7, endCol: 10, preview: 'const foo = 1' }] }])
+    expect(out.files).toEqual([
+      { path: 'src/a.ts', hits: [{ line: 12, col: 7, endCol: 10, preview: 'const foo = 1' }] },
+    ])
   })
 
   it('converts ripgrep UTF-8 byte offsets to editor UTF-16 columns', () => {
     const prefix = '🙂 café '
     const start = Buffer.byteLength(prefix)
-    const out = parseRgJson([begin('unicode.ts'), match('unicode.ts', 4, `${prefix}needle\n`, start, start + 6), end('unicode.ts')].join('\n'))
+    const out = parseRgJson(
+      [begin('unicode.ts'), match('unicode.ts', 4, `${prefix}needle\n`, start, start + 6), end('unicode.ts')].join(
+        '\n',
+      ),
+    )
     expect(out.files[0].hits[0]).toMatchObject({ line: 4, col: 9, endCol: 15, preview: '🙂 café needle' })
   })
 
@@ -54,7 +65,12 @@ it('reports malformed output instead of returning an empty success', () => {
 it('does not count unsupported bytes events as evidence beyond exactly 2000 hits', () => {
   const lines = [begin('supported.ts')]
   for (let i = 0; i < 2000; i++) lines.push(match('supported.ts', i + 1, 'hit\n', 0, 3))
-  lines.push(JSON.stringify({ type: 'match', data: { lines: { bytes: 'aGl0' }, line_number: 2001, submatches: [{ start: 0, end: 3 }] } }))
+  lines.push(
+    JSON.stringify({
+      type: 'match',
+      data: { lines: { bytes: 'aGl0' }, line_number: 2001, submatches: [{ start: 0, end: 3 }] },
+    }),
+  )
   lines.push(JSON.stringify({ type: 'begin', data: { path: { bytes: 'aGl0' } } }))
   lines.push(match('ignored', 1, 'hit\n', 0, 3))
   const result = parseRgJson(lines.join('\n'))

@@ -6,11 +6,10 @@
 // "what can a third-party plugin do to my machine" is decided here, and the table is deliberately an
 // allowlist of (path shape, method) pairs rather than a prefix match.
 //
-// Why not `core.tasks:read ⇒ GET /v1/core/tasks*`, which is what the phase doc sketches: that glob
-// also matches `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL, and the same shape
-// over `/v1/core/projects*` would match `GET /v1/core/projects/:id/mcp`, which hands out the commands a
-// project's agents run. Both are read-shaped and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
-// path.
+// Why not `core.tasks:read ⇒ /v1/core/tasks*`: that glob also matches `/v1/core/tasks/:id/preview-url`,
+// which runs the project's preview script, and the same shape over `/v1/core/projects*` would match
+// `GET /v1/core/projects/:id/mcp`, which hands out the commands a project's agents run. Neither belongs
+// to a plugin. A star is the wrong granularity, so every rule below names its path.
 //
 // Three groups, and the difference between the last two is intent rather than effect:
 //
@@ -53,7 +52,7 @@ const SEG = '[^/]+'
 const shape = (pattern: string) => new RegExp(`^${pattern}$`)
 
 // Ordered: the first rule whose path matches decides. Literal paths come before the `:id` shapes they
-// would otherwise be captured by (`/workspaces/bootstrap` before `/workspaces/:id`).
+// would otherwise be captured by (`/workspaces/icon-images/:imageId` before `/workspaces/:id`).
 const RULES: readonly RouteRule[] = [
   // ── Tasks ───────────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/tasks'), scopes: { GET: 'core.tasks:read', POST: 'core.tasks:write' } },
@@ -66,32 +65,33 @@ const RULES: readonly RouteRule[] = [
   {
     path: shape(`/v1/core/tasks/${SEG}/links`),
     scopes: { GET: 'core.tasks:read', POST: 'core.tasks:write' },
-    note: 'DELETE stays absent: unlinking is a user-visible edit to task history, handled by native task UI.',
   },
   { path: shape(`/v1/core/tasks/${SEG}/context`), scopes: { GET: 'core.tasks:read' } },
   { path: shape(`/v1/core/tasks/${SEG}/archive`), scopes: { POST: 'core.tasks:write' } },
   {
     path: shape(`/v1/core/tasks/${SEG}/restore`),
     scopes: {},
-    note: 'Restore rebuilds the worktree and runs the project setup script, so it is an owner act from '
-      + 'the archive page, not something a frame can trigger.',
+    note:
+      'Restore rebuilds the worktree and runs the project setup script, so it is an owner act from ' +
+      'the archive page, not something a frame can trigger.',
   },
   {
     path: shape(`/v1/core/tasks/${SEG}/delete`),
     scopes: {},
-    note: 'Deletes a task and every plugin\'s data for it, with no undo. Device-only on the node as well.',
+    note: "Deletes a task and every plugin's data for it, with no undo. Device-only on the node as well.",
   },
   {
     path: shape('/v1/core/search'),
     scopes: {},
-    note: 'Reaches every task\'s history across every plugin. Device-only on the node as well.',
+    note: "Reaches every task's history across every plugin. Device-only on the node as well.",
   },
   {
     path: shape(`/v1/core/tasks/${SEG}/archive-concerns`),
     scopes: {},
-    note: 'Every plugin\'s answer about archiving this task, in one list. No scope, because reading '
-      + 'it would hand a frame the other installed plugins\' warnings about the owner\'s work, a '
-      + 'cross-plugin read this profile refuses. The dialog that shows it is the host\'s own.',
+    note:
+      "Every plugin's answer about archiving this task, in one list. No scope, because reading " +
+      "it would hand a frame the other installed plugins' warnings about the owner's work, a " +
+      "cross-plugin read this profile refuses. The dialog that shows it is the host's own.",
   },
 
   // ── Projects ────────────────────────────────────────────────────────────────────────────────────
@@ -109,43 +109,58 @@ const RULES: readonly RouteRule[] = [
   {
     path: shape(`/v1/core/projects/${SEG}/config`),
     scopes: { GET: 'core.projects:config' },
-    note: 'GET reads setup/dev/teardown/db-url scripts, which frequently carry credentials. PUT writes those scripts for the Node to execute and is permanently unmappable (server/repoConfigTrust.ts).',
+    note: 'GET reads setup/dev/teardown/db-url scripts, which frequently carry credentials. PUT writes those scripts for the Node to execute and is permanently unmappable (server/projects/repoConfigTrust.ts).',
   },
   {
     path: shape(`/v1/core/projects/${SEG}/run-targets`),
     scopes: {},
     note: 'Same as config: run targets are commands the Node runs.',
   },
-  { path: shape(`/v1/core/projects/${SEG}/mcp`), scopes: {}, note: 'The MCP servers a project’s agents load, commands and masked environments included.' },
+  {
+    path: shape(`/v1/core/projects/${SEG}/mcp`),
+    scopes: {},
+    note: 'The MCP servers a project’s agents load, commands and masked environments included.',
+  },
   { path: shape(`/v1/core/projects/${SEG}/mcp/starter`), scopes: {}, note: 'Writes a file into the project folder.' },
   {
     path: shape(`/v1/core/projects/${SEG}/worktrees`),
     scopes: {},
-    note: 'Absolute paths and branches of git worktrees on the machine, for the host\'s own new-task dialog.',
+    note: "Absolute paths and branches of git worktrees on the machine, for the host's own new-task dialog.",
   },
   {
     path: shape(`/v1/core/projects/${SEG}/branches`),
     scopes: {},
-    note: 'Local Git branch names belong to the host\'s new-task flow, not a sandboxed frame.',
+    note: "Local Git branch names belong to the host's new-task flow, not a sandboxed frame.",
   },
   {
     path: shape(`/v1/core/projects/${SEG}/worktree-availability`),
     scopes: {},
-    note: 'Probes local branch and worktree state for the host\'s new-task flow.',
+    note: "Probes local branch and worktree state for the host's new-task flow.",
   },
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
-  { path: shape('/v1/core/workspaces/bootstrap'), scopes: {}, note: 'Creates a project collection; mutation.' },
-  { path: shape(`/v1/core/workspaces/icon-images/${SEG}`), scopes: {}, note: 'Workspace artwork is fetched by the authenticated host, not plugin frames.' },
-  { path: shape(`/v1/core/workspaces/${SEG}/icon-image`), scopes: {}, note: 'Workspace appearance uploads are owner mutations.' },
+  {
+    path: shape(`/v1/core/workspaces/icon-images/${SEG}`),
+    scopes: {},
+    note: 'Workspace artwork is fetched by the authenticated host, not plugin frames.',
+  },
+  {
+    path: shape(`/v1/core/workspaces/${SEG}/icon-image`),
+    scopes: {},
+    note: 'Workspace appearance uploads are owner mutations.',
+  },
   {
     path: shape(`/v1/core/workspaces/${SEG}`),
     scopes: { GET: 'core.workspaces:read' },
     note: 'A project collection mutation is unmappable: it changes the top-level unit a user organises by hand.',
   },
   { path: shape(`/v1/core/workspaces/${SEG}/external-projects`), scopes: { GET: 'core.workspaces:read' } },
-  { path: shape(`/v1/core/workspaces/${SEG}/project-order`), scopes: {}, note: 'Project order is an owner-controlled mutation.' },
+  {
+    path: shape(`/v1/core/workspaces/${SEG}/project-order`),
+    scopes: {},
+    note: 'Project order is an owner-controlled mutation.',
+  },
 
   // ── Permanently unmappable ──────────────────────────────────────────────────────────────────────
   // Node administration and owner surfaces. Nothing here has a read a plugin needs, and several would
@@ -158,11 +173,19 @@ const RULES: readonly RouteRule[] = [
   // runtimes). Unmappable, and it is a write rather than a read: everything admitted there reaches
   // every subscribed sink and a sink can post it off the machine. A frame measuring its own work
   // has `ctx.telemetry` on the bridge, which files under the plugin the host bound.
-  { path: shape('/v1/core/telemetry'), scopes: {}, note: 'Anything posted here reaches every sink; a frame cannot be allowed to write into that stream.' },
+  {
+    path: shape('/v1/core/telemetry'),
+    scopes: {},
+    note: 'Anything posted here reaches every sink; a frame cannot be allowed to write into that stream.',
+  },
   // The counters Settings draws (docs/telemetry/diagnosis.md § What the page shows). Unmappable because the
   // answer names every other plugin on this machine and how much each of them is producing, which
   // is a plugin roster with a load profile attached. A plugin's own numbers are its own to keep.
-  { path: shape('/v1/core/telemetry/summary'), scopes: {}, note: 'Names every other owner on this node and what each produces.' },
+  {
+    path: shape('/v1/core/telemetry/summary'),
+    scopes: {},
+    note: 'Names every other owner on this node and what each produces.',
+  },
   // Periodic work the node runs unattended (docs/schedules.md). Unmappable in both directions: reading
   // the list enumerates what this machine does while nobody is watching, and creating or resuming one is
   // a way to make code run later, which is the same primitive as an install with a delay on it. A plugin
@@ -178,7 +201,11 @@ const RULES: readonly RouteRule[] = [
   // The control plane this node is attached to (docs/node-enrollment.md). Unmappable in both
   // directions: reading it names a control plane and the device row that vouches for it, and the DELETE
   // would let a plugin frame cut a node off from whoever provisioned it.
-  { path: shape('/v1/core/attachment'), scopes: {}, note: 'Attachment is owner administration; the DELETE revokes a credential.' },
+  {
+    path: shape('/v1/core/attachment'),
+    scopes: {},
+    note: 'Attachment is owner administration; the DELETE revokes a credential.',
+  },
   // Node providers (docs/plugins/node-providers.md § Node providers). The sharpest entry added since the plugin-install
   // routes below, and for the same reason: `adopt` hands over a durable credential for another machine,
   // `create` spends the owner's money, and `destroy` is irreversible. The list is no better — it
@@ -195,7 +222,11 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v1/core/pair'), scopes: {}, note: 'Pairing window administration belongs to the owner.' },
   { path: shape('/v1/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
-  { path: shape('/v1/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
+  {
+    path: shape('/v1/core/plugins'),
+    scopes: {},
+    note: 'Which code a device runs is an owner decision, not a plugin one.',
+  },
   { path: shape(`/v1/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   { path: shape(`/v1/core/plugins/${SEG}/bundles/${SEG}`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
@@ -207,36 +238,80 @@ const RULES: readonly RouteRule[] = [
   // exactly why a frame must not be able to reach it: a prompt-injected agent driving a frame could
   // otherwise re-run a plugin's node half on its own timing.
   { path: shape(`/v1/core/plugins/${SEG}/reload`), scopes: {} },
-  { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
-  { path: shape(`/v1/core/plugins/${SEG}/input-grant`), scopes: {}, note: 'Approves which of the owner’s data a plugin may read.' },
-  { path: shape(`/v1/core/plugins/${SEG}/model-grant`), scopes: {}, note: 'Sets which model a plugin spends and how much, which the plugin must not choose for itself.' },
+  {
+    path: shape(`/v1/core/plugins/${SEG}/review`),
+    scopes: {},
+    note: 'Clears a durable gate before Node code can run.',
+  },
+  {
+    path: shape(`/v1/core/plugins/${SEG}/input-grant`),
+    scopes: {},
+    note: 'Approves which of the owner’s data a plugin may read.',
+  },
+  {
+    path: shape(`/v1/core/plugins/${SEG}/model-grant`),
+    scopes: {},
+    note: 'Sets which model a plugin spends and how much, which the plugin must not choose for itself.',
+  },
   { path: shape(`/v1/core/plugins/${SEG}/skills`), scopes: {}, note: 'Switches the procedures a plugin gives agents.' },
-  { path: shape(`/v1/core/plugins/${SEG}/skill-grant`), scopes: {}, note: 'Approves text a plugin puts in front of every agent.' },
+  {
+    path: shape(`/v1/core/plugins/${SEG}/skill-grant`),
+    scopes: {},
+    note: 'Approves text a plugin puts in front of every agent.',
+  },
   // Development mode reloads a plugin on every save and approves what it reads, so a frame that could
   // turn it on would get both without a prompt.
-  { path: shape(`/v1/core/plugins/${SEG}/development`), scopes: {}, note: 'Reloads a plugin on save and approves what it reads.' },
+  {
+    path: shape(`/v1/core/plugins/${SEG}/development`),
+    scopes: {},
+    note: 'Reloads a plugin on save and approves what it reads.',
+  },
   { path: shape(`/v1/core/plugins/${SEG}/logs`), scopes: {}, note: 'Another plugin’s log lines.' },
   // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
   // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
   // able to answer the very question that exists because an agent must not install code.
   { path: shape(`/v1/core/plugins/requests/${SEG}`), scopes: {} },
-  { path: shape(`/v1/core/plugins/${SEG}`), scopes: {}, note: 'Uninstall, including the option to delete another plugin’s data.' },
-  { path: shape('/v1/core/prefs'), scopes: {}, note: 'Every preference on the node, including other plugins’ persisted state. Frames get their own namespaced `state` verb instead.' },
+  {
+    path: shape(`/v1/core/plugins/${SEG}`),
+    scopes: {},
+    note: 'Uninstall, including the option to delete another plugin’s data.',
+  },
+  {
+    path: shape('/v1/core/prefs'),
+    scopes: {},
+    note: 'Every preference on the node, including other plugins’ persisted state. Frames get their own namespaced `state` verb instead.',
+  },
   // The measure series behind a stat's trend. Denied for the same reason `prefs` is: a panel is composed
   // over whatever collections its owner chose, so one plugin's frame reading a panel's history is one
   // plugin reading a number derived from another's rows. The panels themselves are drawn by the host.
-  { path: shape('/v1/core/dashboards/history'), scopes: {}, note: 'A panel’s measure may be derived from another plugin’s collection.' },
+  {
+    path: shape('/v1/core/dashboards/history'),
+    scopes: {},
+    note: 'A panel’s measure may be derived from another plugin’s collection.',
+  },
   { path: shape('/v1/core/agent-tools'), scopes: {}, note: 'Agent tool catalog and permissions.' },
-  { path: shape(`/v1/core/tasks/${SEG}/renderer-tools/${SEG}`), scopes: {}, note: 'The renderer’s own agent-tool call surface.' },
+  {
+    path: shape(`/v1/core/tasks/${SEG}/renderer-tools/${SEG}`),
+    scopes: {},
+    note: 'The renderer’s own agent-tool call surface.',
+  },
   { path: shape(`/v1/core/tasks/${SEG}/run`), scopes: {}, note: 'Run targets are commands.' },
   { path: shape(`/v1/core/tasks/${SEG}/run/default-url`), scopes: {} },
   { path: shape(`/v1/core/tasks/${SEG}/run/${SEG}/start`), scopes: {}, note: 'Executes a command on the Node.' },
   { path: shape(`/v1/core/tasks/${SEG}/run/${SEG}/stop`), scopes: {} },
   { path: shape(`/v1/core/tasks/${SEG}/run/${SEG}/status`), scopes: {} },
-  { path: shape(`/v1/core/tasks/${SEG}/config-trust`), scopes: {}, note: 'Acknowledging repo config trust is the user’s act, and the whole guard on the code-execution path.' },
-  { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Read-shaped, but hands out a tunnel URL.' },
+  {
+    path: shape(`/v1/core/tasks/${SEG}/config-trust`),
+    scopes: {},
+    note: 'Acknowledging repo config trust is the user’s act, and the whole guard on the code-execution path.',
+  },
+  { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Runs the project’s preview script.' },
   { path: shape(`/v1/core/tasks/${SEG}/on-created`), scopes: {}, note: 'Runs the task setup script.' },
-  { path: shape('/v1/core/integrations'), scopes: {}, note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.' },
+  {
+    path: shape('/v1/core/integrations'),
+    scopes: {},
+    note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.',
+  },
   { path: shape(`/v1/core/integrations/${SEG}`), scopes: {} },
   { path: shape(`/v1/core/integrations/${SEG}/test`), scopes: {}, note: 'Spends another plugin’s credential.' },
   // Read-shaped and still unmappable, for both halves of the rule above it: the call spends another
@@ -253,7 +328,11 @@ const RULES: readonly RouteRule[] = [
   // plugin every connection the owner holds to serve one dropdown. A plugin that needs the list serves
   // it from its own `/v1/p/<id>` route over `ctx.core.models.available`, which is what the three
   // Generate dialogs already do (docs/integrations/model-providers.md § Model providers).
-  { path: shape('/v1/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
+  {
+    path: shape('/v1/core/models/backends'),
+    scopes: {},
+    note: 'The whole model roster. A plugin proxies its own through ctx.core.models.',
+  },
 ]
 
 export type ApiDecision = { allowed: true; path: string } | { allowed: false; reason: string }
@@ -353,13 +432,24 @@ export const GRANTABLE_SCOPES: readonly string[] = [
 // and the icon live here, beside the grant, rather than being guessed back from the sentence: this
 // table is the only place that knows how serious `core.projects:read` is.
 //
-// The copy is free to change. It used to be the update-diff key: a rewording marked the line as newly
-// requested for every owner of every installed plugin. The scope name is the key now
-// (plugins/permissions.ts).
+// The copy is free to change: the update diff keys on the scope name, not the sentence
+// (trust/permissions.ts).
 const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
-  'core.projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },
-  'core.projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
-  'core.projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
+  'core.projects:config': {
+    text: 'Read every project’s build, dev and database scripts',
+    icon: 'file-cog',
+    high: true,
+  },
+  'core.projects:read': {
+    text: 'Read projects, including where every codebase lives on disk',
+    icon: 'folder-tree',
+    high: true,
+  },
+  'core.projects:write': {
+    text: 'Create and update projects, including their on-disk locations',
+    icon: 'folder-plus',
+    high: true,
+  },
   'core.tasks:read': { text: 'Read tasks', icon: 'list' },
   'core.tasks:write': { text: 'Create and update tasks', icon: 'square-pen' },
   'core.workspaces:read': { text: 'Read project collections', icon: 'layout-grid' },

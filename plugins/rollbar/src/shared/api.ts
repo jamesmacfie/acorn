@@ -9,7 +9,7 @@ export type RollbarItemSummary = {
   integrationId: string
   integrationLabel: string
   identifier: string // the project-visible counter ('142')
-  itemId: string // system-wide item id, a string at Acorn boundaries ('' when a legacy row predates it)
+  itemId: string // system-wide item id, a string at Acorn boundaries
   url: string | null // Rollbar's account-independent item permalink
   title: string
   level: string
@@ -19,8 +19,6 @@ export type RollbarItemSummary = {
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
   framework?: string
-  // Optional, like framework, so an older cached row stays valid until the next list refresh.
-  lastActivatedAt?: number | null // later than firstOccurrenceAt ⇒ the item regressed after a resolve
   uniqueOccurrences?: number // distinct-IP count; plan-dependent upstream
 }
 
@@ -63,7 +61,16 @@ export type RollbarItemMetadata = RollbarItemSummary & {
 // Person is flattened to the username only: list rows never carry emails into the cache.
 export type RollbarOccurrenceSummary = Pick<
   RollbarOccurrenceDetail,
-  'id' | 'occurredAt' | 'uuid' | 'url' | 'kind' | 'exceptionClass' | 'message' | 'environment' | 'codeVersion' | 'request'
+  | 'id'
+  | 'occurredAt'
+  | 'uuid'
+  | 'url'
+  | 'kind'
+  | 'exceptionClass'
+  | 'message'
+  | 'environment'
+  | 'codeVersion'
+  | 'request'
 > & { personUsername: string | null }
 
 export type RollbarOccurrencesResponse = {
@@ -87,18 +94,16 @@ export type RollbarItemsResponse = {
 export const rollbarItemsRoute = '/v1/p/rollbar/items'
 export const rollbarItemsForConnectionsRoute = (integrationIds: readonly string[]) =>
   `${rollbarItemsRoute}?integrations=${encodeURIComponent([...new Set(integrationIds)].sort().join(','))}`
-export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemMetadataRoute = (integrationId: string, identifier: string, refresh = false) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
-export const rollbarOccurrenceRoute = (integrationId: string, identifier: string, occurrenceId: string, refresh = false) =>
+export const rollbarOccurrenceRoute = (
+  integrationId: string,
+  identifier: string,
+  occurrenceId: string,
+  refresh = false,
+) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = (integrationIds: readonly string[]) =>
   ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
-export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
-export const rollbarItemMetadataKey = (integrationId: string, identifier: string) => ['rollbar-item-metadata', integrationId, identifier] as const
-export const rollbarOccurrencesKey = (integrationId: string, identifier: string) => ['rollbar-occurrences', integrationId, identifier] as const
-export const rollbarOccurrenceKey = (integrationId: string, identifier: string, occurrenceId: string) =>
-  ['rollbar-occurrence', integrationId, identifier, occurrenceId] as const

@@ -56,10 +56,13 @@ describe('FleetStore', () => {
     expect(statSync(join(dir, 'acorn-1-device-token-node-remote')).mode & 0o777).toBe(0o600)
   })
 
-  it('scopes the local node\'s token by the data dir, not its nodeId', () => {
+  it("scopes the local node's token by the data dir, not its nodeId", () => {
     // The local token has to be readable before the service starts, and starting it is the only thing
     // that can report the nodeId (deviceTokenStore.ts).
-    store().remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
+    store().remember(
+      { nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true },
+      'tok-local',
+    )
 
     expect(existsSync(join(dir, 'acorn-1-device-token-local'))).toBe(true)
     expect(existsSync(join(dir, 'acorn-1-device-token-node-local'))).toBe(false)
@@ -84,21 +87,39 @@ describe('FleetStore', () => {
     // for.
     const fleet = store()
     fleet.remember({ ...remote }, 'tok-remote')
-    fleet.remember({ nodeId: 'node-was', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-old')
-    fleet.remember({ nodeId: 'node-now', label: 'This computer', endpoint: 'https://127.0.0.1:2', local: true }, 'tok-new')
+    fleet.remember(
+      { nodeId: 'node-was', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true },
+      'tok-old',
+    )
+    fleet.remember(
+      { nodeId: 'node-now', label: 'This computer', endpoint: 'https://127.0.0.1:2', local: true },
+      'tok-new',
+    )
 
-    expect(fleet.list().filter((node) => node.local).map((node) => node.nodeId)).toEqual(['node-now'])
+    expect(
+      fleet
+        .list()
+        .filter((node) => node.local)
+        .map((node) => node.nodeId),
+    ).toEqual(['node-now'])
     expect(fleet.get('node-was')).toBeUndefined()
     // Pairings are untouched, and the shared local token scope now holds the live node's credential.
     expect(fleet.get('node-remote')?.endpoint).toBe(remote.endpoint)
     expect(fleet.tokenFor('node-now')).toBe('tok-new')
-    expect(store().list().filter((node) => node.local)).toHaveLength(1)
+    expect(
+      store()
+        .list()
+        .filter((node) => node.local),
+    ).toHaveLength(1)
   })
 
   it('does not let a pairing displace the local node', () => {
     // The singleton rule is one-directional: remembering a remote node must leave the local row alone.
     const fleet = store()
-    fleet.remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
+    fleet.remember(
+      { nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true },
+      'tok-local',
+    )
     fleet.remember({ ...remote }, 'tok-remote')
 
     expect(fleet.list().map((node) => node.nodeId)).toEqual(['node-local', 'node-remote'])

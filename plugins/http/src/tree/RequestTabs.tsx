@@ -2,15 +2,40 @@
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
 // panels, Bruno's arrangement, and it keeps the current mode visible from any tab.
 import { createMemo, createSignal, Show } from 'solid-js'
-import { Field, Input, KeyValueEditor, Select, Stack, TabPanel, Tabs, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui/tree'
-import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
+import {
+  Field,
+  Input,
+  KeyValueEditor,
+  Select,
+  Stack,
+  TabPanel,
+  Tabs,
+  Text,
+  Textarea,
+  Toolbar,
+} from '@acorn/plugin-api/ui/tree'
+import {
+  authModes,
+  bodyModes,
+  joinUrl,
+  parseFormBody,
+  splitUrl,
+  type AuthConfig,
+  type BodyMode,
+  type KeyValue,
+} from '../shared/model'
 import type { Draft } from './draft'
 
 type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 
 // The stored mode words stay as they are; only what the selects show changes.
 const BODY_LABEL: Record<BodyMode, string> = { none: 'None', json: 'JSON', text: 'Text', form: 'Form (URL-encoded)' }
-const AUTH_LABEL: Record<AuthConfig['mode'], string> = { none: 'None', basic: 'Basic', bearer: 'Bearer token', apikey: 'API key' }
+const AUTH_LABEL: Record<AuthConfig['mode'], string> = {
+  none: 'None',
+  basic: 'Basic',
+  bearer: 'Bearer token',
+  apikey: 'API key',
+}
 
 // Two shapes the kit owns, declared here rather than imported from the components barrel: a tree
 // bundle must not reach that barrel, because its build compiles JSX into acorn's nodes and a shell
@@ -25,14 +50,21 @@ type KVRow = { enabled?: boolean; key: string; value: string }
  * The grid lives in client-core's KeyValueEditor, including the trailing blank row and the
  * `<Index>`-not-`<For>` rule that keeps an input from losing focus on every keystroke.
  */
-function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; nameLabel?: string; valueLabel?: string }) {
+function KeyValueTable(props: {
+  rows: KeyValue[]
+  onChange: (rows: KeyValue[]) => void
+  nameLabel?: string
+  valueLabel?: string
+}) {
   return (
     <KeyValueEditor
       ariaLabel={`${props.nameLabel ?? 'Name'} / ${props.valueLabel ?? 'Value'}`}
       keyPlaceholder={props.nameLabel ?? 'Name'}
       valuePlaceholder={props.valueLabel ?? 'Value'}
       rows={props.rows.map((row) => ({ key: row.name, value: row.value, enabled: row.enabled }))}
-      onChange={(rows: KVRow[]) => props.onChange(rows.map((row) => ({ name: row.key, value: row.value, enabled: row.enabled ?? true })))}
+      onChange={(rows: KVRow[]) =>
+        props.onChange(rows.map((row) => ({ name: row.key, value: row.value, enabled: row.enabled ?? true })))
+      }
     />
   )
 }
@@ -40,7 +72,9 @@ function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) =
 // Per-request variable overrides are a plain Record, not KeyValue[]: they have no enabled flag and
 // no kind. Secrets and commands are repo-level, where the server can decrypt and run them.
 function VarsTable(props: { vars: Record<string, string>; onChange: (vars: Record<string, string>) => void }) {
-  const rows = createMemo<KeyValue[]>(() => Object.entries(props.vars).map(([name, value]) => ({ name, value, enabled: true })))
+  const rows = createMemo<KeyValue[]>(() =>
+    Object.entries(props.vars).map(([name, value]) => ({ name, value, enabled: true })),
+  )
   return (
     <Stack gap="row">
       <Text tone="muted" wrap>
@@ -63,7 +97,9 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
   return (
     <Stack gap="row">
       <Show when={props.auth.mode === 'none'}>
-        <Text tone="muted" wrap>This request sends no credentials. You can also add an Authorization header on the Headers tab.</Text>
+        <Text tone="muted" wrap>
+          This request sends no credentials. You can also add an Authorization header on the Headers tab.
+        </Text>
       </Show>
 
       <Show when={props.auth.mode === 'basic'}>
@@ -72,10 +108,19 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
           return (
             <>
               <Field label="Username">
-                <Input size="sm" value={auth().username} onChange={(value: string) => props.onChange({ ...auth(), username: value })} />
+                <Input
+                  size="sm"
+                  value={auth().username}
+                  onChange={(value: string) => props.onChange({ ...auth(), username: value })}
+                />
               </Field>
               <Field label="Password">
-                <Input size="sm" type="password" value={auth().password} onChange={(value: string) => props.onChange({ ...auth(), password: value })} />
+                <Input
+                  size="sm"
+                  type="password"
+                  value={auth().password}
+                  onChange={(value: string) => props.onChange({ ...auth(), password: value })}
+                />
               </Field>
             </>
           )
@@ -87,7 +132,12 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
           const auth = () => props.auth as Extract<AuthConfig, { mode: 'bearer' }>
           return (
             <Field label="Token">
-              <Input size="sm" value={auth().token} placeholder="{{TOKEN}}" onChange={(value: string) => props.onChange({ mode: 'bearer', token: value })} />
+              <Input
+                size="sm"
+                value={auth().token}
+                placeholder="{{TOKEN}}"
+                onChange={(value: string) => props.onChange({ mode: 'bearer', token: value })}
+              />
             </Field>
           )
         })()}
@@ -99,10 +149,20 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
           return (
             <>
               <Field label="Key">
-                <Input size="sm" value={auth().key} placeholder="X-API-Key" onChange={(value: string) => props.onChange({ ...auth(), key: value })} />
+                <Input
+                  size="sm"
+                  value={auth().key}
+                  placeholder="X-API-Key"
+                  onChange={(value: string) => props.onChange({ ...auth(), key: value })}
+                />
               </Field>
               <Field label="Value">
-                <Input size="sm" value={auth().value} placeholder="{{API_KEY}}" onChange={(value: string) => props.onChange({ ...auth(), value })} />
+                <Input
+                  size="sm"
+                  value={auth().value}
+                  placeholder="{{API_KEY}}"
+                  onChange={(value: string) => props.onChange({ ...auth(), value })}
+                />
               </Field>
               <Field label="Send in">
                 <Select
@@ -110,7 +170,10 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
                   width="narrow"
                   value={auth().placement}
                   onChange={(value: string) => props.onChange({ ...auth(), placement: value as 'header' | 'query' })}
-                  options={[{ value: 'header', label: 'Header' }, { value: 'query', label: 'Query string' }]}
+                  options={[
+                    { value: 'header', label: 'Header' },
+                    { value: 'query', label: 'Query string' },
+                  ]}
                 />
               </Field>
             </>
@@ -118,7 +181,9 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
         })()}
       </Show>
 
-      <Text tone="muted" wrap>acorn sends this as a header or a query parameter. The response's Timeline shows what was sent.</Text>
+      <Text tone="muted" wrap>
+        acorn sends this as a header or a query parameter. The response's Timeline shows what was sent.
+      </Text>
     </Stack>
   )
 }
@@ -165,16 +230,30 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
         ariaLabel="Request"
       />
       {/* A remote-tree prop is data, not another tree. Passing these controls through Tabs.actions
-          put Solid nodes and handlers onto the worker message and stopped both API regions with a
+          puts Solid nodes and handlers onto the worker message and stops both API regions with a
           DataCloneError. Keep them adjacent to the strip as ordinary tree children instead. */}
       <Show when={tab() === 'body'}>
         <Toolbar variant="actions" size="sm">
-          <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: BODY_LABEL[m] }))]} />
+          <Select
+            size="sm"
+            width="narrow"
+            value={props.draft.bodyMode}
+            label="Body type"
+            onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })}
+            options={[...bodyModes.map((m) => ({ value: m, label: BODY_LABEL[m] }))]}
+          />
         </Toolbar>
       </Show>
       <Show when={tab() === 'auth'}>
         <Toolbar variant="actions" size="sm">
-          <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: AUTH_LABEL[m] }))]} />
+          <Select
+            size="sm"
+            width="narrow"
+            value={props.draft.auth.mode}
+            label="Auth type"
+            onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })}
+            options={[...authModes.map((m) => ({ value: m, label: AUTH_LABEL[m] }))]}
+          />
         </Toolbar>
       </Show>
 
@@ -184,15 +263,25 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
         </Show>
 
         <Show when={tab() === 'headers'}>
-          <KeyValueTable rows={props.draft.headers} onChange={(headers) => props.patch({ headers })} nameLabel="Header" />
+          <KeyValueTable
+            rows={props.draft.headers}
+            onChange={(headers) => props.patch({ headers })}
+            nameLabel="Header"
+          />
         </Show>
 
         <Show when={tab() === 'body'}>
           <Show when={props.draft.bodyMode === 'none'}>
-            <Text tone="muted" wrap>This request has no body.</Text>
+            <Text tone="muted" wrap>
+              This request has no body.
+            </Text>
           </Show>
           <Show when={props.draft.bodyMode === 'form'}>
-            <KeyValueTable rows={formRows()} onChange={(rows) => props.patch({ body: JSON.stringify(rows) })} nameLabel="Field" />
+            <KeyValueTable
+              rows={formRows()}
+              onChange={(rows) => props.patch({ body: JSON.stringify(rows) })}
+              nameLabel="Field"
+            />
           </Show>
           <Show when={props.draft.bodyMode === 'json' || props.draft.bodyMode === 'text'}>
             <Textarea
@@ -215,5 +304,3 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
     </>
   )
 }
-
-export { KeyValueTable }

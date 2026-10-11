@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'solid-js'
 import { createDeviceFlow, type DeviceFlowController } from './deviceFlow'
-import { integrationFlowRegistry, type DeviceFlowPoll, type DeviceFlowStart } from '../../host/registries/sources/integrationFlows'
+import {
+  integrationFlowRegistry,
+  type DeviceFlowPoll,
+  type DeviceFlowStart,
+} from '../../host/registries/sources/integrationFlows'
 
 const STARTED: DeviceFlowStart = {
   deviceCode: 'device-code',
@@ -47,7 +51,14 @@ describe('createDeviceFlow', () => {
   const run = (fn: (flow: DeviceFlowController) => Promise<void>) =>
     createRoot(async (disposer) => {
       disposeRoot = disposer
-      await fn(createDeviceFlow(() => 'test-provider', () => { connected += 1 }))
+      await fn(
+        createDeviceFlow(
+          () => 'test-provider',
+          () => {
+            connected += 1
+          },
+        ),
+      )
     })
 
   it('waits the advertised interval before the first poll', async () => {
@@ -71,7 +82,7 @@ describe('createDeviceFlow', () => {
       await vi.advanceTimersByTimeAsync(5_000)
       expect(pollCalls).toBe(1)
 
-      // The old 5s cadence would have fired again by now. The widened one must not have.
+      // A 5s cadence would have fired again by now. The widened one must not have.
       await vi.advanceTimersByTimeAsync(5_000)
       expect(pollCalls).toBe(1)
 

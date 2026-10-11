@@ -14,7 +14,8 @@ import { createDetailRequest } from '../settingsDetail'
 export const SERVICES_PAGE = 'integrations'
 export const AI_MODELS_PAGE = 'ai-models'
 
-export const isModelProvider = (provider: PublicIntegrationProvider | undefined): boolean => provider?.kind === 'model-provider'
+export const isModelProvider = (provider: PublicIntegrationProvider | undefined): boolean =>
+  provider?.kind === 'model-provider'
 
 /** The page that lists a connection. A connection whose provider this node no longer registers is
  *  listed as a service, so it stays in sight rather than vanishing from both pages. */
@@ -27,19 +28,34 @@ export const needsYouFirst = (connections: readonly Integration[]): Integration[
 
 /** A list row's description: the provider and account when the name does not already say them, then
  *  the reason when something is wrong. The row's badge says the status itself. */
-export function connectionRowText(connection: Integration, provider: PublicIntegrationProvider | undefined): string | undefined {
+export function connectionRowText(
+  connection: Integration,
+  provider: PublicIntegrationProvider | undefined,
+): string | undefined {
   const where = [provider?.label ?? connection.providerId, connection.account?.label].filter(Boolean).join(' · ')
   const parts = [where && where !== connectionName(connection) ? `${where}.` : '']
-  if (connection.status === 'needs-auth' || connection.status === 'degraded') parts.push(connectionStatusText(connection, provider))
+  if (connection.status === 'needs-auth' || connection.status === 'degraded')
+    parts.push(connectionStatusText(connection, provider))
   return parts.filter(Boolean).join(' ') || undefined
 }
 
 /** The badge beside a connection: danger for one that needs its owner, amber for one that did not
  *  answer, plain for one that is off. */
 export const connectionTone = (connection: Integration): 'ok' | 'warn' | 'danger' | 'neutral' =>
-  connection.status === 'connected' ? 'ok' : connection.status === 'disabled' ? 'neutral' : connection.status === 'needs-auth' ? 'danger' : 'warn'
+  connection.status === 'connected'
+    ? 'ok'
+    : connection.status === 'disabled'
+      ? 'neutral'
+      : connection.status === 'needs-auth'
+        ? 'danger'
+        : 'warn'
 
-const STATUS_LABELS = { 'needs-auth': 'Needs you', degraded: 'Not answering', disabled: 'Off', connected: 'Connected' } as const
+const STATUS_LABELS = {
+  'needs-auth': 'Needs you',
+  degraded: 'Not answering',
+  disabled: 'Off',
+  connected: 'Connected',
+} as const
 /** The badge's word. */
 export const connectionStatusLabel = (connection: Integration): string => STATUS_LABELS[connection.status]
 
@@ -77,7 +93,10 @@ export type GalleryCard = {
 
 /** Every provider someone can connect, in the node's order. A provider at its limit stays in the
  *  gallery marked as connected, rather than vanishing and leaving the reader to wonder where it went. */
-export function galleryCards(providers: readonly PublicIntegrationProvider[], connections: readonly Integration[]): GalleryCard[] {
+export function galleryCards(
+  providers: readonly PublicIntegrationProvider[],
+  connections: readonly Integration[],
+): GalleryCard[] {
   return providers
     .filter((provider) => provider.connection.connectable)
     .map((provider) => {
@@ -87,7 +106,7 @@ export function galleryCards(providers: readonly PublicIntegrationProvider[], co
     })
 }
 
-// A connection page and the gallery are details of a list page (../settingsDetail.ts), not pages of
+// A connection page and the gallery are details of a list page (`createDetailRequest`), not pages of
 // their own, so a link from elsewhere in settings travels as a detail request. It names its page,
 // because the page on screen may be the other one of the two.
 export type ConnectionRequest = { kind: 'connection'; id: string } | { kind: 'add' }
@@ -96,6 +115,10 @@ const requests = createDetailRequest<ConnectionRequest>()
 export const takeConnectionRequest = requests.take
 
 /** Open one connection's page, on whichever page lists it. */
-export function openConnectionPage(navigate: SettingsNavigate, connection: Integration, provider: PublicIntegrationProvider | undefined): void {
+export function openConnectionPage(
+  navigate: SettingsNavigate,
+  connection: Integration,
+  provider: PublicIntegrationProvider | undefined,
+): void {
   requests.open(navigate, connectionPageOf(provider), { kind: 'connection', id: connection.id })
 }

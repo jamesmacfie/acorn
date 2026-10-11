@@ -6,7 +6,10 @@ import type { DockerContainerSummary } from '../shared/model'
 import { defaultOverrides, type DockerMatchOverrides } from './dockerConfig'
 
 export type MatchableTask = { worktreePath: string | null; branch: string | null }
-export type MatchableContainer = Pick<DockerContainerSummary, 'name' | 'composeProject' | 'composeWorkingDir' | 'labels'>
+export type MatchableContainer = Pick<
+  DockerContainerSummary,
+  'name' | 'composeProject' | 'composeWorkingDir' | 'labels'
+>
 
 export const branchSlug = (branch: string): string => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
@@ -29,7 +32,8 @@ function absolutePath(path: string): string | null {
     if (meaningful.length < 3 || meaningful.some((p) => p.includes(':'))) return null
     return `//${meaningful.join('/')}`
   }
-  if (windows) return meaningful.length > 1 && meaningful.slice(1).every((p) => !p.includes(':')) ? meaningful.join('/') : null
+  if (windows)
+    return meaningful.length > 1 && meaningful.slice(1).every((p) => !p.includes(':')) ? meaningful.join('/') : null
   return meaningful.length ? `/${meaningful.join('/')}` : null
 }
 
@@ -41,11 +45,17 @@ const isInside = (child: string, parent: string): boolean => {
 
 /** Only host-stored task roots and daemon working-directory metadata confer cleanup eligibility. */
 export function containerBelongsToTask(container: MatchableContainer, task: MatchableTask): boolean {
-  return !!task.worktreePath && !!container.composeWorkingDir && isInside(container.composeWorkingDir, task.worktreePath)
+  return (
+    !!task.worktreePath && !!container.composeWorkingDir && isInside(container.composeWorkingDir, task.worktreePath)
+  )
 }
 
 /** Display hints for the device-only task summary; never destructive authority. */
-export function containerMatchesTask(container: MatchableContainer, task: MatchableTask, overrides: DockerMatchOverrides = defaultOverrides): boolean {
+export function containerMatchesTask(
+  container: MatchableContainer,
+  task: MatchableTask,
+  overrides: DockerMatchOverrides = defaultOverrides,
+): boolean {
   // Explicit foreign/invalid metadata must not fall through to a matching name, label or project.
   if (container.composeWorkingDir !== null) return containerBelongsToTask(container, task)
   if (overrides.composeProject && container.composeProject === overrides.composeProject) return true

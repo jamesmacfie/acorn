@@ -6,7 +6,7 @@
 //    says so). Dead sessions fall out of the picker, so no exit hook is needed; task archive
 //    evicts explicitly.
 //
-// 2. Target session: which agent session Sync targets, per task (the activeByTask pattern),
+// 2. Target session: which agent session Sync targets, per task,
 //    always validated against the live list so a killed target falls back to the most-recent
 //    session.
 import { createSignal } from 'solid-js'
@@ -53,8 +53,12 @@ export function evictSyncState(taskId: string): void {
 }
 
 // Registered here rather than in the shell's evictor file, so this signal and the thing that clears
-// it are one edit apart (registries/scopeEviction.ts).
+// it are one edit apart (client-core's `onScopeEvicted`).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictSyncState(e.taskId)
-  if (e.scope === 'node-switched') { targetByTask.clear(); lastSync.clear(); bump(tick() + 1) }
+  if (e.scope === 'node-switched') {
+    targetByTask.clear()
+    lastSync.clear()
+    bump(tick() + 1)
+  }
 })

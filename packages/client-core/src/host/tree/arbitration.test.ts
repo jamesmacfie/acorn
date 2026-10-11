@@ -1,12 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  matchesKey,
-  slotChoiceFor,
-  resolveSlot,
-  slotChoiceKey,
-  slotChoices,
-  withSlotChoice,
-} from './arbitration'
+import { matchesKey, slotChoiceFor, resolveSlot, slotChoiceKey, slotChoices, withSlotChoice } from './arbitration'
 import {
   extensionPointRegistry,
   extensionRegistry,
@@ -42,17 +35,19 @@ const point = (over: Partial<ExtensionPointContribution> = {}): ExtensionPointCo
 }
 
 const contributor = (pluginId: string, matches?: string[]) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:draw`,
-    pluginId,
-    point: 'agents:attachment',
-    label: `${pluginId} viewer`,
-    order: 500,
-    carrier: 'remote',
-    entry: 'draw',
-    hash: 'abc',
-    ...(matches ? { matches } : {}),
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:draw`,
+      pluginId,
+      point: 'agents:attachment',
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'remote',
+      entry: 'draw',
+      hash: 'abc',
+      ...(matches ? { matches } : {}),
+    } as ExtensionContribution),
+  )
 
 describe('matchesKey', () => {
   it('takes every key when the contributor named none', () => {
@@ -103,7 +98,9 @@ describe('resolveSlot', () => {
     const declared = point()
     contributor('images', ['image/*'])
     contributor('thumbs', ['image/png'])
-    expect(resolveSlot(declared, 'image/png', () => 'thumbs').occupants.map((entry) => entry.pluginId)).toEqual(['thumbs'])
+    expect(resolveSlot(declared, 'image/png', () => 'thumbs').occupants.map((entry) => entry.pluginId)).toEqual([
+      'thumbs',
+    ])
     // A pick naming a plugin that no longer matches. Silently promoting the other candidate would mean
     // the box changed hands because somebody uninstalled something.
     expect(resolveSlot(declared, 'image/png', () => 'gone')).toMatchObject({ occupants: [], why: 'tie' })
@@ -114,7 +111,10 @@ describe('resolveSlot', () => {
     const declared = point()
     contributor('images', ['image/*'])
     const asked: string[] = []
-    const choice = (label: string) => () => { asked.push(label); return undefined }
+    const choice = (label: string) => () => {
+      asked.push(label)
+      return undefined
+    }
     resolveSlot(declared, 'text/csv', choice('none'))
     resolveSlot(declared, 'image/png', choice('one'))
     contributor('thumbs', ['image/png'])
@@ -125,16 +125,18 @@ describe('resolveSlot', () => {
   it('stacks every match up to the owner’s ceiling and counts the rest', () => {
     const declared = point({ id: 'agents:composer-actions', mode: 'stack', max: 2 })
     for (const id of ['a', 'b', 'c']) {
-      registered.push(extensionRegistry.register({
-        id: `plugin:${id}:draw`,
-        pluginId: id,
-        point: 'agents:composer-actions',
-        label: id,
-        order: 500,
-        carrier: 'remote',
-        entry: 'draw',
-        hash: 'abc',
-      } as ExtensionContribution))
+      registered.push(
+        extensionRegistry.register({
+          id: `plugin:${id}:draw`,
+          pluginId: id,
+          point: 'agents:composer-actions',
+          label: id,
+          order: 500,
+          carrier: 'remote',
+          entry: 'draw',
+          hash: 'abc',
+        } as ExtensionContribution),
+      )
     }
     const outcome = resolveSlot(declared, undefined, () => undefined)
     expect(outcome.occupants.map((entry) => entry.pluginId)).toEqual(['a', 'b'])

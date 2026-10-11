@@ -12,14 +12,22 @@ import { panelDotTone } from './props'
 // One cell, drawn by its semantic field type. Every decision worth testing is in `formatCell`; this file
 // is the JSX for its answers and nothing else, because vitest here can't render a Solid component.
 
-export default function Cell(props: { field: DashboardDisplayField; value: DashboardDisplayCell | undefined; unit?: string }) {
-  const cell = createMemo(() => formatCell(props.unit ? { ...props.field, unit: props.unit } : props.field, props.value))
+export default function Cell(props: {
+  field: DashboardDisplayField
+  value: DashboardDisplayCell | undefined
+  unit?: string
+}) {
+  const cell = createMemo(() =>
+    formatCell(props.unit ? { ...props.field, unit: props.unit } : props.field, props.value),
+  )
   const navigate = useNavigate()
   // Narrows the union for `Match`, which can't do it from a `kind ===` comparison on its own.
-  const of = <K extends FormattedCell['kind']>(kind: K) => (): Extract<FormattedCell, { kind: K }> | undefined => {
-    const value = cell()
-    return value.kind === kind ? value as Extract<FormattedCell, { kind: K }> : undefined
-  }
+  const of =
+    <K extends FormattedCell['kind']>(kind: K) =>
+    (): Extract<FormattedCell, { kind: K }> | undefined => {
+      const value = cell()
+      return value.kind === kind ? (value as Extract<FormattedCell, { kind: K }>) : undefined
+    }
 
   return (
     // An em dash, not a blank: "this row has no value here" is a fact worth showing, and it's a
@@ -44,7 +52,11 @@ export default function Cell(props: { field: DashboardDisplayField; value: Dashb
       <Match when={of('datetime')()}>
         {/* The age is what a person reads at a glance and the absolute time is what they check, so
             one is the label and the other is the tooltip. */}
-        {(value) => <span class="dash-cell-time" title={value().absolute}>{value().relative}</span>}
+        {(value) => (
+          <span class="dash-cell-time" title={value().absolute}>
+            {value().relative}
+          </span>
+        )}
       </Match>
       <Match when={of('link')()}>
         {(value) => (
@@ -56,11 +68,12 @@ export default function Cell(props: { field: DashboardDisplayField; value: Dashb
             // The row around this one has its own declared action, and a link click isn't that click.
             // The href stays the real external URL, which is what a middle-click, a copy-link and a
             // modified click should all give. Only a plain left click is taken, and only when the URL
-            // names something acorn has a surface for (registries/contentLinks.ts § openInAppUrl).
+            // names something acorn has a surface for (`openInAppUrl`).
             onClick={(event) => {
               event.stopPropagation()
               if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-              if (openInAppUrl(value().url, { taskId: activeTaskId(), prefer: 'route', navigate })) event.preventDefault()
+              if (openInAppUrl(value().url, { taskId: activeTaskId(), prefer: 'route', navigate }))
+                event.preventDefault()
             }}
           >
             {value().text}
@@ -76,7 +89,11 @@ export default function Cell(props: { field: DashboardDisplayField; value: Dashb
         {(value) => (
           <span class="dash-cell-person">
             <Show when={value().initials}>
-              {(initials) => <span class="dash-cell-avatar" aria-hidden="true">{initials()}</span>}
+              {(initials) => (
+                <span class="dash-cell-avatar" aria-hidden="true">
+                  {initials()}
+                </span>
+              )}
             </Show>
             {value().name}
           </span>
@@ -84,7 +101,15 @@ export default function Cell(props: { field: DashboardDisplayField; value: Dashb
       </Match>
       <Match when={of('boolean')()}>{(value) => <span>{value().text}</span>}</Match>
       <Match when={of('text')()}>{(value) => <span>{value().text}</span>}</Match>
-      <Match when={of('list')()}>{(value) => <span class="dash-cell-list">{value().items.map(item => <span class="dash-cell-chip">{cellText(item)}</span>)}</span>}</Match>
+      <Match when={of('list')()}>
+        {(value) => (
+          <span class="dash-cell-list">
+            {value().items.map((item) => (
+              <span class="dash-cell-chip">{cellText(item)}</span>
+            ))}
+          </span>
+        )}
+      </Match>
     </Switch>
   )
 }

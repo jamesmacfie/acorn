@@ -169,7 +169,7 @@ describe('pull files stale-while-revalidate', () => {
     const ghPromise = new Promise<Response>((resolve) => {
       resolveGh = resolve
     })
-    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ? ghPromise : responseJson({}))
+    vi.mocked(gh).mockImplementation(async (_token, path) => (path.includes('/files?') ? ghPromise : responseJson({})))
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -181,12 +181,13 @@ describe('pull files stale-while-revalidate', () => {
     const blobGet = vi.fn()
 
     // GitHub never answers until the test says so, so a route that waited on it would lose this race
-    // however long the timer is. It is generous because 20ms lost on a loaded CI runner.
+    // however long the timer is. It is generous because 20ms loses on a loaded CI runner.
     const response = await Promise.race([
-      app.fetch(
-        new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
-        { DB: core.db, BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
-      ),
+      app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'), {
+        DB: core.db,
+        BLOBS: { get: blobGet, put: vi.fn() },
+        ...testSecretEnv(ENC_KEY),
+      } as unknown as Env),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
     ])
 
@@ -210,9 +211,15 @@ describe('pull files stale-while-revalidate', () => {
       revision: null,
     })
     expect(blobGet).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
+    await vi.waitFor(() =>
+      expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'),
+    )
 
-    resolveGh(responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]))
+    resolveGh(
+      responseJson([
+        { filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' },
+      ]),
+    )
     await settleBackground()
   })
 
@@ -231,17 +238,14 @@ describe('pull files stale-while-revalidate', () => {
       patchKey: 'sha256:abc',
     }
     const freshSync = { userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() }
-    const db = makePullFilesDb([
-      [{ id: 19847 }],
-      [freshSync],
-      [fileRow],
-      [],
-      [freshSync],
-      [fileRow],
-      [],
-    ])
-    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ?
-      responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]) : responseJson({}))
+    const db = makePullFilesDb([[{ id: 19847 }], [freshSync], [fileRow], [], [freshSync], [fileRow], []])
+    vi.mocked(gh).mockImplementation(async (_token, path) =>
+      path.includes('/files?')
+        ? responseJson([
+            { filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' },
+          ])
+        : responseJson({}),
+    )
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -251,11 +255,17 @@ describe('pull files stale-while-revalidate', () => {
     app.route('/api/repos', pullFiles(db))
     const response = await app.fetch(
       new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?force=true'),
-      { DB: core.db, BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
+      {
+        DB: core.db,
+        BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) },
+        ...testSecretEnv(ENC_KEY),
+      } as unknown as Env,
     )
 
     expect(response.status).toBe(200)
-    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
+    await vi.waitFor(() =>
+      expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'),
+    )
   })
 
   it('serves a stale diff document at once and refreshes in the background', async () => {
@@ -298,7 +308,7 @@ describe('pull files stale-while-revalidate', () => {
     const ghPromise = new Promise<Response>((resolve) => {
       resolveGh = resolve
     })
-    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ? ghPromise : responseJson({}))
+    vi.mocked(gh).mockImplementation(async (_token, path) => (path.includes('/files?') ? ghPromise : responseJson({})))
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -308,15 +318,19 @@ describe('pull files stale-while-revalidate', () => {
     app.route('/api/repos', pullFiles(db))
 
     // The document is cut from the patch bodies the first time, which also stores their descriptors.
-    const bodies: Record<string, string> = { 'patch:sha256:a': '@@ -1 +1 @@\n+a', 'patch:sha256:b': '@@ -1 +1 @@\n-b\n+c' }
+    const bodies: Record<string, string> = {
+      'patch:sha256:a': '@@ -1 +1 @@\n+a',
+      'patch:sha256:b': '@@ -1 +1 @@\n-b\n+c',
+    }
     const blobGet = vi.fn(async (key: string) => bodies[key] ?? null)
     const blobPut = vi.fn(async () => undefined)
 
     const response = await Promise.race([
-      app.fetch(
-        new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/diff'),
-        { DB: core.db, BLOBS: { get: blobGet, put: blobPut }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
-      ),
+      app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/diff'), {
+        DB: core.db,
+        BLOBS: { get: blobGet, put: blobPut },
+        ...testSecretEnv(ENC_KEY),
+      } as unknown as Env),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
     ])
 
@@ -329,7 +343,9 @@ describe('pull files stale-while-revalidate', () => {
     ])
     expect(JSON.stringify(body)).not.toContain('+a')
     expect(blobPut).toHaveBeenCalledWith(`diffdoc:v${DIFF_DOCUMENT_VERSION}:sha256:a`, expect.any(String))
-    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
+    await vi.waitFor(() =>
+      expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'),
+    )
 
     resolveGh(
       responseJson([

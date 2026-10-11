@@ -1,18 +1,32 @@
 import { createMemo, type Accessor } from 'solid-js'
-import { segmentContentKey, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentDescriptor } from '@acorn/diff-document/document'
 import {
-  DIFF_FILE_HEADER_HEIGHT, DIFF_GAP_ROW_HEIGHT, DIFF_LINE_HEIGHT,
-  type CodeRow, type DiffThread, type ViewMode,
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffDocumentTopology,
+  type DiffSegmentDescriptor,
+} from '@acorn/diff-document/document'
+import {
+  DIFF_FILE_HEADER_HEIGHT,
+  DIFF_GAP_ROW_HEIGHT,
+  DIFF_LINE_HEIGHT,
+  type CodeRow,
+  type DiffThread,
+  type ViewMode,
 } from '../../kit/diff/diffModel'
 
 // The document as the viewer scrolls it: one item per file header, per segment, and per slice of an
 // expanded gap, built from the topology alone (docs/diff-rendering/loading.md § Parsing and highlighting). No row exists here.
 // A segment item's code rows have an exact height from its counts before its rows load, and a
-// segment's inline threads are known from their line numbers, so ./diffLayout.ts can reserve for them
+// segment's inline threads are known from their line numbers, so `createDiffLayout` can reserve for them
 // and the scrollbar and every file's offset are right from the first frame.
 
 /** One segment of one file, and the key its content is cached and requested under. */
-export type SegmentRef = { file: DiffDocumentFile; ordinal: number; descriptor: DiffSegmentDescriptor; contentKey: string }
+export type SegmentRef = {
+  file: DiffDocumentFile
+  ordinal: number
+  descriptor: DiffSegmentDescriptor
+  contentKey: string
+}
 
 /** The context lines a gap revealed, and which edge of its segment the gap was on. A gap only ever
  *  sits at a segment's first row, or the bottom gap at its last (@acorn/diff-document § segmentRows). */
@@ -29,7 +43,7 @@ export type DiffItem =
 
 /** Revealed context is drawn in slices this long, so opening a five-thousand-line gap mounts a
  *  segment's worth of rows rather than all of them. */
-export const OVERLAY_SLICE_ROWS = 64
+const OVERLAY_SLICE_ROWS = 64
 
 /** Where a thread sits: the new side unless GitHub said LEFT. The same rule that interleaves it. */
 export const threadAnchor = (thread: DiffThread): { side: 'old' | 'new'; line: number } | null =>
@@ -37,7 +51,9 @@ export const threadAnchor = (thread: DiffThread): { side: 'old' | 'new'; line: n
 
 const covers = (descriptor: DiffSegmentDescriptor, side: 'old' | 'new', line: number): boolean => {
   const [oldFirst, oldLast, newFirst, newLast] = descriptor.lines
-  return side === 'old' ? !!oldFirst && line >= oldFirst && line <= oldLast : !!newFirst && line >= newFirst && line <= newLast
+  return side === 'old'
+    ? !!oldFirst && line >= oldFirst && line <= oldLast
+    : !!newFirst && line >= newFirst && line <= newLast
 }
 
 /** Which of a file's segments holds this line. Their line spans only increase, so the first that
@@ -79,12 +95,25 @@ export function createDocumentView(props: {
         const last = opened.find((overlay) => overlay.edge === 'last')
         const slices = (overlay: GapOverlay) => {
           for (let at = 0; at < overlay.rows.length; at += OVERLAY_SLICE_ROWS) {
-            out.push({ kind: 'overlay', key: `o:${file.path}:${ordinal}:${overlay.edge}:${at}`, file, rows: overlay.rows.slice(at, at + OVERLAY_SLICE_ROWS) })
+            out.push({
+              kind: 'overlay',
+              key: `o:${file.path}:${ordinal}:${overlay.edge}:${at}`,
+              file,
+              rows: overlay.rows.slice(at, at + OVERLAY_SLICE_ROWS),
+            })
           }
         }
         if (first) slices(first)
         const kept = descriptor.rows - (first ? 1 : 0) - (last ? 1 : 0)
-        if (kept > 0) out.push({ kind: 'segment', key: `s:${file.path}:${ordinal}`, file, segment, skipFirst: !!first, skipLast: !!last })
+        if (kept > 0)
+          out.push({
+            kind: 'segment',
+            key: `s:${file.path}:${ordinal}`,
+            file,
+            segment,
+            skipFirst: !!first,
+            skipLast: !!last,
+          })
         if (last) slices(last)
       })
     }
@@ -111,7 +140,7 @@ export function createDocumentView(props: {
   })
 
   /** An item's code rows, headers and gaps: exact, because none of them wraps. Threads and whatever a
-   *  line draws under itself are dynamic blocks on top of this (./diffLayout.ts). */
+   *  line draws under itself are dynamic blocks on top of this (`createDiffLayout`). */
   const fixedHeight = (item: DiffItem, mode: ViewMode): number => {
     if (item.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
     if (item.kind === 'nodiff') return DIFF_GAP_ROW_HEIGHT
@@ -136,5 +165,3 @@ export function createDocumentView(props: {
 
   return { files, fileByPath, items, indexByKey, fixedHeight, threadsIn, placedThreads }
 }
-
-export type DocumentView = ReturnType<typeof createDocumentView>

@@ -30,7 +30,11 @@ const { _resetFrameContributions, syncFrameContributions } = await import('../fr
 
 const HASH = 'a'.repeat(64)
 
-const row = (name: string, declared: Partial<PluginContributions> = {}, over: Partial<NodePluginRow> = {}): NodePluginRow => ({
+const row = (
+  name: string,
+  declared: Partial<PluginContributions> = {},
+  over: Partial<NodePluginRow> = {},
+): NodePluginRow => ({
   name,
   required: false,
   disabled: false,
@@ -39,7 +43,11 @@ const row = (name: string, declared: Partial<PluginContributions> = {}, over: Pa
   installed: {
     version: '1.0.0',
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+    permissions: {
+      api: [],
+      events: [],
+      node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    },
     contributions: { frames: [], ...declared },
     client: null,
   },
@@ -49,24 +57,30 @@ const row = (name: string, declared: Partial<PluginContributions> = {}, over: Pa
 // The host: a plugin with a pane and a point drawn under it.
 const HOST_PLUGIN: Partial<PluginContributions> = {
   frames: [{ target: 'pane', id: 'board', label: 'Board', glyph: 'kanban', order: 500, formFactor: ['desktop'] }],
-  extensionPoints: [{ id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 }],
+  extensionPoints: [
+    { id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 },
+  ],
 }
 
 // The guest: a plugin that fills the host's point from a route of its own.
 const GUEST_PLUGIN: Partial<PluginContributions> = {
-  extensions: [{
-    id: 'board-issues',
-    point: 'board:card-links',
-    label: 'Linear issues',
-    order: 500,
-    items: '/v1/p/tracker/board-issues',
-    onSelect: { verb: 'runNodeAction', path: '/v1/p/tracker/open' },
-  }],
+  extensions: [
+    {
+      id: 'board-issues',
+      point: 'board:card-links',
+      label: 'Linear issues',
+      order: 500,
+      items: '/v1/p/tracker/board-issues',
+      onSelect: { verb: 'runNodeAction', path: '/v1/p/tracker/open' },
+    },
+  ],
 }
 
-const pointIds = () => extensionPointRegistry.entries()
-  .filter((entry) => entry.ownerId !== 'core')
-  .map((entry) => entry.id)
+const pointIds = () =>
+  extensionPointRegistry
+    .entries()
+    .filter((entry) => entry.ownerId !== 'core')
+    .map((entry) => entry.id)
 const extensionIds = () => extensionRegistry.entries().map((entry) => entry.id)
 
 beforeEach(() => {
@@ -118,30 +132,44 @@ describe('cooperative extension points', () => {
   })
 
   it('registers a loaded core:task manifest contribution, posts one key batch and reaches the rail', async () => {
-    _seedPluginDistribution([['node-a', [row('tracker', {
-      extensions: [{
-        id: 'task-status',
-        point: 'core:task',
-        label: 'Tracker status',
-        order: 500,
-        items: '/v1/p/tracker/task-status',
-      }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('tracker', {
+            extensions: [
+              {
+                id: 'task-status',
+                point: 'core:task',
+                label: 'Tracker status',
+                order: 500,
+                items: '/v1/p/tracker/task-status',
+              },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
-    writeJson.mockResolvedValue({ items: [
-      { key: { task: 'task-1' }, severity: 'warn', text: 'Waiting on review' },
-      { key: { task: 'task-2' }, severity: 'purple', text: 'Malformed' },
-    ] })
+    writeJson.mockResolvedValue({
+      items: [
+        { key: { task: 'task-1' }, severity: 'warn', text: 'Waiting on review' },
+        { key: { task: 'task-2' }, severity: 'purple', text: 'Malformed' },
+      ],
+    })
 
     requestTaskAnnotations(['task-1', 'task-2'])
     await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 'task-1' })).toHaveLength(1))
 
     expect(writeJson).toHaveBeenCalledTimes(1)
-    expect(writeJson).toHaveBeenCalledWith('/v1/p/tracker/task-status', expect.objectContaining({
-      method: 'POST',
-      nodeId: 'node-a',
-      body: JSON.stringify({ keys: [{ task: 'task-1' }, { task: 'task-2' }] }),
-    }))
+    expect(writeJson).toHaveBeenCalledWith(
+      '/v1/p/tracker/task-status',
+      expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-a',
+        body: JSON.stringify({ keys: [{ task: 'task-1' }, { task: 'task-2' }] }),
+      }),
+    )
     expect(markersFor({ kind: 'task', id: 'task-1' })[0]).toMatchObject({
       label: 'Waiting on review — tracker',
       dotTone: 'warn',
@@ -150,16 +178,33 @@ describe('cooperative extension points', () => {
   })
 
   it('posts one core:pane batch for many consenting buttons and keeps only well-formed marks for them', async () => {
-    _seedPluginDistribution([['node-a', [row('tracker', {
-      extensions: [{ id: 'pane-status', point: 'core:pane', label: 'Tracker status', order: 500, items: '/v1/p/tracker/pane-status' }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('tracker', {
+            extensions: [
+              {
+                id: 'pane-status',
+                point: 'core:pane',
+                label: 'Tracker status',
+                order: 500,
+                items: '/v1/p/tracker/pane-status',
+              },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
-    writeJson.mockResolvedValue({ items: [
-      { key: { paneId: 'pane-0', taskId: 'task-1' }, severity: 'info', text: 'Linked to ACO-1' },
-      { key: { paneId: 'pane-1', taskId: 'task-1' }, severity: 'purple', text: 'Malformed' },
-      { key: { paneId: 'pane-2', taskId: 'task-1' } },
-      { key: { paneId: 'notes', taskId: 'task-1' }, severity: 'warn', text: 'Not asked about' },
-    ] })
+    writeJson.mockResolvedValue({
+      items: [
+        { key: { paneId: 'pane-0', taskId: 'task-1' }, severity: 'info', text: 'Linked to ACO-1' },
+        { key: { paneId: 'pane-1', taskId: 'task-1' }, severity: 'purple', text: 'Malformed' },
+        { key: { paneId: 'pane-2', taskId: 'task-1' } },
+        { key: { paneId: 'notes', taskId: 'task-1' }, severity: 'warn', text: 'Not asked about' },
+      ],
+    })
 
     const panes = Array.from({ length: 40 }, (_, index) => ({ id: `pane-${index}`, statusAnnotations: true }))
     requestPaneAnnotations('task-1', [...panes, { id: 'notes' }])
@@ -184,31 +229,37 @@ describe('cooperative extension points', () => {
   })
 
   it('delivers nothing when the point’s owner dropped it in an update', () => {
-    _seedPluginDistribution([['node-a', [row('board', {
-      frames: HOST_PLUGIN.frames!,
-      // Same plugin, same pane, no point any more.
-      extensionPoints: [],
-    }), row('tracker', GUEST_PLUGIN)]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', {
+            frames: HOST_PLUGIN.frames!,
+            // Same plugin, same pane, no point any more.
+            extensionPoints: [],
+          }),
+          row('tracker', GUEST_PLUGIN),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(pointIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
   })
 
   it('delivers nothing when either side is disabled on the node being looked at', () => {
-    _seedPluginDistribution([['node-a', [
-      row('board', HOST_PLUGIN, { disabled: true, running: false }),
-      row('tracker', GUEST_PLUGIN),
-    ]]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', HOST_PLUGIN, { disabled: true, running: false }), row('tracker', GUEST_PLUGIN)]],
+    ])
     syncChromeContributions()
     // Inactive plugins retain command metadata, but no extension point authority.
     expect(pointIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
 
     _resetChromeContributions()
-    _seedPluginDistribution([['node-a', [
-      row('board', HOST_PLUGIN),
-      row('tracker', GUEST_PLUGIN, { disabled: true, running: false }),
-    ]]])
+    _seedPluginDistribution([
+      ['node-a', [row('board', HOST_PLUGIN), row('tracker', GUEST_PLUGIN, { disabled: true, running: false })]],
+    ])
     syncChromeContributions()
     expect(extensionDeliveries('board:card-links')).toEqual([])
   })
@@ -216,45 +267,79 @@ describe('cooperative extension points', () => {
   it('delivers nothing when the host’s bundle was never accepted on this device', () => {
     // A package with a client half this device has not been cleared to run contributes no chrome at all,
     // which includes the point it opened. So its guest has nowhere to land, and finds that out silently.
-    _seedPluginDistribution([['node-a', [
-      row('board', HOST_PLUGIN, { installed: { ...row('board', HOST_PLUGIN).installed!, client: { hash: HASH, bytes: 12 } } }),
-      row('tracker', GUEST_PLUGIN),
-    ]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', HOST_PLUGIN, {
+            installed: { ...row('board', HOST_PLUGIN).installed!, client: { hash: HASH, bytes: 12 } },
+          }),
+          row('tracker', GUEST_PLUGIN),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(pointIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
   })
 
   it('refuses a contribution that would read another plugin’s namespace', () => {
-    _seedPluginDistribution([['node-a', [row('board', HOST_PLUGIN), row('tracker', {
-      extensions: [{
-        id: 'board-issues',
-        point: 'board:card-links',
-        label: 'Linear issues',
-        order: 500,
-        // The point owner's namespace. This is the shape of "read another plugin's routes", and it is
-        // refused by the same confinement every descriptor route gets.
-        items: '/v1/p/board/cards',
-      }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', HOST_PLUGIN),
+          row('tracker', {
+            extensions: [
+              {
+                id: 'board-issues',
+                point: 'board:card-links',
+                label: 'Linear issues',
+                order: 500,
+                // The point owner's namespace. This is the shape of "read another plugin's routes", and it is
+                // refused by the same confinement every descriptor route gets.
+                items: '/v1/p/board/cards',
+              },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(extensionIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
   })
 
   it('refuses a contribution whose point reference is not a reference', () => {
-    _seedPluginDistribution([['node-a', [row('board', HOST_PLUGIN), row('tracker', {
-      extensions: [{ id: 'loose', point: 'card-links', label: 'Loose', order: 500, items: '/v1/p/tracker/x' }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', HOST_PLUGIN),
+          row('tracker', {
+            extensions: [{ id: 'loose', point: 'card-links', label: 'Loose', order: 500, items: '/v1/p/tracker/x' }],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(extensionIds()).toEqual([])
   })
 
   it('refuses a point hung off a surface its own manifest does not declare', () => {
-    _seedPluginDistribution([['node-a', [row('board', {
-      frames: HOST_PLUGIN.frames!,
-      extensionPoints: [{ id: 'ghost', label: 'Ghost', kind: 'rows', location: 'pane.footer', surface: 'not-a-surface', max: 4 }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', {
+            frames: HOST_PLUGIN.frames!,
+            extensionPoints: [
+              { id: 'ghost', label: 'Ghost', kind: 'rows', location: 'pane.footer', surface: 'not-a-surface', max: 4 },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(pointIds()).toEqual([])
   })
@@ -262,10 +347,19 @@ describe('cooperative extension points', () => {
   it('refuses a point at a location this shell has no host for', () => {
     // The version-skew case: a newer node describing a location this client cannot draw. Refused loudly
     // enough for an author to see, rather than coerced into the one location that does exist.
-    _seedPluginDistribution([['node-a', [row('board', {
-      frames: HOST_PLUGIN.frames!,
-      extensionPoints: [{ id: 'future', label: 'Future', kind: 'rows', location: 'pane.header', surface: 'board', max: 4 }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', {
+            frames: HOST_PLUGIN.frames!,
+            extensionPoints: [
+              { id: 'future', label: 'Future', kind: 'rows', location: 'pane.header', surface: 'board', max: 4 },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(pointIds()).toEqual([])
   })
@@ -274,23 +368,55 @@ describe('cooperative extension points', () => {
     // The client's re-check of what the node refused at parse: a roster row is bytes a node sent.
     const frames: PluginContributions['frames'] = [
       { target: 'pane', id: 'tracker-issue', label: 'Issue', order: 500, scope: 'project', formFactor: ['desktop'] },
-      { target: 'refPanel', id: 'tracker-ref', label: 'Issue', providerId: 'tracker', order: 500, formFactor: ['desktop'] },
+      {
+        target: 'refPanel',
+        id: 'tracker-ref',
+        label: 'Issue',
+        providerId: 'tracker',
+        order: 500,
+        formFactor: ['desktop'],
+      },
       { target: 'pane', id: 'tracker', label: 'Tracker', order: 500, formFactor: ['desktop'] },
     ] as PluginContributions['frames']
-    const summary = (id: string, over: Record<string, unknown>) =>
-      ({ id, label: 'Summary', kind: 'remote', mode: 'stack', max: 2, ...over })
-    _seedPluginDistribution([['node-a', [row('tracker', {
-      frames,
-      extensionPoints: [
-        summary('summary', { mounts: [{ surface: 'tracker-issue', region: 'header' }, { surface: 'tracker-ref', region: 'footer' }] }),
-        // Another plugin's view, a task pane, a region this shell has no host for, and a kind that
-        // is not remote. Each costs only its own point.
-        summary('stranger', { mounts: [{ surface: 'linear-issue', region: 'header' }] }),
-        summary('task', { mounts: [{ surface: 'tracker', region: 'header' }] }),
-        summary('aside', { mounts: [{ surface: 'tracker-issue', region: 'aside' }] }),
-        { id: 'rows', label: 'Rows', kind: 'annotation', key: { id: 'string' }, max: 4, mounts: [{ surface: 'tracker-issue', region: 'footer' }] },
+    const summary = (id: string, over: Record<string, unknown>) => ({
+      id,
+      label: 'Summary',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+      ...over,
+    })
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('tracker', {
+            frames,
+            extensionPoints: [
+              summary('summary', {
+                mounts: [
+                  { surface: 'tracker-issue', region: 'header' },
+                  { surface: 'tracker-ref', region: 'footer' },
+                ],
+              }),
+              // Another plugin's view, a task pane, a region this shell has no host for, and a kind that
+              // is not remote. Each costs only its own point.
+              summary('stranger', { mounts: [{ surface: 'linear-issue', region: 'header' }] }),
+              summary('task', { mounts: [{ surface: 'tracker', region: 'header' }] }),
+              summary('aside', { mounts: [{ surface: 'tracker-issue', region: 'aside' }] }),
+              {
+                id: 'rows',
+                label: 'Rows',
+                kind: 'annotation',
+                key: { id: 'string' },
+                max: 4,
+                mounts: [{ surface: 'tracker-issue', region: 'footer' }],
+              },
+            ],
+          }),
+        ],
       ],
-    })]]])
+    ])
     syncChromeContributions()
     expect(pointIds()).toEqual(['tracker:summary'])
     expect(extensionPointRegistry.get('tracker:summary')?.mounts).toEqual([
@@ -300,27 +426,46 @@ describe('cooperative extension points', () => {
   })
 
   it('drops an onSelect the device cannot honour rather than registering a row that can only fail', () => {
-    _seedPluginDistribution([['node-a', [row('board', HOST_PLUGIN), row('tracker', {
-      extensions: [{
-        id: 'board-issues',
-        point: 'board:card-links',
-        label: 'Linear issues',
-        order: 500,
-        items: '/v1/p/tracker/board-issues',
-        // Another plugin's route behind the verb.
-        onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
-      }],
-    })]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', HOST_PLUGIN),
+          row('tracker', {
+            extensions: [
+              {
+                id: 'board-issues',
+                point: 'board:card-links',
+                label: 'Linear issues',
+                order: 500,
+                items: '/v1/p/tracker/board-issues',
+                // Another plugin's route behind the verb.
+                onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
+              },
+            ],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(extensionIds()).toEqual([])
   })
 
   it('orders deliveries by order then id, never by which plugin registered first', () => {
-    _seedPluginDistribution([['node-a', [
-      row('board', HOST_PLUGIN),
-      row('zeta', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Zeta', order: 10, items: '/v1/p/zeta/i' }] }),
-      row('alpha', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Alpha', order: 20, items: '/v1/p/alpha/i' }] }),
-    ]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', HOST_PLUGIN),
+          row('zeta', {
+            extensions: [{ id: 'a', point: 'board:card-links', label: 'Zeta', order: 10, items: '/v1/p/zeta/i' }],
+          }),
+          row('alpha', {
+            extensions: [{ id: 'a', point: 'board:card-links', label: 'Alpha', order: 20, items: '/v1/p/alpha/i' }],
+          }),
+        ],
+      ],
+    ])
     syncChromeContributions()
     expect(extensionDeliveries('board:card-links').map((entry) => entry.pluginId)).toEqual(['zeta', 'alpha'])
   })
@@ -331,22 +476,30 @@ describe('cooperative extension points', () => {
   //
   // The interesting one is the hook. It registers here like the rest so the developer view can list it
   // beside them, and it delivers nowhere, because the chain runs on the node and this registry has no
-  // part in it (../../registries/extensionPoints.ts § carrierFits).
+  // part in it (`carrierFits`).
   it('registers all five kinds from one plugin, and delivers the four that draw', () => {
     const SINK: Partial<PluginContributions> = {
-      frames: [
-        { target: 'pane', id: 'sink', label: 'Sink', glyph: 'puzzle', order: 800, formFactor: ['desktop'] },
-      ],
+      frames: [{ target: 'pane', id: 'sink', label: 'Sink', glyph: 'puzzle', order: 800, formFactor: ['desktop'] }],
       extensionPoints: [
         { id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'sink', max: 4 },
         { id: 'row-note', label: 'Row notes', kind: 'annotation', key: { row: 'string' }, max: 4 },
         { id: 'beside-row', label: 'Beside a row', kind: 'remote', mode: 'replace', max: 4 },
-        { id: 'beside-pane', label: 'Beside the pane', kind: 'rectangle', location: 'pane.inline-beside', surface: 'sink', mode: 'replace', max: 4 },
+        {
+          id: 'beside-pane',
+          label: 'Beside the pane',
+          kind: 'rectangle',
+          location: 'pane.inline-beside',
+          surface: 'sink',
+          mode: 'replace',
+          max: 4,
+        },
         { id: 'before-flush', label: 'flush the sink', kind: 'hook', max: 4 },
       ],
     }
     const GUEST: Partial<PluginContributions> = {
-      frames: [{ target: 'inline', id: 'preview', label: 'Preview', glyph: 'eye', order: 800, formFactor: ['desktop'] }],
+      frames: [
+        { target: 'inline', id: 'preview', label: 'Preview', glyph: 'eye', order: 800, formFactor: ['desktop'] },
+      ],
       extensions: [
         { id: 'links', point: 'sink:card-links', label: 'Guest links', order: 500, items: '/v1/p/guest/links' },
         { id: 'notes', point: 'sink:row-note', label: 'Guest notes', order: 500, items: '/v1/p/guest/marks' },
@@ -356,12 +509,20 @@ describe('cooperative extension points', () => {
       ],
     }
     const guestRow = row('guest', GUEST)
-    _seedPluginDistribution([['node-a', [
-      row('sink', SINK),
-      // A `remote` contribution runs the plugin's own bytes, so it needs an accepted bundle on this
-      // device for the same reason a frame does.
-      { ...guestRow, installed: { ...guestRow.installed!, client: { hash: HASH, bytes: 12 } } },
-    ]]], [`guest ${HASH}`])
+    _seedPluginDistribution(
+      [
+        [
+          'node-a',
+          [
+            row('sink', SINK),
+            // A `remote` contribution runs the plugin's own bytes, so it needs an accepted bundle on this
+            // device for the same reason a frame does.
+            { ...guestRow, installed: { ...guestRow.installed!, client: { hash: HASH, bytes: 12 } } },
+          ],
+        ],
+      ],
+      [`guest ${HASH}`],
+    )
     // Both passes, because the five kinds are split across them: `items` and `route` are descriptors
     // and ride the chrome pass, while `remote` and `frame` run the contributor's own bytes and ride the
     // frames pass, where the accepted hash and the trust answer are in scope. One plugin, five
@@ -369,15 +530,24 @@ describe('cooperative extension points', () => {
     syncChromeContributions()
     syncFrameContributions()
 
-    expect(extensionPointRegistry.entries().filter((entry) => entry.ownerId !== 'core').map((entry) => [entry.id, entry.kind])).toEqual([
+    expect(
+      extensionPointRegistry
+        .entries()
+        .filter((entry) => entry.ownerId !== 'core')
+        .map((entry) => [entry.id, entry.kind]),
+    ).toEqual([
       ['sink:card-links', 'rows'],
       ['sink:row-note', 'annotation'],
       ['sink:beside-row', 'remote'],
       ['sink:beside-pane', 'rectangle'],
       ['sink:before-flush', 'hook'],
     ])
-    expect(extensionRegistry.entries().map((entry) => entry.carrier).sort())
-      .toEqual(['frame', 'items', 'items', 'remote', 'route'])
+    expect(
+      extensionRegistry
+        .entries()
+        .map((entry) => entry.carrier)
+        .sort(),
+    ).toEqual(['frame', 'items', 'items', 'remote', 'route'])
     for (const point of ['sink:card-links', 'sink:row-note', 'sink:beside-row', 'sink:beside-pane']) {
       expect(extensionDeliveries(point).map((entry) => entry.pluginId)).toEqual(['guest'])
     }

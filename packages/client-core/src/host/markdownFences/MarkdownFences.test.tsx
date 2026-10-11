@@ -1,7 +1,11 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CORE_MARKDOWN_FENCE_POINT, MAX_MARKDOWN_FENCE_BYTES, type MarkdownFenceProps } from '@acorn/protocol/extensionPoints.ts'
+import {
+  CORE_MARKDOWN_FENCE_POINT,
+  MAX_MARKDOWN_FENCE_BYTES,
+  type MarkdownFenceProps,
+} from '@acorn/protocol/extensionPoints.ts'
 import Markdown from '../../kit/components/content/Markdown'
 import { extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
@@ -67,7 +71,10 @@ const draw = (initial: string, scope: FenceScope = { taskId: 'task-1' }) => {
     setText,
     wraps: () => [...host.querySelectorAll<HTMLElement>('.ui-code-wrap')],
     toggles: () => [...host.querySelectorAll<HTMLButtonElement>('.markdown-fence-toggle button')],
-    done: () => { dispose(); host.remove() },
+    done: () => {
+      dispose()
+      host.remove()
+    },
   }
 }
 
@@ -92,7 +99,13 @@ describe('Markdown fence viewers', () => {
       expect(mounted).toHaveLength(0)
       view.setText('Intro\n\n```JSON\n{"a": 1}\n```')
       await settle(() => expect(mounted).toHaveLength(1))
-      expect(mounted[0]).toEqual({ blockId: 'fence-1', language: 'JSON', text: '{"a": 1}', revision: 2, taskId: 'task-1' })
+      expect(mounted[0]).toEqual({
+        blockId: 'fence-1',
+        language: 'JSON',
+        text: '{"a": 1}',
+        revision: 2,
+        taskId: 'task-1',
+      })
       const wrap = view.wraps()[0]
       expect(wrap.hasAttribute('data-preview')).toBe(true)
       // The wrapper keeps what a selection action reads, and the source stays for Copy and Source.
@@ -100,19 +113,25 @@ describe('Markdown fence viewers', () => {
       expect(wrap.querySelector('pre')?.textContent).toBe('{"a": 1}')
       expect(wrap.querySelector('.copy-btn')).not.toBeNull()
       expect(view.toggles()[0].getAttribute('aria-pressed')).toBe('true')
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('gives a fence with no hint, no match, or text over the cap no viewer', async () => {
     viewer()
-    const view = draw([fence('plain', ''), fence('a,b', 'csv'), fence('x'.repeat(MAX_MARKDOWN_FENCE_BYTES + 1))].join('\n\n'))
+    const view = draw(
+      [fence('plain', ''), fence('a,b', 'csv'), fence('x'.repeat(MAX_MARKDOWN_FENCE_BYTES + 1))].join('\n\n'),
+    )
     try {
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(view.wraps()).toHaveLength(3)
       expect(view.toggles()).toHaveLength(0)
       expect(view.host.querySelector('[data-preview]')).toBeNull()
       expect(mounted).toHaveLength(0)
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('opens four viewers on its own and makes room for a fifth only when asked', async () => {
@@ -127,7 +146,9 @@ describe('Markdown fence viewers', () => {
       expect(mounted).toHaveLength(MAX_FENCE_VIEWERS)
       // The earliest open fence went back to its source to make room.
       expect(view.wraps()[0].hasAttribute('data-preview')).toBe(false)
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('goes back to source and copies it whoever draws the fence', async () => {
@@ -143,7 +164,9 @@ describe('Markdown fence viewers', () => {
       await settle(() => expect(mounted).toHaveLength(0))
       expect(view.wraps()[0].hasAttribute('data-preview')).toBe(false)
       expect(view.toggles()[0].getAttribute('aria-pressed')).toBe('false')
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('disposes the old viewer before a changed fence gets its own', async () => {
@@ -155,7 +178,9 @@ describe('Markdown fence viewers', () => {
       await settle(() => expect(mounted.map((props) => props.text)).toEqual(['{"v": 2}']))
       expect(events).toEqual(['mount fence-1', 'unmount fence-1', 'mount fence-2'])
       expect(mounted[0].revision).toBe(2)
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('gives two equal fences a viewer each and keeps both across an insertion and a removal', async () => {
@@ -170,7 +195,9 @@ describe('Markdown fence viewers', () => {
       view.setText(`A new paragraph first.\n\n${same}`)
       await settle(() => expect(mounted).toHaveLength(1))
       expect(events).toHaveLength(3)
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('keeps a selection in the paragraph above while a fence opens and toggles', async () => {
@@ -187,7 +214,9 @@ describe('Markdown fence viewers', () => {
       await settle(() => expect(mounted).toHaveLength(0))
       expect(view.host.querySelector('p')).toBe(paragraph)
       expect(document.getSelection()!.toString()).toBe('A paragraph somebody is reading.')
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 
   it('falls back to source when the viewer’s plugin goes away or its tree fails', async () => {
@@ -201,18 +230,31 @@ describe('Markdown fence viewers', () => {
       expect(view.wraps()[0].hasAttribute('data-preview')).toBe(false)
       expect(view.wraps()[0].querySelector('pre')?.textContent).toBe('{"a": 1}')
       expect(view.wraps()[0].querySelector('.copy-btn')).not.toBeNull()
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
 
-    registered.push(extensionRegistry.register({
-      id: 'plugin:broken:fence', pluginId: 'broken', point: CORE_MARKDOWN_FENCE_POINT, label: 'Broken',
-      order: 500, carrier: 'remote', entry: 'fence', hash: 'abc', matches: ['json'],
-    } as ExtensionContribution))
+    registered.push(
+      extensionRegistry.register({
+        id: 'plugin:broken:fence',
+        pluginId: 'broken',
+        point: CORE_MARKDOWN_FENCE_POINT,
+        label: 'Broken',
+        order: 500,
+        carrier: 'remote',
+        entry: 'fence',
+        hash: 'abc',
+        matches: ['json'],
+      } as ExtensionContribution),
+    )
     const broken = draw(fence('{"a": 1}'))
     try {
       await settle(() => expect(broken.toggles()).toHaveLength(0))
       expect(broken.wraps()[0].hasAttribute('data-preview')).toBe(false)
       expect(broken.wraps()[0].querySelector('pre')).not.toBeNull()
-    } finally { broken.done() }
+    } finally {
+      broken.done()
+    }
   })
 
   it('leaves a fence as source while two plugins tie and nobody has picked', async () => {
@@ -223,6 +265,8 @@ describe('Markdown fence viewers', () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(view.toggles()).toHaveLength(0)
       expect(mounted).toHaveLength(0)
-    } finally { view.done() }
+    } finally {
+      view.done()
+    }
   })
 })

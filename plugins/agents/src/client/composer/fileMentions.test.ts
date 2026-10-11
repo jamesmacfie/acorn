@@ -33,16 +33,13 @@ describe('managed composer file mentions', () => {
   it('quotes a path with a space in it, so the mention it writes reads back as one token', () => {
     expect(formatFileMention('src/app.ts')).toBe('@src/app.ts')
     expect(formatFileMention('docs/product brief.md')).toBe('@"docs/product brief.md"')
-    expect(parseFileMentions(`Review ${formatFileMention('docs/product brief.md')} next.`, files))
-      .toEqual([{ type: 'file', path: 'docs/product brief.md' }])
+    expect(parseFileMentions(`Review ${formatFileMention('docs/product brief.md')} next.`, files)).toEqual([
+      { type: 'file', path: 'docs/product brief.md' },
+    ])
   })
 
   it('fuzzy-ranks file suggestions and caps the list', () => {
-    const files = [
-      'src/components/AgentPane.tsx',
-      'src/agent/state.ts',
-      'README.md',
-    ]
+    const files = ['src/components/AgentPane.tsx', 'src/agent/state.ts', 'README.md']
     expect(fileMentionSuggestions(files, 'state', 2)[0]).toBe('src/agent/state.ts')
     expect(fileMentionSuggestions(files, '', 2)).toEqual(files.slice(0, 2))
   })

@@ -3,8 +3,19 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import {
-  activateTaskSignals, activeNodeId, createFleetQuery, createWorkspaceWords, nodes, openPane, pathForTask, readJson,
-  setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions,
+  activateTaskSignals,
+  activeNodeId,
+  createFleetQuery,
+  createWorkspaceWords,
+  nodes,
+  openPane,
+  pathForTask,
+  readJson,
+  setActiveNode,
+  type Task,
+  tasksOptions,
+  workspaceForProject,
+  workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from '../sessions/agentActivity'
@@ -14,8 +25,23 @@ import { openManagedSession, selectManagedSession } from '../sessions/managedSel
 import { workflowRunOf } from './workflowRun'
 import type { AgentSession } from '../../contract/wire.ts'
 import {
-  Alert, Card, Chip, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Row,
-  Rows, SegmentedControl, Select, Stack, StatusDot, Text,
+  Alert,
+  Card,
+  Chip,
+  DetailColumn,
+  EmptyState,
+  Heading,
+  Icon,
+  Inline,
+  Input,
+  ListDetail,
+  Row,
+  Rows,
+  SegmentedControl,
+  Select,
+  Stack,
+  StatusDot,
+  Text,
 } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from '../sessions/RuntimeStateIcon'
 import { providerTone } from '../sessions/stateTone'
@@ -45,12 +71,12 @@ export default function AgentCenter() {
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
-  const activeWorkspace = createMemo(() =>
-    workspaceForProject(workspaces.data, params.projectId))
+  const activeWorkspace = createMemo(() => workspaceForProject(workspaces.data, params.projectId))
   const workspaceId = createMemo(() => activeWorkspace()?.id ?? '')
   const workspaceProjectIds = createMemo(() => new Set(activeWorkspace()?.projects.map((project) => project.id) ?? []))
   const workspaceTasks = createMemo(() =>
-    (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)))
+    (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)),
+  )
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(
     () => managedAgentStore.captureRead(),
@@ -79,7 +105,11 @@ export default function AgentCenter() {
       const activeId = workspaceId()
       return value && activeId && !fleetScope() ? { value, activeId, owner: managedAgentStore.captureRead() } : null
     },
-    (target) => managedAgentApi.search(target.value, { workspaceId: target.activeId }, target.owner).then((rows) => { target.owner.check(); return rows }),
+    (target) =>
+      managedAgentApi.search(target.value, { workspaceId: target.activeId }, target.owner).then((rows) => {
+        target.owner.check()
+        return rows
+      }),
   )
   const [workspaceSessions] = createResource(
     () => ({ activeId: workspaceId(), owner: managedAgentStore.captureRead() }),
@@ -91,10 +121,13 @@ export default function AgentCenter() {
       return page.sessions
     },
   )
-  // Asked for only when the archived filter is chosen. This used to load on every visit and every
-  // workspace switch, which is a second full session page fetched to fill a list nobody had opened.
+  // Asked for only when the archived filter is chosen, so a visit or a workspace switch does not fetch
+  // a second full session page to fill a list nobody opened.
   const [archived, { refetch: refetchArchived }] = createResource(
-    () => stateFilter() === 'archived' && workspaceId() ? { activeId: workspaceId(), owner: managedAgentStore.captureRead() } : null,
+    () =>
+      stateFilter() === 'archived' && workspaceId()
+        ? { activeId: workspaceId(), owner: managedAgentStore.captureRead() }
+        : null,
     async ({ activeId, owner }) => {
       const page = await managedAgentApi.sessions({ workspaceId: activeId, archived: true }, owner)
       owner.check()
@@ -121,56 +154,84 @@ export default function AgentCenter() {
     onCleanup(managedAgentStore.activate())
   })
 
-  createEffect(on(workspaceId, () => {
-    setError('')
-  }, { defer: true }))
+  createEffect(
+    on(
+      workspaceId,
+      () => {
+        setError('')
+      },
+      { defer: true },
+    ),
+  )
 
   const taskById = createMemo(() => new Map(workspaceTasks().map((task) => [task.id, task])))
 
   // Rows, in whichever scope is selected. Both branches produce the same shape, so the filters, counts,
   // sort, and open below are written once.
-  const rows = createMemo<AgentRow[]>(() => agentTelemetry.measure('agents.center.rows', () => {
-    if (fleetScope()) {
-      // Per node, because a task id is only meaningful on its own node (docs/architecture/fleet.md § Fan-out and partial results:
-      // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
-      // another node's session.
-      const tasksByNode = new Map(
-        fleetTasks().rows.map((row) => [row.nodeId, new Map(row.data.map((task) => [task.id, task]))]),
-      )
-      return fleetSessions().rows.flatMap((row) =>
-        row.data.map((session) => ({
-          session,
-          nodeId: row.nodeId,
-          nodeLabel: row.node.label,
-          task: tasksByNode.get(row.nodeId)?.get(session.taskId),
-        })),
-      )
-    }
-    void workspaceSessions()
-    const sessions = stateFilter() === 'archived'
-      ? (archived() ?? [])
-      : query().trim()
-        ? (searchResults() ?? [])
-        : managedAgentStore.sessions().filter((session) => !session.archivedAt && workspaceTaskIds().has(session.taskId))
-    const active = activeNodeId() ?? ''
-    return sessions.map((session) => ({ session, nodeId: active, nodeLabel: '', task: taskById().get(session.taskId) }))
-  }))
+  const rows = createMemo<AgentRow[]>(() =>
+    agentTelemetry.measure('agents.center.rows', () => {
+      if (fleetScope()) {
+        // Per node, because a task id is only meaningful on its own node
+        // (docs/architecture/fleet.md § Fan-out and partial results: two nodes may hold the same UUID). A
+        // single flat map would resolve one node's task title against another node's session.
+        const tasksByNode = new Map(
+          fleetTasks().rows.map((row) => [row.nodeId, new Map(row.data.map((task) => [task.id, task]))]),
+        )
+        return fleetSessions().rows.flatMap((row) =>
+          row.data.map((session) => ({
+            session,
+            nodeId: row.nodeId,
+            nodeLabel: row.node.label,
+            task: tasksByNode.get(row.nodeId)?.get(session.taskId),
+          })),
+        )
+      }
+      void workspaceSessions()
+      const sessions =
+        stateFilter() === 'archived'
+          ? (archived() ?? [])
+          : query().trim()
+            ? (searchResults() ?? [])
+            : managedAgentStore
+                .sessions()
+                .filter((session) => !session.archivedAt && workspaceTaskIds().has(session.taskId))
+      const active = activeNodeId() ?? ''
+      return sessions.map((session) => ({
+        session,
+        nodeId: active,
+        nodeLabel: '',
+        task: taskById().get(session.taskId),
+      }))
+    }),
+  )
 
   const sourceSessions = createMemo(() => rows().map((row) => row.session))
-  const shown = createMemo(() => agentTelemetry.measure('agents.center.filter', () => {
-    const needle = fleetScope() ? query().trim().toLowerCase() : ''
-    return rows().filter(({ session, task }) => {
-      if (providerFilter() && session.providerId !== providerFilter()) return false
-      if (stateFilter() === 'active' && !isActiveAgent(session)) return false
-      if (stateFilter() === 'attention' && !needsAttention(session)) return false
-      // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
-      // only names a workspace on one node, so there is nothing to fan a server search out with.
-      if (needle && !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.github?.name ?? task?.projectId ?? ''}`.toLowerCase().includes(needle)) return false
-      return true
-    }).sort((a, b) =>
-      Number(needsAttention(b.session)) - Number(needsAttention(a.session)) || b.session.updatedAt - a.session.updatedAt,
-    )
-  }))
+  const shown = createMemo(() =>
+    agentTelemetry.measure('agents.center.filter', () => {
+      const needle = fleetScope() ? query().trim().toLowerCase() : ''
+      return rows()
+        .filter(({ session, task }) => {
+          if (providerFilter() && session.providerId !== providerFilter()) return false
+          if (stateFilter() === 'active' && !isActiveAgent(session)) return false
+          if (stateFilter() === 'attention' && !needsAttention(session)) return false
+          // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
+          // only names a workspace on one node, so there is nothing to fan a server search out with.
+          if (
+            needle &&
+            !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.github?.name ?? task?.projectId ?? ''}`
+              .toLowerCase()
+              .includes(needle)
+          )
+            return false
+          return true
+        })
+        .sort(
+          (a, b) =>
+            Number(needsAttention(b.session)) - Number(needsAttention(a.session)) ||
+            b.session.updatedAt - a.session.updatedAt,
+        )
+    }),
+  )
   createEffect(() => {
     agentTelemetry.observe('agents.center.rows_count', shown().length)
     if (tasks.isError || workspaces.isError || workspaceSessions.error || providers.error) view.fail()
@@ -181,13 +242,13 @@ export default function AgentCenter() {
   // § Fan-out and partial results).
   const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
   // Key to row. `Rows` runs its body once per row, and the body below reads its own row about a dozen
-  // times: as a `find` per read that is a scan of the list per field, and a session frame lands about
-  // 25 times a second while an agent is working (../sessions/managedStore.ts § the transcript store).
+  // times: as a `find` per read that is a scan of the list per field, on every session frame that lands
+  // while an agent is working.
   const shownByKey = createMemo(() => new Map(shown().map((row) => [rowKey(row), row])))
 
   // Two targets on one row, because a workflow session has two homes and neither is the obvious one:
   // the body opens the session, this opens the run it belongs to. Row ignores a click that landed on a
-  // control inside it, so there is nothing to stop here (client-core kit RowActions.tsx).
+  // control inside it, so there is nothing to stop here.
   function openRun(row: AgentRow, run: { runId: string; stepId?: string }) {
     if (!row.task) return setError('The session’s task is no longer available.')
     if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
@@ -230,7 +291,9 @@ export default function AgentCenter() {
       <DetailColumn scroll>
         <Stack gap="section">
           <Inline wrap gap="section">
-            <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : words().capitalized}>Agent Center</Heading>
+            <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : words().capitalized}>
+              Agent Center
+            </Heading>
             <Inline wrap gap="section">
               <Stack gap="none">
                 <Text emphasis="eyebrow">active</Text>
@@ -247,14 +310,20 @@ export default function AgentCenter() {
             </Inline>
           </Inline>
           <Show when={fleetScope()}>
-            <Text emphasis="muted" wrap>Managed sessions across every paired node. Remote rows refresh on load rather than live.</Text>
+            <Text emphasis="muted" wrap>
+              Managed sessions across every paired node. Remote rows refresh on load rather than live.
+            </Text>
           </Show>
 
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
 
           {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
           <For each={unavailable()}>
-            {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}
+            {(entry) => (
+              <Alert tone="warn" variant="banner">
+                {entry.label} unavailable — {entry.reason}
+              </Alert>
+            )}
           </For>
 
           <Inline wrap>
@@ -263,8 +332,16 @@ export default function AgentCenter() {
                 <Card pad="sm" fit>
                   <Inline>
                     <StatusDot
-                      tone={providerTone(provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing')}
-                      label={provider.installed ? provider.authenticated === false ? 'Authentication required' : 'Available' : 'Not installed'}
+                      tone={providerTone(
+                        provider.installed ? (provider.authenticated === false ? 'error' : 'ok') : 'missing',
+                      )}
+                      label={
+                        provider.installed
+                          ? provider.authenticated === false
+                            ? 'Authentication required'
+                            : 'Available'
+                          : 'Not installed'
+                      }
                     />
                     <Text emphasis="strong">{provider.label}</Text>
                   </Inline>
@@ -274,7 +351,7 @@ export default function AgentCenter() {
           </Inline>
 
           {/* Not a `Toolbar`: this is a page, and a toolbar is a chrome strip with a background and a
-              rule that reaches the surface's edges. In the middle of a padded column it read as a
+              rule that reaches the surface's edges. In the middle of a padded column it reads as a
               stray band. */}
           <Inline wrap gap="row">
             <Input
@@ -320,9 +397,7 @@ export default function AgentCenter() {
           <Show
             when={shown().length}
             fallback={
-              <EmptyState icon={<Icon name="sparkles" tone="accent" />}>
-                No sessions match these filters.
-              </EmptyState>
+              <EmptyState icon={<Icon name="sparkles" tone="accent" />}>No sessions match these filters.</EmptyState>
             }
           >
             <Card pad="sm">
@@ -342,55 +417,55 @@ export default function AgentCenter() {
                       {(narrowed) => {
                         const current = narrowed
                         return (
-                        <Row
-                          item={itemProps}
-                          variant="stacked"
-                          leading={<Icon name={providerGlyph(current().session.providerId)} tone="brand" />}
-                          meta={
-                            <>
-                              <Inline>
-                                <RuntimeStateIcon state={current().session.runtimeState} queued={current().session.queuedTurns} />
-                                <Text emphasis="muted">
-                                  {current().session.runtimeState}
-                                  {current().session.attention === 'none'
-                                    ? ''
-                                    : ` · ${current().session.attention.replace('_', ' ')}`}
-                                </Text>
-                              </Inline>
-                              <Text emphasis="muted">{elapsed(current().session.updatedAt)}</Text>
-                            </>
-                          }
-                          metaFields={2}
-                          onPress={() => open(current())}
-                        >
-                          <Inline>
-                            <Text emphasis="strong">{current().session.title}</Text>
-                            {/* A session a workflow started, and the way back to the run. The same
+                          <Row
+                            item={itemProps}
+                            variant="stacked"
+                            leading={<Icon name={providerGlyph(current().session.providerId)} tone="brand" />}
+                            meta={
+                              <>
+                                <Inline>
+                                  <RuntimeStateIcon
+                                    state={current().session.runtimeState}
+                                    queued={current().session.queuedTurns}
+                                  />
+                                  <Text emphasis="muted">
+                                    {current().session.runtimeState}
+                                    {current().session.attention === 'none'
+                                      ? ''
+                                      : ` · ${current().session.attention.replace('_', ' ')}`}
+                                  </Text>
+                                </Inline>
+                                <Text emphasis="muted">{elapsed(current().session.updatedAt)}</Text>
+                              </>
+                            }
+                            metaFields={2}
+                            onPress={() => open(current())}
+                          >
+                            <Inline>
+                              <Text emphasis="strong">{current().session.title}</Text>
+                              {/* A session a workflow started, and the way back to the run. The same
                                 chip the Agent pane's header carries, so the two read alike. */}
-                            <Show when={workflowRunOf(current().session)}>
-                              {(run) => (
-                                <Chip
-                                  leading={<Icon name="workflow" />}
-                                  onPress={() => openRun(current(), run())}
-                                >
-                                  Run
+                              <Show when={workflowRunOf(current().session)}>
+                                {(run) => (
+                                  <Chip leading={<Icon name="workflow" />} onPress={() => openRun(current(), run())}>
+                                    Run
+                                  </Chip>
+                                )}
+                              </Show>
+                              <Show when={current().session.archivedAt}>
+                                <Chip leading={<Icon name="archive-restore" />} onPress={() => void restore(current())}>
+                                  Restore
                                 </Chip>
-                              )}
-                            </Show>
-                            <Show when={current().session.archivedAt}>
-                              <Chip leading={<Icon name="archive-restore" />} onPress={() => void restore(current())}>
-                                Restore
-                              </Chip>
-                            </Show>
-                          </Inline>
-                          <Text emphasis="muted">
-                            {current().session.providerId} · {current().session.kind} ·{' '}
-                            {current().task?.title ?? 'Missing task'}
-                            {/* The node only when there is a fleet to disambiguate — otherwise it names
+                              </Show>
+                            </Inline>
+                            <Text emphasis="muted">
+                              {current().session.providerId} · {current().session.kind} ·{' '}
+                              {current().task?.title ?? 'Missing task'}
+                              {/* The node only when there is a fleet to disambiguate — otherwise it names
                                 the only machine there is. */}
-                            {current().nodeLabel ? ` · ${current().nodeLabel}` : ''}
-                          </Text>
-                        </Row>
+                              {current().nodeLabel ? ` · ${current().nodeLabel}` : ''}
+                            </Text>
+                          </Row>
                         )
                       }}
                     </Show>

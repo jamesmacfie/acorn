@@ -10,10 +10,7 @@ import Icon from '../../../kit/components/content/Icon'
 export default function Provenance(props: { pluginId: string }) {
   const mark = () => brandMarkRegistry.get(props.pluginId)
   return (
-    <Show
-      when={mark()}
-      fallback={<Badge size="xs">{props.pluginId}</Badge>}
-    >
+    <Show when={mark()} fallback={<Badge size="xs">{props.pluginId}</Badge>}>
       <Icon name={`brand:${props.pluginId}`} title={props.pluginId} />
     </Show>
   )

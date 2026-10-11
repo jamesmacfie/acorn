@@ -41,14 +41,15 @@ UI around it, and the host terminates it and removes its trees.
 
 ## Requests that cross the sandbox
 
-**Two messages cross the tree channel toward the host**, and both are bounded requests rather than an
-RPC door ([asking the owner](../plugins.md#asking-the-owner)). `owner.invoke` calls one action the
-owning extension point declared and the owner's `Slot` bound a handler for. `overlay.open` shows the
-one overlay this contribution's manifest named. The host scopes a request by the slot it arrived on,
-so plugin code supplies no plugin, point, owner, overlay, or slot id. Payload and reply are each capped
-at 64 KiB, eight may be outstanding per slot, an owner has ten seconds to answer, and a failure is a
-code and a sentence with no host stack (`@acorn/protocol/tree/messages.ts`). `overlay.open` also needs
-focus inside that tree and is throttled to one a second, so a modal stays a person's act.
+**Two messages cross the tree channel toward the host**, and both are bounded requests rather than
+an RPC door ([asking the owner](../plugins/remote-points.md#asking-the-owner)). `owner.invoke` calls
+one action the owning extension point declared and the owner's `Slot` bound a handler for.
+`overlay.open` shows the one overlay this contribution's manifest named. The host scopes a request
+by the slot it arrived on, so plugin code supplies no plugin, point, owner, overlay, or slot id.
+Payload and reply are each capped at 64 KiB, eight may be outstanding per slot, an owner has ten
+seconds to answer, and a failure is a code and a sentence with no host stack
+(`@acorn/protocol/tree/messages.ts`). `overlay.open` also needs focus inside that tree and is
+throttled to one a second, so a modal stays a person's act.
 
 **Binary bridge calls change no permission.** `api.bytes` runs the same `allowApi` decision as `api`,
 before the body is touched, so a plugin's own `/v1/p/<id>/` namespace is reachable and another

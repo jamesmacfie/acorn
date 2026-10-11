@@ -23,7 +23,7 @@ type Sink<N> = {
   text(value: string): N
 }
 
-// The shape of changes' agent tool card, which is the card this phase exists to prove.
+// The shape of changes' agent tool card, drawn by both paths.
 const toolCard = <N,>(sink: Sink<N>, press: () => void): N =>
   sink.node('Fold', { label: 'Edit src/app.ts', open: true, onOpenChange: () => {} }, [
     sink.node('Stack', { gap: 'row' }, [
@@ -37,7 +37,12 @@ const directSink: Sink<JSX.Element> = {
   // Through `kitComponent`, because a table entry is a component or a loader for one (../tree/kitEntry.ts).
   // Every node in the card above is a cheap primitive, so what comes back is always the component.
   node: (type, props, children) =>
-    createComponent(kitComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS])!, { ...props, get children() { return children } }),
+    createComponent(kitComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS])!, {
+      ...props,
+      get children() {
+        return children
+      },
+    }),
   text: (value) => value,
 }
 
@@ -77,13 +82,20 @@ describe('the compiled card and the remote card are the same card', () => {
 
     const batches: TreeMutation[][] = []
     const root = createRemoteRoot((ops) => batches.push(ops))
-    insertNode(root.node, toolCard(remoteSink, () => {}), null)
+    insertNode(
+      root.node,
+      toolCard(remoteSink, () => {}),
+      null,
+    )
     await new Promise<void>((resolve) => queueMicrotask(resolve))
     expect(batches).toHaveLength(1)
 
     let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
     const transport: TreeTransport = {
-      onBatch: (listener) => { deliver = listener; return () => {} },
+      onBatch: (listener) => {
+        deliver = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       // Back to the sandbox's own closure, which is the half a worker would carry.
       send: (handler, _event, payload) => root.dispatch(handler, payload),
@@ -107,7 +119,10 @@ describe('the compiled card and the remote card are the same card', () => {
 
     let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
     const transport: TreeTransport = {
-      onBatch: (listener) => { deliver = listener; return () => {} },
+      onBatch: (listener) => {
+        deliver = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       send: (handler, _event, payload) => root.dispatch(handler, payload),
     }
@@ -123,14 +138,27 @@ describe('the compiled card and the remote card are the same card', () => {
     const confirmed = vi.fn()
     const batches: TreeMutation[][] = []
     const root = createRemoteRoot((ops) => batches.push(ops))
-    insertNode(root.node, remoteSink.node('ConfirmButton', {
-      label: 'Delete', confirmLabel: 'Confirm delete', onConfirm: confirmed,
-    }, [remoteSink.text('Delete')]), null)
+    insertNode(
+      root.node,
+      remoteSink.node(
+        'ConfirmButton',
+        {
+          label: 'Delete',
+          confirmLabel: 'Confirm delete',
+          onConfirm: confirmed,
+        },
+        [remoteSink.text('Delete')],
+      ),
+      null,
+    )
     await new Promise<void>((resolve) => queueMicrotask(resolve))
 
     let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
     const transport: TreeTransport = {
-      onBatch: (listener) => { deliver = listener; return () => {} },
+      onBatch: (listener) => {
+        deliver = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       send: (handler, _event, payload) => root.dispatch(handler, payload),
     }

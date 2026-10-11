@@ -5,7 +5,12 @@
 // The engine loads this on the first permission request, not at boot
 // (apps/node/scripts/check-service-budget.mjs).
 import { createLogger, describeError, type PluginHookRegistry } from '@acorn/plugin-api/node'
-import type { AgentNormalizedEvent, AgentPermissionOption, AgentRequestBlocked, AgentSession } from '../../contract/wire.ts'
+import type {
+  AgentNormalizedEvent,
+  AgentPermissionOption,
+  AgentRequestBlocked,
+  AgentSession,
+} from '../../contract/wire.ts'
 import {
   BEFORE_PERMISSION_HOOK,
   type AgentBeforePermissionPayload,
@@ -41,7 +46,10 @@ export type PermissionRequestPorts = {
  * shown it, so there is nothing to resolve. Otherwise the reply and the enqueue run with no await
  * between them, so whatever the provider does with a refusal reaches the queue after the request.
  */
-export async function settlePermissionRequest(ports: PermissionRequestPorts, event: AgentDriverPermissionRequest): Promise<void> {
+export async function settlePermissionRequest(
+  ports: PermissionRequestPorts,
+  event: AgentDriverPermissionRequest,
+): Promise<void> {
   const blocked = await askPolicy(ports, event)
   if (!ports.owned()) return
   const [request] = await ports.materialize(blocked ? { ...event.request, blocked } : event.request)
@@ -63,7 +71,10 @@ export async function settlePermissionRequest(ports: PermissionRequestPorts, eve
 }
 
 // Fails open: a payload that can't be built means nobody objected, and the person decides.
-async function askPolicy(ports: PermissionRequestPorts, event: AgentDriverPermissionRequest): Promise<AgentRequestBlocked | null> {
+async function askPolicy(
+  ports: PermissionRequestPorts,
+  event: AgentDriverPermissionRequest,
+): Promise<AgentRequestBlocked | null> {
   if (!ports.hooks) return null
   try {
     const session = await ports.session()
@@ -96,7 +107,7 @@ const boundedSubject = (subject: AgentPermissionSubject): AgentPermissionSubject
 
 /** The answer a veto sends: the first "reject once" option, never a lasting rule in the harness's own
  *  settings. A request that offers none is cancelled, which both drivers answer as a plain refusal. */
-export const vetoResolution = (options: readonly AgentPermissionOption[] | undefined): unknown => {
+const vetoResolution = (options: readonly AgentPermissionOption[] | undefined): unknown => {
   const reject = options?.find((option) => option.kind === 'reject_once')
   return reject ? { optionId: reject.id } : { cancelled: true }
 }

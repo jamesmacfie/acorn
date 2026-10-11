@@ -1,9 +1,7 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { Task } from '@acorn/plugin-api/client'
-import {
-  Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs,
-} from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
@@ -15,21 +13,19 @@ import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 
-// The PR pane: one pull request, drawn the way the GitHub browse surface draws one — the navigator
-// column beside the diff (../GithubBrowse.tsx). Browse reaches the same pair through its own pull
-// list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
+// The PR pane: one pull request, drawn the way the GitHub browse surface draws one, the navigator
+// column beside the diff. Browse reaches the same pair through its own pull list; a task already
+// knows which pull it is about, so the list is a strip of related pulls instead.
 //
 // A `single` layout holding one kit node, not the host's `list-detail`: the halves are one surface
-// with a shared model rather than two regions, and `Sections` is the node that arranges them — folds
-// beside the diff on a desktop, a strip of tabs in a terminal
-// (client-core/kit/components/layout/Sections.tsx). It is what makes this look like browse rather
-// than like a second design, because browse draws the same node from the same list.
+// with a shared model rather than two regions, and the kit's `Sections` arranges them: folds beside
+// the diff on a desktop, a strip of tabs in a terminal. Browse draws the same node from the same list.
 //
-// A task can be about more than one pull — the one it was made from, the ones that mention it, the
-// ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
+// A task can be about more than one pull (the one it was made from, the ones that mention it, the
+// ones stacked on it), so the navigator opens with the strip that switches between them.
 //
-// The registration is next door in ./paneContribution.ts, which is what keeps this file — and the
-// pull-request model behind it — out of the renderer's first paint.
+// The registration lives in `prPaneContribution`, which keeps this file and the pull-request model
+// behind it out of the renderer's first paint.
 
 // A destination a related pull has and this pane does not. The mark on the tab says which one, and
 // the control beside the strip is how a reader takes it.
@@ -42,15 +38,19 @@ function PullStrip(props: { tabs: PrTabsModel }) {
   // Rebuilt when the strip's contents change and never when the selection does. `Tabs` draws with
   // `For`, which remounts a tab it is handed a new object for, and a remount under a keyboard user
   // drops the focus they were moving (docs/ui-design.md).
-  const defs = createMemo(() => tabs().tabs().map((tab) => {
-    const kind = destinationKind(tab, taskId())
-    return {
-      id: pullRefKey(tab.pull),
-      label: `#${tab.pull.number}`,
-      title: taskPullTabTooltip(tab, taskId()),
-      ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
-    }
-  }))
+  const defs = createMemo(() =>
+    tabs()
+      .tabs()
+      .map((tab) => {
+        const kind = destinationKind(tab, taskId())
+        return {
+          id: pullRefKey(tab.pull),
+          label: `#${tab.pull.number}`,
+          title: taskPullTabTooltip(tab, taskId()),
+          ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
+        }
+      }),
+  )
   const selected = () => tabs().selected()
   const kind = () => {
     const tab = selected()
@@ -93,7 +93,11 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                     {(menu) => (
                       <For each={linked()}>
                         {(linkedTask) => (
-                          <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
+                          <Menu.Item
+                            context={menu}
+                            onSelect={() => tabs().openTask(linkedTask)}
+                            leading={<Icon name="list-checks" size={13} />}
+                          >
                             {linkedTask.title}
                           </Menu.Item>
                         )}
@@ -114,7 +118,9 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                     disabled={tabs().creatingTask() || !tabs().canCreateTask()}
                     tip={tabs().taskCreationTitle()}
                     onPress={() => void tabs().createSelectedTask()}
-                  >{tabs().creatingTask() ? 'Creating…' : 'Create task'}</Button>
+                  >
+                    {tabs().creatingTask() ? 'Creating…' : 'Create task'}
+                  </Button>
                 </Show>
               </>
             }
@@ -142,7 +148,7 @@ export function PrPane(props: { task: Task }) {
   })
   const onLinkClick = makeContentLinkHandler(navigate, { taskId: props.task.id })
   // A pane has no router, so the selected file is held locally and the diff column hears about it
-  // through the file-scroll event rather than through `?file=` (../changedFiles.ts).
+  // through the file-scroll event rather than through `?file=`.
   const changedFiles = useChangedFiles(
     () => {
       const pull = tabs.selected()?.pull
@@ -150,13 +156,19 @@ export function PrPane(props: { task: Task }) {
     },
     { router: false },
   )
-  // Keyed on the selected pull and whether it is read-only, for the reason ../PullDetail.tsx gives: a
-  // related pull otherwise showed the primary's threads with live Reply boxes.
+  // Keyed on the selected pull and whether it is read-only, because `DiffForPull` reads its route
+  // once: without a new mount, a related pull would show the primary's threads with live Reply boxes.
   const diffRoute = createMemo<(PullRoute & { readOnly: boolean }) | null>(
     () => {
       const scope = model()?.scope
       return scope
-        ? { owner: scope.owner, repo: scope.repo, number: scope.number, key: routeKey(scope.owner, scope.repo, scope.number), readOnly: !tabs.isPrimary() }
+        ? {
+            owner: scope.owner,
+            repo: scope.repo,
+            number: scope.number,
+            key: routeKey(scope.owner, scope.repo, scope.number),
+            readOnly: !tabs.isPrimary(),
+          }
         : null
     },
     null,
@@ -169,7 +181,14 @@ export function PrPane(props: { task: Task }) {
   }
 
   return (
-    <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+    <Show
+      when={model()}
+      fallback={
+        <EmptyState align="start" busy>
+          Loading…
+        </EmptyState>
+      }
+    >
       {(loaded) => (
         <>
           <Sections
@@ -181,7 +200,12 @@ export function PrPane(props: { task: Task }) {
               render: () => (
                 <Stack gap="section">
                   <PullStrip tabs={tabs} />
-                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} hideNumber={tabs.tabs().length > 1} />
+                  <PrOverview
+                    model={loaded()}
+                    onOpenFile={select}
+                    onLinkClick={onLinkClick}
+                    hideNumber={tabs.tabs().length > 1}
+                  />
                 </Stack>
               ),
             }}
@@ -196,7 +220,9 @@ export function PrPane(props: { task: Task }) {
               label: 'Diff',
               render: () => (
                 <Show when={diffRoute()} keyed>
-                  {(route) => <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />}
+                  {(route) => (
+                    <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />
+                  )}
                 </Show>
               ),
             }}
@@ -209,7 +235,7 @@ export function PrPane(props: { task: Task }) {
                 repo={loaded().scope.repo}
                 runId={check().runId}
                 jobName={check().name}
-                    url={check().url}
+                url={check().url}
                 onClose={() => loaded().setOpenCheck(null)}
               />
             )}
@@ -219,4 +245,3 @@ export function PrPane(props: { task: Task }) {
     </Show>
   )
 }
-

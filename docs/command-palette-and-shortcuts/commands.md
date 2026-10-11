@@ -9,9 +9,13 @@ and why every row is a command. Read it before you add a palette row. It's part 
 Core's own commands form a small tree:
 
 - **Go to** holds the task, workspace, project, and Node searches and the **Last workspace** action
-  (`packages/client-core/src/host/palette/navigationCommands.ts`). Going to a task or a workspace is
-  a `fleet`-scoped search, so the root shows one named row instead of every task in the fleet. The
-  palette switches Node before it activates a task on another Node.
+  (`packages/client-core/src/host/registries/commands/navigationCommands.ts`). Both clients register
+  the same commands. Each host supplies a `NavigationHost` that lists what to offer and opens what's
+  picked: the desktop's lists the fleet and opens through the router
+  (`packages/client-core/src/host/palette/routerNavigation.ts`), and the terminal client's lists its one
+  Node and opens through its shell model (`apps/tui/src/chrome/navigation.ts`). Going to a task or a
+  workspace is a `fleet`-scoped search, so the root shows one named row instead of every task in the
+  fleet. The desktop switches Node before it activates a task on another Node.
 - **Panes** and **Terminal** hold the task-scoped operations: showing, closing, pinning, and moving
   panes, and the drawer and a shell in the worktree (`apps/desktop/src/client/TaskView.tsx`).
 - **Settings** holds one row per page the settings rail lists, in the rail's order, with the page's
@@ -105,7 +109,7 @@ Each plugin's list is short on purpose:
 
 Each plugin's own doc lists its share under "From the command palette". Memory's edit, history,
 restore, and import controls live on the Memory page
-([notes and memory](../notes-and-memory.md#the-memory-page-and-transcript)).
+([notes and memory](../notes-and-memory/memory-page.md)).
 
 Stopping an agent, removing a container, deleting a note, merging a pull request, and approving a
 workflow gate aren't palette commands. Each needs context and a confirmation that a short row can't

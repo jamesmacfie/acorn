@@ -13,7 +13,7 @@ import { nodes } from './fleet'
 // Core-owned rather than plugin-contributed, because the plugin that failed is not running to speak
 // for itself and the state belongs to the node.
 //
-// An attention item rather than a notice (registries/attention.ts), because this is a state. The
+// An attention item rather than a notice, because this is a state. The
 // plugin stays broken across refetches until the owner disables it or fixes it, so a dismissed row
 // coming back is correct.
 //
@@ -36,7 +36,8 @@ const titleFor = (row: NodePluginRow): string => {
 const SETTINGS_TARGET = { kind: 'settings', resourceId: 'plugins' } as const
 
 // The generic sentence, used only when the node sends no reason.
-const FALLBACK_DETAIL = 'It is installed on this node but its start-up threw. Its routes and contributions are not registered.'
+const FALLBACK_DETAIL =
+  'It is installed on this node but its start-up threw. Its routes and contributions are not registered.'
 
 export const pluginFailureAttention: AttentionSourceContribution = {
   id: 'core.pluginFailures',

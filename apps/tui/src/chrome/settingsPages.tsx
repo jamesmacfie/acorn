@@ -1,10 +1,17 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { lazy } from 'solid-js'
 import { join } from 'node:path'
-import { CORE_SETTINGS_PAGES, settingsCategoryLabel, type CoreSettingsPageId } from '@acorn/client-core/features/settings'
+import {
+  CORE_SETTINGS_PAGES,
+  settingsCategoryLabel,
+  type CoreSettingsPageId,
+} from '@acorn/client-core/features/settings'
 import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import {
-  settingsCategoryOf, settingsRegistry, settingsScopeOf, type SettingsContribution,
+  settingsCategoryOf,
+  settingsRegistry,
+  settingsScopeOf,
+  type SettingsContribution,
 } from '@acorn/client-core/host/registries/shell'
 import { configDir } from '../node/paths'
 
@@ -29,13 +36,15 @@ const TERMINAL_FORMS: Partial<Record<CoreSettingsPageId, SettingsContribution['c
 /** A plugin page whose rows all shape a surface this host does not draw, and why. Named by page id,
  *  because this is the host saying what it cannot honour, which the plugin cannot know. */
 const PLUGIN_PAGES_NOT_DRAWN: Record<string, string> = {
-  terminal: 'Its settings choose how the desktop app\'s terminal drawer opens and the size of its text. '
-    + 'This client opens terminal sessions full screen, in your own terminal\'s font.',
+  terminal:
+    "Its settings choose how the desktop app's terminal drawer opens and the size of its text. " +
+    "This client opens terminal sessions full screen, in your own terminal's font.",
 }
 
 /** Why a core page has no terminal form, where there is a better reason than the general one. */
 const WHY_NOT_HERE: Partial<Record<CoreSettingsPageId, string>> = {
-  shortcuts: 'Recording a shortcut needs the key press itself, and a terminal passes only some key combinations through.',
+  shortcuts:
+    'Recording a shortcut needs the key press itself, and a terminal passes only some key combinations through.',
   cli: 'It installs the acorn command for the desktop app. You are running that command already.',
   nodes: 'To pair this terminal with another node, start it with acorn --node <address>.',
 }
@@ -63,9 +72,10 @@ export function drawnElsewhere(page: SettingsContribution, mode?: WorkspacesMode
   const core = CORE_PAGE_IDS.has(page.id)
   if (!pluginReason && (!core || TERMINAL_FORMS[page.id as CoreSettingsPageId])) return undefined
   const path = `Settings > ${settingsCategoryLabel(settingsCategoryOf(page), mode)} > ${page.title ?? page.label}`
-  const why = pluginReason
-    ?? WHY_NOT_HERE[page.id as CoreSettingsPageId]
-    ?? 'The page is drawn with the desktop app\'s own controls, which have no terminal form.'
+  const why =
+    pluginReason ??
+    WHY_NOT_HERE[page.id as CoreSettingsPageId] ??
+    "The page is drawn with the desktop app's own controls, which have no terminal form."
   if (settingsScopeOf(page) === 'device') {
     return {
       why,
@@ -88,6 +98,9 @@ const drawsNothing = () => null
 /** Register core's pages for this host. Returns the teardown, which the shell runs on unmount. */
 export function registerCoreSettingsPages(): () => void {
   const registered = CORE_SETTINGS_PAGES.map((page) =>
-    settingsRegistry.register({ ...page, component: TERMINAL_FORMS[page.id] ?? drawsNothing }))
-  return () => { for (const entry of registered) entry.dispose() }
+    settingsRegistry.register({ ...page, component: TERMINAL_FORMS[page.id] ?? drawsNothing }),
+  )
+  return () => {
+    for (const entry of registered) entry.dispose()
+  }
 }

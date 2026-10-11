@@ -11,7 +11,7 @@ import { imageAlt, isInlineImageType, MAX_INLINE_IMAGE_BYTES } from './inlineIma
 // One artifact the agent produced: its body, then a row that names it and downloads it.
 //
 // The body is the `agents:artifact` point, keyed by media type, so another plugin can draw a JSON
-// file or a log better than a download row can (../../contract/transcriptMedia.ts). With nobody
+// file or a log better than a download row can (`AGENT_ARTIFACT_POINT`). With nobody
 // drawing it, a raster image draws inline and anything else has no body. The download row stays
 // outside the slot, so the title, size and download are there whoever draws the body.
 
@@ -39,15 +39,13 @@ export function MediaDownloadRow(props: { title: string; byteSize?: number; onDo
 function ArtifactImage(props: { artifact: ArtifactEvent; media: MediaLease }) {
   const [image] = createResource(
     () => ({ media: props.media, descriptor: props.artifact }),
-    ({ media, descriptor }) => descriptor.byteSize === undefined || descriptor.byteSize <= MAX_INLINE_IMAGE_BYTES
-      ? media.preview(descriptor).catch(() => null) : Promise.resolve(null),
+    ({ media, descriptor }) =>
+      descriptor.byteSize === undefined || descriptor.byteSize <= MAX_INLINE_IMAGE_BYTES
+        ? media.preview(descriptor).catch(() => null)
+        : Promise.resolve(null),
   )
   const alt = () => imageAlt(props.artifact.title) || 'Generated image'
-  return (
-    <Show when={image()}>
-      {(source) => <Markdown text={`![${alt()}](${source()})`} images="inline" />}
-    </Show>
-  )
+  return <Show when={image()}>{(source) => <Markdown text={`![${alt()}](${source()})`} images="inline" />}</Show>
 }
 
 export default function AgentArtifactCard(props: { artifact: ArtifactEvent; taskId: string; sessionId: string }) {
@@ -83,7 +81,11 @@ export default function AgentArtifactCard(props: { artifact: ArtifactEvent; task
           <ArtifactImage artifact={props.artifact} media={media()} />
         </Show>
       </Slot>
-      <MediaDownloadRow title={props.artifact.title} byteSize={props.artifact.byteSize} onDownload={() => void download()} />
+      <MediaDownloadRow
+        title={props.artifact.title}
+        byteSize={props.artifact.byteSize}
+        onDownload={() => void download()}
+      />
     </Stack>
   )
 

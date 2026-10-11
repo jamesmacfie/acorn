@@ -2,10 +2,9 @@ import { createSignal, onCleanup } from 'solid-js'
 
 // Arm-to-confirm, keyed. First request arms, the second commits, and a timeout disarms.
 //
-// Lifted from plugins/http/src/frame/confirmDelete.ts (the best of the five hand-rolled copies)
-// plus docker's auto-reset timer. It is keyed because the armed state often has to live outside a
-// single button: a group header arming one of nine rows needs to know which row is armed, and
-// ConfirmButton is just the degenerate one-key case.
+// It is keyed because the armed state often has to live outside a single button: a group header
+// arming one of nine rows needs to know which row is armed, and ConfirmButton is just the degenerate
+// one-key case.
 //
 // Behaviour as a hook, markup at the call site; same idiom as dismissable.ts.
 

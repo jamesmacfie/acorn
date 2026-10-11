@@ -1,6 +1,6 @@
 // The browser xterm.js and its two addons, as this host's answer: a throw.
 //
-// The seventh alias in the host switch (../vite.config.ts). Four specifiers resolve here —
+// An alias in the host switch (`apps/tui/vite.config.ts`). Four specifiers resolve here —
 // `@xterm/xterm`, its stylesheet, `@xterm/addon-fit` and `@xterm/addon-webgl`.
 //
 // **`@xterm/headless` is not one of them and must never be.** That is the emulator behind this host's
@@ -20,22 +20,28 @@
 
 const absent = (what: string): never => {
   throw new Error(
-    `${what} is browser xterm.js, and the terminal client has no canvas to draw it on. `
-    + 'This host runs a shell in the `pty` rectangle over @xterm/headless instead '
-    + '(apps/tui/src/kit/xterm.ts, apps/tui/vite.config.ts).',
+    `${what} is browser xterm.js, and the terminal client has no canvas to draw it on. ` +
+      'This host runs a shell in the `pty` rectangle over @xterm/headless instead ' +
+      '(apps/tui/src/kit/xterm.ts, apps/tui/vite.config.ts).',
   )
 }
 
 export class Terminal {
-  constructor() { absent('Terminal') }
+  constructor() {
+    absent('Terminal')
+  }
 }
 
 export class FitAddon {
-  constructor() { absent('FitAddon') }
+  constructor() {
+    absent('FitAddon')
+  }
 }
 
 export class WebglAddon {
-  constructor() { absent('WebglAddon') }
+  constructor() {
+    absent('WebglAddon')
+  }
 }
 
 /** `@xterm/xterm/css/xterm.css`, imported for its side effects. A stylesheet has nothing to throw

@@ -1,6 +1,15 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,7 +38,8 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   id: 'ntfy',
   name: 'ntfy plugin',
   version: '1.0.0',
-  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1',
+  apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
   client: './dist/client.js',
   ...over,
@@ -68,7 +78,7 @@ function serve(bytes: Buffer, url = 'https://example.test/acorn-plugin.tgz'): vo
 }
 
 beforeEach(() => {
-  // A space in the path on purpose, matching pluginLoader.test.ts: every path this module builds ends
+  // A space in the path on purpose, as the plugin loader's integration test has: every path this module builds ends
   // up in an argv or a rename, and quoting mistakes only show up on input like this.
   root = mkdtempSync(join(tmpdir(), 'acorn install-'))
   workshop = mkdtempSync(join(tmpdir(), 'acorn workshop-'))
@@ -101,7 +111,9 @@ describe('resolving a source', () => {
     expect(lock.resolvedVersion).toBe('1.0.0')
     expect(lock.archiveSha256).toBe(createHash('sha256').update(bytes).digest('hex'))
     // Both entrypoints, hashed from what actually landed rather than from anything the archive claimed.
-    expect(lock.entrypoints.node).toBe(createHash('sha256').update('export default { name: "ntfy", init: () => {} }\n').digest('hex'))
+    expect(lock.entrypoints.node).toBe(
+      createHash('sha256').update('export default { name: "ntfy", init: () => {} }\n').digest('hex'),
+    )
     expect(lock.entrypoints.client).toBe(createHash('sha256').update('export function activate() {}\n').digest('hex'))
   })
 
@@ -120,7 +132,10 @@ describe('resolving a source', () => {
         const asked = String(input)
         calls.push(asked)
         if (asked === 'https://api.github.com/repos/acme/ntfy/releases/tags/v1.0.0') {
-          return Response.json({ tag_name: 'v1.0.0', assets: [{ name: 'acorn-plugin.tgz', browser_download_url: 'https://cdn.test/a.tgz' }] })
+          return Response.json({
+            tag_name: 'v1.0.0',
+            assets: [{ name: 'acorn-plugin.tgz', browser_download_url: 'https://cdn.test/a.tgz' }],
+          })
         }
         return new Response(new Uint8Array(bytes), { status: 200 })
       }),
@@ -133,7 +148,15 @@ describe('resolving a source', () => {
   })
 
   it('refuses a release with no acorn-plugin.tgz asset, naming the convention', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v1', assets: [{ name: 'source.zip', browser_download_url: 'https://cdn.test/s.zip' }] })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          tag_name: 'v1',
+          assets: [{ name: 'source.zip', browser_download_url: 'https://cdn.test/s.zip' }],
+        }),
+      ),
+    )
     await expect(installPlugin(root, { github: 'acme/ntfy' })).rejects.toThrow(/acorn-plugin\.tgz/)
   })
 
@@ -146,9 +169,11 @@ describe('resolving a source', () => {
       vi.fn(async (input: string | URL) =>
         String(input) === 'https://registry.npmjs.org/acorn-ntfy'
           ? Response.json({
-            'dist-tags': { latest: '1.0.0' },
-            versions: { '1.0.0': { dist: { tarball: 'https://registry.npmjs.org/a.tgz', ...(integrity ? { integrity } : {}) } } },
-          })
+              'dist-tags': { latest: '1.0.0' },
+              versions: {
+                '1.0.0': { dist: { tarball: 'https://registry.npmjs.org/a.tgz', ...(integrity ? { integrity } : {}) } },
+              },
+            })
           : new Response(new Uint8Array(bytes), { status: 200 }),
       ),
     )
@@ -161,8 +186,8 @@ describe('resolving a source', () => {
     expect(readLockfile(root, 'ntfy')!.provenance).toEqual({ version: '1.0.0', integrity })
   })
 
-  // The finding this closes: the integrity was recorded into provenance and never compared, so bytes
-  // that were not the published ones installed and ran with the node's own access.
+  // The integrity is compared, not only recorded into provenance. Otherwise bytes that are not the
+  // published ones install and run with the node's own access.
   it('refuses a package whose bytes do not match the published digest', async () => {
     const bytes = tarball(packageDir(), { nested: true })
     serveNpm(bytes, `sha512-${createHash('sha512').update('something else').digest('base64')}`)
@@ -231,7 +256,7 @@ describe('validation', () => {
     )
   })
 
-  it("refuses a package whose id is not the one being updated", async () => {
+  it('refuses a package whose id is not the one being updated', async () => {
     serve(tarball(packageDir()))
     await installPlugin(root, { url: 'https://example.test/acorn-plugin.tgz' })
     // The lockfile's source now resolves to a different plugin, the classic re-pointed-tag shape.
@@ -281,8 +306,8 @@ describe('updating', () => {
     await expect(updatePlugin(root, 'handmade')).rejects.toThrow(/does not know where/)
   })
 
-  // "A mid-install crash cannot corrupt an existing installation" is the phase's exit criterion, and it
-  // rests on two things this suite checks separately: everything up to the swap happens in staging (this
+  // "A mid-install crash cannot corrupt an installed plugin" rests on two things this suite checks
+  // separately: everything up to the swap happens in staging (this
   // test), and the swap's own window is reclaimed at the next boot (the debris tests).
   it('leaves the running version untouched when the new package is refused', async () => {
     await install('1.0.0')
@@ -294,7 +319,9 @@ describe('updating', () => {
     expect(readFileSync(join(pluginInstallRoot(root), 'ntfy', 'acorn-plugin.json'), 'utf8')).toBe(before)
     expect(readLockfile(root, 'ntfy')!.resolvedVersion).toBe('1.0.0')
     // And nothing was left behind for the loader to trip over at the next boot.
-    expect(readdirSync(pluginInstallRoot(root)).filter((name) => name.startsWith('.') || name.includes('.incoming-'))).toEqual([])
+    expect(
+      readdirSync(pluginInstallRoot(root)).filter((name) => name.startsWith('.') || name.includes('.incoming-')),
+    ).toEqual([])
   })
 })
 
@@ -326,9 +353,8 @@ describe('uninstalling', () => {
 })
 
 describe('folder installs', () => {
-  // The gate this used to assert, `allowLocalPath`, dev builds only, is gone. A folder is a
-  // first-class source on every build (docs/security/plugin-install.md § Installing from a folder), so the absence of
-  // any option at all is the assertion: nothing left for a composition root to get wrong.
+  // A folder is a first-class source on every build (docs/security/plugin-install.md § Installing from a
+  // folder), so the absence of any option at all is the assertion: nothing for a composition root to get wrong.
   it('need no option to say which kind of build this is', async () => {
     const result = await installPlugin(root, { path: packageDir() })
     expect(result).toMatchObject({ id: 'ntfy', state: 'installed-restart-required' })

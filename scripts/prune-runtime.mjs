@@ -11,7 +11,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from 'node:f
 import { join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-// Each cut was reviewed against these exact versions on October 9, 2026. Any other version fails,
+// Each cut was reviewed against these exact versions. Any other version fails,
 // so a dependency update repeats the review instead of shipping an unchecked assumption.
 //
 // - The adapter's claudeCliPath() returns CLAUDE_CODE_EXECUTABLE before it looks for the SDK's

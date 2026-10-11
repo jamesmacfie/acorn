@@ -3,7 +3,10 @@
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 
 export type TreeSandbox = {
-  postMessage(message: { acornBridge: typeof PLUGIN_BRIDGE_VERSION; treeSlotBridge?: 1 }, transfer: Transferable[]): void
+  postMessage(
+    message: { acornBridge: typeof PLUGIN_BRIDGE_VERSION; treeSlotBridge?: 1 },
+    transfer: Transferable[],
+  ): void
   terminate(): void
   onerror: ((event: ErrorEvent) => void) | null
 }
@@ -37,7 +40,10 @@ export function createIsolatedTreeWorker(hash: string, rendererOrigin = globalTh
 
   let ended = false
   let ready = false
-  let pending: { message: { acornBridge: typeof PLUGIN_BRIDGE_VERSION; treeSlotBridge?: 1 }; transfer: Transferable[] } | null = null
+  let pending: {
+    message: { acornBridge: typeof PLUGIN_BRIDGE_VERSION; treeSlotBridge?: 1 }
+    transfer: Transferable[]
+  } | null = null
   const sandbox: TreeSandbox = {
     onerror: null,
     postMessage(message, transfer) {
@@ -46,7 +52,9 @@ export function createIsolatedTreeWorker(hash: string, rendererOrigin = globalTh
       }
       pending = { message, transfer }
     },
-    terminate() { teardown() },
+    terminate() {
+      teardown()
+    },
   }
 
   const teardown = (): void => {
@@ -55,7 +63,14 @@ export function createIsolatedTreeWorker(hash: string, rendererOrigin = globalTh
     clearTimeout(deadline)
     window.removeEventListener('message', onMessage)
     frame.remove()
-    if (pending) for (const endpoint of pending.transfer) { try { (endpoint as MessagePort).close?.() } catch { /* finish retiring every untransferred endpoint */ } }
+    if (pending)
+      for (const endpoint of pending.transfer) {
+        try {
+          ;(endpoint as MessagePort).close?.()
+        } catch {
+          /* finish retiring every untransferred endpoint */
+        }
+      }
     pending = null
   }
   const fail = (reason: string): void => {

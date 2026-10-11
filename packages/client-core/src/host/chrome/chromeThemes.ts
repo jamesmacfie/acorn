@@ -44,16 +44,14 @@ export function pluginThemeBlock(id: string, descriptor: PluginThemeDescriptor):
   // Self-description, written by the host from one boolean (docs/ui-design/appearance.md § Plugin themes).
   // --color-scheme is what makes a plugin theme colour syntax correctly with no further declaration:
   // the diff and fence rules read Shiki's dual output through light-dark(), which follows it.
-  declarations.push(descriptor.dark
-    ? '  --is-dark: 1;  --color-scheme: dark;'
-    : '  --is-dark: 0;  --color-scheme: light;')
+  declarations.push(
+    descriptor.dark ? '  --is-dark: 1;  --color-scheme: dark;' : '  --is-dark: 0;  --color-scheme: light;',
+  )
   return `:root[data-theme="${id}"] {\n${declarations.join('\n')}\n}`
 }
 
 // The installed blocks, keyed by theme id. The map is the state and the <style> element is its
-// projection, which is what lets a node-environment suite assert on the generated CSS: the repo's
-// vitest has no DOM, and a feature whose only observable output was `document.head` would be
-// untestable here.
+// projection, which is what lets a node-environment suite assert on the generated CSS without a DOM.
 const blocks = new Map<string, string>()
 let element: HTMLStyleElement | null = null
 
@@ -82,8 +80,8 @@ function flush(): void {
 export function registerPluginTheme(pluginId: string, descriptor: PluginThemeDescriptor): Disposable {
   const id = pluginThemeId(pluginId, descriptor.id)
   const css = pluginThemeBlock(id, descriptor)
-  // The label carries the plugin id because the picker is one flat list holding the built-in twelve
-  // and every plugin's themes: two packages offering a "Nightfall" would otherwise be indistinguishable
+  // The label carries the plugin id because the picker is one flat list holding the built-in themes
+  // and every plugin's: two packages offering a "Nightfall" would otherwise be indistinguishable
   // at the only place a user chooses between them.
   const entry = themeRegistry.register({ id, label: `${descriptor.label} (${pluginId})` }, pluginId)
   blocks.set(id, css)

@@ -24,5 +24,5 @@ export async function claimEditorPty(root: string, path: string): Promise<() => 
 
 export async function activeEditorUnder(root: string, path: string): Promise<boolean> {
   const paths = owners.get(await canonicalCheckoutKey(root))
-  return [...paths?.keys() ?? []].some((owned) => owned === path || owned.startsWith(`${path}/`))
+  return [...(paths?.keys() ?? [])].some((owned) => owned === path || owned.startsWith(`${path}/`))
 }

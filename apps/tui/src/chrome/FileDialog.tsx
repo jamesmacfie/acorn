@@ -9,9 +9,16 @@ import { Modal, ModalBody } from '../kit/grouping'
 import { finishFilePrompt, type FilePrompt } from './filePrompt'
 
 const mime: Record<string, string> = {
-  csv: 'text/csv', gif: 'image/gif', jpeg: 'image/jpeg', jpg: 'image/jpeg',
-  json: 'application/json', md: 'text/markdown', pdf: 'application/pdf',
-  png: 'image/png', txt: 'text/plain', webp: 'image/webp',
+  csv: 'text/csv',
+  gif: 'image/gif',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  json: 'application/json',
+  md: 'text/markdown',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  txt: 'text/plain',
+  webp: 'image/webp',
 }
 // The Agent attachment route rejects files above this size. The terminal checks the local file
 // before loading its bytes so a mistaken path cannot allocate a much larger buffer in the TUI.
@@ -47,7 +54,10 @@ export function FileDialog(props: { prompt: FilePrompt }) {
           try {
             await writeFile(target, props.prompt.request.bytes, { flag: 'wx' })
           } catch (cause) {
-            if ((cause as NodeJS.ErrnoException).code === 'EEXIST') { setOverwrite(true); return }
+            if ((cause as NodeJS.ErrnoException).code === 'EEXIST') {
+              setOverwrite(true)
+              return
+            }
             throw cause
           }
         } else {
@@ -63,19 +73,45 @@ export function FileDialog(props: { prompt: FilePrompt }) {
   }
 
   return (
-    <Modal onDismiss={close} title={props.prompt.kind === 'pick' ? 'Attach local file' : 'Save to local file'} size="wide">
+    <Modal
+      onDismiss={close}
+      title={props.prompt.kind === 'pick' ? 'Attach local file' : 'Save to local file'}
+      size="wide"
+    >
       <ModalBody>
         <box flexDirection="column" gap={1}>
           <Line role="muted">Path on this computer:</Line>
-          <Show when={props.prompt.kind === 'save'}><Line role="muted">Suggested name: {props.prompt.kind === 'save' ? props.prompt.request.suggestedName : ''}</Line></Show>
-          <Input value={path()} placeholder="/absolute/path/to/file" onInput={(value) => { setPath(value); setOverwrite(false) }} onSubmit={() => void submit()} />
-          <Show when={props.prompt.kind === 'pick' && props.prompt.accept.length}>
-            <Line role="muted">Accepted: {props.prompt.kind === 'pick' ? props.prompt.accept.map((value) => `.${value}`).join(', ') : ''}</Line>
+          <Show when={props.prompt.kind === 'save'}>
+            <Line role="muted">
+              Suggested name: {props.prompt.kind === 'save' ? props.prompt.request.suggestedName : ''}
+            </Line>
           </Show>
-          <Show when={error()}><Alert tone="danger">{error()}</Alert></Show>
-          <Show when={overwrite()}><Alert tone="warn">This file exists. Save again to replace it.</Alert></Show>
-          <Button disabled={busy() || !path().trim()} onPress={() => void submit()}>{overwrite() ? 'Replace file' : props.prompt.kind === 'pick' ? 'Attach file' : 'Save file'}</Button>
-          <Button variant="bare" onPress={close}>Cancel</Button>
+          <Input
+            value={path()}
+            placeholder="/absolute/path/to/file"
+            onInput={(value) => {
+              setPath(value)
+              setOverwrite(false)
+            }}
+            onSubmit={() => void submit()}
+          />
+          <Show when={props.prompt.kind === 'pick' && props.prompt.accept.length}>
+            <Line role="muted">
+              Accepted: {props.prompt.kind === 'pick' ? props.prompt.accept.map((value) => `.${value}`).join(', ') : ''}
+            </Line>
+          </Show>
+          <Show when={error()}>
+            <Alert tone="danger">{error()}</Alert>
+          </Show>
+          <Show when={overwrite()}>
+            <Alert tone="warn">This file exists. Save again to replace it.</Alert>
+          </Show>
+          <Button disabled={busy() || !path().trim()} onPress={() => void submit()}>
+            {overwrite() ? 'Replace file' : props.prompt.kind === 'pick' ? 'Attach file' : 'Save file'}
+          </Button>
+          <Button variant="bare" onPress={close}>
+            Cancel
+          </Button>
         </box>
       </ModalBody>
     </Modal>

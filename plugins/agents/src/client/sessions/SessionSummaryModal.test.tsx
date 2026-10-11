@@ -8,35 +8,58 @@ import type { SessionSummary } from '../../shared/sessionSummary'
 const summarize = vi.fn<(...args: unknown[]) => Promise<SessionSummary>>()
 vi.mock('./managedClient', () => ({ managedAgentApi: { summarize } }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...await original<typeof import('@acorn/plugin-api/client')>(),
+  ...(await original<typeof import('@acorn/plugin-api/client')>()),
   activeNodeId: () => 'summary-node',
-  modelBackendsOptions: () => ({ queryKey: ['summary-backends'], initialData: { backends: [
-    { id: 'harness:codex', label: 'Codex', kind: 'harness', models: [], defaultModelId: '' },
-  ] } }),
+  modelBackendsOptions: () => ({
+    queryKey: ['summary-backends'],
+    initialData: {
+      backends: [{ id: 'harness:codex', label: 'Codex', kind: 'harness', models: [], defaultModelId: '' }],
+    },
+  }),
   prefsOptions: () => ({ queryKey: ['summary-prefs'], initialData: {} }),
 }))
 const { default: SessionSummaryModal } = await import('./SessionSummaryModal')
 let dispose: (() => void) | undefined
 let host: HTMLElement
 
-afterEach(() => { dispose?.(); host?.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); summarize.mockReset() })
-const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button')]
-  .find((element) => element.textContent?.trim() === text)!
+afterEach(() => {
+  dispose?.()
+  host?.remove()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  summarize.mockReset()
+})
+const button = (text: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === text)!
 const mount = () => {
   host = document.createElement('div')
   document.body.append(host)
   const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } })
   const [open, setOpen] = createSignal(true)
-  dispose = render(() => <QueryClientProvider client={client}>
-    <Show when={open()}><SessionSummaryModal session={{ id: 'summary-session', title: 'A running agent' } as AgentSession}
-      onDismiss={() => setOpen(false)} /></Show>
-  </QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Show when={open()}>
+          <SessionSummaryModal
+            session={{ id: 'summary-session', title: 'A running agent' } as AgentSession}
+            onDismiss={() => setOpen(false)}
+          />
+        </Show>
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 describe('the run summary dialog', () => {
   it('expands while generating, includes extra context, and copies the raw Markdown', async () => {
     let finish!: (value: SessionSummary) => void
-    summarize.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    summarize.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
     const writeText = vi.fn(async () => {})
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     mount()
@@ -48,9 +71,14 @@ describe('the run summary dialog', () => {
     button('Generate Markdown').click()
     expect(document.querySelector('[role="dialog"]')?.getAttribute('data-size')).toBe('wide')
     expect(document.querySelector('[role="status"][aria-label="Generating summary"]')).toBeTruthy()
-    expect(summarize).toHaveBeenCalledWith('summary-session', {
-      backendId: 'harness:codex', context: 'Focus on the remaining work',
-    }, { nodeId: 'summary-node', signal: expect.any(AbortSignal) })
+    expect(summarize).toHaveBeenCalledWith(
+      'summary-session',
+      {
+        backendId: 'harness:codex',
+        context: 'Focus on the remaining work',
+      },
+      { nodeId: 'summary-node', signal: expect.any(AbortSignal) },
+    )
     finish({ markdown: '# Summary\n\n- Work remains', truncated: false, throughSeq: 9 })
     await vi.waitFor(() => expect(button('Copy Markdown')).toBeTruthy())
     const result = [...document.querySelectorAll<HTMLTextAreaElement>('textarea')].find((element) => element.readOnly)!
@@ -63,7 +91,8 @@ describe('the run summary dialog', () => {
   })
 
   it('keeps context on failure and allows a retry', async () => {
-    summarize.mockRejectedValueOnce(new Error('Provider unavailable'))
+    summarize
+      .mockRejectedValueOnce(new Error('Provider unavailable'))
       .mockResolvedValueOnce({ markdown: '# Retried', truncated: true, throughSeq: 11 })
     mount()
     button('Generate Markdown').click()
@@ -77,7 +106,12 @@ describe('the run summary dialog', () => {
 
   it('aborts generation when dismissed and ignores a late result', async () => {
     let finish!: (value: SessionSummary) => void
-    summarize.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    summarize.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
     mount()
     button('Generate Markdown').click()
     const signal = (summarize.mock.calls[0]![2] as { signal: AbortSignal }).signal

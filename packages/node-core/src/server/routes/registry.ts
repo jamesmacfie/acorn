@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
+import type { Disposable } from '../pluginHost/capabilities'
 import type { PluginFetchHandler } from '../pluginHost/types'
 
 // The two current HTTP namespaces (docs/api-reference/transport.md § Transport). Core owns
@@ -10,22 +11,21 @@ export const PLUGIN_NAMESPACE = '/v1/p'
 
 const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 
-// Plugin-owned HTTP routers, projected into the app after the auth gate. A plugin server part
-// contributes { plugin, prefix, router }; the app activation module (app/server/routes.ts) registers
-// them before createApp() runs, and createApp() iterates this registry. Core never imports a
-// product route module directly (docs/plugins.md).
+// Plugin-owned HTTP routers, projected into the app after the auth gate. A plugin contributes
+// { plugin, prefix, router } through `ctx.routes` during init, before createApp() runs, and
+// createApp() iterates this registry. Core never imports a product route module directly
+// (docs/plugins.md).
 //
 // `plugin` is declared rather than parsed back out of the prefix: the effective mount is
-// `/v1/p/${plugin}${prefix}`, so a later phase can enable/disable a plugin per node by filtering
-// this registry on one field instead of pattern-matching URLs. `prefix` is whatever path the plugin
-// wants under its own namespace, empty for a router that owns the whole namespace, `/tasks` for the
-// task-scoped sub-resources. Distinct sub-paths mean registration order is not load-bearing.
+// `/v1/p/${plugin}${prefix}`, so removing a plugin's routes filters this registry on one field
+// instead of pattern-matching URLs. `prefix` is whatever path the plugin wants under its own
+// namespace, empty for a router that owns the whole namespace, `/tasks` for the task-scoped
+// sub-resources. Distinct sub-paths mean registration order is not load-bearing.
 //
 // Two carriers, one mount. A built-in contributes a `router`; a loaded plugin contributes a
 // `fetch` handler, because a Hono instance is a live object from the plugin's realm and cannot
-// cross the process boundary that rung 2 will put there (docs/security/plugin-storage-and-supply-chain.md § Design
-// rules). Everything downstream, the mount path, the auth envelope, per-plugin removal, is
-// identical, which is the point: the transport changes later, the registry does not.
+// cross the worker boundary (docs/security/plugin-storage-and-supply-chain.md § Design rules).
+// Everything downstream, the mount path, the auth envelope, per-plugin removal, is identical.
 export type RouteContribution = { plugin: string; prefix: string; note?: string } & (
   | { router: Hono<AppEnv>; fetch?: never }
   | { fetch: PluginFetchHandler; router?: never }
@@ -34,7 +34,7 @@ export type RouteContribution = { plugin: string; prefix: string; note?: string 
 export class RouteRegistry {
   readonly #contributions: RouteContribution[] = []
 
-  register(contribution: RouteContribution): void {
+  register(contribution: RouteContribution): Disposable {
     if (!PLUGIN_ID_RE.test(contribution.plugin)) {
       throw new Error(`Plugin route id must match ${PLUGIN_ID_RE.source}: '${contribution.plugin}'.`)
     }
@@ -44,9 +44,17 @@ export class RouteRegistry {
       throw new Error(`Plugin route prefix must be empty or start with '/': '${contribution.prefix}'.`)
     }
     if (contribution.prefix.startsWith('/v1')) {
-      throw new Error(`Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v1': '${contribution.prefix}'.`)
+      throw new Error(
+        `Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v1': '${contribution.prefix}'.`,
+      )
     }
     this.#contributions.push(contribution)
+    return {
+      dispose: () => {
+        const index = this.#contributions.indexOf(contribution)
+        if (index >= 0) this.#contributions.splice(index, 1)
+      },
+    }
   }
 
   list(): readonly RouteContribution[] {
@@ -72,8 +80,8 @@ export function routeMountPath(contribution: RouteContribution): string {
 
 const registry = new RouteRegistry()
 
-export function registerRoute(contribution: RouteContribution): void {
-  registry.register(contribution)
+export function registerRoute(contribution: RouteContribution): Disposable {
+  return registry.register(contribution)
 }
 
 export function pluginRouteContributions(): readonly RouteContribution[] {
@@ -86,12 +94,11 @@ export function removePluginRoutes(plugin: string): void {
 
 /** Which fetch-shaped contribution should serve `path`, resolved at request time.
  *
- * createApp() used to iterate the registry once and capture `contribution.fetch` in a mount-time
- * closure, which quietly made the mount table a boot snapshot: a reload replaced the registry's entry
- * and every request still reached the previous instance's handler. The app now mounts one dispatcher
- * over the whole plugin namespace and asks here per request, so this registry is the single source of
- * truth about who serves what. A prefix that only exists after a reload is reachable, as is a
- * plugin that contributed no routes at all when the app was built.
+ * The app mounts one dispatcher over the whole plugin namespace and asks here per request, so this
+ * registry is the single source of truth about who serves what. A mount-time closure over
+ * `contribution.fetch` would make the mount table a boot snapshot, and after a reload every request
+ * would still reach the previous instance's handler. A prefix that only exists after a reload is
+ * reachable, as is a plugin that contributed no routes at all when the app was built.
  *
  * Longest prefix wins, so a plugin owning both '' and '/tasks' gets the specific handler for
  * '/tasks/…'. That keeps registration order irrelevant, which is what `register` above promises. */

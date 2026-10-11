@@ -54,7 +54,8 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   const [postError, setPostError] = createSignal('')
   // The linked issues' titles, for the task pane's list, keyed by identifier.
   const [titles, setTitles] = createSignal<Record<string, string>>({})
-  let load = 0
+  // The issue read. A newer one aborts it.
+  let issueRead = new AbortController()
 
   const activeIdentifier = () => override() ?? target()?.identifier ?? ''
 
@@ -62,7 +63,9 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   // has selected another, and a comment typed in that gap has no composer to land in. A refresh
   // (`keep`) leaves the issue on screen and reports a failure above it, as rollbar's `keepView` does.
   const fetchIssue = async (identifier: string, connectionId?: string, keep = false): Promise<void> => {
-    const request = ++load
+    issueRead.abort()
+    issueRead = new AbortController()
+    const request = issueRead.signal
     setRefreshError('')
     if (!keep) {
       setIssue(null)
@@ -70,10 +73,10 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
     }
     try {
       const detail = await props.bridge.api.get<LinearIssueDetail>(linearIssueRoute(identifier, connectionId))
-      if (request !== load) return
+      if (request.aborted) return
       setIssue(detail)
     } catch (error) {
-      if (request !== load) return
+      if (request.aborted) return
       if (keep && issue()) {
         setRefreshError(failureReason(error))
         return
@@ -145,10 +148,9 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   // One batch read for every linked issue's title. A failure leaves the keys, which still work.
   const readTitles = async (targets: LinearRailTarget[]): Promise<void> => {
     try {
-      const resolved = await props.bridge.api.post<PluginRefResolutionBody[]>(
-        linearIssuesRoute,
-        { identifiers: targets.map((entry) => entry.identifier) } satisfies LinearIssuesRequest,
-      )
+      const resolved = await props.bridge.api.post<PluginRefResolutionBody[]>(linearIssuesRoute, {
+        identifiers: targets.map((entry) => entry.identifier),
+      } satisfies LinearIssuesRequest)
       setTitles(Object.fromEntries(resolved.map((entry) => [entry.identifier, entry.label])))
     } catch {
       // Keys only.
@@ -258,17 +260,35 @@ function PageStatus(props: { state: Page }) {
   const failure = () => (props.state.kind === 'error' ? props.state : undefined)
   const empty = () => (props.state.kind === 'empty' ? props.state : undefined)
   return (
-    <Show when={failure()} fallback={(
-      <Show when={empty()} fallback={<EmptyState busy align="start" size="sm">Loading issue…</EmptyState>}>
-        {(state) => <EmptyState title={state().title} />}
-      </Show>
-    )}
+    <Show
+      when={failure()}
+      fallback={
+        <Show
+          when={empty()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading issue…
+            </EmptyState>
+          }
+        >
+          {(state) => <EmptyState title={state().title} />}
+        </Show>
+      }
     >
       {(error) => (
         <EmptyState title={error().title}>
           {error().detail}
           {/* A child, not `action`: a tree's props are JSON, so an element-valued prop never arrives. */}
-          <Show when={error().retry}>{(retry) => <> <Button size="sm" variant="ghost" onPress={retry()}>Try again</Button></>}</Show>
+          <Show when={error().retry}>
+            {(retry) => (
+              <>
+                {' '}
+                <Button size="sm" variant="ghost" onPress={retry()}>
+                  Try again
+                </Button>
+              </>
+            )}
+          </Show>
         </EmptyState>
       )}
     </Show>

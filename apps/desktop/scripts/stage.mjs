@@ -9,8 +9,8 @@ import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
 // will find them (docs/shell/packaging.md § Build and packaging).
 //
-// It detects missing artifacts, not stale ones — the same rule the Electron build follows. Build order
-// is the caller's job, and package.json's `stage` script is where it is written down.
+// It detects missing artifacts, not stale ones. Build order is the caller's job, and package.json's
+// `stage` script is where it is written down.
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(PKG, '../..')
@@ -23,8 +23,8 @@ const need = (path, hint) => {
 }
 
 // The node service, staged beside the helper so both resolve their externals from this package's
-// node_modules. The spike found this out the hard way: service.js leaves native and run-time-loaded
-// packages external (apps/node/externals.ts) and cannot resolve them from apps/node
+// node_modules. service.js leaves native and run-time-loaded packages external (apps/node/externals.ts)
+// and cannot resolve them from apps/node
 // (docs/shell/node-child.md § Node child).
 const dist = need(resolve(ROOT, 'apps/node/dist'), 'run `pnpm --filter @acorn/node build` first.')
 need(resolve(dist, 'service.js'), 'run `pnpm --filter @acorn/node build` first.')
@@ -64,7 +64,7 @@ for (const chain of chains) {
 // The bundled Node runtime, as a Tauri external binary: `binaries/node-<target triple>` is the name
 // `bundle.externalBin` resolves, and the triple comes from rustc rather than a guess about how
 // process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
-// developer's own Node no longer has to be the pinned one — see scripts/node-runtime.mjs.
+// developer's own Node doesn't have to be the pinned one; see `stageNodeRuntime`.
 const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
 const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple: target.triple })
 

@@ -15,12 +15,12 @@ import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 // The host's chrome around a plugin reference panel: the backdrop, the box, the title and the
 // dismiss affordance (docs/plugins/frames.md § Frame contribution kind).
 //
-// The overlay is the host's here, unlike a first-party panel that draws its own. Two reasons, both
+// The overlay is the host's here, as it is for a first-party panel (`RefPanelBox`). Two reasons, both
 // structural rather than stylistic. A frame is an iframe: it cannot Portal out of the box the consumer
 // put it in, so `position: fixed` inside the frame positions against the frame, and a ref panel
 // rendered inline into a PR conversation would be a 150px letterbox in the middle of a page. And a
-// refPanel frame has no way to call `onClose`: the bridge's close verb is gated to importer surfaces
-// (frames/broker.ts), deliberately, so the dismiss affordance has to live on this side of the port
+// refPanel frame has no way to call `onClose`: the bridge's close verb is gated to importer and overlay
+// surfaces (frames/broker.ts), deliberately, so the dismiss affordance has to live on this side of the port
 // too. Same classes the first-party panels use, so the two look identical.
 //
 // A file of its own rather than markup inside ./register.ts, for the reason that module states at the
@@ -65,10 +65,10 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
       >
         <header class="integrations-panel-head">
           {/* No fallback, deliberately. `openRefPanel` refuses a falsy `displayId`, so a panel with
-              no subject is unreachable and a `?? 'Reference'` here would only be able to hide a bug
-              — which is precisely what it would have done: the empty title was the visible half of
-              the reserved-`ref`-prop defect, and the reason it was found at all. */}
-          <span class="integrations-panel-title" id={titleId}>{props.displayId}</span>
+              no subject is unreachable and a `?? 'Reference'` here could only hide a bug. */}
+          <span class="integrations-panel-title" id={titleId}>
+            {props.displayId}
+          </span>
           <Toolbar.Spacer />
           <IconButton icon="x" label="Close" onPress={props.onClose} />
         </header>
@@ -77,7 +77,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
         </Show>
         <Show
           when={props.tree}
-          fallback={<PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />}
+          fallback={
+            <PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />
+          }
         >
           {(contribution) => (
             <RemoteTree
@@ -92,9 +94,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
         </Show>
         {/* Host-drawn, below the frame rather than inside it. Creating a task is a core write that makes a
             worktree, and a plugin that drew this itself would need `core.tasks:write` for its whole life
-            to earn one button — ../../registries/RefPanelTaskLink.tsx has the argument in full. */}
+            to earn one button. `RefPanelTaskLink` has the argument in full. */}
         {/* `pluginId` IS the provider here, not an approximation: a refPanel frame declares `providerId`
-            in its manifest and registries/plugin.ts throws when a plugin names one that is not its own. */}
+            in its manifest and the frames pass throws when a plugin names one that is not its own. */}
         <RefPanelTaskLink target={{ providerId: props.binding.pluginId, displayId: props.displayId }} />
       </aside>
     </Portal>

@@ -13,19 +13,25 @@ const binding = (id: string, state?: 'enabled' | 'disabled' | 'absent'): Keybind
 
 describe('shortcut settings lifecycle', () => {
   it('shows disabled plugins but hides plugins absent from the active node', () => {
-    expect(visibleShortcutBindings([binding('core'), binding('disabled', 'disabled'), binding('absent', 'absent')]).map((item) => item.id))
-      .toEqual(['core', 'disabled'])
+    expect(
+      visibleShortcutBindings([binding('core'), binding('disabled', 'disabled'), binding('absent', 'absent')]).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['core', 'disabled'])
   })
 
   it('identifies only unmatched plugin overrides as explicit cleanup candidates', () => {
-    expect(orphanedPluginOverrideIds(
-      { core: 'meta+c', 'plugin.board.live': 'meta+l', 'plugin.old.gone': null },
-      [binding('core'), binding('plugin.board.live', 'enabled')],
-    )).toEqual(['plugin.old.gone'])
+    expect(
+      orphanedPluginOverrideIds({ core: 'meta+c', 'plugin.board.live': 'meta+l', 'plugin.old.gone': null }, [
+        binding('core'),
+        binding('plugin.board.live', 'enabled'),
+      ]),
+    ).toEqual(['plugin.old.gone'])
   })
 
   it('removes one group without touching another', () => {
-    expect(removeOverrideIds({ global: 'meta+g', pane: 'meta+p', plugin: null }, ['pane', 'plugin']))
-      .toEqual({ global: 'meta+g' })
+    expect(removeOverrideIds({ global: 'meta+g', pane: 'meta+p', plugin: null }, ['pane', 'plugin'])).toEqual({
+      global: 'meta+g',
+    })
   })
 })

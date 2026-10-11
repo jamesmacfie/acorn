@@ -13,7 +13,7 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 // the same reason for being its own file: ./register.ts must stay importable from a bare-Node suite.
 //
 // Nothing here decides when it appears. An overlay has no click site of its own: what opens one is the
-// `openOverlay` verb (plugins/chrome/actions.ts) or a remote tree asking for its companion overlay
+// `openOverlay` verb (chrome/actions.ts) or a remote tree asking for its companion overlay
 // (../tree/RemoteTree.tsx). Both arrive here as an invocation on ./overlays.ts.
 
 export type PluginOverlayProps = {
@@ -30,29 +30,34 @@ export default function PluginOverlay(props: PluginOverlayProps) {
   const invocation = () => (props.open() ? pluginOverlayInvocation() : null)
   return (
     <Portal>
-    <Show when={invocation()} keyed>
-      {/* Keyed on the invocation, so opening the same overlay a second time builds a second iframe with
+      <Show when={invocation()} keyed>
+        {/* Keyed on the invocation, so opening the same overlay a second time builds a second iframe with
           only the second input. A reused document would let an editor inherit the previous canvas, and
           the reader would have no way to tell which image they were drawing on. */}
-      {(open) => (
-        <div class="overlay-backdrop" onClick={closePluginOverlay}>
-          <div class="overlay plugin-overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <header class="overlay-title plugin-overlay-head">
-              <span class="overlay-title-text">{props.label}</span>
-              <IconButton icon="x" label="Close" onPress={closePluginOverlay} />
-            </header>
-            <div class="plugin-overlay-body">
-              <PluginFrame
-                binding={props.binding()}
-                hash={props.hash}
-                {...(open.input === undefined ? {} : { input: open.input })}
-                onClose={(result) => (result === undefined ? closePluginOverlay() : closePluginOverlayWith(result))}
-              />
+        {(open) => (
+          <div class="overlay-backdrop" onClick={closePluginOverlay}>
+            <div
+              class="overlay plugin-overlay"
+              role="dialog"
+              aria-modal="true"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header class="overlay-title plugin-overlay-head">
+                <span class="overlay-title-text">{props.label}</span>
+                <IconButton icon="x" label="Close" onPress={closePluginOverlay} />
+              </header>
+              <div class="plugin-overlay-body">
+                <PluginFrame
+                  binding={props.binding()}
+                  hash={props.hash}
+                  {...(open.input === undefined ? {} : { input: open.input })}
+                  onClose={(result) => (result === undefined ? closePluginOverlay() : closePluginOverlayWith(result))}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </Show>
+        )}
+      </Show>
     </Portal>
   )
 }

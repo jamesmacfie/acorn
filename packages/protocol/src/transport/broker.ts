@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const nodeFetchBodySchema = z.discriminatedUnion('kind', [
+const nodeFetchBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('bytes'), bytes: z.instanceof(Uint8Array) }),
   // Multipart is described rather than pre-encoded: main builds the real FormData, so we never have to
   // hand-roll boundary generation on the renderer side.
@@ -26,21 +26,33 @@ export const nodeFetchRequestSchema = z.strictObject({
   requestId: z.string().min(1),
   // Always node-relative and always absolute-rooted. Main joins it onto the node's endpoint, so a
   // renderer cannot redirect traffic at another host by smuggling in a full URL.
-  path: z.string().startsWith('/').refine((path) =>
-    !path.startsWith('//') && !path.includes('\\') && !path.includes('#') &&
-    new URL(path, 'https://acorn.invalid').origin === 'https://acorn.invalid',
-  'Node paths must be absolute paths on the paired node'),
+  path: z
+    .string()
+    .startsWith('/')
+    .refine(
+      (path) =>
+        !path.startsWith('//') &&
+        !path.includes('\\') &&
+        !path.includes('#') &&
+        new URL(path, 'https://acorn.invalid').origin === 'https://acorn.invalid',
+      'Node paths must be absolute paths on the paired node',
+    ),
   method: z.string().min(1).default('GET'),
   headers: z.record(z.string(), z.string()).default({}),
   body: nodeFetchBodySchema.optional(),
   timeoutMs: z.number().int().positive().optional(),
   // The renderer may ask for a stricter ceiling for previews. The broker always applies its own
   // 64 MiB maximum, so this field can only reduce its allocation.
-  maxResponseBytes: z.number().int().positive().max(64 * 1024 * 1024).optional(),
+  maxResponseBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(64 * 1024 * 1024)
+    .optional(),
 })
 export type NodeFetchRequest = z.input<typeof nodeFetchRequestSchema>
 
-export const nodeFetchResponseSchema = z.strictObject({
+const nodeFetchResponseSchema = z.strictObject({
   status: z.number().int(),
   headers: z.record(z.string(), z.string()),
   body: z.instanceof(Uint8Array),
@@ -50,10 +62,10 @@ export type NodeFetchResponse = z.infer<typeof nodeFetchResponseSchema>
 // docs/architecture/fleet.md § Client state and fleet behavior lists exactly these five. A
 // fingerprint mismatch is not a sixth: it surfaces as `offline` carrying an `identity_mismatch`
 // error, because it is a reason a node is unreachable rather than a distinct steady state.
-export const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
+const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
 export type NodeConnectionState = z.infer<typeof nodeConnectionStateSchema>
 
-export const nodeStatusSchema = z.strictObject({
+const nodeStatusSchema = z.strictObject({
   nodeId: z.string(),
   state: nodeConnectionStateSchema,
   // Set when the state has a nameable cause the UI must render differently. Above all
@@ -93,14 +105,16 @@ export const nodeRecordSchema = z.strictObject({
   //
   // Provenance, not authority: the pinned fingerprint is still what the connection is checked
   // against, and it was still confirmed against the certificate the endpoint presented.
-  provider: z.strictObject({ providerId: z.string().min(1), providerNodeId: z.string().min(1), sourceNodeId: z.string().min(1) }).optional(),
+  provider: z
+    .strictObject({ providerId: z.string().min(1), providerNodeId: z.string().min(1), sourceNodeId: z.string().min(1) })
+    .optional(),
 })
 export type NodeRecord = z.infer<typeof nodeRecordSchema>
 
 // --- Owner-initiated fleet mutations ---
 //
-// Membership is the helper's to change, so the renderer asks. Each of these is Zod-parsed in
-// `helperServer.ts` exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
+// Membership is the helper's to change, so the renderer asks. The desktop helper server Zod-parses
+// each of these exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
 // compromised renderer asked for…" reasoning about the files that hold device tokens.
 //
 // There are two routes into the fleet, and this is the whole of what each requires.
@@ -108,7 +122,7 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 // Probe-then-pair, below, is the human one: the owner reads a fingerprint off the node itself and
 // confirms it, and no shape here lets a caller skip that by supplying its own token.
 //
-// Adoption, `nodeAdoptRequestSchema`, is the unattended one, added for provisioned nodes
+// Adoption, `nodeAdoptRequestSchema`, is the unattended one, for provisioned nodes
 // (docs/plugins/node-providers.md § Node providers). It is narrower than it looks: the renderer names a provider and
 // a node id, and the host asks the node that listed it for the endpoint, the fingerprint and the
 // credential, then probes that endpoint and refuses a certificate whose fingerprint is not the one
@@ -128,7 +142,6 @@ export const nodeAdoptRequestSchema = z.strictObject({
 export type NodeAdoptRequest = z.infer<typeof nodeAdoptRequestSchema>
 
 export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
-export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>
 
 // What the owner is asked to compare against the fingerprint the node itself displays. That
 // out-of-band comparison is the security of pairing (docs/api-reference/transport.md § Pairing): reading a
@@ -159,7 +172,6 @@ export const nodeRenameRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   label: z.string().min(1).max(120),
 })
-export type NodeRenameRequest = z.infer<typeof nodeRenameRequestSchema>
 
 // Unpair vs revoke (docs/authentication.md § Device tokens): `revoke: false` is this client
 // forgetting the node, `revoke: true` also asks the node to forget this client. Confusing them loses
@@ -168,15 +180,3 @@ export const nodeForgetRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   revoke: z.boolean(),
 })
-export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>
-
-// Opening a preview tunnel (docs/api-reference/websocket.md § WebSocket). The renderer names a task and a port
-// on the node and gets back a loopback port on this machine, never an endpoint and never a token. The
-// pipe itself is main's, like every other byte to or from a node.
-export const nodeTunnelRequestSchema = z.strictObject({
-  nodeId: z.string().min(1),
-  taskId: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
-})
-export type NodeTunnelRequest = z.infer<typeof nodeTunnelRequestSchema>
-export type NodeTunnelResult = { port: number }

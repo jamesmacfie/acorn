@@ -21,14 +21,12 @@ import { canAdvanceOn, STEPS } from './OnboardingWizard'
 // so the assertion is on the real rule and the real control.
 
 const backends: ModelBackendsResponse = {
-  backends: [
-    { id: 'harness:claude-code', kind: 'harness', label: 'Claude Code', models: [], defaultModelId: '' },
-  ],
+  backends: [{ id: 'harness:claude-code', kind: 'harness', label: 'Claude Code', models: [], defaultModelId: '' }],
   missing: [{ id: 'harness:codex', label: 'Codex' }],
 }
 
 // No providers and no connections: the machine has an agent CLI and nothing else, which is the case
-// this whole programme exists for.
+// this step exists for.
 const noProviders: IntegrationsResponse = { providers: [], integrations: [] }
 
 let host: HTMLDivElement
@@ -51,18 +49,21 @@ const mount = (route: ModelBackendsResponse, integrations: IntegrationsResponse)
   client.setQueryData(integrationsKey, integrations)
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => (
-    <QueryClientProvider client={client}>
-      <Wizard
-        stateKey="onboarding"
-        label="Set up acorn"
-        steps={STEPS}
-        current="ai"
-        canAdvance={canAdvanceOn('ai', 0)}
-        regions={{ step: () => <AiSetup /> }}
-      />
-    </QueryClientProvider>
-  ), host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Wizard
+          stateKey="onboarding"
+          label="Set up acorn"
+          steps={STEPS}
+          current="ai"
+          canAdvance={canAdvanceOn('ai', 0)}
+          regions={{ step: () => <AiSetup /> }}
+        />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 const text = (): string => host.textContent ?? ''
@@ -94,23 +95,28 @@ describe('the AI step', () => {
   })
 
   it('offers a key form built from the provider descriptor', () => {
-    mount({ backends: [], missing: [] }, {
-      providers: [{
-        id: 'openai',
-        label: 'OpenAI',
-        kind: 'model-provider',
-        glyph: 'brand:model-providers/openai',
-        connection: {
-          authKind: 'api-key',
-          fields: [{ id: 'apiKey', label: 'API key', type: 'password', required: true }],
-          connectable: true,
-          disconnectable: true,
-          maxConnections: 1,
-        },
-        capabilities: {},
-      }],
-      integrations: [],
-    })
+    mount(
+      { backends: [], missing: [] },
+      {
+        providers: [
+          {
+            id: 'openai',
+            label: 'OpenAI',
+            kind: 'model-provider',
+            glyph: 'brand:model-providers/openai',
+            connection: {
+              authKind: 'api-key',
+              fields: [{ id: 'apiKey', label: 'API key', type: 'password', required: true }],
+              connectable: true,
+              disconnectable: true,
+              maxConnections: 1,
+            },
+            capabilities: {},
+          },
+        ],
+        integrations: [],
+      },
+    )
     expect(text()).toContain('OpenAI')
     card('OpenAI')!.click()
     expect(text()).toContain('Connect OpenAI')

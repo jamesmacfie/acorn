@@ -8,7 +8,16 @@
 // description, validation, and provider scheduling as a direct read, and this module stays out of an
 // import cycle with ./runtime.ts.
 import { createHash } from 'node:crypto'
-import { DATA_SOURCE_PREVIEW_MODE, parseDataSourceInputRef, type DataSourceDescription, type DataSourceDevelopment, type DataSourceInputRead, type DataSourceRequest, type DataSourceResponse, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import {
+  DATA_SOURCE_PREVIEW_MODE,
+  parseDataSourceInputRef,
+  type DataSourceDescription,
+  type DataSourceDevelopment,
+  type DataSourceInputRead,
+  type DataSourceRequest,
+  type DataSourceResponse,
+  type DataSourceResult,
+} from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInputHandle } from '../pluginHost/types'
@@ -17,7 +26,11 @@ import { inputScope, type DataSourceInvocation } from './authority'
 import type { RegisteredDataSource } from './registry'
 import { DataSourceError } from './validation'
 
-type Invoke = <R extends DataSourceRequest>(env: Env, request: R, invocation: DataSourceInvocation) => Promise<DataSourceResponse<R>>
+type Invoke = <R extends DataSourceRequest>(
+  env: Env,
+  request: R,
+  invocation: DataSourceInvocation,
+) => Promise<DataSourceResponse<R>>
 type IncompleteCause = Extract<DataSourceResult['completeness'], { kind: 'incomplete' }>['cause']
 
 /** What one invocation of a derived source learned from its input reads and its own records.
@@ -44,7 +57,9 @@ export function checkInputChain(source: RegisteredDataSource, invocation: DataSo
   const chain = invocation.chain ?? []
   if (chain.includes(sourceKey(source))) throw new DataSourceError('invalid-request', { reason: 'Inputs form a loop' })
   if (source.inputs && chain.length >= MAX_DERIVED_DEPTH) {
-    throw new DataSourceError('invalid-request', { reason: `Inputs nest more than ${MAX_DERIVED_DEPTH} derived sources deep` })
+    throw new DataSourceError('invalid-request', {
+      reason: `Inputs nest more than ${MAX_DERIVED_DEPTH} derived sources deep`,
+    })
   }
 }
 
@@ -60,10 +75,11 @@ export function inputHandles(
 ): Record<string, DataSourceInputHandle> | undefined {
   if (!source.inputs) return undefined
   const scope = request.operation === 'query' ? request.query.scope : request.scope
-  const child: DataSourceInvocation = { ...invocation, chain: [...invocation.chain ?? [], sourceKey(source)] }
-  const timing = request.operation === 'query'
-    ? { mode: request.mode, evaluationTime: request.evaluationTime }
-    : { mode: DATA_SOURCE_PREVIEW_MODE, evaluationTime: Date.now() }
+  const child: DataSourceInvocation = { ...invocation, chain: [...(invocation.chain ?? []), sourceKey(source)] }
+  const timing =
+    request.operation === 'query'
+      ? { mode: request.mode, evaluationTime: request.evaluationTime }
+      : { mode: DATA_SOURCE_PREVIEW_MODE, evaluationTime: Date.now() }
   const handles: Record<string, DataSourceInputHandle> = {}
   for (const [name, input] of Object.entries(source.inputs)) {
     const binding = scope.inputs?.[name]
@@ -73,7 +89,10 @@ export function inputHandles(
     // Checked at each read rather than once, so an approval or a revocation takes effect mid-session.
     // This reads input-grants.json on every call. Cache it in memory if a derived source reads hot.
     const admit = () => {
-      if (source.loaded && !grantCoversInput(inputGrantsStore(env.DATA_DIR).get(source.pluginId), source.sourceId, name, input)) {
+      if (
+        source.loaded &&
+        !grantCoversInput(inputGrantsStore(env.DATA_DIR).get(source.pluginId), source.sourceId, name, input)
+      ) {
         throw new DataSourceError('input-unavailable', { input: name, reason: 'Not approved' })
       }
     }
@@ -89,17 +108,40 @@ export function inputHandles(
     handles[name] = {
       describe: () => read({ operation: 'describe', source: ref, scope: bound }),
       identity: () => read({ operation: 'identity', source: ref, scope: bound }),
-      options: ({ target, pointer, search, cursor, pageSize }) => read({ operation: 'options', source: ref, scope: bound,
-        target, pointer, search: search ?? '', ...(cursor ? { cursor } : {}), pageSize: pageSize ?? DATA_LIMITS.options }),
+      options: ({ target, pointer, search, cursor, pageSize }) =>
+        read({
+          operation: 'options',
+          source: ref,
+          scope: bound,
+          target,
+          pointer,
+          search: search ?? '',
+          ...(cursor ? { cursor } : {}),
+          pageSize: pageSize ?? DATA_LIMITS.options,
+        }),
       query: async ({ predicate, sort, take, cursor, pageSize } = {}) => {
         const started = performance.now()
-        const result = await read({ operation: 'query', ...timing,
-          query: { source: ref, scope: bound, sort: sort ?? [], ...(predicate ? { predicate } : {}), ...(take ? { take } : {}) },
-          ...(cursor ? { cursor } : {}), pageSize: pageSize ?? DATA_LIMITS.previewRecords })
+        const result = await read({
+          operation: 'query',
+          ...timing,
+          query: {
+            source: ref,
+            scope: bound,
+            sort: sort ?? [],
+            ...(predicate ? { predicate } : {}),
+            ...(take ? { take } : {}),
+          },
+          ...(cursor ? { cursor } : {}),
+          pageSize: pageSize ?? DATA_LIMITS.previewRecords,
+        })
         if (result.completeness.kind === 'incomplete') state.inputIncomplete ??= result.completeness.cause
-        const reads = state.inputReads ??= {}
-        reads[name] = { records: (reads[name]?.records ?? 0) + result.records.length, completeness: result.completeness }
-        if (state.development) state.development.inputMs[name] = (state.development.inputMs[name] ?? 0) + performance.now() - started
+        const reads = (state.inputReads ??= {})
+        reads[name] = {
+          records: (reads[name]?.records ?? 0) + result.records.length,
+          completeness: result.completeness,
+        }
+        if (state.development)
+          state.development.inputMs[name] = (state.development.inputMs[name] ?? 0) + performance.now() - started
         return result
       },
     }
@@ -117,31 +159,49 @@ export async function composeDerivedRevision(
   invocation: DataSourceInvocation,
   invoke: Invoke,
 ): Promise<string> {
-  const child: DataSourceInvocation = { ...invocation, chain: [...invocation.chain ?? [], sourceKey(source)] }
+  const child: DataSourceInvocation = { ...invocation, chain: [...(invocation.chain ?? []), sourceKey(source)] }
   const parts: [string, string][] = []
   for (const [name, input] of Object.entries(source.inputs ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
     const binding = scope.inputs?.[name]
     if (!binding) continue
-    const upstream = await invoke(env, { operation: 'describe', source: parseDataSourceInputRef(input.source), scope: inputScope(scope, binding) }, child)
+    const upstream = await invoke(
+      env,
+      { operation: 'describe', source: parseDataSourceInputRef(input.source), scope: inputScope(scope, binding) },
+      child,
+    )
     parts.push([name, upstream.revision])
   }
-  const digest = createHash('sha256').update(JSON.stringify([description.revision, parts])).digest('base64url').slice(0, 22)
+  const digest = createHash('sha256')
+    .update(JSON.stringify([description.revision, parts]))
+    .digest('base64url')
+    .slice(0, 22)
   return `derived.${digest}`
 }
 
 /** Fold what the input reads and record checks learned into the page the caller sees. The plugin's
  *  own `incomplete` wins, then an input's cause, then the count of records dropped for their shape.
  *  `queryMs` is the whole query's time, which development mode splits into input and plugin time. */
-export function finishDerivedResult(result: DataSourceResult, state: DerivedReadState, queryMs: number): DataSourceResult {
+export function finishDerivedResult(
+  result: DataSourceResult,
+  state: DerivedReadState,
+  queryMs: number,
+): DataSourceResult {
   const development = state.development
   const read = {
     ...result,
     ...(state.inputReads ? { inputs: state.inputReads } : {}),
-    ...(development ? { development: { ...development,
-      pluginMs: Math.max(0, queryMs - Object.values(development.inputMs).reduce((sum, ms) => sum + ms, 0)) } } : {}),
+    ...(development
+      ? {
+          development: {
+            ...development,
+            pluginMs: Math.max(0, queryMs - Object.values(development.inputMs).reduce((sum, ms) => sum + ms, 0)),
+          },
+        }
+      : {}),
   }
   if (result.completeness.kind !== 'complete' && result.completeness.kind !== 'bounded') return read
   if (state.inputIncomplete) return { ...read, completeness: { kind: 'incomplete', cause: state.inputIncomplete } }
-  if (state.droppedRecords) return { ...read, completeness: { kind: 'incomplete', cause: 'invalid-records', count: state.droppedRecords } }
+  if (state.droppedRecords)
+    return { ...read, completeness: { kind: 'incomplete', cause: 'invalid-records', count: state.droppedRecords } }
   return read
 }

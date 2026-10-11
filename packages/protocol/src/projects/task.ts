@@ -2,11 +2,11 @@
 export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: string }
 
 // Result of archiving a task (docs/workspaces-and-tasks.md). `reason` carries the guard refusal
-// (running sessions / dirty worktree) for the UI to surface. A failed teardown script
-// (docs/workspaces-and-tasks.md) sets teardownFailed so the UI can offer continue (re-archive with
-// skipTeardown) or abort; `output` is the script's tail for display.
-// `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task is archived, and
-// reporting a failure would have the caller offering to retry something already done.
+// (running sessions / dirty worktree) for the UI to surface. A failed teardown script sets
+// teardownFailed so the UI can offer continue (re-archive with skipTeardown) or abort; `output` is the
+// script's tail for display. `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is
+// still true: the task is archived, and reporting a failure would have the caller offering to retry
+// something already done.
 // `archivedTaskIds` includes descendants that finished, even when a later task refused archive.
 export type ArchiveResult =
   | { ok: true; cleanupFailed?: string[]; archivedTaskIds?: string[] }
@@ -17,16 +17,13 @@ export type ArchiveOpts = {
   force?: boolean
   skipTeardown?: boolean
   // Qualified concern ids whose checkbox the owner left ticked in the archive dialog. Matched against
-  // the node's own task-check registry before anything runs, never treated as a route
-  // (node-core/server/pluginHost/taskChecks.ts).
+  // the node's own task-check registry before anything runs, never treated as a route.
   applyChecks?: string[]
 }
 
 // `branchMissing` lets the caller offer a new branch when the archived task's local branch
 // disappeared. A failed restore leaves the task archived.
-export type RestoreResult =
-  | { ok: true }
-  | { ok: false; reason: string; branchMissing?: boolean }
+export type RestoreResult = { ok: true } | { ok: false; reason: string; branchMissing?: boolean }
 
 export type RestoreOpts = {
   newBranch?: boolean
@@ -59,7 +56,7 @@ export type TaskArchiveConcern = {
 }
 
 // Live worktree status for a task (docs/workspaces-and-tasks.md). `missing` = the task has a
-// worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed in main
+// worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed on the node
 // (git status --porcelain + an existence check) and polled by the rail / task footer.
 export type TaskStatus = {
   taskId: string
@@ -69,7 +66,7 @@ export type TaskStatus = {
   missing: boolean
   // Where the worktree's HEAD is. Both null when the directory is missing or git could not answer;
   // `branch` alone is null on a detached HEAD. The node compares `head` between polls to emit
-  // `head:changed` (@acorn/protocol/nodeEvents.ts).
+  // `head:changed`.
   branch: string | null
   head: string | null
 }

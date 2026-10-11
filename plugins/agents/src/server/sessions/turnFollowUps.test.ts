@@ -40,32 +40,63 @@ describe('agents:turn-follow-up', () => {
       delegationLive: (turn) => reports.operationLive(turn),
       deadlineMs,
     })
-    reports = new DelegationReports(runtime, new AgentDelegationStore(ctx.storage.open()), async () => followUps, ctx.core)
-    messages = new SessionMessages({ runtime, entries: () => senders, notice: () => {}, followUps: async () => followUps })
+    reports = new DelegationReports(
+      runtime,
+      new AgentDelegationStore(ctx.storage.open()),
+      async () => followUps,
+      ctx.core,
+    )
+    messages = new SessionMessages({
+      runtime,
+      entries: () => senders,
+      notice: () => {},
+      followUps: async () => followUps,
+    })
   }
   let senders: { id: string; pluginId: string; value: { connect(sender: SessionMessenger): void } }[]
   const messenger = async (pluginId: string): Promise<SessionMessenger> => {
     let sender: SessionMessenger | null = null
-    senders.push({ id: `${pluginId}:notes`, pluginId, value: { connect: (given) => { sender = given } } })
+    senders.push({
+      id: `${pluginId}:notes`,
+      pluginId,
+      value: {
+        connect: (given) => {
+          sender = given
+        },
+      },
+    })
     await messages.reconcile()
     return sender!
   }
   const reviewer = (pluginId: string, review: (window: TurnFollowUpWindow) => Promise<void>) =>
     reviewers.push({ id: `${pluginId}:review`, pluginId, value: { review } })
-  const note = (window: Pick<TurnFollowUpWindow, 'taskId' | 'sessionId' | 'turnId'>, text = 'add() subtracts.'): SessionMessage => ({
-    taskId: window.taskId, sessionId: window.sessionId, originTurnId: window.turnId, text, subject: 'advisor blocker', idempotencyKey: randomUUID(),
+  const note = (
+    window: Pick<TurnFollowUpWindow, 'taskId' | 'sessionId' | 'turnId'>,
+    text = 'add() subtracts.',
+  ): SessionMessage => ({
+    taskId: window.taskId,
+    sessionId: window.sessionId,
+    originTurnId: window.turnId,
+    text,
+    subject: 'advisor blocker',
+    idempotencyKey: randomUUID(),
   })
 
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     vi.spyOn(ctx.core.tasks, 'requireRoot').mockResolvedValue(ctx.dataDir)
     vi.spyOn(ctx.core.tasks, 'workspaceId').mockResolvedValue('workspace')
-    replies = []; sent = []; release = null; reviewers = []; senders = []
+    replies = []
+    sent = []
+    release = null
+    reviewers = []
+    senders = []
     providerId = 'scripted'
     const registry = new AgentDriverRegistry()
     const driver = (id: string) => ({
-      providerId: id, profileId: id,
-      probe: async () => ({ ...await new FakeAgentDriver().probe(), id, profileId: id }),
+      providerId: id,
+      profileId: id,
+      probe: async () => ({ ...(await new FakeAgentDriver().probe()), id, profileId: id }),
       start: async (options: Parameters<FakeAgentDriver['start']>[0]) => {
         await options.onEvent({ type: 'session_metadata', providerSessionRef: options.session.id })
         await options.onEvent({ type: 'session_state', state: 'ready' })
@@ -73,13 +104,21 @@ describe('agents:turn-follow-up', () => {
         const finish = async (reply: Reply) => {
           await options.onEvent({ type: 'assistant_message', text: reply.text })
           if (reply.usage) await options.onEvent({ type: 'usage', usage: reply.usage })
-          if (reply.fail) await options.onEvent({ type: 'error', code: 'fixture_failure', message: 'Follow-up failed.', retryable: false })
+          if (reply.fail)
+            await options.onEvent({
+              type: 'error',
+              code: 'fixture_failure',
+              message: 'Follow-up failed.',
+              retryable: false,
+            })
           else await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
           active = false
         }
         return {
           providerSessionRef: options.session.id,
-          get ready() { return !active },
+          get ready() {
+            return !active
+          },
           sendTurn: async ({ turn }: { turn: AgentTurn }) => {
             active = true
             sent.push(turn.id)
@@ -88,7 +127,9 @@ describe('agents:turn-follow-up', () => {
             else await finish(reply)
             return {}
           },
-          cancel: async () => { active = false },
+          cancel: async () => {
+            active = false
+          },
           resolveRequest: async () => {},
           stop: async () => {},
         }
@@ -103,62 +144,121 @@ describe('agents:turn-follow-up', () => {
     ]
     releaseProfile = () => releases.forEach((dispose) => dispose())
     runtime = new ManagedAgentRuntime({
-      db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
-      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner',
+      db: ctx.storage.open(),
+      dataDir: ctx.dataDir,
+      core: ctx.core,
+      registry,
+      internalEnv: () => ({}),
+      secrets: ctx.env.SECRETS,
+      currentUserId: () => 'owner',
     })
     build()
   })
-  afterEach(async () => { await runtime.stop(); releaseProfile(); ctx.cleanup(); vi.restoreAllMocks() })
+  afterEach(async () => {
+    await runtime.stop()
+    releaseProfile()
+    ctx.cleanup()
+    vi.restoreAllMocks()
+  })
 
   const step = (patch: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
-    createSessionExecute(runtime, async () => followUps)({
-      taskId: 'task-1', profileId: providerId, title: 'Workflow: review', prompt: 'Write add().',
+    createSessionExecute(
+      runtime,
+      async () => followUps,
+    )({
+      taskId: 'task-1',
+      profileId: providerId,
+      title: 'Workflow: review',
+      prompt: 'Write add().',
       schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
-      runId: 'run-1', stepId: `step-${randomUUID()}`, timeoutMs: 20_000, ...patch,
+      runId: 'run-1',
+      stepId: `step-${randomUUID()}`,
+      timeoutMs: 20_000,
+      ...patch,
     })
   const turnsOf = async (sessionId: string) => (await runtime.store.snapshot(sessionId, 0)).turns
 
-  it.each(['gated', 'autonomous'] as const)('runs a blocker’s correction under %s before the step publishes', async (posture) => {
-    replies = [
-      { text: 'Done.\n```json\n{"ok": false}\n```', usage: { inputTokens: 100, outputTokens: 10, cost: { amount: 0.5, currency: 'USD' } } },
-      { text: 'Fixed add().\n```json\n{"ok": true}\n```', usage: { inputTokens: 40, outputTokens: 4, cost: { amount: 0.25, currency: 'USD' } } },
-    ]
-    const sender = await messenger('acorn-advisor')
-    const windows: TurnFollowUpWindow[] = []
-    reviewer('acorn-advisor', async (window) => {
-      windows.push(window)
-      expect(await sender.queue(note(window))).toMatchObject({ ok: true })
-    })
-    const result = await step({ posture })
-    expect(result).toMatchObject({ status: 'ok', capture: { result: expect.stringContaining('Fixed add()'), structuredOutput: { ok: true } } })
-    // Both turns are the step's: its usage and cost are theirs together.
-    expect(result!.capture.usage).toMatchObject({ inputTokens: 140, outputTokens: 14 })
-    expect(result!.capture.costUsd).toBe(0.75)
-    const [original, correction] = await turnsOf(result!.agentSessionId!)
-    expect(windows).toEqual([expect.objectContaining({ turnId: original!.id, owner: 'workflow', taskId: 'task-1' })])
-    expect(correction).toMatchObject({
-      source: 'plugin', status: 'completed',
-      effectivePolicy: { attendance: posture === 'autonomous' ? 'autonomous' : 'supervised', followUpOf: original!.id, sentBy: { pluginId: 'acorn-advisor' }, workflowRunId: 'run-1', workflowStepId: original!.effectivePolicy.workflowStepId },
-    })
-    expect(correction!.effectivePolicy.reportTo).toBeUndefined()
-    expect(correction!.input[0]).toMatchObject({ text: expect.stringContaining('fenced `json` result block again') })
-    // The correction is a plugin turn, so it opened no second window.
-    expect(windows).toHaveLength(1)
-    expect(await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'))
-      .toMatchObject({ outcome: 'reviewed', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'done' }] })
-    // The step has finished, so the same note is now late.
-    expect(await sender.queue(note({ taskId: 'task-1', sessionId: result!.agentSessionId!, turnId: original!.id }))).toEqual({ ok: false, reason: 'operation-closed' })
-  })
+  it.each(['gated', 'autonomous'] as const)(
+    'runs a blocker’s correction under %s before the step publishes',
+    async (posture) => {
+      replies = [
+        {
+          text: 'Done.\n```json\n{"ok": false}\n```',
+          usage: { inputTokens: 100, outputTokens: 10, cost: { amount: 0.5, currency: 'USD' } },
+        },
+        {
+          text: 'Fixed add().\n```json\n{"ok": true}\n```',
+          usage: { inputTokens: 40, outputTokens: 4, cost: { amount: 0.25, currency: 'USD' } },
+        },
+      ]
+      const sender = await messenger('acorn-advisor')
+      const windows: TurnFollowUpWindow[] = []
+      reviewer('acorn-advisor', async (window) => {
+        windows.push(window)
+        expect(await sender.queue(note(window))).toMatchObject({ ok: true })
+      })
+      const result = await step({ posture })
+      expect(result).toMatchObject({
+        status: 'ok',
+        capture: { result: expect.stringContaining('Fixed add()'), structuredOutput: { ok: true } },
+      })
+      // Both turns are the step's: its usage and cost are theirs together.
+      expect(result!.capture.usage).toMatchObject({ inputTokens: 140, outputTokens: 14 })
+      expect(result!.capture.costUsd).toBe(0.75)
+      const [original, correction] = await turnsOf(result!.agentSessionId!)
+      expect(windows).toEqual([expect.objectContaining({ turnId: original!.id, owner: 'workflow', taskId: 'task-1' })])
+      expect(correction).toMatchObject({
+        source: 'plugin',
+        status: 'completed',
+        effectivePolicy: {
+          attendance: posture === 'autonomous' ? 'autonomous' : 'supervised',
+          followUpOf: original!.id,
+          sentBy: { pluginId: 'acorn-advisor' },
+          workflowRunId: 'run-1',
+          workflowStepId: original!.effectivePolicy.workflowStepId,
+        },
+      })
+      expect(correction!.effectivePolicy.reportTo).toBeUndefined()
+      expect(correction!.input[0]).toMatchObject({ text: expect.stringContaining('fenced `json` result block again') })
+      // The correction is a plugin turn, so it opened no second window.
+      expect(windows).toHaveLength(1)
+      expect(
+        await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'),
+      ).toMatchObject({ outcome: 'reviewed', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'done' }] })
+      // The step has finished, so the same note is now late.
+      expect(
+        await sender.queue(note({ taskId: 'task-1', sessionId: result!.agentSessionId!, turnId: original!.id })),
+      ).toEqual({ ok: false, reason: 'operation-closed' })
+    },
+  )
 
   it('checks a goal again after a reviewer’s correction, and opens the review window once', async () => {
     // The judge runs through the profile's one-shot mode, which the scripted profile otherwise lacks.
     const get = agentProfileRegistry.get.bind(agentProfileRegistry)
-    vi.spyOn(agentProfileRegistry, 'get').mockImplementation((id) => id === 'scripted' ? { ...get(id)!, aiArgv: () => null } as never : get(id))
+    vi.spyOn(agentProfileRegistry, 'get').mockImplementation((id) =>
+      id === 'scripted' ? ({ ...get(id)!, aiArgv: () => null } as never) : get(id),
+    )
     const judged: string[] = []
-    const judge = { currentUserId: () => 'owner', models: { generateText: vi.fn(async (request: { input: { prompt: string } }) => {
-      judged.push(request.input.prompt)
-      return { text: JSON.stringify({ satisfied: true, blocker: 'none', reason: 'Done.', evidence_summary: 'Tests pass.', relied_on_assumption: false }), providerId: 'p', backendId: 'b', modelId: 'm' }
-    }) } }
+    const judge = {
+      currentUserId: () => 'owner',
+      models: {
+        generateText: vi.fn(async (request: { input: { prompt: string } }) => {
+          judged.push(request.input.prompt)
+          return {
+            text: JSON.stringify({
+              satisfied: true,
+              blocker: 'none',
+              reason: 'Done.',
+              evidence_summary: 'Tests pass.',
+              relied_on_assumption: false,
+            }),
+            providerId: 'p',
+            backendId: 'b',
+            modelId: 'm',
+          }
+        }),
+      },
+    }
     replies = [{ text: 'Done.\n```json\n{"ok": true}\n```' }, { text: 'Fixed add().\n```json\n{"ok": true}\n```' }]
     const sender = await messenger('acorn-advisor')
     let reviews = 0
@@ -166,12 +266,26 @@ describe('agents:turn-follow-up', () => {
       reviews += 1
       await sender.queue(note(window))
     })
-    const result = await createSessionExecute(runtime, async () => followUps, judge as never)({
-      taskId: 'task-1', profileId: 'scripted', title: 'Workflow: review', prompt: 'Write add().', goal: 'add() adds.',
+    const result = await createSessionExecute(
+      runtime,
+      async () => followUps,
+      judge as never,
+    )({
+      taskId: 'task-1',
+      profileId: 'scripted',
+      title: 'Workflow: review',
+      prompt: 'Write add().',
+      goal: 'add() adds.',
       schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
-      runId: 'run-1', stepId: `step-${randomUUID()}`, timeoutMs: 20_000,
+      runId: 'run-1',
+      stepId: `step-${randomUUID()}`,
+      timeoutMs: 20_000,
     })
-    expect(result).toMatchObject({ status: 'ok', capture: { result: expect.stringContaining('Fixed add()') }, goal: { status: 'satisfied' } })
+    expect(result).toMatchObject({
+      status: 'ok',
+      capture: { result: expect.stringContaining('Fixed add()') },
+      goal: { status: 'satisfied' },
+    })
     expect(reviews).toBe(1)
     // Once for the step's own turn, and again for the turn set the correction changed.
     expect(judged).toHaveLength(2)
@@ -179,20 +293,33 @@ describe('agents:turn-follow-up', () => {
   })
 
   it('keeps a note queued during the running turn inside the step, and refuses notes with no live operation', async () => {
-    replies = [{ text: 'Working.\n```json\n{"ok": true}\n```', hold: true }, { text: 'Understood.\n```json\n{"ok": true}\n```' }]
+    replies = [
+      { text: 'Working.\n```json\n{"ok": true}\n```', hold: true },
+      { text: 'Understood.\n```json\n{"ok": true}\n```' },
+    ]
     const sender = await messenger('acorn-permission-policy')
     const running = step()
     await vi.waitFor(() => expect(sent).toHaveLength(1))
-    const [first] = await runtime.store.snapshot((await runtime.store.turn(sent[0]!))!.sessionId, 0).then((snapshot) => snapshot.turns)
+    const [first] = await runtime.store
+      .snapshot((await runtime.store.turn(sent[0]!))!.sessionId, 0)
+      .then((snapshot) => snapshot.turns)
     const sessionId = first!.sessionId
     expect(await sender.queue(note({ taskId: 'task-1', sessionId, turnId: first!.id }))).toMatchObject({ ok: true })
     // No origin, or an origin in another session, has no operation.
-    expect(await sender.queue({ ...note({ taskId: 'task-1', sessionId, turnId: first!.id }), originTurnId: undefined })).toEqual({ ok: false, reason: 'operation-closed' })
-    expect(await sender.queue(note({ taskId: 'task-1', sessionId, turnId: randomUUID() }))).toEqual({ ok: false, reason: 'operation-closed' })
+    expect(
+      await sender.queue({ ...note({ taskId: 'task-1', sessionId, turnId: first!.id }), originTurnId: undefined }),
+    ).toEqual({ ok: false, reason: 'operation-closed' })
+    expect(await sender.queue(note({ taskId: 'task-1', sessionId, turnId: randomUUID() }))).toEqual({
+      ok: false,
+      reason: 'operation-closed',
+    })
     await release!()
     const result = await running
     expect(result?.capture.result).toContain('Understood.')
-    expect((await turnsOf(sessionId)).map((turn) => [turn.source, turn.status])).toEqual([['workflow', 'completed'], ['plugin', 'completed']])
+    expect((await turnsOf(sessionId)).map((turn) => [turn.source, turn.status])).toEqual([
+      ['workflow', 'completed'],
+      ['plugin', 'completed'],
+    ])
   })
 
   it('records a review timeout and refuses the late reviewer’s note', async () => {
@@ -212,18 +339,22 @@ describe('agents:turn-follow-up', () => {
     expect(await late).toEqual({ ok: false, reason: 'operation-closed' })
     const [original, ...rest] = await turnsOf(result!.agentSessionId!)
     expect(rest).toEqual([])
-    expect(await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'))
-      .toMatchObject({ outcome: 'timed-out', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'timed-out' }] })
+    expect(
+      await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'),
+    ).toMatchObject({ outcome: 'timed-out', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'timed-out' }] })
   })
 
   it('finishes ordinary execution when a reviewer fails', async () => {
     replies = [{ text: '```json\n{"ok": true}\n```' }]
-    reviewer('acorn-advisor', async () => { throw Object.assign(new Error('Advisor has used today’s allowance.'), { code: 'provider_budget_exhausted' }) })
+    reviewer('acorn-advisor', async () => {
+      throw Object.assign(new Error('Advisor has used today’s allowance.'), { code: 'provider_budget_exhausted' })
+    })
     const result = await step()
     expect(result?.status).toBe('ok')
     const [original] = await turnsOf(result!.agentSessionId!)
-    expect(await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'))
-      .toMatchObject({ outcome: 'reviewed', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'failed' }] })
+    expect(
+      await runtime.store.operationResult(`turn-follow-up:${original!.id}`, 'turn-follow-up.review'),
+    ).toMatchObject({ outcome: 'reviewed', reviewers: [{ pluginId: 'acorn-advisor', outcome: 'failed' }] })
   })
 
   it('leaves no orphan work when cancellation races the review and a note’s admission', async () => {
@@ -239,7 +370,9 @@ describe('agents:turn-follow-up', () => {
     const result = await step({ signal: controller.signal })
     const turns = await turnsOf(result!.agentSessionId!)
     expect(turns.every((turn) => ['completed', 'cancelled'].includes(turn.status))).toBe(true)
-    expect(await runtime.store.operationResult(`turn-follow-up:${turns[0]!.id}`, 'turn-follow-up.review')).toMatchObject({ outcome: 'cancelled' })
+    expect(
+      await runtime.store.operationResult(`turn-follow-up:${turns[0]!.id}`, 'turn-follow-up.review'),
+    ).toMatchObject({ outcome: 'cancelled' })
   })
 
   it('takes Codex’s cumulative usage from its last turn instead of summing', async () => {
@@ -249,7 +382,9 @@ describe('agents:turn-follow-up', () => {
       { text: '```json\n{"ok": true}\n```', usage: { inputTokens: 150, outputTokens: 16 } },
     ]
     const sender = await messenger('acorn-advisor')
-    reviewer('acorn-advisor', async (window) => { await sender.queue(note(window)) })
+    reviewer('acorn-advisor', async (window) => {
+      await sender.queue(note(window))
+    })
     const result = await step()
     expect(result!.capture.usage).toMatchObject({ inputTokens: 150, outputTokens: 16 })
     expect(result!.capture.costUsd).toBeNull()
@@ -258,7 +393,9 @@ describe('agents:turn-follow-up', () => {
   it('does not review an operation twice, and a restart cancels a workflow step’s queued notes', async () => {
     replies = [{ text: '```json\n{"ok": true}\n```' }, { text: 'Hold.', hold: true }]
     let reviews = 0
-    reviewer('acorn-advisor', async () => { reviews += 1 })
+    reviewer('acorn-advisor', async () => {
+      reviews += 1
+    })
     const result = await step()
     const [original] = await turnsOf(result!.agentSessionId!)
     const operation = followUps.open(original!, 'workflow')
@@ -268,9 +405,17 @@ describe('agents:turn-follow-up', () => {
 
     // A note queued behind a held turn, as if the Node stopped with the step running.
     const sessionId = result!.agentSessionId!
-    const held = await runtime.enqueueTurn(sessionId, { input: [{ type: 'text', text: 'More.' }], source: 'workflow', effectivePolicy: {}, idempotencyKey: randomUUID() })
+    const held = await runtime.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text: 'More.' }],
+      source: 'workflow',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
     const orphan = await runtime.enqueueTurn(sessionId, {
-      input: [{ type: 'text', text: 'Note.' }], source: 'plugin', effectivePolicy: { sentBy: { pluginId: 'acorn-advisor' }, followUpOf: held.id }, idempotencyKey: randomUUID(),
+      input: [{ type: 'text', text: 'Note.' }],
+      source: 'plugin',
+      effectivePolicy: { sentBy: { pluginId: 'acorn-advisor' }, followUpOf: held.id },
+      idempotencyKey: randomUUID(),
     })
     await runtime.store.cancelWorkflowFollowUps()
     expect((await runtime.store.turn(orphan.id))?.status).toBe('cancelled')
@@ -278,11 +423,20 @@ describe('agents:turn-follow-up', () => {
 
   describe('a delegated turn', () => {
     const delegated = async (reply: Reply, effectivePolicy: Record<string, unknown> = {}) => {
-      const owner = await runtime.store.createSession({ taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
-      const child = await runtime.store.createSession({ taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'delegated', config: {} }, await new FakeAgentDriver().probe())
+      const owner = await runtime.store.createSession(
+        { taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'interactive', config: {} },
+        await new FakeAgentDriver().probe(),
+      )
+      const child = await runtime.store.createSession(
+        { taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'delegated', config: {} },
+        await new FakeAgentDriver().probe(),
+      )
       replies = [reply]
       const turn = await runtime.enqueueTurn(child.id, {
-        input: [{ type: 'text', text: 'Write add().' }], source: 'delegation', effectivePolicy: { reportTo: owner.id, ...effectivePolicy }, idempotencyKey: randomUUID(),
+        input: [{ type: 'text', text: 'Write add().' }],
+        source: 'delegation',
+        effectivePolicy: { reportTo: owner.id, ...effectivePolicy },
+        idempotencyKey: randomUUID(),
       })
       await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('completed'))
       return { owner, child, turn }
@@ -305,7 +459,10 @@ describe('agents:turn-follow-up', () => {
       expect(body).toContain('Fixed add().')
       expect(body).toContain('A plugin sent it notes')
       // After the report, the operation is closed.
-      expect(await sender.queue(note({ taskId: 'task-1', sessionId: turn.sessionId, turnId: turn.id }))).toEqual({ ok: false, reason: 'operation-closed' })
+      expect(await sender.queue(note({ taskId: 'task-1', sessionId: turn.sessionId, turnId: turn.id }))).toEqual({
+        ok: false,
+        reason: 'operation-closed',
+      })
     })
 
     it('records an unverified check against a failed plugin follow-up outcome', async () => {
@@ -314,13 +471,17 @@ describe('agents:turn-follow-up', () => {
         await sender.queue(note(window))
         replies.push({ text: 'Could not finish.', fail: true })
       })
-      const { owner, turn } = await delegated({ text: 'Done.' }, { checks: [{ kind: 'file-exists', path: 'output.txt' }] })
+      const { owner, turn } = await delegated(
+        { text: 'Done.' },
+        { checks: [{ kind: 'file-exists', path: 'output.txt' }] },
+      )
       await reports.deliver(turn.id)
       const [report] = (await turnsOf(owner.id)).filter((candidate) => candidate.source === 'delegation_report')
       const followUp = (await runtime.store.followUpTurns(turn.sessionId, turn.id))[0]!
       expect(followUp.status).toBe('failed')
       expect(report?.effectivePolicy.checkResults).toMatchObject({
-        outcome: 'failed', outcomeTurnId: followUp.id,
+        outcome: 'failed',
+        outcomeTurnId: followUp.id,
         verdicts: [{ status: 'unverified', reason: 'Turn failed.' }],
       })
       expect((report!.input[0] as { text: string }).text).toContain('Outcome: failed')

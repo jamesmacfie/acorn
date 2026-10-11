@@ -29,19 +29,27 @@ type Sandbox = {
 let sandbox: Sandbox | null = null
 let sandboxes: Sandbox[] = []
 
-const stubWorker = (record: Sandbox): Worker => ({
-  postMessage: (_message: unknown, transfer?: Transferable[]) => {
-    // The hello: the bridge port first, the tree port second, exactly as a frame's hello carries one.
-    const port = ((transfer ?? []) as MessagePort[])[1]!
-    ;((transfer ?? []) as MessagePort[])[0]!.postMessage({ kind: 'connected' })
-    record.port = port
-    port.onmessage = (event: MessageEvent) => record.seen.push(event.data)
-    port.start()
-    port.postMessage({ kind: 'tree:ready', version: 1, entries: ['toolCard'], ...(record.scoped ? { scopedBridge: true } : {}) })
-  },
-  terminate: () => { record.terminated = true },
-  onerror: null,
-} as unknown as Worker)
+const stubWorker = (record: Sandbox): Worker =>
+  ({
+    postMessage: (_message: unknown, transfer?: Transferable[]) => {
+      // The hello: the bridge port first, the tree port second, exactly as a frame's hello carries one.
+      const port = ((transfer ?? []) as MessagePort[])[1]!
+      ;((transfer ?? []) as MessagePort[])[0]!.postMessage({ kind: 'connected' })
+      record.port = port
+      port.onmessage = (event: MessageEvent) => record.seen.push(event.data)
+      port.start()
+      port.postMessage({
+        kind: 'tree:ready',
+        version: 1,
+        entries: ['toolCard'],
+        ...(record.scoped ? { scopedBridge: true } : {}),
+      })
+    },
+    terminate: () => {
+      record.terminated = true
+    },
+    onerror: null,
+  }) as unknown as Worker
 
 const bridge = (): FrameBridge => ({ dispose: () => {} })
 const slotBridge = (): TreeSlotBridge => ({
@@ -50,13 +58,25 @@ const slotBridge = (): TreeSlotBridge => ({
 })
 
 const acquire = (refused: string[] = []) =>
-  acquireTreeWorker({ pluginId: 'stranger', hash: HASH, authority: 'equivalent-test-context', connect: () => bridge(), onRefused: (reason) => refused.push(reason) })
+  acquireTreeWorker({
+    pluginId: 'stranger',
+    hash: HASH,
+    authority: 'equivalent-test-context',
+    connect: () => bridge(),
+    onRefused: (reason) => refused.push(reason),
+  })
 
 const start = (scoped = false): void => {
   sandbox = null
   sandboxes = []
   _setWorkerFactory(() => {
-    const record: Sandbox = { worker: null as unknown as Worker, port: null as unknown as MessagePort, terminated: false, seen: [], scoped }
+    const record: Sandbox = {
+      worker: null as unknown as Worker,
+      port: null as unknown as MessagePort,
+      terminated: false,
+      seen: [],
+      scoped,
+    }
     record.worker = stubWorker(record)
     sandboxes.push(record)
     sandbox = record
@@ -83,7 +103,9 @@ afterEach(() => {
 
 describe('one worker per bundle', () => {
   it('reports unavailable isolation through its surface without creating an app-origin worker', async () => {
-    _setWorkerFactory(() => { throw new Error('unknown renderer origin for a plugin worker') })
+    _setWorkerFactory(() => {
+      throw new Error('unknown renderer origin for a plugin worker')
+    })
     const refused: string[] = []
     const failures: string[] = []
     const handle = acquire(refused)
@@ -98,17 +120,20 @@ describe('one worker per bundle', () => {
   it('isolates identical bytes by plugin id, including each bridge’s API namespace', async () => {
     start()
     const connected: string[] = []
-    const take = (pluginId: string) => acquireTreeWorker({
-      pluginId,
-      hash: HASH,
-      connect: () => {
-        connected.push(pluginId)
-        expect(allowApi({ pluginId, api: [] }, 'GET', `/v1/p/${pluginId}/items`).allowed).toBe(true)
-        expect(allowApi({ pluginId, api: [] }, 'GET', `/v1/p/${pluginId === 'alpha' ? 'beta' : 'alpha'}/items`).allowed).toBe(false)
-        return bridge()
-      },
-      onRefused: () => {},
-    })
+    const take = (pluginId: string) =>
+      acquireTreeWorker({
+        pluginId,
+        hash: HASH,
+        connect: () => {
+          connected.push(pluginId)
+          expect(allowApi({ pluginId, api: [] }, 'GET', `/v1/p/${pluginId}/items`).allowed).toBe(true)
+          expect(
+            allowApi({ pluginId, api: [] }, 'GET', `/v1/p/${pluginId === 'alpha' ? 'beta' : 'alpha'}/items`).allowed,
+          ).toBe(false)
+          return bridge()
+        },
+        onRefused: () => {},
+      })
     const alpha = take('alpha')
     const beta = take('beta')
     expect(sandboxes).toHaveLength(2)
@@ -127,7 +152,12 @@ describe('one worker per bundle', () => {
   it('keeps different hashes of one plugin independent', async () => {
     start()
     const alpha = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => bridge(), onRefused: () => {} })
-    const newer = acquireTreeWorker({ pluginId: 'alpha', hash: OTHER_HASH, connect: () => bridge(), onRefused: () => {} })
+    const newer = acquireTreeWorker({
+      pluginId: 'alpha',
+      hash: OTHER_HASH,
+      connect: () => bridge(),
+      onRefused: () => {},
+    })
     expect(sandboxes).toHaveLength(2)
     await settle()
     stopTreeWorker({ pluginId: 'alpha', hash: HASH }, 'replaced')
@@ -147,10 +177,17 @@ describe('one worker per bundle', () => {
     // Real timers here: a port delivers on the event loop, not on a timer, so a fake clock cannot
     // advance it. The grace period below is a timer, and that is what the fake clock is for.
     await settle()
-    expect(sandbox!.seen.map((message) => {
-      const { bridgePort: _port, context: _context, slotBridge: _slotBridge, ...rest } = message as Record<string, unknown>
-      return rest
-    })).toEqual([
+    expect(
+      sandbox!.seen.map((message) => {
+        const {
+          bridgePort: _port,
+          context: _context,
+          slotBridge: _slotBridge,
+          ...rest
+        } = message as Record<string, unknown>
+        return rest
+      }),
+    ).toEqual([
       { kind: 'tree:mount', slot: 's1', entry: 'toolCard', props: { tool: 'a' } },
       { kind: 'tree:mount', slot: 's2', entry: 'toolCard', props: { tool: 'b' } },
     ])
@@ -196,7 +233,9 @@ describe('one worker per bundle', () => {
     const first = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => bridge(), onRefused: () => {} })
     const oldWorker = sandbox!
     first.mount('s1', 'toolCard', {}, slotBridge)
-    await vi.waitFor(() => expect(oldWorker.seen.some((message) => (message as { kind?: string }).kind === 'tree:mount')).toBe(true))
+    await vi.waitFor(() =>
+      expect(oldWorker.seen.some((message) => (message as { kind?: string }).kind === 'tree:mount')).toBe(true),
+    )
     vi.useFakeTimers()
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
     first.release()
@@ -217,7 +256,12 @@ describe('one worker per bundle', () => {
   it.each(['mounted', 'in grace'] as const)('stops a revoked worker immediately while %s', async (state) => {
     start(true)
     const dispose = vi.fn()
-    const handle = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => ({ dispose }), onRefused: () => {} })
+    const handle = acquireTreeWorker({
+      pluginId: 'alpha',
+      hash: HASH,
+      connect: () => ({ dispose }),
+      onRefused: () => {},
+    })
     const failures: string[] = []
     handle.transport('s1').onFailed((reason) => failures.push(reason))
     handle.mount('s1', 'toolCard', {})
@@ -253,7 +297,9 @@ describe('what reaches a tree', () => {
     start()
     const handle = acquire()
     handle.mount('s1', 'topbar', {})
-    const ops: TreeMutation[] = [{ op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Heading', props: {}, children: [] } }]
+    const ops: TreeMutation[] = [
+      { op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Heading', props: {}, children: [] } },
+    ]
     sandbox!.port.postMessage({ kind: 'tree:batch', slot: 's1', ops })
     await settle()
 
@@ -278,10 +324,12 @@ describe('what reaches a tree', () => {
 
     handle.select('s2', 'issue-2')
     handle.surfaceAction('s1', 'refresh')
-    await vi.waitFor(() => expect(messages).toEqual([
-      [{ kind: 'surfaceAction', command: 'refresh' }],
-      [{ kind: 'select', item: 'issue-2' }],
-    ]))
+    await vi.waitFor(() =>
+      expect(messages).toEqual([
+        [{ kind: 'surfaceAction', command: 'refresh' }],
+        [{ kind: 'select', item: 'issue-2' }],
+      ]),
+    )
     handle.unmount('s1')
     handle.select('s1', 'stale')
     await settle()
@@ -315,7 +363,9 @@ describe('what reaches a tree', () => {
     handle.mount('s1', 'toolCard', {})
     handle.mount('s2', 'toolCard', {})
 
-    const ops: TreeMutation[] = [{ op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Card', props: {}, children: [] } }]
+    const ops: TreeMutation[] = [
+      { op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Card', props: {}, children: [] } },
+    ]
     sandbox!.port.postMessage({ kind: 'tree:batch', slot: 's1', ops })
     await settle()
     expect(mine).toEqual([ops])
@@ -505,7 +555,13 @@ describe('what reaches a tree', () => {
     const replies = ask('owner.invoke', new Promise(() => {}))
     await vi.advanceTimersByTimeAsync(30_000)
     expect(replies()).toEqual([
-      { kind: 'tree:host-reply', slot: 's1', id: 1, ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } },
+      {
+        kind: 'tree:host-reply',
+        slot: 's1',
+        id: 1,
+        ok: false,
+        error: { code: 'timeout', message: 'the owner did not answer in time' },
+      },
     ])
   })
 
@@ -519,7 +575,12 @@ describe('what reaches a tree', () => {
 
   it('delivers an overlay result to the tree that asked for it', async () => {
     let close = (_: unknown) => {}
-    const replies = ask('overlay.open', new Promise((resolve) => { close = resolve }))
+    const replies = ask(
+      'overlay.open',
+      new Promise((resolve) => {
+        close = resolve
+      }),
+    )
     await settle()
     close(null)
     await settle()

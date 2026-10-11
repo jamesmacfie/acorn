@@ -68,7 +68,7 @@ export function closeLinkPreview(): void {
 }
 
 /** The pointer reached a link. It opens after the dwell unless the pointer leaves first. */
-export function hoverLink(request: Omit<LinkPreviewRequest, 'focus'>): void {
+function hoverLink(request: Omit<LinkPreviewRequest, 'focus'>): void {
   clearTimeout(grace)
   const open = current()
   if (open && open.anchor === request.anchor) return
@@ -97,7 +97,8 @@ export function linkPreviewProps(request: LinkPreviewRequest): LinkPreviewProps 
     ...(request.scope.taskId ? { taskId: request.scope.taskId } : {}),
     ...(request.scope.projectId ? { projectId: request.scope.projectId } : {}),
     ...(typeof kind === 'string' && kind.length <= 64 && typeof id === 'string' && id && id.length <= 300
-      ? { ref: { kind, id } } : {}),
+      ? { ref: { kind, id } }
+      : {}),
   }
 }
 
@@ -109,7 +110,7 @@ export function linkLabel(text: string, url: string): string | undefined {
 
 /** The previewable link an event landed on, or `null`. A link with no HTTPS href, such as a bare
  *  `ENG-1` reference, has nothing to preview. */
-export function previewableLink(target: EventTarget | null): { anchor: HTMLAnchorElement; url: string } | null {
+function previewableLink(target: EventTarget | null): { anchor: HTMLAnchorElement; url: string } | null {
   const anchor = target instanceof Element ? target.closest<HTMLAnchorElement>('a[href]') : null
   const url = anchor ? linkPreviewKey(anchor.getAttribute('href') ?? '') : null
   return anchor && url ? { anchor, url } : null
@@ -125,7 +126,7 @@ const claim = (event: Event): boolean => {
 }
 
 /** What a right-click or the menu key on a link opened, for the desktop's link menu. */
-export type LinkMenuOpening = { at: { x: number; y: number }; request: LinkPreviewRequest }
+type LinkMenuOpening = { at: { x: number; y: number }; request: LinkPreviewRequest }
 
 const [linkMenu, setLinkMenu] = createSignal<LinkMenuOpening | null>(null)
 export { linkMenu, setLinkMenu }
@@ -151,8 +152,18 @@ export function createLinkPreviewBoundary(scope: () => LinkPreviewScope) {
 
   // A memo, because `on` re-runs whenever its source is read again, even with the same ids.
   const scopeKey = createMemo(() => `${scope().taskId ?? ''}\0${scope().projectId ?? ''}`)
-  createEffect(on(scopeKey, () => { if (ours()) closeLinkPreview() }, { defer: true }))
-  onCleanup(() => { if (ours()) closeLinkPreview() })
+  createEffect(
+    on(
+      scopeKey,
+      () => {
+        if (ours()) closeLinkPreview()
+      },
+      { defer: true },
+    ),
+  )
+  onCleanup(() => {
+    if (ours()) closeLinkPreview()
+  })
 
   // Hover only. Focus alone opens nothing: tabbing through a reply would pop a preview at every link,
   // and focus returning to a link after its preview closed would open it again. The keyboard asks

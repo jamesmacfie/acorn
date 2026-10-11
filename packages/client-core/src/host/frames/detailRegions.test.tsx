@@ -33,7 +33,11 @@ vi.mock('../tree/RemoteTree', () => ({
       queueMicrotask(() => props.onFailed?.('worker crashed'))
       return null
     }
-    return <span data-tree={props.contribution.pluginId}>{`${props.contribution.pluginId}:${JSON.stringify(props.props())}`}</span>
+    return (
+      <span
+        data-tree={props.contribution.pluginId}
+      >{`${props.contribution.pluginId}:${JSON.stringify(props.props())}`}</span>
+    )
   },
 }))
 
@@ -47,46 +51,89 @@ const { extensionRegistry } = await import('../registries/extensionPoints/extens
 
 const HASH = 'a'.repeat(64)
 
-const ownerRow = (ownerEntry = 'pane'): NodePluginRow => ({
-  name: 'tracker',
-  required: false,
-  disabled: false,
-  running: true,
-  state: 'active',
-  installed: {
-    version: '1.0.0',
-    baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
-    client: { hash: HASH, bytes: 12 },
-    contributions: {
-      frames: [
-        { target: 'pane', id: 'tracker-issue', label: 'Issue', order: 500, scope: 'project', formFactor: ['desktop'], claimsKeys: [],
-          layout: 'single', regions: { body: { kind: 'remote', entry: ownerEntry } } },
-        { target: 'refPanel', id: 'tracker-ref', label: 'Issue', providerId: 'tracker', order: 500, formFactor: ['desktop'], claimsKeys: [],
-          layout: 'single', regions: { body: { kind: 'remote', entry: ownerEntry } } },
-      ],
-      routes: [{ id: 'tracker.issue-route', path: '/p/:projectId/x/tracker/issues/:issue', surface: 'tracker-issue', item: 'issue', order: 500 }],
-      extensionPoints: [{
-        id: 'issue-summary', label: 'Issue summary', kind: 'remote', mode: 'stack', max: 2,
-        mounts: [{ surface: 'tracker-issue', region: 'header' }, { surface: 'tracker-ref', region: 'header' }],
-      }],
+const ownerRow = (ownerEntry = 'pane'): NodePluginRow =>
+  ({
+    name: 'tracker',
+    required: false,
+    disabled: false,
+    running: true,
+    state: 'active',
+    installed: {
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
+      client: { hash: HASH, bytes: 12 },
+      contributions: {
+        frames: [
+          {
+            target: 'pane',
+            id: 'tracker-issue',
+            label: 'Issue',
+            order: 500,
+            scope: 'project',
+            formFactor: ['desktop'],
+            claimsKeys: [],
+            layout: 'single',
+            regions: { body: { kind: 'remote', entry: ownerEntry } },
+          },
+          {
+            target: 'refPanel',
+            id: 'tracker-ref',
+            label: 'Issue',
+            providerId: 'tracker',
+            order: 500,
+            formFactor: ['desktop'],
+            claimsKeys: [],
+            layout: 'single',
+            regions: { body: { kind: 'remote', entry: ownerEntry } },
+          },
+        ],
+        routes: [
+          {
+            id: 'tracker.issue-route',
+            path: '/p/:projectId/x/tracker/issues/:issue',
+            surface: 'tracker-issue',
+            item: 'issue',
+            order: 500,
+          },
+        ],
+        extensionPoints: [
+          {
+            id: 'issue-summary',
+            label: 'Issue summary',
+            kind: 'remote',
+            mode: 'stack',
+            max: 2,
+            mounts: [
+              { surface: 'tracker-issue', region: 'header' },
+              { surface: 'tracker-ref', region: 'header' },
+            ],
+          },
+        ],
+      },
     },
-  },
-} as unknown as NodePluginRow)
+  }) as unknown as NodePluginRow
 
 const registered: Disposable[] = []
 const contributor = (pluginId: string, over: { entry?: string; when?: () => boolean } = {}) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:summary`,
-    pluginId,
-    point: 'tracker:issue-summary',
-    label: `${pluginId} summary`,
-    order: 500,
-    carrier: 'remote',
-    entry: over.entry ?? 'summary',
-    hash: HASH,
-    ...(over.when ? { when: over.when } : {}),
-  }))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:summary`,
+      pluginId,
+      point: 'tracker:issue-summary',
+      label: `${pluginId} summary`,
+      order: 500,
+      carrier: 'remote',
+      entry: over.entry ?? 'summary',
+      hash: HASH,
+      ...(over.when ? { when: over.when } : {}),
+    }),
+  )
 
 const contributorTrees = () => mounted.filter((tree) => tree.contribution.id.startsWith('plugin:'))
 
@@ -98,16 +145,34 @@ const drawProjectView = (initial: { projectId: string; item?: string }) => {
   document.body.append(host)
   const qc = new QueryClient()
   registerQueryOwner(qc, null)
-  const dispose = render(() => createComponent(QueryClientProvider, {
-    client: qc,
-    get children() {
-      return createComponent(surface.component, {
-        get projectId() { return projectId() },
-        get item() { return item() },
-      })
+  const dispose = render(
+    () =>
+      createComponent(QueryClientProvider, {
+        client: qc,
+        get children() {
+          return createComponent(surface.component, {
+            get projectId() {
+              return projectId()
+            },
+            get item() {
+              return item()
+            },
+          })
+        },
+      }),
+    host,
+  )
+  const view = {
+    host,
+    setProjectId,
+    setItem,
+    dispose: () => {
+      views.splice(views.indexOf(view), 1)
+      dispose()
+      host.remove()
+      qc.clear()
     },
-  }), host)
-  const view = { host, setProjectId, setItem, dispose: () => { views.splice(views.indexOf(view), 1); dispose(); host.remove(); qc.clear() } }
+  }
   views.push(view)
   return view
 }
@@ -150,7 +215,10 @@ describe('a project detail view’s regions', () => {
     const header = view.host.querySelector('.detail-region[data-region="header"]')!
     expect(header.contains(view.host.querySelector('[data-tree="widgets"]'))).toBe(true)
     expect(header.contains(view.host.querySelector('[data-tree="tracker"]'))).toBe(false)
-    expect(header.compareDocumentPosition(view.host.querySelector('[data-tree="tracker"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      header.compareDocumentPosition(view.host.querySelector('[data-tree="tracker"]')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('carries a new routed item to the same worker, and remounts for a new project', async () => {
@@ -220,12 +288,19 @@ describe('a reference panel’s regions', () => {
     const panel = refPanelRegistry.get('tracker-ref')!
     const qc = new QueryClient()
     registerQueryOwner(qc, null)
-    const dispose = render(() => createComponent(QueryClientProvider, {
-      client: qc,
-      get children() {
-        return createComponent(panel.component, { target: { providerId: 'tracker', displayId: 'ENG-7' }, onClose: () => {} } as never)
-      },
-    }), document.createElement('div'))
+    const dispose = render(
+      () =>
+        createComponent(QueryClientProvider, {
+          client: qc,
+          get children() {
+            return createComponent(panel.component, {
+              target: { providerId: 'tracker', displayId: 'ENG-7' },
+              onClose: () => {},
+            } as never)
+          },
+        }),
+      document.createElement('div'),
+    )
     await vi.waitFor(() => expect(contributorTrees()).toHaveLength(1))
     expect(contributorTrees()[0]!.props()).toEqual({ item: 'ENG-7', refId: 'ENG-7', surface: 'tracker-ref' })
     expect(contributorTrees()[0]!.scope?.()).toEqual({})

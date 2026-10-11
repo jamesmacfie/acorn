@@ -8,10 +8,46 @@ import type { DbCatalogTable } from '../shared/database'
 // Enough to be useful in an editor whose author knows SQL, not a dialect reference. A completion list
 // that offers three hundred keywords is one people learn to dismiss.
 const KEYWORDS = [
-  'SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'INNER JOIN', 'ON', 'GROUP BY', 'ORDER BY', 'HAVING',
-  'LIMIT', 'OFFSET', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM', 'RETURNING', 'DISTINCT',
-  'AS', 'AND', 'OR', 'NOT', 'NULL', 'IS NULL', 'IS NOT NULL', 'IN', 'BETWEEN', 'LIKE', 'ILIKE',
-  'COUNT(*)', 'WITH', 'UNION', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'ASC', 'DESC',
+  'SELECT',
+  'FROM',
+  'WHERE',
+  'JOIN',
+  'LEFT JOIN',
+  'INNER JOIN',
+  'ON',
+  'GROUP BY',
+  'ORDER BY',
+  'HAVING',
+  'LIMIT',
+  'OFFSET',
+  'INSERT INTO',
+  'VALUES',
+  'UPDATE',
+  'SET',
+  'DELETE FROM',
+  'RETURNING',
+  'DISTINCT',
+  'AS',
+  'AND',
+  'OR',
+  'NOT',
+  'NULL',
+  'IS NULL',
+  'IS NOT NULL',
+  'IN',
+  'BETWEEN',
+  'LIKE',
+  'ILIKE',
+  'COUNT(*)',
+  'WITH',
+  'UNION',
+  'CASE',
+  'WHEN',
+  'THEN',
+  'ELSE',
+  'END',
+  'ASC',
+  'DESC',
 ]
 
 // The clauses after which a name is a table. `INTO` covers `INSERT INTO`, `UPDATE` its own target.
@@ -38,14 +74,24 @@ export function textBeforeCursor(text: string, position: { line: number; column:
  * Falls back to matching the qualifier against real table names, so `public.` and `orders.` work
  * without an alias ever having been declared.
  */
-export function resolveQualifier(text: string, qualifier: string, tables: readonly DbCatalogTable[]): DbCatalogTable | null {
+export function resolveQualifier(
+  text: string,
+  qualifier: string,
+  tables: readonly DbCatalogTable[],
+): DbCatalogTable | null {
   const lower = qualifier.toLowerCase()
   // `FROM <schema.>?<table> <alias>` or `JOIN <table> AS <alias>`. Bounded by the statement text the caller
   // already holds; no backtracking risk, because every quantifier is over a character class.
-  const alias = new RegExp(`\\b(?:from|join|update|into)\\s+(?:([a-z_][\\w$]*)\\.)?([a-z_][\\w$]*)(?:\\s+as)?\\s+${lower}\\b`, 'i').exec(text)
+  const alias = new RegExp(
+    `\\b(?:from|join|update|into)\\s+(?:([a-z_][\\w$]*)\\.)?([a-z_][\\w$]*)(?:\\s+as)?\\s+${lower}\\b`,
+    'i',
+  ).exec(text)
   if (alias) {
     const [, schema, name] = alias
-    const match = tables.find((t) => t.name.toLowerCase() === name.toLowerCase() && (!schema || t.schema.toLowerCase() === schema.toLowerCase()))
+    const match = tables.find(
+      (t) =>
+        t.name.toLowerCase() === name.toLowerCase() && (!schema || t.schema.toLowerCase() === schema.toLowerCase()),
+    )
     if (match) return match
   }
   // Not an alias, then: a bare table name, or a schema the reader is drilling into. A schema qualifier has
@@ -53,7 +99,8 @@ export function resolveQualifier(text: string, qualifier: string, tables: readon
   return tables.find((t) => t.name.toLowerCase() === lower) ?? null
 }
 
-const tableLabel = (table: DbCatalogTable): string => (table.schema === 'public' ? table.name : `${table.schema}.${table.name}`)
+const tableLabel = (table: DbCatalogTable): string =>
+  table.schema === 'public' ? table.name : `${table.schema}.${table.name}`
 
 /**
  * What to offer at this position. Three cases, in the order they are tested:
@@ -75,7 +122,11 @@ export function completeSql(
   if (qualified) {
     const table = resolveQualifier(text, qualified[1], tables)
     if (table) {
-      return table.columns.map((column) => ({ label: column.name, kind: 'field', detail: `${column.dataType} · ${tableLabel(table)}` }))
+      return table.columns.map((column) => ({
+        label: column.name,
+        kind: 'field',
+        detail: `${column.dataType} · ${tableLabel(table)}`,
+      }))
     }
     // A schema qualifier: offer that schema's tables unqualified, since the reader already typed it.
     const schema = qualified[1].toLowerCase()

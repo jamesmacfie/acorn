@@ -14,7 +14,9 @@ import type { LayoutProps, Region } from './regions'
 let host: HTMLElement
 let dispose: (() => void) | undefined
 
-const text = (name: string): Region => () => <span data-region={name}>{name}</span>
+const text =
+  (name: string): Region =>
+  () => <span data-region={name}>{name}</span>
 
 const mount = (layout: keyof typeof LAYOUTS, props: Partial<LayoutProps> = {}) => {
   dispose = render(() => LAYOUTS[layout]({ stateKey: 'pane', label: 'Pane', regions: {}, ...props }), host)
@@ -45,7 +47,12 @@ describe('every layout draws the regions it is given, in order', () => {
 
   it('list-detail, with the optional regions inside the list column', () => {
     mount('list-detail', {
-      regions: { list: text('list'), detail: text('detail'), 'list-header': text('list-header'), 'list-footer': text('list-footer') },
+      regions: {
+        list: text('list'),
+        detail: text('detail'),
+        'list-header': text('list-header'),
+        'list-footer': text('list-footer'),
+      },
     })
     expect(regionOrder()).toEqual(['list-header', 'list', 'list-footer', 'detail'])
     // The host draws the divider, so the list column carries a handle a keyboard can reach.
@@ -64,14 +71,21 @@ describe('every layout draws the regions it is given, in order', () => {
 
   it('list-detail can collapse to an empty rail while keeping its header and expand control', () => {
     mount('list-detail', {
-      regions: { list: text('list'), detail: text('detail'), 'list-header': text('list-header'), 'list-footer': text('list-footer') },
+      regions: {
+        list: text('list'),
+        detail: text('detail'),
+        'list-header': text('list-header'),
+        'list-footer': text('list-footer'),
+      },
       collapsible: true,
       collapseContent: 'empty',
     })
     host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!.click()
     expect(regionOrder()).toEqual(['detail'])
     expect(host.querySelector('.layout-collapsed-header')).not.toBe(null)
-    expect(host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')?.getAttribute('aria-label')).toBe('Expand Pane list')
+    expect(host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')?.getAttribute('aria-label')).toBe(
+      'Expand Pane list',
+    )
   })
 
   it('header-body-footer, with all three optional', () => {
@@ -84,7 +98,10 @@ describe('every layout draws the regions it is given, in order', () => {
 
   it('tabs draws the bar and only the selected panel', () => {
     mount('tabs', {
-      tabs: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }],
+      tabs: [
+        { id: 'one', label: 'One' },
+        { id: 'two', label: 'Two' },
+      ],
       regions: { 'panel:one': text('panel:one'), 'panel:two': text('panel:two') },
     })
     expect([...host.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(['One', 'Two'])
@@ -95,7 +112,10 @@ describe('every layout draws the regions it is given, in order', () => {
   })
 
   it('document-over-frame and frame-beside-document are the same regions on two axes', () => {
-    for (const [layout, axis] of [['document-over-frame', 'y'], ['frame-beside-document', 'x']] as const) {
+    for (const [layout, axis] of [
+      ['document-over-frame', 'y'],
+      ['frame-beside-document', 'x'],
+    ] as const) {
       mount(layout, { regions: { document: text('document'), frame: text('frame') } })
       expect(regionOrder()).toEqual(['document', 'frame'])
       expect(host.querySelector('.layout-document-split')?.getAttribute('data-axis')).toBe(axis)
@@ -113,21 +133,34 @@ describe('every layout draws the regions it is given, in order', () => {
   it('wizard draws the indicator and the controls around the step', () => {
     mount('wizard', {
       regions: { step: text('step') },
-      steps: [{ id: 'a', label: 'Add' }, { id: 'b', label: 'Organize' }, { id: 'c', label: 'Done' }],
+      steps: [
+        { id: 'a', label: 'Add' },
+        { id: 'b', label: 'Organize' },
+        { id: 'c', label: 'Done' },
+      ],
       current: 'b',
     })
     expect(regionOrder()).toEqual(['step'])
-    expect([...host.querySelectorAll('.layout-wizard-step')].map((node) => node.getAttribute('data-state')))
-      .toEqual(['done', 'current', 'todo'])
+    expect([...host.querySelectorAll('.layout-wizard-step')].map((node) => node.getAttribute('data-state'))).toEqual([
+      'done',
+      'current',
+      'todo',
+    ])
     // Back and next, because the middle step has somewhere to go in both directions.
-    expect([...host.querySelectorAll('.layout-wizard-actions button')].map((node) => node.textContent)).toEqual(['Back', 'Next'])
+    expect([...host.querySelectorAll('.layout-wizard-actions button')].map((node) => node.textContent)).toEqual([
+      'Back',
+      'Next',
+    ])
   })
 })
 
 describe('per-pane layout state', () => {
   it('keeps a tab selection under the pane id across an unmount', () => {
     mount('tabs', {
-      tabs: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }],
+      tabs: [
+        { id: 'one', label: 'One' },
+        { id: 'two', label: 'Two' },
+      ],
       regions: { 'panel:one': text('panel:one'), 'panel:two': text('panel:two') },
     })
     host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1].click()
@@ -136,7 +169,10 @@ describe('per-pane layout state', () => {
     dispose?.()
     host.replaceChildren()
     mount('tabs', {
-      tabs: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }],
+      tabs: [
+        { id: 'one', label: 'One' },
+        { id: 'two', label: 'Two' },
+      ],
       regions: { 'panel:one': text('panel:one'), 'panel:two': text('panel:two') },
     })
     expect(regionOrder()).toEqual(['panel:two'])
@@ -144,7 +180,10 @@ describe('per-pane layout state', () => {
 
   it('falls back to the first tab when the stored one is gone', () => {
     mount('tabs', {
-      tabs: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }],
+      tabs: [
+        { id: 'one', label: 'One' },
+        { id: 'two', label: 'Two' },
+      ],
       regions: { 'panel:one': text('panel:one'), 'panel:two': text('panel:two') },
     })
     host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1].click()

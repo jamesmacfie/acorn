@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // docs/contribution-kinds.md is the one page an author can see whole, and its whole value is being
-// complete (architecture review finding 5, plugin surface review finding 4). A kind added to the
+// complete. A kind added to the
 // manifest schema or to a plugin context with no row here makes the page a partial list, which is
 // worse than no list: a reader who trusts it concludes the kind does not exist.
 //
@@ -29,7 +29,7 @@ const TABLE = read('docs/contribution-kinds.md')
  *  suite to read twelve property names. */
 const members = (source: string, typeName: string): string[] => {
   // The compiled type of each pair is `<Loaded> & { … }`, so the intersection prefix is optional here.
-  const body = new RegExp(`export type ${typeName} = (?:\\w+ & )?\\{(.*?)\\n\\}`, 's').exec(source)
+  const body = new RegExp(`^(?:export )?type ${typeName} = (?:\\w+ & )?\\{(.*?)\\n\\}`, 'ms').exec(source)
   if (!body) throw new Error(`Could not find ${typeName}`)
   return [...body[1].matchAll(/^ {2}(?:readonly )?([a-zA-Z]+)[?]?:/gm)].map((match) => match[1]!)
 }
@@ -63,8 +63,8 @@ describe('the contribution-kind table is complete', () => {
     // A row whose tier is not "Both" has to say what happens to it. The check is on the row text, so a
     // new compiled-only kind cannot be added without answering the question.
     const rows = TABLE.split('\n').filter((line) => line.startsWith('| ') && /\| (Compiled|Loaded) \|/.test(line))
-    // Five permanent/scheduled live-object seams remain after agent tools and context sections gained
-    // manifest carriers. Keep an anti-vacuity floor without making adding a safe twin fail the suite.
+    // Five permanent/scheduled live-object seams have no manifest carrier. Keep an anti-vacuity floor
+    // without making adding a safe twin fail the suite.
     expect(rows.length).toBeGreaterThanOrEqual(5)
     expect(rows.filter((row) => !row.includes('**Direction:'))).toEqual([])
   })

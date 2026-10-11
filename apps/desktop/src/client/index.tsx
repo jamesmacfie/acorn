@@ -14,15 +14,8 @@ import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources'
 import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
-import { watchPluginChanges } from '@acorn/client-core/host/plugins/reload.ts'
-import { watchTaskChanges } from '@acorn/client-core/features/tasks/watchTaskChanges.ts'
-import { watchConnectionChanges } from '@acorn/client-core/features/integrations/watchConnectionChanges.ts'
-import { watchProjectChanges } from '@acorn/client-core/features/projects/watchProjectChanges.ts'
-import { watchWorkspaceChanges } from '@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts'
-import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
-import { startDeviceConfigSync } from '@acorn/client-core/infra/persistence/deviceConfigSync.ts'
-import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
-import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
+import { startClientRuntime } from '@acorn/client-core/host/clientRuntime.ts'
+import { emitError, flushTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { bootMark, emitBootSpans } from './boot'
 import { markFirstFrame } from './startupMilestones'
 import { startDesktopLinks } from './links'
@@ -31,10 +24,11 @@ import { RegionLoading } from '@acorn/client-core/host/layouts/RegionLoading.tsx
 
 const noop = () => null
 
-// The renderer's telemetry, wired before anything renders so a seam that fires during boot has
-// somewhere to put its record (docs/telemetry/renderer.md § The emitter). Wiring is not collecting: the
-// emitter stays off until `App.tsx` reads `telemetry.enabled` off the node and says otherwise.
-startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
+// The runtime both clients share: telemetry, the node event watchers, notices, client schedules and
+// device config sync (client-core/host/clientRuntime.ts). First, so a seam that fires during boot has
+// somewhere to put its record (docs/telemetry/renderer.md § The emitter). Nothing here waits on it, and
+// it lives as long as the window does.
+void startClientRuntime({ runtime: 'renderer', client: () => clientFor(activeCacheId()).client })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
 // Counts about the page every thirty seconds while collecting, read against the memory the shell
@@ -42,8 +36,8 @@ window.addEventListener('pagehide', stopResponsiveness, { once: true })
 const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
 window.addEventListener('pagehide', stopPageFacts, { once: true })
 
-// The two failures nothing in the app catches. Before this the renderer had neither handler, so an
-// error thrown outside a component's boundary was a line in a devtools console nobody had open.
+// The two failures nothing in the app catches. Without these handlers, an error thrown outside a
+// component's boundary is a line in a devtools console nobody has open.
 //
 // Fatal and unhandled, with the stack, which is the one place a client record carries one: an
 // uncaught error with no stack is not worth sending anywhere (docs/telemetry/model.md § What never leaves
@@ -115,7 +109,7 @@ void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins 
 //
 // `cancelRefetch: false` leaves a request that is already out alone. The shell's own queries wait on
 // `nodeReady()`, which turns true on this same status, so they can already be fetching when this runs.
-// Cancelling them cost a cancelled request and a duplicate for each one that had cached data.
+// Cancelling them costs a cancelled request and a duplicate for each one that had cached data.
 createRoot(() => {
   createEffect(() => {
     const nodeId = activeNodeId()
@@ -123,35 +117,6 @@ createRoot(() => {
     void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' }, { cancelRefetch: false })
   })
 })
-
-// Third-party plugin bundles, across the whole fleet rather than just the active node
-// (docs/plugins.md): cache the bytes, queue whatever this device has never decided about, and register
-// the surfaces every accepted plugin declared. The trust dialog is an overlay contribution, so whatever
-// it queues renders whenever the pass settles, and panes read the active node at render, so a node
-// switch needs no second pass.
-//
-// Both passes live behind this watcher now, and it runs them when a node first becomes reachable rather
-// than here. A pass fired from this line ran before the fleet list had been read and while the node the
-// helper just started was still `offline`, so it asked nobody and found nothing, and no loaded plugin
-// appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
-// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins/dev-loop.md § The dev loop).
-watchPluginChanges()
-void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
-
-// The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
-// window invalidates its cached list whether or not it was the one that wrote
-// (docs/plugins/events.md § Hearing a core event).
-watchTaskChanges()
-
-// …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
-// so Settings → Services and the Sources rail hear about it here rather than at the next 401
-// (docs/plugins/events.md § Hearing a core event).
-watchConnectionChanges()
-// The rest of the core catalogue (docs/plugins/events.md § Hearing a core event): projects invalidate their query;
-// HEAD, run targets and agent sessions are re-emitted on the client bus for whoever listens.
-watchProjectChanges()
-watchWorkspaceChanges()
-watchNodeEvents()
 
 render(
   () => (
@@ -167,14 +132,18 @@ render(
                 <Route path="/" component={noop} />
                 <Route path="/t/:taskId" component={noop} />
                 <Route path="/settings/projects" component={noop} />
-                {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
+                {sourceRouteContributions().map((route) => (
+                  <Route path={route.path} component={noop} />
+                ))}
                 {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
                     id (client-core/host/registries/commands/corePaths.ts). Read here rather than folded into the line above
                     because they belong to a surface rather than to a rail source, and they arrive later than
                     compiled routes do. The distribution pass settles after the first paint, and this
                     expression is inside the Router's `children` memo, so a route registered then is picked up
                     rather than missed. */}
-                {projectSurfaceRoutes().map((route) => <Route path={route.path} component={noop} />)}
+                {projectSurfaceRoutes().map((route) => (
+                  <Route path={route.path} component={noop} />
+                ))}
               </Router>
             </PaneModelHost>
           </QueryCacheProvider>

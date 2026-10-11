@@ -14,11 +14,10 @@ import { Text } from './kit/showing'
 // `ACORN_FIXTURE_SECOND_WORKSPACE` is, so the screenshots and every other suite see the shell a person
 // gets.
 //
-// Installed from `./harness.tsx` with the other resets rather than from `App.tsx`, and this is the one
-// place the design changed on contact: the composition root is module scope, so it runs once per
-// worker and the second case in a file would inherit the first case's flags. Every registration here
-// is disposed and re-read on each render, which is what the other fixture flags get for free by being
-// read per request.
+// Installed from `./harness.tsx` with the other resets rather than from `App.tsx`: the composition
+// root is module scope, so it runs once per worker and the second case in a file would inherit the
+// first case's flags. Every registration here is disposed and re-read on each render, which is what
+// the other fixture flags get for free by being read per request.
 
 /** What the badge contribution's button was pressed with, for a test to read back. */
 export const fixtureBadgePresses: string[] = []
@@ -36,9 +35,12 @@ function installBadge(shape: string): Disposable {
     label: 'Fixture badge',
     order: 10,
     carrier: 'component',
-    component: () => (shape === 'text'
-      ? <Text>fixture says staging</Text>
-      : <Button onPress={() => fixtureBadgePresses.push('deploy')}>Deploy fixture</Button>),
+    component: () =>
+      shape === 'text' ? (
+        <Text>fixture says staging</Text>
+      ) : (
+        <Button onPress={() => fixtureBadgePresses.push('deploy')}>Deploy fixture</Button>
+      ),
   })
 }
 
@@ -53,9 +55,7 @@ function installDiffMark(): Disposable {
     order: 10,
     carrier: 'items',
     fetch: async () => [],
-    marks: async () => [
-      { key: { file: 'src/login.ts', line: 2, side: 'new' }, text: 'uncovered', severity: 'warn' },
-    ],
+    marks: async () => [{ key: { file: 'src/login.ts', line: 2, side: 'new' }, text: 'uncovered', severity: 'warn' }],
   })
 }
 
@@ -64,20 +64,25 @@ function installDiffMark(): Disposable {
  *  A manifest chord carries a command modifier and the desktop's is `meta`, which `toKeymapKey` spells
  *  `super` and `commandLayer.ts` § `asCtrl` rewrites to `ctrl` — because a terminal emulator keeps Cmd
  *  for itself. `meta+ctrl+…` therefore arrives at the engine carrying `ctrl` twice, which its parser
- *  reads as one flag (../keys/commandLayer.ts). */
+ *  reads as one flag (./keys/commandLayer.ts). */
 function installChord(): Disposable[] {
-  return [commandRegistry.register({
-    id: 'plugin.fixture.mark',
-    title: 'Fixture: mark it',
-    category: 'action',
-    run: () => { fixtureBadgePresses.push('chord') },
-  }), keybindingRegistry.register({
-    id: 'plugin.fixture.mark',
-    command: 'plugin.fixture.mark',
-    description: 'Fixture: mark it',
-    category: 'fixture',
-    defaultChord: 'meta+ctrl+alt+shift+d',
-  })]
+  return [
+    commandRegistry.register({
+      id: 'plugin.fixture.mark',
+      title: 'Fixture: mark it',
+      category: 'action',
+      run: () => {
+        fixtureBadgePresses.push('chord')
+      },
+    }),
+    keybindingRegistry.register({
+      id: 'plugin.fixture.mark',
+      command: 'plugin.fixture.mark',
+      description: 'Fixture: mark it',
+      category: 'fixture',
+      defaultChord: 'meta+ctrl+alt+shift+d',
+    }),
+  ]
 }
 
 let installed: Disposable[] = []

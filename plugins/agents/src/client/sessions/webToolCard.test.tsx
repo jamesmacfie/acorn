@@ -8,20 +8,26 @@ import { WebToolBody, safeWebUrl, webSummary } from './webToolCard'
 // drawing by filling in `AgentToolCall.web` and nothing else.
 
 const hosts: Array<() => void> = []
-afterEach(() => { for (const dispose of hosts.splice(0).reverse()) dispose() })
+afterEach(() => {
+  for (const dispose of hosts.splice(0).reverse()) dispose()
+})
 
 const draw = (web: AgentWebActivity, output?: string) => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <WebToolBody web={web} output={output} />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
-const links = (host: HTMLElement) => Array.from(host.querySelectorAll('a')).map((anchor) => ({
-  href: anchor.getAttribute('href'),
-  text: anchor.textContent,
-}))
+const links = (host: HTMLElement) =>
+  Array.from(host.querySelectorAll('a')).map((anchor) => ({
+    href: anchor.getAttribute('href'),
+    text: anchor.textContent,
+  }))
 
 it('draws a search that has a query and nothing back yet', () => {
   const host = draw({ action: { type: 'search', queries: ['acp specification'] } })
@@ -46,8 +52,9 @@ it('draws every query and both kinds of domain filter', () => {
 })
 
 it('draws the page of an open, a find and a fetch', () => {
-  expect(draw({ action: { type: 'open_page', url: 'https://example.com/page' } }).textContent)
-    .toContain('https://example.com/page')
+  expect(draw({ action: { type: 'open_page', url: 'https://example.com/page' } }).textContent).toContain(
+    'https://example.com/page',
+  )
   const find = draw({ action: { type: 'find_in_page', url: 'https://example.com/page', pattern: 'session' } })
   expect(find.textContent).toContain('session')
   const fetched = draw({ action: { type: 'fetch_page', url: 'https://example.com/page', prompt: 'what is a session' } })
@@ -59,7 +66,10 @@ it('draws what the page answered, in the warning tone only when it is not 2xx', 
   const ok = draw({ action: { type: 'fetch_page', url: 'https://example.com' }, status: { code: 200, text: 'OK' } })
   expect(ok.textContent).toContain('200 OK')
   expect(ok.querySelector('[data-tone="warn"]')).toBeNull()
-  const missing = draw({ action: { type: 'fetch_page', url: 'https://example.com' }, status: { code: 404, text: 'Not Found' } })
+  const missing = draw({
+    action: { type: 'fetch_page', url: 'https://example.com' },
+    status: { code: 404, text: 'Not Found' },
+  })
   expect(missing.querySelector('[data-tone="warn"]')?.textContent).toBe('404 Not Found')
 })
 
@@ -72,12 +82,14 @@ it('keeps a page address with a refused scheme as words, not a link', () => {
 it('draws a source as a link, its host, and its snippet', () => {
   const host = draw({
     action: { type: 'search', queries: ['acp'] },
-    results: [{
-      url: 'https://docs.example/intro',
-      title: 'Introduction',
-      domain: 'docs.example',
-      snippet: 'A sentence from the page.',
-    }],
+    results: [
+      {
+        url: 'https://docs.example/intro',
+        title: 'Introduction',
+        domain: 'docs.example',
+        snippet: 'A sentence from the page.',
+      },
+    ],
   })
   expect(links(host)).toEqual([{ href: 'https://docs.example/intro', text: 'Introduction' }])
   expect(host.textContent).toContain('docs.example')
@@ -91,21 +103,25 @@ it('shows the host a provider did not report, read off the URL rather than store
 })
 
 it('uses the URL as the link text when a source has no title', () => {
-  expect(links(draw({ results: [{ url: 'https://docs.example/intro' }] })))
-    .toEqual([{ href: 'https://docs.example/intro', text: 'https://docs.example/intro' }])
+  expect(links(draw({ results: [{ url: 'https://docs.example/intro' }] }))).toEqual([
+    { href: 'https://docs.example/intro', text: 'https://docs.example/intro' },
+  ])
 })
 
 it('keeps the provider’s own words beside the structured half', () => {
   // Claude Code's search answer, and any failed call's error, live here.
-  const host = draw(
-    { action: { type: 'search', queries: ['acp'] } },
-    'Search failed: rate limited',
-  )
+  const host = draw({ action: { type: 'search', queries: ['acp'] } }, 'Search failed: rate limited')
   expect(host.textContent).toContain('Search failed: rate limited')
 })
 
 it('refuses every scheme but http and https, and still shows the text', () => {
-  for (const url of ['javascript:alert(1)', 'data:text/html,<script>', 'file:///etc/passwd', 'acorn://task/1', 'not a url']) {
+  for (const url of [
+    'javascript:alert(1)',
+    'data:text/html,<script>',
+    'file:///etc/passwd',
+    'acorn://task/1',
+    'not a url',
+  ]) {
     expect(safeWebUrl(url), url).toBeUndefined()
     const host = draw({ results: [{ url, title: 'Looks harmless' }] })
     expect(links(host), url).toEqual([])
@@ -136,7 +152,9 @@ it('keeps the sources a provider repeated, in the order it gave them', () => {
 
 it('summarises a row by its first query, its page host, or its pattern', () => {
   expect(webSummary({ action: { type: 'search', queries: ['first', 'second'] } })).toBe('first')
-  expect(webSummary({ action: { type: 'open_page', url: 'https://docs.example/a/very/long/path' } })).toBe('docs.example')
+  expect(webSummary({ action: { type: 'open_page', url: 'https://docs.example/a/very/long/path' } })).toBe(
+    'docs.example',
+  )
   expect(webSummary({ action: { type: 'find_in_page', pattern: 'session' } })).toBe('session')
   expect(webSummary({ action: { type: 'other' } })).toBeUndefined()
   expect(webSummary({ results: [{ url: 'https://docs.example' }] })).toBeUndefined()

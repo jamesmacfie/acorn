@@ -128,8 +128,7 @@ import needs a device, even for service callers, because it administers core pro
 [GitHub integration](./github-integration.md)).
 
 A workflow or delegated managed session persists its tool ceiling, and the runtime includes it when it
-mints the token. The agent-tool route enforces only the signed ceiling. `ACORN_TOOL_CEILING` and
-`x-acorn-tool-ceiling` are compatibility metadata and can't widen authority. Internal tokens expire
+mints the token. The agent-tool route enforces only the signed ceiling. Internal tokens expire
 after 48 hours and authenticate only from a loopback socket peer. Session children receive a token
 file that the Node refreshes without widening those signed claims, including after a restart.
 Workflow child files are refreshed while their steps run and removed, and their tokens revoked, when

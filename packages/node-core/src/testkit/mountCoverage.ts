@@ -22,6 +22,7 @@ export function mountCovers(mount: string, route: string): boolean {
 // `requireDevice` mount in such a router stops looking like a gate.
 export function registeredHandler(handler: unknown): unknown {
   let current = handler
-  while (typeof current === 'function' && '__COMPOSED_HANDLER' in current) current = (current as { __COMPOSED_HANDLER: unknown }).__COMPOSED_HANDLER
+  while (typeof current === 'function' && '__COMPOSED_HANDLER' in current)
+    current = (current as { __COMPOSED_HANDLER: unknown }).__COMPOSED_HANDLER
   return current
 }

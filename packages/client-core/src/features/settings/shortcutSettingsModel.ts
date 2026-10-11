@@ -8,10 +8,15 @@ export const orphanedPluginOverrideIds = (
   bindings: readonly KeybindingContribution[],
 ): string[] => {
   const known = new Set(bindings.map((binding) => binding.id))
-  return Object.keys(overrides).filter((id) => id.startsWith('plugin.') && !known.has(id)).sort()
+  return Object.keys(overrides)
+    .filter((id) => id.startsWith('plugin.') && !known.has(id))
+    .sort()
 }
 
-export const removeOverrideIds = <T>(overrides: Readonly<Record<string, T>>, ids: Iterable<string>): Record<string, T> => {
+export const removeOverrideIds = <T>(
+  overrides: Readonly<Record<string, T>>,
+  ids: Iterable<string>,
+): Record<string, T> => {
   const removed = new Set(ids)
   return Object.fromEntries(Object.entries(overrides).filter(([id]) => !removed.has(id)))
 }

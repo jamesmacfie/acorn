@@ -2,8 +2,11 @@
 // not use Node's filesystem permission checks, so its exact state files must be regular files.
 import { closeSync, constants, fchmodSync, fstatSync, lstatSync, openSync } from 'node:fs'
 
-export const pluginDbFiles = (databasePath: string): readonly string[] =>
-  [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]
+export const pluginDbFiles = (databasePath: string): readonly string[] => [
+  databasePath,
+  `${databasePath}-wal`,
+  `${databasePath}-shm`,
+]
 
 function checkFile(path: string, create: boolean, privateMode: boolean): void {
   // Also check the directory entry on hosts without POSIX NOFOLLOW. This rejects static links
@@ -19,8 +22,14 @@ function checkFile(path: string, create: boolean, privateMode: boolean): void {
   try {
     // NONBLOCK keeps a FIFO from hanging preflight. NOFOLLOW refuses a linked leaf before it can
     // be opened or chmodded; fstat and fchmod operate on the same descriptor.
-    fd = openSync(path, (privateMode ? constants.O_RDWR : constants.O_RDONLY)
-      | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0) | (create ? constants.O_CREAT : 0), 0o600)
+    fd = openSync(
+      path,
+      (privateMode ? constants.O_RDWR : constants.O_RDONLY) |
+        (constants.O_NOFOLLOW ?? 0) |
+        (constants.O_NONBLOCK ?? 0) |
+        (create ? constants.O_CREAT : 0),
+      0o600,
+    )
   } catch (error) {
     if (!create && (error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error

@@ -18,7 +18,7 @@ import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import { ExclusiveSlotFailureContext } from './ExclusiveSlotFailure'
 
 // The one site where a plugin draws in place of a core surface, and the one site that guarantees core
-// gets it back (registries/exclusiveSlots.ts holds the arbitration rule).
+// gets it back (`exclusiveSlotRegistry` holds the arbitration rule).
 //
 // Every path selects a registered provider. The fallback is the registered core component, so an
 // absent, disabled, untrusted, or failed offer does not need a second rendering mechanism.
@@ -37,7 +37,8 @@ export default function ExclusiveSlotHost(props: ExclusiveSlotHostProps) {
   const provider = () => {
     const choice = exclusiveSlotChoices(prefs.data?.[PrefKeys.exclusiveSlots])[props.slot]
     const failed = failedInstance()
-    if (choice && failed?.key === `${props.slot}:${choice}` && failed.epoch === exclusiveSlotFailureEpoch()) return core()
+    if (choice && failed?.key === `${props.slot}:${choice}` && failed.epoch === exclusiveSlotFailureEpoch())
+      return core()
     return resolveExclusiveSlot(props.slot, choice)
   }
   const report = (pluginId: string) => {
@@ -48,7 +49,8 @@ export default function ExclusiveSlotHost(props: ExclusiveSlotHostProps) {
       noteExclusiveSlotFailure(props.slot, pluginId)
       setFailedInstance({ key: `${props.slot}:${pluginId}`, epoch: exclusiveSlotFailureEpoch() })
       pushNotice({
-        taskId: activeTaskId() ?? '', kind: 'plugin',
+        taskId: activeTaskId() ?? '',
+        kind: 'plugin',
         title: `${pluginId} could not draw ${props.slot}; acorn restored its own surface`,
         at: Date.now(),
       })
@@ -57,22 +59,24 @@ export default function ExclusiveSlotHost(props: ExclusiveSlotHostProps) {
 
   return (
     <WithNestedChromeSlots slots={props.nestedSlots ?? []}>
-    <Show keyed when={provider()}>
-      {(chosen) => (
-        <ErrorBoundary
-          fallback={() => {
-            if (chosen.pluginId === CORE_SLOT_PROVIDER) return null
-            // Draw core in this render, then publish the failure outside Solid's render pass.
-            report(chosen.pluginId)
-            return <Dynamic component={core().component} value={props.value} />
-          }}
-        >
-          <ExclusiveSlotFailureContext.Provider value={chosen.pluginId === CORE_SLOT_PROVIDER ? undefined : () => report(chosen.pluginId)}>
-            <Dynamic component={chosen.component} value={props.value} />
-          </ExclusiveSlotFailureContext.Provider>
-        </ErrorBoundary>
-      )}
-    </Show>
+      <Show keyed when={provider()}>
+        {(chosen) => (
+          <ErrorBoundary
+            fallback={() => {
+              if (chosen.pluginId === CORE_SLOT_PROVIDER) return null
+              // Draw core in this render, then publish the failure outside Solid's render pass.
+              report(chosen.pluginId)
+              return <Dynamic component={core().component} value={props.value} />
+            }}
+          >
+            <ExclusiveSlotFailureContext.Provider
+              value={chosen.pluginId === CORE_SLOT_PROVIDER ? undefined : () => report(chosen.pluginId)}
+            >
+              <Dynamic component={chosen.component} value={props.value} />
+            </ExclusiveSlotFailureContext.Provider>
+          </ErrorBoundary>
+        )}
+      </Show>
     </WithNestedChromeSlots>
   )
 }

@@ -6,8 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PLUGIN_DB_DIR, adoptRenamedPluginDb, openPluginDb } from './storage'
 import { openSqlite } from '../storage/sqlite'
 
-// The per-plugin database factory has ten-plus production consumers and had no direct test: every
-// plugin's storage goes through it, covered only incidentally by integration suites.
+// The per-plugin database factory, tested directly: every plugin's storage goes through it.
 describe('plugin storage', () => {
   let dir: string
   let migrations: string
@@ -18,7 +17,10 @@ describe('plugin storage', () => {
     // insists on a readable journal.
     migrations = join(dir, 'migrations')
     mkdirSync(join(migrations, 'meta'), { recursive: true })
-    writeFileSync(join(migrations, 'meta', '_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+    writeFileSync(
+      join(migrations, 'meta', '_journal.json'),
+      JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }),
+    )
   })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -75,18 +77,25 @@ describe('plugin storage', () => {
     openPluginDb(dir, 'widgets', { migrationsFolder: migrations }).close()
     try {
       const path = join(dir, PLUGIN_DB_DIR, 'widgets.sqlite')
-      const probe = spawnSync(process.execPath, ['-e', `
+      const probe = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `
         const db = new (require('node:sqlite').DatabaseSync)(${JSON.stringify(path)})
         db.exec('PRAGMA locking_mode = EXCLUSIVE')
         try { db.prepare('SELECT 1 FROM sqlite_master').all(); console.log('exclusive') }
-        catch (error) { console.log(error.message) }`], { encoding: 'utf8' })
+        catch (error) { console.log(error.message) }`,
+        ],
+        { encoding: 'utf8' },
+      )
       expect(probe.stdout.trim()).toBe('database is locked')
     } finally {
       db.close()
     }
   })
 
-  it('moves a renamed plugin\'s rows to its new id once, and never over a database the new id has', () => {
+  it("moves a renamed plugin's rows to its new id once, and never over a database the new id has", () => {
     expect(adoptRenamedPluginDb(dir, 'before', 'after')).toBe(false)
     const old = openPluginDb(dir, 'before', { migrationsFolder: migrations })
     old.$client.exec("CREATE TABLE notes (body TEXT); INSERT INTO notes VALUES ('kept')")

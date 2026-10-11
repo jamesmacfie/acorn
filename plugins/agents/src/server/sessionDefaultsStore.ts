@@ -5,10 +5,7 @@ import {
   type AgentSessionDefaults,
 } from '../shared/sessionDefaults'
 
-export async function readAgentSessionDefaults(
-  prefs: PrefService,
-  userId: string,
-): Promise<AgentSessionDefaults> {
+export async function readAgentSessionDefaults(prefs: PrefService, userId: string): Promise<AgentSessionDefaults> {
   return parseAgentSessionDefaults(await prefs.read(userId, agentSessionDefaultsPreferenceKey))
 }
 

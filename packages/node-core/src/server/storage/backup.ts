@@ -1,4 +1,14 @@
-import { chmodSync, closeSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
@@ -33,8 +43,8 @@ const EXCLUDED = [
 
 // Copy one SQLite file with the online-backup API. Returns the destination path.
 async function backupDatabase(source: string, destination: string): Promise<void> {
-  // readonly stands in for better-sqlite3's `fileMustExist`. Opening a missing file read-only fails,
-  // which is the same refusal by another route.
+  // readonly makes a missing source an error: opening a missing file read-only fails rather than
+  // creating an empty database.
   const handle = openSqlite(source, { readonly: true })
   try {
     await handle.backup(destination)

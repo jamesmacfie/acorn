@@ -49,7 +49,9 @@ const sameItem = (segment: Extract<Segment, { item: string }>, value: unknown): 
 }
 
 const label = (segments: readonly Segment[]): string =>
-  segments.map((segment, index) => 'key' in segment ? `${index ? '.' : ''}${segment.key}` : `[${segment.item}]`).join('')
+  segments
+    .map((segment, index) => ('key' in segment ? `${index ? '.' : ''}${segment.key}` : `[${segment.item}]`))
+    .join('')
 
 function child(current: unknown, segment: Segment): unknown {
   if ('key' in segment) return isObject(current) ? current[segment.key] : undefined
@@ -130,7 +132,8 @@ function protectedFields(def: Json, found: Located[]): Json {
     const identity = itemIdentity(step, true)
     if (!identity || !isObject(step)) continue
     for (const path of STEP_PROTECTED) {
-      if (remove(step, path)) found.push({ segments: [{ key: 'steps' }, identity, ...path.map((key) => ({ key }))], reason: 'protected' })
+      if (remove(step, path))
+        found.push({ segments: [{ key: 'steps' }, identity, ...path.map((key) => ({ key }))], reason: 'protected' })
     }
   }
   return def

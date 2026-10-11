@@ -14,8 +14,6 @@ import { keymap } from '../../kit/keys/keymapHost'
 // has focus, so a chord a pane shadows shows the pane's meaning, and one whose command is
 // unavailable does not show at all. A list built from the registry would say what is registered,
 // which is not the question anyone is asking with a cheat sheet open.
-//
-// Textual draws the same data as a footer strip; a terminal host would read this function too.
 
 type Line = { display: string; group: string; desc: string }
 type Group = { name: string; lines: Line[] }
@@ -24,7 +22,8 @@ type Group = { name: string; lines: Line[] }
 const groups = (): Group[] => {
   const engine = keymap()
   if (!engine) return []
-  const lines = engine.getActiveKeys({ includeMetadata: true })
+  const lines = engine
+    .getActiveKeys({ includeMetadata: true })
     .map((key): Line => ({
       display: formatChord(engine.formatKey(key.display, { separator: ' ' })),
       group: String(key.commandAttrs?.group ?? key.bindingAttrs?.group ?? 'Other'),
@@ -43,23 +42,33 @@ export function CheatSheet() {
   const [sections, setSections] = createSignal<Group[]>([])
 
   onMount(() => {
-    const commands = registerCommands([{
-      id: 'core.shortcuts.cheat-sheet',
-      title: 'Show keyboard shortcuts',
-      hint: 'what the keyboard does right here',
-      category: 'navigation',
-      palette: true,
-      run: () => { setSections(groups()); setOpen(true) },
-    }])
-    const bindings = registerKeybindings([{
-      id: 'core.shortcuts.cheat-sheet',
-      command: 'core.shortcuts.cheat-sheet',
-      description: 'Show keyboard shortcuts',
-      category: 'Global',
-      defaultChord: 'meta+/',
-      when: 'global',
-    }])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    const commands = registerCommands([
+      {
+        id: 'core.shortcuts.cheat-sheet',
+        title: 'Show keyboard shortcuts',
+        hint: 'what the keyboard does right here',
+        category: 'navigation',
+        palette: true,
+        run: () => {
+          setSections(groups())
+          setOpen(true)
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      {
+        id: 'core.shortcuts.cheat-sheet',
+        command: 'core.shortcuts.cheat-sheet',
+        description: 'Show keyboard shortcuts',
+        category: 'Global',
+        defaultChord: 'meta+/',
+        when: 'global',
+      },
+    ])
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   return (
@@ -73,11 +82,13 @@ export function CheatSheet() {
                   <For each={group.lines}>
                     {(line) => (
                       // What it does first and the key at the end, as a menu shows them. With the key
-                      // first, each section's table sized its own key column and the descriptions
-                      // started at a different edge in every section.
+                      // first, each section's table sizes its own key column and the descriptions
+                      // start at a different edge in every section.
                       <TableRow>
                         <TableCell>{line.desc}</TableCell>
-                        <TableCell align="end"><Kbd>{line.display}</Kbd></TableCell>
+                        <TableCell align="end">
+                          <Kbd>{line.display}</Kbd>
+                        </TableCell>
                       </TableRow>
                     )}
                   </For>
@@ -87,7 +98,9 @@ export function CheatSheet() {
           </For>
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="ghost" onPress={() => setOpen(false)}>Close</Button>
+          <Button variant="ghost" onPress={() => setOpen(false)}>
+            Close
+          </Button>
         </Modal.Actions>
       </Modal>
     </Show>

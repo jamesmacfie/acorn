@@ -95,7 +95,7 @@ export function readingOrder(layout: PanelLayout): PanelId[] {
 
 /** Slide a rect along one axis until it clears everything already placed.
  *
- *  `pushRight` and `pushDown` are this one function with an axis and a bound. On `y` the page scrolls,
+ *  A rightward push and a downward push are this one function with an axis and a bound. On `y` the page scrolls,
  *  so there is no wall and the slide always succeeds. On `x` the grid has a right edge, and running
  *  into it answers `undefined`, which is how the resize clamp finds the widest width that fits.
  *
@@ -107,9 +107,7 @@ function slide(rect: Rect, placed: readonly Placed[], axis: 'x' | 'y'): Rect | u
   for (let guard = 0; guard <= placed.length; guard++) {
     const hit = placed.find((entry) => collides(out, entry.rect))
     if (!hit) return out
-    out = axis === 'x'
-      ? { ...out, x: hit.rect.x + hit.rect.w }
-      : { ...out, y: hit.rect.y + hit.rect.h }
+    out = axis === 'x' ? { ...out, x: hit.rect.x + hit.rect.w } : { ...out, y: hit.rect.y + hit.rect.h }
     if (axis === 'x' && out.x + out.w > COLS) return undefined
   }
   return undefined
@@ -178,7 +176,13 @@ export function normalize(layout: PanelLayout, sizeOf: (id: PanelId) => PanelSiz
   for (const id of layout.order) {
     if (layout.rects[id] || placed.some((entry) => entry.id === id)) continue
     const size = sizeOf(id)
-    placed.push({ id, rect: firstFit(placed.map((entry) => entry.rect), size) })
+    placed.push({
+      id,
+      rect: firstFit(
+        placed.map((entry) => entry.rect),
+        size,
+      ),
+    })
   }
 
   return compact(toLayout(layout.order, placed))
@@ -193,7 +197,7 @@ export function normalize(layout: PanelLayout, sizeOf: (id: PanelId) => PanelSiz
  *  this function's output live, so release persists exactly what was on screen.
  *
  *  `undefined` means the push chain hit the right wall, which only `x` can do. */
-export function apply(
+function apply(
   layout: PanelLayout,
   id: PanelId,
   candidate: Rect,

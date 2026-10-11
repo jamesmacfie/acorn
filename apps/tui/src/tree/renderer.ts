@@ -12,29 +12,22 @@ import { requestFrame } from './frames'
 //
 // `solid-js/universal` wants ten node operations and this is all ten of them. The module is the
 // target of the `moduleName` alias in `../../vite.config.ts`, so every JSX call in the process lands
-// here — client-core's components and a sandboxed plugin's included — and it exports the same three
-// exports the three names a Solid host has to export: `render`, `Dynamic` and `extend`.
+// here — client-core's components and a sandboxed plugin's included — and beside the operations it
+// exports what a Solid host adds to them: `render` and `Dynamic`.
 //
-// **What it replaces, and why the replacements are absences.** The two reconciler overrides and the
-// two prototype patches this host used to carry — deleted in phase 4, and in the git history under
-// `kit/reconciler.ts` and `renderGuard.ts` — all existed because a `Renderable` has a lifecycle, has
-// behaviour, and reads its own size. A plain object has none of the three, so:
+// A plain object has no lifecycle, no behaviour and no size of its own, so two hazards of a node
+// that does never arise:
 //
-//   - The orphan-text rule goes. A `#text` under a `box` is legal here; paint draws it as a one-line
-//     run at the box's content origin. Four crashes in one week were a bare `{count()}` under a
-//     `<Stack>`, and the shape that caused them is now just a shape.
-//   - The destroy-on-detach race goes. `removeNode` unlinks and keeps the object. When `Suspense`
-//     hands the same instance back on resolve — which it does, because its children memo is created
-//     once — `insertNode` links it again and it still has its Yoga node. There is nothing to be
-//     "already destroyed".
+//   - A `#text` under a `box` is legal. Paint draws it as a one-line run at the box's content origin.
+//   - `removeNode` unlinks and keeps the object. When `Suspense` hands the same instance back on
+//     resolve — which it does, because its children memo is created once — `insertNode` links it
+//     again and it still has its Yoga node. There is nothing to be "already destroyed".
 //
-// **What did not become an absence: the Yoga handle.** It is a wasm pointer, so somebody has to give
-// it back. Solid's ownership graph already knows the difference the old code was guessing at: a real
-// unmount disposes the owner that created the node, while `Suspense` keeps its children's owners
-// alive on purpose. So `createElement` ties the free to the creating owner with `onCleanup`, the same
-// trick the old reconciler patch used for `tieDestroyToOwner`, and a node made outside any owner frees
-// when it is removed instead, which is the right answer for something no reactive scope will
-// re-insert.
+// **The Yoga handle is the exception.** It is a wasm pointer, so somebody has to give it back. Solid's
+// ownership graph knows a real unmount from a `Suspense` hold: an unmount disposes the owner that
+// created the node, while `Suspense` keeps its children's owners alive on purpose. So `createElement`
+// ties the free to the creating owner with `onCleanup`, and a node made outside any owner frees when
+// it is removed instead, which is the right answer for something no reactive scope will re-insert.
 
 /** Nodes with no owner to free them. A `WeakSet` rather than a field, because the `Node` type is
  *  deliberately the whole type and this is bookkeeping, not state anything reads. */
@@ -140,9 +133,8 @@ export function removeNode(parent: Node, node: Node): void {
   // Nothing is freed here unless nothing else will. The Yoga node outlives the removal because Solid
   // may hand this exact object back, and the owner that made it is what decides otherwise.
   if (freeOnRemove.has(node)) freeYogaNode(node)
-  // A node leaving the tree is one of the two ways the keys end up nowhere, and it is the one the old
-  // painter noticed by destroying the renderable a tick later. Here nothing is destroyed, so the
-  // store is told: the landing pass walks the parents before it decides, and a node whose chain no
+  // A node leaving the tree is one of the two ways the keys end up nowhere. Nothing is destroyed
+  // here, so the store is told: the landing pass walks the parents before it decides, and a node whose chain no
   // longer reaches the root cannot hold them. Only where they have actually gone, because a pass that
   // ran on every removal would reveal the focused node in its viewports on every re-render
   // (../keys/regions.ts § The landing rule, § ensureFocus).
@@ -156,9 +148,9 @@ export function removeNode(parent: Node, node: Node): void {
 export function setProperty(node: Node, name: string, value: unknown): void {
   node.props[name] = value
   if (node.yoga) applyProp(node.yoga, name, value)
-  // A shrink nobody said is derived from the size somebody did, the way the old painter derived it,
-  // so all three props are re-read whenever any one of them lands — they arrive one at a time and in
-  // whatever order the JSX spelled them (../layout/props.ts § flexShrinkFor).
+  // A shrink nobody said is derived from the size somebody did, so all three props are re-read whenever any
+  // one of them lands — they arrive one at a time and in whatever order the JSX spelled them
+  // (../layout/props.ts § flexShrinkFor).
   if (node.yoga && SHRINK_DEPENDS.has(name)) node.yoga.setFlexShrink(flexShrinkFor(node.props))
   // How a run wraps is an input to its measure function rather than a Yoga style, so the cache has
   // to be told by hand.
@@ -197,9 +189,7 @@ export function render(code: () => SolidJSX.Element, root: Renderable = createEl
 }
 
 /** A component chosen at runtime, and the universal one rather than `solid-js/web`'s: the DOM version
- *  would put a second Solid renderer in the process. Six chrome and plugin surfaces use it
- *  (`../chrome/Shell.tsx`, `../chrome/Rail.tsx`, `../chrome/slot.tsx`, `../kit/host.tsx`,
- *  `../plugins/TreeHost.tsx`, `../plugins/SourcePanel.tsx`).
+ *  would put a second Solid renderer in the process.
  *
  *  A memo is what comes back and `JSX.Element` is what it is called, for the reason `render` above
  *  gives: Solid unwraps a function in a child position, so the accessor is the element as far as
@@ -214,10 +204,12 @@ export function Dynamic<T extends Record<string, unknown>>(
   return createMemo(() => {
     const component = chosen()
     // Untracked, so the chosen component's own reads belong to its own owner rather than to this memo.
-    return component ? untrack(() => createComponent(component as unknown as (props: T) => Node, rest as unknown as T)) : undefined
+    return component
+      ? untrack(() => createComponent(component as unknown as (props: T) => Node, rest as unknown as T))
+      : undefined
   }) as unknown as SolidJSX.Element
 }
 
-export { laysOut, measuresText, runText, textOwner } from './node'
+export { runText } from './node'
 export type { Kind, Node } from './node'
 export type { JSX } from './jsx'

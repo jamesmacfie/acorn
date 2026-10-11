@@ -1,9 +1,7 @@
 // The Changes tab's wire contract: the working-tree review and its inline notes.
 //
-// Types, route builders, and the query key live together, following the docker and http convention:
-// the plugin that owns the namespace owns the shape of what crosses it. The query key is
-// byte-identical to the one in @acorn/protocol/api.ts, because changing it orphans a user's
-// IndexedDB (docs/caching.md).
+// Types, route builders, and the query key live together: the plugin that owns the namespace owns the
+// shape of what crosses it.
 
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { DiffSearchRequest, DiffSegmentDescriptor, DiffSegmentRequest } from '@acorn/diff-document/document'
@@ -22,12 +20,13 @@ export type ReviewNote = {
   sentAt: number | null // stamped on delivery; cleared on edit
   createdAt: number
 }
-export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
+export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & {
+  snippet?: string | null
+}
 
 export const reviewNotesRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/review-notes`
 export const reviewNoteRoute = (taskId: string, noteId: string) => `/v1/p/git/tasks/${taskId}/review-notes/${noteId}`
 export const reviewNotesSentRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/review-notes/sent`
-export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 
 // Local-changes review: working-tree status, diff and blob reads, plus the staging, commit, discard
 // and remote actions.
@@ -35,10 +34,17 @@ export const localStatusRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/l
 /** A clean tree with nothing known about the branch: what a task with no worktree yet looks like, and
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
-export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
-// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at a time:
-// the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
-// for the file, which is how the node knows a file has not moved and need not be diffed again.
+export const emptyLocalStatus = (): LocalStatus => ({
+  branch: null,
+  upstream: null,
+  ahead: null,
+  behind: null,
+  operation: null,
+  changes: [],
+})
+// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at
+// a time: the same path can be in both, and a document keys a file by its path. `key` is the pane's
+// status key for the file, which is how the node knows a file has not moved and need not be diffed again.
 export const localDocumentRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document`
 export const localSegmentsRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document/segments`
 export const localSearchRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/document/search`
@@ -71,7 +77,9 @@ export type DependencyReview = {
 }
 export type LocalDocumentRequest = { scope: LocalScope; files: { path: string; key: string }[] }
 /** Per file: the patch's digest, null for no diff, and how it cuts. The pane holds the rest. */
-export type LocalDocumentResponse = { files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[] }
+export type LocalDocumentResponse = {
+  files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[]
+}
 export type LocalSegmentsRequest = { scope: LocalScope; requests: DiffSegmentRequest[] }
 export type LocalSearchRequest = DiffSearchRequest & { scope: LocalScope; files: { path: string; patchKey: string }[] }
 // The new side of a file's diff, for filling a gap the reader expands. Scoped like the diff itself:
@@ -80,7 +88,18 @@ export const localNewSideRoute = (taskId: string, path: string, scope: 'unstaged
   `/v1/p/git/tasks/${taskId}/local/new-side?path=${encodeURIComponent(path)}&scope=${scope}`
 export const localActionRoute = (
   taskId: string,
-  action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'fetch' | 'pull' | 'push' | 'abort',
+  action:
+    | 'stage'
+    | 'unstage'
+    | 'discard'
+    | 'commit'
+    | 'stage-all'
+    | 'unstage-all'
+    | 'discard-all'
+    | 'fetch'
+    | 'pull'
+    | 'push'
+    | 'abort',
 ) => `/v1/p/git/tasks/${taskId}/local/${action}`
 /** What the commit menu offers, as the body a commit POST carries.
  *
@@ -121,7 +140,7 @@ export const COMMIT_MESSAGE_MAX_OUTPUT_TOKENS = 512
 
 /** Which backend and model the wand spends, as the body a commit-message POST carries and as the
  *  device preference that remembers the last pick. A backend is a stored key or an agent CLI installed
- *  on this machine (@acorn/protocol/modelProviders.ts § ModelBackend). `modelId` is `''` when the
+ *  on this machine (`ModelBackend`). `modelId` is `''` when the
  *  backend declares neither a default nor a list, which is a real answer: the node omits it and the
  *  backend falls back to its own recommendation — an adapter's for a key, the CLI's own configured
  *  default for a harness. */
@@ -141,7 +160,6 @@ export const localCommitMessageRoute = (taskId: string) => `/v1/p/git/tasks/${ta
  *
  *  This plugin's own route rather than a read of core's roster: `/v1/core/integrations` has no bridge
  *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
- *  (docs/integrations/model-providers.md § Model providers). The path still says `model-connections` after the rename:
- *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
- *  side of it. */
+ *  (docs/integrations/model-providers.md § Model providers). The path says `model-connections` where
+ *  the type says backends; only this plugin's own client reads it. */
 export const localModelBackendsRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/local/model-connections`

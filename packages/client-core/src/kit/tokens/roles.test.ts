@@ -7,7 +7,7 @@ import { ROLE_ENUMS, type RoleName } from './tokens'
 // checked. The DOM column must name a token the appearance contract already declares, or a pack
 // could never move it. See docs/ui-design/tokens.md § Token axes.
 //
-// The terminal column is checked twice over, because it says two things now: a sentence, which is
+// The terminal column is checked twice over, because it says two things: a sentence, which is
 // the documentation, and the cells a component is handed. `ignored` is an answer in both — the
 // sentence says so and `roleCell` hands back nothing — and the pair has to agree, or a role would
 // read as ignored in the docs and paint something on screen.
@@ -52,9 +52,18 @@ describe('role tokens resolve on every host', () => {
     // regression this file exists to catch — a kit that draws nothing passes every other assertion
     // here.
     const empty = roles.flatMap((role) =>
-      tuiValues(role).filter(([value]) => Object.keys(roleCell(role, value as never)).length === 0).map(([value]) => `${role}.${value}`))
+      tuiValues(role)
+        .filter(([value]) => Object.keys(roleCell(role, value as never)).length === 0)
+        .map(([value]) => `${role}.${value}`),
+    )
     expect(empty.sort()).toEqual([
-      'border.none', 'radius.chip', 'radius.control', 'radius.pill', 'radius.surface', 'text.body', 'text.mono',
+      'border.none',
+      'radius.chip',
+      'radius.control',
+      'radius.pill',
+      'radius.surface',
+      'text.body',
+      'text.mono',
     ])
     for (const entry of empty) {
       const [role, value] = entry.split('.') as [RoleName, string]
@@ -67,7 +76,8 @@ describe('role tokens resolve on every host', () => {
     // The whole reason `Slot` exists: a role says "the accent", the appearance layer says which
     // sixteenth or which hex that is (apps/tui/src/appearance.ts). A hex here would be a theme
     // decision taken in the wrong file.
-    const named = roles.flatMap((role) => tuiValues(role).map(([value, tui]) => `${role}.${value}: ${tui.slot ?? ''}`))
+    const named = roles
+      .flatMap((role) => tuiValues(role).map(([value, tui]) => `${role}.${value}: ${tui.slot ?? ''}`))
       .filter((entry) => /#|rgb|oklch/.test(entry))
     expect(named).toEqual([])
   })
@@ -75,7 +85,11 @@ describe('role tokens resolve on every host', () => {
   it('only radius and mono are ignored outright', () => {
     // A terminal is monospaced and has no corners, so those five have nothing to say. A sixth
     // arriving is a decision somebody should have to make on purpose.
-    const ignored = roles.flatMap((role) => tuiValues(role).filter(([, tui]) => tui.said === 'ignored').map(([value]) => `${role}.${value}`))
+    const ignored = roles.flatMap((role) =>
+      tuiValues(role)
+        .filter(([, tui]) => tui.said === 'ignored')
+        .map(([value]) => `${role}.${value}`),
+    )
     expect(ignored.sort()).toEqual(['radius.chip', 'radius.control', 'radius.pill', 'radius.surface', 'text.mono'])
   })
 })

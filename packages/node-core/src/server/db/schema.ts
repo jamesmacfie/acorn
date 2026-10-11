@@ -3,7 +3,14 @@ import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex 
 export { queryDrafts, queryRevisions, queryConsumers, queryPublicationHolds } from '../queries/schema'
 export { dashboardDrafts, dashboardRevisions } from '../dashboards/schema'
 export { pluginModelGrants, pluginModelCalls } from '../modelProviders/grantSchema'
-export { datasets, datasetVersions, datasetRows, datasetCorrections, datasetCaptures, datasetCoverage } from '../datasets/schema'
+export {
+  datasets,
+  datasetVersions,
+  datasetRows,
+  datasetCorrections,
+  datasetCaptures,
+  datasetCoverage,
+} from '../datasets/schema'
 
 export const syncState = sqliteTable(
   'sync_state',
@@ -19,9 +26,8 @@ export const syncState = sqliteTable(
 // ── App-state tables: data GitHub does not have, so acorn is the source of truth ────────────────
 //
 // `user_id` on `prefs` is the single canonical user id: the node's opaque owner id, minted at boot
-// (server/core/identity.ts). Installs that predate boot-minting carry their old GitHub login as
-// the value, same column, same semantics, never rewritten. Single-user app, so the column is not
-// multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
+// (server/core/identity.ts). Single-user app, so the column is not multi-tenancy. The other app-state
+// tables (tasks, projects, and so on) are machine-scoped and have no user_id.
 
 export const prefs = sqliteTable(
   'prefs',
@@ -74,13 +80,18 @@ export const configAcks = sqliteTable(
     snapshot: text('snapshot').notNull(), // verbatim grouped source shown to the user
     ackedAt: integer('acked_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.projectId, t.hash] }), index('config_acks_project_acked_idx').on(t.projectId, t.ackedAt)],
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.hash] }),
+    index('config_acks_project_acked_idx').on(t.projectId, t.ackedAt),
+  ],
 )
 
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(), // opaque uuid
   name: text('name').notNull(), // editable label
-  appearance: text('appearance', { mode: 'json' }).$type<import('@acorn/protocol/workspaceAppearance.ts').WorkspaceAppearance>(),
+  appearance: text('appearance', { mode: 'json' }).$type<
+    import('@acorn/protocol/workspaceAppearance.ts').WorkspaceAppearance
+  >(),
   isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false), // the catch-all group
   sort: integer('sort').notNull().default(0), // selector ordering
   createdAt: integer('created_at').notNull(),
@@ -131,7 +142,6 @@ export const projects = sqliteTable(
     dbSchemaNotes: text('db_schema_notes'),
     previewMode: text('preview_mode'),
     previewValue: text('preview_value'),
-    browserRules: text('browser_rules'),
     branchPrefix: text('branch_prefix'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -218,7 +228,9 @@ export const taskPulls = sqliteTable(
     // Related rows are unlimited. Only one durable attachment may record that it won the task's
     // primary slot; SQLite serialises the attach transaction and this constraint protects the
     // invariant if another writer is added later.
-    uniqueIndex('task_pulls_one_primary_idx').on(t.taskId).where(sql`${t.role} = 'primary'`),
+    uniqueIndex('task_pulls_one_primary_idx')
+      .on(t.taskId)
+      .where(sql`${t.role} = 'primary'`),
   ],
 )
 
@@ -317,7 +329,7 @@ export const idempotency = sqliteTable(
 
 // ── Schedules: periodic work owned by the node ────────────────────────────────────────────────────
 //
-// Machine-scoped like every newer app-state table. State and definition split by owner
+// Machine-scoped like the other app-state tables. State and definition split by owner
 // (docs/schedules.md § The three declarers, one registry): a state row whose schedule is no longer registered is
 // retained unread, since disabling a plugin must not delete the owner's pause or its run history.
 // See docs/schedules.md for the reserved `'*'` global pause key.
@@ -407,19 +419,23 @@ export const audit = sqliteTable(
 )
 
 // Durable lifecycle evidence owned by core; terminal sessions are disposable plugin records.
-export const taskScriptAttempts = sqliteTable('task_script_attempts', {
-  attemptId: text('attempt_id').primaryKey(),
-  taskId: text('task_id').notNull(),
-  phase: text('phase').notNull(),
-  generation: integer('generation').notNull(),
-  state: text('state').notNull(),
-  reason: text('reason').notNull(),
-  terminalSessionId: text('terminal_session_id'),
-  requestedAt: integer('requested_at').notNull(),
-  startedAt: integer('started_at'),
-  finishedAt: integer('finished_at'),
-  exitCode: integer('exit_code'),
-  output: text('output').notNull().default(''),
-  outputAvailable: integer('output_available', { mode: 'boolean' }).notNull().default(false),
-  outputTruncated: integer('output_truncated', { mode: 'boolean' }).notNull().default(false),
-}, (t) => [index('task_script_attempts_task_generation').on(t.taskId, t.generation, t.phase)])
+export const taskScriptAttempts = sqliteTable(
+  'task_script_attempts',
+  {
+    attemptId: text('attempt_id').primaryKey(),
+    taskId: text('task_id').notNull(),
+    phase: text('phase').notNull(),
+    generation: integer('generation').notNull(),
+    state: text('state').notNull(),
+    reason: text('reason').notNull(),
+    terminalSessionId: text('terminal_session_id'),
+    requestedAt: integer('requested_at').notNull(),
+    startedAt: integer('started_at'),
+    finishedAt: integer('finished_at'),
+    exitCode: integer('exit_code'),
+    output: text('output').notNull().default(''),
+    outputAvailable: integer('output_available', { mode: 'boolean' }).notNull().default(false),
+    outputTruncated: integer('output_truncated', { mode: 'boolean' }).notNull().default(false),
+  },
+  (t) => [index('task_script_attempts_task_generation').on(t.taskId, t.generation, t.phase)],
+)

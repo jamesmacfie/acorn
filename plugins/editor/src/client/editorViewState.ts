@@ -7,7 +7,12 @@ import { movedPath, pathContains } from './editorState'
 const viewStates = new Map<string, EditorViewState>()
 const viewKey = (taskId: string, path: string, nodeId: string | null): string => `${nodeId ?? ''}/${taskId}:${path}`
 
-export const rememberEditorViewState = (taskId: string, path: string, state: EditorViewState, nodeId = activeNodeId()): void => {
+export const rememberEditorViewState = (
+  taskId: string,
+  path: string,
+  state: EditorViewState,
+  nodeId = activeNodeId(),
+): void => {
   viewStates.set(viewKey(taskId, path, nodeId), state)
 }
 
@@ -31,18 +36,14 @@ export function moveEditorViewStates(taskId: string, from: string, to: string, n
 
 export function removeEditorViewStates(taskId: string, path: string, nodeId = activeNodeId()): void {
   const prefix = `${nodeId ?? ''}/${taskId}:`
-  for (const key of viewStates.keys()) if (key.startsWith(prefix) && pathContains(path, key.slice(prefix.length))) viewStates.delete(key)
+  for (const key of viewStates.keys())
+    if (key.startsWith(prefix) && pathContains(path, key.slice(prefix.length))) viewStates.delete(key)
 }
 
-export function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {
+function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {
   // A matching task ID on another Node has independent view state.
   const suffix = `${nodeId ?? ''}/${taskId}:`
   for (const key of viewStates.keys()) if (key.startsWith(suffix)) viewStates.delete(key)
-}
-
-// Test reset; ordinary Node switches retain independently keyed view state.
-export function clearEditorViewStates(): void {
-  viewStates.clear()
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list

@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ListDetail } from './primitives'
 
 // The list arrives in a prop, and a prop is a getter: every read re-runs the JSX the caller wrote
-// there. ListDetail read it three times, so the column was built three times over and the copies
-// fought over the same nodes. Docker's rail source drew an empty column
-// (docs/ui-design/two-column-panes.md § Two-column panes).
+// there. Reading it more than once builds the column several times over, the copies fight over the
+// same nodes, and the column draws empty (docs/ui-design/two-column-panes.md § Two-column panes).
 
 let host: HTMLElement
 beforeEach(() => {
@@ -42,12 +41,15 @@ describe('ListDetail', () => {
   })
 
   it('puts the shared resize handle between remote-tree column children', () => {
-    render(() => (
-      <ListDetail split>
-        <div class="ui-listdetail-list">the list</div>
-        <div class="ui-listdetail-detail">the detail</div>
-      </ListDetail>
-    ), host)
+    render(
+      () => (
+        <ListDetail split>
+          <div class="ui-listdetail-list">the list</div>
+          <div class="ui-listdetail-detail">the detail</div>
+        </ListDetail>
+      ),
+      host,
+    )
 
     const root = host.querySelector<HTMLElement>('.ui-listdetail')!
     expect([...root.children].map((node) => node.className)).toEqual([
@@ -77,12 +79,22 @@ describe('ListDetail', () => {
 
   it('restores a resized sidebar after remount and scopes widths to the supplied identity', () => {
     const [key, setKey] = createSignal('retained-git-project')
-    const draw = () => render(() => <ListDetail widthKey={key()} list={<span>list</span>}>detail</ListDetail>, host)
+    const draw = () =>
+      render(
+        () => (
+          <ListDetail widthKey={key()} list={<span>list</span>}>
+            detail
+          </ListDetail>
+        ),
+        host,
+      )
     let dispose = draw()
     const root = () => host.querySelector<HTMLElement>('.ui-listdetail')!
     Object.defineProperty(root(), 'offsetWidth', { configurable: true, value: 800 })
     Object.defineProperty(host.querySelector('.ui-listdetail-list')!, 'offsetWidth', { configurable: true, value: 200 })
-    host.querySelector('[role="separator"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    host
+      .querySelector('[role="separator"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     dispose()
     dispose = draw()
     expect(root().style.gridTemplateColumns).toBe('216px 1px minmax(0, 1fr)')

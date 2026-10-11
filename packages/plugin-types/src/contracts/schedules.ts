@@ -11,10 +11,7 @@ export type PluginScheduleRegistry = {
 /** How often a schedule runs. Clamped on read to the plugin floor of 300 seconds, never rejected: a
  *  stored out-of-range value would otherwise be a row the owner can see and the node refuses to load.
  *  `at` is `HH:MM` in the node's local time; `day` is 0 for Sunday. */
-export type Cadence =
-  | { every: number }
-  | { daily: string }
-  | { weekly: { day: number; at: string } }
+export type Cadence = { every: number } | { daily: string } | { weekly: { day: number; at: string } }
 
 export type PluginSchedule = {
   /** Unique within this plugin. The host prefixes it with your id. */

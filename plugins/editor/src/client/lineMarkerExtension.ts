@@ -4,10 +4,8 @@ import type { EditorLineMarkerSet } from '../contract/lineMarkers'
 
 const replaceMarkers = StateEffect.define<readonly EditorLineMarkerSet[]>()
 
-const classFor = (pullRequest: boolean, uncommitted: boolean): string => [
-  pullRequest ? 'cm-line-pull-request' : '',
-  uncommitted ? 'cm-line-uncommitted' : '',
-].filter(Boolean).join(' ')
+const classFor = (pullRequest: boolean, uncommitted: boolean): string =>
+  [pullRequest ? 'cm-line-pull-request' : '', uncommitted ? 'cm-line-uncommitted' : ''].filter(Boolean).join(' ')
 
 function decorations(doc: Text, sets: readonly EditorLineMarkerSet[]): DecorationSet {
   const flags = new Uint8Array(doc.lines + 1)
@@ -23,9 +21,13 @@ function decorations(doc: Text, sets: readonly EditorLineMarkerSet[]): Decoratio
   for (let line = 1; line <= doc.lines; line++) {
     const flag = flags[line]!
     if (!flag) continue
-    builder.add(doc.line(line).from, doc.line(line).from, Decoration.line({
-      attributes: { class: classFor(!!(flag & 1), !!(flag & 2)) },
-    }))
+    builder.add(
+      doc.line(line).from,
+      doc.line(line).from,
+      Decoration.line({
+        attributes: { class: classFor(!!(flag & 1), !!(flag & 2)) },
+      }),
+    )
   }
   return builder.finish()
 }

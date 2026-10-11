@@ -1,9 +1,9 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Settings → Limits and cost's concurrency section saves each ceiling when its field is committed, on blur or Enter,
-// which the browser reports as one `change` event. A number the route would refuse stays in the
-// field with the reason beside it, and so does one the node failed to store.
+// Settings → Limits and cost's concurrency section saves each ceiling when its field is committed, on
+// blur or Enter, which the browser reports as one `change` event. A number the route would refuse stays
+// in the field with the reason beside it, and so does one the node failed to store.
 
 const saveAgentConcurrency = vi.fn(async (limits: unknown) => limits)
 
@@ -26,7 +26,10 @@ const draw = () => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentConcurrencySettings />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 

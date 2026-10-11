@@ -1,10 +1,6 @@
-// The transcript store's per-event bookkeeping.
-//
-// A streaming session reaches a client about 25 times a second (the node coalesces text deltas at
-// 40 ms in ../../server/sessions/durableEventBuffer.ts), and a long session on this machine's database
-// holds 2,700 events. So everything here is about what one frame costs: it used to be two linear
-// scans, a copy of the whole array and a sort of an already-sorted array, plus a refetch of up to
-// 2,000 rows whenever a projected event arrived.
+// The transcript store's per-event bookkeeping. A streaming session reaches a client about 25 times a
+// second and a long session holds thousands of events, so everything here is about what one frame
+// costs: no scan of the whole list, no copy, no sort, and no refetch for a projected event.
 import { readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +18,9 @@ let onFrame: ((value: unknown) => void) | undefined
 vi.mock('./wsChannel', () => ({
   wsOnAgentFrame: (cb: (value: unknown) => void) => {
     onFrame = cb
-    return () => { onFrame = undefined }
+    return () => {
+      onFrame = undefined
+    }
   },
 }))
 
@@ -117,8 +115,8 @@ beforeEach(() => {
   gates = {}
 })
 
-// The snapshot route caps its event list, so a session past the cap arrives short. Reopening one used
-// to stop at the cap and show a transcript that ended hours before the last message.
+// The snapshot route caps its event list, so a session past the cap arrives short. Reopening one must
+// not stop at the cap and show a transcript that ends hours before the last message.
 describe('a snapshot the node truncated', () => {
   it('pages forward until it reaches lastEventSeq', async () => {
     servedPages = { 2: [prose(3), prose(4)], 4: [prose(5)] }
@@ -144,13 +142,16 @@ describe('appending a streamed event', () => {
     await seed()
     const sort = vi.spyOn(Array.prototype, 'sort')
     for (let seq = 1; seq <= 2_000; seq++) push({ channel: 'agent:event', event: prose(seq) })
-    // The old path copied the array and sorted it once per frame. Two thousand frames is two thousand
-    // sorts of an array that was already ordered.
+    // A sort per frame would be two thousand sorts of an array that was already ordered.
     expect(sort).not.toHaveBeenCalled()
     sort.mockRestore()
 
     expect(events()).toHaveLength(2_000)
-    expect(events().map((item) => item.seq).every((seq, at) => seq === at + 1)).toBe(true)
+    expect(
+      events()
+        .map((item) => item.seq)
+        .every((seq, at) => seq === at + 1),
+    ).toBe(true)
   })
 
   it('seats an out-of-order event in position', async () => {
@@ -250,11 +251,17 @@ describe('what a projected event costs', () => {
 
   it('reads no rows for a request or its answer: the node sends the request', async () => {
     await seed()
-    push({ channel: 'agent:event', event: event(1, { type: 'request', requestId: 'p1', kind: 'permission', title: 'May I' }) })
+    push({
+      channel: 'agent:event',
+      event: event(1, { type: 'request', requestId: 'p1', kind: 'permission', title: 'May I' }),
+    })
     push({ channel: 'agent:request', request: request('pending') })
     expect(managedAgentStore.snapshots()[SESSION].requests.map((item) => item.status)).toEqual(['pending'])
 
-    push({ channel: 'agent:event', event: event(2, { type: 'request_resolved', requestId: 'p1', resolution: 'allow' }) })
+    push({
+      channel: 'agent:event',
+      event: event(2, { type: 'request_resolved', requestId: 'p1', resolution: 'allow' }),
+    })
     push({ channel: 'agent:request', request: { ...request('resolved'), resolvedAt: 2 } })
     expect(managedAgentStore.snapshots()[SESSION].requests.map((item) => item.status)).toEqual(['resolved'])
     expect(snapshotCalls).toEqual([])
@@ -263,14 +270,17 @@ describe('what a projected event costs', () => {
   it('still refetches on an error, because it also expires this session’s pending requests', async () => {
     await seed({ requests: [request('pending')] })
     served = { session, turns: [], events: [], requests: [request('expired')] }
-    push({ channel: 'agent:event', event: event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }) })
+    push({
+      channel: 'agent:event',
+      event: event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }),
+    })
     await vi.waitFor(() => expect(snapshotCalls).toEqual([SESSION]))
   })
 })
 
 // The rail warms a task's session list on hover, and the pane model asks for the same list a moment
-// later when the reader clicks (docs/panes/contributions.md § Contributions). Without a window between them that is
-// two reads of the same rows for one click.
+// later when the reader clicks (docs/panes/contributions.md § Contributions). Without a window between
+// them that is two reads of the same rows for one click.
 describe('a task’s session list', () => {
   beforeEach(() => {
     sessionCalls.length = 0
@@ -312,12 +322,14 @@ describe('a task’s session list', () => {
     const child = { ...session, id: 'delegated-1', taskId: 't12', kind: 'delegated' as const }
     servedList = {
       sessions: [child],
-      delegations: [{
-        sessionId: child.id,
-        depth: 1,
-        isolation: 'shared' as const,
-        owner: { kind: 'terminal' as const, label: 'Codex terminal', profileId: 'codex' },
-      }],
+      delegations: [
+        {
+          sessionId: child.id,
+          depth: 1,
+          isolation: 'shared' as const,
+          owner: { kind: 'terminal' as const, label: 'Codex terminal', profileId: 'codex' },
+        },
+      ],
       nextCursor: null,
     }
     await managedAgentStore.loadTask('t12')
@@ -334,12 +346,14 @@ describe('a task’s session list', () => {
     const child = { ...session, id: 'delegated-live', taskId: 't13', kind: 'delegated' as const }
     servedList = {
       sessions: [child],
-      delegations: [{
-        sessionId: child.id,
-        depth: 1,
-        isolation: 'shared',
-        owner: { kind: 'managed', parentSessionId: 'parent-live' },
-      }],
+      delegations: [
+        {
+          sessionId: child.id,
+          depth: 1,
+          isolation: 'shared',
+          owner: { kind: 'managed', parentSessionId: 'parent-live' },
+        },
+      ],
       nextCursor: null,
     }
     const release = managedAgentStore.activate()
@@ -354,8 +368,8 @@ describe('a session’s snapshot', () => {
   it('is one read for two readers in the same tick', async () => {
     served = { session, turns: [], events: [], requests: [] }
     await Promise.all([managedAgentStore.loadSnapshot(SESSION), managedAgentStore.loadSnapshot(SESSION)])
-    // Two panes open on one session, which is what the run pane makes possible. The transcript is up
-    // to a couple of thousand event rows, so the second reader has to be free.
+    // Two panes open on one session, which the run pane makes possible. The second reader has to be
+    // free, because a transcript can be thousands of event rows.
     expect(snapshotCalls).toEqual([SESSION])
   })
 
@@ -369,14 +383,23 @@ describe('a session’s snapshot', () => {
   })
 })
 
-// Switching back to a task used to read its whole session again: 2.9 MB for a 4,000-event transcript
-// the store already held, 11.7 MB for a 16,000-event one. The ledger only appends, so a held session
-// reads on from where its events are whole.
+// Switching back to a task must not read its whole session again. The ledger only appends, so a held
+// session reads on from where its events are whole.
 describe('reading a session the store holds', () => {
   const pending = {
-    id: 'r1', sessionId: SESSION, turnId: 'turn1', providerRequestId: 'p1', kind: 'permission',
-    status: 'pending', title: 'May I', detail: null, payload: {}, resolution: null, expiresAt: null,
-    createdAt: 1, resolvedAt: null,
+    id: 'r1',
+    sessionId: SESSION,
+    turnId: 'turn1',
+    providerRequestId: 'p1',
+    kind: 'permission',
+    status: 'pending',
+    title: 'May I',
+    detail: null,
+    payload: {},
+    resolution: null,
+    expiresAt: null,
+    createdAt: 1,
+    resolvedAt: null,
   } as AgentRequest
 
   it('resumes after the last event the socket delivered, and keeps the held events as they are', async () => {
@@ -410,7 +433,9 @@ describe('reading a session the store holds', () => {
     servedPages = { 9: [prose(10)] }
     await seed({
       session: { ...session, lastEventSeq: 10 },
-      events: [{ ...event(1, { type: 'tool', tool: { id: 'x', title: 'Run', status: 'completed' } }), foldedThroughSeq: 9 }],
+      events: [
+        { ...event(1, { type: 'tool', tool: { id: 'x', title: 'Run', status: 'completed' } }), foldedThroughSeq: 9 },
+      ],
     })
     expect(pageCalls).toEqual([9])
     await managedAgentStore.loadSnapshot(SESSION)
@@ -435,8 +460,7 @@ describe('reading a session the store holds', () => {
   })
 })
 
-// The store kept every transcript it read until the session was deleted: 46 MB of JSON after opening
-// eight real sessions one after another. It keeps what is drawn and the three drawn last.
+// The store keeps what is drawn and the three drawn last, not every transcript it has read.
 describe('which snapshots the store keeps', () => {
   const answer = (id: string): AgentSessionSnapshot => ({
     session: { ...session, id, lastEventSeq: 1 },
@@ -459,7 +483,12 @@ describe('which snapshots the store keeps', () => {
   it('keeps the three drawn last and drops the rest, rows and all left in the roster', async () => {
     await visit('a', 'b', 'c', 'd', 'e')
     expect(kept()).toEqual(['c', 'd', 'e'])
-    expect(managedAgentStore.sessions().map((item) => item.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(
+      managedAgentStore
+        .sessions()
+        .map((item) => item.id)
+        .sort(),
+    ).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 
   it('never drops a session something is drawing, and counts letting go as the latest drawing', async () => {
@@ -497,7 +526,9 @@ describe('which snapshots the store keeps', () => {
   it('leaves a session alone while it is being read', async () => {
     await visit('a', 'b', 'c')
     let open_ = (): void => undefined
-    gates.a = new Promise((resolve) => { open_ = resolve })
+    gates.a = new Promise((resolve) => {
+      open_ = resolve
+    })
     const reading = managedAgentStore.loadSnapshot('a')
     await visit('d', 'e')
     // Past the bound, and the oldest, but its read resumes from the events it holds.
@@ -510,14 +541,21 @@ describe('which snapshots the store keeps', () => {
 
   it('does not read back a session it is not keeping when that session reports an error', async () => {
     managedAgentStore.upsertSession({ ...session, id: 'z' })
-    push({ channel: 'agent:event', event: { ...event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }), id: 'z-e1', sessionId: 'z' } })
+    push({
+      channel: 'agent:event',
+      event: {
+        ...event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }),
+        id: 'z-e1',
+        sessionId: 'z',
+      },
+    })
     await new Promise((resolve) => setTimeout(resolve, 80))
     expect(snapshotCalls).not.toContain('z')
   })
 })
 
 // The transcript keeps its projection open and adds each streamed row to it rather than rebuilding
-// the whole session per event (conversationItems.ts § createConversationProjection). That is only
+// the whole session per event (`createConversationProjection`). That is only
 // right if it always lands where a rebuild would, whatever the store did to the array: pushed a row,
 // merged a usage update into the line in place, seated a late frame behind the tail, or took a row the
 // node's fold already covered. So these drive the real store, a frame at a time, and compare the kept
@@ -536,13 +574,14 @@ describe('the transcript projection a streaming session keeps', () => {
   // update, plans, and closing lines that sometimes carry no turn.
   const synthetic = (count: number, random: () => number): AgentEventRecord[] => {
     const out: AgentEventRecord[] = []
-    const pick = <T,>(items: T[]): T => items[Math.floor(random() * items.length)]
+    const pick = <T>(items: T[]): T => items[Math.floor(random() * items.length)]
     const calls: { id: string; turnId: string | null; subagentId?: string }[] = []
     const subagents: string[] = []
     let turnId: string | null = null
     let turns = 0
     let message = 'm0'
-    const emit = (value: AgentNormalizedEvent, turn: string | null = turnId) => out.push(event(out.length + 1, value, turn))
+    const emit = (value: AgentNormalizedEvent, turn: string | null = turnId) =>
+      out.push(event(out.length + 1, value, turn))
     while (out.length < count) {
       const roll = random()
       if (!turnId || roll < 0.03) {
@@ -554,34 +593,79 @@ describe('the transcript projection a streaming session keeps', () => {
         emit({ type: 'user_message', text: 'go' })
       } else if (roll < 0.25) {
         if (random() < 0.1) message = `m${out.length}`
-        emit({ type: random() < 0.2 ? 'reasoning' : 'assistant_message', text: 'x', messageId: message, append: random() < 0.8,
-          ...(subagents.length && random() < 0.2 ? { subagentId: pick(subagents) } : {}) })
+        emit({
+          type: random() < 0.2 ? 'reasoning' : 'assistant_message',
+          text: 'x',
+          messageId: message,
+          append: random() < 0.8,
+          ...(subagents.length && random() < 0.2 ? { subagentId: pick(subagents) } : {}),
+        })
       } else if (roll < 0.35) {
-        const call = { id: `call${out.length}`, turnId: random() < 0.1 ? null : turnId,
-          ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}) }
+        const call = {
+          id: `call${out.length}`,
+          turnId: random() < 0.1 ? null : turnId,
+          ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}),
+        }
         calls.push(call)
-        emit({ type: 'tool', tool: { id: call.id, title: 'Run', kind: 'execute', status: 'running', subagentId: call.subagentId } }, call.turnId)
+        emit(
+          {
+            type: 'tool',
+            tool: { id: call.id, title: 'Run', kind: 'execute', status: 'running', subagentId: call.subagentId },
+          },
+          call.turnId,
+        )
       } else if (roll < 0.62 && calls.length) {
         const call = pick(calls.slice(-6))
         const shape = random()
-        emit({ type: 'tool', tool: shape < 0.6
-          ? { id: call.id, title: '', output: `o${out.length}\n`, outputAppend: true }
-          : shape < 0.8
-            ? { id: call.id, title: '', status: 'completed', output: 'whole\n' }
-            : { id: call.id, title: '', subagentId: random() < 0.5 ? call.subagentId : undefined } }, call.turnId)
+        emit(
+          {
+            type: 'tool',
+            tool:
+              shape < 0.6
+                ? { id: call.id, title: '', output: `o${out.length}\n`, outputAppend: true }
+                : shape < 0.8
+                  ? { id: call.id, title: '', status: 'completed', output: 'whole\n' }
+                  : { id: call.id, title: '', subagentId: random() < 0.5 ? call.subagentId : undefined },
+          },
+          call.turnId,
+        )
       } else if (roll < 0.74) {
-        emit({ type: 'usage', usage: { contextUsed: out.length * 10, ...(random() < 0.3 ? { contextSize: 200_000 } : {}), inputTokens: out.length } },
-          random() < 0.2 ? null : turnId)
+        emit(
+          {
+            type: 'usage',
+            usage: {
+              contextUsed: out.length * 10,
+              ...(random() < 0.3 ? { contextSize: 200_000 } : {}),
+              inputTokens: out.length,
+            },
+          },
+          random() < 0.2 ? null : turnId,
+        )
       } else if (roll < 0.8) {
         const id = subagents.length && random() < 0.6 ? pick(subagents) : `sub${out.length}`
         if (!subagents.includes(id)) subagents.push(id)
-        emit({ type: 'subagent', subagent: { id, title: random() < 0.5 ? 'Explore' : undefined, status: pick(['running', 'completed'] as const) } })
+        emit({
+          type: 'subagent',
+          subagent: {
+            id,
+            title: random() < 0.5 ? 'Explore' : undefined,
+            status: pick(['running', 'completed'] as const),
+          },
+        })
       } else if (roll < 0.85) {
         emit({ type: 'plan', entries: [{ id: 'p', text: `step ${out.length}`, status: 'in_progress' }] })
       } else if (roll < 0.9) {
-        emit({ type: 'file_change', path: 'a.ts', ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}) })
+        emit({
+          type: 'file_change',
+          path: 'a.ts',
+          ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}),
+        })
       } else if (roll < 0.95) {
-        emit(random() < 0.5 ? { type: 'session_state', state: 'working' } : { type: 'diagnostic', level: 'info', message: 'note' })
+        emit(
+          random() < 0.5
+            ? { type: 'session_state', state: 'working' }
+            : { type: 'diagnostic', level: 'info', message: 'note' },
+        )
       } else {
         emit({ type: 'user_message', text: 'brief', ...(subagents.length ? { subagentId: pick(subagents) } : {}) })
       }
@@ -594,7 +678,12 @@ describe('the transcript projection a streaming session keeps', () => {
   // Returns how many frames it compared after.
   const replay = async (
     all: AgentEventRecord[],
-    { loaded, page, random, compare }: {
+    {
+      loaded,
+      page,
+      random,
+      compare,
+    }: {
       loaded: number
       page: number
       random: () => number
@@ -603,9 +692,16 @@ describe('the transcript projection a streaming session keeps', () => {
   ): Promise<number> => {
     const head = all.slice(0, loaded)
     const pages: AgentEventRecord[][] = []
-    for (let at = 0; at < head.length; at += page) pages.push(foldToolEvents(foldUsageEvents(head.slice(at, at + page))))
-    servedPages = Object.fromEntries(pages.slice(1).map((events, at) => [pages[at].reduce((reach, record) =>
-      Math.max(reach, record.foldedThroughSeq ?? record.seq), 0), events]))
+    for (let at = 0; at < head.length; at += page)
+      pages.push(foldToolEvents(foldUsageEvents(head.slice(at, at + page))))
+    servedPages = Object.fromEntries(
+      pages
+        .slice(1)
+        .map((events, at) => [
+          pages[at].reduce((reach, record) => Math.max(reach, record.foldedThroughSeq ?? record.seq), 0),
+          events,
+        ]),
+    )
     await seed({ session: { ...session, lastEventSeq: head.at(-1)?.seq ?? 0 }, events: pages[0] ?? [] })
     const project = createConversationProjection()
     project(events())
@@ -638,8 +734,11 @@ describe('the transcript projection a streaming session keeps', () => {
       const random = seeded(seed_)
       const all = synthetic(1_500, random)
       // Cut the load after a run of tool updates, so the node folds its last rows into earlier cards.
-      const update = (record: AgentEventRecord | undefined) => record?.event.type === 'tool' && record.event.tool.title === ''
-      const loaded = all.findIndex((_, at) => at >= 600 && update(all[at - 1]) && update(all[at - 2]) && update(all[at - 3]))
+      const update = (record: AgentEventRecord | undefined) =>
+        record?.event.type === 'tool' && record.event.tool.title === ''
+      const loaded = all.findIndex(
+        (_, at) => at >= 600 && update(all[at - 1]) && update(all[at - 2]) && update(all[at - 3]),
+      )
       managedAgentStore.clear()
       expect(await replay(all, { loaded, page: 170, random, compare: exact })).toBeGreaterThan(500)
     }
@@ -653,11 +752,17 @@ describe('the transcript projection a streaming session keeps', () => {
   // A real session, when there is one to hand: a JSON array of event records, as the ledger holds them.
   // `ACORN_TRANSCRIPT_REPLAY=/path/to/events.json`, ordered by seq. The last quarter streams.
   const recorded = process.env.ACORN_TRANSCRIPT_REPLAY
-  it.skipIf(!recorded)('matches a rebuild after every frame of a recorded session', async () => {
-    const all = (JSON.parse(readFileSync(recorded!, 'utf8')) as AgentEventRecord[])
-      .map((record) => ({ ...record, sessionId: SESSION }))
-    const loaded = Math.floor(all.length * 0.75)
-    const steps = await replay(all, { loaded, page: 2_000, random: seeded(7), compare: exact })
-    expect(steps).toBeGreaterThanOrEqual(all.length - loaded)
-  }, 3_600_000)
+  it.skipIf(!recorded)(
+    'matches a rebuild after every frame of a recorded session',
+    async () => {
+      const all = (JSON.parse(readFileSync(recorded!, 'utf8')) as AgentEventRecord[]).map((record) => ({
+        ...record,
+        sessionId: SESSION,
+      }))
+      const loaded = Math.floor(all.length * 0.75)
+      const steps = await replay(all, { loaded, page: 2_000, random: seeded(7), compare: exact })
+      expect(steps).toBeGreaterThanOrEqual(all.length - loaded)
+    },
+    3_600_000,
+  )
 })

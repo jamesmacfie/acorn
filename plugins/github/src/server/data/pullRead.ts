@@ -5,46 +5,85 @@ import { pullSourceDescription } from '../../shared/pullSourceDescription'
 import { ghGraphQL, ghGraphQLResult } from '../githubApi'
 
 const pageInfo = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
-const timestamp = z.string().transform(value => Date.parse(value)).refine(Number.isFinite)
+const timestamp = z
+  .string()
+  .transform((value) => Date.parse(value))
+  .refine(Number.isFinite)
 // GitHub can ask a bot, such as Copilot, or a mannequin (an imported account's placeholder) for a
 // review as well as a person or a team. Each of those has a login, like a person.
-const reviewer = z.union([
-  z.object({ __typename: z.enum(['User', 'Bot', 'Mannequin']), login: z.string() }),
-  z.object({ __typename: z.literal('Team'), name: z.string(), slug: z.string() }),
-]).nullable()
+const reviewer = z
+  .union([
+    z.object({ __typename: z.enum(['User', 'Bot', 'Mannequin']), login: z.string() }),
+    z.object({ __typename: z.literal('Team'), name: z.string(), slug: z.string() }),
+  ])
+  .nullable()
 // How many of a commit's checks are in each state. Counts are exact however many checks a commit
 // runs, where a list of them stops at 100 a page, and a busy repository runs more than that.
 const stateCounts = z.array(z.object({ state: z.string(), count: z.number().int().nonnegative() }))
 // A check run's state is its conclusion once it has finished. Until then it is one of these, which the
 // source reports as PENDING.
 const UNFINISHED_RUNS = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED'])
-const REVIEWER = '__typename ... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Team { name slug }'
+const REVIEWER =
+  '__typename ... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Team { name slug }'
 const pull = z.object({
-  id: z.string().min(1), number: z.number().int().positive(), title: z.string(), url: z.string().url(),
-  state: z.enum(['OPEN', 'CLOSED', 'MERGED']), isDraft: z.boolean(),
-  author: z.object({ login: z.string() }).nullable(), repository: z.object({ nameWithOwner: z.string() }),
-  headRepository: z.object({ nameWithOwner: z.string() }).nullable(), headRefName: z.string().nullable(),
-  createdAt: timestamp, updatedAt: timestamp, closedAt: timestamp.nullable(), mergedAt: timestamp.nullable(),
-  mergeable: z.string(), mergeStateStatus: z.string(), autoMergeRequest: z.object({ mergeMethod: z.string() }).nullable(),
+  id: z.string().min(1),
+  number: z.number().int().positive(),
+  title: z.string(),
+  url: z.string().url(),
+  state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+  isDraft: z.boolean(),
+  author: z.object({ login: z.string() }).nullable(),
+  repository: z.object({ nameWithOwner: z.string() }),
+  headRepository: z.object({ nameWithOwner: z.string() }).nullable(),
+  headRefName: z.string().nullable(),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  closedAt: timestamp.nullable(),
+  mergedAt: timestamp.nullable(),
+  mergeable: z.string(),
+  mergeStateStatus: z.string(),
+  autoMergeRequest: z.object({ mergeMethod: z.string() }).nullable(),
   reviewDecision: z.string().nullable(),
-  latestCommit: z.object({ nodes: z.array(z.object({ commit: z.object({ committedDate: timestamp,
-    statusCheckRollup: z.object({ state: z.string(), contexts: z.object({
-      checkRunCountsByState: stateCounts, statusContextCountsByState: stateCounts,
-    }) }).nullable() }) })) }),
+  latestCommit: z.object({
+    nodes: z.array(
+      z.object({
+        commit: z.object({
+          committedDate: timestamp,
+          statusCheckRollup: z
+            .object({
+              state: z.string(),
+              contexts: z.object({
+                checkRunCountsByState: stateCounts,
+                statusContextCountsByState: stateCounts,
+              }),
+            })
+            .nullable(),
+        }),
+      }),
+    ),
+  }),
   labels: z.object({ nodes: z.array(z.object({ name: z.string() })), pageInfo }),
   reviewRequests: z.object({ nodes: z.array(z.object({ requestedReviewer: reviewer })), pageInfo }),
   latestComment: z.object({ nodes: z.array(z.object({ createdAt: timestamp })) }),
   latestReview: z.object({ nodes: z.array(z.object({ submittedAt: timestamp.nullable() })) }),
-  reviewRequestEvents: z.object({ pageInfo: z.object({ hasPreviousPage: z.boolean() }), nodes: z.array(z.object({
-    createdAt: timestamp, requestedReviewer: reviewer,
-  })) }),
+  reviewRequestEvents: z.object({
+    pageInfo: z.object({ hasPreviousPage: z.boolean() }),
+    nodes: z.array(
+      z.object({
+        createdAt: timestamp,
+        requestedReviewer: reviewer,
+      }),
+    ),
+  }),
 })
 // GitHub gives a search query about 10 seconds. These nested fields make each match expensive, so
-// 100 matches per page times out on any broad search. 25 takes about 5 seconds, and 10 of those
-// pages fit inside a dashboard run's 60-second budget.
+// 100 matches per page times out on any broad search. A page of 25 stays well inside that limit, and
+// 10 of those pages fit inside a dashboard run's 60-second budget.
 const SEARCH_PAGE_SIZE = 25
 const SEARCH_PAGES = 10
-const searchPage = z.object({ search: z.object({ issueCount: z.number().int().nonnegative(), nodes: z.array(pull), pageInfo }) })
+const searchPage = z.object({
+  search: z.object({ issueCount: z.number().int().nonnegative(), nodes: z.array(pull), pageInfo }),
+})
 const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String) {
   search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount pageInfo { hasNextPage endCursor }
@@ -67,70 +106,160 @@ const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String)
   }
 }`
 
-export async function githubData<T>(token: string, query: string, variables: Record<string, unknown>, schema: z.ZodType<T>, signal: AbortSignal): Promise<T> {
+async function githubData<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  schema: z.ZodType<T>,
+  signal: AbortSignal,
+): Promise<T> {
   signal.throwIfAborted()
   const result = await ghGraphQLResult<unknown>(await ghGraphQL(token, query, variables, signal))
   // An organisation's SAML enforcement answers a GraphQL search with an error, not a 403.
-  if (!result.ok) throw new Error(result.kind === 'http' ? result.failure.error
-    : result.messages.some(text => /SAML enforcement/i.test(text)) ? 'sso' : 'github_query_failed')
+  if (!result.ok)
+    throw new Error(
+      result.kind === 'http'
+        ? result.failure.error
+        : result.messages.some((text) => /SAML enforcement/i.test(text))
+          ? 'sso'
+          : 'github_query_failed',
+    )
   return schema.parse(result.data)
 }
 
-export async function readPullSelection(token: string, q: string, connectionId: string, signal: AbortSignal): Promise<DataSourcePage> {
+export async function readPullSelection(
+  token: string,
+  q: string,
+  connectionId: string,
+  signal: AbortSignal,
+): Promise<DataSourcePage> {
   const records: DataSourcePage['records'] = []
   const seen = new Set<string>()
   const cursors = new Set<string>()
   let after: string | null = null
   let bytes = 0
-  const result = (completeness: DataSourcePage['completeness']): DataSourcePage => ({ records, completeness, revision: pullSourceDescription.revision, readTime: Date.now() })
+  const result = (completeness: DataSourcePage['completeness']): DataSourcePage => ({
+    records,
+    completeness,
+    revision: pullSourceDescription.revision,
+    readTime: Date.now(),
+  })
   for (let page = 0; page < SEARCH_PAGES; page++) {
-    const response: z.infer<typeof searchPage> = await githubData(token, SEARCH, { q, first: SEARCH_PAGE_SIZE, after }, searchPage, signal)
+    const response: z.infer<typeof searchPage> = await githubData(
+      token,
+      SEARCH,
+      { q, first: SEARCH_PAGE_SIZE, after },
+      searchPage,
+      signal,
+    )
     const search: z.infer<typeof searchPage>['search'] = response.search
-    if (search.issueCount > SEARCH_PAGE_SIZE * SEARCH_PAGES) return result({ kind: 'incomplete', cause: 'upstream-cap' })
+    if (search.issueCount > SEARCH_PAGE_SIZE * SEARCH_PAGES)
+      return result({ kind: 'incomplete', cause: 'upstream-cap' })
     for (const node of search.nodes) {
       if (seen.has(node.id)) throw new Error('github_duplicate_record')
       seen.add(node.id)
       const statusCheckRollup = node.latestCommit.nodes[0]?.commit.statusCheckRollup ?? null
-      if (node.labels.pageInfo.hasNextPage || node.reviewRequests.pageInfo.hasNextPage
-        || node.reviewRequestEvents.pageInfo.hasPreviousPage) {
+      if (
+        node.labels.pageInfo.hasNextPage ||
+        node.reviewRequests.pageInfo.hasNextPage ||
+        node.reviewRequestEvents.pageInfo.hasPreviousPage
+      ) {
         return result({ kind: 'incomplete', cause: 'upstream-cap' })
       }
-      const { author, repository, headRepository, headRefName, isDraft, state, autoMergeRequest, labels, reviewRequests,
-        latestCommit, latestComment, latestReview, reviewRequestEvents, ...fields } = node
-      const activity = [node.createdAt, ...latestCommit.nodes.map(item => item.commit.committedDate),
-        ...latestComment.nodes.map(item => item.createdAt), ...latestReview.nodes.flatMap(item => item.submittedAt === null ? [] : [item.submittedAt])]
+      const {
+        author,
+        repository,
+        headRepository,
+        headRefName,
+        isDraft,
+        state,
+        autoMergeRequest,
+        labels,
+        reviewRequests,
+        latestCommit,
+        latestComment,
+        latestReview,
+        reviewRequestEvents,
+        ...fields
+      } = node
+      const activity = [
+        node.createdAt,
+        ...latestCommit.nodes.map((item) => item.commit.committedDate),
+        ...latestComment.nodes.map((item) => item.createdAt),
+        ...latestReview.nodes.flatMap((item) => (item.submittedAt === null ? [] : [item.submittedAt])),
+      ]
       const requestTimes = new Map<string, number>()
       for (const event of reviewRequestEvents.nodes) {
         const reviewer = event.requestedReviewer
-        if (reviewer) requestTimes.set(`${reviewer.__typename}:${reviewer.__typename === 'Team' ? reviewer.slug : reviewer.login}`, event.createdAt)
+        if (reviewer)
+          requestTimes.set(
+            `${reviewer.__typename}:${reviewer.__typename === 'Team' ? reviewer.slug : reviewer.login}`,
+            event.createdAt,
+          )
       }
       const checkStatuses = [
         ...(statusCheckRollup?.contexts.checkRunCountsByState ?? []).flatMap(({ state, count }) =>
-          Array<string>(count).fill(UNFINISHED_RUNS.has(state) ? 'PENDING' : state === 'COMPLETED' ? 'UNKNOWN' : state)),
-        ...(statusCheckRollup?.contexts.statusContextCountsByState ?? []).flatMap(({ state, count }) => Array<string>(count).fill(state)),
+          Array<string>(count).fill(UNFINISHED_RUNS.has(state) ? 'PENDING' : state === 'COMPLETED' ? 'UNKNOWN' : state),
+        ),
+        ...(statusCheckRollup?.contexts.statusContextCountsByState ?? []).flatMap(({ state, count }) =>
+          Array<string>(count).fill(state),
+        ),
       ]
-      const data = { ...fields, author: author?.login ?? null, repository: repository.nameWithOwner,
-        githubProvider: 'github', githubConnectionId: connectionId,
-        headRepository: headRepository?.nameWithOwner.toLowerCase() ?? null, headBranch: headRefName,
-        draft: isDraft, state: state.toLowerCase(), autoMergeEnabled: autoMergeRequest !== null,
+      const data = {
+        ...fields,
+        author: author?.login ?? null,
+        repository: repository.nameWithOwner,
+        githubProvider: 'github',
+        githubConnectionId: connectionId,
+        headRepository: headRepository?.nameWithOwner.toLowerCase() ?? null,
+        headBranch: headRefName,
+        draft: isDraft,
+        state: state.toLowerCase(),
+        autoMergeEnabled: autoMergeRequest !== null,
         checks: statusCheckRollup?.state ?? 'EXPECTED',
         checkStatuses,
-        labels: labels.nodes.map(item => item.name),
-        requestedReviewers: reviewRequests.nodes.flatMap(item => item.requestedReviewer?.__typename === 'User' ? [item.requestedReviewer.login] : []),
-        requestedTeams: reviewRequests.nodes.flatMap(item => item.requestedReviewer?.__typename === 'Team' ? [item.requestedReviewer.slug] : []),
-        reviewRequests: reviewRequests.nodes.flatMap(item => item.requestedReviewer ? [{ kind: item.requestedReviewer.__typename.toLowerCase(),
-          name: item.requestedReviewer.__typename === 'Team' ? item.requestedReviewer.slug : item.requestedReviewer.login,
-          requestedAt: requestTimes.get(`${item.requestedReviewer.__typename}:${item.requestedReviewer.__typename === 'Team' ? item.requestedReviewer.slug : item.requestedReviewer.login}`) ?? null }] : []),
-        reviewRequestedFromViewer: q.includes('-review-requested:@me') ? false
-          : q.includes('review-requested:@me') ? true : null,
+        labels: labels.nodes.map((item) => item.name),
+        requestedReviewers: reviewRequests.nodes.flatMap((item) =>
+          item.requestedReviewer?.__typename === 'User' ? [item.requestedReviewer.login] : [],
+        ),
+        requestedTeams: reviewRequests.nodes.flatMap((item) =>
+          item.requestedReviewer?.__typename === 'Team' ? [item.requestedReviewer.slug] : [],
+        ),
+        reviewRequests: reviewRequests.nodes.flatMap((item) =>
+          item.requestedReviewer
+            ? [
+                {
+                  kind: item.requestedReviewer.__typename.toLowerCase(),
+                  name:
+                    item.requestedReviewer.__typename === 'Team'
+                      ? item.requestedReviewer.slug
+                      : item.requestedReviewer.login,
+                  requestedAt:
+                    requestTimes.get(
+                      `${item.requestedReviewer.__typename}:${item.requestedReviewer.__typename === 'Team' ? item.requestedReviewer.slug : item.requestedReviewer.login}`,
+                    ) ?? null,
+                },
+              ]
+            : [],
+        ),
+        reviewRequestedFromViewer: q.includes('-review-requested:@me')
+          ? false
+          : q.includes('review-requested:@me')
+            ? true
+            : null,
         lastActivityAt: Math.max(...activity),
       }
       parseDataValue(data, DATA_LIMITS.recordBytes)
       bytes += Buffer.byteLength(JSON.stringify(data))
       if (bytes > DATA_LIMITS.selectionBytes) return result({ kind: 'incomplete', cause: 'host-budget' })
-      records.push({ recordId: node.id, data, display: { title: node.title, url: node.url }, action: { verb: 'openUrl', url: node.url },
+      records.push({
+        recordId: node.id,
+        data,
+        display: { title: node.title, url: node.url },
+        action: { verb: 'openUrl', url: node.url },
         writableFields: state === 'MERGED' ? [] : ['/state'],
-        target: { kind: 'github.pull-request', item: `${repository.nameWithOwner}#${node.number}` } })
+        target: { kind: 'github.pull-request', item: `${repository.nameWithOwner}#${node.number}` },
+      })
     }
     if (!search.pageInfo.hasNextPage) return result({ kind: 'complete' })
     const next: string | null = search.pageInfo.endCursor
@@ -147,27 +276,43 @@ const REPOSITORIES = `query AcornSourceRepositories($first: Int!, $after: String
     nodes { nameWithOwner } pageInfo { hasNextPage endCursor }
   } }
 }`
-const repositoriesPage = z.object({ viewer: z.object({ repositories: z.object({ nodes: z.array(z.object({ nameWithOwner: z.string() })), pageInfo }) }) })
+const repositoriesPage = z.object({
+  viewer: z.object({ repositories: z.object({ nodes: z.array(z.object({ nameWithOwner: z.string() })), pageInfo }) }),
+})
 
 // The viewer's repository list can't be filtered by name, so a search walks pages until it fills
 // one page of matches. Without this, a repository past the first page can never be found.
 const REPOSITORY_SEARCH_PAGES = 10
 
 // An option's id is the repository folded to lower case, and its label keeps GitHub's spelling. A
-// workspace's repositories come from its projects, which store the name folded (node-core
-// queries/sourceContext.ts), and the Node checks each chosen repository against these ids exactly.
+// workspace's repositories come from its projects, which store the name folded, and the Node checks
+// each chosen repository against these ids exactly.
 // GitHub ignores case in repository names, so a search reads the same pull requests either way.
-export async function readRepositoryOptions(token: string, input: { pageSize: number; cursor?: string; search: string }, signal: AbortSignal) {
+export async function readRepositoryOptions(
+  token: string,
+  input: { pageSize: number; cursor?: string; search: string },
+  signal: AbortSignal,
+) {
   const search = input.search.toLowerCase()
   const options: { id: string; label: string }[] = []
   let after = input.cursor ?? null
   for (let page = 0; page < REPOSITORY_SEARCH_PAGES; page++) {
     // Ask only for the slots left, so the matches never pass the page size and the cursor stays exact.
-    const { viewer: { repositories } } = await githubData(token, REPOSITORIES,
-      { first: input.pageSize - options.length, after }, repositoriesPage, signal)
+    const {
+      viewer: { repositories },
+    } = await githubData(
+      token,
+      REPOSITORIES,
+      { first: input.pageSize - options.length, after },
+      repositoriesPage,
+      signal,
+    )
     if (repositories.pageInfo.hasNextPage && !repositories.pageInfo.endCursor) throw new Error('github_invalid_cursor')
-    options.push(...repositories.nodes.filter(repo => repo.nameWithOwner.toLowerCase().includes(search))
-      .map(repo => ({ id: repo.nameWithOwner.toLowerCase(), label: repo.nameWithOwner.slice(0, 80) })))
+    options.push(
+      ...repositories.nodes
+        .filter((repo) => repo.nameWithOwner.toLowerCase().includes(search))
+        .map((repo) => ({ id: repo.nameWithOwner.toLowerCase(), label: repo.nameWithOwner.slice(0, 80) })),
+    )
     after = repositories.pageInfo.hasNextPage ? repositories.pageInfo.endCursor : null
     if (!after || !search || options.length >= input.pageSize) break
   }
@@ -175,9 +320,15 @@ export async function readRepositoryOptions(token: string, input: { pageSize: nu
 }
 
 const VIEWER = 'query AcornSourceViewer { viewer { id login name email } }'
-const viewerSchema = z.object({ viewer: z.object({ id: z.string(), login: z.string(), name: z.string().nullable(), email: z.string().nullable() }) })
+const viewerSchema = z.object({
+  viewer: z.object({ id: z.string(), login: z.string(), name: z.string().nullable(), email: z.string().nullable() }),
+})
 export async function readViewerIdentity(token: string, signal: AbortSignal) {
   const { viewer } = await githubData(token, VIEWER, {}, viewerSchema, signal)
-  return { id: viewer.id, login: viewer.login, ...(viewer.name ? { name: viewer.name } : {}),
-    ...(viewer.email ? { email: viewer.email } : {}) }
+  return {
+    id: viewer.id,
+    login: viewer.login,
+    ...(viewer.name ? { name: viewer.name } : {}),
+    ...(viewer.email ? { email: viewer.email } : {}),
+  }
 }

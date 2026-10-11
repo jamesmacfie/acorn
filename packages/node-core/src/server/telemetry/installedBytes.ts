@@ -9,8 +9,8 @@ import { createLogger, describeError } from './logger'
 //
 // Two sources, kept apart by their `method` label:
 //
-//   build  the numbers apps/desktop/scripts/size-report.mjs wrote into helper/size-report.json when
-//          the app was built. Immutable, so they are read, never measured again.
+//   build  the numbers apps/desktop/scripts/size-report.mjs wrote into the helper's `size-report.json`
+//          when the app was built. Immutable, so they are read, never measured again.
 //   walk   the component directories that report names, measured on this machine. That is what the
 //          owner actually has on disk after an update, a partial install, or a development build.
 //
@@ -53,7 +53,13 @@ const inside = (root: string, path: string): boolean => {
 
 function readReport(raw: string): SizeReport | null {
   const report = JSON.parse(raw) as Partial<SizeReport>
-  if (report.schema !== 1 || !Array.isArray(report.startup) || !Array.isArray(report.components) || !Array.isArray(report.missing)) return null
+  if (
+    report.schema !== 1 ||
+    !Array.isArray(report.startup) ||
+    !Array.isArray(report.components) ||
+    !Array.isArray(report.missing)
+  )
+    return null
   return report as SizeReport
 }
 
@@ -63,17 +69,31 @@ type Walk = { bytes: number; files: number; truncated: boolean }
  * Bytes under one component. `seen` is shared across components so a hard-linked file counts once,
  * and `skip` holds the directories that belong to another component or to nobody.
  */
-async function walkComponent(root: string, skip: readonly string[], seen: Set<string>, budget: { files: number; depth: number }): Promise<Walk> {
+async function walkComponent(
+  root: string,
+  skip: readonly string[],
+  seen: Set<string>,
+  budget: { files: number; depth: number },
+): Promise<Walk> {
   const result: Walk = { bytes: 0, files: 0, truncated: false }
   const visit = async (dir: string, depth: number): Promise<void> => {
-    if (depth > budget.depth) { result.truncated = true; return }
+    if (depth > budget.depth) {
+      result.truncated = true
+      return
+    }
     for (const entry of await readdir(dir, { withFileTypes: true })) {
-      if (budget.files <= 0) { result.truncated = true; return }
+      if (budget.files <= 0) {
+        result.truncated = true
+        return
+      }
       const path = join(dir, entry.name)
       if (entry.name === '.git' || skip.some((excluded) => inside(excluded, path))) continue
       // A symlink is never followed, so nothing outside the root can be read through one.
       if (entry.isSymbolicLink()) continue
-      if (entry.isDirectory()) { await visit(path, depth + 1); continue }
+      if (entry.isDirectory()) {
+        await visit(path, depth + 1)
+        continue
+      }
       if (!entry.isFile() || entry.name === 'size-report.json' || entry.name.endsWith('.map')) continue
       const stats = await lstat(path)
       budget.files -= 1
@@ -106,17 +126,26 @@ export async function reportInstalledBytes(options: InstalledBytesOptions): Prom
   if (!report) return false
 
   const installation = options.packaged ? 'packaged' : 'development'
-  const gauge = (name: string, value: number, attrs: TelemetryAttrs) => emitMetric('core', {
-    name,
-    type: 'gauge',
-    value,
-    unit: 'byte',
-    attrs: { release: options.release, installation, ...attrs },
-  })
+  const gauge = (name: string, value: number, attrs: TelemetryAttrs) =>
+    emitMetric('core', {
+      name,
+      type: 'gauge',
+      value,
+      unit: 'byte',
+      attrs: { release: options.release, installation, ...attrs },
+    })
 
-  const built = { platform: report.platform, arch: report.arch, 'build.mode': report.buildMode, method: 'build', complete: report.missing.length === 0 }
-  for (const entry of report.startup) gauge('app.startup.bytes', entry.bytes, { ...built, 'startup.runtime': entry.runtime, phase: entry.phase })
-  for (const entry of report.components) gauge('app.bundle.bytes', entry.bytes, { ...built, artifact: 'build', component: entry.component })
+  const built = {
+    platform: report.platform,
+    arch: report.arch,
+    'build.mode': report.buildMode,
+    method: 'build',
+    complete: report.missing.length === 0,
+  }
+  for (const entry of report.startup)
+    gauge('app.startup.bytes', entry.bytes, { ...built, 'startup.runtime': entry.runtime, phase: entry.phase })
+  for (const entry of report.components)
+    gauge('app.bundle.bytes', entry.bytes, { ...built, artifact: 'build', component: entry.component })
 
   const here = { platform: process.platform, arch: process.arch, method: 'walk', artifact: 'installed' }
   const owned = report.components.flatMap((entry) => {
@@ -129,14 +158,18 @@ export async function reportInstalledBytes(options: InstalledBytesOptions): Prom
   const excluded = options.excludedRoots.map((path) => resolve(path))
   for (const { component, path } of owned) {
     // A component nested in this one is measured on its own, the way the build counted it.
-    const skip = [...excluded, ...owned.map((other) => other.path).filter((other) => other !== path && inside(path, other))]
+    const skip = [
+      ...excluded,
+      ...owned.map((other) => other.path).filter((other) => other !== path && inside(path, other)),
+    ]
     let measured: Walk
     try {
       // The component itself must be a directory here, not a link to somewhere else.
       if (!(await lstat(path)).isDirectory()) throw Object.assign(new Error('not a directory'), { code: 'ENOENT' })
       measured = await walkComponent(path, skip, seen, budget)
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`could not measure ${component}`, { 'error.name': describeError(error).name })
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        log.warn(`could not measure ${component}`, { 'error.name': describeError(error).name })
       gauge('app.bundle.bytes', 0, { ...here, component, complete: false })
       continue
     }
@@ -144,7 +177,8 @@ export async function reportInstalledBytes(options: InstalledBytesOptions): Prom
   }
   if (options.packaged && options.nativeRuntime) {
     const runtime = await stat(options.nativeRuntime).catch(() => null)
-    if (runtime) gauge('app.bundle.bytes', runtime.size, { ...here, method: 'stat', component: 'native-runtime', complete: true })
+    if (runtime)
+      gauge('app.bundle.bytes', runtime.size, { ...here, method: 'stat', component: 'native-runtime', complete: true })
   }
   return true
 }
@@ -154,18 +188,23 @@ export async function reportInstalledBytes(options: InstalledBytesOptions): Prom
  * a fixed minute instead, which keeps the walk off every launch's critical path. With telemetry off
  * it checks again every ten minutes until it has reported once. The timers never hold the process open.
  */
-export function scheduleInstalledBytesReport(options: InstalledBytesOptions, delays = { first: 60_000, retry: 600_000 }): () => void {
+export function scheduleInstalledBytesReport(
+  options: InstalledBytesOptions,
+  delays = { first: 60_000, retry: 600_000 },
+): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
   let stopped = false
   const attempt = () => {
-    void reportInstalledBytes(options).catch((error: unknown) => {
-      log.warn('installed bytes report failed', { 'error.name': describeError(error).name })
-      return true
-    }).then((done) => {
-      if (done || stopped) return
-      timer = setTimeout(attempt, delays.retry)
-      timer.unref?.()
-    })
+    void reportInstalledBytes(options)
+      .catch((error: unknown) => {
+        log.warn('installed bytes report failed', { 'error.name': describeError(error).name })
+        return true
+      })
+      .then((done) => {
+        if (done || stopped) return
+        timer = setTimeout(attempt, delays.retry)
+        timer.unref?.()
+      })
   }
   timer = setTimeout(attempt, delays.first)
   timer.unref?.()

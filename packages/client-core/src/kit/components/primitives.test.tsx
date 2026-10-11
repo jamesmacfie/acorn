@@ -27,10 +27,21 @@ afterEach(() => {
 it('focuses an input on an autofocus edge without reclaiming focus on value updates', () => {
   const [row, setRow] = createSignal({ active: true, value: 'query' })
   let reference: HTMLInputElement | undefined
-  dispose = render(() => <>
-    <Input autofocus={row().active} value={row().value} ref={(element) => { reference = element }} />
-    <button type="button">Elsewhere</button>
-  </>, host)
+  dispose = render(
+    () => (
+      <>
+        <Input
+          autofocus={row().active}
+          value={row().value}
+          ref={(element) => {
+            reference = element
+          }}
+        />
+        <button type="button">Elsewhere</button>
+      </>
+    ),
+    host,
+  )
   const input = host.querySelector('input')!
   const button = host.querySelector('button')!
   expect(reference).toBe(input)
@@ -46,12 +57,15 @@ it('focuses an input on an autofocus edge without reclaiming focus on value upda
 describe('Card reveal', () => {
   it('reveals once and does not steal focus back when its row is rebuilt with focus still set', () => {
     const [row, setRow] = createSignal({ focused: true })
-    dispose = render(() => (
-      <>
-        <Card focus={row().focused}>card</Card>
-        <button type="button">elsewhere</button>
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <Card focus={row().focused}>card</Card>
+          <button type="button">elsewhere</button>
+        </>
+      ),
+      host,
+    )
     const card = host.querySelector('.ui-card') as HTMLElement
     expect(document.activeElement).toBe(card)
 
@@ -71,12 +85,15 @@ describe('Card reveal', () => {
     // under a running agent — rebuilds its rows, and the rebuilt selected row would re-issue a reveal
     // into the middle of someone's sentence.
     const [rows, setRows] = createSignal([{ id: 'a' }])
-    dispose = render(() => (
-      <>
-        <textarea />
-        <For each={rows()}>{(row) => <Card focus={row.id === 'a'}>card</Card>}</For>
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <textarea />
+          <For each={rows()}>{(row) => <Card focus={row.id === 'a'}>card</Card>}</For>
+        </>
+      ),
+      host,
+    )
     const field = host.querySelector('textarea') as HTMLTextAreaElement
     field.focus()
     expect(document.activeElement).toBe(field)
@@ -87,12 +104,15 @@ describe('Card reveal', () => {
 
   it('reveals again once focus goes false and true', () => {
     const [focused, setFocused] = createSignal(true)
-    dispose = render(() => (
-      <>
-        <Card focus={focused()}>card</Card>
-        <button type="button">elsewhere</button>
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <Card focus={focused()}>card</Card>
+          <button type="button">elsewhere</button>
+        </>
+      ),
+      host,
+    )
     const card = host.querySelector('.ui-card') as HTMLElement
     const button = host.querySelector('button') as HTMLButtonElement
     button.focus()

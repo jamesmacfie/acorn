@@ -52,7 +52,10 @@ export default function GoalDetails(props: { step: WorkflowStepRow }) {
                   size="sm"
                   items={[
                     { label: 'Status', value: status() },
-                    { label: 'Automatic turns', value: `${turns(goal().continuations, 'goal continuation', 'goal continuations')}, ${turns(goal().repairs, 'result repair', 'result repairs')}` },
+                    {
+                      label: 'Automatic turns',
+                      value: `${turns(goal().continuations, 'goal continuation', 'goal continuations')}, ${turns(goal().repairs, 'result repair', 'result repairs')}`,
+                    },
                   ]}
                 />
               )}

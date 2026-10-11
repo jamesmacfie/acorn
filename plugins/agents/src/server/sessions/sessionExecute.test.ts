@@ -23,26 +23,41 @@ const advertised = (): AgentConfigOption[] => [
     label: 'Model',
     category: 'model',
     currentValue: 'sonnet',
-    values: [{ value: 'sonnet', label: 'Sonnet 5' }, { value: 'opus', label: 'Opus 5' }],
+    values: [
+      { value: 'sonnet', label: 'Sonnet 5' },
+      { value: 'opus', label: 'Opus 5' },
+    ],
   },
   {
     id: 'reasoning',
     label: 'Reasoning effort',
     category: 'reasoning',
     currentValue: 'medium',
-    values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+    values: [
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+    ],
   },
 ]
 
 // Registered as the profile `agents.sessionExecute` maps to a managed provider, so the whole path
 // runs rather than falling through to the caller's headless fallback.
 class ConfigDriver implements AgentDriver {
-  constructor(readonly providerId = 'claude', readonly profileId = 'claude-code') {}
+  constructor(
+    readonly providerId = 'claude',
+    readonly profileId = 'claude-code',
+  ) {}
   readonly configSets: Array<[string, string]> = []
   readonly turns: AgentDriverTurnOptions[] = []
   readonly envs: Record<string, string>[] = []
   // What each turn answers, in order. Past the end of the script every turn answers 'Done.'.
-  replies: Array<{ text: string; stopReason: string; events?: AgentNormalizedEvent[]; hang?: boolean; afterEvents?: () => void }> = []
+  replies: Array<{
+    text: string
+    stopReason: string
+    events?: AgentNormalizedEvent[]
+    hang?: boolean
+    afterEvents?: () => void
+  }> = []
   push: (event: AgentNormalizedEvent) => Promise<void> = async () => {}
 
   async probe(): Promise<AgentProviderDescriptor> {
@@ -64,7 +79,9 @@ class ConfigDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
-    this.push = async (event) => { await options.onEvent(event) }
+    this.push = async (event) => {
+      await options.onEvent(event)
+    }
     this.envs.push(options.env)
     const providerSessionRef = options.session.providerSessionRef ?? `cfg-${randomUUID()}`
     let active = false
@@ -95,7 +112,7 @@ class ConfigDriver implements AgentDriver {
       async resolveRequest() {},
       async setConfig(optionId: string, value: string) {
         driver.configSets.push([optionId, value])
-        current = current.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)
+        current = current.map((option) => (option.id === optionId ? { ...option, currentValue: value } : option))
         return current
       },
       async stop() {},
@@ -173,31 +190,41 @@ describe('agents.sessionExecute config options', () => {
     ctx.cleanup()
   })
 
-  const execute = (configOptions?: Record<string, string>, tools?: ToolCeiling) => createSessionExecute(runtime)({
-    taskId,
-    profileId: 'claude-code',
-    title: 'Workflow: synthesise',
-    prompt: 'Write one answer.',
-    configOptions,
-    tools,
-    runId: 'run-1',
-    stepId: 'step-1',
-  })
+  const execute = (configOptions?: Record<string, string>, tools?: ToolCeiling) =>
+    createSessionExecute(runtime)({
+      taskId,
+      profileId: 'claude-code',
+      title: 'Workflow: synthesise',
+      prompt: 'Write one answer.',
+      configOptions,
+      tools,
+      runId: 'run-1',
+      stepId: 'step-1',
+    })
 
   it('applies what the provider advertised, and puts the same request on the turn', async () => {
     const result = await execute({ model: 'opus', reasoning: 'high' })
     expect(result?.status).toBe('ok')
-    expect(driver.configSets).toEqual([['model', 'opus'], ['reasoning', 'high']])
+    expect(driver.configSets).toEqual([
+      ['model', 'opus'],
+      ['reasoning', 'high'],
+    ])
 
     const session = await runtime.store.requireSession(result!.agentSessionId!)
     const options = session.config.configOptions as AgentConfigOption[]
-    expect(options.map((option) => [option.id, option.currentValue])).toEqual([['model', 'opus'], ['reasoning', 'high']])
+    expect(options.map((option) => [option.id, option.currentValue])).toEqual([
+      ['model', 'opus'],
+      ['reasoning', 'high'],
+    ])
 
     // Codex reads the model and the effort off the turn, so both drivers see the same request.
     const policy = driver.turns[0]!.turn.effectivePolicy
     expect(policy.model).toBe('opus')
     expect(policy.effort).toBe('high')
-    expect(driver.turns[0]!.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('A message with no tool call in it ends your turn') })
+    expect(driver.turns[0]!.input[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('A message with no tool call in it ends your turn'),
+    })
   })
 
   it('mints the managed session token from its persisted tool ceiling', async () => {
@@ -231,12 +258,13 @@ describe('agents.sessionExecute config options', () => {
 
     const snapshot = await runtime.store.snapshot(result!.agentSessionId!, 0)
     const warnings = snapshot.events.flatMap((record) =>
-      record.event.type === 'diagnostic' && record.event.level === 'warning' ? [record.event.message] : [])
+      record.event.type === 'diagnostic' && record.event.level === 'warning' ? [record.event.message] : [],
+    )
     expect(warnings.join('\n')).toContain('model = gpt-9')
   })
 
   // A manifest harness registers its profile with its own runtime id as the managed provider
-  // (../harnessRegistry.ts), so a step names it the way it names Claude. A profile that names no
+  // (createHarnessRegistry), so a step names it the way it names Claude. A profile that names no
   // driver still answers null, which is the caller's cue to run its headless fallback.
   it('runs a contributed harness profile as a managed session, and answers null for one with no driver', async () => {
     const contributed = new ConfigDriver('acme:agent', 'acme:agent')
@@ -251,7 +279,10 @@ describe('agents.sessionExecute config options', () => {
       const result = await createSessionExecute(runtime)({ ...step, profileId: 'acme:agent', stepId: 'step-acme' })
       expect(result?.status).toBe('ok')
       expect(contributed.turns).toHaveLength(1)
-      expect(await runtime.store.requireSession(result!.agentSessionId!)).toMatchObject({ providerId: 'acme:agent', profileId: 'acme:agent' })
+      expect(await runtime.store.requireSession(result!.agentSessionId!)).toMatchObject({
+        providerId: 'acme:agent',
+        profileId: 'acme:agent',
+      })
 
       expect(await createSessionExecute(runtime)({ ...step, profileId: 'plain', stepId: 'step-plain' })).toBeNull()
     } finally {
@@ -269,15 +300,16 @@ describe('agents.sessionExecute config options', () => {
   // The transcript draws the prompt and folds each context part, so the step's own prompt is all the
   // reader sees of the turn unless they open a part.
   it('sends the context as parts of their own, and inlines them past the context cap', async () => {
-    const withContext = (content: string) => createSessionExecute(runtime)({
-      taskId,
-      profileId: 'claude-code',
-      title: 'Workflow: synthesise',
-      prompt: 'Write one answer.',
-      context: [{ label: 'Output of get-diff', source: 'workflow.upstream', content }],
-      runId: 'run-1',
-      stepId: `step-${randomUUID()}`,
-    })
+    const withContext = (content: string) =>
+      createSessionExecute(runtime)({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow: synthesise',
+        prompt: 'Write one answer.',
+        context: [{ label: 'Output of get-diff', source: 'workflow.upstream', content }],
+        runId: 'run-1',
+        stepId: `step-${randomUUID()}`,
+      })
     await withContext('diff --git a/x b/x')
     expect(driver.turns[0]!.input.map((part) => part.type)).toEqual(['text', 'text', 'context'])
     expect(driver.turns[0]!.input[2]).toMatchObject({ label: 'Output of get-diff', content: 'diff --git a/x b/x' })
@@ -285,21 +317,25 @@ describe('agents.sessionExecute config options', () => {
     await withContext('x'.repeat(600 * 1024))
     const [, only, ...rest] = driver.turns[1]!.input
     expect(rest).toEqual([])
-    expect(only?.type === 'text' && only.text).toContain('<acorn-context source="workflow.upstream" label="Output of get-diff">')
+    expect(only?.type === 'text' && only.text).toContain(
+      '<acorn-context source="workflow.upstream" label="Output of get-diff">',
+    )
   })
 
   describe('a turn that ends without what the step needs', () => {
     const answerSchema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
-    const executeWithSchema = () => createSessionExecute(runtime)({
-      taskId,
-      profileId: 'claude-code',
-      title: 'Workflow: synthesise',
-      prompt: 'Write one answer.',
-      schema: answerSchema,
-      runId: 'run-1',
-      stepId: 'step-1',
-    })
-    const promptOf = (turn: AgentDriverTurnOptions) => turn.input.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n')
+    const executeWithSchema = () =>
+      createSessionExecute(runtime)({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow: synthesise',
+        prompt: 'Write one answer.',
+        schema: answerSchema,
+        runId: 'run-1',
+        stepId: 'step-1',
+      })
+    const promptOf = (turn: AgentDriverTurnOptions) =>
+      turn.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n')
 
     it('is told to carry on, and the step takes the result the next turn returns', async () => {
       driver.replies = [
@@ -331,9 +367,19 @@ describe('agents.sessionExecute config options', () => {
     })
 
     it('keeps autonomous attendance when a saved workflow session is reused without a posture override', async () => {
-      const session = await runtime.createSession({ taskId, providerId: 'claude', profileId: 'claude-code', kind: 'workflow', config: {} }, 'saved-autonomous', 'autonomous')
+      const session = await runtime.createSession(
+        { taskId, providerId: 'claude', profileId: 'claude-code', kind: 'workflow', config: {} },
+        'saved-autonomous',
+        'autonomous',
+      )
       driver.replies = [{ text: 'Done.', stopReason: 'end_turn' }]
-      const outcome = await createSessionExecute(runtime)({ taskId, profileId: 'claude-code', title: 'Workflow', prompt: 'Continue', managedSessionId: session.id })
+      const outcome = await createSessionExecute(runtime)({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow',
+        prompt: 'Continue',
+        managedSessionId: session.id,
+      })
       expect(outcome?.status).toBe('ok')
       expect(driver.turns[0]?.turn.effectivePolicy.attendance).toBe('autonomous')
     })
@@ -341,8 +387,14 @@ describe('agents.sessionExecute config options', () => {
     it('fails a BLOCKED result without sending a continuation', async () => {
       driver.replies = [{ text: 'BLOCKED: Need the owner to choose a deployment target.', stopReason: 'end_turn' }]
       const outcome = await createSessionExecute(runtime)({
-        taskId, profileId: 'claude-code', title: 'Workflow', prompt: 'Deploy', schema: answerSchema,
-        posture: 'autonomous', runId: 'run-1', stepId: 'step-blocked',
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow',
+        prompt: 'Deploy',
+        schema: answerSchema,
+        posture: 'autonomous',
+        runId: 'run-1',
+        stepId: 'step-blocked',
       })
       expect(outcome?.status).toBe('error')
       expect(outcome?.stderrTail).toBe('BLOCKED: Need the owner to choose a deployment target.')
@@ -353,33 +405,52 @@ describe('agents.sessionExecute config options', () => {
   })
   describe('complete workflow capture', () => {
     const normalized = (event: StreamEvent): AgentNormalizedEvent | undefined =>
-      event.type === 'managed-agent' ? event.event as AgentNormalizedEvent : undefined
-    const run = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) => createSessionExecute(runtime)({
-      taskId, profileId: 'claude-code', title: 'Capture', prompt: 'Answer.', timeoutMs: 5_000, ...extra,
-    })
-    const progress = (count: number): AgentNormalizedEvent[] => Array.from({ length: count }, (_, n) => ({
-      type: 'reasoning', text: `reason ${n}`, messageId: `reason-${n}`,
-    }))
+      event.type === 'managed-agent' ? (event.event as AgentNormalizedEvent) : undefined
+    const run = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
+      createSessionExecute(runtime)({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Capture',
+        prompt: 'Answer.',
+        timeoutMs: 5_000,
+        ...extra,
+      })
+    const progress = (count: number): AgentNormalizedEvent[] =>
+      Array.from({ length: count }, (_, n) => ({
+        type: 'reasoning',
+        text: `reason ${n}`,
+        messageId: `reason-${n}`,
+      }))
 
     it.each([501, 2_001])('captures results beyond %i events and parses a JSON token across pages', async (count) => {
       const expected = '```json\n{"answer":"' + 'x'.repeat(300_000) + 'token"}\n```'
-      driver.replies = [{ text: '', stopReason: 'end_turn', events: [
-        ...progress(498),
-        { type: 'assistant_message', text: expected.slice(0, -10), append: true, messageId: 'answer' },
-        { type: 'diagnostic', level: 'info', message: 'page boundary' },
-        { type: 'assistant_message', text: expected.slice(-10), append: true, messageId: 'answer' },
-        ...progress(count - 501),
-      ] }]
+      driver.replies = [
+        {
+          text: '',
+          stopReason: 'end_turn',
+          events: [
+            ...progress(498),
+            { type: 'assistant_message', text: expected.slice(0, -10), append: true, messageId: 'answer' },
+            { type: 'diagnostic', level: 'info', message: 'page boundary' },
+            { type: 'assistant_message', text: expected.slice(-10), append: true, messageId: 'answer' },
+            ...progress(count - 501),
+          ],
+        },
+      ]
       const streamed: StreamEvent[] = []
       // Force the entire accepted stream into the enqueue/turn-id gap.
       const enqueue = runtime.enqueueTurn.bind(runtime)
       vi.spyOn(runtime, 'enqueueTurn').mockImplementation(async (...args) => {
         const turn = await enqueue(...args)
-        await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('completed'), { timeout: 5_000 })
+        await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('completed'), {
+          timeout: 5_000,
+        })
         return turn
       })
-      const result = await run({ onEvent: (event) => streamed.push(event),
-        schema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] } })
+      const result = await run({
+        onEvent: (event) => streamed.push(event),
+        schema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] },
+      })
       expect(result?.status).toBe('ok')
       expect(result?.capture.result).toBe(expected)
       expect(result?.capture.structuredOutput).toEqual({ answer: 'x'.repeat(300_000) + 'token' })
@@ -393,23 +464,49 @@ describe('agents.sessionExecute config options', () => {
       vi.restoreAllMocks()
     })
 
-    it.each(['cancelled', 'timeout', 'error', 'interrupted'] as const)('retains the full response and tool events for %s', async (status) => {
-      const controller = new AbortController()
-      driver.replies = [{ text: '', stopReason: 'end_turn', hang: true, events: [
-        ...progress(501), { type: 'tool', tool: { id: 'tool', title: 'Read', status: 'completed', output: 'exact tool output' } },
-        { type: 'assistant_message', text: 'exact partial response' },
-        ...(['error', 'interrupted'].includes(status) ? [{ type: 'error', code: 'failed', message: 'provider failed', retryable: status === 'interrupted' } as const] : []),
-      ] }]
-      const result = await run({ signal: controller.signal, timeoutMs: status === 'timeout' ? 200 : 5_000,
-        onEvent: (event) => { if (status === 'cancelled' && normalized(event)?.type === 'assistant_message') controller.abort() },
-      })
-      expect(result?.status).toBe(status === 'interrupted' ? 'error' : status)
-      expect(result?.capture.result).toBe('exact partial response')
-      expect(result?.capture.events.some((event) => {
-        const value = normalized(event)
-        return value?.type === 'tool' && value.tool.output === 'exact tool output'
-      })).toBe(true)
-    })
+    it.each(['cancelled', 'timeout', 'error', 'interrupted'] as const)(
+      'retains the full response and tool events for %s',
+      async (status) => {
+        const controller = new AbortController()
+        driver.replies = [
+          {
+            text: '',
+            stopReason: 'end_turn',
+            hang: true,
+            events: [
+              ...progress(501),
+              { type: 'tool', tool: { id: 'tool', title: 'Read', status: 'completed', output: 'exact tool output' } },
+              { type: 'assistant_message', text: 'exact partial response' },
+              ...(['error', 'interrupted'].includes(status)
+                ? [
+                    {
+                      type: 'error',
+                      code: 'failed',
+                      message: 'provider failed',
+                      retryable: status === 'interrupted',
+                    } as const,
+                  ]
+                : []),
+            ],
+          },
+        ]
+        const result = await run({
+          signal: controller.signal,
+          timeoutMs: status === 'timeout' ? 200 : 5_000,
+          onEvent: (event) => {
+            if (status === 'cancelled' && normalized(event)?.type === 'assistant_message') controller.abort()
+          },
+        })
+        expect(result?.status).toBe(status === 'interrupted' ? 'error' : status)
+        expect(result?.capture.result).toBe('exact partial response')
+        expect(
+          result?.capture.events.some((event) => {
+            const value = normalized(event)
+            return value?.type === 'tool' && value.tool.output === 'exact tool output'
+          }),
+        ).toBe(true)
+      },
+    )
 
     it('keeps both target turns complete and excludes unrelated session history', async () => {
       driver.replies = [{ text: 'unrelated', stopReason: 'end_turn' }]
@@ -418,22 +515,32 @@ describe('agents.sessionExecute config options', () => {
         { text: 'malformed', stopReason: 'end_turn', events: progress(501) },
         { text: '```json\n{"answer":"complete"}\n```', stopReason: 'end_turn', events: progress(2_001) },
       ]
-      const result = await run({ managedSessionId: previous!.agentSessionId!, schema: { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } } })
+      const result = await run({
+        managedSessionId: previous!.agentSessionId!,
+        schema: { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } },
+      })
       expect(result?.status).toBe('ok')
       expect(result?.capture.structuredOutput).toEqual({ answer: 'complete' })
       expect(result?.capture.events.length).toBeGreaterThan(2_500)
-      expect(result?.capture.events.some((event) => {
-        const value = normalized(event)
-        return value?.type === 'assistant_message' && value.text === 'unrelated'
-      })).toBe(false)
+      expect(
+        result?.capture.events.some((event) => {
+          const value = normalized(event)
+          return value?.type === 'assistant_message' && value.text === 'unrelated'
+        }),
+      ).toBe(false)
     })
 
     it('flushes accepted append deltas before cancellation capture without waiting for the buffer timer', async () => {
       const controller = new AbortController()
-      driver.replies = [{ text: '', stopReason: 'end_turn', hang: true,
-        events: [{ type: 'assistant_message', text: 'accepted buffered text', append: true }],
-        afterEvents: () => controller.abort(),
-      }]
+      driver.replies = [
+        {
+          text: '',
+          stopReason: 'end_turn',
+          hang: true,
+          events: [{ type: 'assistant_message', text: 'accepted buffered text', append: true }],
+          afterEvents: () => controller.abort(),
+        },
+      ]
       const result = await run({ signal: controller.signal })
       expect(result?.status).toBe('cancelled')
       expect(result?.capture.result).toBe('accepted buffered text')
@@ -448,42 +555,72 @@ describe('agents.sessionExecute config options', () => {
       expect(late.event).toEqual({ type: 'usage', usage: { inputTokens: 12, outputTokens: 34 } })
       expect(late.turnId).toBeNull()
       await runtime.store.recordEvent(result!.agentSessionId!, driver.turns[0]!.turn.id, late.event)
-      expect((await runtime.store.turn(driver.turns[0]!.turn.id))?.usage).toMatchObject({ inputTokens: 12, outputTokens: 34 })
+      expect((await runtime.store.turn(driver.turns[0]!.turn.id))?.usage).toMatchObject({
+        inputTokens: 12,
+        outputTokens: 34,
+      })
       expect(result?.capture.usage).toBeUndefined()
     })
   })
 
-
   // A step with a completion condition (docs/workflows/agent-steps.md § Completion conditions). The
   // judge is faked; each test scripts its verdicts in order.
   describe('a step with a completion condition', () => {
-    const verdictText = (blocker: string, reason = 'Reason.') => JSON.stringify({
-      satisfied: blocker === 'none', blocker, reason, evidence_summary: 'Evidence.', relied_on_assumption: false,
-    })
+    const verdictText = (blocker: string, reason = 'Reason.') =>
+      JSON.stringify({
+        satisfied: blocker === 'none',
+        blocker,
+        reason,
+        evidence_summary: 'Evidence.',
+        relied_on_assumption: false,
+      })
     let verdicts: Array<string | Error>
     let judgeCalls: number
     let judge: { models: { generateText: ReturnType<typeof vi.fn> }; currentUserId: () => string | null }
-    const tool: AgentNormalizedEvent = { type: 'tool', tool: { id: 'tool', title: 'Edit', status: 'completed', output: 'ok' } }
-    const promptOf = (turn: AgentDriverTurnOptions) => turn.input.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n')
+    const tool: AgentNormalizedEvent = {
+      type: 'tool',
+      tool: { id: 'tool', title: 'Edit', status: 'completed', output: 'ok' },
+    }
+    const promptOf = (turn: AgentDriverTurnOptions) =>
+      turn.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n')
 
     beforeEach(() => {
       verdicts = []
       judgeCalls = 0
       judge = {
         currentUserId: () => 'user-1',
-        models: { generateText: vi.fn(async () => {
-          judgeCalls += 1
-          const next = verdicts.shift() ?? verdictText('none')
-          if (next instanceof Error) throw next
-          return { text: next, providerId: 'p', backendId: 'b', modelId: 'haiku', usage: { inputTokens: 10, outputTokens: 2 } }
-        }) },
+        models: {
+          generateText: vi.fn(async () => {
+            judgeCalls += 1
+            const next = verdicts.shift() ?? verdictText('none')
+            if (next instanceof Error) throw next
+            return {
+              text: next,
+              providerId: 'p',
+              backendId: 'b',
+              modelId: 'haiku',
+              usage: { inputTokens: 10, outputTokens: 2 },
+            }
+          }),
+        },
       }
     })
 
     const run = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
-      createSessionExecute(runtime, undefined, judge as never)({
-        taskId, profileId: 'claude-code', title: 'Workflow: fix', prompt: 'Fix the login regression.',
-        goal: 'The login tests pass.', runId: 'run-1', stepId: `step-${randomUUID()}`, timeoutMs: 10_000, ...extra,
+      createSessionExecute(
+        runtime,
+        undefined,
+        judge as never,
+      )({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow: fix',
+        prompt: 'Fix the login regression.',
+        goal: 'The login tests pass.',
+        runId: 'run-1',
+        stepId: `step-${randomUUID()}`,
+        timeoutMs: 10_000,
+        ...extra,
       })
 
     it('continues in the same session until the condition is met, then publishes once', async () => {
@@ -500,8 +637,12 @@ describe('agents.sessionExecute config options', () => {
       expect(promptOf(driver.turns[0]!)).toContain('Completion condition: The login tests pass.')
       expect(promptOf(driver.turns[1]!)).toContain('The tests were not run.')
       expect(driver.turns[1]!.turn.effectivePolicy.continuationOf).toBe(driver.turns[0]!.turn.id)
-      expect(result?.goal).toMatchObject({ status: 'satisfied', continuations: 1, repairs: 0,
-        automaticTurns: [{ turnId: driver.turns[1]!.turn.id, reason: 'goal' }] })
+      expect(result?.goal).toMatchObject({
+        status: 'satisfied',
+        continuations: 1,
+        repairs: 0,
+        automaticTurns: [{ turnId: driver.turns[1]!.turn.id, reason: 'goal' }],
+      })
       expect(goals).toEqual(['checking', 'continuing', 'checking', 'satisfied'])
       // Judge usage joins the step's usage once.
       expect(result?.capture.usage).toMatchObject({ inputTokens: 20, outputTokens: 4 })
@@ -526,7 +667,11 @@ describe('agents.sessionExecute config options', () => {
 
     it('stops after two continuations that make no tool call or file change', async () => {
       verdicts = [1, 2, 3].map(() => verdictText('goal_not_met_yet', 'Still not done.'))
-      driver.replies = [{ text: 'Started.', stopReason: 'end_turn', events: [tool] }, { text: 'Thinking.', stopReason: 'end_turn' }, { text: 'Thinking.', stopReason: 'end_turn' }]
+      driver.replies = [
+        { text: 'Started.', stopReason: 'end_turn', events: [tool] },
+        { text: 'Thinking.', stopReason: 'end_turn' },
+        { text: 'Thinking.', stopReason: 'end_turn' },
+      ]
       const result = await run()
       expect(result?.status).toBe('error')
       expect(result?.stderrTail).toContain('Goal limit reached')
@@ -537,10 +682,12 @@ describe('agents.sessionExecute config options', () => {
     it('asks the caller before each check and each automatic turn, and stops when refused', async () => {
       verdicts = [verdictText('goal_not_met_yet')]
       const asked: string[] = []
-      const result = await run({ admitAutomatic: async ({ kind }) => {
-        asked.push(kind)
-        return kind === 'turn' ? 'turn budget exhausted' : null
-      } })
+      const result = await run({
+        admitAutomatic: async ({ kind }) => {
+          asked.push(kind)
+          return kind === 'turn' ? 'turn budget exhausted' : null
+        },
+      })
       expect(asked).toEqual(['check', 'turn'])
       expect(result?.status).toBe('error')
       expect(result?.stderrTail).toBe('turn budget exhausted')
@@ -549,7 +696,10 @@ describe('agents.sessionExecute config options', () => {
 
     it('repairs a malformed result after the condition is met, then checks again', async () => {
       const schema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
-      driver.replies = [{ text: 'Done, tests pass.', stopReason: 'end_turn' }, { text: '```json\n{"answer":"fixed"}\n```', stopReason: 'end_turn' }]
+      driver.replies = [
+        { text: 'Done, tests pass.', stopReason: 'end_turn' },
+        { text: '```json\n{"answer":"fixed"}\n```', stopReason: 'end_turn' },
+      ]
       const result = await run({ schema })
       expect(result?.status).toBe('ok')
       expect(result?.capture.structuredOutput).toEqual({ answer: 'fixed' })
@@ -566,16 +716,17 @@ describe('agents.sessionExecute config options', () => {
 
     it('cancels without saving a satisfied result when the run stops during a check', async () => {
       const controller = new AbortController()
-      judge.models.generateText.mockImplementation(async (request: { input: { signal: AbortSignal } }) =>
-        new Promise((_resolve, reject) => {
-          request.input.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
-          controller.abort()
-        }))
+      judge.models.generateText.mockImplementation(
+        async (request: { input: { signal: AbortSignal } }) =>
+          new Promise((_resolve, reject) => {
+            request.input.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+            controller.abort()
+          }),
+      )
       const result = await run({ signal: controller.signal })
       expect(result?.status).toBe('cancelled')
       expect(result?.goal?.status).toBe('stopped')
       expect(driver.turns).toHaveLength(1)
     })
   })
-
 })

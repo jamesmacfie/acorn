@@ -1,6 +1,11 @@
 import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, registerCommands, type ContributedCommand, type UiSlotContribution } from '@acorn/plugin-api/client'
+import {
+  prefsOptions,
+  registerCommands,
+  type ContributedCommand,
+  type UiSlotContribution,
+} from '@acorn/plugin-api/client'
 import { startSessionFromPalette } from './commands'
 import { agentProvidersOptions } from './providersClient'
 import { customAgentsOptions } from './settings/customAgentsClient'
@@ -13,29 +18,23 @@ import {
   type AgentToolFoldMode,
 } from './sessions/toolFoldPrefs'
 
-// The two agent defaults the catalogue admits as palette settings: whether a session carries the last
-// one's model forward, and how a tool card starts out
-// (docs/managed-agents/palette.md § From the command palette).
+// The palette rows that need the query cache: the two agent defaults the catalogue admits as settings
+// (whether a session carries the last one's model forward, and how a tool card starts out), and one
+// New session row per harness or custom agent (docs/managed-agents/palette.md § From the command palette).
 //
-// **Why a mounted component rather than `ctx.commands` at boot.** Both write through the accessors
-// their Settings pages already use, and both of those accessors take a `QueryClient` — the cache is
-// what makes every reader move at once, and a second write path is exactly what phase 3 existed to
-// prevent. There is no query client at plugin `init`: the desktop mints one per node and hands it to a
-// provider. So these register where a client is in scope, which is a component, and the slot is how a
-// component that draws nothing gets mounted. It is the same shape github's router-scoped commands take
-// (plugins/github/src/client/Shortcuts.tsx).
+// A mounted component rather than `ctx.commands` at boot, because the settings write through the same
+// `QueryClient` accessors as their Settings pages, so every reader moves at once, and there is no query
+// client at plugin `init`: the desktop mints one per node and hands it to a provider. The slot is how
+// a component that draws nothing gets mounted.
 //
-// **Desktop only, and that is the honest answer rather than a gap.** The `overlay` slot is not drawn in
-// a terminal (docs/tui/plugin-losses.md § What a plugin loses here), and the tool-fold value is a device preference
-// with nowhere to be stored there — which is the same reason core registers Appearance on the desktop
-// and not in the terminal. A choice that would quietly fail to persist is worse than an absent row.
-//
-// Everything else on those two pages stays a page: pricing and concurrency are numeric forms, and the
-// per-provider default values are a table keyed by options a provider advertises at run time.
+// Desktop only on purpose. The `overlay` slot is not drawn in a terminal
+// (docs/tui/plugin-losses.md § What a plugin loses here), and the tool-fold value is a device
+// preference with nowhere to be stored there. A choice that would quietly fail to persist is worse than
+// an absent row.
 
 const on = (value: boolean): string => (value ? 'on' : 'off')
 
-export function AgentCommands() {
+function AgentCommands() {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
 
@@ -74,7 +73,7 @@ export function AgentCommands() {
         scope: 'none',
         requires: { plugin: 'agents' },
         read: () => Promise.resolve(readAgentToolFoldPrefs(prefs.data).mode),
-        // The page's three choices, spelled once (./sessions/toolFoldPrefs.ts).
+        // The page's three choices, spelled once.
         options: AGENT_TOOL_FOLD_CHOICES,
         write: async (value) => {
           await saveAgentToolFoldMode(queryClient, prefs.data, value as AgentToolFoldMode)
@@ -89,7 +88,11 @@ export function AgentCommands() {
   const providers = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
   registerNewSessionCommands(() =>
-    newSessionChoices((providers.data ?? []).filter((provider) => provider.installed), customAgents.data ?? []))
+    newSessionChoices(
+      (providers.data ?? []).filter((provider) => provider.installed),
+      customAgents.data ?? [],
+    ),
+  )
 
   return null
 }
@@ -114,29 +117,31 @@ function registerNewSessionCommands(list: () => readonly NewSessionChoice[]): vo
   createEffect(() => {
     const ids = roster()
     if (!ids.length) return
-    const registered = registerCommands(ids.map((id): ContributedCommand => ({
-      id,
-      title: () => {
-        const choice = live(id)
-        return `New ${choice ? choiceLabel(choice) : 'agent'} session`
-      },
-      hint: () => (live(id)?.agent ? 'a custom agent, started in this task' : 'an agent session in this task'),
-      keywords: ['agent', 'new', 'session', id.startsWith('agents.custom-agent.') ? 'custom' : 'harness'],
-      category: 'action',
-      palette: true,
-      scope: 'task',
-      requires: { plugin: 'agents' },
-      when: () => !!live(id),
-      run: (context) => {
-        const choice = live(id)
-        if (!choice || !context.taskId) return
-        return startSessionFromPalette(
-          context.taskId,
-          { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
-          choice.agent?.id,
-        )
-      },
-    })))
+    const registered = registerCommands(
+      ids.map((id): ContributedCommand => ({
+        id,
+        title: () => {
+          const choice = live(id)
+          return `New ${choice ? choiceLabel(choice) : 'agent'} session`
+        },
+        hint: () => (live(id)?.agent ? 'a custom agent, started in this task' : 'an agent session in this task'),
+        keywords: ['agent', 'new', 'session', id.startsWith('agents.custom-agent.') ? 'custom' : 'harness'],
+        category: 'action',
+        palette: true,
+        scope: 'task',
+        requires: { plugin: 'agents' },
+        when: () => !!live(id),
+        run: (context) => {
+          const choice = live(id)
+          if (!choice || !context.taskId) return
+          return startSessionFromPalette(
+            context.taskId,
+            { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
+            choice.agent?.id,
+          )
+        },
+      })),
+    )
     onCleanup(() => registered.dispose())
   })
 }

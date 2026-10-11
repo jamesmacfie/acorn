@@ -2,8 +2,7 @@ import { createSignal, onCleanup, type Accessor } from 'solid-js'
 import { integrationFlowRegistry, type DeviceFlowStart } from '../../host/registries/sources/integrationFlows'
 
 // Device authorization grant (RFC 8628) for a provider whose descriptor says `kind: 'device-flow'`.
-// The node performs the token exchange; this only paces the polling, which is the whole reason it
-// is a shared module rather than a branch inside one settings component. Both Settings' Add connection and
+// The node performs the token exchange; this only paces the polling. Settings' Add connection and
 // first-run onboarding need identical pacing, and getting it wrong (polling faster than the
 // advertised interval, ignoring slow_down) is how a connection quietly stops working.
 //

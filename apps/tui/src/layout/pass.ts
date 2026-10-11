@@ -3,24 +3,18 @@ import type { Node } from '../tree/node'
 
 // One layout pass, and the clamp that reads it back.
 //
-// This function is where the old render guard went — deleted with the old painter, and in the git
-// history as `apps/tui/src/renderGuard.ts`. That file patched two methods on somebody else's
-// prototype because a node that joins the tree after a frame's layout pass has no computed size, and
-// the fault is Yoga's rather than OpenTUI's: `getComputedWidth` and `getComputedHeight` on an
-// unmeasured node both return `NaN`, and so does `getComputedLayout()` for the same two fields
-// (docs/tui/rendering.md § Rendering). It survives the move to wasm unchanged. What changes is that there is
-// one place a rectangle is read, so there is one place to answer it.
+// A node that joins the tree after a frame's layout pass has no computed size: Yoga's
+// `getComputedWidth` and `getComputedHeight` on an unmeasured node both return `NaN`
+// (docs/tui/rendering.md § Rendering). This is the one place a rectangle is read, so it is the one
+// place that answers it.
 //
-// Three things the clamp has to know, each measured rather than assumed.
+// Three things the clamp has to know.
 //
 //   NaN is the marker    and zero is not. An empty auto-sized box lays out at height 0 and a
 //                        `DISPLAY_NONE` subtree lays out at 0, 0, 0, 0, both legitimately, so "is it
 //                        zero" cannot be the question anywhere. Only `Number.isFinite` can.
-//   a size becomes zero  rather than the one cell the render guard chose. That 1 was for the Zig
-//                        side, which took a `u32` and threw on `NaN` from inside the render loop.
-//                        Our paint has no such door: a zero rectangle paints nothing, which is the
-//                        honest answer for a node Yoga has never measured, and the next frame has
-//                        the real size.
+//   a size becomes zero  because a zero rectangle paints nothing, which is the honest answer for a
+//                        node Yoga has never measured, and the next frame has the real size.
 //   a left may be        and stays negative. An overflowing child under `alignItems: center`
 //   negative             reported left -15 at width 40 inside a 10-cell parent. Clamping that to 0
 //                        would move the run; paint's job is to clip it. So the invariant is four
@@ -41,9 +35,7 @@ const position = (value: number): number => (Number.isFinite(value) ? Math.round
 const size = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0)
 
 /** Yoga's four computed numbers, made safe, and offset into absolute screen cells by the parent's
- *  origin. Exported on its own because it is the whole of what the render guard's own test pinned,
- *  and `./layout.test.ts § clamps the rectangle of a node that joined the tree after the pass` is
- *  where that assertion now lives. */
+ *  origin. Exported on its own so `./layout.test.ts` can pin the clamp directly. */
 export function clampRect(
   left: number,
   top: number,
@@ -108,12 +100,12 @@ export function readBack(node: Node, originX = 0, originY = 0, resized: Node[] =
  * Lay the whole tree out at a terminal size and read it back. Called once per dirty frame.
  *
  * The `onSizeChange` calls come after the whole read-back rather than during it, and they are the
- * one thing in this file that runs somebody else's code. Eight components in this package pick a
- * form from the width they were given — the rail takes a third of the shell, the footer cuts its
- * hints to the row it has, a `list-detail` stacks below 80 cells — and every one of them reads it
- * from this prop. Without the call each of those reads the zero its `ref` saw before the first
- * layout and never hears otherwise: the rail drew at its 20-cell floor instead of 24, and the footer
- * cut every hint to nothing (../chrome/Rail.tsx § railCells, ../chrome/Footer.tsx).
+ * one thing in this file that runs somebody else's code. Components in this package pick a form
+ * from the width they were given — the rail takes a third of the shell, the footer cuts its hints to
+ * the row it has, a `list-detail` stacks below 80 cells — and every one of them reads it from this
+ * prop. Without the call each of those reads the zero its `ref` saw before the first layout and never
+ * hears otherwise, so the rail draws at its floor and the footer cuts every hint to nothing
+ * (../chrome/Rail.tsx § railCells, ../chrome/Footer.tsx).
  *
  * After the walk, because a handler writes a signal, and a signal written mid-walk is a tree
  * changing while it is being measured. It asks for the next frame instead, which the scheduler

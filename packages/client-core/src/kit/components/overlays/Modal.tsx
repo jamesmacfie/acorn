@@ -2,6 +2,7 @@ import { createRenderEffect, createUniqueId, on, onCleanup, onMount, Show, type 
 import { Portal } from 'solid-js/web'
 import { focusableIn, restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/controls/dismissable'
+import { latestSignal } from '../../lib/state/latestSignal'
 import { IconButton } from '../inputs/IconButton'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design/overlays.md § Chrome and
@@ -9,15 +10,14 @@ import { IconButton } from '../inputs/IconButton'
 // don't use it.
 //
 // A trap: it holds Tab inside while it is open and hands focus back to whatever opened it when it
-// goes (../keys/trap.ts). Before that, dismissing left the body focused and the next Tab started
-// again from the top of the page.
+// goes (`restoreFocusOnCleanup`), so dismissing does not leave the body focused and the next Tab
+// starting again from the top of the page.
 //
 // It portals, like every other overlay in the kit. `.pane` sets `contain: layout paint`
 // (infra/styles/shell.css), which makes the pane a containing block for `position: fixed`, so a
-// modal rendered inline inside a pane got a backdrop the size of that pane and clipped by its
-// `overflow: auto` rather than one over the window. The ref-based focus trap and dismissal are
-// unaffected by the move, and a loaded plugin's overlay is inside an iframe, so it stays boxed
-// either way (host/frames/PluginRefPanel.tsx).
+// modal rendered inline inside a pane would get a backdrop the size of that pane, clipped by its
+// `overflow: auto`, rather than one over the window. A loaded plugin's overlay is inside an iframe,
+// so it stays boxed either way (host/frames/PluginRefPanel.tsx).
 //
 // Focus moves inside on open, so the next Tab stays in the dialog and a screen reader hears it. With
 // no `autoFocus`, it goes to the first control in the body. An `alertdialog` starts on its first
@@ -62,29 +62,45 @@ export function Modal(props: {
 }) {
   let dialog!: HTMLDivElement
   let sizeAnimation: Animation | undefined
-  let resizeRevision = 0
+  const resize = latestSignal()
   // Read the old box before the size attribute and children update, then animate to the final box.
   // This follows the layout rather than scaling text, and applies to any dialog that changes size.
-  createRenderEffect(on(() => props.size, () => {
-    if (!dialog?.isConnected || !dialog.animate || document.visibilityState === 'hidden'
-      || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    const revision = ++resizeRevision
-    const before = dialog.getBoundingClientRect()
-    sizeAnimation?.cancel()
-    queueMicrotask(() => {
-      if (!dialog.isConnected || revision !== resizeRevision || document.visibilityState === 'hidden') return
-      const after = dialog.getBoundingClientRect()
-      sizeAnimation = dialog.animate([
-        { width: `${before.width}px`, height: `${before.height}px` },
-        { width: `${after.width}px`, height: `${after.height}px` },
-      ], { duration: 220, easing: 'ease-out' })
-    })
-  }, { defer: true }))
+  createRenderEffect(
+    on(
+      () => props.size,
+      () => {
+        if (
+          !dialog?.isConnected ||
+          !dialog.animate ||
+          document.visibilityState === 'hidden' ||
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        )
+          return
+        const resizing = resize.next()
+        const before = dialog.getBoundingClientRect()
+        sizeAnimation?.cancel()
+        queueMicrotask(() => {
+          if (!dialog.isConnected || resizing.aborted || document.visibilityState === 'hidden') return
+          const after = dialog.getBoundingClientRect()
+          sizeAnimation = dialog.animate(
+            [
+              { width: `${before.width}px`, height: `${before.height}px` },
+              { width: `${after.width}px`, height: `${after.height}px` },
+            ],
+            { duration: 220, easing: 'ease-out' },
+          )
+        })
+      },
+      { defer: true },
+    ),
+  )
   // WebKit pauses animation clocks in an occluded window. Keep the final layout if it is hidden.
-  const settleHiddenResize = () => { if (document.visibilityState === 'hidden') sizeAnimation?.cancel() }
+  const settleHiddenResize = () => {
+    if (document.visibilityState === 'hidden') sizeAnimation?.cancel()
+  }
   document.addEventListener('visibilitychange', settleHiddenResize)
   onCleanup(() => {
-    resizeRevision++
+    resize.abort()
     sizeAnimation?.cancel()
     document.removeEventListener('visibilitychange', settleHiddenResize)
   })
@@ -99,12 +115,14 @@ export function Modal(props: {
   restoreFocusOnCleanup()
   // After mount rather than straight away: a dialog under a Suspense boundary is built before it is
   // in the document, and a focus call on a detached element does nothing.
-  onMount(() => queueMicrotask(() => {
-    const own = props.autoFocus?.()
-    if (own) return own.focus()
-    if (!dialog?.isConnected || dialog.contains(document.activeElement)) return
-    firstFocus(dialog, props.role ?? 'dialog').focus({ preventScroll: true })
-  }))
+  onMount(() =>
+    queueMicrotask(() => {
+      const own = props.autoFocus?.()
+      if (own) return own.focus()
+      if (!dialog?.isConnected || dialog.contains(document.activeElement)) return
+      firstFocus(dialog, props.role ?? 'dialog').focus({ preventScroll: true })
+    }),
+  )
   // An empty `dismissOn` means the dialog must be finished, not left, so it draws no close button.
   const closable = () => (props.dismissOn ?? ['escape']).length > 0
 
@@ -129,7 +147,9 @@ export function Modal(props: {
         >
           <Show when={props.title}>
             <div class="overlay-title">
-              <span class="overlay-title-text" id={titleId}>{props.title}</span>
+              <span class="overlay-title-text" id={titleId}>
+                {props.title}
+              </span>
               <Show when={closable()}>
                 <IconButton icon="x" label="Close" onPress={() => props.onDismiss()} />
               </Show>

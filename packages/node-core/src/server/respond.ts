@@ -3,9 +3,23 @@ import type { Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { codeForStatus, requestIdSchema, statusIsRetryable, type ApiError, type ErrorCodeOrDomain } from '@acorn/protocol/errors.ts'
+import {
+  codeForStatus,
+  requestIdSchema,
+  statusIsRetryable,
+  type ApiError,
+  type ErrorCodeOrDomain,
+} from '@acorn/protocol/errors.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
-import { emitError, emitSpan, newSpanId, newTraceId, runWithTelemetry, telemetryEnabled, PERF } from './telemetry/collector'
+import {
+  emitError,
+  emitSpan,
+  newSpanId,
+  newTraceId,
+  runWithTelemetry,
+  telemetryEnabled,
+  PERF,
+} from './telemetry/collector'
 import { createLogger, perfLine } from './telemetry/logger'
 import type { AppEnv } from './middleware/auth'
 
@@ -26,8 +40,8 @@ import type { AppEnv } from './middleware/auth'
 // input.
 //
 // The response size rides along because the desktop's helper wire base64-encodes every body, and
-// `apps/desktop/src/shell/wire.ts` puts the ceiling on that at tens of megabytes. Nothing could say
-// whether a real body ever reaches it, because nothing measured a body. `-1` means the response is a
+// `apps/desktop/src/shell/wire.ts` puts the ceiling on that at tens of megabytes, and this is what
+// shows whether a real body gets near it. `-1` means the response is a
 // stream and did not declare a length, which is what terminal output and file downloads look like.
 export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const provided = c.req.header('x-request-id')
@@ -121,7 +135,7 @@ export function respondError(
 export const onServerError = (err: Error, c: Context<AppEnv>) => {
   if (err instanceof HTTPException) return err.getResponse()
   const value = err as Error & { code?: unknown }
-  // Drizzle/better-sqlite3 can embed bound values in err.message. Neither the browser nor logs get
+  // Drizzle and the SQLite driver can embed bound values in err.message. Neither the browser nor logs get
   // the message/stack at this generic backstop; domain paths that intentionally expose safe detail
   // must do so before throwing. Name + a short machine code retain useful classification, and the
   // requestId is what ties this log line to the envelope the user saw.

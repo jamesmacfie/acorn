@@ -8,7 +8,7 @@ import { segmentCaches } from './segmentCaches'
 //
 // One cache per query client, which is one per node: the same partition, and the same lifetime, as
 // everything else the renderer holds for a node. A pane mounts, reads from it and writes to it, and
-// leaves it behind when it unmounts. Removing the node clears it (infra/node/fleet.ts § dropNode).
+// leaves it behind when it unmounts. Removing the node clears it (`dropNode`).
 // Nothing here is ever written to disk.
 //
 // An entry is one segment of one file: its plain rows, and its coloured rows once colour arrives.
@@ -18,9 +18,9 @@ import { segmentCaches } from './segmentCaches'
 
 /** Rows held across every diff on the node. About six of the largest pull requests anyone reviews;
  *  the segments on screen and near it are a few hundred. */
-export const SEGMENT_CACHE_ROWS = 40_000
+const SEGMENT_CACHE_ROWS = 40_000
 /** Estimated bytes held, plain and coloured together. */
-export const SEGMENT_CACHE_BYTES = 32 * 1024 * 1024
+const SEGMENT_CACHE_BYTES = 32 * 1024 * 1024
 
 // The estimator's allowances. A budget, not the engine's heap: an object's fields, an array's header
 // and a string's two bytes a character, counted the same way every time. Strings rows share, the
@@ -65,7 +65,8 @@ export function enrichmentWeight(rows: readonly DiffRow[]): number {
  * Nothing else goes in. Rows are a pure function of these, so the same key on any source of the node
  * is the same rows; review threads and theme are not inputs (tokens carry both themes' colours).
  */
-export const residentKey = (contentKey: string, path: string, sha: string | null): string => `${contentKey}\u0000${path}\u0000${sha ?? ''}`
+export const residentKey = (contentKey: string, path: string, sha: string | null): string =>
+  `${contentKey}\u0000${path}\u0000${sha ?? ''}`
 
 /** `provisional` colour is a fallback after the highlight worker timed out: drawn, but a later pane
  *  colours the segment again rather than take it as final. */
@@ -100,7 +101,9 @@ export type SegmentHolder = {
   supersede: (path: string, patchKey: string) => void
 }
 
-export function createSegmentCache(limits: { rows: number; bytes: number } = { rows: SEGMENT_CACHE_ROWS, bytes: SEGMENT_CACHE_BYTES }) {
+export function createSegmentCache(
+  limits: { rows: number; bytes: number } = { rows: SEGMENT_CACHE_ROWS, bytes: SEGMENT_CACHE_BYTES },
+) {
   // Oldest first: a Map iterates in insertion order, and a touch re-inserts.
   const entries = new Map<string, Entry>()
   const holders = new Set<Holder>()

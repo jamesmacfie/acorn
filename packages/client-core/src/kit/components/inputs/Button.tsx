@@ -5,7 +5,7 @@ import { isExternal } from '../content/isExternal'
 import type { Size, Tone } from '../../tokens/tokens'
 
 /** The delegated tooltip, as props rather than attributes. See docs/ui-design/tooltips.md § Tooltips: the
- *  contract is still data attributes on the element, but only the kit writes them now. */
+ *  contract is data attributes on the element, and only the kit writes them. */
 type Tipped = {
   tip?: string
   /** The second line: what happens, where the tip's first line is what it is. */
@@ -85,17 +85,22 @@ const buttonAttrs = (own: ButtonProps) => ({
 
 export function Button(props: ButtonProps) {
   const safeHref = () => safeContentHref(props.href)
-  // Read once, for the reason on RowParts: testing `props.children` and then inserting it built an
-  // icon button's mark twice.
+  // Read once, for the reason on RowParts: testing `props.children` and then inserting it would build
+  // an icon button's mark twice.
   const content = children(() => props.children)
   // The label doubles as the visible text, so a call site that has only words never writes them
   // twice. A remote tree hands every node its children as a list, empty when there are none, and an
   // empty list is truthy, so "has content" means a child that draws something.
-  const hasContent = () => content.toArray().some((child) => child != null && child !== '' && typeof child !== 'boolean')
+  const hasContent = () =>
+    content.toArray().some((child) => child != null && child !== '' && typeof child !== 'boolean')
   const body = () => (
     <>
-      <Show when={props.busy}><Spinner size="sm" /></Show>
-      <Show when={hasContent()} fallback={props.label}>{content()}</Show>
+      <Show when={props.busy}>
+        <Spinner size="sm" />
+      </Show>
+      <Show when={hasContent()} fallback={props.label}>
+        {content()}
+      </Show>
     </>
   )
   return (

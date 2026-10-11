@@ -36,7 +36,10 @@ export default function ModelPickerPopover(props: {
           onPress={toggle}
         >
           <Show when={props.sparkle} fallback={<Icon name="chevron-down" />}>
-            <Inline gap="none"><Icon name="sparkles" /><Icon name="chevron-down" /></Inline>
+            <Inline gap="none">
+              <Icon name="sparkles" />
+              <Icon name="chevron-down" />
+            </Inline>
           </Show>
         </Button>
       )}

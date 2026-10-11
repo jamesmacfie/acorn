@@ -13,7 +13,7 @@ import type { LayoutProps } from './regions'
 // `list-detail`: a list beside a detail, with the host drawing the divider and the drag handle.
 //
 // Regions: `list`, `detail`, and optionally `list-header` and `list-footer`, which pin above and below
-// the list's own scroll. Two focus groups from phase 2, `list` and `detail`.
+// the list's own scroll. Two focus groups, `list` and `detail`.
 //
 // Hiding `list` drops the whole column, its header and footer with it, and the detail takes the width.
 // That is what a pane collapsing its library asks for, and it is the same move the narrow projection
@@ -22,8 +22,8 @@ import type { LayoutProps } from './regions'
 // Collapsing is the other answer to the same question, and the column survives it: it narrows to the
 // width of the icon rails and each row keeps one mark. Every pane that names this layout gets the
 // control, with no field on the contribution, because a pane that names `list-detail` is a sidebar by
-// definition. The kit node has to be told (kit/components/layout/ListDetail.tsx) since it also
-// draws splits that are two halves of one document.
+// definition. The kit's `ListDetail` node has to be told, since it also draws splits that are two
+// halves of one document.
 //
 // The regions are left alone while collapsed. A pane's `list-header` is the pane's own, so whether it
 // becomes one icon or nothing at all is a question only the pane can answer, and it answers it by
@@ -49,9 +49,9 @@ export function ListDetail(props: LayoutProps) {
   // from the last drag's start.
   let dragStart: number | null = null
   // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
-  // window is not what its list is allowed to fill, and no layout may read the window's width
-  // (shell.css § Layouts, docs/ui-design/closed-kit.md § What the kit and layouts must never do, "never do these" item 12). Before
-  // the element is measurable there is no ceiling to apply; the floor still holds.
+  // window is not what its list is allowed to fill, and no layout may read the window's width (the pane
+  // layouts block in shell.css, and docs/ui-design/closed-kit.md § What the kit and layouts must never
+  // do, item 12). Before the element is measurable there is no ceiling to apply; the floor still holds.
   const ceiling = () => {
     const extent = root?.offsetWidth ?? 0
     return extent > 0 ? extent * MAX_LIST_FRACTION : Number.POSITIVE_INFINITY
@@ -59,28 +59,51 @@ export function ListDetail(props: LayoutProps) {
   const drag = createSplitDrag({
     axis: 'x',
     label: `Resize ${props.label} list`,
-    onStart: () => { dragStart = width() || (list?.offsetWidth ?? MIN_LIST_WIDTH) },
+    onStart: () => {
+      dragStart = width() || (list?.offsetWidth ?? MIN_LIST_WIDTH)
+    },
     onDelta: (deltaPx) => {
       const from = dragStart ?? (width() || (list?.offsetWidth ?? MIN_LIST_WIDTH))
       setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_WIDTH), ceiling()))
     },
-    onCommit: () => { dragStart = null },
+    onCommit: () => {
+      dragStart = null
+    },
   })
 
   return (
-    <div ref={root} class="pane layout-list-detail" style={width() && !collapsed() ? { '--listdetail-w': `${width()}px` } : undefined}>
+    <div
+      ref={root}
+      class="pane layout-list-detail"
+      style={width() && !collapsed() ? { '--listdetail-w': `${width()}px` } : undefined}
+    >
       <Show when={!props.hidden?.includes('list')}>
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}
-        <aside ref={list} class="layout-region-list" data-collapsed={collapsed() ? '' : undefined} aria-label={`${props.label} list`} use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}>
-          <Show when={collapsed()}><div class="layout-collapsed-header" aria-hidden="true" /></Show>
+        <aside
+          ref={list}
+          class="layout-region-list"
+          data-collapsed={collapsed() ? '' : undefined}
+          aria-label={`${props.label} list`}
+          use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}
+        >
+          <Show when={collapsed()}>
+            <div class="layout-collapsed-header" aria-hidden="true" />
+          </Show>
           <Show when={!collapsed() || props.collapseContent !== 'empty'}>
             {props.regions['list-header']?.()}
-            <div class="layout-list-scroll" ref={(element) => retainScroll(element, {
-              key: () => props.scrollScope ?? '',
-              read: (scope) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[0](),
-              write: (scope, offset) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[1](offset),
-            })}>{props.regions.list?.()}</div>
+            <div
+              class="layout-list-scroll"
+              ref={(element) =>
+                retainScroll(element, {
+                  key: () => props.scrollScope ?? '',
+                  read: (scope) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[0](),
+                  write: (scope, offset) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[1](offset),
+                })
+              }
+            >
+              {props.regions.list?.()}
+            </div>
             <Show when={props.regions['list-footer']}>
               <div class="layout-list-footer">{props.regions['list-footer']?.()}</div>
             </Show>
@@ -98,7 +121,9 @@ export function ListDetail(props: LayoutProps) {
           />
         </Show>
       </Show>
-      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>{props.regions.detail?.()}</div>
+      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>
+        {props.regions.detail?.()}
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 // The command layer: tier 0, acorn's resolved keybindings over the command registry.
 //
-// The desktop builds the same layer inside `client-core/host/keys/install.ts`, and it is not shared
-// because the half that decides whether a binding may fire is DOM all the way down: it reads
+// The desktop builds the same layer in client-core's `installKeymap`, and it is not shared because
+// the half that decides whether a binding may fire is DOM all the way down: it reads
 // `document.activeElement`, asks whether that element is inside a `[role="dialog"]`, and has a special
 // case for the hidden textarea xterm focuses. None of those questions exist here, and the two that do
 // — "is a task open" and "which pane has focus" — are the shell's own signals.
@@ -16,10 +16,16 @@ import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { toKeymapKey } from '@acorn/client-core/kit/keys'
 import {
-  commandAvailable, commandRegistry, commandTitle, executeCommand,
+  commandAvailable,
+  commandRegistry,
+  commandTitle,
+  executeCommand,
 } from '@acorn/client-core/host/registries/commands'
 import {
-  keybindingRegistry, resolveKeybindings, type KeybindingPrefs, type ResolvedKeybinding,
+  keybindingRegistry,
+  resolveKeybindings,
+  type KeybindingPrefs,
+  type ResolvedKeybinding,
 } from '@acorn/client-core/host/registries/commands'
 import type { TuiKeymap } from './install'
 import { focusedRenderable, isField, scopeDepth } from './regions'
@@ -47,9 +53,8 @@ const isBareKey = (key: string): boolean => !key.includes('+')
  * A terminal emulator keeps Cmd for itself and never delivers it, so `super+shift+r` is a chord nobody
  * can press — and half the panes in the roster spell their own as `meta+shift+…`, which is acorn's
  * name for the platform's command key and comes out of `toKeymapKey` as `super` on macOS. The intent
- * table already asks this host which modifier it has and is told `ctrl` (../keys/install.ts); a
- * contribution's own chord is a literal and had to be read the same way, or the footer advertises keys
- * that do nothing (docs/tui.md).
+ * table asks this host which modifier it has and is told `ctrl` (./install.ts); a contribution's own
+ * chord is a literal and has to be read the same way, or the footer advertises keys that do nothing.
  *
  * Collisions are possible and are the lesser problem: `resolveKeybindings` already reports two bindings
  * on one chord, and a duplicate that shows up in the conflict list beats a chord that silently never
@@ -72,15 +77,11 @@ const mayFire = (binding: ResolvedKeybinding, scope: CommandScope): boolean => {
  *
  * The caller's reactive scope owns the teardown, which on this host is the process ending.
  *
- * **Nothing here carries a runtime matcher, and that is deliberate.** `@opentui/keymap` 0.5.9 counts
- * a layer, a command or a binding with a matcher as a reason to switch its active-key cache off, and
- * the counter is global — so one `active` or one `enabled` on one command in this layer turned the
- * cache off for every `getActiveKeys` call in the process, and the footer makes one per render
- * (../chrome/bindings.ts, ./tiers.ts § TYPING). This effect already re-runs when the registries or
- * the reader's overrides change; every other question a matcher was asking is a signal too, so the
- * effect reads them and the answers become which bindings the layer has rather than which of its
- * bindings may fire. The layer comes and goes where a matcher used to run per key, which is the same
- * trade the typing shadow makes one tier up.
+ * **Nothing here carries a runtime matcher, and that is deliberate.** One `active` or `enabled` on one
+ * command would switch the engine's active-key cache off for the whole process, and the footer asks
+ * for active keys on every render (./tiers.ts § TYPING). Every question a matcher would ask is a
+ * signal, so the effect reads them and the answers decide which bindings the layer has rather than
+ * which may fire. It is the same trade the typing shadow makes one tier up.
  *
  * What that costs is a rebuild of this layer when any of those answers moves: a task opening, a
  * scope pushing, a route changing, a plugin's own `active` flipping. None of them is per key.
@@ -91,16 +92,20 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
     const depth = scopeDepth()
     const node = focusedRenderable()
     const typing = !!node && isField(node)
-    const commands = commandRegistry.entries()
-      // `enabled` was this field's home and it was a matcher. A command the host cannot run is a
-      // command the palette must not offer and the footer must not name, and dropping it from the
-      // layer says that without one.
+    const commands = commandRegistry
+      .entries()
+      // A command the host cannot run is one the palette must not offer and the footer must not
+      // name. Dropping it from the layer says that without a matcher.
       .filter((command) => commandAvailable(command))
       .map((command): Command<Renderable, KeyEvent> => ({
         name: command.id,
         desc: commandTitle(command),
         group: command.category,
-        run: () => { void executeCommand(command.id).catch((error: unknown) => log.error(`${command.id} failed`, error, { 'command.id': command.id })) },
+        run: () => {
+          void executeCommand(command.id).catch((error: unknown) =>
+            log.error(`${command.id} failed`, error, { 'command.id': command.id }),
+          )
+        },
       }))
     const runnable = new Set(commands.map((command) => command.name))
     const bindings = resolveKeybindings(keybindingRegistry.entries(), scope.prefs())
@@ -111,8 +116,8 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         if (!key) return []
         if (!mayFire(binding, scope) || !runnable.has(binding.command)) return []
         // A bare key belongs to the screen. `w`, `p`, `;`, `n`, `q` and `?` switch or open a picker,
-        // and a reader who presses one inside a dialog meant the dialog. Before this, `w` over the trust prompt
-        // raised the workspace picker on top of it. Chords stay live at every depth, because
+        // and a reader who presses one inside a dialog meant the dialog: `w` over the trust prompt
+        // would raise the workspace picker on top of it. Chords stay live at every depth, because
         // Ctrl+K is not a key anything inside a dialog could want, and the collection layers
         // behind the dialog need no gate of their own: they are focus-within and the focus is
         // inside the dialog, so they never fire (./regions.ts § Scopes).

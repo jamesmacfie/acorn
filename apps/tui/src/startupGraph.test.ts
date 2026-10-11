@@ -18,7 +18,13 @@ describe('complete terminal startup budget', () => {
   let dist: string
   let chunks: Record<string, { imports: string[]; dynamicImports: string[]; modules: string[] }>
   let roots: string[]
-  const chunk = (file: string, bytes = 100, imports: string[] = [], modules: string[] = [], dynamicImports: string[] = []) => {
+  const chunk = (
+    file: string,
+    bytes = 100,
+    imports: string[] = [],
+    modules: string[] = [],
+    dynamicImports: string[] = [],
+  ) => {
     writeFileSync(join(dist, file), 'x'.repeat(bytes))
     chunks[file] = { imports, modules, dynamicImports }
   }
@@ -59,12 +65,15 @@ describe('complete terminal startup budget', () => {
     expect(check().code).toBe(1)
   })
 
-  it.each(['viewState', 'prModel', 'RemoteTree', 'TreeHost', 'roster'])('rejects %s merged into an unrelated startup chunk', (name) => {
-    chunk('chunks/App-a.js', 100, [], [`apps/tui/src/plugins/${name}.tsx`])
-    const result = check()
-    expect(result.code).toBe(1)
-    expect(result.output).toContain(`${name}.tsx (in chunks/App-a.js)`)
-  })
+  it.each(['viewState', 'prModel', 'RemoteTree', 'TreeHost', 'roster'])(
+    'rejects %s merged into an unrelated startup chunk',
+    (name) => {
+      chunk('chunks/App-a.js', 100, [], [`apps/tui/src/plugins/${name}.tsx`])
+      const result = check()
+      expect(result.code).toBe(1)
+      expect(result.output).toContain(`${name}.tsx (in chunks/App-a.js)`)
+    },
+  )
 
   it('rejects an external ORM import and reports other external packages without claiming their bytes', () => {
     chunk('main.js', 100, ['ws', 'drizzle-orm/sqlite-core'])

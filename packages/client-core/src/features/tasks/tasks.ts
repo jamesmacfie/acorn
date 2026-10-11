@@ -1,6 +1,6 @@
 // Rail selection state. The task list is a TanStack query (tasksOptions); this module tracks what
 // the rail has selected, a Source browse view or an active task, plus each task's pane layout.
-// Signals-only, like ../terminal/sessions.ts. The terminal drawer and topbar key off activeTaskId.
+// Signals-only. The terminal drawer and topbar key off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
@@ -9,11 +9,21 @@ import { startRenderTransition } from '../../infra/telemetry/emitter'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
-export type TaskLaunchRequest = { nodeId: string | null; projectId: string; title: string; baseCommit?: string; worktreePath?: string }
+export type TaskLaunchRequest = {
+  nodeId: string | null
+  projectId: string
+  title: string
+  baseCommit?: string
+  worktreePath?: string
+}
 const [taskLaunch, setTaskLaunch] = createSignal<TaskLaunchRequest | null>(null)
 export const taskLaunchRequest = taskLaunch
-export const requestTaskLaunch = (draft: TaskLaunchRequest): void => { setTaskLaunch(draft) }
-export const closeTaskLaunch = (): void => { setTaskLaunch(null) }
+export const requestTaskLaunch = (draft: TaskLaunchRequest): void => {
+  setTaskLaunch(draft)
+}
+export const closeTaskLaunch = (): void => {
+  setTaskLaunch(null)
+}
 
 export type { PaneId, TaskLayout } from './taskLayout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
@@ -22,7 +32,6 @@ export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 // accepts an unknown string, so a missing plugin source stays inert and round-trips through
 // persistence until the user picks another one.
 export type SourceId = string
-export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && !!sourceRegistry.get(v)
 
 // The default source is registered after this module is evaluated. Keep the initial state unset so the
 // accessor resolves that contribution lazily, while retaining an explicit null for task views.
@@ -30,7 +39,7 @@ const UNSET_SOURCE = Symbol('unset-source')
 const [selectedSourceState, setSelectedSourceState] = createSignal<string | null | typeof UNSET_SOURCE>(UNSET_SOURCE)
 export const selectedSource = (): string | null => {
   const selected = selectedSourceState()
-  return selected === UNSET_SOURCE ? defaultSourceId() ?? null : selected
+  return selected === UNSET_SOURCE ? (defaultSourceId() ?? null) : selected
 }
 export function setSelectedSource(source: string | null): void {
   // The source's own plugin owns the span, so "which rail source is slow to draw" is one query
@@ -41,9 +50,8 @@ export function setSelectedSource(source: string | null): void {
 }
 
 // Per-workspace memory of the last view, a rail source or a task, so switching workspaces returns
-// you to what you were looking at. Persisted by the `core.workspace-views` slice
-// (infra/persistence/stateSlices.ts), so it also survives a relaunch. Both clients reopen on the
-// `last_workspace` pref and read what to show from here.
+// you to what you were looking at. Persisted by the `core.workspace-views` slice, so it also survives
+// a relaunch. Both clients reopen on the `last_workspace` pref and read what to show from here.
 //
 // A signal rather than a Map because the persistence pass reads it, and keyed by bare workspace id
 // with the node added at write time by `storageKeyFor` — the same shape as `taskLayouts` below, and
@@ -76,12 +84,11 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
 // Per-task pane layout (docs/panes.md): a left-to-right row of open panes. All transitions go
 // through the pure reducer (applyLayoutAction) via dispatchLayout, the single-writer rule.
-// Persisted to the `task_layouts` preference (App.tsx); the value is migrated on hydrate and
+// Persisted to the `task_layouts` preference; the value is migrated on hydrate and
 // scoped per task.
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
 export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]
-export const activeLayout = (): TaskLayout => taskLayouts()[activeTaskId() ?? ''] ?? defaultLayout()
 
 export function dispatchLayout(taskId: string, action: LayoutAction): void {
   // Resizing can fire on every pointer move. The other actions are deliberate transitions and run
@@ -108,31 +115,16 @@ export function dispatchLayout(taskId: string, action: LayoutAction): void {
   if (focused && !nextLayout.panes.includes(focused)) clearFocusedPane(taskId, focused)
   if (action.type === 'show' || (maximized && !nextLayout.panes.includes(maximized))) setMaximizedPane(taskId, null)
 }
-export const dispatchActiveLayout = (action: LayoutAction): void => {
-  const id = activeTaskId()
-  if (id) dispatchLayout(id, action)
-}
 
-// Seed from persisted prefs at startup without clobbering any layout the user changed pre-hydration.
-export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
-  setTaskLayouts((p) => ({ ...map, ...p }))
-}
 export function hydrateTaskLayout(taskId: string, layout: TaskLayout): void {
   setTaskLayouts((current) => (current[taskId] ? current : { ...current, [taskId]: layout }))
-}
-
-// Recipe-resolved browser home URLs (docs/workspaces-and-tasks/project-config.md § Layout recipes): a layout recipe points the browser pane at
-// a run target's resolved URL. Session-only view state, per task.
-const [recipeBrowserUrls, setRecipeBrowserUrls] = createSignal<Record<string, string>>({})
-export const recipeBrowserUrl = (taskId: string): string | undefined => recipeBrowserUrls()[taskId]
-export function setRecipeBrowserUrl(taskId: string, url: string): void {
-  setRecipeBrowserUrls((p) => (p[taskId] === url ? p : { ...p, [taskId]: url }))
 }
 
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
 // its drawer is open, so switching tasks swaps it and a Source browse (no task) shows no terminal.
 const [terminalOpenTasks, setTerminalOpenTasks] = createSignal<Set<string>>(new Set())
-export const isTerminalOpen = (taskId: string | null | undefined): boolean => !!taskId && terminalOpenTasks().has(taskId)
+export const isTerminalOpen = (taskId: string | null | undefined): boolean =>
+  !!taskId && terminalOpenTasks().has(taskId)
 export function setTerminalOpen(taskId: string, open: boolean): void {
   setTerminalOpenTasks((prev) => {
     if (open === prev.has(taskId)) return prev
@@ -161,7 +153,8 @@ export function setTerminalMax(taskId: string, max: boolean): void {
 // Core-owned focused pane and session-only maximize state. Pane content never mutates these
 // directly: the host's paneFocus directive marks focus on pointer/focusin, and commands read it.
 const [focusedPanes, setFocusedPanes] = createSignal<Record<string, PaneId | undefined>>({})
-export const focusedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? focusedPanes()[taskId] : undefined)
+export const focusedPane = (taskId: string | null | undefined): PaneId | undefined =>
+  taskId ? focusedPanes()[taskId] : undefined
 export function setFocusedPane(taskId: string, pane: PaneId): void {
   setFocusedPanes((current) => (current[taskId] === pane ? current : { ...current, [taskId]: pane }))
 }
@@ -175,7 +168,8 @@ function clearFocusedPane(taskId: string, pane?: PaneId): void {
 }
 
 const [maximizedPanes, setMaximizedPanes] = createSignal<Record<string, PaneId | undefined>>({})
-export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? maximizedPanes()[taskId] : undefined)
+export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined =>
+  taskId ? maximizedPanes()[taskId] : undefined
 export function setMaximizedPane(taskId: string, pane: PaneId | null): void {
   setMaximizedPanes((current) => {
     if ((current[taskId] ?? null) === pane) return current
@@ -196,16 +190,10 @@ export function toggleFocusedPaneMax(taskId: string): void {
   setMaximizedPane(taskId, maximizedPane(taskId) === pane ? null : pane)
 }
 
-// Lifecycle eviction is called by the event-bus subscriber in persistence/scopedEviction.ts.
-// T3 layout removal also causes the descriptor persister to write a scoped tombstone.
-export function evictTaskState(taskId: string): void {
+// Called by the `onScopeEvicted` listener at the foot of this file. Dropping the task's layout also
+// makes the slice persister write a tombstone for that scope.
+function evictTaskState(taskId: string): void {
   setTaskLayouts((current) => {
-    if (!(taskId in current)) return current
-    const next = { ...current }
-    delete next[taskId]
-    return next
-  })
-  setRecipeBrowserUrls((current) => {
     if (!(taskId in current)) return current
     const next = { ...current }
     delete next[taskId]
@@ -239,18 +227,17 @@ export function evictTaskState(taskId: string): void {
 
 export { activeTaskId, setActiveTaskId, taskLayouts }
 
-export function clearNodeScopedTaskState(): void {
+function clearNodeScopedTaskState(): void {
   setWorkspaceViews({})
   setTaskLayouts({})
-  setRecipeBrowserUrls({})
   setTerminalOpenTasks(new Set<string>())
   setTerminalMaxTasks(new Set<string>())
   setFocusedPanes({})
   setMaximizedPanes({})
 }
 
-// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
-// it are one edit apart (registries/scopeEviction.ts).
+// Registered here rather than in a central evictor list, so this signal and the thing that clears it
+// are one edit apart.
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictTaskState(e.taskId)
   else if (e.scope === 'workspace') evictWorkspaceView(e.workspaceId)

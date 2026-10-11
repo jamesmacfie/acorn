@@ -24,36 +24,46 @@ const node = (identifier: string, over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
-const connection = (id: string, label: string) => ({ id, label } as StoredConnection)
+const connection = (id: string, label: string) => ({ id, label }) as StoredConnection
 
 /** The request context the host would build, with the connection list and the credential lending
  *  stubbed. `withConnections` is what the route calls; everything else stays the real runtime. */
-const contextFor = (connections: StoredConnection[]) => makeTestRequestContext({
-  plugin: 'linear',
-  principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
-  providers: {
-    connections: (async () => connections) as never,
-    withConnections: (async (_provider: string, visit: (row: StoredConnection, key: string) => unknown) =>
-      Promise.all(connections.map((row) => visit(row, `key-for-${row.id}`)))) as never,
-  },
-})
+const contextFor = (connections: StoredConnection[]) =>
+  makeTestRequestContext({
+    plugin: 'linear',
+    principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
+    providers: {
+      connections: (async () => connections) as never,
+      withConnections: (async (_provider: string, visit: (row: StoredConnection, key: string) => unknown) =>
+        Promise.all(connections.map((row) => visit(row, `key-for-${row.id}`)))) as never,
+    },
+  })
 
 /** Linear's answer per credential, and a record of what each one was asked. */
-function stubLinear(answer: (key: string) => { status?: number; nodes?: ReturnType<typeof node>[]; more?: boolean }): Sent[] {
+function stubLinear(
+  answer: (key: string) => { status?: number; nodes?: ReturnType<typeof node>[]; more?: boolean },
+): Sent[] {
   const sent: Sent[] = []
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
-    const key = init.headers.Authorization
-    const body = JSON.parse(init.body) as { variables: { filter: Record<string, unknown> } }
-    sent.push({ key, variables: body.variables })
-    const reply = answer(key)
-    if (reply.status) return new Response('{}', { status: reply.status })
-    return new Response(JSON.stringify({ data: { issues: { nodes: reply.nodes ?? [], pageInfo: { hasNextPage: reply.more === true } } } }))
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
+      const key = init.headers.Authorization
+      const body = JSON.parse(init.body) as { variables: { filter: Record<string, unknown> } }
+      sent.push({ key, variables: body.variables })
+      const reply = answer(key)
+      if (reply.status) return new Response('{}', { status: reply.status })
+      return new Response(
+        JSON.stringify({
+          data: { issues: { nodes: reply.nodes ?? [], pageInfo: { hasNextPage: reply.more === true } } },
+        }),
+      )
+    }),
+  )
   return sent
 }
 
 const mappingFor = (rows: { connectionId: string; externalId: string; projectId: string }[]) => ({
-  byId: async (id: string) => ({ id, workspaceId: 'workspace-1' } as never),
+  byId: async (id: string) => ({ id, workspaceId: 'workspace-1' }) as never,
   externalProjects: async () => rows,
 })
 
@@ -64,10 +74,12 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Linear palette search', () => {
   it('asks only the connections the routed project maps, and sends their project ids with the query', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: 'project-1' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: 'project-2' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: 'project-1' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: 'project-2' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Other')])
     const sent = stubLinear(() => ({ nodes: [node('ENG-42')] }))
 
@@ -84,12 +96,14 @@ describe('Linear palette search', () => {
       ],
     })
     expect(await response.json()).toEqual({
-      items: [{
-        id: 'linear-a:ENG-42',
-        title: 'Fix ENG-42',
-        subtitle: 'ENG-42 · In Progress · Acme',
-        ref: 'ENG-42',
-      }],
+      items: [
+        {
+          id: 'linear-a:ENG-42',
+          title: 'Fix ENG-42',
+          subtitle: 'ENG-42 · In Progress · Acme',
+          ref: 'ENG-42',
+        },
+      ],
     })
   })
 
@@ -108,21 +122,30 @@ describe('Linear palette search', () => {
   // is unique inside its workspace and no further, so two connected workspaces whose teams share a
   // prefix both have an ENG-42 and one would otherwise overwrite the other.
   it('keeps two connections’ identically named issues apart', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Globex')])
     stubLinear(() => ({ nodes: [node('ENG-42')] }))
 
-    const body = await (await fetchRoutes(search('ENG-42'), context)).json() as { items: { id: string; subtitle: string }[] }
+    const body = (await (await fetchRoutes(search('ENG-42'), context)).json()) as {
+      items: { id: string; subtitle: string }[]
+    }
     expect(body.items.map((row) => row.id)).toEqual(['linear-a:ENG-42', 'linear-b:ENG-42'])
     // And the reader can tell which is which, because the row says whose workspace it came from.
-    expect(body.items.map((row) => row.subtitle)).toEqual(['ENG-42 · In Progress · Acme', 'ENG-42 · In Progress · Globex'])
+    expect(body.items.map((row) => row.subtitle)).toEqual([
+      'ENG-42 · In Progress · Acme',
+      'ENG-42 · In Progress · Globex',
+    ])
   })
 
   it('sends a pasted identifier as its team and number as well as as text', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
     const sent = stubLinear(() => ({ nodes: [] }))
 
@@ -135,12 +158,14 @@ describe('Linear palette search', () => {
   })
 
   it('keeps the workspace that answered when another one fails', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Globex')])
-    stubLinear((key) => key === 'key-for-linear-a' ? { status: 500 } : { nodes: [node('OPS-1')] })
+    stubLinear((key) => (key === 'key-for-linear-a' ? { status: 500 } : { nodes: [node('OPS-1')] }))
 
     const response = await fetchRoutes(search('ops'), context)
     expect(response.status).toBe(200)
@@ -150,12 +175,14 @@ describe('Linear palette search', () => {
   // An empty answer is an answer. The reader typed a word no ticket in that workspace matches, which is
   // not the same as the workspace being unreachable, so the failing sibling does not turn it into one.
   it('treats a workspace that answered with nothing as a success', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Globex')])
-    stubLinear((key) => key === 'key-for-linear-a' ? { status: 500 } : { nodes: [] })
+    stubLinear((key) => (key === 'key-for-linear-a' ? { status: 500 } : { nodes: [] }))
 
     const response = await fetchRoutes(search('nothing matches'), context)
     expect(response.status).toBe(200)
@@ -163,7 +190,9 @@ describe('Linear palette search', () => {
   })
 
   it('reports a total failure rather than looking like an empty workspace', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
     stubLinear(() => ({ status: 401 }))
 
@@ -173,22 +202,30 @@ describe('Linear palette search', () => {
   })
 
   it('caps at the fifty rows the host will draw', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
     stubLinear(() => ({ nodes: Array.from({ length: 80 }, (_, at) => node(`ENG-${at}`)) }))
 
-    const body = await (await fetchRoutes(search('eng'), context)).json() as { items: unknown[] }
+    const body = (await (await fetchRoutes(search('eng'), context)).json()) as { items: unknown[] }
     expect(body.items).toHaveLength(50)
   })
 
   // The row carries what a reader reads and the identity the surface is addressed by. It never carries
   // the credential the request was made with, the branch name, the description, or a verb.
   it('answers with display facts only', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
-    stubLinear(() => ({ nodes: [node('ENG-9', { branchName: 'eng-9-fix', description: 'secret plan', priority: 1, priorityLabel: 'Urgent' })] }))
+    stubLinear(() => ({
+      nodes: [
+        node('ENG-9', { branchName: 'eng-9-fix', description: 'secret plan', priority: 1, priorityLabel: 'Urgent' }),
+      ],
+    }))
 
-    const body = await (await fetchRoutes(search('eng'), context)).json() as { items: Record<string, unknown>[] }
+    const body = (await (await fetchRoutes(search('eng'), context)).json()) as { items: Record<string, unknown>[] }
     expect(Object.keys(body.items[0]).sort()).toEqual(['badge', 'id', 'ref', 'subtitle', 'title'])
     expect(body.items[0].badge).toBe('Urgent')
     expect(JSON.stringify(body)).not.toContain('key-for-linear-a')
@@ -203,10 +240,12 @@ describe('Linear rail search', () => {
     new Request(`http://linear.test/rail-search?project=${projectId}&q=${encodeURIComponent(query)}`)
 
   it('finds an issue the 250-row list never loads, as a rail row that keeps its connection', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: 'project-1' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: 'project-2' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: 'project-1' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: 'project-2' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Other')])
     const sent = stubLinear(() => ({ nodes: [node('ENG-900', { branchName: 'eng-900-fix' })] }))
 
@@ -220,7 +259,7 @@ describe('Linear rail search', () => {
         { or: [{ title: { containsIgnoreCase: 'login' } }] },
       ],
     })
-    const body = await response.json() as { items: { id: string; task?: { branch?: string } }[]; incomplete: boolean }
+    const body = (await response.json()) as { items: { id: string; task?: { branch?: string } }[]; incomplete: boolean }
     expect(body.items.map((row) => row.id)).toEqual(['linear-a:ENG-900'])
     // The promotion seed rides along, so Create task works on a search result.
     expect(body.items[0].task?.branch).toBe('eng-900-fix')
@@ -228,7 +267,9 @@ describe('Linear rail search', () => {
   })
 
   it('says the answer is incomplete when a page was full', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
     stubLinear(() => ({ nodes: [node('ENG-1')], more: true }))
 
@@ -236,12 +277,14 @@ describe('Linear rail search', () => {
   })
 
   it('keeps the connection that answered when another fails, and calls the answer incomplete', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([
-      { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
-      { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
-    ]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([
+        { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
+        { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
+      ]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Globex')])
-    stubLinear((key) => key === 'key-for-linear-a' ? { status: 500 } : { nodes: [node('OPS-1')] })
+    stubLinear((key) => (key === 'key-for-linear-a' ? { status: 500 } : { nodes: [node('OPS-1')] }))
 
     const response = await fetchRoutes(railSearch('ops'), context)
     expect(response.status).toBe(200)
@@ -249,7 +292,9 @@ describe('Linear rail search', () => {
   })
 
   it('reports a total failure', async () => {
-    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]),
+    )
     const context = await contextFor([connection('linear-a', 'Acme')])
     stubLinear(() => ({ status: 500 }))
 

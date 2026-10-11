@@ -1,14 +1,9 @@
 // The Changes tab's one device preference: how its list is drawn (`changes_view`). Read from the
-// prefs query and written through saveJsonPref — the device-prefs pattern, where localStorage is
-// written before the query cache (packages/client-core/src/features/settings/savePref.ts).
+// prefs query and written through saveJsonPref, which writes localStorage before the query cache.
 //
 // The device's, not the node's. Which shape a list is in is about the person reading it, not about
 // the worktree, and the other client paired with the same node draws on a screen with different room
 // on it (docs/state-ownership/scope-rules.md § Scope rules).
-//
-// Which backend the commit-message wand spends used to be a second key here. It is now the one
-// "Generate with" default every Generate control in the app shares, so the pane reads and writes it
-// through `@acorn/plugin-api/client` instead.
 import type { QueryClient } from '@tanstack/solid-query'
 import { z } from 'zod'
 import { PrefKeys, saveJsonPref, type PersistedStateSlice } from '@acorn/plugin-api/client'
@@ -56,8 +51,8 @@ export const changeViewSlice: PersistedStateSlice<Record<string, unknown>> = {
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }

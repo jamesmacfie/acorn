@@ -7,11 +7,9 @@ import { mergeToolCall } from '../../shared/toolFold'
 // A tool call or a file change is stored as two rows: the one that opened its card, and one that
 // holds its whole latest state. docs/managed-agents/transcript-store.md § How the ledger stores a tool call says why.
 //
-// A harness reports a tool call as a run of updates on one id, and each used to stay in the ledger as
-// its own row. On this developer's database that was 196,000 tool rows for 39,000 calls, 300 MB of
-// JSON for cards every reader folds into one. So when an update arrives, the node folds the card's
-// rows and the update into one state, writes it at the next sequence, and deletes the rows it
-// supersedes, all in the event's own transaction.
+// A harness reports a tool call as a run of updates on one id, which every reader folds into one card.
+// So when an update arrives, the node folds the card's rows and the update into one state, writes it at
+// the next sequence, and deletes the rows it supersedes, all in the event's own transaction.
 //
 // Why a new row and not an update in place: a client that holds a session reads on from its mark,
 // because nothing below the mark can change. A row rewritten below the mark would never reach it.
@@ -35,22 +33,24 @@ export type CardKeyFields = {
 /**
  * Which card a row updates, within its turn, or `null` for a row that is a moment of its own.
  *
- * The same keys the transcript folds on (client/sessions/conversationItems.ts): a tool call by its id,
+ * The same keys the client's transcript folds on: a tool call by its id,
  * and a file change by its change id and path. A file change with no change id is never folded there,
  * so it is not folded here either.
  */
 export function cardKeyOf(fields: CardKeyFields): string | null {
   if (fields.type === 'tool' && fields.toolId != null) return `tool\n${fields.toolId}`
-  if (fields.type === 'file_change' && fields.changeId != null) return `change\n${fields.changeId}\n${fields.path ?? ''}`
+  if (fields.type === 'file_change' && fields.changeId != null)
+    return `change\n${fields.changeId}\n${fields.path ?? ''}`
   return null
 }
 
-export const eventCardKey = (event: AgentNormalizedEvent): string | null => cardKeyOf({
-  type: event.type,
-  toolId: event.type === 'tool' ? event.tool.id : null,
-  changeId: event.type === 'file_change' ? event.changeId ?? null : null,
-  path: event.type === 'file_change' ? event.path ?? null : null,
-})
+export const eventCardKey = (event: AgentNormalizedEvent): string | null =>
+  cardKeyOf({
+    type: event.type,
+    toolId: event.type === 'tool' ? event.tool.id : null,
+    changeId: event.type === 'file_change' ? (event.changeId ?? null) : null,
+    path: event.type === 'file_change' ? (event.path ?? null) : null,
+  })
 
 /** The SQL that reads a row's card fields. Kept beside `cardKeyOf` so the two cannot drift. */
 export const cardKeyColumns = sql`
@@ -67,9 +67,9 @@ export const cardKeyColumns = sql`
  * report each time, so the last one is the state.
  */
 export function foldCard(events: readonly AgentNormalizedEvent[]): AgentNormalizedEvent {
-  return events.reduce((card, next) => card.type === 'tool' && next.type === 'tool'
-    ? { type: 'tool', tool: mergeToolCall(card.tool, next.tool) }
-    : next)
+  return events.reduce((card, next) =>
+    card.type === 'tool' && next.type === 'tool' ? { type: 'tool', tool: mergeToolCall(card.tool, next.tool) } : next,
+  )
 }
 
 export const parseStoredEvent = (json: string): AgentNormalizedEvent | null => {
@@ -102,7 +102,7 @@ const KEPT_TURNS = 64
  * Held per turn, because a card is keyed by turn. A turn this process has not written to yet is read
  * from the ledger once, which also covers a call that was running when the node last stopped. The map
  * is a cache of what the ledger says. A row it names that has since gone, because the background pass
- * (./ledgerCompaction.ts) folded it, is skipped.
+ * (compactLedgers) folded it, is skipped.
  */
 export class LedgerFold {
   readonly #turns = new Map<string, Map<string, Card>>()
@@ -133,9 +133,8 @@ export class LedgerFold {
     // The opener has the lowest sequence, so it comes first if it is still there. It goes only with its
     // session, and then this event has no session to land in either.
     if (rows[0]?.id !== card.head) return open()
-    const stored = event.type === 'tool'
-      ? foldCard([...rows.flatMap((row) => parseStoredEvent(row.eventJson) ?? []), event])
-      : event
+    const stored =
+      event.type === 'tool' ? foldCard([...rows.flatMap((row) => parseStoredEvent(row.eventJson) ?? []), event]) : event
     return {
       head: card.head,
       stored,

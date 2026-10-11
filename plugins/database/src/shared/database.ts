@@ -1,7 +1,7 @@
 // Wire types for the Database pane HTTP/bridge boundary, shared between the node handlers
-// (main/database.ts) and the frame client (frame/databaseClient.ts). Cell values are normalized to
-// string | null in main (numbers/booleans to string, objects to JSON, dates to ISO) so the grid renders
-// uniformly and `null` stays distinct for NULL styling.
+// (server/routes/database.ts) and the tree client (tree/databaseClient.ts). Cell values are normalized to
+// string | null on the node (numbers/booleans to string, objects to JSON, dates to ISO) so the grid
+// renders uniformly and `null` stays distinct for NULL styling.
 export type DbCell = string | null
 
 export type DbColumn = { name: string; dataType: string; nullable: boolean; isPk: boolean }
@@ -28,7 +28,7 @@ export type DbCatalogResult = { tables: DbCatalogTable[] } | { error: string }
 // AI query generation (docs/data-layer/plugin-databases.md § The database plugin): where the schema text
 // in the prompt came from, and the result of a generate call. Generate errors travel as HTTP error
 // responses, not a union.
-export type DbSchemaSource = 'auto' | 'script' | 'file'
+type DbSchemaSource = 'auto' | 'script' | 'file'
 // `notes` is the project's free-form schema notes (projects.db_schema_notes), facts the schema text
 // can't express, carried here so the route needs no repo lookup.
 export type DbSchemaResult = { schema: string; source: DbSchemaSource; notes?: string } | { error: string }
@@ -51,28 +51,35 @@ export type DbSavedQuery = { id: string; name: string; notes: string | null; sql
 // rather than spelled at each call site so the frame, the manifest's document region, and the route
 // table cannot drift apart. The manifest declares the scratch and completions paths as literals with
 // `:taskId` in them, the one form these helpers cannot produce.
-export const DATABASE_ROUTE_PREFIX = '/v1/p/database'
-const taskRoute = (taskId: string, rest: string) => `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
+const DATABASE_ROUTE_PREFIX = '/v1/p/database'
+const taskRoute = (taskId: string, rest: string) =>
+  `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
 
 export const databaseTablesRoute = (taskId: string) => taskRoute(taskId, '/tables')
 export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
   taskRoute(taskId, `/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`)
 export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
-  taskRoute(taskId, `/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`)
-export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
-  taskRoute(taskId, `/${action}`)
+  taskRoute(
+    taskId,
+    `/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`,
+  )
+export const databaseActionRoute = (
+  taskId: string,
+  action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate',
+) => taskRoute(taskId, `/${action}`)
 // Saved queries: project-scoped rows, addressed through the task (the project is resolved server-side).
 export const databaseQueriesRoute = (taskId: string) => taskRoute(taskId, '/queries')
 // The task's scratch document, as this plugin's own route rather than the host's document handle: the
 // panel reads it back after the palette's `Generate SQL` wrote it, which is a question about the stored
 // row and not about what is in the editor right now.
 export const databaseScratchRoute = (taskId: string) => taskRoute(taskId, '/scratch')
-export const databaseQueryRoute = (taskId: string, queryId: string) => taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
+export const databaseQueryRoute = (taskId: string, queryId: string) =>
+  taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
 // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
 // machine. A plugin route rather than a bridge call because `/v1/core/integrations` has no bridge
 // scope, and the frame needs ids and labels, not keys.
 //
-// The path still says `model-connections` after the rename. Only code that ships with this plugin
-// reads it — this client and the `optionsRoute` on the `database:generate` step field — so a rename
-// would be churn with nothing on the other side of it.
+// The path says `model-connections`, not backends. Only code that ships with this plugin reads it —
+// this client and the `optionsRoute` on the `database:generate` step field — so renaming it would be
+// churn with nothing on the other side of it.
 export const databaseModelBackendsRoute = (taskId: string) => taskRoute(taskId, '/model-connections')

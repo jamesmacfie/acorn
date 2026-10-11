@@ -14,13 +14,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | [Agent drivers](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client from the command line, native control, and the large-surface flow. |
 | [Profiling](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
-
-<a id="agent-driven-desktop-development"></a>
-<a id="native-control-of-a-session"></a>
-<a id="agent-driven-terminal-development"></a>
-<a id="large-surface-flow"></a>
-<a id="timing-a-cold-start"></a>
-<a id="timing-a-task-switch"></a>
+| [Formatting](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, making `git blame` skip formatting commits with `blame.ignoreRevsFile`, and carrying a branch across one. |
 
 The agent-driven desktop and terminal sections, native control, and the large-surface flow moved to
 [agent drivers](./local-development/agent-drivers.md). Timing a cold start and timing a task switch
@@ -129,7 +123,7 @@ package resolves the same physical copy.
 `scripts/db.mjs` finds a migration chain by its `drizzle.config.ts`. Every plugin's config is one line
 that re-exports `plugins/drizzle.shared.ts`, which maps `./src/node/schema.ts` to `./migrations`. A new
 table-owning plugin adds that one-line file, plus `migrationsModule: import.meta.url` on its
-`NodePlugin`, so the host opens and migrates its database. [Data layer](./data-layer.md#migrations)
+`NodePlugin`, so the host opens and migrates its database. [Data layer](./data-layer/migrations.md)
 covers migrations.
 
 Edit the schema in its owning package, then run:
@@ -162,8 +156,8 @@ The command checks Node locks and open files, exports each listed file to a priv
 verifies SHA-256 digests, and records each removal in `manifest.json`. Run the same command with the
 same recovery directory to resume an interrupted reset. Repository files, worktrees, `.env`, other
 files, and external databases aren't in the inventory. Restore the snapshot only into an isolated
-directory with the old acorn binary. Retained worktrees stay detached until you add them again. Name
-the private memory root with `--memory-root` to reset accepted memory.
+directory with the acorn build that wrote it. Retained worktrees stay detached until you add them
+again. Name the private memory root with `--memory-root` to reset accepted memory.
 
 For a desktop installation, quit the normal app, make an empty private recovery directory, and run
 the desktop binary's host stage first:

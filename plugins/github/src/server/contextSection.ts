@@ -23,7 +23,15 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
       return {
-        items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
+        items: [
+          {
+            id: `pr:${pr.number}`,
+            kind: 'PR',
+            label: `#${pr.number} ${pr.title}`,
+            body: pr.body ?? undefined,
+            details: changedFiles,
+          },
+        ],
       }
     },
     format(items) {

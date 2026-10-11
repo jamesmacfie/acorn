@@ -1,14 +1,8 @@
-// Who fills a box when more than one contributor could (docs/plugins/cooperative-extension-points.md § Arbitration).
-//
-// No JSX here (docs/frontend/registries.md § Registries and plugins), because the decision is the part worth a
-// test: which contributors match a key, who wins a `replace` tie, where the user's pick comes in, and
-// what happens past `max`. `Slot.tsx` is a `<For>` over the answer.
-//
-// The rule in one sentence: an override is an offer, not a seizure. Two contributors matching one key
-// draw the owner's default until the user says which, because a package that could take a box by
-// registering for it could take one from another package by registering later.
-import type { ArbitrationMode } from '@acorn/protocol/extensionPoints.ts'
-import { extensionDeliveries, type ExtensionContribution, type ExtensionPointContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionDeliveries,
+  type ExtensionContribution,
+  type ExtensionPointContribution,
+} from '../registries/extensionPoints/extensionPoints'
 
 /**
  * Does this contributor's `matches` cover the key the owner passed?
@@ -77,10 +71,9 @@ export function resolveSlot(
  * The stored arbitration, read out of the one preference that holds all of it.
  *
  * `{ '<owner>:<point>|<key>': pluginId }`, one key per point-and-selector-value, because "who draws a
- * PNG attachment" and "who draws a CSV one" are two decisions. A point with no key stores under the
- * point alone. Same one-preference-holds-all shape the exclusive slots use
- * (registries/exclusiveSlots.ts), and the same failure rule: anything unparseable reads as nothing
- * chosen, which is the owner's default.
+ * PNG attachment" and "who draws a CSV one" are two decisions. A point with no key stores under the point alone. Same
+ * one-preference-holds-all shape the exclusive slots use, and the same failure rule: anything unparseable reads as
+ * nothing chosen, which is the owner's default.
  */
 export const slotChoiceKey = (pointId: string, key: string | undefined): string =>
   key === undefined ? pointId : `${pointId}|${key}`
@@ -132,5 +125,3 @@ export function withSlotChoice(raw: string | undefined, slot: string, choice: st
  */
 export const slotFills = (pointId: string, key?: string): boolean =>
   extensionDeliveries(pointId).some((entry) => matchesKey(entry.matches, key))
-
-export type ArbitrationModeValue = ArbitrationMode

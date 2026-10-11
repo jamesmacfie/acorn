@@ -6,7 +6,7 @@ export type GenerateTextInput = {
   signal?: AbortSignal
 }
 
-export type GenerateTextUsage = {
+type GenerateTextUsage = {
   inputTokens?: number
   outputTokens?: number
 }
@@ -29,9 +29,5 @@ export type ModelProviderAdapterResult = {
 export type ModelProviderAdapter = {
   providerId: string
   recommendedModelId: string
-  generateText(args: {
-    secret: string
-    config: unknown
-    input: GenerateTextInput
-  }): Promise<ModelProviderAdapterResult>
+  generateText(args: { secret: string; config: unknown; input: GenerateTextInput }): Promise<ModelProviderAdapterResult>
 }

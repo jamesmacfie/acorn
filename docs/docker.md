@@ -57,7 +57,7 @@ persisted query cache. Plugin retirement disposes application refresh subscripti
 
 Two rows, registered by the plugin in `plugins/docker/src/client/commands.ts`.
 [Command palette and shortcuts](./command-palette-and-shortcuts.md) covers how the palette runs a
-search, and [command kinds](./plugins.md#command-kinds) holds the vocabulary.
+search, and [command kinds](./plugins/commands.md#command-kinds) holds the vocabulary.
 
 **Open Docker** selects the rail source. **Find a Docker resource** is one search over all four
 lists, containers, images, volumes, and networks, with a badge on each row saying which list it came
@@ -141,7 +141,7 @@ present. Missing or zero dimensions default to 80 columns and 24 rows. Integer d
 Malformed frames are ignored. Native write, resize, kill, and cleanup failures stay within the
 connection, and disconnect attempts every stream and exec teardown independently.
 
-Manual task teardown and archive cleanup refresh daemon metadata and target full immutable container
+Archive cleanup refreshes daemon metadata and targets full immutable container
 IDs associated with that task root. Active containers are stopped (paused containers are first
 unpaused), and associated Compose containers are then removed without force or volume deletion.
 Loose associated containers are only stopped. Cleanup never runs project-wide `compose down` and

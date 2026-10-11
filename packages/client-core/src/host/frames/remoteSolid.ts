@@ -23,17 +23,32 @@ import { CHROME_SLOT_NODE, KIT_NODES, type KitNodeName } from '@acorn/protocol/t
 import type { AcornBridge } from './sdk/bridgeTypes'
 import type { TreeMount, TreeRender } from './sdk/treeChannel'
 import {
-  createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
-  removeNode, setProperty, setText, type RemoteNode,
+  createNode,
+  createText,
+  firstChild,
+  insertNode as attach,
+  isTextNode,
+  nextSibling,
+  parentOf,
+  removeNode,
+  setProperty,
+  setText,
+  type RemoteNode,
 } from './remoteRoot'
 
 const renderer = createRenderer<RemoteNode>({
   createElement: createNode,
   createTextNode: createText,
   replaceText: setText,
-  setProperty: (node, name, value) => { setProperty(node, name, value) },
-  insertNode: (parent, node, anchor) => { attach(parent, node, anchor) },
-  removeNode: (parent, node) => { removeNode(parent, node) },
+  setProperty: (node, name, value) => {
+    setProperty(node, name, value)
+  },
+  insertNode: (parent, node, anchor) => {
+    attach(parent, node, anchor)
+  },
+  removeNode: (parent, node) => {
+    removeNode(parent, node)
+  },
   isTextNode,
   // Solid's walkers want `undefined` where there is nothing; the root speaks `null`, which is the
   // honest answer for "this node has no parent" and the one the wire uses.
@@ -44,8 +59,18 @@ const renderer = createRenderer<RemoteNode>({
 
 // What the JSX preset compiles against. The names are Solid's, not ours.
 export const {
-  render, effect, memo, createComponent, createElement, createTextNode, insertNode, insert, spread,
-  setProp, mergeProps, use,
+  render,
+  effect,
+  memo,
+  createComponent,
+  createElement,
+  createTextNode,
+  insertNode,
+  insert,
+  spread,
+  setProp,
+  mergeProps,
+  use,
 } = renderer
 
 /**
@@ -54,7 +79,7 @@ export const {
  * Loose on purpose. The host validates every prop against the wire schema before it reaches a
  * component (@acorn/protocol/tree/props.ts), so a narrow type here would be a second, drifting copy
  * of a rule that is already enforced where it matters. What it does buy is the shape of the value: a
- * function survives only under one of the kit's twelve event names, and `class`, `style` and the rest
+ * function survives only under one of the kit's event names, and `class`, `style` and the rest
  * of the DOM escape hatches are dropped before they cross.
  */
 export type KitNodeProps = Record<string, unknown> & { children?: unknown }
@@ -83,25 +108,96 @@ const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
 }
 
 /** Every kit node, keyed by name. The named exports below are this object, destructured. */
-export const KIT_NODE_COMPONENTS = Object.fromEntries(
-  KIT_NODES.map((name) => [name, kitNode(name)]),
-) as Record<KitNodeName, (props: KitNodeProps) => JSX.Element>
+export const KIT_NODE_COMPONENTS = Object.fromEntries(KIT_NODES.map((name) => [name, kitNode(name)])) as Record<
+  KitNodeName,
+  (props: KitNodeProps) => JSX.Element
+>
 
 /** Only a rail or topbar replacement receives a host-minted slotRef that this can place. */
 export const Slot = kitNode(CHROME_SLOT_NODE)
 
 // Destructured rather than written out one `export const` at a time, so the list cannot drift from
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
-// missing here is caught by ./remoteSolid.test.ts.
+// missing here is caught by ./remoteSolid.test.tsx.
 export const {
-  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, FilterBar, Modal, ModalBody,
-  ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
-  SectionHeader, TabPanel, ToolbarSpacer, SettingsSection, SettingRow, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
-  ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
-  DiffLine, FileHead, StackedDiff,
-  NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, IconButton, Input, Textarea,
-  Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
+  Stack,
+  Inline,
+  Section,
+  Fold,
+  Card,
+  Timeline,
+  Tabs,
+  Toolbar,
+  FilterBar,
+  Modal,
+  ModalBody,
+  ModalActions,
+  Menu,
+  Popover,
+  ListDetail,
+  ListColumn,
+  DetailColumn,
+  SplitHandle,
+  DocumentTabs,
+  SectionHeader,
+  TabPanel,
+  ToolbarSpacer,
+  SettingsSection,
+  SettingRow,
+  Text,
+  Link,
+  Heading,
+  Rows,
+  Row,
+  TreeRow,
+  RowActions,
+  Badge,
+  Chip,
+  ChipRow,
+  StatusDot,
+  Facts,
+  DescriptionList,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  Grid,
+  Meter,
+  CodeBlock,
+  Log,
+  Markdown,
+  DiffPane,
+  DiffLine,
+  FileHead,
+  StackedDiff,
+  NonCodeRow,
+  SplitCell,
+  EmptyState,
+  Alert,
+  Spinner,
+  Kbd,
+  UserAvatar,
+  Icon,
+  Button,
+  IconButton,
+  Input,
+  Textarea,
+  Select,
+  Checkbox,
+  SegmentedControl,
+  ToggleButton,
+  Picker,
+  PickerRow,
+  Composer,
+  MentionTextarea,
+  KeyValueEditor,
+  FindBar,
+  Field,
+  ConfirmButton,
+  CopyButton,
+  ModelBackendPicker,
+  Rectangle,
+  Only,
   Fallback,
 } = KIT_NODE_COMPONENTS
 
@@ -119,7 +215,7 @@ export function solidTree<P extends Record<string, unknown>>(
     // `host` beside `bridge`, and for the same reason: both are stable for this mount's life and
     // neither is data the owner sent. Without it the two things a tree may ask its host for — call an
     // owner action, open its companion overlay — would be unreachable from a Solid component, which is
-    // how every loaded plugin acorn ships is written (./sdk.ts § TreeMount.host).
+    // how every loaded plugin acorn ships is written (`TreeMount.host`).
     //
     // Same object on every reconcile, so the store's diff sees no change and a redraw does not
     // invalidate a handler mid-await.

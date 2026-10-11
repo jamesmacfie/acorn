@@ -43,24 +43,53 @@ async function measure(name: string, run: () => Promise<{ files: readonly unknow
     files = result.files.length
   }
   durations.sort((a, b) => a - b)
-  console.log(JSON.stringify({ name, ownerRequests: 3, ripgrepProcessesPerRequest: processCounts, durationsMs: durations, medianMs: durations[1], files }))
+  console.log(
+    JSON.stringify({
+      name,
+      ownerRequests: 3,
+      ripgrepProcessesPerRequest: processCounts,
+      durationsMs: durations,
+      medianMs: durations[1],
+      files,
+    }),
+  )
 }
 
-// Reproduces the first Phase 06 two-pass owner: the text pass scans the whole root
-// and discards matches whose names the filename pass did not select.
+// The two-pass baseline: the text pass scans the whole root and discards matches whose names the
+// filename pass did not select.
 async function main() {
   const { runRipgrep } = await import('../../plugins/editor/src/server/searchProcess')
   const { searchInFiles } = await import('../../plugins/editor/src/server/search')
   await measure('pre-follow-up two-pass', async () => {
-    const names = childProcess.execFileSync(rgPath, ['--files', '--null', '--no-config',
-      ...include.flatMap((pattern) => ['--glob', pattern]),
-      ...exclude.flatMap((pattern) => ['--glob', `!${pattern}`]), '--', '.'],
-    { cwd: root, maxBuffer: 4 * 1024 * 1024 }).toString('utf8')
-    const allowedPaths = new Set(names.split('\0').filter(Boolean).map((path) => path.startsWith('./') ? path.slice(2) : path))
-    return runRipgrep(root, ['--json', '--no-config', '--fixed-strings', '--ignore-case', '--', query, '.'], { allowedPaths })
+    const names = childProcess
+      .execFileSync(
+        rgPath,
+        [
+          '--files',
+          '--null',
+          '--no-config',
+          ...include.flatMap((pattern) => ['--glob', pattern]),
+          ...exclude.flatMap((pattern) => ['--glob', `!${pattern}`]),
+          '--',
+          '.',
+        ],
+        { cwd: root, maxBuffer: 4 * 1024 * 1024 },
+      )
+      .toString('utf8')
+    const allowedPaths = new Set(
+      names
+        .split('\0')
+        .filter(Boolean)
+        .map((path) => (path.startsWith('./') ? path.slice(2) : path)),
+    )
+    return runRipgrep(root, ['--json', '--no-config', '--fixed-strings', '--ignore-case', '--', query, '.'], {
+      allowedPaths,
+    })
   })
   await measure('follow-up filtered owner', () => searchInFiles(core, 'task', query, opts))
-  await measure('unfiltered owner', () => searchInFiles(core, 'task', query, { caseSensitive: false, wholeWord: false, regex: false }))
+  await measure('unfiltered owner', () =>
+    searchInFiles(core, 'task', query, { caseSensitive: false, wholeWord: false, regex: false }),
+  )
   const { ignoredEntries } = await import('../../plugins/editor/src/server/ignoredEntries')
   const { resolveInRoot } = await import('../../packages/plugin-api/src/node')
   const metadataCore = { ...core, fs: { resolveInRoot } }
@@ -68,10 +97,21 @@ async function main() {
     const names = await readdir(join(root, directory))
     gitSpawned = 0
     const result = await ignoredEntries(metadataCore, 'task', directory, names)
-    console.log(JSON.stringify({ name: 'directory ignore owner', directory, names: names.length,
-      gitProcesses: gitSpawned, available: result.available, ignored: result.ignored.length,
-      responseBytes: Buffer.byteLength(JSON.stringify(result)) }))
+    console.log(
+      JSON.stringify({
+        name: 'directory ignore owner',
+        directory,
+        names: names.length,
+        gitProcesses: gitSpawned,
+        available: result.available,
+        ignored: result.ignored.length,
+        responseBytes: Buffer.byteLength(JSON.stringify(result)),
+      }),
+    )
   }
 }
 
-main().catch((error: unknown) => { console.error(error); process.exitCode = 1 })
+main().catch((error: unknown) => {
+  console.error(error)
+  process.exitCode = 1
+})

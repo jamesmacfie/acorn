@@ -18,7 +18,7 @@ export type TerminalToolbarProps = {
 
 /** `host.invoke('interrupt', payload)`. Refused unless `expectedSessionId` is still the selected,
  *  running session of the task the contributor was mounted for. */
-export type TerminalInterruptPayload = { expectedSessionId: string }
+type TerminalInterruptPayload = { expectedSessionId: string }
 
 /**
  * What `interrupt` answers. A refusal, not an error, so the contributor can say why in its own control.
@@ -45,7 +45,13 @@ export function interruptRefusal(input: {
   if (!input.byPerson) return { ok: false, reason: 'needs_person' }
   const expected = (input.payload as Partial<TerminalInterruptPayload> | null)?.expectedSessionId
   const selected = input.selected
-  if (!input.live || !selected || selected.id !== expected || selected.taskId !== input.mountedTaskId || !selected.running) {
+  if (
+    !input.live ||
+    !selected ||
+    selected.id !== expected ||
+    selected.taskId !== input.mountedTaskId ||
+    !selected.running
+  ) {
     return { ok: false, reason: 'changed' }
   }
   return null

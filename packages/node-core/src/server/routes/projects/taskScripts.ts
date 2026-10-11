@@ -10,7 +10,13 @@ import { taskScripts } from '../../taskScripts/service'
 
 const queryNumber = z.coerce.number().int()
 const waitQuery = taskScriptWaitInputSchema.extend({ timeoutMs: queryNumber.min(0).max(30_000).default(30_000) })
-const logsQuery = taskScriptLogsInputSchema.extend({ tailLines: queryNumber.min(1).max(1000).default(100), maxBytes: queryNumber.min(1).max(32 * 1024).default(32 * 1024) })
+const logsQuery = taskScriptLogsInputSchema.extend({
+  tailLines: queryNumber.min(1).max(1000).default(100),
+  maxBytes: queryNumber
+    .min(1)
+    .max(32 * 1024)
+    .default(32 * 1024),
+})
 export const scripts = new Hono<AppEnv>()
   .onError((error, c) => {
     if (error instanceof BridgeError) return respondError(c, error.status, error.code, [error.message])

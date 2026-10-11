@@ -18,14 +18,31 @@ export function BranchOptions(props: {
   return (
     <Fold label="Advanced" open={open() || !!props.error} onOpenChange={setOpen}>
       <Stack>
-        <Field label="Branch name" error={props.error} hint={props.checking ? 'Checking worktree availability…' : undefined}>
+        <Field
+          label="Branch name"
+          error={props.error}
+          hint={props.checking ? 'Checking worktree availability…' : undefined}
+        >
           <Input value={props.branch} onInput={props.onBranch} onSubmit={props.onSubmit} />
         </Field>
         <Field label="Branch from" hint="Starts from the branch's last commit. Uncommitted changes do not carry over.">
-          <Select value={props.base} onChange={props.onBase} options={[
-            ...(props.branches?.tasks ?? []).map((task) => ({ value: task.branch, label: task.title, description: task.branch, group: 'Active tasks' })),
-            ...(props.branches?.other ?? []).map((branch) => ({ value: branch.name, label: branch.name, group: 'Other local branches' })),
-          ]} />
+          <Select
+            value={props.base}
+            onChange={props.onBase}
+            options={[
+              ...(props.branches?.tasks ?? []).map((task) => ({
+                value: task.branch,
+                label: task.title,
+                description: task.branch,
+                group: 'Active tasks',
+              })),
+              ...(props.branches?.other ?? []).map((branch) => ({
+                value: branch.name,
+                label: branch.name,
+                group: 'Other local branches',
+              })),
+            ]}
+          />
         </Field>
       </Stack>
     </Fold>

@@ -7,7 +7,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The desktop opens in three processes and the helper is the middle one: Rust spawns it, it sweeps its
 // caches, starts and supervises the node, binds the WebSocket the renderer talks to, and only then
 // prints the ready line Rust is blocked on. Every one of those steps is in front of the window
-// appearing, and none of them was timed (docs/local-development/profiling.md § Timing a cold start).
+// appearing, so each is timed here (docs/local-development/profiling.md § Timing a cold start).
 //
 // stderr, not stdout: stdout is the line protocol Rust parses, and a timing line on it is a handshake
 // Rust cannot read (apps/desktop/src/helper/helperMain.ts). The *printing* is behind the switch rather
@@ -18,9 +18,9 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The clock starts when this module is evaluated, which in the helper is the first thing its bundle
 // does, so the offsets are from process start closely enough to subtract from Rust's own spawn time.
 
-export const HELPER_PERF = process.env.ACORN_PERF === '1'
+const HELPER_PERF = process.env.ACORN_PERF === '1'
 
-// The tag is the prefix the account has always carried, so `[helper:boot] <label> +<ms>ms (<ms>ms)`
+// The tag is the account's prefix, so `[helper:boot] <label> +<ms>ms (<ms>ms)`
 // is what reaches stderr and what the desktop boot test reads (apps/desktop/test/boot.test.ts).
 const log = createLogger('helper:boot')
 
@@ -89,7 +89,10 @@ function span(
 // not a secret.
 const hex = (bytes: number): string => {
   let out = ''
-  for (let index = 0; index < bytes; index += 1) out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+  for (let index = 0; index < bytes; index += 1)
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0')
   return out
 }
 

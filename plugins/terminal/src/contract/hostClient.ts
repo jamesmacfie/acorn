@@ -25,7 +25,9 @@ let current: TerminalHostClient | null = null
 
 export function installTerminalHostClient(client: TerminalHostClient): () => void {
   current = client
-  return () => { if (current === client) current = null }
+  return () => {
+    if (current === client) current = null
+  }
 }
 
 function installed(): TerminalHostClient {

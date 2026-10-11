@@ -32,20 +32,32 @@ export class HarnessError extends Error {
   }
 }
 
-const STATUS: Record<HarnessErrorKind, 503 | 404 | 400 | 409 | 500> = { unavailable: 503, not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
+const STATUS: Record<HarnessErrorKind, 503 | 404 | 400 | 409 | 500> = {
+  unavailable: 503,
+  not_found: 404,
+  bad_request: 400,
+  'needs-trust': 409,
+  failed: 500,
+}
 
 // Resolve the run bridge, run the call, JSON the data; a missing bridge → 503, thrown errors → their
 // kind's status (untyped throws classify as 'failed', or the route's declared errorKind).
-async function respond<B>(c: Context<AppEnv>, bridge: B | null | undefined, fn: (b: B) => Promise<unknown>, opts?: { errorKind?: HarnessError['kind'] }): Promise<Response> {
+async function respond<B>(
+  c: Context<AppEnv>,
+  bridge: B | null | undefined,
+  fn: (b: B) => Promise<unknown>,
+  opts?: { errorKind?: HarnessError['kind'] },
+): Promise<Response> {
   if (!bridge) return respondError(c, 503, 'bridge-unavailable')
   try {
     return c.json(await fn(bridge))
   } catch (e) {
-    const kind: HarnessErrorKind = e instanceof HarnessError
-      ? e.kind
-      : e && typeof e === 'object' && 'code' in e && e.code === 'needs-trust'
-        ? 'needs-trust'
-        : (opts?.errorKind ?? 'failed')
+    const kind: HarnessErrorKind =
+      e instanceof HarnessError
+        ? e.kind
+        : e && typeof e === 'object' && 'code' in e && e.code === 'needs-trust'
+          ? 'needs-trust'
+          : (opts?.errorKind ?? 'failed')
     const message = e instanceof Error ? e.message : 'harness call failed'
     return respondError(c, STATUS[kind], kind, [message])
   }
@@ -58,8 +70,20 @@ async function respond<B>(c: Context<AppEnv>, bridge: B | null | undefined, fn: 
 export const harness = new Hono<AppEnv>()
   .get('/:id/run', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.targets(c.req.param('id'))))
   // Static 'default-url' before the ':target' routes so it can't be shadowed by a target id.
-  .get('/:id/run/default-url', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), async (b) => ({ url: (await b.defaultUrl(c.req.param('id'))) ?? null })))
-  .post('/:id/run/:target/start', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.start(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/stop', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.stop(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/restart', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.restart(c.req.param('id'), c.req.param('target'))))
-  .get('/:id/run/:target/status', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.status(c.req.param('id'), c.req.param('target'))))
+  .get('/:id/run/default-url', (c) =>
+    respond(c, routeCapabilityFor(c, RUN_TARGETS), async (b) => ({
+      url: (await b.defaultUrl(c.req.param('id'))) ?? null,
+    })),
+  )
+  .post('/:id/run/:target/start', requireDevice, (c) =>
+    respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.start(c.req.param('id'), c.req.param('target'))),
+  )
+  .post('/:id/run/:target/stop', requireDevice, (c) =>
+    respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.stop(c.req.param('id'), c.req.param('target'))),
+  )
+  .post('/:id/run/:target/restart', requireDevice, (c) =>
+    respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.restart(c.req.param('id'), c.req.param('target'))),
+  )
+  .get('/:id/run/:target/status', (c) =>
+    respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.status(c.req.param('id'), c.req.param('target'))),
+  )

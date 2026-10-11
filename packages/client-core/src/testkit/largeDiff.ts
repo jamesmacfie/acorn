@@ -12,21 +12,37 @@
 //
 // Test scaffolding: imported by tests and by the agent-automation seeder, never by production code
 // (tools/arch/boundaries.test.ts § the testkit is imported only by tests).
-import { documentTopology, fileDocument, searchDocument, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  documentTopology,
+  fileDocument,
+  searchDocument,
+  type DiffDocumentFile,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import type { DiffFile, DiffThread } from '../kit/diff/diffModel'
 import type { DiffLineAnchor, DiffSource } from '../features/diff/source'
 
 export type LargeSurfaceProfile = 'small' | 'scale' | 'canonical'
 
 /** Files, the fixed rows they add up to, and the dynamic blocks (threads and notes) anchored in them. */
-export const LARGE_SURFACE_PROFILES: Record<LargeSurfaceProfile, { files: number; rows: number; largeFiles: number; largeRows: number; threads: number; notes: number }> = {
+export const LARGE_SURFACE_PROFILES: Record<
+  LargeSurfaceProfile,
+  { files: number; rows: number; largeFiles: number; largeRows: number; threads: number; notes: number }
+> = {
   small: { files: 22, rows: 10_000, largeFiles: 1, largeRows: 3_000, threads: 20, notes: 20 },
   scale: { files: 220, rows: 100_000, largeFiles: 3, largeRows: 12_000, threads: 100, notes: 100 },
   canonical: { files: 2_200, rows: 1_040_000, largeFiles: 8, largeRows: 60_000, threads: 400, notes: 400 },
 }
 
 /** A review note on one line, in the Changes plugin's own vocabulary. */
-export type LargeDiffNote = { path: string; side: 'additions' | 'deletions'; line: number; snippet: string; body: string }
+type LargeDiffNote = {
+  path: string
+  side: 'additions' | 'deletions'
+  line: number
+  snippet: string
+  body: string
+}
 
 export type LargeDiffFile = DiffFile & {
   /** The file's previous path when it was renamed. The diff model has no field for it. */
@@ -55,7 +71,20 @@ function random(seed: number): () => number {
   }
 }
 
-const WORDS = ['alpha', 'branch', 'cursor', 'delta', 'engine', 'frame', 'glyph', 'hunk', 'index', 'join', 'kernel', 'layout']
+const WORDS = [
+  'alpha',
+  'branch',
+  'cursor',
+  'delta',
+  'engine',
+  'frame',
+  'glyph',
+  'hunk',
+  'index',
+  'join',
+  'kernel',
+  'layout',
+]
 /** One block of text that recurs across files, so nothing may key a row by its text or position. */
 const DUPLICATE = ['  if (value == null) return fallback', '  return value', '}']
 const LONG_LINE = `const table = [${Array.from({ length: 700 }, (_, index) => index).join(', ')}]`
@@ -81,9 +110,14 @@ function editScript(next: () => number, target: number, fileIndex: number): Op[]
     const dels = Math.floor(next() * 5)
     const adds = Math.max(dels === 0 ? 1 : 0, Math.floor(next() * 7))
     const duplicate = next() < 0.05
-    for (let i = 0; i < dels; i++) ops.push({ kind: '-', text: duplicate ? DUPLICATE[i % DUPLICATE.length]! : line(next, n++) })
+    for (let i = 0; i < dels; i++)
+      ops.push({ kind: '-', text: duplicate ? DUPLICATE[i % DUPLICATE.length]! : line(next, n++) })
     for (let i = 0; i < adds; i++) {
-      const text = duplicate ? DUPLICATE[i % DUPLICATE.length]! : fileIndex % 97 === 5 && i === 0 ? LONG_LINE : line(next, n++)
+      const text = duplicate
+        ? DUPLICATE[i % DUPLICATE.length]!
+        : fileIndex % 97 === 5 && i === 0
+          ? LONG_LINE
+          : line(next, n++)
       ops.push({ kind: '+', text })
     }
     codeRows += dels + adds
@@ -115,7 +149,14 @@ function hunksOf(ops: Op[], context = 3): Hunk[] {
     const oldLines = oldAt[end + 1]! - oldAt[start]!
     const newLines = newAt[end + 1]! - newAt[start]!
     // A side with no lines names the line before it, which is 0 for a file that did not exist.
-    return { start, end, oldLines, newLines, oldStart: oldLines ? oldAt[start]! + 1 : oldAt[start]!, newStart: newLines ? newAt[start]! + 1 : newAt[start]! }
+    return {
+      start,
+      end,
+      oldLines,
+      newLines,
+      oldStart: oldLines ? oldAt[start]! + 1 : oldAt[start]!,
+      newStart: newLines ? newAt[start]! + 1 : newAt[start]!,
+    }
   })
 }
 
@@ -164,7 +205,10 @@ function anchorsIn(ops: Op[], hunks: Hunk[], count: number): { op: Op; oldNo: nu
     }
   }
   if (count === 1) return [candidates[0]!]
-  return Array.from({ length: count }, (_, index) => candidates[Math.round((index * (candidates.length - 1)) / (count - 1))]!)
+  return Array.from(
+    { length: count },
+    (_, index) => candidates[Math.round((index * (candidates.length - 1)) / (count - 1))]!,
+  )
 }
 
 /**
@@ -177,7 +221,11 @@ export function* largeDiffFiles(profile: LargeSurfaceProfile, seed = 1): Generat
   const small = shape.files - shape.largeFiles
   const average = (shape.rows - shape.largeFiles * shape.largeRows) / small
   // Large files spread through the list rather than bunched at one end.
-  const large = new Set(Array.from({ length: shape.largeFiles }, (_, index) => Math.floor(((index + 0.5) * shape.files) / shape.largeFiles)))
+  const large = new Set(
+    Array.from({ length: shape.largeFiles }, (_, index) =>
+      Math.floor(((index + 0.5) * shape.files) / shape.largeFiles),
+    ),
+  )
   let threadsLeft = shape.threads
   let notesLeft = shape.notes
   for (let index = 0; index < shape.files; index++) {
@@ -185,15 +233,35 @@ export function* largeDiffFiles(profile: LargeSurfaceProfile, seed = 1): Generat
     const folder = `pkg-${String(index % 40).padStart(2, '0')}`
     const path = `src/${folder}/module-${String(index).padStart(4, '0')}.ts`
     // The large files stay plain modifications, so every profile has several very large patches.
-    const kind = large.has(index) ? 'modified'
-      : index % 53 === 7 ? 'binary' : index % 61 === 11 ? 'renamed' : index % 67 === 13 ? 'added' : index % 71 === 17 ? 'removed' : 'modified'
+    const kind = large.has(index)
+      ? 'modified'
+      : index % 53 === 7
+        ? 'binary'
+        : index % 61 === 11
+          ? 'renamed'
+          : index % 67 === 13
+            ? 'added'
+            : index % 71 === 17
+              ? 'removed'
+              : 'modified'
 
     if (kind === 'binary') {
       const bytes = (fill: number) => String.fromCharCode(0, 1, 2, fill, 0, 255, 0, fill).repeat(16)
       yield {
         path: `assets/${folder}/image-${String(index).padStart(4, '0')}.bin`,
-        status: 'modified', additions: null, deletions: null, sha: null, viewed: false, patch: null,
-        oldPath: null, base: bytes(3), head: bytes(4), binary: true, threads: [], notes: [], rows: 2,
+        status: 'modified',
+        additions: null,
+        deletions: null,
+        sha: null,
+        viewed: false,
+        patch: null,
+        oldPath: null,
+        base: bytes(3),
+        head: bytes(4),
+        binary: true,
+        threads: [],
+        notes: [],
+        rows: 2,
       }
       continue
     }
@@ -204,8 +272,20 @@ export function* largeDiffFiles(profile: LargeSurfaceProfile, seed = 1): Generat
     if (kind === 'removed') ops = ops.filter((op) => op.kind !== '+').map((op) => ({ kind: '-', text: op.text }))
     const hunks = hunksOf(ops)
     const patch = patchOf(ops, hunks)
-    const base = kind === 'added' ? null : `${ops.filter((op) => op.kind !== '+').map((op) => op.text).join('\n')}\n`
-    const head = kind === 'removed' ? null : `${ops.filter((op) => op.kind !== '-').map((op) => op.text).join('\n')}\n`
+    const base =
+      kind === 'added'
+        ? null
+        : `${ops
+            .filter((op) => op.kind !== '+')
+            .map((op) => op.text)
+            .join('\n')}\n`
+    const head =
+      kind === 'removed'
+        ? null
+        : `${ops
+            .filter((op) => op.kind !== '-')
+            .map((op) => op.text)
+            .join('\n')}\n`
 
     // Spread the dynamic blocks over the files that remain, a few more on the large ones.
     const threadCount = Math.min(threadsLeft, Math.ceil(threadsLeft / filesLeft) + (large.has(index) ? 2 : 0))
@@ -236,7 +316,10 @@ export function* largeDiffFiles(profile: LargeSurfaceProfile, seed = 1): Generat
       side: op.kind === '-' ? 'deletions' : 'additions',
       line: op.kind === '-' ? oldNo : newNo,
       snippet: op.text,
-      body: position % 3 === 2 ? `Note ${position}: ${BODIES[0]} ${'This one wraps across the row. '.repeat(4)}` : `Note ${position}: check this line.`,
+      body:
+        position % 3 === 2
+          ? `Note ${position}: ${BODIES[0]} ${'This one wraps across the row. '.repeat(4)}`
+          : `Note ${position}: check this line.`,
     }))
 
     yield {
@@ -279,7 +362,8 @@ export function largeDiffSummary(profile: LargeSurfaceProfile, seed = 1) {
     threads += file.threads.length
     notes += file.notes.length
     hash = fold(fold(fold(hash, file.path), file.patch ?? ''), file.oldPath ?? '')
-    for (const thread of file.threads) hash = fold(hash, `${thread.threadId}:${thread.side}:${thread.line}:${thread.comments.length}`)
+    for (const thread of file.threads)
+      hash = fold(hash, `${thread.threadId}:${thread.side}:${thread.line}:${thread.comments.length}`)
     for (const note of file.notes) hash = fold(hash, `${note.side}:${note.line}:${note.body}`)
   }
   return { files, fixedRows, threads, notes, digest: hash.toString(16).padStart(8, '0') }
@@ -294,24 +378,31 @@ export function largeDiffSummary(profile: LargeSurfaceProfile, seed = 1) {
  * `onLoad` sees every segment request, which is how a test proves what the viewer asked for.
  * `delay` holds each answer back, for a test about what the viewer shows while it waits.
  */
-export function largeDiffSource(files: readonly LargeDiffFile[], options: {
-  scope?: string
-  threads?: () => DiffThread[]
-  onLoad?: (requests: DiffSegmentRequest[]) => void
-  delay?: () => Promise<void>
-} = {}): DiffSource {
+export function largeDiffSource(
+  files: readonly LargeDiffFile[],
+  options: {
+    scope?: string
+    threads?: () => DiffThread[]
+    onLoad?: (requests: DiffSegmentRequest[]) => void
+    delay?: () => Promise<void>
+  } = {},
+): DiffSource {
   const documents = new Map(files.map((file) => [file.path, fileDocument(file.path, file.patch)]))
-  const patchKeys = new Map(files.map((file) => [file.path, file.patch ? `fixture:${fold(2166136261, file.patch).toString(16)}` : null]))
-  const topology = documentTopology(files.map((file): DiffDocumentFile => ({
-    path: file.path,
-    status: file.status,
-    additions: file.additions,
-    deletions: file.deletions,
-    sha: file.sha,
-    viewed: file.viewed,
-    patchKey: patchKeys.get(file.path) ?? null,
-    segments: documents.get(file.path)!.descriptors,
-  })))
+  const patchKeys = new Map(
+    files.map((file) => [file.path, file.patch ? `fixture:${fold(2166136261, file.patch).toString(16)}` : null]),
+  )
+  const topology = documentTopology(
+    files.map((file): DiffDocumentFile => ({
+      path: file.path,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      sha: file.sha,
+      viewed: file.viewed,
+      patchKey: patchKeys.get(file.path) ?? null,
+      segments: documents.get(file.path)!.descriptors,
+    })),
+  )
   const byPath = new Map(files.map((file) => [file.path, file]))
   const allThreads = files.flatMap((file) => file.threads)
   const notesAt = new Map<string, LargeDiffNote[]>()
@@ -321,11 +412,19 @@ export function largeDiffSource(files: readonly LargeDiffFile[], options: {
       notesAt.set(key, [...(notesAt.get(key) ?? []), note])
     }
   }
-  const anchors: DiffLineAnchor[] = files.flatMap((file) => file.notes.map((note) => ({
-    path: note.path, side: note.side === 'deletions' ? 'old' as const : 'new' as const, line: note.line,
-  })))
+  const anchors: DiffLineAnchor[] = files.flatMap((file) =>
+    file.notes.map((note) => ({
+      path: note.path,
+      side: note.side === 'deletions' ? ('old' as const) : ('new' as const),
+      line: note.line,
+    })),
+  )
   const notesFor = (row: { path: string; oldNo: number | null; newNo: number | null }) =>
-    row.newNo != null ? notesAt.get(`${row.path}:additions:${row.newNo}`) : row.oldNo != null ? notesAt.get(`${row.path}:deletions:${row.oldNo}`) : undefined
+    row.newNo != null
+      ? notesAt.get(`${row.path}:additions:${row.newNo}`)
+      : row.oldNo != null
+        ? notesAt.get(`${row.path}:deletions:${row.oldNo}`)
+        : undefined
   const scope = options.scope ?? 'large-diff'
   return {
     scope: { taskId: scope, routeKey: scope },
@@ -338,15 +437,18 @@ export function largeDiffSource(files: readonly LargeDiffFile[], options: {
       options.onLoad?.(requests)
       await options.delay?.()
       return requests.flatMap((request): DiffSegmentPayload[] => {
-        const rows = patchKeys.get(request.path) === request.patchKey ? documents.get(request.path)?.segments[request.ordinal] : undefined
+        const rows =
+          patchKeys.get(request.path) === request.patchKey
+            ? documents.get(request.path)?.segments[request.ordinal]
+            : undefined
         return rows ? [{ ...request, rows }] : []
       })
     },
-    search: async (request) => (await searchDocument(
-      topology.files,
-      async (file) => documents.get(file.path)?.segments ?? [],
-      request,
-    )) ?? { matches: [], nextCursor: null },
+    search: async (request) =>
+      (await searchDocument(topology.files, async (file) => documents.get(file.path)?.segments ?? [], request)) ?? {
+        matches: [],
+        nextCursor: null,
+      },
     fileText: async ({ path }) => byPath.get(path)?.head ?? '',
     canComment: () => false,
     invalidate: () => {},

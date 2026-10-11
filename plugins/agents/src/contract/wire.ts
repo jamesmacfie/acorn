@@ -25,7 +25,7 @@ export type AgentAttentionReason =
   | 'unread'
   | 'none'
 
-export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
+type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
 export type AgentAttendance = 'attended' | 'supervised' | 'autonomous'
@@ -33,9 +33,23 @@ export type AgentAttendance = 'attended' | 'supervised' | 'autonomous'
 // settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
 // `plugin` is a note a plugin queued through `agents:session-messenger`; its `effectivePolicy.sentBy`
 // names the plugin (docs/managed-agents/session-messages.md).
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
+export type AgentTurnSource =
+  | 'interactive'
+  | 'workflow'
+  | 'delegation'
+  | 'delegation_report'
+  | 'automation'
+  | 'import'
+  | 'plugin'
+  | 'goal'
 export type AgentGoalStatus = 'active' | 'satisfied' | 'blocked' | 'paused' | 'exhausted' | 'cleared'
-export type AgentGoalBlocker = 'none' | 'missing_evidence' | 'needs_user_input' | 'run_failed' | 'external_wait' | 'goal_not_met_yet'
+export type AgentGoalBlocker =
+  | 'none'
+  | 'missing_evidence'
+  | 'needs_user_input'
+  | 'run_failed'
+  | 'external_wait'
+  | 'goal_not_met_yet'
 export type AgentGoalVerdict = {
   turnId: string
   satisfied: boolean
@@ -44,7 +58,7 @@ export type AgentGoalVerdict = {
   evidence_summary: string
   relied_on_assumption: boolean
 }
-export type AgentGoal = {
+type AgentGoal = {
   objective: string
   status: AgentGoalStatus
   continuations: number
@@ -278,7 +292,7 @@ export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' |
 /**
  * One subagent a session spawned, as a projection rather than a session row of its own: a subagent is
  * not something you can address, resume, or send a turn to, so making it a session would be a lie in
- * every table that reads one. docs/managed-agents/subagents.md, states the model.
+ * every table that reads one. docs/managed-agents/subagents.md states the model.
  *
  * `id` is whatever the harness makes stable from the moment the subagent starts, which differs by
  * harness: Claude's spawning tool call, Codex's child thread. `providerAgentRef` is the harness's own
@@ -307,8 +321,7 @@ export type AgentSubagent = {
 
 /** A subagent update. Absent means unchanged, the same convention AgentToolCall.status follows, so a
  *  harness that only learns the model at completion does not wipe the title it reported at spawn. */
-export type AgentSubagentUpdate =
-  Partial<Omit<AgentSubagent, 'id' | 'startedAt' | 'updatedAt'>> & { id: string }
+export type AgentSubagentUpdate = Partial<Omit<AgentSubagent, 'id' | 'startedAt' | 'updatedAt'>> & { id: string }
 
 export type AgentArtifact = {
   id: string
@@ -330,7 +343,13 @@ export type AgentPlanEntry = {
 
 export type AgentNormalizedEvent =
   | { type: 'session_state'; state: AgentRuntimeState; detail?: string }
-  | { type: 'session_metadata'; providerSessionRef?: string; configOptions?: AgentConfigOption[]; commands?: AgentCommandDescriptor[]; skills?: AgentSkillDescriptor[] }
+  | {
+      type: 'session_metadata'
+      providerSessionRef?: string
+      configOptions?: AgentConfigOption[]
+      commands?: AgentCommandDescriptor[]
+      skills?: AgentSkillDescriptor[]
+    }
   /** `subagentId` means somebody other than the reader wrote this turn: it is the brief a subagent was
    *  handed, so it belongs in that subagent's stream rather than in the session's. */
   | { type: 'user_message'; text: string; subagentId?: string; automatic?: boolean }
@@ -344,9 +363,26 @@ export type AgentNormalizedEvent =
   | { type: 'usage'; usage: AgentUsage }
   /** `blocked` marks a request refused by unattended policy or a permission policy plugin. The row is written
    *  resolved, never pending, and an older client draws it as an ordinary resolved request. */
-  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval; blocked?: AgentRequestBlocked }
+  | {
+      type: 'request'
+      requestId: string
+      kind: AgentRequestKind
+      title: string
+      detail?: string
+      options?: AgentPermissionOption[]
+      questions?: AgentQuestion[]
+      approval?: AgentAppApproval
+      blocked?: AgentRequestBlocked
+    }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
-  | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
+  | {
+      type: 'artifact'
+      artifactId: string
+      kind: AgentArtifactKind
+      title: string
+      mediaType?: string
+      byteSize?: number
+    }
   /** `patch` is the unified hunks for `path`, from the first `@@` on, with no file header. A change
    *  with no path is Codex's whole-turn diff, which is a multi-file git patch instead.
    *
@@ -356,9 +392,15 @@ export type AgentNormalizedEvent =
    *  line numbers count from the top of the excerpt. `patchArtifactId` is set when the patch was too
    *  large to keep inline and went to that artifact instead. */
   | {
-    type: 'file_change'; path?: string; patch?: string; summary?: string; subagentId?: string
-    changeId?: string; snippet?: boolean; patchArtifactId?: string
-  }
+      type: 'file_change'
+      path?: string
+      patch?: string
+      summary?: string
+      subagentId?: string
+      changeId?: string
+      snippet?: boolean
+      patchArtifactId?: string
+    }
   | { type: 'terminal'; terminalSessionId: string; title: string }
   | { type: 'turn_completed'; stopReason?: string }
   | { type: 'error'; code: string; message: string; retryable: boolean }
@@ -384,7 +426,7 @@ export type AgentSession = {
   config: Record<string, unknown>
   parentSessionId: string | null
   parentTurnId: string | null
-  /** Projected from the session's own `subagent` events by the repository, so every surface that reads
+  /** Projected from the session's own `subagent` events by `AgentStore`, so every surface that reads
    *  a session row sees the live roster without loading its transcript. */
   subagents: AgentSubagent[]
   /** How many follow-up turns are queued and waiting to dispatch. Counted onto the list read model so a
@@ -436,7 +478,7 @@ export type AgentEventRecord = {
    *  socket leave it out, since no client reads it and on a tool row it repeats the output. */
   searchText?: string | null
   createdAt: number
-  /** Present on a record the node folded later rows into (../shared/usageFold.ts, ../shared/toolFold.ts):
+  /** Present on a record the node folded later rows into (`foldUsageEvents`, `foldToolEvents`):
    *  the seq of the last row it absorbed. A reader pages on from here, and treats a row at or below it
    *  for the same card as already applied. */
   foldedThroughSeq?: number
@@ -463,7 +505,8 @@ export type AgentSessionSnapshot = {
   turns: AgentTurn[]
   events: AgentEventRecord[]
   requests: AgentRequest[]
-  /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field. */
+  /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field.
+   *  Mixed-version path until 2026-12-31. */
   wait?: AgentWaitFacts & { eventsThroughSeq: number; eventsComplete: boolean }
 }
 
@@ -486,9 +529,7 @@ export type AgentSessionDelegation = {
   sessionId: string
   depth: number
   isolation: 'shared' | 'worktree'
-  owner:
-    | { kind: 'managed'; parentSessionId: string }
-    | { kind: 'terminal'; label: string; profileId: string | null }
+  owner: { kind: 'managed'; parentSessionId: string } | { kind: 'terminal'; label: string; profileId: string | null }
 }
 
 export type AgentSessionList = {
@@ -521,8 +562,8 @@ export type AgentFootprint = {
 }
 
 // `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
-// Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
-// per row — to learn that one turn had closed or one permission request had been answered
+// Without them a client would refetch the whole snapshot, a JSON body parsed per event row, to learn
+// that one turn closed or one permission request was answered
 // (docs/managed-agents/transcript-store.md § The transcript store).
 export type AgentWsFrame =
   | { channel: 'agent:event'; event: AgentEventRecord }
@@ -538,7 +579,9 @@ const webSearchText = (web: AgentWebActivity | undefined): string[] => {
   if (!web) return []
   const action = web.action
   return [
-    ...(action?.type === 'search' ? [...action.queries, ...action.allowedDomains ?? [], ...action.blockedDomains ?? []] : []),
+    ...(action?.type === 'search'
+      ? [...action.queries, ...(action.allowedDomains ?? []), ...(action.blockedDomains ?? [])]
+      : []),
     ...(action && 'url' in action && action.url ? [action.url] : []),
     ...(action?.type === 'find_in_page' && action.pattern ? [action.pattern] : []),
     ...(action?.type === 'fetch_page' && action.prompt ? [action.prompt] : []),
@@ -560,7 +603,9 @@ export const agentEventSearchText = (event: AgentNormalizedEvent): string | null
         event.tool.output,
         ...(event.tool.paths ?? []),
         ...webSearchText(event.tool.web),
-      ].filter(Boolean).join(' ')
+      ]
+        .filter(Boolean)
+        .join(' ')
     case 'subagent':
       return [event.subagent.title, event.subagent.role].filter(Boolean).join(' ') || null
     case 'file_change':

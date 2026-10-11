@@ -4,8 +4,13 @@ import type { CommandExecutionContext, CommandOutcome, SearchCommand } from '@ac
 import { taskHasWorkflowRuns } from './runs/runStore'
 
 const mocks = vi.hoisted(() => ({
-  defs: vi.fn(), start: vi.fn(), createDef: vi.fn(), runs: vi.fn(),
-  requestStart: vi.fn(), setSelectedSource: vi.fn(), openPane: vi.fn(),
+  defs: vi.fn(),
+  start: vi.fn(),
+  createDef: vi.fn(),
+  runs: vi.fn(),
+  requestStart: vi.fn(),
+  setSelectedSource: vi.fn(),
+  openPane: vi.fn(),
 }))
 vi.mock('./workflowsClient', () => ({
   workflowApi: { defs: mocks.defs, start: mocks.start, createDef: mocks.createDef, runs: mocks.runs },
@@ -24,21 +29,26 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 
 import { workflowsCommands } from './commands'
 
-// The search that replaced this plugin's `paletteRows` source on 2026-09-03. Start semantics are
-// untouched: the whole definition goes to `start`, and an error comes back as the frame's message
-// rather than as a closed palette.
-
 const run = workflowsCommands[0] as SearchCommand
 const find = workflowsCommands[1] as SearchCommand
 const create = workflowsCommands[2] as { run: (context: CommandExecutionContext) => Promise<CommandOutcome> }
 
 const navigate = vi.fn()
 const context = (taskId: string): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null, navigate,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId,
+  paneId: null,
+  surfaceId: null,
+  navigate,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
-const def = (id: string, steps = 2): WorkflowDefSummary => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
+const def = (id: string, steps = 2): WorkflowDefSummary => ({
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   id,
   name: id.toUpperCase(),
   source: 'repo',
@@ -52,17 +62,19 @@ describe('the workflows plugin catalogue', () => {
   })
 
   it('is a task-scoped search and a project-scoped action, both gated on a node that runs terminals', () => {
-    // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one. The gate
-    // the row source declared, unchanged.
-    expect(workflowsCommands.map((command) => command.id)).toEqual(['workflows.run', 'workflows.runs.find', 'workflows.new'])
+    // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one.
+    expect(workflowsCommands.map((command) => command.id)).toEqual([
+      'workflows.run',
+      'workflows.runs.find',
+      'workflows.new',
+    ])
     expect(create).toMatchObject({ scope: 'project', category: 'action', requires: { plugin: 'terminal' } })
     expect(run).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'terminal' } })
     expect(run.debounceMs).toBe(0)
     expect(run.minQueryLength).toBe(0)
   })
 
-  // "Find a run" waited for somewhere to open one (docs/workflows/routes-and-ui.md § The run pane).
-  it('lists this task\'s runs and opens the one that was picked', async () => {
+  it("lists this task's runs and opens the one that was picked", async () => {
     mocks.runs.mockResolvedValue([
       { id: 'run-2', name: 'Investigate an issue', status: 'running', createdAt: Date.now() },
     ])
@@ -100,15 +112,27 @@ describe('the workflows plugin catalogue', () => {
     const world = context('task-1')
     const rows = await run.query('', world, signal())
     expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.start).toHaveBeenCalledWith('task-1', { defId: 'repo:ship' }, undefined, expect.any(Function), undefined)
+    expect(mocks.start).toHaveBeenCalledWith(
+      'task-1',
+      { defId: 'repo:ship' },
+      undefined,
+      expect.any(Function),
+      undefined,
+    )
     expect(taskHasWorkflowRuns('task-1')).toBe(true)
     // A row is addressed by its own id, because it belongs to no layer.
     await run.select(rows[1], world)
-    expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' }, undefined, expect.any(Function), undefined)
+    expect(mocks.start).toHaveBeenLastCalledWith(
+      'task-1',
+      { defId: 'mine' },
+      undefined,
+      expect.any(Function),
+      undefined,
+    )
   })
 
   // A definition that asks for something opens the dialog instead of starting a run with an empty
-  // required input (./editor/StartDialog.tsx).
+  // required input.
   it('opens the start dialog for a definition whose required input has no value yet', async () => {
     const inputs = [{ name: 'issue', required: true }]
     mocks.defs.mockResolvedValue({ workflows: [{ ...def('ship'), inputs }], errors: [] })
@@ -116,7 +140,11 @@ describe('the workflows plugin catalogue', () => {
     const rows = await run.query('', world, signal())
     expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
     expect(mocks.requestStart).toHaveBeenCalledWith({
-      defId: 'repo:ship', name: 'SHIP', inputs, taskId: 'task-1', projectId: 'p-1',
+      defId: 'repo:ship',
+      name: 'SHIP',
+      inputs,
+      taskId: 'task-1',
+      projectId: 'p-1',
     })
     // The rail goes to Workflows, because that is the one place the dialog is mounted.
     expect(mocks.setSelectedSource).toHaveBeenCalledWith('workflows')
@@ -126,7 +154,11 @@ describe('the workflows plugin catalogue', () => {
   it('creates a row and opens it, for "New workflow"', async () => {
     mocks.createDef.mockResolvedValue({ id: 'row-1' })
     expect(await create.run(context('task-1'))).toEqual({ effect: 'close' })
-    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] } })
+    expect(mocks.createDef).toHaveBeenCalledWith({
+      workspaceId: 'w-1',
+      projectId: 'p-1',
+      def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] },
+    })
     expect(navigate).toHaveBeenCalledWith('/p/p-1/x/workflows/db%3Arow-1')
   })
 
@@ -142,7 +174,9 @@ describe('the workflows plugin catalogue', () => {
     mocks.defs.mockResolvedValue({ workflows: [def('ship')], errors: [{ source: 'repo', message: 'bad step' }] })
     const world = context('task-1')
     const rows = await run.query('', world, signal())
-    await expect(run.select({ id: 'workflow:gone', title: 'x', ref: 'gone' }, world)).rejects.toThrow('no longer a workflow')
+    await expect(run.select({ id: 'workflow:gone', title: 'x', ref: 'gone' }, world)).rejects.toThrow(
+      'no longer a workflow',
+    )
     expect(await run.select(rows[0], world)).toEqual({ effect: 'stay', status: 'repo: bad step' })
     expect(mocks.start).not.toHaveBeenCalled()
   })

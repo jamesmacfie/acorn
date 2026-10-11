@@ -14,7 +14,6 @@ export const ITEM: RollbarApiItem = {
   last_occurrence_timestamp: 1_700_100_000,
   framework: 'node',
   last_occurrence_id: 555,
-  last_activated_timestamp: 1_700_050_000,
   unique_occurrences: 12,
   resolved_in_version: null,
   assigned_user_id: null,
@@ -50,7 +49,15 @@ export const TRACE_INSTANCE: RollbarApiInstance = {
       trace: {
         exception: { class: 'TypeError', message: 'token is null' },
         frames: [
-          { filename: 'auth/session.ts', lineno: 84, colno: 12, method: 'readSession', code: 'return s.token', in_app: true, context: { pre: ['a', 'b'], post: ['c', 'd'] } },
+          {
+            filename: 'auth/session.ts',
+            lineno: 84,
+            colno: 12,
+            method: 'readSession',
+            code: 'return s.token',
+            in_app: true,
+            context: { pre: ['a', 'b'], post: ['c', 'd'] },
+          },
           { filename: 'api/login.ts', lineno: 31, method: 'login' },
         ],
       },

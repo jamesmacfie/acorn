@@ -52,7 +52,7 @@ describe('installCrashHandlers', () => {
     expect(fatal.stack).toContain('TypeError')
     expect(fatal.attrs.seam).toBe('uncaughtException')
     // Node prints the stack itself when no listener is registered, so a listener that did not print
-    // would make a crash quieter than it was before this file existed.
+    // would make a crash quieter than Node's own default.
     expect(String(error.mock.calls)).toContain('cannot read properties of undefined')
     expect(exit).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1_000)

@@ -1,21 +1,18 @@
-// The one git seam. Before this, `promisify(execFile)('git', …)` appeared at about 15 sites across
-// changes, github, editor, memory and core's worktrees.ts, each picking its own timeout and maxBuffer,
-// and each inheriting whatever env hygiene that site happened to have.
-//
-// Two behaviours this adds that no individual call site had:
+// The one git seam, so every git spawn gets the same timeout, output cap, and env hygiene. Two
+// behaviours worth knowing:
 //
 //   GIT_TERMINAL_PROMPT=0. A fetch against a repo whose credentials have expired would otherwise block
 //   on a username prompt until the caller's timeout, turning a fast auth failure into a 30-second hang.
 //
-//   SSH_AUTH_SOCK in the passthrough. It isn't in the base allowlist (childEnv), so a push over ssh
-//   would fail with "agent refused operation" once git went through the broker. It grants use of the
-//   agent, not a readable secret.
+//   SSH_AUTH_SOCK in the passthrough. It isn't in the base allowlist (childEnv), so without it a push
+//   over ssh fails with "agent refused operation" through the broker. It grants use of the agent, not a
+//   readable secret.
 import { existsSync } from 'node:fs'
 import { measure } from '../telemetry/collector'
 import { ProcessError, runProcess, runProcessOrThrow, type ProcResult } from './proc'
 
 // Most git reads are small; `git diff` on a large change is the exception, so the cap is generous while
-// still bounded. Was 1 MiB at some sites, which silently truncated big diffs.
+// still bounded.
 export const GIT_MAX_OUTPUT_BYTES = 16 << 20
 export const GIT_TIMEOUT_MS = 30_000
 
@@ -68,14 +65,13 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
 // the selected executable and must reach the caller unchanged.
 const commandLineToolsGit = '/Library/Developer/CommandLineTools/usr/bin/git'
 const xcodeLicenseBlocked = (result: ProcResult): boolean =>
-  process.platform === 'darwin'
-  && result.code === 69
-  && /You have not agreed to the Xcode license agreements/.test(result.stderr)
-  && existsSync(commandLineToolsGit)
+  process.platform === 'darwin' &&
+  result.code === 69 &&
+  /You have not agreed to the Xcode license agreements/.test(result.stderr) &&
+  existsSync(commandLineToolsGit)
 
 // A histogram per subcommand rather than per argument list: a status ping spawns `git status` and
-// two `git diff` per active worktree per connected client and nothing counted them, which is the
-// measurement phase 5 of the performance programme argues from (../telemetry/collector.ts).
+// two `git diff` per active worktree per connected client, and this is what counts them.
 //
 // A histogram and not a span, because this fires far more than ten times a second under normal use
 // (docs/telemetry/model.md § Hot seams are metrics). `measure` is a straight passthrough when nothing is
@@ -92,9 +88,7 @@ export const git = (args: readonly string[], opts: GitOptions): Promise<ProcResu
   measure('core', seam(args), async () => {
     const command = spec(args, opts)
     const result = await runProcess(command)
-    return xcodeLicenseBlocked(result)
-      ? runProcess({ ...command, file: commandLineToolsGit })
-      : result
+    return xcodeLicenseBlocked(result) ? runProcess({ ...command, file: commandLineToolsGit }) : result
   })
 
 // For the callers that treat a non-zero exit as an error.
@@ -110,4 +104,5 @@ export const gitOrThrow = (args: readonly string[], opts: GitOptions): Promise<P
   })
 
 // stdout of a successful command, trimmed, which is the shape most call sites wanted.
-export const gitText = async (args: readonly string[], opts: GitOptions): Promise<string> => (await gitOrThrow(args, opts)).stdout.trim()
+export const gitText = async (args: readonly string[], opts: GitOptions): Promise<string> =>
+  (await gitOrThrow(args, opts)).stdout.trim()

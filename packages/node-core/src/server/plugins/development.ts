@@ -55,7 +55,10 @@ type Watch = {
   listener: (current: Stats, previous: Stats) => void
 }
 
-export function createPluginDevelopment(options: { dataDir: string; reload(id: string): Promise<PluginReloadResult> }): PluginDevelopment {
+export function createPluginDevelopment(options: {
+  dataDir: string
+  reload(id: string): Promise<PluginReloadResult>
+}): PluginDevelopment {
   const { dataDir } = options
   const store = pluginListStore(dataDir, DEVELOPMENT_FILE)
   const watches = new Map<string, Watch>()
@@ -64,8 +67,10 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
     const source = readLockfile(dataDir, id)?.source
     return !!source && 'path' in source
   }
-  const folderPlugin = (id: string): InstalledPlugin | undefined => fromFolder(id)
-    ? scanInstalled(dataDir).installed.find((entry) => entry.manifest.id === id && entry.manifest.node) : undefined
+  const folderPlugin = (id: string): InstalledPlugin | undefined =>
+    fromFolder(id)
+      ? scanInstalled(dataDir).installed.find((entry) => entry.manifest.id === id && entry.manifest.node)
+      : undefined
 
   // Written before each reload, so the new code's first read is covered. A plugin that stops declaring
   // inputs loses its development grant, and never a grant the person gave.
@@ -73,7 +78,13 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
     const grants = inputGrantsStore(dataDir)
     const sources = declaredInputs(entry.manifest.contributions.dataSources)
     if (Object.keys(sources).length) {
-      grants.set({ pluginId: entry.manifest.id, sources, grantedAt: Date.now(), grantedBy: 'development', development: true })
+      grants.set({
+        pluginId: entry.manifest.id,
+        sources,
+        grantedAt: Date.now(),
+        grantedBy: 'development',
+        development: true,
+      })
     } else if (grants.get(entry.manifest.id)?.development) grants.delete(entry.manifest.id)
   }
 
@@ -105,7 +116,11 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
   const reload = (id: string): Promise<PluginReloadResult> => {
     const next = (queue.get(id) ?? Promise.resolve()).catch(() => {}).then(() => attempt(id))
     queue.set(id, next)
-    void next.catch(() => {}).finally(() => { if (queue.get(id) === next) queue.delete(id) })
+    void next
+      .catch(() => {})
+      .finally(() => {
+        if (queue.get(id) === next) queue.delete(id)
+      })
     return next
   }
 
@@ -113,7 +128,8 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
     const id = entry.manifest.id
     if (watches.has(id)) return
     const files = [MANIFEST_FILE, entry.manifest.node, entry.manifest.client]
-      .filter((file): file is string => !!file).map((file) => join(entry.dir, file))
+      .filter((file): file is string => !!file)
+      .map((file) => join(entry.dir, file))
     const watch: Watch = {
       files,
       listener: (current, previous) => {
@@ -121,7 +137,9 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
         clearTimeout(watch.timer)
         watch.timer = setTimeout(() => {
           void reload(id).then(
-            (result) => { if (result.state === 'failed') log.warn(`${id}: reload failed: ${result.reason ?? ''}`) },
+            (result) => {
+              if (result.state === 'failed') log.warn(`${id}: reload failed: ${result.reason ?? ''}`)
+            },
             (error: unknown) => log.warn(`${id}: reload failed: ${describeError(error).message}`),
           )
         }, DEBOUNCE_MS)
@@ -155,7 +173,11 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
       if (!fromFolder(id)) return undefined
       const watch = watches.get(id)
       if (!watch) return { on: false }
-      return { on: true, ...(watch.reloadedAt ? { reloadedAt: watch.reloadedAt } : {}), ...(watch.failure ? { failure: watch.failure } : {}) }
+      return {
+        on: true,
+        ...(watch.reloadedAt ? { reloadedAt: watch.reloadedAt } : {}),
+        ...(watch.failure ? { failure: watch.failure } : {}),
+      }
     },
     set: (id, on) => {
       if (on) {
@@ -172,8 +194,10 @@ export function createPluginDevelopment(options: { dataDir: string; reload(id: s
       const grants = inputGrantsStore(dataDir)
       if (grants.get(id)?.development) grants.delete(id)
     },
-    logs: (id) => (watches.has(id) ? pluginLogs(id) ?? [] : null),
+    logs: (id) => (watches.has(id) ? (pluginLogs(id) ?? []) : null),
     reload,
-    dispose: () => { for (const id of [...watches.keys()]) stop(id) },
+    dispose: () => {
+      for (const id of [...watches.keys()]) stop(id)
+    },
   }
 }

@@ -11,9 +11,7 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-// The host ladder, as one call now. It used to be `parseInAppTarget` then `openContentTarget`, and the
-// frame side had to hold the target in between; `openInAppUrl` owns the whole question, including the
-// route rung this surface previously had no way to reach.
+// The host ladder, as one call: `openInAppUrl` owns the whole question, including the route rung.
 const openInAppUrl = vi.fn((..._args: unknown[]) => false)
 
 vi.mock('../registries/panes/contentLinks', () => ({
@@ -50,9 +48,8 @@ const { createFrameServices } = await import('./frameServices')
 // The host half of the frame bridge (docs/plugins.md).
 //
 // broker.test.ts pins what the checker refuses; this pins what the host then actually does with a call
-// that got through. The two halves used to sit on opposite sides of a `.tsx` boundary, so only one of
-// them could be tested. The effects are the half that pins a node, hand-parses the prefs cache and
-// decides where a link goes.
+// that got through. The effects are the half that pins a node, hand-parses the prefs cache and decides
+// where a link goes.
 
 const binding = (over: Partial<FrameBinding> = {}): FrameBinding => ({
   pluginId: 'board',
@@ -68,14 +65,20 @@ const binding = (over: Partial<FrameBinding> = {}): FrameBinding => ({
 
 // Just enough query client for the two verbs that read the prefs cache.
 const queryClient = (prefs: Record<string, string> = {}): QueryClient =>
-  ({ getQueryData: (key: unknown) => (JSON.stringify(key) === JSON.stringify(prefsKey) ? prefs : undefined) }) as unknown as QueryClient
+  ({
+    getQueryData: (key: unknown) => (JSON.stringify(key) === JSON.stringify(prefsKey) ? prefs : undefined),
+  }) as unknown as QueryClient
 
 export const navigated: string[] = []
 
 const build = (props: Partial<PluginFrameProps> = {}, over: { prefs?: Record<string, string>; focus?: boolean } = {}) =>
   createFrameServices(
     { binding: binding(), hash: 'a'.repeat(64), ...props },
-    { qc: queryClient(over.prefs), frameHasFocus: () => over.focus ?? false, navigate: (to) => void navigated.push(to) },
+    {
+      qc: queryClient(over.prefs),
+      frameHasFocus: () => over.focus ?? false,
+      navigate: (to) => void navigated.push(to),
+    },
   )
 
 const windowOpen = vi.fn()
@@ -100,16 +103,22 @@ describe('fetch', () => {
   it('pins the frame’s own node, which no message can name', () => {
     const services = build({ binding: binding({ nodeId: 'node-b' }) })
     void services.fetch('GET', '/v1/p/board/items', undefined, new AbortController().signal)
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/items', expect.objectContaining({ method: 'GET', nodeId: 'node-b' }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/board/items',
+      expect.objectContaining({ method: 'GET', nodeId: 'node-b' }),
+    )
   })
 
   it('sends a body as JSON and omits the header when there is none', () => {
     const signal = new AbortController().signal
     void build().fetch('POST', '/v1/p/board/items', { title: 'x' }, signal)
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/items', expect.objectContaining({
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'x' }),
-    }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/board/items',
+      expect.objectContaining({
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'x' }),
+      }),
+    )
     void build().fetch('DELETE', '/v1/p/board/items/1', undefined, signal)
     expect(sendRaw.mock.calls.at(-1)?.[1]).not.toHaveProperty('body')
   })
@@ -120,7 +129,9 @@ describe('subscribe', () => {
     // `presentation:pane-intent` exists and is emitted constantly. It is simply the shell's own
     // intent traffic, which a plugin has no business watching (./channels.ts). The broker checks the
     // manifest declared a channel; this checks the shell offers it, and neither check creates one.
-    expect(() => build().subscribe('presentation:pane-intent', () => {})).toThrow(/not a channel a plugin frame can subscribe to/)
+    expect(() => build().subscribe('presentation:pane-intent', () => {})).toThrow(
+      /not a channel a plugin frame can subscribe to/,
+    )
   })
 
   it('attaches to one that does and detaches on the returned handle', async () => {
@@ -133,7 +144,7 @@ describe('subscribe', () => {
     expect(seen).toHaveLength(1)
   })
 
-  it('attaches to the plugin\'s own live channel and hands over the frame minus its channel', async () => {
+  it("attaches to the plugin's own live channel and hands over the frame minus its channel", async () => {
     const { _resetPluginChannels, onPluginPush } = await import('../plugins/pluginChannel')
     const { routeWsFrame } = await import('../../infra/node/wsChannels')
     // A push has to reach the bus for the frame to hear it, and `onPluginPush` is what claims the
@@ -152,7 +163,7 @@ describe('subscribe', () => {
     }
   })
 
-  it('accepts another plugin\'s channel; the manifest grant is the broker\'s check', () => {
+  it("accepts another plugin's channel; the manifest grant is the broker's check", () => {
     // docs/plugins/events.md § Hearing another plugin. Routes stay plugin-private; a
     // declared verb on the live channel does not.
     expect(() => build().subscribe('plugin:other:sample', () => {})).not.toThrow()
@@ -167,7 +178,9 @@ describe('plugin state', () => {
 
   it('reports a value some other writer put there as absent', () => {
     // Not this plugin's state, so it is not handed over as a string either.
-    expect(build({}, { prefs: { 'plugin.board.filters': 'not json' } }).stateGet('plugin.board.filters')).toBeUndefined()
+    expect(
+      build({}, { prefs: { 'plugin.board.filters': 'not json' } }).stateGet('plugin.board.filters'),
+    ).toBeUndefined()
     expect(build().stateGet('plugin.board.filters')).toBeUndefined()
   })
 
@@ -200,7 +213,10 @@ describe('openUrl', () => {
   it('keeps an in-app target in-app', () => {
     openInAppUrl.mockReturnValue(true)
     build({ binding: binding({ taskId: 'task-1' }) }).openUrl('https://board.example/cards/ENG-1')
-    expect(openInAppUrl).toHaveBeenCalledWith('https://board.example/cards/ENG-1', expect.objectContaining({ taskId: 'task-1' }))
+    expect(openInAppUrl).toHaveBeenCalledWith(
+      'https://board.example/cards/ENG-1',
+      expect.objectContaining({ taskId: 'task-1' }),
+    )
     expect(windowOpen).not.toHaveBeenCalled()
   })
 
@@ -214,7 +230,10 @@ describe('openUrl', () => {
     // clicked inside one cannot navigate the shell out from under the reader.
     openInAppUrl.mockReturnValue(true)
     build({ binding: binding({ target: 'refPanel', taskId: 'task-1' }) }).openUrl('https://linear.app/x/ENG-1')
-    expect(openInAppUrl).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId: 'task-1', prefer: 'refPanel' }))
+    expect(openInAppUrl).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ taskId: 'task-1', prefer: 'refPanel' }),
+    )
 
     build({ binding: binding({ taskId: 'task-1' }) }).openUrl('https://linear.app/x/ENG-1')
     expect(openInAppUrl.mock.lastCall?.[1]).not.toHaveProperty('prefer')
@@ -243,7 +262,9 @@ describe('the structural grants', () => {
     // The absence is the permission check the broker applies. There is no scope to declare, because
     // the grant is structural.
     expect(build().document).toBeUndefined()
-    expect(build({ document: () => ({ read: () => 'x', write: () => {}, flush: async () => {} }) }).document).toBeDefined()
+    expect(
+      build({ document: () => ({ read: () => 'x', write: () => {}, flush: async () => {} }) }).document,
+    ).toBeDefined()
   })
 
   it('reads the document per call, so a frame that connected first still reaches it', () => {
@@ -291,12 +312,18 @@ describe('toast', () => {
 
 describe('cooperative destinations', () => {
   it('pins target navigation to the frame task', () => {
-    build({ binding: binding({ taskId: 'task-7' }) }).openTarget?.({ kind: 'findings-candidate', resourceId: 'candidate-1' })
+    build({ binding: binding({ taskId: 'task-7' }) }).openTarget?.({
+      kind: 'findings-candidate',
+      resourceId: 'candidate-1',
+    })
     expect(openTarget).toHaveBeenCalledWith('task-7', { kind: 'findings-candidate', resourceId: 'candidate-1' })
   })
 
   it('does nothing when the surface has no task', () => {
-    build({ binding: binding({ taskId: undefined }) }).openTarget?.({ kind: 'findings-candidate', resourceId: 'candidate-1' })
+    build({ binding: binding({ taskId: undefined }) }).openTarget?.({
+      kind: 'findings-candidate',
+      resourceId: 'candidate-1',
+    })
     expect(openTarget).not.toHaveBeenCalled()
   })
 })

@@ -4,11 +4,16 @@
 // plugin document region, and Editor's files.
 //
 // A document region names its own routes and never asks this registry. Editor's files have no plugin
-// of their own, so they ask by language: `contributions.documentServices`, registered by
-// host/chrome/chromeRegister.ts.
+// of their own, so they ask by language: `contributions.documentServices`, registered by the chrome
+// pass.
 import {
-  DIAGNOSTIC_SEVERITIES, MAX_DIAGNOSTICS, MAX_HOVER_BYTES, MAX_LANGUAGE_REQUEST_BYTES,
-  type PluginDiagnosticSeverity, type PluginPosition, type PluginRange,
+  DIAGNOSTIC_SEVERITIES,
+  MAX_DIAGNOSTICS,
+  MAX_HOVER_BYTES,
+  MAX_LANGUAGE_REQUEST_BYTES,
+  type PluginDiagnosticSeverity,
+  type PluginPosition,
+  type PluginRange,
 } from '@acorn/protocol/documentSurface.ts'
 import { utf8Exceeds } from '@acorn/protocol/extensionPoints.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
@@ -38,11 +43,18 @@ export const documentServiceRegistry = new Registry<DocumentServiceContribution>
 export type DocumentServiceRoute = { pluginId: string; label: string; route: string }
 export type DocumentServiceRoutes = { hover?: DocumentServiceRoute; diagnostics?: DocumentServiceRoute }
 
-export const documentServiceChoiceKey = (languageId: string, service: DocumentServiceKind): string => `${languageId}|${service}`
+export const documentServiceChoiceKey = (languageId: string, service: DocumentServiceKind): string =>
+  `${languageId}|${service}`
 
 /** Every provider of one service for one language on this Node, for the settings picker. */
-export const documentServiceCandidates = (nodeId: string, languageId: string, service: DocumentServiceKind): DocumentServiceContribution[] =>
-  documentServiceRegistry.entries().filter((entry) => entry.languageId === languageId && entry[service] && entry.available(nodeId))
+export const documentServiceCandidates = (
+  nodeId: string,
+  languageId: string,
+  service: DocumentServiceKind,
+): DocumentServiceContribution[] =>
+  documentServiceRegistry
+    .entries()
+    .filter((entry) => entry.languageId === languageId && entry[service] && entry.available(nodeId))
 
 /**
  * Which providers serve a file in this language on this Node. The arbitration rule a `replace` slot
@@ -50,13 +62,18 @@ export const documentServiceCandidates = (nodeId: string, languageId: string, se
  * preferences. With no pick, or a pick that no longer offers the service, nobody serves, which is
  * Editor's own behaviour. Never the first to register.
  */
-export function resolveDocumentServices(nodeId: string, languageId: string, prefs: Record<string, string> | undefined): DocumentServiceRoutes {
+export function resolveDocumentServices(
+  nodeId: string,
+  languageId: string,
+  prefs: Record<string, string> | undefined,
+): DocumentServiceRoutes {
   const choices = slotChoices(prefs?.[PrefKeys.documentServices])
   const pick = (service: DocumentServiceKind): DocumentServiceRoute | undefined => {
     const candidates = documentServiceCandidates(nodeId, languageId, service)
-    const chosen = candidates.length === 1
-      ? candidates[0]
-      : candidates.find((entry) => entry.pluginId === choices[documentServiceChoiceKey(languageId, service)])
+    const chosen =
+      candidates.length === 1
+        ? candidates[0]
+        : candidates.find((entry) => entry.pluginId === choices[documentServiceChoiceKey(languageId, service)])
     return chosen && { pluginId: chosen.pluginId, label: chosen.label, route: chosen[service]! }
   }
   const hover = pick('hover')
@@ -73,7 +90,11 @@ export const languageRequestTooLarge = (text: string): boolean => utf8Exceeds(te
 // POST a request to a provider's route on the bound Node. The answer is unchecked bytes.
 const postDocumentService = (route: string, nodeId: string, body: object, signal?: AbortSignal): Promise<unknown> =>
   writeJson<unknown>(route, {
-    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), ...(signal ? { signal } : {}),
+    method: 'POST',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   })
 
 // Where each line starts, as UTF-16 offsets. Lines split on `\n`, the separator an editor's text uses.
@@ -86,7 +107,8 @@ const lineStarts = (text: string): number[] => {
 const offsetIn = (text: string, starts: readonly number[], position: unknown): number | undefined => {
   if (!position || typeof position !== 'object') return undefined
   const { line, column } = position as Partial<PluginPosition>
-  if (!Number.isInteger(line) || !Number.isInteger(column) || line! < 1 || column! < 1 || line! > starts.length) return undefined
+  if (!Number.isInteger(line) || !Number.isInteger(column) || line! < 1 || column! < 1 || line! > starts.length)
+    return undefined
   const start = starts[line! - 1]!
   const end = line! < starts.length ? starts[line!]! - 1 : text.length
   // Column `length + 1` is the end of the line, which an exclusive end needs.
@@ -144,7 +166,10 @@ const bounded = (value: unknown, max: number): string | undefined =>
  * another revision or isn't a list, which the owner treats as a failure and clears. Items past 200, and
  * items with a bad range, severity, or message, are dropped one by one.
  */
-export function checkDiagnostics(body: unknown, sent: { text: string; revision: number }): CheckedDiagnostic[] | undefined {
+export function checkDiagnostics(
+  body: unknown,
+  sent: { text: string; revision: number },
+): CheckedDiagnostic[] | undefined {
   if (!body || typeof body !== 'object') return undefined
   const { revision, items } = body as Record<string, unknown>
   if (revision !== sent.revision || !Array.isArray(items)) return undefined
@@ -157,17 +182,32 @@ export function checkDiagnostics(body: unknown, sent: { text: string; revision: 
     if (!span || !SEVERITIES.has(severity) || !text) return []
     const codeText = bounded(code, 100)
     const sourceText = bounded(source, 100)
-    return [{ ...span, severity: severity as PluginDiagnosticSeverity, message: text,
-      ...(codeText ? { code: codeText } : {}), ...(sourceText ? { source: sourceText } : {}) }]
+    return [
+      {
+        ...span,
+        severity: severity as PluginDiagnosticSeverity,
+        message: text,
+        ...(codeText ? { code: codeText } : {}),
+        ...(sourceText ? { source: sourceText } : {}),
+      },
+    ]
   })
 }
 
 /** Ask a provider about the position at `offset`, and check its answer. Undefined for a failure, an
  *  abort, or anything `checkHover` refuses. The caller checks the buffer hasn't moved on since. */
-export async function requestHover(route: string, nodeId: string, sent: { text: string; revision: number; offset: number }, signal?: AbortSignal): Promise<CheckedHover | undefined> {
+export async function requestHover(
+  route: string,
+  nodeId: string,
+  sent: { text: string; revision: number; offset: number },
+  signal?: AbortSignal,
+): Promise<CheckedHover | undefined> {
   const { text, revision, offset } = sent
   try {
-    return checkHover(await postDocumentService(route, nodeId, { text, position: positionAt(text, offset), revision }, signal), sent)
+    return checkHover(
+      await postDocumentService(route, nodeId, { text, position: positionAt(text, offset), revision }, signal),
+      sent,
+    )
   } catch {
     return undefined
   }
@@ -175,9 +215,17 @@ export async function requestHover(route: string, nodeId: string, sent: { text: 
 
 /** Ask a provider for diagnostics on `text`, and check its answer. Undefined for a failure, an abort, or
  *  a refused answer, all of which the owner clears its marks for. */
-export async function requestDiagnostics(route: string, nodeId: string, sent: { text: string; revision: number }, signal?: AbortSignal): Promise<CheckedDiagnostic[] | undefined> {
+export async function requestDiagnostics(
+  route: string,
+  nodeId: string,
+  sent: { text: string; revision: number },
+  signal?: AbortSignal,
+): Promise<CheckedDiagnostic[] | undefined> {
   try {
-    return checkDiagnostics(await postDocumentService(route, nodeId, { text: sent.text, revision: sent.revision }, signal), sent)
+    return checkDiagnostics(
+      await postDocumentService(route, nodeId, { text: sent.text, revision: sent.revision }, signal),
+      sent,
+    )
   } catch {
     return undefined
   }

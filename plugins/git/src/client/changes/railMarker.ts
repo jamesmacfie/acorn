@@ -7,7 +7,12 @@
 // that poll already says the tree is clean, so a clean task costs no read. A task in the project folder
 // has no entry in that poll, so it is asked about rather than assumed clean.
 import { createSignal } from 'solid-js'
-import { taskStatus, taskStatusRevision, type RailMarkerContribution, type RailMarkerDot } from '@acorn/plugin-api/client'
+import {
+  taskStatus,
+  taskStatusRevision,
+  type RailMarkerContribution,
+  type RailMarkerDot,
+} from '@acorn/plugin-api/client'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { localGitApi } from './changesClient'
 import { GIT_PANE } from '../gitPane'
@@ -48,12 +53,20 @@ export const changesRailMarkerContribution: RailMarkerContribution = {
   id: 'changes',
   order: 20,
   markers: (target) => {
-    const taskId = target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === GIT_PANE ? target.taskId : null
+    const taskId =
+      target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === GIT_PANE ? target.taskId : null
     if (!taskId || taskStatus(taskId)?.dirty === false) return []
     ask(taskId, taskStatusRevision())
     const dot = dots()[taskId]
     if (!dot) return []
     // A task row's top corners go to notices and the pin, so its dot takes a bottom one.
-    return [{ id: 'lines', label: LABEL[dot]!, dotTone: dot, placements: target.kind === 'task' ? ['bottom-end', 'bottom-start'] : ['top-end'] }]
+    return [
+      {
+        id: 'lines',
+        label: LABEL[dot]!,
+        dotTone: dot,
+        placements: target.kind === 'task' ? ['bottom-end', 'bottom-start'] : ['top-end'],
+      },
+    ]
   },
 }

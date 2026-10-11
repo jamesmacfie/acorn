@@ -1,15 +1,42 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, queryOwner, clientEvents, consumeTerminalFocusIntent, formatChord, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, registerKeybindings, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  queryOwner,
+  clientEvents,
+  consumeTerminalFocusIntent,
+  formatChord,
+  isTerminalMax,
+  onClosePaneWithin,
+  PrefKeys,
+  prefsOptions,
+  registerCommands,
+  registerKeybindings,
+  savePref,
+  type Task,
+  termFontSize,
+} from '@acorn/plugin-api/client'
 import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, sessions } from './sessionStore'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import {
-  Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
+  Alert,
+  Button,
+  createSplitDrag,
+  DocumentTabs,
+  EmptyState,
+  IconButton,
+  Menu,
+  SplitHandle,
 } from '@acorn/plugin-api/ui'
 import { Drawer, Slot } from '@acorn/plugin-api/ui/host'
-import { interruptRefusal, TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps, type TerminalToolbarResult } from '../contract/toolbarActions'
+import {
+  interruptRefusal,
+  TERMINAL_TOOLBAR_ACTIONS_POINT,
+  type TerminalToolbarProps,
+  type TerminalToolbarResult,
+} from '../contract/toolbarActions'
 import { resolveTerminalFontSize } from './preferences'
 
 const PROFILES_STALE_MS = 5 * 60_000
@@ -23,7 +50,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const nodeId = owner === undefined ? activeNodeId() : owner
   const api = terminalApi(nodeId)
   let disposed = false
-  onCleanup(() => { disposed = true })
+  onCleanup(() => {
+    disposed = true
+  })
   const ws = () => props.task
   const taskId = createMemo(() => ws()?.id)
   const view = createMemo(() => ({ taskId: taskId() }))
@@ -75,7 +104,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   createEffect(() => {
     view()
-    setBusy(false); setLaunching(false); setPendingTitle(null); setError(null)
+    setBusy(false)
+    setLaunching(false)
+    setPendingTitle(null)
+    setError(null)
   })
 
   onMount(async () => {
@@ -84,11 +116,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
     // Cached for a few minutes. The node answers by running `which` for tmux and every agent profile,
-    // about 18 ms of its loop, and the drawer remounts on every return to a task that has it open. The
+    // which blocks its loop, and the drawer remounts on every return to a task that has it open. The
     // list changes when a harness lands on PATH, which nothing reports, so a short stale time is the
     // refresh.
     try {
-      const loaded = await queryClient.fetchQuery({ queryKey: ['terminal', 'profiles'], queryFn: () => api.profiles(), staleTime: PROFILES_STALE_MS })
+      const loaded = await queryClient.fetchQuery({
+        queryKey: ['terminal', 'profiles'],
+        queryFn: () => api.profiles(),
+        staleTime: PROFILES_STALE_MS,
+      })
       if (!live(captured)) return
       setProfiles(loaded)
       // A failed roster is not fresh enough to decide whether to auto-launch another session.
@@ -107,14 +143,19 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Snapshotted at pointer-down. Null between drags, so a keyboard nudge measures from the current
   // height instead of the last drag's starting point.
   let dragStartHeight: number | null = null
-  onClosePaneWithin(() => drawerRef, () => {
-    const s = activeSession()
-    if (s) void closeTab(s)
-  })
+  onClosePaneWithin(
+    () => drawerRef,
+    () => {
+      const s = activeSession()
+      if (s) void closeTab(s)
+    },
+  )
 
   const focusActiveSurface = () => {
     const captured = view()
-    requestAnimationFrame(() => { if (live(captured)) drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus() })
+    requestAnimationFrame(() => {
+      if (live(captured)) drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus()
+    })
   }
 
   const applyTerminalFocus = (sessionId: string) => {
@@ -157,19 +198,45 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }))
     const commands = registerCommands([
       ...numbered,
-      { id: 'terminal.focus.previous', title: 'Focus previous terminal', category: 'terminal', run: () => stepTerminal(-1) },
+      {
+        id: 'terminal.focus.previous',
+        title: 'Focus previous terminal',
+        category: 'terminal',
+        run: () => stepTerminal(-1),
+      },
       { id: 'terminal.focus.next', title: 'Focus next terminal', category: 'terminal', run: () => stepTerminal(1) },
     ])
     const bindings = registerKeybindings([
       ...numbered.map((command, index) => ({
-        id: command.id, command: command.id, description: command.title, category: 'Terminal',
-        defaultChord: `meta+shift+${index + 1}`, when: 'task' as const,
+        id: command.id,
+        command: command.id,
+        description: command.title,
+        category: 'Terminal',
+        defaultChord: `meta+shift+${index + 1}`,
+        when: 'task' as const,
         active: () => visibleSessions().length > index,
       })),
-      { id: 'terminal.focus.previous', command: 'terminal.focus.previous', description: 'Focus previous terminal', category: 'Terminal', defaultChord: 'meta+shift+[', when: 'task' },
-      { id: 'terminal.focus.next', command: 'terminal.focus.next', description: 'Focus next terminal', category: 'Terminal', defaultChord: 'meta+shift+]', when: 'task' },
+      {
+        id: 'terminal.focus.previous',
+        command: 'terminal.focus.previous',
+        description: 'Focus previous terminal',
+        category: 'Terminal',
+        defaultChord: 'meta+shift+[',
+        when: 'task',
+      },
+      {
+        id: 'terminal.focus.next',
+        command: 'terminal.focus.next',
+        description: 'Focus next terminal',
+        category: 'Terminal',
+        defaultChord: 'meta+shift+]',
+        when: 'task',
+      },
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
@@ -178,18 +245,20 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Another plugin's Interrupt (docs/plugins/toolbar-actions.md). It names the session it drew beside,
   // and the drawer checks that session is still the selected, running one of the task and Node the
   // contributor was mounted for. Then it sends the same interrupt as the drawer's own Stop.
-  const interruptFor = (mountedTaskId: string) => async (payload: unknown, invocation: { byPerson: boolean }): Promise<TerminalToolbarResult> => {
-    const session = activeSession()
-    const refusal = interruptRefusal({
-      byPerson: invocation.byPerson,
-      payload,
-      mountedTaskId,
-      live: live() && taskId() === mountedTaskId,
-      selected: session && { id: session.id, taskId: session.taskId, running: session.status === 'running' },
-    })
-    if (refusal) return refusal
-    return await api.interrupt(session!.id) ? { ok: true } : { ok: false, reason: 'changed' }
-  }
+  const interruptFor =
+    (mountedTaskId: string) =>
+    async (payload: unknown, invocation: { byPerson: boolean }): Promise<TerminalToolbarResult> => {
+      const session = activeSession()
+      const refusal = interruptRefusal({
+        byPerson: invocation.byPerson,
+        payload,
+        mountedTaskId,
+        live: live() && taskId() === mountedTaskId,
+        selected: session && { id: session.id, taskId: session.taskId, running: session.status === 'running' },
+      })
+      if (refusal) return refusal
+      return (await api.interrupt(session!.id)) ? { ok: true } : { ok: false, reason: 'changed' }
+    }
 
   // Maximized (⌘⇧⏎) fills the pane region via CSS (top: --topbar-h); the partial drag-height is ignored.
   const maximized = () => isTerminalMax(ws()?.id)
@@ -223,7 +292,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     axis: 'y',
     label: 'Resize terminal drawer',
     invert: true,
-    onStart: () => { dragStartHeight = height() },
+    onStart: () => {
+      dragStartHeight = height()
+    },
     onDelta: (deltaPx) => setHeight(Math.min(Math.max((dragStartHeight ?? height()) - deltaPx, 160), maxHeight())),
     onCommit: () => {
       dragStartHeight = null
@@ -232,14 +303,19 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   })
 
   const taskContext = (task?: Task | null): string =>
-    task?.github ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}` : task?.title ?? ''
+    task?.github
+      ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}`
+      : (task?.title ?? '')
 
   // Shells are numbered, so two of them in one task can be told apart; the task goes in the tab's tip.
   // The title is stored on the node, so the number is picked here, at creation, and older sessions
   // keep the title they were given.
   function titleFor(profileId: string, task?: Task | null): string {
     if (profileId === 'shell') {
-      const taken = visibleSessions().map((s) => /^Shell(?: (\d+))?$/.exec(s.title)).filter((m) => m !== null).map((m) => Number(m[1] ?? 1))
+      const taken = visibleSessions()
+        .map((s) => /^Shell(?: (\d+))?$/.exec(s.title))
+        .filter((m) => m !== null)
+        .map((m) => Number(m[1] ?? 1))
       return taken.length ? `Shell ${Math.max(...taken) + 1}` : 'Shell'
     }
     const ctx = taskContext(task)
@@ -264,13 +340,16 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     } catch (e) {
       if (live(captured)) setError(e instanceof Error ? e.message : "Couldn't start the terminal.")
     } finally {
-      if (live(captured)) { setPendingTitle(null); setBusy(false) }
+      if (live(captured)) {
+        setPendingTitle(null)
+        setBusy(false)
+      }
     }
   }
 
   // Launch a profile; the node resolves project path/worktree from taskId
-  // (docs/workspaces-and-tasks.md § Task). Context comes from the task, not the URL; the worktree is
-  // created lazily in main.
+  // (docs/workspaces-and-tasks.md § Task). Context comes from the task, not the URL; the node creates
+  // the worktree lazily.
   async function startProfile(profileId: string) {
     setError(null)
     const w = ws()
@@ -293,13 +372,19 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   }
 
   return (
-    <Drawer ref={(element) => { drawerRef = element }} ariaLabel="Terminal" height={height()} maximized={maximized()}>
+    <Drawer
+      ref={(element) => {
+        drawerRef = element
+      }}
+      ariaLabel="Terminal"
+      height={height()}
+      maximized={maximized()}
+    >
       <Show when={!maximized()}>
         <SplitHandle axis="y" drag={drawerDrag} />
       </Show>
-      {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
-          the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
-          same element at the same height as the editor's file tab bar. */}
+      {/* DocumentTabs owns the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's
+          header is the same element at the same height as the editor's file tab bar. */}
       <DocumentTabs
         level="pane"
         idPrefix="terminal"
@@ -314,10 +399,13 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           ...visibleSessions().map((session) => ({
             id: session.id,
             label: session.title,
-            status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
+            status:
+              session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
             title: session.idle
               ? 'Idle. It may be waiting for you.'
-              : session.kind === 'shell' && taskContext(ws()) ? `${session.title} · ${taskContext(ws())}` : session.title,
+              : session.kind === 'shell' && taskContext(ws())
+                ? `${session.title} · ${taskContext(ws())}`
+                : session.title,
           })),
           // The launching session has no id yet, so it cannot be activated or closed. It is a
           // placeholder tab that the real session replaces.
@@ -325,9 +413,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
         ]}
         actions={
           <>
-            {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
-                click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
-                roles. Menu brings all of it. */}
+            {/* Menu brings click-away, Escape, menu roles, and a portal so no overflow ancestor
+                clips it. */}
             <Menu
               ariaLabel="New session"
               trigger={({ toggle, open }) => (
@@ -348,9 +435,13 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                     <Menu.Item
                       context={menu}
                       disabled={!p.available}
-                      title={!p.available
-                        ? `acorn can't find ${p.label} on your PATH.`
-                        : p.tmuxMissing ? "tmux isn't installed, so this session ends when acorn quits." : undefined}
+                      title={
+                        !p.available
+                          ? `acorn can't find ${p.label} on your PATH.`
+                          : p.tmuxMissing
+                            ? "tmux isn't installed, so this session ends when acorn quits."
+                            : undefined
+                      }
                       onSelect={() => void startProfile(p.id)}
                       trailing={
                         <>
@@ -409,13 +500,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       {/* The session draws its own `Rectangle kind="pty"` (./TerminalSurface.tsx): a terminal is the
           rectangle, and an empty drawer has no pixels for one to hold.
 
-          Every open session gets a surface and all but one is hidden. This used to mount the active
-          tab alone, keyed on its id, so each switch threw away an xterm and its WebGL context, asked
-          the node to serialize a thousand-line framebuffer, shipped it as one frame and parsed it into
-          a fresh emulator — for the most common thing anyone does in this drawer.
-          A hidden xterm stays attached and stays
-          current, so a switch is a repaint. What it costs is one xterm per open tab, which is what a
-          terminal application spends.
+          Every open session gets a surface and all but one is hidden. A hidden xterm stays attached
+          and stays current, so a switch is a repaint rather than a new xterm, a new WebGL context and
+          a serialized framebuffer from the node. What it costs is one xterm per open tab, which is
+          what a terminal application spends.
 
           `<For>` over the ids rather than over the sessions, and rather than `<Index>`. The sessions
           are replaced wholesale on every roster refresh, so `<For>` over them would rebuild every row
@@ -425,13 +513,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       <Show
         when={visibleIds().length > 0}
         fallback={
-          <Show
-            when={!launching() && !pendingTitle()}
-            fallback={<EmptyState busy>Starting…</EmptyState>}
-          >
+          <Show when={!launching() && !pendingTitle()} fallback={<EmptyState busy>Starting…</EmptyState>}>
             <EmptyState
               title="No terminals"
-              action={<Button disabled={busy() || !ws()} onPress={() => void startProfile('shell')}>New terminal</Button>}
+              action={
+                <Button disabled={busy() || !ws()} onPress={() => void startProfile('shell')}>
+                  New terminal
+                </Button>
+              }
             />
           </Show>
         }
@@ -444,9 +533,11 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
               hidden={id !== activeId()}
               onExit={() => {
                 const captured = view()
-                if (live(captured)) void refreshSessions().catch((failure) => {
-                  if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to refresh terminals.')
-                })
+                if (live(captured))
+                  void refreshSessions().catch((failure) => {
+                    if (live(captured))
+                      setError(failure instanceof Error ? failure.message : 'Failed to refresh terminals.')
+                  })
               }}
             />
           )}

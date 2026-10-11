@@ -10,7 +10,9 @@ const TOOLS: AgentToolCatalogEntry[] = [
   { name: 'run_start', description: 'Start a run target.', risk: 'execute', owner: 'core' },
 ]
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: (options: () => { queryKey: string[] }) => ({ data: options().queryKey[0] === 'agent-tools-catalog' ? TOOLS : {} }),
+  createQuery: (options: () => { queryKey: string[] }) => ({
+    data: options().queryKey[0] === 'agent-tools-catalog' ? TOOLS : {},
+  }),
   useQueryClient: () => ({}),
 }))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['prefs'] }) }))
@@ -30,16 +32,23 @@ afterEach(() => {
   host.remove()
 })
 
-const headings = () => [...host.querySelectorAll('[data-settings-section="tools"] .ui-section-header-label')].map((label) => label.textContent)
+const headings = () =>
+  [...host.querySelectorAll('[data-settings-section="tools"] .ui-section-header-label')].map(
+    (label) => label.textContent,
+  )
 const chipOf = (tool: string) =>
-  [...host.querySelectorAll('.ui-setting-row')].find((row) => row.querySelector('.ui-setting-label')?.textContent === tool)?.querySelector('.ui-badge')?.textContent
+  [...host.querySelectorAll('.ui-setting-row')]
+    .find((row) => row.querySelector('.ui-setting-label')?.textContent === tool)
+    ?.querySelector('.ui-badge')?.textContent
 
 describe('Tools and permissions', () => {
   it('groups tools by owner, acorn first, and by tier on request', () => {
     expect(headings()).toEqual(['acorn', 'findings'])
     expect(chipOf('findings_record')).toBe('Write')
 
-    const byTier = [...host.querySelectorAll<HTMLButtonElement>('.ui-segment')].find((button) => button.textContent === 'By tier')!
+    const byTier = [...host.querySelectorAll<HTMLButtonElement>('.ui-segment')].find(
+      (button) => button.textContent === 'By tier',
+    )!
     byTier.click()
     expect(headings()).toEqual(['Read tools', 'Write tools', 'Execute tools'])
     expect(chipOf('findings_record')).toBe('findings')
@@ -48,8 +57,14 @@ describe('Tools and permissions', () => {
 
 describe('splitToolDescription', () => {
   it('ends the summary at a period before a capital, and nowhere else', () => {
-    expect(splitToolDescription("A run target's status: { running, url?, exitCode? }. Poll it.")).toEqual({ summary: "A run target's status: { running, url?, exitCode? }.", rest: 'Poll it.' })
+    expect(splitToolDescription("A run target's status: { running, url?, exitCode? }. Poll it.")).toEqual({
+      summary: "A run target's status: { running, url?, exitCode? }.",
+      rest: 'Poll it.',
+    })
     expect(splitToolDescription('Read one note.')).toEqual({ summary: 'Read one note.', rest: '' })
-    expect(splitToolDescription('Uses e.g. notes. Then more.')).toEqual({ summary: 'Uses e.g. notes.', rest: 'Then more.' })
+    expect(splitToolDescription('Uses e.g. notes. Then more.')).toEqual({
+      summary: 'Uses e.g. notes.',
+      rest: 'Then more.',
+    })
   })
 })

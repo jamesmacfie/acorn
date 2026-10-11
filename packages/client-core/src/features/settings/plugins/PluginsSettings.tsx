@@ -5,7 +5,12 @@ import { nodes } from '../../../infra/node/fleet'
 import { restartLocalNode } from '../../../infra/node/fleetActions'
 import { installNodePlugin, refreshNodePlugins } from '../../../infra/node/nodePlugins'
 import { installPluginOnDevice, readPluginHostState } from '../../../host/plugins/host'
-import { devicePlugins, distribution, reviewPendingTrust, syncPluginDistribution } from '../../../host/plugins/distribution'
+import {
+  devicePlugins,
+  distribution,
+  reviewPendingTrust,
+  syncPluginDistribution,
+} from '../../../host/plugins/distribution'
 import { awaitingNodeApproval } from '../../../host/plugins/distributionModel'
 import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
@@ -19,7 +24,17 @@ import ConfigPluginOffers from './ConfigPluginOffers'
 import { DataSourcePromptDialog } from './DataSourcePromptDialog'
 import { InstallPlugin, type InstallTarget } from './InstallPlugin'
 import {
-  installedPlugins, matchesFilter, pluginName, pluginOrigin, statusBadgeTone, statusDetail, statusOf, statusWord, takePluginRequest, type InstalledFilter, type InstalledPlugin,
+  installedPlugins,
+  matchesFilter,
+  pluginName,
+  pluginOrigin,
+  statusBadgeTone,
+  statusDetail,
+  statusOf,
+  statusWord,
+  takePluginRequest,
+  type InstalledFilter,
+  type InstalledPlugin,
 } from './installed'
 import { PluginPage } from './PluginPage'
 import type { PluginStatus } from '../../../host/plugins/pluginStatus'
@@ -37,7 +52,7 @@ import './plugins.css'
 // The seeded prompt behind "Create a plugin" (docs/plugins/agent-install.md § Teaching the agent). The teaching
 // lives in the `plugin_authoring` tool this text names, not in the text; that tool's test asserts
 // this file still names it.
-export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
+const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
 
 Call the \`plugin_authoring\` tool first. It returns the authoring contract and this node's own manifest
 vocabulary, and an answer from memory will be wrong. Then write the package and ask me for it with
@@ -48,7 +63,7 @@ What it should do: `
 /** The prompt behind "Build a data source from your connections" (docs/plugin-authoring/derived-sources.md).
  *  It names the template and the helpers, and each input by id. The agent reads each input's fields
  *  with `data_source_describe`, because this page can't describe a source without an account. */
-export function dataSourceStarterPrompt(row: string, inputs: { source: string; name: string }[]): string {
+function dataSourceStarterPrompt(row: string, inputs: { source: string; name: string }[]): string {
   return `I want an acorn plugin with a derived data source: rows my own rules build from data acorn already reads.
 
 Call the \`plugin_authoring\` tool first, and follow its section on derived data sources. Start from
@@ -61,7 +76,7 @@ package with \`plugin_request\` using \`dev: true\`.
 One row is: ${row}
 
 It reads:
-${inputs.map(input => `- ${input.name} (\`${input.source}\`)`).join('\n')}
+${inputs.map((input) => `- ${input.name} (\`${input.source}\`)`).join('\n')}
 
 The rules for each row: `
 }
@@ -72,7 +87,10 @@ const stop = (text: string): string => (/[.!?…]$/.test(text) ? text : `${text}
 /** A row's line: its version and where it came from, then the status sentence when the badge's word
  *  leaves something out. */
 const rowText = (entry: { plugin: InstalledPlugin; status: PluginStatus }): string => {
-  const version = entry.plugin.kind === 'node' && entry.plugin.row.installed?.version ? `Version ${entry.plugin.row.installed.version}, ` : ''
+  const version =
+    entry.plugin.kind === 'node' && entry.plugin.row.installed?.version
+      ? `Version ${entry.plugin.row.installed.version}, `
+      : ''
   const detail = statusDetail(entry.status)
   return sentence(`${version}${pluginOrigin(entry.plugin)}.${detail ? ` ${stop(detail)}` : ''}`)
 }
@@ -107,17 +125,29 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
 
   const plugins = createMemo(() => installedPlugins(rows(), devicePlugins()))
-  const devMode = (plugin: InstalledPlugin) => (custody()?.devGrants ?? []).some((grant) => grant.pluginId === plugin.id
-    && (plugin.kind === 'device' ? grant.source?.kind === 'device' : grant.nodeId === nodeId()))
-  const listed = createMemo(() => plugins().map((plugin) => ({ plugin, status: statusOf(distribution(), nodeId(), plugin, devMode(plugin)) })))
+  const devMode = (plugin: InstalledPlugin) =>
+    (custody()?.devGrants ?? []).some(
+      (grant) =>
+        grant.pluginId === plugin.id &&
+        (plugin.kind === 'device' ? grant.source?.kind === 'device' : grant.nodeId === nodeId()),
+    )
+  const listed = createMemo(() =>
+    plugins().map((plugin) => ({ plugin, status: statusOf(distribution(), nodeId(), plugin, devMode(plugin)) })),
+  )
   const shown = () => listed().filter((entry) => matchesFilter(filter(), entry.plugin, entry.status))
-  const count = (which: InstalledFilter) => listed().filter((entry) => matchesFilter(which, entry.plugin, entry.status)).length
+  const count = (which: InstalledFilter) =>
+    listed().filter((entry) => matchesFilter(which, entry.plugin, entry.status)).length
 
-  // Manage plugin, from a plugin's strip or a tool's owner, lands here (./installed.ts § openPluginPage).
+  // Manage plugin, from a plugin's strip or a tool's owner, lands here (`openPluginPage`).
   createEffect(() => {
     const asked = takePluginRequest()
     if (!asked) return
-    setOpen({ kind: 'plugin', id: asked.id, ...(asked.kind ? { pluginKind: asked.kind } : {}), ...(asked.tab ? { tab: asked.tab } : {}) })
+    setOpen({
+      kind: 'plugin',
+      id: asked.id,
+      ...(asked.kind ? { pluginKind: asked.kind } : {}),
+      ...(asked.tab ? { tab: asked.tab } : {}),
+    })
   })
   const openTab = () => {
     const current = open()
@@ -126,14 +156,17 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   const openPlugin = createMemo((): InstalledPlugin | undefined => {
     const current = open()
     if (current?.kind !== 'plugin') return undefined
-    return plugins().find((plugin) => plugin.id === current.id && (!current.pluginKind || plugin.kind === current.pluginKind))
+    return plugins().find(
+      (plugin) => plugin.id === current.id && (!current.pluginKind || plugin.kind === current.pluginKind),
+    )
   })
 
   // A plugin waiting to have what it reads or its skills approved opens that dialog, which is the one
   // decision left.
   // A folder install opens its page instead, because development mode there is the other answer.
   const manage = (plugin: InstalledPlugin) => {
-    if (plugin.kind === 'node' && awaitingNodeApproval(plugin.row) && !plugin.row.development) reviewPendingTrust(plugin.id)
+    if (plugin.kind === 'node' && awaitingNodeApproval(plugin.row) && !plugin.row.development)
+      reviewPendingTrust(plugin.id)
     else setOpen({ kind: 'plugin', id: plugin.id, pluginKind: plugin.kind })
   }
 
@@ -170,44 +203,58 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
     await settleNode()
   }
 
-  const restart = () => run(async () => {
-    await restartLocalNode()
-    // The shell reloads the renderer after a successful restart, so this refetch only matters when that
-    // did not happen and the list still needs a re-read.
-    await refetch()
-  })
+  const restart = () =>
+    run(async () => {
+      await restartLocalNode()
+      // The shell reloads the renderer after a successful restart, so this refetch only matters when that
+      // did not happen and the list still needs a re-read.
+      await refetch()
+    })
 
   // The agent writes the package; the owner still installs it (docs/plugins/agent-install.md § Approval-mediated
   // install). This button reaches an agent, never the install route. It lands a draft in the task's
   // composer rather than starting a turn, because a settings button that silently starts an agent turn
   // is one nobody presses twice.
-  const draftForAgent = (prompt: string) => run(async () => {
-    const taskId = activeTaskId()
-    if (!taskId) throw new Error('Open a task first. The prompt goes to that task’s agent.')
-    const result = await sendReferenceToAgent(taskId, prompt)
-    if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
-  })
+  const draftForAgent = (prompt: string) =>
+    run(async () => {
+      const taskId = activeTaskId()
+      if (!taskId) throw new Error('Open a task first. The prompt goes to that task’s agent.')
+      const result = await sendReferenceToAgent(taskId, prompt)
+      if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
+    })
 
   const list = () => (
     <>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
       <Show when={state()?.restartRequired}>
         <Alert
           tone="warn"
           variant="banner"
           actions={
-            <Show when={node()?.local} fallback={<Text emphasis="muted">Restart it on its own machine to apply the change.</Text>}>
-              <Button size="sm" disabled={busy()} onPress={() => void restart()}>Restart node</Button>
+            <Show
+              when={node()?.local}
+              fallback={<Text emphasis="muted">Restart it on its own machine to apply the change.</Text>}
+            >
+              <Button size="sm" disabled={busy()} onPress={() => void restart()}>
+                Restart node
+              </Button>
             </Show>
           }
         >
           {nodeLabel()} is still running the plugins it started with.
         </Alert>
       </Show>
-      <ConfigPluginOffers busy={busy()} onInstall={(id, source) => void run(async () => {
-        await installPluginOnDevice(source, id)
-        await settleDevice()
-      })} />
+      <ConfigPluginOffers
+        busy={busy()}
+        onInstall={(id, source) =>
+          void run(async () => {
+            await installPluginOnDevice(source, id)
+            await settleDevice()
+          })
+        }
+      />
 
       {/* No browse-and-discover surface, because any listing acorn could offer would be unreviewed
           (docs/extensibility.md § Some decisions that look like gaps). */}
@@ -227,24 +274,39 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
                 { value: 'device', label: `This device${count('device') ? ` (${count('device')})` : ''}` },
               ]}
             />
-            <Button size="sm" onPress={() => setOpen({ kind: 'install' })}>Install…</Button>
+            <Button size="sm" onPress={() => setOpen({ kind: 'install' })}>
+              Install…
+            </Button>
           </>
         }
       >
-        <Show when={reading()}><Text emphasis="muted">Reading the plugin list…</Text></Show>
+        <Show when={reading()}>
+          <Text emphasis="muted">Reading the plugin list…</Text>
+        </Show>
         {/* A node that cannot answer is not an empty list; rendering nothing would read as one. */}
         <Show when={!reading() && !rows().length}>
           <Text emphasis="muted">{nodeLabel()} didn't send its plugin list. It may be offline.</Text>
         </Show>
         <For
           each={shown()}
-          fallback={<Show when={rows().length || devicePlugins().length}><Text emphasis="muted">{filter() === 'needs-you' ? 'Nothing needs you.' : 'No plugins on this device.'}</Text></Show>}
+          fallback={
+            <Show when={rows().length || devicePlugins().length}>
+              <Text emphasis="muted">
+                {filter() === 'needs-you' ? 'Nothing needs you.' : 'No plugins on this device.'}
+              </Text>
+            </Show>
+          }
         >
           {(entry) => (
             <SettingRow label={pluginName(entry.plugin)} description={rowText(entry)}>
               <Inline>
                 <Badge tone={statusBadgeTone(entry.status)}>{statusWord(entry.status)}</Badge>
-                <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => manage(entry.plugin)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  label={`Manage ${pluginName(entry.plugin)}`}
+                  onPress={() => manage(entry.plugin)}
+                >
                   Manage
                 </Button>
               </Inline>
@@ -258,13 +320,17 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
           label="Ask an agent to write one"
           description="Starts a prompt in the open task's agent. It writes the plugin, and you decide whether to install it."
         >
-          <Button size="sm" disabled={busy()} onPress={() => void draftForAgent(PLUGIN_STARTER_PROMPT)}>Ask an agent</Button>
+          <Button size="sm" disabled={busy()} onPress={() => void draftForAgent(PLUGIN_STARTER_PROMPT)}>
+            Ask an agent
+          </Button>
         </SettingRow>
         <SettingRow
           label="Build a data source from your connections"
           description="Your own rules over data acorn already reads, such as Linear issues and their pull requests. Starts a prompt in the open task's agent."
         >
-          <Button size="sm" disabled={busy()} onPress={() => setAskingForSource(true)}>Start</Button>
+          <Button size="sm" disabled={busy()} onPress={() => setAskingForSource(true)}>
+            Start
+          </Button>
         </SettingRow>
       </SettingsSection>
       <Show when={askingForSource()}>
@@ -305,7 +371,12 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
         </Show>
       }
     >
-      <InstallPlugin nodeLabel={nodeLabel()} nodeIsLocal={node()?.local === true} install={install} onClose={() => setOpen(undefined)} />
+      <InstallPlugin
+        nodeLabel={nodeLabel()}
+        nodeIsLocal={node()?.local === true}
+        install={install}
+        onClose={() => setOpen(undefined)}
+      />
     </Show>
   )
 }

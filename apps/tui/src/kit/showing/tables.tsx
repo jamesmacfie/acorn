@@ -39,7 +39,10 @@ export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidt
     const order = [...all].sort((a, b) => PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority] || a.index - b.index)
     return new Set(order.slice(0, fits()).map((column) => column.index))
   })
-  const lost = () => columns().filter((_column, index) => !kept().has(index)).map((column) => column.label)
+  const lost = () =>
+    columns()
+      .filter((_column, index) => !kept().has(index))
+      .map((column) => column.label)
 
   const state: TableState = {
     width,
@@ -59,7 +62,10 @@ export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidt
   return (
     <box
       flexDirection="column"
-      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
+      ref={(element: Renderable) => {
+        box = element
+        setWidth(element.width)
+      }}
       onSizeChange={() => setWidth(box?.width ?? 80)}
     >
       {props.children}
@@ -74,7 +80,11 @@ export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidt
 
 /** reduced: the column's label in the bold header line; the lowest priority is dropped first, and a
  *  muted line under the table names what was lost. */
-export function TableHead(props: { align?: 'start' | 'center' | 'end'; priority?: 'high' | 'normal' | 'low'; children?: JSX.Element }) {
+export function TableHead(props: {
+  align?: 'start' | 'center' | 'end'
+  priority?: 'high' | 'normal' | 'low'
+  children?: JSX.Element
+}) {
   const table = building
   const index = table?.register({ priority: props.priority ?? 'normal', label: flatten(props.children) }) ?? 0
   return (
@@ -91,14 +101,18 @@ export function TableRow(props: { head?: boolean; onPress?: () => void; children
     <box
       flexDirection="row"
       gap={1}
-      ref={(element: Renderable) => { if (props.onPress) control.ref(element) }}
+      ref={(element: Renderable) => {
+        if (props.onPress) control.ref(element)
+      }}
     >
       {props.children}
       {/* The caret goes after the cells rather than before them, and it is the one place in the kit
           where it does: a table's columns line up across rows, and a cell of caret in front of the
           first one would move every column of the focused row one to the right. The cells themselves
           are the caller's `TableCell`s, so this row cannot restyle them. */}
-      <Show when={control.focused()}><Line tone="accent">›</Line></Show>
+      <Show when={control.focused()}>
+        <Line tone="accent">›</Line>
+      </Show>
     </box>
   )
 }
@@ -132,7 +146,10 @@ export function Grid(props: {
     const at = props.selected ?? 0
     return Math.min(Math.max(0, at - Math.floor(visible() / 2)), Math.max(0, props.rows.length - visible()))
   }
-  const line = (cells: readonly string[]) => shown().map((_column, index) => pad(cells[index] ?? '', columnWidth())).join('│')
+  const line = (cells: readonly string[]) =>
+    shown()
+      .map((_column, index) => pad(cells[index] ?? '', columnWidth()))
+      .join('│')
 
   // `NODE_FOCUS` calls `Grid` a collection, but its rows are strings rather than
   // renderables — that is what makes its arithmetic possible at all — so there is nothing per row to
@@ -149,8 +166,9 @@ export function Grid(props: {
     onItem: () => false,
   })
   const control = stop({
-    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as
-      Partial<Record<Intent, () => boolean>>,
+    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as Partial<
+      Record<Intent, () => boolean>
+    >,
   })
 
   return (
@@ -166,9 +184,7 @@ export function Grid(props: {
     >
       <Line role="strong">{line(props.columns)}</Line>
       <Index each={props.rows.slice(from(), from() + visible())}>
-        {(row, index) => (
-          <Line role={props.selected === from() + index ? 'match' : 'body'}>{line(row())}</Line>
-        )}
+        {(row, index) => <Line role={props.selected === from() + index ? 'match' : 'body'}>{line(row())}</Line>}
       </Index>
       <Line role="muted">
         {`${props.rows.length ? from() + 1 : 0}–${Math.min(props.rows.length, from() + visible())} of ${props.rows.length}`}

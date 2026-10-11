@@ -4,10 +4,24 @@
 //
 // This function knows nothing about lifecycle. Ordering, containment, the ready pass, the roster and
 // the rollback of everything registered here all stay in host.ts, because they are decisions about a
-// set of plugins and this is one plugin's surface.
+// set of plugins and this is one plugin's surface. What it does own is the undo: every registration
+// below hands its disposer to `onUndo`, so teardown is one list (host.ts § clearRegistrations).
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { Env } from '../bindings'
-import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginCustomAgentDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
+import type {
+  NodePermissions,
+  PluginAgentToolDescriptor,
+  PluginAuditActionDescriptor,
+  PluginCommandDescriptor,
+  PluginContextSectionDescriptor,
+  PluginExtensionDescriptor,
+  PluginExtensionPointDescriptor,
+  PluginCustomAgentDescriptor,
+  PluginFrameSurface,
+  PluginHarnessDescriptor,
+  PluginScheduleDescriptor,
+  PluginTaskCheckDescriptor,
+} from '../plugins/manifest'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
@@ -42,7 +56,12 @@ import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../transport/wsHub'
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
-import { broadcastNotice, broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorktreeStatusChanged } from '../notify'
+import {
+  broadcastNotice,
+  broadcastRepoConfigTrustNotice,
+  broadcastStatus,
+  broadcastWorktreeStatusChanged,
+} from '../notify'
 import { buildPluginRequestContext } from './requestContext'
 import { telemetryFor } from '../telemetry/collector'
 import { telemetryServiceFor } from '../core/telemetry'
@@ -72,7 +91,7 @@ export type LoadedPluginBinding = {
   dataSources?: readonly import('@acorn/protocol/dataSources.ts').DataSourceRegistration[]
   dataSourceDiscoveries?: readonly import('@acorn/protocol/dataSources.ts').DataSourceDiscovery[]
   // And its commands, of which the host reads one thing: which are `runNodeAction`, so a person can put
-  // one on a schedule (../nodeActions/registry.ts). A command's palette entry, keybinding and category
+  // one on a schedule (`registerNodeAction`). A command's palette entry, keybinding and category
   // are the client's business and never reach here.
   commands?: readonly PluginCommandDescriptor[]
   // And what it declared as archive checks, by the same route as schedules: the registration is
@@ -122,11 +141,10 @@ export type PluginContextOptions = {
   // handle outlives the data-root lock release. The caller already keeps a loaded plugin away from its
   // own `migrationsModule`, so one source of truth is enough.
   storage?: PluginStorage
-  // Where an undo goes for a registration `clearRegistrations` cannot reach on its own. The WS hub's two
-  // slots are module singletons with no duplicate guard, and a schedule lives in the composition root's
-  // scheduler rather than in a module registry. For both, the host records the undo per plugin and takes
-  // it back on re-init or on a contained failure. A caller that passes nothing keeps no undo record.
-  onUndo?: (undo: () => void) => void
+  // Where every registration's undo goes. The host keeps them per plugin and runs them newest first on
+  // re-init, reload, a contained failure or shutdown. Required, because a context with nowhere to put
+  // an undo leaves registrations behind that nothing can take back.
+  onUndo: (undo: () => void) => void
   // The candidate registration set (server/pluginHost/host.ts § reload). When present, every registration
   // this context hands the plugin is buffered here as a thunk instead of reaching the module-singleton
   // registries, and the host replays it once it decides to commit.
@@ -157,25 +175,47 @@ export function revokePluginContext(ctx: NodePluginContext): void {
  * stream. Absent for a plugin whose manifest never asked for the token, and absent means absent:
  * the whole point of gating by omission is that an ungranted facet is not there to call.
  *
- * A copy with the shared object as its prototype. The composition root fills some seams after the
- * plugins have initialized, such as `pluginSecurity` and `nodeKeys`, and a plain copy taken at init
- * never saw them. The own fields keep a spread of the context's core working, as test helpers do.
+ * A sink is a closure over the plugin instance, and the collector holds it on a timer, so its undo is
+ * recorded like any other registration's.
  */
-const withOwnedTelemetry = <T extends CoreServices>(core: T, plugin: string): T =>
-  core.telemetry ? Object.assign(Object.create(core) as T, core, { telemetry: telemetryServiceFor(plugin) }) : core
+const withOwnedTelemetry = <T extends CoreServices>(
+  core: T,
+  plugin: string,
+  recordUndo: (undo: () => void) => void,
+): T => {
+  if (!core.telemetry) return core
+  const owned = telemetryServiceFor(plugin)
+  return {
+    ...core,
+    telemetry: {
+      enabled: owned.enabled,
+      onBatch: (sink) => {
+        const handle = owned.onBatch(sink)
+        recordUndo(handle.dispose)
+        return handle
+      },
+    },
+  }
+}
 
 export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
   const plugin = options.plugin
   // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
   // Everything below that differs between the two tiers keys off this one value.
   const permissions = options.loaded?.permissions
-  const recordUndo = options.onUndo ?? (() => {})
+  const recordUndo = options.onUndo
   const pending = options.pending
   // A loaded plugin files into a disclosed node point only if its manifest named it, which is what put
   // the grant in front of the owner (@acorn/protocol/extensionPoints.ts § DISCLOSED_NODE_POINTS).
   const assertDisclosedPoint = <T>(point: ExtensionPointId<T>): ExtensionPointId<T> => {
-    if (permissions && Object.hasOwn(DISCLOSED_NODE_POINTS, point) && !options.loaded?.extensions?.some((entry) => entry.point === point)) {
-      throw new Error(`Plugin '${plugin}' must declare '${point}' in its manifest's contributions.extensions before it can contribute there.`)
+    if (
+      permissions &&
+      Object.hasOwn(DISCLOSED_NODE_POINTS, point) &&
+      !options.loaded?.extensions?.some((entry) => entry.point === point)
+    ) {
+      throw new Error(
+        `Plugin '${plugin}' must declare '${point}' in its manifest's contributions.extensions before it can contribute there.`,
+      )
     }
     return point
   }
@@ -187,12 +227,14 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // throwing stub, so the failure is the immediate "not a function" an author can act on.
       register: permissions
         ? (undefined as never)
-        : (router, opts) => registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }),
-      fetch: (handler, opts) => registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }),
+        : (router, opts) =>
+            recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }).dispose),
+      fetch: (handler, opts) =>
+        recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }).dispose),
     },
     // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under another
     // plugin's name, and cannot remove another plugin's tools.
-    tools: { register: (tool) => registerAgentTool(plugin, tool) },
+    tools: { register: (tool) => recordUndo(registerAgentTool(plugin, tool).dispose) },
     // The scheduler resolves through the capability registry at call time rather than being threaded in:
     // the composition root builds it and owns its start and stop, and a context built before it exists
     // must still work.
@@ -219,7 +261,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       registerTarget: (target) => {
         if (permissions) throw new Error('User schedule targets require a compiled plugin')
         const scheduler = options.capabilities.get(SCHEDULER)
-        if (!scheduler) throw new Error(`Plugin '${plugin}' registered a schedule target, but this node has no scheduler.`)
+        if (!scheduler)
+          throw new Error(`Plugin '${plugin}' registered a schedule target, but this node has no scheduler.`)
         const handle = scheduler.registerTarget(target)
         recordUndo(() => handle.dispose())
       },
@@ -235,7 +278,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         return discoverDataSources(options.env, request, invocation)
       },
       queryPublication: (request, invocation) => {
-        if (!options.env || permissions) throw new Error('Query publication coordination requires a compiled host consumer')
+        if (!options.env || permissions)
+          throw new Error('Query publication coordination requires a compiled host consumer')
         return queryPublication(options.env, request, invocation)
       },
       resolveQuery: async (scope, reference, context, invocation) => {
@@ -247,8 +291,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         await authorizeQueryScope(options.env, scope, invocation)
         queryStore(options.env.DB).setConsumer(scope, queryId, { ...consumer, pluginId: plugin }, remove)
       },
-      register: (source) => registerDataSource(plugin, source, { loaded: !!permissions }),
-      discover: (discovery) => registerDataSourceDiscovery(plugin, discovery),
+      register: (source) => recordUndo(registerDataSource(plugin, source, { loaded: !!permissions }).dispose),
+      discover: (discovery) => recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose),
       invoke: (request, invocation) => {
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may invoke its own sources here. It reads another plugin's source only as a
@@ -256,38 +300,45 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         // can't read outside a request or with an account nobody chose (../dataSources/inputs.ts).
         // Cross-plugin workflow execution is a compiled host consumer; raw task principals remain
         // refused by source admission.
-        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
+        const source =
+          request.operation === 'query'
+            ? request.query.source
+            : request.operation === 'details' || request.operation === 'actions'
+              ? request.ref
+              : request.source
         if (permissions && source.pluginId !== plugin) throw new Error('Source belongs to another plugin')
         return invokeDataSource(options.env, request, invocation)
       },
     },
-    datasets: permissions ? (undefined as never) : {
-      writeForTask: async (taskId, input) => {
-        if (!options.env) throw new Error('Dataset writes require host bindings')
-        const { writeWorkflowDataset } = await import('../datasets/workflow')
-        return writeWorkflowDataset(options.env.DB, taskId, input)
-      },
-    },
-    // Owner-bound. This is the list anything unattended picks an action from — a person arming a
-    // schedule today, and whatever asks next — and the tier beside each entry drives the confirmation
+    datasets: permissions
+      ? (undefined as never)
+      : {
+          writeForTask: async (taskId, input) => {
+            if (!options.env) throw new Error('Dataset writes require host bindings')
+            const { writeWorkflowDataset } = await import('../datasets/workflow')
+            return writeWorkflowDataset(options.env.DB, taskId, input)
+          },
+        },
+    // Owner-bound. This is the list anything unattended picks an action from, such as a person arming a
+    // schedule, and the tier beside each entry drives the confirmation
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for
     // your own route.
     nodeActions: {
-      register: (action) => registerNodeAction({ ...action, pluginId: plugin }),
+      register: (action) => recordUndo(registerNodeAction({ ...action, pluginId: plugin }).dispose),
     },
     // Owner-bound like the three above, and the provenance the dialog draws: every concern this check
     // answers with renders beside the plugin's name.
     taskChecks: {
-      register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
+      register: (check) => recordUndo(registerTaskCheck({ ...check, pluginId: plugin }).dispose),
     },
     // Owner-bound like task checks, and compiled only (./types.ts § CompiledNodePluginContext).
     search: permissions
       ? (undefined as never)
-      : { register: (provider) => registerSearchProvider({ ...provider, pluginId: plugin }) },
+      : { register: (provider) => recordUndo(registerSearchProvider({ ...provider, pluginId: plugin }).dispose) },
     // Owner-bound like the rest: a plugin lists its own runs and cannot register a pointer at someone
     // else's route (../runs/registry.ts). The route is re-confined on every read.
     runs: {
-      register: (source) => registerRunSource({ ...source, pluginId: plugin }),
+      register: (source) => recordUndo(registerRunSource({ ...source, pluginId: plugin }).dispose),
     },
     // Owner-bound like the four above, and here the binding is the id itself: a harness id is persisted
     // into session rows and workflow steps, so minting it from `plugin` keeps one package's sessions out
@@ -322,20 +373,15 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     skills: {
       register: (skill) => recordUndo(registerSkill(plugin, skill).dispose),
     },
-    // Owner-bound on both halves: `open` refuses a point outside this plugin's namespace, and a
+    // Owner-bound on both halves: `declare` refuses a point outside this plugin's namespace, and a
     // contributed entry's id is minted from the plugin rather than taken from the entry. Both
     // registrations record an undo, because the maps behind them are module singletons and a reload's
     // candidate instance has to be able to take back what it filed.
     extensionPoints: {
-      declare: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
+      declare: (point, label) =>
+        recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
       handle: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
       handlers: (point) => extensionsFor(point),
-      // The names these three carried until 2026-08-31, kept for one major so a plugin outside this
-      // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). Aliases rather than
-      // wrappers, so the guard pass below wraps each of the six once and both spellings behave the same.
-      open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
-      contribute: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
-      entries: (point) => extensionsFor(point),
     },
     // Owner-bound on both halves, like the extension points above. `declare` mints the point id from
     // this plugin, `handle` mints the handler id from it, and `run` takes a bare id and qualifies it, so
@@ -347,28 +393,36 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // builds the route-carrying one from a loaded plugin's manifest (./manifestWork.ts). Nothing inside the
     // chain runner can tell which it has.
     hooks: {
-      declare: (point) => recordUndo(registerHookPoint({
-        id: qualifiedExtensionPointId(plugin, point.id),
-        ownerId: plugin,
-        payload: point.payload,
-        allows: point.allows,
-        timeoutMs: point.timeoutMs ?? 5_000,
-        onTimeout: point.onTimeout ?? 'allow',
-        order: point.order ?? 'priority',
-        collect: point.collect ?? false,
-      }).dispose),
-      handle: (point, handler) => recordUndo(registerHookHandler({
-        id: `${plugin}:${handler.id}`,
-        pluginId: plugin,
-        point,
-        mode: handler.mode,
-        priority: handler.priority ?? 500,
-        call: (payload, signal) => handler.run(payload, signal),
-      }).dispose),
+      declare: (point) =>
+        recordUndo(
+          registerHookPoint({
+            id: qualifiedExtensionPointId(plugin, point.id),
+            ownerId: plugin,
+            payload: point.payload,
+            allows: point.allows,
+            timeoutMs: point.timeoutMs ?? 5_000,
+            onTimeout: point.onTimeout ?? 'allow',
+            order: point.order ?? 'priority',
+            collect: point.collect ?? false,
+          }).dispose,
+        ),
+      handle: (point, handler) =>
+        recordUndo(
+          registerHookHandler({
+            id: `${plugin}:${handler.id}`,
+            pluginId: plugin,
+            point,
+            mode: handler.mode,
+            priority: handler.priority ?? 500,
+            call: (payload, signal) => handler.run(payload, signal),
+          }).dispose,
+        ),
       run: (id, payload) => runHook(qualifiedExtensionPointId(plugin, id), payload),
-      handlers: async (id) => [...new Set(hookHandlersFor(qualifiedExtensionPointId(plugin, id)).map((handler) => handler.pluginId))],
+      handlers: async (id) => [
+        ...new Set(hookHandlersFor(qualifiedExtensionPointId(plugin, id)).map((handler) => handler.pluginId)),
+      ],
     },
-    // Owner-bound on both halves, like the extension points below: `declare` qualifies the verb with
+    // Owner-bound on both halves, like the extension points above: `declare` qualifies the verb with
     // this plugin's id, and `record` refuses anything outside what this plugin declared. Writing goes
     // straight to core's table because the trail is core's — a plugin owning its own audit rows would
     // be a second trail nobody reviews.
@@ -377,7 +431,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // the plugin id so "which package wrote this" is answerable even though the qualified verb already
     // says so.
     audit: {
-      declare: (action) => declareAuditAction(plugin, action),
+      declare: (action) => recordUndo(declareAuditAction(plugin, action).dispose),
       record: (action, entry) => {
         if (!options.env) return // no host bindings — a context-shape unit test, with no table to write to
         recordAudit(options.env.DB, {
@@ -390,28 +444,35 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     },
     // asContextSection drops core's database handle rather than leaving it unused: core's own `issues`
     // section keeps it, a plugin-registered one can never see it, and neither side has to remember.
-    contextSections: { register: (section) => registerContextSection(plugin, asContextSection(section)) },
+    contextSections: {
+      register: (section) => recordUndo(registerContextSection(plugin, asContextSection(section)).dispose),
+    },
     // Owner-bound like routes and tools: a plugin cannot contribute a provider under another plugin's
     // name, and so cannot have its contributions cleared by another plugin's re-init.
     providers: {
+      // Three registrations, three undos, taken back newest first so the route goes before its provider.
       integration: (provider, route) => {
-        connectionProviderRegistry.register(provider, plugin)
-        integrationProviderRegistry.register(provider, plugin)
+        recordUndo(connectionProviderRegistry.register(provider, plugin).dispose)
+        recordUndo(integrationProviderRegistry.register(provider, plugin).dispose)
         if (!route) return
         if (permissions && typeof route !== 'function') {
-          throw new Error(`Plugin '${plugin}' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.`)
+          throw new Error(
+            `Plugin '${plugin}' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.`,
+          )
         }
-        integrationProviderRegistry.registerRoute({
-          providerId: provider.id,
-          prefix: '',
-          ...(typeof route === 'function'
-            ? { fetch: route as PluginFetchHandler }
-            : { router: route }),
-        })
+        recordUndo(
+          integrationProviderRegistry.registerRoute({
+            providerId: provider.id,
+            prefix: '',
+            ...(typeof route === 'function' ? { fetch: route as PluginFetchHandler } : { router: route }),
+          }).dispose,
+        )
       },
-      connection: (provider) => connectionProviderRegistry.register(provider, plugin),
-      model: (adapter) => modelProviderRegistry.register(adapter, plugin),
-      nodes: (provider) => registerNodeProvider(plugin, provider),
+      connection: (provider) => recordUndo(connectionProviderRegistry.register(provider, plugin).dispose),
+      model: (adapter) => recordUndo(modelProviderRegistry.register(adapter, plugin).dispose),
+      // A node provider holds a closure over this plugin's context and, for a cloud one, its credential
+      // scope, so a survivor would keep listing nodes through an instance whose dispose already ran.
+      nodes: (provider) => recordUndo(registerNodeProvider(plugin, provider).dispose),
       withConnection: async (userId, providerId, visit) => {
         if (!options.env) throw new Error(`Plugin '${plugin}' requested a provider credential without host bindings.`)
         let visited = false
@@ -433,14 +494,20 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // Rung 1 of the containment ladder for a loaded plugin: only the capability ids and CoreServices
     // facets its manifest declared. See server/plugins/permissions.ts. This is least privilege for
     // cooperative code, not a security boundary.
-    capabilities: permissions ? scopeCapabilities(options.capabilities, permissions.capabilities, plugin) : options.capabilities,
+    capabilities: permissions
+      ? scopeCapabilities(options.capabilities, permissions.capabilities, plugin)
+      : options.capabilities,
     // Both tiers, from the one option the caller derived. `undefined as never` for a plugin that owns no
     // tables, matching routes.register above.
     storage: options.storage ?? (undefined as never),
     // The read facet is bound to this plugin too, wherever it is present: a sink registered through
     // it is filed under the plugin's id, so Settings can say who is reading the stream and a
     // rollback can drop this plugin's subscriptions (../core/telemetry.ts).
-    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin) as CompiledCoreServices,
+    core: withOwnedTelemetry(
+      permissions ? scopeCore(options.core, permissions, plugin) : options.core,
+      plugin,
+      recordUndo,
+    ) as CompiledCoreServices,
     // Owner-bound like every registration above, and here the binding is the whole feature: a record
     // this plugin emits says `owner: <plugin>` because the host closed over the id, not because the
     // plugin passed one. An `owner` attribute set by the emitter is dropped by the collector for the
@@ -450,28 +517,29 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // `ctx.core.telemetry` and it is a token (../plugins/permissions.ts).
     telemetry: telemetryFor(plugin),
     log: createLogger(plugin, plugin, (level, line) => recordPluginLog(plugin, level, line)),
-    // The broadcast surface, projected rather than re-implemented: these are server/notify.ts and
-    // server/transport/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
+    // The broadcast surface, projected rather than re-implemented: these are the notify and wsHub
+    // functions, reached through the context so a plugin does not deep-import them. `channel` and
     // `streams` return disposers, which the host records like any other contribution.
     events: {
       // Confined to the plugin's own channel namespace for a loaded plugin, unrestricted for a
       // built-in. A built-in owns real prefixes through `channel` below and is compiled into this
       // binary. An unconfined `send` lets a loaded package post frames on `term:` or `workflow:` and
       // impersonate core's own streams. `plugin:<id>:*` is also the namespace its frames may subscribe
-      // to and the one a push invalidates its chrome from (client-core/host/plugins/pluginChannel.ts).
+      // to and the one a push invalidates its chrome from (client-core's pluginChannel).
       //
       // A throw rather than a silent drop, because a broadcast that goes nowhere is invisible and leaves
       // the author debugging the renderer.
       send: permissions
         ? (frame) => {
-          if (parsePluginChannel(frame.channel)?.pluginId !== plugin) {
-            throw new Error(`plugin '${plugin}' may only broadcast on ${pluginChannel(plugin, '<verb>')}, not '${frame.channel}'`)
+            if (parsePluginChannel(frame.channel)?.pluginId !== plugin) {
+              throw new Error(
+                `plugin '${plugin}' may only broadcast on ${pluginChannel(plugin, '<verb>')}, not '${frame.channel}'`,
+              )
+            }
+            wsBroadcast(frame)
           }
-          wsBroadcast(frame)
-        }
         : wsBroadcast,
-      // Bound to the caller's own id, which is the whole fix for the chrome sweep: `bumpChrome` has
-      // held a per-plugin revision map all along and this was the one caller that told it nothing.
+      // Bound to the caller's own id, so the client's `bumpChrome` refetches only this plugin's chrome.
       status: () => broadcastStatus(plugin),
       worktreeStatus: (taskId) => broadcastWorktreeStatusChanged({ taskId }),
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
@@ -490,12 +558,17 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // author to debug.
       notice: permissions
         ? ({ taskId, title, detail, kind, target }) => {
-          const declared = options.loaded?.destinations?.find((entry) =>
-            entry.targetKind === target?.kind && (entry.noticeKind === undefined || entry.noticeKind === kind))
-          broadcastNotice(plugin, declared
-            ? { taskId, title, detail, kind: declared.noticeKind ?? 'plugin', target }
-            : { taskId, title, detail, kind: 'plugin' })
-        }
+            const declared = options.loaded?.destinations?.find(
+              (entry) =>
+                entry.targetKind === target?.kind && (entry.noticeKind === undefined || entry.noticeKind === kind),
+            )
+            broadcastNotice(
+              plugin,
+              declared
+                ? { taskId, title, detail, kind: declared.noticeKind ?? 'plugin', target }
+                : { taskId, title, detail, kind: 'plugin' },
+            )
+          }
         : (notice) => broadcastNotice(plugin, notice),
       // The receive side (docs/plugins/events.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and
@@ -521,19 +594,19 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       },
       // Never present for a loaded plugin, whatever its manifest says. PTY stream ownership and WS
       // channel prefixes are infrastructure exactly one plugin may own, and neither survives a
-      // message-passing boundary (README § Two tiers).
+      // message-passing boundary (docs/extensibility.md § Two tiers, permanently).
       channel: permissions
         ? (undefined as never)
         : (prefix, handler) => {
-          registerWsChannelHandler(prefix, handler)
-          recordUndo(() => registerWsChannelHandler(prefix, null))
-        },
+            registerWsChannelHandler(prefix, handler)
+            recordUndo(() => registerWsChannelHandler(prefix, null))
+          },
       streams: permissions
         ? (undefined as never)
         : (handlers) => {
-          setStreamHandlers(handlers)
-          recordUndo(() => setStreamHandlers(null))
-        },
+            setStreamHandlers(handlers)
+            recordUndo(() => setStreamHandlers(null))
+          },
     },
   }
 
@@ -549,10 +622,13 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // touches that is exact, because `events.channel` and `streams` are the only registrations on `events`
   // and both are absent for a loaded plugin.
   let revoked = false
-  const guard = <A extends unknown[], R>(fn: (...args: A) => R, buffer: boolean): ((...args: A) => R) =>
+  const guard =
+    <A extends unknown[], R>(fn: (...args: A) => R, buffer: boolean): ((...args: A) => R) =>
     (...args: A): R => {
       if (revoked) {
-        throw new Error(`Plugin '${plugin}' used a context from a previous load; that instance was replaced by a reload.`)
+        throw new Error(
+          `Plugin '${plugin}' used a context from a previous load; that instance was replaced by a reload.`,
+        )
       }
       if (!buffer || !pending) return fn(...args)
       pending.push(() => void fn(...args))
@@ -563,7 +639,26 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
   // it never fails the thing it describes (docs/telemetry/runtimes.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
-  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'customAgents', 'skills', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
+  for (const group of [
+    'routes',
+    'tools',
+    'schedules',
+    'dataSources',
+    'nodeActions',
+    'runs',
+    'taskChecks',
+    'search',
+    'harnesses',
+    'customAgents',
+    'skills',
+    'contextSections',
+    'audit',
+    'extensionPoints',
+    'hooks',
+    'providers',
+    'events',
+    'storage',
+  ] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined
@@ -572,16 +667,22 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // when it is called, while `audit.declare` beside it is an ordinary registration that buffers.
     const buffer = group !== 'events' && group !== 'storage'
     for (const [key, value] of Object.entries(members)) {
-      // `extensionPoints.handlers` reads (under both its spellings), `audit.record` writes, and
+      // `extensionPoints.handlers` reads, `audit.record` writes, and
       // `hooks.run` awaits a chain and answers the caller: all are guarded against a revoked context like
       // the rest and none is ever deferred, because a buffered call would return undefined to a caller
       // about to act on it.
-      const reads = key === 'handlers' || key === 'entries' || key === 'record' || key === 'run' || key === 'invoke'
+      const reads = key === 'handlers' || key === 'record' || key === 'run' || key === 'invoke'
       if (typeof value === 'function') {
         members[key] = guard(value as (...args: unknown[]) => unknown, buffer && !reads)
       }
     }
   }
+
+  // The one registration on `core`, revoked like the members above. A revoked context's undo list is
+  // never run again, so a sink it subscribed would read every record for the life of the process.
+  // Never buffered: a sink starts reading when it subscribes. `withOwnedTelemetry` built this facet for
+  // this context alone, so replacing the member touches no other plugin's.
+  if (ctx.core.telemetry) ctx.core.telemetry.onBatch = guard(ctx.core.telemetry.onBatch, false)
 
   // `capabilities` is the one registration that hands the plugin something back, so it cannot go through
   // the loop above: the Disposable has to work before the replay, cancelling the pending registration,

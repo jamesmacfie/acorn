@@ -16,7 +16,23 @@ import { createSignal } from 'solid-js'
  *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx).
  *  `notifications` is the bell's two sections, which on this host have no popover to live in
  *  (./Inbox.tsx). */
-export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications' | 'setup' | 'settings' | 'promotion' | 'sessions' | 'file' | 'task-launch' | 'action-picker' | 'workflow-launch' | 'link-preview'
+export type OverlayName =
+  | 'palette'
+  | 'help'
+  | 'quit'
+  | 'trust'
+  | 'workspace'
+  | 'project'
+  | 'notifications'
+  | 'setup'
+  | 'settings'
+  | 'promotion'
+  | 'sessions'
+  | 'file'
+  | 'task-launch'
+  | 'action-picker'
+  | 'workflow-launch'
+  | 'link-preview'
 
 // A stack rather than one slot, because the topmost is the one that owns the keys and closing it has
 // to reveal the one under it. In practice two are rarely open at once — `?` inside the palette types
@@ -63,13 +79,11 @@ export { chosenWorkspace, setChosenWorkspace }
 const [highlightedTaskId, setHighlightedTaskId] = createSignal<string | null>(null)
 export { highlightedTaskId, setHighlightedTaskId }
 
-/** Release the transient shell state before mounting another Node's query cache. */
+/** Release the transient shell state before mounting another Node's query cache. Tests call it
+ *  between renders too, because module state outlives a render. */
 export function resetChromeForNodeSwitch(): void {
   setStack([])
   setChosenWorkspace(null)
   setHighlightedTaskId(null)
   setPlaceRestored(false)
 }
-
-/** Test seam. Module state outlives a render, so a suite must not inherit the previous one's shell. */
-export const _resetChrome = resetChromeForNodeSwitch

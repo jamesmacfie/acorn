@@ -14,15 +14,13 @@ export type CreatePullInput = {
   draft?: boolean
 }
 
-export type CreatePullFailure = {
+type CreatePullFailure = {
   status: 400 | 401 | 403 | 422 | 429 | 502
   error: string
   detail?: string[]
 }
 
-export type CreatePullResult =
-  | { ok: true; number: number }
-  | { ok: false; failure: CreatePullFailure }
+export type CreatePullResult = { ok: true; number: number } | { ok: false; failure: CreatePullFailure }
 
 // One GitHub write shared by the interactive route and the task-scoped agent tool. Keeping cache
 // invalidation here matters: both writers must make the mirrored open list cold after GitHub accepts

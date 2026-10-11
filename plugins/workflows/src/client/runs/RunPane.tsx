@@ -1,8 +1,19 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { formatRelativeTime, readLocal, type Task, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Badge, ConfirmButton, EmptyState, Icon, IconButton, Inline, Row, Rows, SectionHeader, SegmentedControl, Stack,
-  Text, Toolbar,
+  Badge,
+  ConfirmButton,
+  EmptyState,
+  Icon,
+  IconButton,
+  Inline,
+  Row,
+  Rows,
+  SectionHeader,
+  SegmentedControl,
+  Stack,
+  Text,
+  Toolbar,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
 import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
@@ -18,8 +29,8 @@ import type { WorkflowRunProjection } from '../../shared/api'
 //
 // The steps half draws either way: a list, or the kit's `Graph` over the same model. Which one is a
 // per-device preference, because it is a reading habit rather than anything about the run
-// (docs/state-ownership/scope-rules.md § Particular decisions). A module signal, because the switch sits in the header region
-// and the list region draws what it chose.
+// (docs/state-ownership/scope-rules.md § Particular decisions). A module signal, because the switch
+// sits in the header region and the list region draws what it chose.
 
 type NodeView = 'rows' | 'graph'
 const NODE_VIEW_KEY = 'plugin:workflows:runs:nodeView'
@@ -36,17 +47,20 @@ export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
   return (
     <SectionHeader
       count={props.model.runs().length}
-      actions={(
+      actions={
         <Show when={props.model.selectedRun()}>
           <SegmentedControl
             size="sm"
             ariaLabel="Step view"
             value={nodeView()}
-            options={[{ value: 'rows' as const, label: 'List' }, { value: 'graph' as const, label: 'Graph' }]}
+            options={[
+              { value: 'rows' as const, label: 'List' },
+              { value: 'graph' as const, label: 'Graph' },
+            ]}
             onChange={showNodes}
           />
         </Show>
-      )}
+      }
     >
       Runs
     </SectionHeader>
@@ -57,7 +71,9 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
 
   const runItems = createMemo(() => model.runs().map((run) => ({ key: run.id, label: run.name })))
-  const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.label })))
+  const nodeItems = createMemo(() =>
+    model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.label })),
+  )
   const nodeFor = (key: string) => model.nodes().find((node) => (node.step?.id ?? `pending:${node.name}`) === key)
 
   const selectNode = (key: string): void => {
@@ -68,7 +84,14 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   return (
     // Grown only for the graph: its canvas fills whatever height it is given and has none of its own.
     <Stack gap="none" grow={nodeView() === 'graph'}>
-      <Show when={model.runs().length} fallback={<EmptyState size="sm" align="start">No runs on this task.</EmptyState>}>
+      <Show
+        when={model.runs().length}
+        fallback={
+          <EmptyState size="sm" align="start">
+            No runs on this task.
+          </EmptyState>
+        }
+      >
         <Rows
           id={`workflows:runs:${props.task.id}`}
           ariaLabel="Workflow runs"
@@ -86,7 +109,13 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     item={itemProps}
                     selected={selected()}
                     density="compact"
-                    leading={<Icon name={runGlyph(current().status)} tone={runTone(current().status)} spin={current().status === 'running'} />}
+                    leading={
+                      <Icon
+                        name={runGlyph(current().status)}
+                        tone={runTone(current().status)}
+                        spin={current().status === 'running'}
+                      />
+                    }
                     meta={<Text emphasis="muted">{formatRelativeTime(current().createdAt)}</Text>}
                     onPress={() => model.selectRun(current().id)}
                   >
@@ -100,7 +129,9 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
       </Show>
 
       <Show when={model.selectedRun()}>
-        <SectionHeader level="group" count={model.nodes().length}>Steps</SectionHeader>
+        <SectionHeader level="group" count={model.nodes().length}>
+          Steps
+        </SectionHeader>
         <Show when={nodeView() === 'graph'}>
           <RunGraph model={model} />
         </Show>
@@ -123,15 +154,20 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     depth={node().depth}
                     density="compact"
                     variant="tree"
-                    title={node().parents.length > 1 ? `Waits on ${node().parentLabels.join(', ')}` : model.contributedKindLabel(node().step?.kind ?? 'agent') ?? kindLabel(node().step?.kind ?? 'agent')}
-                    leading={(
+                    title={
+                      node().parents.length > 1
+                        ? `Waits on ${node().parentLabels.join(', ')}`
+                        : (model.contributedKindLabel(node().step?.kind ?? 'agent') ??
+                          kindLabel(node().step?.kind ?? 'agent'))
+                    }
+                    leading={
                       <Icon
                         name={stepGlyph(node().step?.status)}
                         tone={stepTone(node().step?.status)}
                         spin={node().step?.status === 'running'}
                       />
-                    )}
-                    meta={(
+                    }
+                    meta={
                       <Inline gap="inline">
                         <Show when={node().parents.length > 1}>
                           <Badge size="xs">{`⇐ ${node().parents.length}`}</Badge>
@@ -149,7 +185,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                         </Show>
                         <Text emphasis="muted">{stepElapsed(node().step, model.now())}</Text>
                       </Inline>
-                    )}
+                    }
                     onPress={() => selectNode(item.key)}
                   >
                     {node().label}
@@ -182,11 +218,23 @@ export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
     <Show when={model.selectedRun()}>
       {(run) => (
         <Toolbar size="sm" ariaLabel="Run status">
-          <Text emphasis="muted">{[statusLabel(run().status), usage(), run().launchedBy && launchedByLabel(run().launchedBy!)].filter(Boolean).join(' · ')}</Text>
+          <Text emphasis="muted">
+            {[statusLabel(run().status), usage(), run().launchedBy && launchedByLabel(run().launchedBy!)]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
           <Toolbar.Spacer />
           <Show
             when={isLiveRun(run())}
-            fallback={<IconButton icon="refresh-cw" label="Refresh" size="sm" disabled={model.busy()} onPress={() => model.refresh()} />}
+            fallback={
+              <IconButton
+                icon="refresh-cw"
+                label="Refresh"
+                size="sm"
+                disabled={model.busy()}
+                onPress={() => model.refresh()}
+              />
+            }
           >
             <ConfirmButton
               size="sm"

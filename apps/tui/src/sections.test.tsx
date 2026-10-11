@@ -10,11 +10,10 @@ import { focusedRegion } from './keys/regions'
 // over one panel, with `main` keeping a column of its own while there is room for one
 // (client-core/kit/components/layout/Sections.tsx).
 //
-// Three things have to hold and each broke while this was being built: the strip has to draw every
-// tab rather than clipping half of them over whatever sits beside it, the strip has to be a parent
-// stop instead of stealing Left/Right from whatever its current panel contains, and the main panel
-// has to be a region Tab can get to at all — it was not, so nothing in a browse surface could be
-// driven.
+// Three things have to hold: the strip draws every tab rather than clipping half of them over
+// whatever sits beside it, the strip is a parent stop instead of stealing Left/Right from whatever its
+// current panel contains, and the main panel is a region Tab can get to, or nothing in a browse
+// surface can be driven.
 describe('a surface drawn as sections', () => {
   it('is a strip of tabs, enters with Down, and takes main into the strip when narrow', async () => {
     const screen = await renderFixture({ width: 160, height: 38, pane: 'pr' })
@@ -31,8 +30,8 @@ describe('a surface drawn as sections', () => {
     expect(wide).toContain('#42')
 
     // This fixture deliberately opens a task, so it starts in Tasks. Tab reaches the outer task-pane
-    // strip; Down enters the PR pane on its own section strip; Right changes that inner strip. The old
-    // focus-within binding let the first Right change the outer strip to Agent instead.
+    // strip; Down enters the PR pane on its own section strip; Right changes that inner strip, not the
+    // outer one.
     await screen.press('TAB')
     expect(focusedRegion()?.regionId).toBe('panes')
     await screen.press('ARROW_DOWN')

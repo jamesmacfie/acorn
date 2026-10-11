@@ -1,5 +1,10 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import type { WorkflowGateForm, WorkflowStepDef, WorkflowStepRow, WorkflowValueBinding } from '../../shared/workflowContracts'
+import type {
+  WorkflowGateForm,
+  WorkflowStepDef,
+  WorkflowStepRow,
+  WorkflowValueBinding,
+} from '../../shared/workflowContracts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { parseWorkflowJsonPointer } from './definition'
 import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
@@ -11,7 +16,7 @@ import { workflowRecordIdentity } from '../processing/rules'
 const TITLE_LIMIT = 500
 const BOUND_TEMPLATE_RE = /\$\{([A-Za-z][A-Za-z0-9_]*)\}/g
 
-export type WorkflowMapRosterEntry = {
+type WorkflowMapRosterEntry = {
   index: number
   itemKey: string
   item: unknown
@@ -24,7 +29,7 @@ export type WorkflowMapRoster = {
   entries: WorkflowMapRosterEntry[]
 }
 
-export function readWorkflowJsonPointer(value: unknown, pointer: string): unknown {
+function readWorkflowJsonPointer(value: unknown, pointer: string): unknown {
   const segments = parseWorkflowJsonPointer(pointer)
   if (!segments) throw new Error(`Binding pointer '${pointer}' is not a safe JSON Pointer.`)
   let current = value
@@ -55,17 +60,34 @@ function resolveBindings(
   item?: { value: unknown },
   admitted?: Readonly<Record<string, DataValue>>,
 ): Record<string, DataValue> {
-  const completed = admitted ?? Object.fromEntries(steps.filter(step => step.parentStepId == null && ['done', 'completed-with-failures'].includes(step.status) && step.structuredJson)
-    .map(step => [step.name, parseDataValue(structuredOutput(step), WORKFLOW_VALUE_BYTES)]))
-  return Object.fromEntries(Object.entries(bindings).flatMap(([name, binding]) => {
-    const typed = dataBindingSchema.parse(binding)
-    if (typed.address.from === 'item' && !item) throw new Error(`Child input '${name}' uses an item binding outside a workflow-map step.`)
-    const value = readDataBinding(typed, { inputs: { ...inputs }, steps: { ...completed }, ...(item ? { item: parseDataValue(item.value, WORKFLOW_VALUE_BYTES) } : {}) })
-    if (value === MISSING) {
-      return [] // The child's input schema decides whether omission is legal.
-    }
-    return [[name, value]]
-  }))
+  const completed =
+    admitted ??
+    Object.fromEntries(
+      steps
+        .filter(
+          (step) =>
+            step.parentStepId == null &&
+            ['done', 'completed-with-failures'].includes(step.status) &&
+            step.structuredJson,
+        )
+        .map((step) => [step.name, parseDataValue(structuredOutput(step), WORKFLOW_VALUE_BYTES)]),
+    )
+  return Object.fromEntries(
+    Object.entries(bindings).flatMap(([name, binding]) => {
+      const typed = dataBindingSchema.parse(binding)
+      if (typed.address.from === 'item' && !item)
+        throw new Error(`Child input '${name}' uses an item binding outside a workflow-map step.`)
+      const value = readDataBinding(typed, {
+        inputs: { ...inputs },
+        steps: { ...completed },
+        ...(item ? { item: parseDataValue(item.value, WORKFLOW_VALUE_BYTES) } : {}),
+      })
+      if (value === MISSING) {
+        return [] // The child's input schema decides whether omission is legal.
+      }
+      return [[name, value]]
+    }),
+  )
 }
 
 /** Evaluates the non-map binding vocabulary against one frozen parent run. */
@@ -95,17 +117,21 @@ export function resolveGateFormProposal(
     try {
       proposal[field.name] = validateDataValue(value, field.schema ?? { type: 'string' }, WORKFLOW_VALUE_BYTES)
     } catch (error) {
-      throw new Error(`Form field '${field.name}' was proposed a value that does not match its type: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(
+        `Form field '${field.name}' was proposed a value that does not match its type: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
   }
   return proposal
 }
 
 function safeTaskTitle(value: string, index: number): string {
-  const printable = [...value].map((character) => {
-    const code = character.charCodeAt(0)
-    return code <= 31 || code === 127 ? ' ' : character
-  }).join('')
+  const printable = [...value]
+    .map((character) => {
+      const code = character.charCodeAt(0)
+      return code <= 31 || code === 127 ? ' ' : character
+    })
+    .join('')
   const title = printable.replace(/\s+/g, ' ').trim().slice(0, TITLE_LIMIT).trim()
   if (!title) throw new Error(`Workflow map item ${index + 1} title must resolve to visible text.`)
   return title
@@ -124,9 +150,14 @@ export function resolveWorkflowMapRoster(
     throw new Error(`Step '${def.name}' is not a complete workflow-map step.`)
   }
   const source = steps.find((candidate) => candidate.name === def.items!.step && candidate.parentStepId == null)
-  if (!source && !admitted?.[def.items.step]) throw new Error(`Map source step '${def.items.step}' was not found in the parent run.`)
-  const items = readWorkflowJsonPointer(admitted ? admitted[def.items.step] : structuredOutput(source!), def.items.pointer)
-  if (!Array.isArray(items)) throw new Error(`Workflow map items pointer '${def.items.pointer}' must resolve to an array.`)
+  if (!source && !admitted?.[def.items.step])
+    throw new Error(`Map source step '${def.items.step}' was not found in the parent run.`)
+  const items = readWorkflowJsonPointer(
+    admitted ? admitted[def.items.step] : structuredOutput(source!),
+    def.items.pointer,
+  )
+  if (!Array.isArray(items))
+    throw new Error(`Workflow map items pointer '${def.items.pointer}' must resolve to an array.`)
 
   const keys = new Set<string>()
   const entries = items.map((item, index): WorkflowMapRosterEntry => {
@@ -142,14 +173,22 @@ export function resolveWorkflowMapRoster(
 
     const childInputs = {
       ...defaults,
-      ...(def.agent ? { item: parseDataValue(item, WORKFLOW_VALUE_BYTES) } : resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }, admitted)),
+      ...(def.agent
+        ? { item: parseDataValue(item, WORKFLOW_VALUE_BYTES) }
+        : resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }, admitted)),
     }
     const titleBindings = resolveBindings(def.title?.bindings ?? {}, inputs, steps, { value: item }, admitted)
-    const defaultLabel = sourceIdentity ? item.display?.title ?? item.ref.recordId : def.agent && item && typeof item === 'object' && typeof item.title === 'string' ? item.title : String(rawKey)
-    const renderedTitle = def.title ? def.title.template.replace(BOUND_TEMPLATE_RE, (_token, name: string) => {
-      if (!Object.hasOwn(titleBindings, name)) throw new Error(`Title binding '${name}' is missing`)
-      return workflowText(titleBindings[name])
-    }) : `${childName}: ${defaultLabel}`
+    const defaultLabel = sourceIdentity
+      ? (item.display?.title ?? item.ref.recordId)
+      : def.agent && item && typeof item === 'object' && typeof item.title === 'string'
+        ? item.title
+        : String(rawKey)
+    const renderedTitle = def.title
+      ? def.title.template.replace(BOUND_TEMPLATE_RE, (_token, name: string) => {
+          if (!Object.hasOwn(titleBindings, name)) throw new Error(`Title binding '${name}' is missing`)
+          return workflowText(titleBindings[name])
+        })
+      : `${childName}: ${defaultLabel}`
     return {
       index,
       itemKey,

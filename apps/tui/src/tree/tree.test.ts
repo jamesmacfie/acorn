@@ -18,9 +18,6 @@ import { runText } from './node'
 
 // The ten node operations, against a tree built by hand rather than by the transform, because what is
 // under test is the operations and not Solid.
-//
-// It runs on the Node the repo pins with no FFI and no flag, like every drawing test here does now.
-// That was the point of the whole programme.
 
 /** A box carrying a `flexGrow` that identifies it. `getChild` returns a fresh wrapper around the same
  *  wasm pointer on every call, so a node's Yoga child cannot be recognised by identity; a distinct
@@ -31,8 +28,9 @@ const tagged = (mark: number) => {
   return node
 }
 
-const yogaOrder = (parent: { yoga: { getChildCount(): number; getChild(index: number): { getFlexGrow(): number } } | null }) =>
-  Array.from({ length: parent.yoga!.getChildCount() }, (_, index) => parent.yoga!.getChild(index).getFlexGrow())
+const yogaOrder = (parent: {
+  yoga: { getChildCount(): number; getChild(index: number): { getFlexGrow(): number } } | null
+}) => Array.from({ length: parent.yoga!.getChildCount() }, (_, index) => parent.yoga!.getChild(index).getFlexGrow())
 
 describe('the node operations', () => {
   it('makes a node with a Yoga node for the kinds that lay out, and none for the kinds that do not', () => {
@@ -69,8 +67,7 @@ describe('the node operations', () => {
 
   it('skips the Yoga slots of children that have no Yoga node', () => {
     // A `text` holding a `span` between two `#text` runs: three tree children, no Yoga children. A
-    // box holding a `#text` beside a box is the same question the other way round, and it is the
-    // orphan-text shape the old reconciler patch used to wrap on the way in.
+    // box holding a `#text` beside a box is the same question the other way round.
     const box = createElement('box')
     const loose = createTextNode('7')
     const after = tagged(7)
@@ -144,10 +141,9 @@ describe('the node operations', () => {
   })
 
   it('keeps a removed node and its Yoga node, because Suspense hands the same instance back', () => {
-    // The destroy-on-detach race, as a test. OpenTUI destroyed a renderable a tick after it left the
-    // tree; `Suspense` removes its children when it suspends and hands the *same instances* back when
-    // it resolves, so any boundary that suspended twice went permanently blank
-    // (docs/tui/rendering.md § Rendering).
+    // `Suspense` removes its children when it suspends and hands the *same instances* back when it
+    // resolves. A node destroyed on detach would leave any boundary that suspends twice permanently
+    // blank (docs/tui/rendering.md § Rendering).
     createRoot((dispose) => {
       const parent = createElement('box')
       const suspended = tagged(5)

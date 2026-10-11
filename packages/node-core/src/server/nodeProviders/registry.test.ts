@@ -36,7 +36,9 @@ describe('registerNodeProvider', () => {
     // somebody needs `destroy` is the moment they have already been billed for something.
     const halfProvider = {
       ...listOnly(),
-      create: async () => { throw new Error('unused') },
+      create: async () => {
+        throw new Error('unused')
+      },
     } as NodeProviderContribution
     expect(() => registerNodeProvider('nodes-file', halfProvider)).toThrow(/must therefore declare destroy/)
     expect(nodeProviders()).toEqual([])
@@ -46,7 +48,9 @@ describe('registerNodeProvider', () => {
     registerNodeProvider('cloud', {
       ...listOnly('machines'),
       label: 'Acme Cloud',
-      create: async () => { throw new Error('unused') },
+      create: async () => {
+        throw new Error('unused')
+      },
       destroy: async () => {},
       stop: async () => {},
     })
@@ -65,7 +69,7 @@ describe('registerNodeProvider', () => {
     expect(() => registerNodeProvider('nodes-file', listOnly('  '))).toThrow(/empty id/)
   })
 
-  it('drops one plugin\'s providers and leaves the rest', () => {
+  it("drops one plugin's providers and leaves the rest", () => {
     registerNodeProvider('nodes-file', listOnly())
     registerNodeProvider('cloud', listOnly('machines'))
     clearNodeProviders('nodes-file')

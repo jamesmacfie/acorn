@@ -48,11 +48,13 @@ export function rollbarSearchScore(item: RollbarItemSummary, query: string): num
 /** One row, as the palette draws it: display facts and the identity the project surface is addressed
  *  by. The id is the rail's own `<connection>:<identifier>`, because a Rollbar counter is only unique
  *  inside its connection and that is the id `navigate` puts in the URL (../shared/rail.ts). */
-export const rollbarSearchItem = (item: RollbarItemSummary): CommandSearchItem => ({
+const rollbarSearchItem = (item: RollbarItemSummary): CommandSearchItem => ({
   id: rollbarRailItemId(item),
   title: item.title.slice(0, TITLE) || `#${item.identifier}`,
   subtitle: [`#${item.identifier}`, item.level, item.environment, item.integrationLabel]
-    .filter(Boolean).join(' · ').slice(0, SUBTITLE),
+    .filter(Boolean)
+    .join(' · ')
+    .slice(0, SUBTITLE),
   badge: `${item.totalOccurrences} occurrence${item.totalOccurrences === 1 ? '' : 's'}`.slice(0, BADGE),
   ref: item.identifier,
 })

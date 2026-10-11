@@ -2,7 +2,14 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentGoalVerdict, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentStore } from './store'
 import { SessionGoalStore } from './sessionGoalStore'
-import { goalCheckFailure, goalContinuationPrompt, goalDecision, goalJudgeUnavailable, judgeGoal, type GoalJudgePorts } from './sessionGoal'
+import {
+  goalCheckFailure,
+  goalContinuationPrompt,
+  goalDecision,
+  goalJudgeUnavailable,
+  judgeGoal,
+  type GoalJudgePorts,
+} from './sessionGoal'
 
 type GoalPorts = GoalJudgePorts & {
   store: AgentStore
@@ -42,8 +49,11 @@ export class SessionGoalGeneration {
     this.ports.publish(resumed)
     const snapshot = await this.ports.store.snapshot(sessionId)
     if (!snapshot.turns.some((turn) => ['queued', 'dispatching', 'active'].includes(turn.status))) {
-      await this.enqueue(sessionId, goalContinuationPrompt(session.goal.objective, 'The person resumed the goal.'),
-        `goal-resume:${sessionId}:${Date.now()}`)
+      await this.enqueue(
+        sessionId,
+        goalContinuationPrompt(session.goal.objective, 'The person resumed the goal.'),
+        `goal-resume:${sessionId}:${Date.now()}`,
+      )
     }
     return resumed
   }
@@ -110,7 +120,8 @@ export class SessionGoalGeneration {
     const turn = snapshot.turns.find((item) => item.id === turnId)
     if (!goal || goal.status !== 'active' || !turn || !['completed', 'failed'].includes(turn.status)) return
     if (snapshot.turns.at(-1)?.id !== turnId) return
-    if (snapshot.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status))) return
+    if (snapshot.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status)))
+      return
     if (goal.verdict?.turnId === turnId) {
       if (goal.verdict.blocker === 'goal_not_met_yet') await this.continue(session, turn, goal.verdict, signal)
       return
@@ -119,7 +130,9 @@ export class SessionGoalGeneration {
     let verdict: AgentGoalVerdict
     const evaluationKey = `goal-eval:${turnId}`
     const saved = await this.ports.store.operationResult<{ objective: string; verdict: AgentGoalVerdict }>(
-      evaluationKey, 'session.goal.evaluate')
+      evaluationKey,
+      'session.goal.evaluate',
+    )
     if (signal.aborted || this.stopped) return
     if (saved?.objective === goal.objective) verdict = saved.verdict
     else if (turn.status === 'failed') {
@@ -128,9 +141,15 @@ export class SessionGoalGeneration {
       if (goalJudgeUnavailable(this.ports, session.profileId)) verdict = goalCheckFailure(turnId)
       else {
         try {
-          verdict = (await judgeGoal(this.ports, {
-            profileId: session.profileId, objective: goal.objective, events: snapshot.events, turnId, signal,
-          })).verdict
+          verdict = (
+            await judgeGoal(this.ports, {
+              profileId: session.profileId,
+              objective: goal.objective,
+              events: snapshot.events,
+              turnId,
+              signal,
+            })
+          ).verdict
         } catch {
           if (signal.aborted) return
           verdict = goalCheckFailure(turnId)
@@ -140,23 +159,45 @@ export class SessionGoalGeneration {
     if (signal.aborted || this.stopped) return
     if ((await this.ports.store.snapshot(sessionId)).turns.at(-1)?.id !== turnId) return
     if (signal.aborted || this.stopped) return
-    await this.ports.store.saveOperation(evaluationKey, 'session.goal.evaluate', { objective: goal.objective, verdict }, sessionId)
+    await this.ports.store.saveOperation(
+      evaluationKey,
+      'session.goal.evaluate',
+      { objective: goal.objective, verdict },
+      sessionId,
+    )
     if (signal.aborted || this.stopped) return
     const decision = goalDecision(session, turn, verdict, events)
-    const applied = await this.goals.apply(sessionId, goal.objective, verdict, decision.status,
-      decision.continuations, decision.noProgress)
+    const applied = await this.goals.apply(
+      sessionId,
+      goal.objective,
+      verdict,
+      decision.status,
+      decision.continuations,
+      decision.noProgress,
+    )
     if (!applied) return
     this.ports.publish(applied)
     if (decision.status === 'active') await this.continue(applied, turn, verdict, signal)
   }
 
-  private async continue(session: AgentSession, turn: AgentTurn, verdict: AgentGoalVerdict, signal: AbortSignal): Promise<void> {
+  private async continue(
+    session: AgentSession,
+    turn: AgentTurn,
+    verdict: AgentGoalVerdict,
+    signal: AbortSignal,
+  ): Promise<void> {
     if (signal.aborted || this.stopped || session.goal?.status !== 'active') return
     const latest = await this.ports.store.snapshot(session.id)
     if (signal.aborted || this.stopped) return
     if (latest.turns.at(-1)?.id !== turn.id) return
-    if (latest.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status))) return
-    await this.enqueue(session.id, goalContinuationPrompt(session.goal.objective, verdict.reason), `goal:${turn.id}`, signal)
+    if (latest.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status)))
+      return
+    await this.enqueue(
+      session.id,
+      goalContinuationPrompt(session.goal.objective, verdict.reason),
+      `goal:${turn.id}`,
+      signal,
+    )
   }
 
   private async enqueue(sessionId: string, prompt: string, key: string, signal?: AbortSignal): Promise<void> {
@@ -164,7 +205,8 @@ export class SessionGoalGeneration {
       await this.ports.enqueue(sessionId, prompt, key, signal)
     } catch (error) {
       const session = await this.ports.store.requireSession(sessionId)
-      if (!signal?.aborted && session.goal?.status === 'active') this.ports.publish(await this.goals.status(sessionId, 'blocked'))
+      if (!signal?.aborted && session.goal?.status === 'active')
+        this.ports.publish(await this.goals.status(sessionId, 'blocked'))
       throw error
     }
   }

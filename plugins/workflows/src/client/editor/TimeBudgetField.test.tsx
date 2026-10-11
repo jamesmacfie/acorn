@@ -5,12 +5,17 @@ import type { WorkflowBudget } from '../../shared/workflowContracts'
 import TimeBudgetField from './TimeBudgetField'
 
 let dispose: (() => void) | undefined
-afterEach(() => { dispose?.(); document.body.replaceChildren() })
+afterEach(() => {
+  dispose?.()
+  document.body.replaceChildren()
+})
 
 it('edits minutes, preserves other limits, and restores inheritance when cleared', () => {
   const [budget, setBudget] = createSignal<WorkflowBudget | undefined>({ maxWallTimeMs: 1_800_000, maxTurns: 3 })
-  dispose = render(() => <TimeBudgetField label="Timeout" hint="Inherited when empty."
-    budget={budget()} onChange={setBudget} />, document.body)
+  dispose = render(
+    () => <TimeBudgetField label="Timeout" hint="Inherited when empty." budget={budget()} onChange={setBudget} />,
+    document.body,
+  )
   const input = document.querySelector('input')!
   expect(input.value).toBe('30')
   input.value = '45.5'
@@ -23,8 +28,18 @@ it('edits minutes, preserves other limits, and restores inheritance when cleared
 
 it('removes an empty budget and reports invalid or widening timeouts', () => {
   const [budget, setBudget] = createSignal<WorkflowBudget | undefined>()
-  dispose = render(() => <TimeBudgetField label="Timeout" hint="Inherited when empty."
-    budget={budget()} maxWallTimeMs={600_000} onChange={setBudget} />, document.body)
+  dispose = render(
+    () => (
+      <TimeBudgetField
+        label="Timeout"
+        hint="Inherited when empty."
+        budget={budget()}
+        maxWallTimeMs={600_000}
+        onChange={setBudget}
+      />
+    ),
+    document.body,
+  )
   const input = document.querySelector('input')!
   input.value = '0'
   input.dispatchEvent(new Event('input', { bubbles: true }))

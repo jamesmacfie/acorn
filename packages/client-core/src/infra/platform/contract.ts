@@ -40,7 +40,10 @@ import {
 // silently dropping out of the contract.
 const members =
   <T extends object>() =>
-  <K extends readonly (keyof T)[]>(keys: K & (Exclude<keyof T, K[number]> extends never ? unknown : ['unlisted seam member', Exclude<keyof T, K[number]>])): readonly string[] =>
+  <K extends readonly (keyof T)[]>(
+    keys: K &
+      (Exclude<keyof T, K[number]> extends never ? unknown : ['unlisted seam member', Exclude<keyof T, K[number]>]),
+  ): readonly string[] =>
     keys as readonly string[]
 
 // Groups a host either implements or does not. Absent is a supported product state for all but the
@@ -53,17 +56,43 @@ const GROUPS = {
   },
   transport: {
     resolve: nodeTransport,
-    members: members<NodeTransport>()(['fetch', 'abort', 'send', 'interest', 'onError', 'onFrame', 'onBytes', 'onStatus']),
+    members: members<NodeTransport>()([
+      'fetch',
+      'abort',
+      'send',
+      'interest',
+      'onError',
+      'onFrame',
+      'onBytes',
+      'onStatus',
+    ]),
   },
   fleet: {
     resolve: fleetBridge,
-    members: members<FleetBridge>()(['list', 'probe', 'pair', 'adopt', 'rename', 'forget', 'reconnect', 'restartLocal', 'tunnelOpen', 'tunnelClose']),
+    members: members<FleetBridge>()([
+      'list',
+      'probe',
+      'pair',
+      'adopt',
+      'rename',
+      'forget',
+      'reconnect',
+      'restartLocal',
+    ]),
   },
   // Reading the fleet and changing it are different capabilities (platform/index.ts).
   pairing: { resolve: () => (canPairNodes() ? {} : null), members: [] },
   plugins: {
     resolve: pluginCustody,
-    members: members<PluginCustody>()(['state', 'cachePut', 'install', 'remove', 'trustRecord', 'trustForget', 'devGrant']),
+    members: members<PluginCustody>()([
+      'state',
+      'cachePut',
+      'install',
+      'remove',
+      'trustRecord',
+      'trustForget',
+      'devGrant',
+    ]),
   },
   config: {
     resolve: deviceConfigBridge,
@@ -99,11 +128,31 @@ const GROUPS = {
   rendererLayer: { resolve: rendererLayer, members: members<RendererLayer>()(['update']) },
   preview: {
     resolve: previewViews,
-    members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'evictAll', 'onEvent']),
+    members: members<PreviewViews>()([
+      'ensure',
+      'setBounds',
+      'show',
+      'hide',
+      'load',
+      'command',
+      'evict',
+      'evictAll',
+      'onEvent',
+    ]),
   },
   webviews: {
     resolve: pluginWebviews,
-    members: members<PluginWebviews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'onEvent', 'onBlocked']),
+    members: members<PluginWebviews>()([
+      'ensure',
+      'setBounds',
+      'show',
+      'hide',
+      'load',
+      'command',
+      'evict',
+      'onEvent',
+      'onBlocked',
+    ]),
   },
 } satisfies Record<string, { resolve: () => object | null; members: readonly string[] }>
 
@@ -112,7 +161,7 @@ export const SEAM_GROUPS = Object.keys(GROUPS) as SeamGroup[]
 
 // Does this host implement the group. The same object that answers "can I draw this" answers "should
 // I offer it", so a `requires: { seam: … }` gate and the surface behind it can never disagree
-// (infra/node/hostCapabilities.ts). Boot-static today, because a host installs its bridge once.
+// (`hasHostCapability`). Boot-static today, because a host installs its bridge once.
 export const seamPresent = (group: SeamGroup): boolean => GROUPS[group].resolve() !== null
 
 // Every problem with the host installed on `window`, given the groups it claims to implement. Empty
@@ -138,7 +187,8 @@ export function seamProblems(implemented: readonly SeamGroup[]): string[] {
       continue
     }
     for (const member of group.members) {
-      if (typeof (resolved as Record<string, unknown>)[member] !== 'function') problems.push(`${name}.${member}: not a function`)
+      if (typeof (resolved as Record<string, unknown>)[member] !== 'function')
+        problems.push(`${name}.${member}: not a function`)
     }
   }
   return problems

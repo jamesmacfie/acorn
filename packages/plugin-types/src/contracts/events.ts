@@ -32,7 +32,10 @@ export type PluginBroadcast = {
    *  attached. The event must be one your manifest named in `permissions.events`. Another plugin's
    *  `plugin:<id>:<verb>` works when that plugin lists the verb in its manifest's `emits`; if it is not
    *  installed you hear nothing and no error. Disposal follows unload. */
-  on(event: NodeEventChannel | `plugin:${string}:${string}`, listener: (frame: { channel: string } & Record<string, unknown>) => void): Disposable
+  on(
+    event: NodeEventChannel | `plugin:${string}:${string}`,
+    listener: (frame: { channel: string } & Record<string, unknown>) => void,
+  ): Disposable
 }
 
 /** A bell row you raise with `events.notice`.

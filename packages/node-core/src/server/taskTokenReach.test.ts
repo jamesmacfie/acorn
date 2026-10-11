@@ -7,35 +7,35 @@ import { makeTestDb, testSecretEnv, type TestDb } from '../testkit/db'
 import type { Env } from './bindings'
 
 // What an agent's own credential can reach, asserted end to end through the real mount table rather
-// than through a hand-built router. Every route below was reachable by a task-scoped internal token
-// before phase 1 of the review program, and each one is here because it was: the preference write that
-// let an agent raise its own tool ceiling, the project scripts this node executes later, and workspace
-// deletion.
+// than through a hand-built router. Every route below must refuse a task-scoped internal token: the
+// preference write that would let an agent raise its own tool ceiling, the project scripts this node
+// executes later, and workspace deletion.
 //
-// mountCoverage.test.ts is the structural companion — it fails when an ungated core mount appears at
-// all. This one is the behavioural check on the specific routes the review named, so a refactor that
-// keeps a gate mounted but stops it applying still fails something.
+// mountCoverage.test.ts is the structural companion: it fails when an ungated core mount appears at
+// all. This one is the behavioural check on these specific routes, so a refactor that keeps a gate
+// mounted but stops it applying still fails something.
 //
-// Core routes only. The plugin half of the same review — GitHub's OAuth device flow, notes' workspace
-// routes — is asserted in each plugin's own suite, because a plugin router reaches this mount table
-// only once the app composes it and node-core does not know those plugins exist.
+// Core routes only. The plugin routes with the same concern, GitHub's OAuth device flow and notes'
+// workspace routes, are asserted in each plugin's own suite, because a plugin router reaches this
+// mount table only once the app composes it and node-core does not know those plugins exist.
 
 const ENC_KEY = '0'.repeat(64)
 const KEY = 'internal-signing-key'
 
 let testDb: TestDb
 
-const env = () => ({
-  DB: testDb.db,
-  INTERNAL_TOKEN: KEY,
-  // A paired device, so the renderer's half of each case below travels the real bearer path rather than
-  // a seeded principal. Seeding one outside createApp() does not work: the app's own authMiddleware
-  // runs over /v1/* and resolves the principal again, so a seeded value is replaced by null and every
-  // "the renderer is unaffected" assertion passes on a 401 it never meant to allow.
-  DEVICES: { authenticate: async () => ({ deviceId: 'device-1' }) },
-  ACTIVE_IDENTITY: { get: () => 'james', set: vi.fn(), clear: vi.fn() },
-  ...testSecretEnv(ENC_KEY),
-}) as unknown as Env
+const env = () =>
+  ({
+    DB: testDb.db,
+    INTERNAL_TOKEN: KEY,
+    // A paired device, so the renderer's half of each case below travels the real bearer path rather than
+    // a seeded principal. Seeding one outside createApp() does not work: the app's own authMiddleware
+    // runs over /v1/* and resolves the principal again, so a seeded value is replaced by null and every
+    // "the renderer is unaffected" assertion passes on a 401 it never meant to allow.
+    DEVICES: { authenticate: async () => ({ deviceId: 'device-1' }) },
+    ACTIVE_IDENTITY: { get: () => 'james', set: vi.fn(), clear: vi.fn() },
+    ...testSecretEnv(ENC_KEY),
+  }) as unknown as Env
 
 const asTask = (taskId: string) => ({ 'x-acorn-internal': mintInternalToken(KEY, { scope: 'task', taskId }) })
 
@@ -45,29 +45,52 @@ const call = (app: Hono<never>, method: string, path: string, headers: Record<st
   app.fetch(
     new Request(`https://127.0.0.1${path}`, {
       method,
-      headers: { ...headers, ...(method === 'GET' || method === 'DELETE' ? {} : { 'content-type': 'application/json' }) },
+      headers: {
+        ...headers,
+        ...(method === 'GET' || method === 'DELETE' ? {} : { 'content-type': 'application/json' }),
+      },
       ...(method === 'GET' || method === 'DELETE' ? {} : { body: '{}' }),
     }),
     env(),
   )
 
-describe("what a task-scoped agent token can reach", () => {
+describe('what a task-scoped agent token can reach', () => {
   const app = createApp() as unknown as Hono<never>
   const headers = asTask('task-1')
 
   beforeEach(async () => {
     testDb = makeTestDb()
     const now = Date.now()
-    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await testDb.db.insert(schema.projects).values({
-      id: 'project-1', name: 'widget', path: '/tmp/widget', workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-1',
+      name: 'widget',
+      path: '/tmp/widget',
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     for (const id of ['task-1', 'task-2']) {
       await testDb.db.insert(schema.tasks).values({
-        id, projectId: 'project-1', branch: id, title: id, status: 'active', origin: 'local',
-        worktreePath: `/tmp/${id}`, createdAt: now, updatedAt: now,
+        id,
+        projectId: 'project-1',
+        branch: id,
+        title: id,
+        status: 'active',
+        origin: 'local',
+        worktreePath: `/tmp/${id}`,
+        createdAt: now,
+        updatedAt: now,
       })
     }
   })
@@ -75,12 +98,12 @@ describe("what a task-scoped agent token can reach", () => {
   afterEach(() => testDb.cleanup())
 
   it.each([
-    // The self-unlock. `agentTools.perms` is a preference key, so this write was the agent turning its
-    // own execute tier back on.
+    // The self-unlock. `agentTools.perms` is a preference key, so this write would let the agent turn
+    // its own execute tier back on.
     ['PUT', '/v1/core/prefs'],
     // Project writes. Each of these lands `setup_script`, `dev_script`, `teardown_script`,
     // `db_url_script` or `run_targets` — commands this node runs on the next task — and none of them is
-    // task-addressed, so the write went against any project id, not the token's own.
+    // task-addressed, so the write would go against any project id, not the token's own.
     ['POST', '/v1/core/projects'],
     ['PATCH', '/v1/core/projects/other-project'],
     ['PUT', '/v1/core/projects/other-project/config'],
@@ -107,7 +130,7 @@ describe("what a task-scoped agent token can reach", () => {
   // Two lists answer 200 and are narrowed instead, because a caller with a legitimate reason to ask
   // about its own task should get an answer rather than a refusal. What it must not get is every other
   // task's title, branch and absolute worktree path.
-  it('narrows the task list to the caller\'s own task instead of refusing it', async () => {
+  it("narrows the task list to the caller's own task instead of refusing it", async () => {
     const response = await call(app, 'GET', '/v1/core/tasks', headers)
     expect(response.status).toBe(200)
     expect(((await response.json()) as { id: string }[]).map((task) => task.id)).toEqual(['task-1'])

@@ -7,7 +7,7 @@ import { memoryIdentityStore } from '../activeIdentity'
 import { wsBroadcast } from '../transport/wsHub'
 import { createCoreServices, SecretService } from '../core'
 import { openPluginDb, type PluginDatabase } from '../plugins/storage'
-import { makeTestDb } from '../../testkit/db'
+import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -22,31 +22,37 @@ import type { CompiledNodePluginContext, NodePlugin } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { hookPoints } from './hooks'
+import { telemetrySummary } from '../telemetry/collector'
 
 const noop = (): void => {}
 
-const provider = (id: string) => publicProvider({
-  id,
-  label: 'Test tracker',
-  glyph: 'T',
-  kind: 'issue-tracker',
-  connection: {
-    authKind: 'api-key' as const,
-    fields: [],
-    connectable: true,
-    disconnectable: true,
-    async validate() { return 'secret' },
-    normalize(_credentials, secret) {
-      return { secret, label: 'Test tracker', account: null, scopes: [], config: {}, capabilities: {} }
+const provider = (id: string) =>
+  publicProvider({
+    id,
+    label: 'Test tracker',
+    glyph: 'T',
+    kind: 'issue-tracker',
+    connection: {
+      authKind: 'api-key' as const,
+      fields: [],
+      connectable: true,
+      disconnectable: true,
+      async validate() {
+        return 'secret'
+      },
+      normalize(_credentials, secret) {
+        return { secret, label: 'Test tracker', account: null, scopes: [], config: {}, capabilities: {} }
+      },
+      async test() {
+        return { ok: true as const }
+      },
     },
-    async test() { return { ok: true as const } },
-  },
-  externalIds: externalIdsFor(id),
-  capabilities: {},
-  resources: [],
-  budgets: defaultBudgets,
-  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
-})
+    externalIds: externalIdsFor(id),
+    capabilities: {},
+    resources: [],
+    budgets: defaultBudgets,
+    memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
+  })
 
 describe('capability registry', () => {
   const greet = capabilityId<(name: string) => string>('test.greet')
@@ -100,7 +106,12 @@ describe('plugin host', () => {
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({
+        secrets: new SecretService('a'.repeat(64)),
+        db: coreDb(),
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: '',
       disabled,
     })
@@ -109,20 +120,35 @@ describe('plugin host', () => {
     let previousDisposed = false
     const binding: LoadedPluginBinding = {
       permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-      storage: { open: () => { throw new Error('test storage is not configured') } },
+      storage: {
+        open: () => {
+          throw new Error('test storage is not configured')
+        },
+      },
     }
     const result = await initPlugins([plugin('widget', { dispose: () => void (previousDisposed = true) })], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({
+        secrets: new SecretService('a'.repeat(64)),
+        db: coreDb(),
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: '',
       loaded: new Map([['widget', binding]]),
     })
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
     try {
-      expect(await result.reload('widget', {
-        plugin: plugin('widget', { ready: () => { throw new Error('candidate ready failed') } }),
-        binding,
-      })).toEqual({ ok: false, error: 'candidate ready failed', retained: true })
+      expect(
+        await result.reload('widget', {
+          plugin: plugin('widget', {
+            ready: () => {
+              throw new Error('candidate ready failed')
+            },
+          }),
+          binding,
+        }),
+      ).toEqual({ ok: false, error: 'candidate ready failed', retained: true })
       expect(previousDisposed).toBe(false)
       expect(result.enabled).toContain('widget')
       expect(result.roster[0]).toMatchObject({ state: 'failed', stage: 'ready', reason: 'candidate ready failed' })
@@ -169,9 +195,9 @@ describe('plugin host', () => {
       }),
       plugin('fast', { init: () => void done.push('fast') }),
     ])
-    // The whole pass is still awaited, so a plugin's migration is finished before the listener binds.
-    // What is gone is the queueing: 'fast' does not sit behind 'slow', which is why completion order is
-    // not declaration order and must not be depended on.
+    // The whole pass is awaited, so a plugin's migration is finished before the listener binds. But
+    // 'fast' does not queue behind 'slow', so completion order is not declaration order and must not be
+    // depended on.
     expect(done).toEqual(['fast', 'slow'])
   })
 
@@ -214,12 +240,18 @@ describe('plugin host', () => {
     await result.dispose()
     expect(() => context!.routes.fetch(() => new Response('late'))).toThrow(/previous load/)
     expect(pluginRouteContributions().some(({ plugin: owner }) => owner === 'held-context')).toBe(false)
+    // Including the telemetry read facet, whose sink would otherwise outlive every undo list.
+    expect(() => context!.core.telemetry.onBatch(() => {})).toThrow(/previous load/)
+    expect(telemetrySummary().sinks).not.toContain('held-context')
   })
 
   it('rejects a duplicate plugin name before running any init', async () => {
     const started: string[] = []
     await expect(
-      host([plugin('dup', { init: () => void started.push('a') }), plugin('dup', { init: () => void started.push('b') })]),
+      host([
+        plugin('dup', { init: () => void started.push('a') }),
+        plugin('dup', { init: () => void started.push('b') }),
+      ]),
     ).rejects.toThrow(/Duplicate node plugin/)
     expect(started).toEqual([])
   })
@@ -235,19 +267,28 @@ describe('plugin host', () => {
       plugin('after', { init: () => void started.push('after') }),
     ])
     await expect(result).rejects.toThrow('nope')
-    // 'after' ran, where the serial loop never reached it: the whole pass is in flight before any
-    // failure is read. What matters is unchanged — the boot fails rather than serving a node one of
-    // whose plugins never initialized — and the test below is the one that proves the neighbours are
-    // torn down again.
+    // 'after' ran: the whole pass is in flight before any failure is read. The boot still fails rather
+    // than serving a node one of whose plugins never initialized, and the test below proves the
+    // neighbours are torn down again.
     expect(started).toEqual(['after'])
   })
 
   it('contains a loaded manifest that fails halfway through registration', async () => {
     const binding: LoadedPluginBinding = {
       permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-      storage: { open: () => { throw new Error('unused storage') } },
+      storage: {
+        open: () => {
+          throw new Error('unused storage')
+        },
+      },
       extensionPoints: [
-        { id: 'widget:before-save', kind: 'hook', label: 'Before save', payload: { id: 'string' }, allows: ['observe'] },
+        {
+          id: 'widget:before-save',
+          kind: 'hook',
+          label: 'Before save',
+          payload: { id: 'string' },
+          allows: ['observe'],
+        },
         { id: 'widget:before-save', kind: 'hook', label: 'Duplicate', payload: { id: 'string' }, allows: ['observe'] },
       ],
     }
@@ -255,15 +296,23 @@ describe('plugin host', () => {
     let disposed = 0
     let neighbourReady = false
     try {
-      const result = await initPlugins([
-        plugin('widget', { dispose: () => void disposed++ }),
-        plugin('neighbour', { ready: () => void (neighbourReady = true) }),
-      ], {
-        capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
-        dataDir: '',
-        loaded: new Map([['widget', binding]]),
-      })
+      const result = await initPlugins(
+        [
+          plugin('widget', { dispose: () => void disposed++ }),
+          plugin('neighbour', { ready: () => void (neighbourReady = true) }),
+        ],
+        {
+          capabilities: new CapabilityRegistry(),
+          core: createCoreServices({
+            secrets: new SecretService('a'.repeat(64)),
+            db: coreDb(),
+            activeIdentity: memoryIdentityStore(),
+            ...testCoreSeams(),
+          }),
+          dataDir: '',
+          loaded: new Map([['widget', binding]]),
+        },
+      )
       expect(result.roster[0]).toMatchObject({ state: 'failed', stage: 'init' })
       expect(result.enabled).toEqual(['neighbour'])
       expect(neighbourReady).toBe(true)
@@ -294,21 +343,25 @@ describe('plugin host', () => {
         plugin('last', { dispose: () => void disposed.push('last') }),
       ]),
     ).rejects.toThrow('nope')
-    // Reverse declaration order, and every plugin whose init resolved is in the list — which is all of
-    // them now, because they all ran. Declaration order is what the dispose sequence reverses, not
+    // Reverse declaration order, and every plugin whose init resolved is in the list, which is all of
+    // them, because they all ran. Declaration order is what the dispose sequence reverses, not
     // completion order: a later plugin may depend on an earlier one's resources.
     expect(disposed).toEqual(['last', 'second', 'first'])
   })
 
   it('clears a failed compiled init after it registered a route', async () => {
     let disposed = false
-    await expect(host([plugin('partial-compiled', {
-      init: (ctx) => {
-        ctx.routes.fetch(() => new Response('partial'))
-        throw new Error('compiled init failed')
-      },
-      dispose: () => void (disposed = true),
-    })])).rejects.toThrow('compiled init failed')
+    await expect(
+      host([
+        plugin('partial-compiled', {
+          init: (ctx) => {
+            ctx.routes.fetch(() => new Response('partial'))
+            throw new Error('compiled init failed')
+          },
+          dispose: () => void (disposed = true),
+        }),
+      ]),
+    ).rejects.toThrow('compiled init failed')
     expect(disposed).toBe(true)
     expect(pluginRouteContributions().some(({ plugin: owner }) => owner === 'partial-compiled')).toBe(false)
   })
@@ -321,27 +374,37 @@ describe('plugin host', () => {
       // A chain with an empty journal: this tests the lifecycle, not anyone's schema. It sits where the
       // plugin's own does, beside the module that declared it, found by the ancestor walk.
       mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
-      writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+      writeFileSync(
+        join(dir, 'migrations/meta/_journal.json'),
+        JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }),
+      )
       let opened: PluginDatabase | null = null
       let again: PluginDatabase | null = null
       let liveInDispose = false
       const result = await initPlugins(
-        [plugin('widgets', {
-          migrationsModule: pathToFileURL(join(dir, 'src/node/index.ts')).href,
-          init: (ctx) => {
-            opened = ctx.storage.open()
-            again = ctx.storage.open()
-          },
-          // agents flushes transcripts, workflows aborts steps and database drains pools through this
-          // handle on the way out, so it has to still be open here. The host closes it after this returns.
-          dispose: () => {
-            opened!.$client.prepare('select 1').get()
-            liveInDispose = true
-          },
-        })],
+        [
+          plugin('widgets', {
+            migrationsModule: pathToFileURL(join(dir, 'src/node/index.ts')).href,
+            init: (ctx) => {
+              opened = ctx.storage.open()
+              again = ctx.storage.open()
+            },
+            // agents flushes transcripts, workflows aborts steps and database drains pools through this
+            // handle on the way out, so it has to still be open here. The host closes it after this returns.
+            dispose: () => {
+              opened!.$client.prepare('select 1').get()
+              liveInDispose = true
+            },
+          }),
+        ],
         {
           capabilities: new CapabilityRegistry(),
-          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          core: createCoreServices({
+            secrets: new SecretService('a'.repeat(64)),
+            db: coreDb(),
+            activeIdentity: memoryIdentityStore(),
+            ...testCoreSeams(),
+          }),
           dataDir: dir,
         },
       )
@@ -361,38 +424,53 @@ describe('plugin host', () => {
     }
   })
 
-  // The twin of the case above, and the one whose absence let a bug through: the context dropped the
-  // host's memoizing wrapper for this tier (server/pluginHost/context.ts), so the `opened` map never saw a
-  // loaded handle, closing was a no-op, and a WAL handle outlived the data-root lock release.
+  // The twin of the case above. If the context drops the host's memoizing wrapper for this tier, the
+  // `opened` map never sees a loaded handle, closing is a no-op, and a WAL handle outlives the data-root
+  // lock release.
   it("opens, reuses and closes a LOADED plugin's database from the manifest chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-loaded-storage-'))
     try {
       mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
-      writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+      writeFileSync(
+        join(dir, 'migrations/meta/_journal.json'),
+        JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }),
+      )
       let opened: PluginDatabase | null = null
       let again: PluginDatabase | null = null
       let liveInDispose = false
       const result = await initPlugins(
-        [plugin('ntfy', {
-          init: (ctx) => {
-            opened = ctx.storage.open()
-            again = ctx.storage.open()
-          },
-          dispose: () => {
-            opened!.$client.prepare('select 1').get()
-            liveInDispose = true
-          },
-        })],
+        [
+          plugin('ntfy', {
+            init: (ctx) => {
+              opened = ctx.storage.open()
+              again = ctx.storage.open()
+            },
+            dispose: () => {
+              opened!.$client.prepare('select 1').get()
+              liveInDispose = true
+            },
+          }),
+        ],
         {
           capabilities: new CapabilityRegistry(),
-          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          core: createCoreServices({
+            secrets: new SecretService('a'.repeat(64)),
+            db: coreDb(),
+            activeIdentity: memoryIdentityStore(),
+            ...testCoreSeams(),
+          }),
           dataDir: dir,
           // The binding as the loader builds it, with the chain already resolved from the manifest. That
           // is why this tier never consults the plugin object's own `migrationsModule`.
-          loaded: new Map([['ntfy', {
-            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-            storage: { open: () => openPluginDb(dir, 'ntfy', { migrationsFolder: join(dir, 'migrations') }) },
-          }]]),
+          loaded: new Map([
+            [
+              'ntfy',
+              {
+                permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+                storage: { open: () => openPluginDb(dir, 'ntfy', { migrationsFolder: join(dir, 'migrations') }) },
+              },
+            ],
+          ]),
         },
       )
       expect(existsSync(join(dir, 'plugins/ntfy.sqlite'))).toBe(true)
@@ -441,7 +519,13 @@ describe('plugin host', () => {
     // of one process keeps the first boot's routes and tools, served through a handle its own dispose
     // already closed.
     const router = new Hono<AppEnv>()
-    const tool = { name: 'probe_tool', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never
+    const tool = {
+      name: 'probe_tool',
+      title: 'Probe',
+      risk: 'read',
+      input: z.object({}),
+      handler: async () => null,
+    } as never
     const contribute = plugin('docker', {
       init: (ctx) => {
         ctx.routes.register(router)
@@ -458,7 +542,10 @@ describe('plugin host', () => {
   })
 
   it('reports a roster state alongside what the owner asked for', async () => {
-    const result = await host([plugin('github'), plugin('terminal', { required: true }), plugin('docker')], ['docker', 'terminal'])
+    const result = await host(
+      [plugin('github'), plugin('terminal', { required: true }), plugin('docker')],
+      ['docker', 'terminal'],
+    )
     expect(result.roster).toEqual([
       { name: 'github', required: false, disabled: false, state: 'active' },
       // Required, so the disable flag is ignored in both fields.
@@ -487,7 +574,12 @@ describe('loaded plugins', () => {
   ) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({
+        secrets: new SecretService('a'.repeat(64)),
+        db: coreDb(),
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: '',
       loaded: new Map(
         Object.entries(loaded).map(([name, node]) => [
@@ -496,7 +588,11 @@ describe('loaded plugins', () => {
             permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false, ...node },
             // The manifest's `permissions.events`, a sibling of the `node` block rather than part of it.
             events: events[name] ?? [],
-            storage: { open: () => { throw new Error('test storage is not configured') } },
+            storage: {
+              open: () => {
+                throw new Error('test storage is not configured')
+              },
+            },
           },
         ]),
       ),
@@ -536,8 +632,12 @@ describe('loaded plugins', () => {
     expect(disposed).toBe(true)
     // The message travels with the row. Stopping at this process's stderr shows it to nobody in a
     // packaged app.
-    expect(result.roster.find((entry) => entry.name === 'ntfy'))
-      .toMatchObject({ state: 'failed', failedAt: expect.any(Number), reason: 'boom', stage: 'init' })
+    expect(result.roster.find((entry) => entry.name === 'ntfy')).toMatchObject({
+      state: 'failed',
+      failedAt: expect.any(Number),
+      reason: 'boom',
+      stage: 'init',
+    })
     error.mockRestore()
   })
 
@@ -545,7 +645,14 @@ describe('loaded plugins', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
     let disposals = 0
     const result = await host(
-      [plugin('ntfy', { ready: () => { throw new Error('late') }, dispose: () => void (disposals += 1) })],
+      [
+        plugin('ntfy', {
+          ready: () => {
+            throw new Error('late')
+          },
+          dispose: () => void (disposals += 1),
+        }),
+      ],
       { ntfy: {} },
     )
     expect(result.failed[0]).toMatchObject({ name: 'ntfy', error: 'late', stage: 'ready' })
@@ -590,11 +697,13 @@ describe('loaded plugins', () => {
 
   it('refuses an ungranted event, and one this node does not publish', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
-    const ungranted = await host(
-      [plugin('ntfy', { init: (ctx) => void ctx.events.on('plugins:changed', noop) })],
-      { ntfy: {} },
-    )
-    expect(ungranted.roster[0]).toMatchObject({ state: 'failed', reason: expect.stringContaining('permissions.events') })
+    const ungranted = await host([plugin('ntfy', { init: (ctx) => void ctx.events.on('plugins:changed', noop) })], {
+      ntfy: {},
+    })
+    expect(ungranted.roster[0]).toMatchObject({
+      state: 'failed',
+      reason: expect.stringContaining('permissions.events'),
+    })
 
     const unknown = await host(
       // Cast: the point of the check is a manifest naming something outside the catalogue, which the
@@ -607,13 +716,18 @@ describe('loaded plugins', () => {
     error.mockRestore()
   })
 
-  it('lets one plugin hear another\'s declared verb, and only a declared one', async () => {
+  it("lets one plugin hear another's declared verb, and only a declared one", async () => {
     // The cross-plugin grant (docs/plugins/events.md § Hearing another plugin). The producer is a built-in with an
     // `emits` field; the consumer is loaded, so the manifest grant applies too.
     const heard: string[] = []
     const gh = plugin('gh', { emits: [{ verb: 'checks-changed', description: 'checks flipped' }] })
     await host(
-      [gh, plugin('wf', { init: (ctx) => void ctx.events.on('plugin:gh:checks-changed', (frame) => heard.push(frame.channel)) })],
+      [
+        gh,
+        plugin('wf', {
+          init: (ctx) => void ctx.events.on('plugin:gh:checks-changed', (frame) => heard.push(frame.channel)),
+        }),
+      ],
       { wf: {} },
       { wf: ['plugin:gh:checks-changed'] },
     )
@@ -667,7 +781,12 @@ describe('loaded plugins', () => {
 
   it('leaves a built-in with the full context', async () => {
     let captured!: CompiledNodePluginContext
-    const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() })
+    const core = createCoreServices({
+      secrets: new SecretService('a'.repeat(64)),
+      db: coreDb(),
+      activeIdentity: memoryIdentityStore(),
+      ...testCoreSeams(),
+    })
     await initPlugins([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {
       capabilities: new CapabilityRegistry(),
       core,
@@ -684,7 +803,9 @@ describe('loaded plugins', () => {
   })
 
   it('mounts a fetch-shaped route under the plugin namespace', async () => {
-    await host([plugin('ntfy', { init: (ctx) => ctx.routes.fetch(() => new Response('ok'), { prefix: '/send' }) })], { ntfy: {} })
+    await host([plugin('ntfy', { init: (ctx) => ctx.routes.fetch(() => new Response('ok'), { prefix: '/send' }) })], {
+      ntfy: {},
+    })
     const contribution = pluginRouteContributions().find((c) => c.plugin === 'ntfy')
     expect(contribution).toMatchObject({ plugin: 'ntfy', prefix: '/send' })
     expect(contribution?.router).toBeUndefined()
@@ -693,16 +814,20 @@ describe('loaded plugins', () => {
 
   it('contains a loaded plugin that passes a Hono router through the provider side door', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
-    const result = await host([
-      plugin('tracker', {
-        init: (ctx) => ctx.providers.integration(provider('tracker-provider'), new Hono<AppEnv>()),
-      }),
-      plugin('after'),
-    ], { tracker: {}, after: {} })
+    const result = await host(
+      [
+        plugin('tracker', {
+          init: (ctx) => ctx.providers.integration(provider('tracker-provider'), new Hono<AppEnv>()),
+        }),
+        plugin('after'),
+      ],
+      { tracker: {}, after: {} },
+    )
 
     expect(result.failed[0]).toMatchObject({
       name: 'tracker',
-      error: "Plugin 'tracker' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.",
+      error:
+        "Plugin 'tracker' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.",
     })
     expect(result.enabled).toEqual(['after'])
     expect(integrationProviderRegistry.get('tracker-provider')).toBeUndefined()
@@ -711,11 +836,14 @@ describe('loaded plugins', () => {
   })
 
   it('accepts a fetch-shaped provider route from a loaded plugin', async () => {
-    await host([
-      plugin('tracker', {
-        init: (ctx) => ctx.providers.integration(provider('tracker-fetch-provider'), () => new Response('ok')),
-      }),
-    ], { tracker: {} })
+    await host(
+      [
+        plugin('tracker', {
+          init: (ctx) => ctx.providers.integration(provider('tracker-fetch-provider'), () => new Response('ok')),
+        }),
+      ],
+      { tracker: {} },
+    )
 
     const route = integrationProviderRegistry.routes().find((entry) => entry.providerId === 'tracker-fetch-provider')
     expect(route?.router).toBeUndefined()
@@ -738,39 +866,62 @@ describe('delivering a manifest-declared harness', () => {
     dir: string,
   ): Promise<{ registered: ManifestHarness[]; dispose: () => Promise<void> }> => {
     const registered: ManifestHarness[] = []
-    const result = await initPlugins([
-      plugin('agents', {
-        init: (ctx) => void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
-          register: (harness) => {
-            registered.push(harness)
-            return { dispose: () => void registered.splice(registered.indexOf(harness), 1) }
-          },
+    const result = await initPlugins(
+      [
+        plugin('agents', {
+          init: (ctx) =>
+            void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
+              register: (harness) => {
+                registered.push(harness)
+                return { dispose: () => void registered.splice(registered.indexOf(harness), 1) }
+              },
+            }),
         }),
-      }),
-      plugin('opencode'),
-    ], {
-      capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
-      dataDir: '',
-      loaded: new Map([['opencode', {
-        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-        storage: { open: () => { throw new Error('test storage is not configured') } },
-        harnesses: harnesses as never,
-        dir,
-      }]]),
-    })
+        plugin('opencode'),
+      ],
+      {
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({
+          secrets: new SecretService('a'.repeat(64)),
+          db: coreDb(),
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
+        }),
+        dataDir: '',
+        loaded: new Map([
+          [
+            'opencode',
+            {
+              permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+              storage: {
+                open: () => {
+                  throw new Error('test storage is not configured')
+                },
+              },
+              harnesses: harnesses as never,
+              dir,
+            },
+          ],
+        ]),
+      },
+    )
     return { registered, dispose: () => result.dispose() }
   }
 
   it('mints the id from the contributing plugin and hands the descriptor over verbatim', async () => {
-    const { registered, dispose } = await boot([{
-      id: 'opencode',
-      label: 'OpenCode',
-      spawn: { command: 'opencode', args: ['acp'] },
-      envPassthrough: ['OPENCODE_*'],
-      quirks: { manualCompaction: true, sessionPersistence: false },
-      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
-    }], '')
+    const { registered, dispose } = await boot(
+      [
+        {
+          id: 'opencode',
+          label: 'OpenCode',
+          spawn: { command: 'opencode', args: ['acp'] },
+          envPassthrough: ['OPENCODE_*'],
+          quirks: { manualCompaction: true, sessionPersistence: false },
+          terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+        },
+      ],
+      '',
+    )
 
     expect(registered).toHaveLength(1)
     // `<pluginId>:<harnessId>`, minted here and nowhere else. It is persisted onto every session row,
@@ -796,24 +947,27 @@ describe('delivering a manifest-declared harness', () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-harness-'))
     try {
       const warn = vi.spyOn(console, 'warn').mockImplementation(noop)
-      const { registered, dispose } = await boot([
-        {
-          id: 'inside',
-          label: 'Inside',
-          spawn: { entry: 'dist/adapter.js', args: [], requires: { command: 'node', env: 'NODE_BIN' } },
-          envPassthrough: [],
-          quirks: { manualCompaction: false, sessionPersistence: false },
-        },
-        // The schema already refuses `..` and a leading slash. This covers a path that escapes only
-        // once it is resolved.
-        {
-          id: 'outside',
-          label: 'Outside',
-          spawn: { entry: 'dist/../../escape.js', args: [] },
-          envPassthrough: [],
-          quirks: { manualCompaction: false, sessionPersistence: false },
-        },
-      ], dir)
+      const { registered, dispose } = await boot(
+        [
+          {
+            id: 'inside',
+            label: 'Inside',
+            spawn: { entry: 'dist/adapter.js', args: [], requires: { command: 'node', env: 'NODE_BIN' } },
+            envPassthrough: [],
+            quirks: { manualCompaction: false, sessionPersistence: false },
+          },
+          // The schema already refuses `..` and a leading slash. This covers a path that escapes only
+          // once it is resolved.
+          {
+            id: 'outside',
+            label: 'Outside',
+            spawn: { entry: 'dist/../../escape.js', args: [] },
+            envPassthrough: [],
+            quirks: { manualCompaction: false, sessionPersistence: false },
+          },
+        ],
+        dir,
+      )
 
       expect(registered.map((harness) => harness.id)).toEqual(['opencode:inside'])
       expect(registered[0].spawn).toEqual({
@@ -834,19 +988,35 @@ describe('delivering a manifest-declared harness', () => {
     // disabled" into "this node does not boot".
     const result = await initPlugins([plugin('opencode')], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({
+        secrets: new SecretService('a'.repeat(64)),
+        db: coreDb(),
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: '',
-      loaded: new Map([['opencode', {
-        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-        storage: { open: () => { throw new Error('test storage is not configured') } },
-        harnesses: [{
-          id: 'opencode',
-          label: 'OpenCode',
-          spawn: { command: 'opencode', args: [] },
-          envPassthrough: [],
-          quirks: { manualCompaction: false, sessionPersistence: false },
-        }] as never,
-      }]]),
+      loaded: new Map([
+        [
+          'opencode',
+          {
+            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+            storage: {
+              open: () => {
+                throw new Error('test storage is not configured')
+              },
+            },
+            harnesses: [
+              {
+                id: 'opencode',
+                label: 'OpenCode',
+                spawn: { command: 'opencode', args: [] },
+                envPassthrough: [],
+                quirks: { manualCompaction: false, sessionPersistence: false },
+              },
+            ] as never,
+          },
+        ],
+      ]),
     })
     expect(result.enabled).toEqual(['opencode'])
     await result.dispose()
@@ -886,18 +1056,25 @@ describe('order independence', () => {
       // plugin's manifest harnesses have to find it there.
       {
         name: 'agents',
-        init: (ctx) => void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
-          register: (harness) => {
-            harnesses.push(harness)
-            return { dispose: () => void harnesses.splice(harnesses.indexOf(harness), 1) }
-          },
-        }),
+        init: (ctx) =>
+          void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
+            register: (harness) => {
+              harnesses.push(harness)
+              return { dispose: () => void harnesses.splice(harnesses.indexOf(harness), 1) }
+            },
+          }),
       },
       {
         name: 'github',
         init: (ctx) => {
           ctx.routes.register(new Hono<AppEnv>())
-          ctx.tools.register({ name: 'probe_order', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never)
+          ctx.tools.register({
+            name: 'probe_order',
+            title: 'Probe',
+            risk: 'read',
+            input: z.object({}),
+            handler: async () => null,
+          } as never)
         },
       },
       { name: 'terminal', init: (ctx) => void ctx.capabilities.provide(greet, () => 'from terminal') },
@@ -909,14 +1086,28 @@ describe('order independence', () => {
       order.map((index) => roster[index]),
       {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({
+          secrets: new SecretService('a'.repeat(64)),
+          db: coreDb(),
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
+        }),
         dataDir: '',
-        loaded: new Map([['opencode', {
-          permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-          storage: { open: () => { throw new Error('test storage is not configured') } },
-          harnesses: [harnessDescriptor] as never,
-          dir: '',
-        }]]),
+        loaded: new Map([
+          [
+            'opencode',
+            {
+              permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+              storage: {
+                open: () => {
+                  throw new Error('test storage is not configured')
+                },
+              },
+              harnesses: [harnessDescriptor] as never,
+              dir: '',
+            },
+          ],
+        ]),
       },
     )
     const registered: Registered = {
@@ -924,8 +1115,12 @@ describe('order independence', () => {
       // plugins ran, not in what sequence.
       enabled: [...result.enabled].sort(),
       harnesses: harnesses.map((harness) => harness.id).sort(),
-      routes: pluginRouteContributions().map((entry) => entry.plugin).sort(),
-      tools: agentToolContributions().map((entry) => entry.name).sort(),
+      routes: pluginRouteContributions()
+        .map((entry) => entry.plugin)
+        .sort(),
+      tools: agentToolContributions()
+        .map((entry) => entry.name)
+        .sort(),
       greeting,
     }
     await result.dispose()
@@ -948,10 +1143,17 @@ describe('order independence', () => {
   it('records a rejecting plugin as failed while its neighbours reach ready', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
     const ready: string[] = []
-    const loaded = (name: string): [string, LoadedPluginBinding] => [name, {
-      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-      storage: { open: () => { throw new Error('test storage is not configured') } },
-    }]
+    const loaded = (name: string): [string, LoadedPluginBinding] => [
+      name,
+      {
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+        storage: {
+          open: () => {
+            throw new Error('test storage is not configured')
+          },
+        },
+      },
+    ]
     const result = await initPlugins(
       [
         { name: 'before', init: () => {}, ready: () => void ready.push('before') },
@@ -967,12 +1169,19 @@ describe('order independence', () => {
       ],
       {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({
+          secrets: new SecretService('a'.repeat(64)),
+          db: coreDb(),
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
+        }),
         dataDir: '',
         loaded: new Map([loaded('before'), loaded('broken'), loaded('after')]),
       },
     )
-    expect(result.failed).toEqual([expect.objectContaining({ name: 'broken', stage: 'init', error: 'init went wrong' })])
+    expect(result.failed).toEqual([
+      expect.objectContaining({ name: 'broken', stage: 'init', error: 'init went wrong' }),
+    ])
     expect([...result.enabled].sort()).toEqual(['after', 'before'])
     // The ready pass runs only for the plugins whose init resolved, so the broken one is not in it and
     // both of its neighbours are.
@@ -990,38 +1199,87 @@ describe('delivering a manifest-declared custom agent', () => {
 
   it('mints the id, qualifies a harness the manifest declares, and passes any other harness on as written', async () => {
     const registered: ManifestCustomAgent[] = []
-    const result = await initPlugins([
+    const result = await initPlugins(
+      [
+        {
+          name: 'agents',
+          init: (ctx) =>
+            void ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
+              register: (agent) => {
+                registered.push(agent)
+                return { dispose: () => void registered.splice(registered.indexOf(agent), 1) }
+              },
+            }),
+        },
+        { name: 'reviews', init: () => {} },
+      ],
       {
-        name: 'agents',
-        init: (ctx) => void ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
-          register: (agent) => {
-            registered.push(agent)
-            return { dispose: () => void registered.splice(registered.indexOf(agent), 1) }
-          },
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({
+          secrets: new SecretService('b'.repeat(64)),
+          db: coreDb(),
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
         }),
+        dataDir: '',
+        loaded: new Map([
+          [
+            'reviews',
+            {
+              permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+              storage: {
+                open: () => {
+                  throw new Error('test storage is not configured')
+                },
+              },
+              harnesses: [
+                {
+                  id: 'reviewer-cli',
+                  label: 'Reviewer',
+                  spawn: { command: 'reviewer', args: ['acp'] },
+                  envPassthrough: [],
+                  quirks: { manualCompaction: false, sessionPersistence: false },
+                },
+              ] as never,
+              customAgents: [
+                {
+                  id: 'strict',
+                  name: 'Strict reviewer',
+                  harness: 'reviewer-cli',
+                  options: {},
+                  instructions: 'Be strict.',
+                },
+                {
+                  id: 'claude-review',
+                  name: 'Claude reviewer',
+                  harness: 'claude',
+                  options: { model: 'opus' },
+                  maxToolRisk: 'read',
+                },
+              ],
+            } satisfies Partial<LoadedPluginBinding> as never,
+          ],
+        ]),
       },
-      { name: 'reviews', init: () => {} },
-    ], {
-      capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
-      dataDir: '',
-      loaded: new Map([['reviews', {
-        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-        storage: { open: () => { throw new Error('test storage is not configured') } },
-        harnesses: [{
-          id: 'reviewer-cli', label: 'Reviewer', spawn: { command: 'reviewer', args: ['acp'] }, envPassthrough: [],
-          quirks: { manualCompaction: false, sessionPersistence: false },
-        }] as never,
-        customAgents: [
-          { id: 'strict', name: 'Strict reviewer', harness: 'reviewer-cli', options: {}, instructions: 'Be strict.' },
-          { id: 'claude-review', name: 'Claude reviewer', harness: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
-        ],
-      } satisfies Partial<LoadedPluginBinding> as never]]),
-    })
+    )
 
     expect(registered).toEqual([
-      { id: 'reviews:strict', pluginId: 'reviews', name: 'Strict reviewer', providerId: 'reviews:reviewer-cli', options: {}, instructions: 'Be strict.' },
-      { id: 'reviews:claude-review', pluginId: 'reviews', name: 'Claude reviewer', providerId: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
+      {
+        id: 'reviews:strict',
+        pluginId: 'reviews',
+        name: 'Strict reviewer',
+        providerId: 'reviews:reviewer-cli',
+        options: {},
+        instructions: 'Be strict.',
+      },
+      {
+        id: 'reviews:claude-review',
+        pluginId: 'reviews',
+        name: 'Claude reviewer',
+        providerId: 'claude',
+        options: { model: 'opus' },
+        maxToolRisk: 'read',
+      },
     ])
     // Rolled back with the plugin's other registrations, since the agents live in the consumer's list.
     clearRegistrations('reviews')

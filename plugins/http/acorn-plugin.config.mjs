@@ -2,19 +2,14 @@
 // to build the bundles and generate `acorn-plugin.json`. It lives here, not in the build script, so
 // the plugin's declared surface is visible from the plugin's own directory.
 //
-// The first plugin to move out with TABLES, which is why it is the one worth moving: it is the only
-// candidate that exercises the whole storage path — a manifest-declared migrations directory staged
-// inside the package, `ctx.storage.open()` with the database id bound from the manifest, and a schema
-// change arriving through the installer against a database that already has rows in it.
-//
 // `id: "http"` (the directory name, which the builder uses as the id) is load-bearing and must never
 // change. It binds `/v1/p/http`, the `http` pane's persisted layout key, and — the one that loses data
 // rather than just breaking a link — `<dataRoot>/plugins/http.sqlite`. Renaming it orphans every saved
 // request and every project variable on the machine.
 //
-// On the permissions, and where they differ from what the migration brief sketched:
+// On the permissions:
 //
-//   exec: true — the brief did not list it, and the brief was wrong. `command`-kind variables run a
+//   exec: true — `command`-kind variables run a
 //     user-typed shell command at send time (server/send.ts runs `bash -lc` through `ctx.core.proc`), so
 //     "Run commands on the node" is exactly what this plugin does. The host process broker runs the
 //     command so Node CLIs can read their own files outside the plugin worker's permissions.
@@ -25,11 +20,11 @@
 //     node's key, so the ciphertext cannot be opened without it.
 //   core: ['tasks', 'projects:read', 'identity'] — `tasks.load` to check a task belongs to the project it
 //     claims and `tasks.root` to resolve `{{worktree}}`; `projects.byId` for the project and its checkout
-//     path. `identity` is the newest and the narrowest: the `http:request` workflow step (src/node/
-//     workflowStep.ts) runs with no HTTP request to take an owner from, and the project's saved
+//     path. `identity` is the narrowest: the `http:request` workflow step (src/server/workflowStep.ts)
+//     runs with no HTTP request to take an owner from, and the project's saved
 //     variables are per-owner rows, so it asks core who this node is bound to. Not `projects:config`
 //     (this plugin's commands come from its own tables, not from repo config), not `projects:write`, no
-//     `prefs` (the brief listed it; nothing reads or writes one).
+//     `prefs` (nothing reads or writes one).
 //   net: ['*'] — the owner chooses the request URL, so no fixed host list describes this plugin's
 //     egress. The worker needs an explicit fetch grant or sends fail before making a request. The
 //     permission prompt names this broad access; raw socket modules remain unavailable.
@@ -55,22 +50,21 @@ export default {
   contributions: {
     // The one thing this plugin does that a person reviewing the node would want to know about, and
     // could not otherwise see: a workflow step made an outbound request from this machine, unattended,
-    // with the owner's saved variables and secrets resolved into it (src/node/workflowStep.ts).
+    // with the owner's saved variables and secrets resolved into it (src/server/workflowStep.ts).
     //
     // Deliberately not every send. The API pane is a person typing a request and watching the answer;
     // putting each of those on the trail would bury the unattended ones, which are the reviewable
     // event. The host qualifies this as `http:request.sent`.
     auditActions: [{ id: 'request.sent', label: 'Workflow sent an HTTP request' }],
-    // THREE surfaces, one bundle: it decides what to draw from `bridge.context` (src/frame/app.tsx).
+    // THREE surfaces, one bundle: it decides what to draw from `bridge.context` (src/tree/app.tsx).
     //
     // `http` keeps its id because it is a persisted layout key — a task that has the API pane open has
     // that string in its stored layout, and prefixing or renaming it would silently close the pane for
     // everyone who had it open.
     //
-    // `http-project` is the surface the move would otherwise have LOST. The compiled rail Source was a
-    // whole panel component; a descriptor source is a list of rows the host draws, and a row click has to
-    // land somewhere. `openPane` needs a task and the rail often has none, so the answer is the same one
-    // linear reached: a project-scoped pane, mounted beside the list, addressed by the route below.
+    // `http-project` is where a rail row lands. A descriptor source is a list of rows the host draws, and
+    // a row click has to land somewhere. `openPane` needs a task and the rail often has none, so the
+    // answer is a project-scoped pane, mounted beside the list, addressed by the route below.
     frames: [
       // `list-detail`: the host draws the split, the divider and the drag handle, and the two regions
       // are two entries in one bundle. They share the selection, the draft and the send result through
@@ -134,15 +128,13 @@ export default {
       item: 'requestId',
       order: 60,
     }],
-    // What the rail lost, stated plainly: the compiled Source rendered the entire panel — tree, URL bar,
-    // response — inside the rail. This lists the project's saved requests and nothing else, and
-    // exploration moved into the frame beside it. That is the rollbar trade-off, taken deliberately: the
-    // alternative is growing the descriptor vocabulary until it is a UI framework.
+    // The rail lists the project's saved requests and nothing else; exploration happens in the frame
+    // beside it. Drawing the whole panel in the rail would mean growing the descriptor vocabulary until
+    // it is a UI framework.
     sources: [{
       id: 'http-requests',
       label: 'API',
       glyph: 'send',
-      // Rail position, declared. Was implied by this plugin's place in the compiled client list.
       order: 50,
       // No `providerId`: nothing backs this with a connected account. Saved requests are local, so the
       // source is always visible — like docker's.
@@ -177,7 +169,7 @@ export default {
       {
         // The group the three visible rows hang under, so the palette root holds one "API" rather than
         // three. The root search still finds a child by its own words: a node is indexed under its
-        // breadcrumb as well as its title (client-core/host/registries/commands/graph.ts).
+        // breadcrumb as well as its title (client-core's command graph).
         //
         // `api` rather than `http`, which is the pane's id: contribution ids are unique across the whole
         // manifest, so a group cannot be named after the surface it is about.
@@ -224,8 +216,8 @@ export default {
         action: { verb: 'surfaceAction', surface: 'http' },
       },
       {
-        // Paste a curl command, get a saved request (docs/command-palette-and-shortcuts.md
-        // § HTTP). Nothing is sent: the parser reads flags out of a token list and never runs a shell,
+        // Paste a curl command, get a saved request (docs/http-client/client.md § From the command
+        // palette). Nothing is sent: the parser reads flags out of a token list and never runs a shell,
         // and sending stays an act the reader takes in the pane with the request in front of them.
         //
         // Task-scoped although saved requests are project-owned, because an input's success verb is the
@@ -244,8 +236,6 @@ export default {
         onSuccess: { verb: 'openPane', pane: 'http' },
       },
     ],
-    // Was `defaultChord` on the compiled pane contribution. Same chord, declared where a loaded plugin
-    // declares one.
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+h', when: 'task' }],
   },
 }

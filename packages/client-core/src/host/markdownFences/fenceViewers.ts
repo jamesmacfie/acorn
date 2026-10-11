@@ -1,5 +1,9 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from 'solid-js'
-import { CORE_MARKDOWN_FENCE_POINT, markdownFenceKey, type MarkdownFenceProps } from '@acorn/protocol/extensionPoints.ts'
+import {
+  CORE_MARKDOWN_FENCE_POINT,
+  markdownFenceKey,
+  type MarkdownFenceProps,
+} from '@acorn/protocol/extensionPoints.ts'
 import type { MarkdownFence } from '../../kit/lib/rendering/markdown'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { resolveSlot } from '../tree/arbitration'
@@ -57,7 +61,10 @@ export function createFenceViewers(scope: FenceScope): (fence: MarkdownFence) =>
     const key = markdownFenceKey(fence)
     if (!key) return undefined
     const blockId = `fence-${++blocks}`
-    const choice = createSlotChoice(() => CORE_MARKDOWN_FENCE_POINT, () => key)
+    const choice = createSlotChoice(
+      () => CORE_MARKDOWN_FENCE_POINT,
+      () => key,
+    )
     const [broken, setBroken] = createSignal(false)
     // The rule `Slot` draws by, asked before mounting one, so a fence nobody can draw, or one waiting
     // past the cap, starts no worker. A tie with no pick draws nothing, so it counts as nobody.
@@ -85,9 +92,10 @@ export function createFenceViewers(scope: FenceScope): (fence: MarkdownFence) =>
       },
       pluginId,
       preview: () => !!pluginId() && isOpen(),
-      toggle: () => setOpen((ids) => (ids.includes(blockId)
-        ? ids.filter((id) => id !== blockId)
-        : [...ids, blockId].slice(-MAX_FENCE_VIEWERS))),
+      toggle: () =>
+        setOpen((ids) =>
+          ids.includes(blockId) ? ids.filter((id) => id !== blockId) : [...ids, blockId].slice(-MAX_FENCE_VIEWERS),
+        ),
       failed: () => setBroken(true),
     }
   }
@@ -97,5 +105,10 @@ export function createFenceViewers(scope: FenceScope): (fence: MarkdownFence) =>
  *  when it opted in, and nothing at all otherwise. */
 export const fenceScope = (optedIn: boolean | undefined, bound: FenceScope): { markdownFences?: FenceScope } =>
   optedIn
-    ? { markdownFences: { ...(bound.taskId ? { taskId: bound.taskId } : {}), ...(bound.projectId ? { projectId: bound.projectId } : {}) } }
+    ? {
+        markdownFences: {
+          ...(bound.taskId ? { taskId: bound.taskId } : {}),
+          ...(bound.projectId ? { projectId: bound.projectId } : {}),
+        },
+      }
     : {}

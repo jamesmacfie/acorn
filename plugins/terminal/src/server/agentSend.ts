@@ -44,12 +44,13 @@ export class AgentSender {
       if (!group.size && this.submits.get(sessionId) === group) this.submits.delete(sessionId)
     }
     try {
-      operation.cancel = this.schedule(() => {
-        if (!operation.active) return
-        operation.active = false
-        finish()
-        if (this.getSession(sessionId) === s && s.running()) s.write('\r')
-      }, this.submitDelayMs) || undefined
+      operation.cancel =
+        this.schedule(() => {
+          if (!operation.active) return
+          operation.active = false
+          finish()
+          if (this.getSession(sessionId) === s && s.running()) s.write('\r')
+        }, this.submitDelayMs) || undefined
     } catch (error) {
       operation.active = false
       finish()
@@ -93,7 +94,11 @@ export class AgentSender {
     let failure: unknown
     for (const operation of group ?? []) {
       operation.active = false
-      try { operation.cancel?.() } catch (error) { failure ??= error }
+      try {
+        operation.cancel?.()
+      } catch (error) {
+        failure ??= error
+      }
     }
     group?.clear()
     if (failure) throw failure

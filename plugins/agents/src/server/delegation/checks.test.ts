@@ -12,16 +12,26 @@ describe('delegation checks', () => {
   const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
   afterAll(() => ctx.cleanup())
   const roots: string[] = []
-  afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
-  const root = async () => { const path = await mkdtemp(join(tmpdir(), 'acorn-checks-')); roots.push(path); return path }
-  const turn = (checks: AgentCheck[], status: AgentTurn['status'] = 'completed') => ({ status, effectivePolicy: { checks } }) as unknown as AgentTurn
+  afterEach(async () => {
+    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  })
+  const root = async () => {
+    const path = await mkdtemp(join(tmpdir(), 'acorn-checks-'))
+    roots.push(path)
+    return path
+  }
+  const turn = (checks: AgentCheck[], status: AgentTurn['status'] = 'completed') =>
+    ({ status, effectivePolicy: { checks } }) as unknown as AgentTurn
   const run = (checks: AgentCheck[], path: string, base?: string, status: AgentTurn['status'] = 'completed') =>
     new DelegationChecks(ctx.core).runInRoot(turn(checks, status), path, base)
 
   it('rejects escaping and excessive checks at the tool boundary', () => {
-    const input = (checks: unknown[]) => agentPromptInputSchema.safeParse({
-      sessionId: '11111111-1111-4111-8111-111111111111', prompt: 'Check.', checks,
-    }).success
+    const input = (checks: unknown[]) =>
+      agentPromptInputSchema.safeParse({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        prompt: 'Check.',
+        checks,
+      }).success
     expect(input([{ kind: 'file-exists', path: '../escape' }])).toBe(false)
     expect(input([{ kind: 'json-valid', path: '/absolute' }])).toBe(false)
     expect(input([{ kind: 'file-nonempty' }])).toBe(false)
@@ -35,12 +45,15 @@ describe('delegation checks', () => {
     await writeFile(join(path, 'empty'), '')
     await writeFile(join(outside, 'secret'), 'secret')
     await symlink(join(outside, 'secret'), join(path, 'escape'))
-    const result = await run([
-      { kind: 'file-exists', path: 'missing' },
-      { kind: 'file-nonempty', path: 'empty' },
-      { kind: 'file-exists', path: 'escape' },
-      { kind: 'file-exists', path: 'empty' },
-    ], path)
+    const result = await run(
+      [
+        { kind: 'file-exists', path: 'missing' },
+        { kind: 'file-nonempty', path: 'empty' },
+        { kind: 'file-exists', path: 'escape' },
+        { kind: 'file-exists', path: 'empty' },
+      ],
+      path,
+    )
     expect(result.verdicts.map((v) => v.status)).toEqual(['fails', 'fails', 'unverified', 'holds'])
   })
 
@@ -50,7 +63,10 @@ describe('delegation checks', () => {
     await writeFile(join(path, 'utf8.json'), Buffer.from([0xff]))
     await writeFile(join(path, 'syntax.json'), '{')
     await writeFile(join(path, 'valid.json'), '{"ok":true}')
-    const result = await run(['large', 'utf8', 'syntax', 'valid'].map((name) => ({ kind: 'json-valid', path: `${name}.json` })), path)
+    const result = await run(
+      ['large', 'utf8', 'syntax', 'valid'].map((name) => ({ kind: 'json-valid', path: `${name}.json` })),
+      path,
+    )
     expect(result.verdicts.map((v) => v.status)).toEqual(['unverified', 'fails', 'fails', 'holds'])
   })
 

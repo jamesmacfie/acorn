@@ -18,7 +18,7 @@ const MAX_REPORT_TEXT = 8 * 1024
 const MAX_REPORTS_PER_OWNER = 100
 
 export const reportKey = (childTurnId: string): string => `delegation-report:${childTurnId}`
-export const requestReportKey = (requestId: string): string => `delegation-request:${requestId}`
+const requestReportKey = (requestId: string): string => `delegation-request:${requestId}`
 
 export const turnResultSchema = (turn: AgentTurn): object | undefined => {
   const value = turn.effectivePolicy.resultSchema ?? turn.effectivePolicy.schema
@@ -48,18 +48,19 @@ const context = (
   capturedAt: Date.now(),
 })
 
-const roleText = (owner: Owner): string => owner.sessionId
-  ? [
-      `You are a delegated agent. ${owner.title} gave you this turn.`,
-      'When the turn ends, your final message goes back to that agent as your report. Put the result, what you changed, and anything still open in that final message, not in a separate file.',
-      'If you need a decision, end the turn with the question. The agent answers with a new turn.',
-      'Do not ask the user directly. Nobody may be watching this session.',
-    ].join('\n')
-  : [
-      'You are a delegated agent. A terminal agent gave you this turn and reads your final message with agent_read.',
-      'Put the result, what you changed, and anything still open in that final message, not in a separate file.',
-      'If you need a decision, end the turn with the question. Do not ask the user directly.',
-    ].join('\n')
+const roleText = (owner: Owner): string =>
+  owner.sessionId
+    ? [
+        `You are a delegated agent. ${owner.title} gave you this turn.`,
+        'When the turn ends, your final message goes back to that agent as your report. Put the result, what you changed, and anything still open in that final message, not in a separate file.',
+        'If you need a decision, end the turn with the question. The agent answers with a new turn.',
+        'Do not ask the user directly. Nobody may be watching this session.',
+      ].join('\n')
+    : [
+        'You are a delegated agent. A terminal agent gave you this turn and reads your final message with agent_read.',
+        'Put the result, what you changed, and anything still open in that final message, not in a separate file.',
+        'If you need a decision, end the turn with the question. Do not ask the user directly.',
+      ].join('\n')
 
 /**
  * The input and policy of a turn an owner queues on its child. A managed owner is recorded as
@@ -81,18 +82,21 @@ export function delegatedTurn(
   }
 }
 
-/** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents/delegation.md § Managed delegation). */
+/** Queues one turn on the owner when a turn it gave a child settles
+ *  (docs/managed-agents/delegation.md § Managed delegation). */
 export class DelegationReports {
   // One delivery per child turn at a time: the broadcast and the startup pass can both ask for it.
   private readonly delivering = new Map<string, Promise<void>>()
   // Reports, reads, and startup recovery share the same logical settlement and host inspection.
-  private readonly settling = new Map<string, Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null>>()
+  private readonly settling = new Map<
+    string,
+    Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null>
+  >()
 
   constructor(
     private readonly runtime: ManagedAgentRuntime,
     private readonly delegations: AgentDelegationStore,
-    // The unattended operations a plugin's note joins (../sessions/turnFollowUps.ts). Absent, a turn
-    // reports as soon as it settles.
+    // The unattended operations a plugin's note joins. Absent, a turn reports as soon as it settles.
     private readonly followUps?: () => Promise<TurnFollowUps>,
     private readonly core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
   ) {}
@@ -110,7 +114,9 @@ export class DelegationReports {
     return running
   }
 
-  private async settleOnce(turnId: string): Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null> {
+  private async settleOnce(
+    turnId: string,
+  ): Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null> {
     // Reload before any decision. A caller may hold the turn object from before another caller saved
     // verdicts, and a later read must not inspect a changed worktree again.
     const turn = await this.runtime.store.turn(turnId)
@@ -141,8 +147,13 @@ export class DelegationReports {
   async deliverRequest(sessionId: string, providerRequestId: string): Promise<void> {
     const store = this.runtime.store
     const request = await store.request(sessionId, providerRequestId)
-    if (!request || request.status !== 'pending' || !request.turnId
-      || !['permission', 'question', 'elicitation'].includes(request.kind)) return
+    if (
+      !request ||
+      request.status !== 'pending' ||
+      !request.turnId ||
+      !['permission', 'question', 'elicitation'].includes(request.kind)
+    )
+      return
     const asked = await store.turn(request.turnId)
     // A plugin's note reports through the delegated turn it follows.
     const followUpOf = asked?.effectivePolicy.followUpOf
@@ -150,22 +161,36 @@ export class DelegationReports {
     const ownerId = turn?.effectivePolicy.reportTo
     if (!turn || turn.sessionId !== sessionId || turn.source !== 'delegation' || typeof ownerId !== 'string') return
     const [owner, child] = await Promise.all([store.getSession(ownerId), store.getSession(sessionId)])
-    if (!owner || !child || owner.archivedAt || owner.runtimeState === 'failed'
-      || !await this.delegations.ownedChild(owner.taskId, ownerId, sessionId)) return
+    if (
+      !owner ||
+      !child ||
+      owner.archivedAt ||
+      owner.runtimeState === 'failed' ||
+      !(await this.delegations.ownedChild(owner.taskId, ownerId, sessionId))
+    )
+      return
     const key = requestReportKey(request.id)
     if (await store.turnForIdempotency(ownerId, key)) return
-    if (await store.countTurns(ownerId, 'delegation_report') >= MAX_REPORTS_PER_OWNER) {
+    if ((await store.countTurns(ownerId, 'delegation_report')) >= MAX_REPORTS_PER_OWNER) {
       log.warn(`not reporting request ${request.id}: session ${ownerId} already holds ${MAX_REPORTS_PER_OWNER} reports`)
       return
     }
-    const need = request.kind === 'permission' ? 'permission' : request.kind === 'question' ? 'an answer' : 'elicitation input'
+    const need =
+      request.kind === 'permission' ? 'permission' : request.kind === 'question' ? 'an answer' : 'elicitation input'
     const detail = [request.title, request.detail].filter(Boolean).join(' — ').slice(0, 500)
     await this.runtime.enqueueTurn(ownerId, {
       input: [
-        { type: 'text', text: `${child.title} is blocked and needs ${need}.\n\nRequest:\n${pastedContent(detail)}\n\nOpen or inspect child session ${child.id} to see the request. A human must resolve it in the child session; you cannot approve or answer it from this report.` },
-        context('delegation_report', child.title,
+        {
+          type: 'text',
+          text: `${child.title} is blocked and needs ${need}.\n\nRequest:\n${pastedContent(detail)}\n\nOpen or inspect child session ${child.id} to see the request. A human must resolve it in the child session; you cannot approve or answer it from this report.`,
+        },
+        context(
+          'delegation_report',
+          child.title,
           `Blocked request from delegated session ${child.id}, turn ${turn.id}, request ${request.id}.`,
-          child.id, `Delegated session ${child.id}, request ${request.id}`),
+          child.id,
+          `Delegated session ${child.id}, request ${request.id}`,
+        ),
       ],
       source: 'delegation_report',
       effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id } },
@@ -175,7 +200,8 @@ export class DelegationReports {
 
   deliverRequestSafely(sessionId: string, providerRequestId: string): void {
     void this.deliverRequest(sessionId, providerRequestId).catch((error: unknown) =>
-      log.warn(`report for request ${providerRequestId} failed: ${describeError(error).message}`))
+      log.warn(`report for request ${providerRequestId} failed: ${describeError(error).message}`),
+    )
   }
 
   /**
@@ -216,17 +242,22 @@ export class DelegationReports {
     const { turn, last, checks } = settled
     const ownerId = turn.effectivePolicy.reportTo
     if (typeof ownerId !== 'string') return
-    if (!await this.operationLive(turn)) return
+    if (!(await this.operationLive(turn))) return
     const child = await store.getSession(turn.sessionId)
     if (!child) return
-    if (await store.countTurns(ownerId, 'delegation_report') >= MAX_REPORTS_PER_OWNER) {
+    if ((await store.countTurns(ownerId, 'delegation_report')) >= MAX_REPORTS_PER_OWNER) {
       log.warn(`not reporting turn ${turn.id}: session ${ownerId} already holds ${MAX_REPORTS_PER_OWNER} reports`)
       return
     }
     const text = assistantResult(await store.eventsForTurn(last.id))
     const schema = turnResultSchema(turn)
     const structured = schema && text ? parseStructuredResult(text, schema) : null
-    const notes = last.id === turn.id ? [] : [`A plugin sent it notes about that turn. The outcome and message below are from its reply to the last one, turn ${last.id}.`]
+    const notes =
+      last.id === turn.id
+        ? []
+        : [
+            `A plugin sent it notes about that turn. The outcome and message below are from its reply to the last one, turn ${last.id}.`,
+          ]
     // The child's message is marked as text the owner did not write. A child that read a hostile page
     // can repeat what it read, and unmarked, that would reach the owner as its own user's request.
     const body = [
@@ -234,9 +265,19 @@ export class DelegationReports {
       ...notes,
       `Outcome: ${last.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : last.status}`,
       ...(last.error ? [`Error: ${last.error.message}`] : []),
-      ...(text ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)] : ['The turn ended with no message.']),
-      ...(checks ? ['Host checks:', `Checked at: ${new Date(checks.checkedAt).toISOString()}`, ...checks.verdicts.map(({ check, status, reason }) =>
-        `- ${check.kind}${'path' in check ? ` ${check.path}` : ''}: ${status} (${reason})`)] : []),
+      ...(text
+        ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)]
+        : ['The turn ended with no message.']),
+      ...(checks
+        ? [
+            'Host checks:',
+            `Checked at: ${new Date(checks.checkedAt).toISOString()}`,
+            ...checks.verdicts.map(
+              ({ check, status, reason }) =>
+                `- ${check.kind}${'path' in check ? ` ${check.path}` : ''}: ${status} (${reason})`,
+            ),
+          ]
+        : []),
       ...(structured != null ? ['Structured result:', '```json', JSON.stringify(structured, null, 2), '```'] : []),
     ].join('\n\n')
     await this.runtime.enqueueTurn(ownerId, {
@@ -253,7 +294,10 @@ export class DelegationReports {
         ),
       ],
       source: 'delegation_report',
-      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id }, ...(checks ? { checkResults: checks } : {}) },
+      effectivePolicy: {
+        reportFrom: { sessionId: child.id, turnId: turn.id },
+        ...(checks ? { checkResults: checks } : {}),
+      },
       idempotencyKey: reportKey(turn.id),
     })
   }
@@ -290,7 +334,8 @@ export class DelegationReports {
   /** Delivers from the lifecycle broadcast, which is not durable; `reconcile` covers a lost one. */
   deliverSafely(childTurnId: string): void {
     void this.deliver(childTurnId).catch((error: unknown) =>
-      log.warn(`report for turn ${childTurnId} failed: ${describeError(error).message}`))
+      log.warn(`report for turn ${childTurnId} failed: ${describeError(error).message}`),
+    )
   }
 
   /**
@@ -311,7 +356,8 @@ export class DelegationReports {
     ])
     for (const id of new Set([...reporting, ...unchecked].map((turn) => turn.id))) {
       void this.deliver(id).catch((error: unknown) =>
-        log.warn(`settlement for turn ${id} failed at startup: ${describeError(error).message}`))
+        log.warn(`settlement for turn ${id} failed at startup: ${describeError(error).message}`),
+      )
     }
   }
 }

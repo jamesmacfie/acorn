@@ -10,11 +10,16 @@ const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('rename-branch'), name, expectedId: id, nextName: name }).strict(),
   z.object({ action: z.literal('delete-branch'), name, expectedId: id }).strict(),
   z.object({ action: z.literal('set-upstream'), name, expectedId: id, upstream: name.nullable() }).strict(),
-  z.object({ action: z.literal('create-tag'), name, startId: id, message: z.string().min(1).max(8192).nullable() }).strict(),
+  z
+    .object({ action: z.literal('create-tag'), name, startId: id, message: z.string().min(1).max(8192).nullable() })
+    .strict(),
   z.object({ action: z.literal('delete-tag'), name, expectedId: id }).strict(),
 ])
 
-export function refRoutes(core: Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>, changed: () => void = () => {}) {
+export function refRoutes(
+  core: Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>,
+  changed: () => void = () => {},
+) {
   return gitRouter()
     .use('/projects/:projectId/refs', requireDevice)
     .get('/projects/:projectId/refs', async (c) => c.json(await refRoster(core, c.req.param('projectId'))))

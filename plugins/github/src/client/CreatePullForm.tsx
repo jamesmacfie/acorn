@@ -4,7 +4,19 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
 import { formatChord, projectsOptions } from '@acorn/plugin-api/client'
 import { pullsKey, type Branch } from '../shared/api'
-import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTextarea, Picker, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Button,
+  Checkbox,
+  EmptyState,
+  Field,
+  Inline,
+  Input,
+  MentionTextarea,
+  Picker,
+  Stack,
+  Text,
+} from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './clientRoutes'
@@ -67,11 +79,19 @@ export default function CreatePullForm() {
     ),
   )
   createEffect(() => {
-    writePullDraft(o(), r(), { base: base(), head: head(), title: title(), body: body(), draft: draft(), touched: touched() })
+    writePullDraft(o(), r(), {
+      base: base(),
+      head: head(),
+      title: title(),
+      body: body(),
+      draft: draft(),
+      touched: touched(),
+    })
   })
 
   const create = createMutation(() => ({
-    mutationFn: () => createPr(o(), r(), { title: title().trim(), body: body(), base: base(), head: head(), draft: draft() }),
+    mutationFn: () =>
+      createPr(o(), r(), { title: title().trim(), body: body(), base: base(), head: head(), draft: draft() }),
   }))
   const aheadBy = () => compare.data?.aheadBy ?? 0
   const canCreate = () => comparable() && !!title().trim() && aheadBy() > 0 && !create.isPending
@@ -106,7 +126,14 @@ export default function CreatePullForm() {
   const cancel = () => navigate(githubBrowsePath(params.projectId ?? ''))
 
   return (
-    <Show when={repoKnown()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
+    <Show
+      when={repoKnown()}
+      fallback={
+        <EmptyState align="start" size="sm" busy>
+          Loading…
+        </EmptyState>
+      }
+    >
       <Stack gap="stack">
         {/* Read in the order the change moves: from the branch with the work, into the one it joins. */}
         <Inline even>
@@ -147,7 +174,10 @@ export default function CreatePullForm() {
           <MentionTextarea
             placeholder="What changed, and why?"
             value={body()}
-            onInput={(value) => { setTouched(true); setBody(value) }}
+            onInput={(value) => {
+              setTouched(true)
+              setBody(value)
+            }}
             onKeyDown={onBodyKey}
             mentions={mentionsList()}
           />
@@ -172,7 +202,9 @@ export default function CreatePullForm() {
           <Button variant="solid" onPress={submit} disabled={!canCreate()}>
             {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
           </Button>
-          <Button variant="ghost" onPress={cancel}>Cancel</Button>
+          <Button variant="ghost" onPress={cancel}>
+            Cancel
+          </Button>
         </Inline>
       </Stack>
     </Show>

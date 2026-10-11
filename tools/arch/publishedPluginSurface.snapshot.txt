@@ -1,4 +1,4 @@
-# loaded plugin API major: 3
+# loaded plugin API major: 5
 acorn-plugin-sdk/data: member DerivedQueryArgs.evaluationTime
 acorn-plugin-sdk/data: member DerivedQueryArgs.inputs
 acorn-plugin-sdk/data: member DerivedQueryArgs.mode
@@ -386,14 +386,6 @@ acorn-plugin-types: member AttachTaskPullInput.repoName
 acorn-plugin-types: member AttachTaskPullInput.repoOwner
 acorn-plugin-types: member AttachTaskPullInput.requestId
 acorn-plugin-types: member AttachTaskPullInput.sessionId
-acorn-plugin-types: member BrowserRule.action
-acorn-plugin-types: member BrowserRule.action.selector
-acorn-plugin-types: member BrowserRule.action.type
-acorn-plugin-types: member BrowserRule.action.value
-acorn-plugin-types: member BrowserRule.enabled
-acorn-plugin-types: member BrowserRule.id
-acorn-plugin-types: member BrowserRule.trigger
-acorn-plugin-types: member BrowserRule.urlPattern
 acorn-plugin-types: member Cadence.daily
 acorn-plugin-types: member Cadence.every
 acorn-plugin-types: member Cadence.weekly
@@ -418,7 +410,6 @@ acorn-plugin-types: member CapabilityCatalogue.'github.mirror'
 acorn-plugin-types: member CapabilityCatalogue.'memory.library'
 acorn-plugin-types: member CapabilityCatalogue.'notes.seedTask'
 acorn-plugin-types: member CapabilityCatalogue.'notes.store'
-acorn-plugin-types: member CapabilityCatalogue.'preview.rules'
 acorn-plugin-types: member CapabilityCatalogue.'preview.urls'
 acorn-plugin-types: member CapabilityCatalogue.'terminal.runTargets'
 acorn-plugin-types: member CapabilityCatalogue.'terminal.sendToAgent'
@@ -832,12 +823,9 @@ acorn-plugin-types: member PluginContextSectionDescriptor.order
 acorn-plugin-types: member PluginContextSectionDescriptor.read
 acorn-plugin-types: member PluginContextSectionDescriptor.scope
 acorn-plugin-types: member PluginContextSectionDescriptor.timeoutMs
-acorn-plugin-types: member PluginExtensionPointRegistry.contribute
 acorn-plugin-types: member PluginExtensionPointRegistry.declare
-acorn-plugin-types: member PluginExtensionPointRegistry.entries
 acorn-plugin-types: member PluginExtensionPointRegistry.handle
 acorn-plugin-types: member PluginExtensionPointRegistry.handlers
-acorn-plugin-types: member PluginExtensionPointRegistry.open
 acorn-plugin-types: member PluginGenerateTextRequest.backendId
 acorn-plugin-types: member PluginGenerateTextRequest.input
 acorn-plugin-types: member PluginGenerateTextRequest.timeoutMs
@@ -951,7 +939,6 @@ acorn-plugin-types: member ProcSpec.signal
 acorn-plugin-types: member ProcSpec.stdin
 acorn-plugin-types: member ProcSpec.timeoutMs
 acorn-plugin-types: member ProjectConfig.branchPrefix
-acorn-plugin-types: member ProjectConfig.browserRules
 acorn-plugin-types: member ProjectConfig.dbSchemaMode
 acorn-plugin-types: member ProjectConfig.dbSchemaNotes
 acorn-plugin-types: member ProjectConfig.dbSchemaValue
@@ -1133,7 +1120,6 @@ acorn-plugin-types: type AgentReviewText
 acorn-plugin-types: type AgentSessionControl
 acorn-plugin-types: type AgentTurnSource
 acorn-plugin-types: type AttachTaskPullInput
-acorn-plugin-types: type BrowserRule
 acorn-plugin-types: type Cadence
 acorn-plugin-types: type CapabilityCatalogue
 acorn-plugin-types: type CapabilityId

@@ -50,9 +50,29 @@ describe('parseStack', () => {
     ].join('\n')
     expect(parseStack(stack)).toEqual([
       { function: 'forEach', in_app: false },
-      { filename: 'app://acorn/assets/AgentPane.js', abs_path: 'app://acorn/assets/AgentPane.js', lineno: 3, colno: 42, in_app: true },
-      { function: 'mount', filename: 'http://app.localhost/assets/RemoteTree.js', abs_path: 'http://app.localhost/assets/RemoteTree.js', lineno: 2, colno: 253, in_app: true },
-      { function: 'slotFor', filename: 'app://acorn/assets/workerHost.js', abs_path: 'app://acorn/assets/workerHost.js', lineno: 1, colno: 153, in_app: true },
+      {
+        filename: 'app://acorn/assets/AgentPane.js',
+        abs_path: 'app://acorn/assets/AgentPane.js',
+        lineno: 3,
+        colno: 42,
+        in_app: true,
+      },
+      {
+        function: 'mount',
+        filename: 'http://app.localhost/assets/RemoteTree.js',
+        abs_path: 'http://app.localhost/assets/RemoteTree.js',
+        lineno: 2,
+        colno: 253,
+        in_app: true,
+      },
+      {
+        function: 'slotFor',
+        filename: 'app://acorn/assets/workerHost.js',
+        abs_path: 'app://acorn/assets/workerHost.js',
+        lineno: 1,
+        colno: 153,
+        in_app: true,
+      },
     ])
   })
 

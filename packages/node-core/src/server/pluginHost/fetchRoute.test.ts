@@ -12,7 +12,13 @@ it('forwards a body that a middleware already read', async () => {
       await c.req.text()
       await next()
     })
-    .post('/v1/p/echo/*', (c) => servePluginFetch(c, { pluginId: 'echo', mount: '/v1/p/echo', fetch: async (request) => new Response(await request.text()) }))
+    .post('/v1/p/echo/*', (c) =>
+      servePluginFetch(c, {
+        pluginId: 'echo',
+        mount: '/v1/p/echo',
+        fetch: async (request) => new Response(await request.text()),
+      }),
+    )
   const response = await app.request('/v1/p/echo/save', { method: 'POST', body: '{"on":true}' })
   expect(response.status).toBe(200)
   expect(await response.text()).toBe('{"on":true}')

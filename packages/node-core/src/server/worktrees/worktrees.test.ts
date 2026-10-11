@@ -1,5 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,9 +88,9 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     }
   })
 
-  // The PR branch used to be created from FETCH_HEAD, a file in the repo's common dir that every
-  // concurrent fetch rewrites, so the branch could be born at another PR's head: right name, clean
-  // status, no diff, another task's tree. Asserting the private per-PR ref keeps it out.
+  // FETCH_HEAD is a file in the repo's common dir that every concurrent fetch rewrites, so a PR branch
+  // created from it could be born at another PR's head: right name, clean status, no diff, another
+  // task's tree. Asserting the private per-PR ref keeps it out.
   it('creates a PR branch from a private per-PR ref, not FETCH_HEAD', async () => {
     // A decoy FETCH_HEAD: whatever it says must not reach the new branch.
     writeFileSync(join(checkout, '.git', 'FETCH_HEAD'), `${localMainSha}\t\t'refs/pull/999/head' of nowhere\n`)
@@ -117,7 +128,10 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
 
   it('identifies a branch occupied by the project checkout', async () => {
     const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'local-topic', null)
-    expect(res).toEqual({ ok: false, reason: expect.stringContaining(`already checked out at '${realpathSync(checkout)}'`) })
+    expect(res).toEqual({
+      ok: false,
+      reason: expect.stringContaining(`already checked out at '${realpathSync(checkout)}'`),
+    })
   })
 
   describe('copyWorktreeFiles (docs/workspaces-and-tasks/worktrees.md § Copy files into a worktree)', () => {

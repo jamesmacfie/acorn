@@ -11,8 +11,8 @@ export const scheduleDescriptor = z.object({
   // POST { scheduleId }. Confined to the plugin's route namespace at parse and re-checked on the node
   // before each run. The response is ignored beyond ok or error.
   run: pluginRoute,
-  // The plugin floor (300s) isn't spelled here. It's enforced on read from the key's owner prefix
-  // (node-core/server/schedules/scheduler.ts § floorFor), so declaring under a plugin key opts in.
+  // The plugin floor (300s) isn't spelled here. node-core's scheduler enforces it on read from the
+  // key's owner prefix (`floorFor`), so declaring under a plugin key opts in.
   cadence: cadenceSchema,
   // Seconds, and the one unit trap in this feature: the engine's DeclaredSchedule.timeoutMs is
   // milliseconds and the host converts. Absent means the engine default of 60s.
@@ -31,21 +31,22 @@ export const taskCheckDescriptor = z.object({
   // means advisory: the host draws no checkbox even if the check's answer asks for one, because a
   // checkbox with nothing behind it is worse than none.
   apply: pluginRoute.optional(),
-  // Seconds, for the check only. Absent means the host default, and the host ceiling wins either way:
-  // the owner is waiting on a dialog (node-core/server/pluginHost/taskChecks.ts).
+  // Seconds, for the check only. Parsed but not applied: every check runs under node-core's
+  // `CHECK_TIMEOUT_MS`, because the owner is waiting on a dialog.
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
 // One verb this plugin will write onto the node's audit trail (docs/security/audit.md § Audit). The host
 // qualifies it as `<pluginId>:<id>`, so a package cannot file a row under a core verb or another
-// plugin's, and the settings surface can still enumerate the whole vocabulary because every entry in it
-// came from a parsed manifest or from core's own closed union.
-//
-// The declaration lets settings enumerate each action. The host refuses a plugin recording an action
-// it did not declare.
+// plugin's. Declaring it lets settings enumerate every action, and the host refuses a plugin recording
+// an action it did not declare.
 export const auditActionDescriptor = z.object({
   // Dots, not colons: the colon is the host's separator. `run.finished`, not `workflows:run.finished`.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9.-]*$/, 'audit action id must be lower-case alphanumeric with dots and dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9.-]*$/, 'audit action id must be lower-case alphanumeric with dots and dashes'),
   // What the settings row calls it. The raw verb is honest but unreadable, and a plugin knows its own
   // wording better than a lookup table in the shell does.
   label: z.string().min(1).max(80),
@@ -59,12 +60,13 @@ export const auditActionDescriptor = z.object({
 
 // A variable name, or a `PREFIX_*` glob. A bare `*` is refused here and in `brokerEnv`: it would copy
 // the node's whole environment into the agent and defeat the allowlist.
-const envName = z.string().min(1).max(64).regex(
-  /^[A-Za-z_][A-Za-z0-9_]*\*?$/,
-  'env passthrough must be a variable name or a PREFIX_* glob',
-)
+const envName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*\*?$/, 'env passthrough must be a variable name or a PREFIX_* glob')
 
-// Exactly one of `command` and `entry`, checked in node-core/server/plugins/manifest.ts because a
+// Exactly one of `command` and `entry`, checked by node-core's `pluginManifestSchema` because a
 // refinement here cannot name the field path inside the containing descriptor.
 const harnessSpawn = z.object({
   // An executable resolved on PATH. The user installs the CLI, and the harness diagnostics report it
@@ -76,10 +78,16 @@ const harnessSpawn = z.object({
   args: z.array(z.string().min(1).max(256)).max(16).default([]),
   // `entry` only: the CLI the adapter drives. Its resolved absolute path reaches the child as the named
   // variable.
-  requires: z.object({
-    command: z.string().min(1).max(128),
-    env: z.string().min(1).max(64).regex(/^[A-Z][A-Z0-9_]*$/, 'env must be an upper-case variable name'),
-  }).optional(),
+  requires: z
+    .object({
+      command: z.string().min(1).max(128),
+      env: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[A-Z][A-Z0-9_]*$/, 'env must be an upper-case variable name'),
+    })
+    .optional(),
 })
 
 // What ACP does not carry, declared per harness rather than hardcoded as an id list inside acorn.
@@ -95,22 +103,18 @@ const harnessQuirks = z.object({
 // is the only argv a manifest may assemble.
 //
 // It sits beside `terminal` rather than inside it, because answering one question and holding a
-// conversation are two different things an agent may do, and some agents do only one. DeepSeek is the
-// case that proved it: `dsh --profile headless` answers a prompt and exits, and `dsh` on its own has
-// no interactive mode at all, so nesting this under a required interactive command locked it out of a
-// list it belongs in.
+// conversation are two different things an agent may do, and some agents do only one: `dsh --profile
+// headless` answers a prompt and exits, and `dsh` on its own has no interactive mode.
 //
 // `headlessArgv` and `resumeArgv` stay refused, because a manifest that can say "if resuming, add
-// these two arguments" is a template language. This one is admitted because it has two variables in
-// fixed positions and nothing to branch on: the model goes after `args` when a caller names one and
-// the CLI has a flag for it, and the prompt is always last. The line we hold is that `oneShot` never
-// grows a placeholder syntax. A CLI that wants the prompt in the middle, or a flag whose value
-// depends on another flag, is asking for a code-tier profile instead.
+// these two arguments" is a template language. This one has two variables in fixed positions and
+// nothing to branch on: the model goes after `args` when a caller names one and the CLI has a flag for
+// it, and the prompt is always last. `oneShot` never grows a placeholder syntax. A CLI that wants the
+// prompt in the middle, or a flag whose value depends on another flag, needs a code-tier profile.
 const harnessOneShot = z.object({
   // The executable, for a harness that declares no `terminal` to borrow one from. A harness has exactly
   // one binary, because it is reported as installed or not by looking one up on PATH, so declaring this
-  // beside a `terminal` is refused rather than resolved. Both rules are in
-  // node-core/server/plugins/manifest.ts.
+  // beside a `terminal` is refused rather than resolved. node-core's `pluginManifestSchema` checks both.
   command: z.string().min(1).max(128).optional(),
   // The subcommand and switches that make the CLI answer once and exit, such as `run` for opencode.
   // Written out rather than defaulted, because this is the invocation the trust prompt discloses.
@@ -122,10 +126,8 @@ const harnessOneShot = z.object({
   // and sends its own chrome to stderr. `json-lines` reads a newline-delimited stream and looks for a
   // `result` event, the shape `claude -p --output-format stream-json` writes.
   //
-  // The one field here with no default, unlike the rest of this descriptor, because there is no common
-  // case to default to: of the four agent CLIs acorn drives, one writes a `result` event and the others
-  // do not. A wrong guess reads as a malformed run with nothing on screen to say why, so we make the
-  // author state it.
+  // No default, because agent CLIs split on this and there is no common case. A wrong guess reads as a
+  // malformed run with nothing on screen to say why, so the author states it.
   output: z.enum(['text', 'json-lines']),
 })
 
@@ -155,10 +157,12 @@ export const harnessDescriptor = z.object({
   // Routes on this plugin's own node half, confined to its own namespace at parse time. `usage` answers
   // the plan-usage snapshot for the Agent pane, `auth` whether the harness's account is signed in.
   // Absent means the matching surface shows less.
-  probes: z.object({
-    usage: pluginRoute.optional(),
-    auth: pluginRoute.optional(),
-  }).optional(),
+  probes: z
+    .object({
+      usage: pluginRoute.optional(),
+      auth: pluginRoute.optional(),
+    })
+    .optional(),
   terminal: harnessTerminal.optional(),
   // One contained text turn. Independent of `terminal`: a harness may offer both, either, or neither.
   oneShot: harnessOneShot.optional(),
@@ -171,7 +175,11 @@ export const harnessDescriptor = z.object({
 // because the rules are about bytes a parser of this file never sees.
 export const skillDescriptor = z.object({
   // Namespaced by the host into `<pluginId>:<id>`, the name the agent and the settings page see.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'skill id must be lower-case letters, digits and dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'skill id must be lower-case letters, digits and dashes'),
   // The skill's folder, inside the package. Its `SKILL.md` and supporting files stay under it.
   path: entry,
 })

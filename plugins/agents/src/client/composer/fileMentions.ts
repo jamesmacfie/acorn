@@ -6,7 +6,7 @@ import { fuzzyScore } from '@acorn/plugin-api/client'
 // email addresses, absolute paths and parent traversal remain ordinary text.
 //
 // Yielded with offsets rather than returned as a list, because the composer's highlighter colours
-// exactly the spans this promotes (composerTokens.ts). Two readings of "is that a file mention"
+// exactly the spans this promotes (`composerTokens`). Two readings of "is that a file mention"
 // would drift, and the visible one would start lying about what the turn actually sends.
 export function* fileMentionMatches(
   text: string,
@@ -16,9 +16,7 @@ export function* fileMentionMatches(
   const expression = /(?:^|\s)@(?:"((?:[^"\\]|\\.)+)"((?::\d+(?:-\d+)?)?)|([^\s]+))/g
   for (const match of text.matchAll(expression)) {
     const quotedPath = match[1]?.replace(/\\(["\\])/g, '$1')
-    const token = quotedPath == null
-      ? match[3].replace(/[),.;]+$/, '')
-      : `${quotedPath}${match[2] ?? ''}`
+    const token = quotedPath == null ? match[3].replace(/[),.;]+$/, '') : `${quotedPath}${match[2] ?? ''}`
     const lines = /:(\d+)(?:-(\d+))?$/.exec(token)
     const path = lines ? token.slice(0, lines.index) : token
     if (!available.has(path) || path.startsWith('/') || path.split('/').includes('..') || path.includes('\\')) continue

@@ -2,15 +2,32 @@ import { createMemo, For, Index, Match, onCleanup, onMount, Show, Switch } from 
 import type { Accessor, JSX } from 'solid-js'
 import type { DiffDocumentFile } from '@acorn/diff-document/document'
 import { Button } from '../../kit/components/primitives'
-import { DiffLine, FileHead, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
+import {
+  DiffLine,
+  FileHead,
+  NonCodeRow,
+  SplitCell,
+  type LineComposerController,
+  type ThreadCollapseController,
+} from '../../kit/diff/DiffRows'
 import type { FindHighlight } from '../../kit/diff/find'
-import { DIFF_LINE_HEIGHT, isCodeRow, toBands, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
+import {
+  DIFF_LINE_HEIGHT,
+  isCodeRow,
+  toBands,
+  type CodeRow,
+  type DiffThread,
+  type GapRow,
+  type Row,
+  type SplitBand,
+  type ViewMode,
+} from '../../kit/diff/diffModel'
 import { createSplitScrollSync } from '../../kit/diff/splitScrollSync'
 import { threadBlockId, type DiffRangeItem } from './diffLayout'
 import type { DiffItem, SegmentRef } from './documentView'
 import type { SegmentStatus } from './segmentLoader'
 
-/** What the canvas needs from the geometry (./diffLayout.ts). */
+/** What the canvas needs from the geometry (`createDiffLayout`). */
 type CanvasLayout = {
   range: Accessor<readonly DiffRangeItem[]>
   attachCanvas: (element: HTMLElement) => void
@@ -37,7 +54,7 @@ export type DiffRowContext = {
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   openLine?: (row: CodeRow) => void
   askAgent?: (row: CodeRow) => void
-  /** The dynamic block a code row or a split band carries now, or null for none (./diffLayout.ts). */
+  /** The dynamic block a code row or a split band carries now, or null for none. */
   lineBlock: (row: CodeRow, itemKey: string) => string | null
   bandBlock: (left: CodeRow | null, right: CodeRow | null, itemKey: string) => string | null
   observeBlock: CanvasLayout['observeBlock']
@@ -88,14 +105,26 @@ export function DiffCanvas(props: {
   const itemBody = (item: Accessor<DiffItem>, size: Accessor<number>) => (
     <Switch>
       <Match when={item().kind === 'file'}>
-        <FileRowView file={item().file} split={split()} collapsed={props.fileCollapsed(item().file.path)} onToggleCollapse={props.onToggleFileCollapse} marks={props.fileMarks(item().file.path)} />
+        <FileRowView
+          file={item().file}
+          split={split()}
+          collapsed={props.fileCollapsed(item().file.path)}
+          onToggleCollapse={props.onToggleFileCollapse}
+          marks={props.fileMarks(item().file.path)}
+        />
       </Match>
       <Match when={item().kind === 'nodiff'}>
         <FullRow split={split()} class="diff-thread-row">
           <span class="diff-nodiff muted">Can't show this file. It's binary or too large.</span>
         </FullRow>
       </Match>
-      <Match when={item().kind === 'segment' || item().kind === 'overlay' ? (item() as Extract<DiffItem, { kind: 'segment' | 'overlay' }>) : null}>
+      <Match
+        when={
+          item().kind === 'segment' || item().kind === 'overlay'
+            ? (item() as Extract<DiffItem, { kind: 'segment' | 'overlay' }>)
+            : null
+        }
+      >
         {(content) => {
           const rows = () => props.itemRows(content())
           const segment = () => {
@@ -103,18 +132,28 @@ export function DiffCanvas(props: {
             return current.kind === 'segment' ? current.segment : null
           }
           return (
-            <Show when={rows()} fallback={(
-              <SegmentPlaceholder
-                height={size()}
-                failed={!!segment() && props.segmentStatus(segment()!) === 'error'}
-                onRetry={() => {
-                  const current = segment()
-                  if (current) props.retrySegment(current)
-                }}
-              />
-            )}>
+            <Show
+              when={rows()}
+              fallback={
+                <SegmentPlaceholder
+                  height={size()}
+                  failed={!!segment() && props.segmentStatus(segment()!) === 'error'}
+                  onRetry={() => {
+                    const current = segment()
+                    if (current) props.retrySegment(current)
+                  }}
+                />
+              }
+            >
               {(loaded) => (
-                <Show when={split()} fallback={<Index each={loaded()}>{(row) => <UnifiedRow row={row()} ctx={props.rows} itemKey={item().key} />}</Index>}>
+                <Show
+                  when={split()}
+                  fallback={
+                    <Index each={loaded()}>
+                      {(row) => <UnifiedRow row={row()} ctx={props.rows} itemKey={item().key} />}
+                    </Index>
+                  }
+                >
                   <Bands rows={loaded()} ctx={props.rows} adopt={splitScroll.adopt} itemKey={item().key} />
                 </Show>
               )}
@@ -147,27 +186,30 @@ export function DiffCanvas(props: {
   )
 
   // The reader's own input, so a scroll that follows it is told apart from this pane's corrections.
-  // The canvas height is the layout's to set, not a style binding here (./diffLayout.ts says why).
+  // The canvas height is the layout's to set, not a style binding here (`createDiffLayout` says why).
   const input = () => props.layout.input()
   return (
-    <Show when={split()} fallback={
-      <div
-        class="diff"
-        ref={(el) => props.publishScrollEl(el, 'unified')}
-        onScroll={(e) => props.onScroll(e.currentTarget)}
-        onWheel={input}
-        onTouchMove={input}
-        onPointerDown={input}
-        onKeyDown={input}
-      >
-        {/* Inside the canvas, not the scroller: the sticky head needs a canvas-wide containing
+    <Show
+      when={split()}
+      fallback={
+        <div
+          class="diff"
+          ref={(el) => props.publishScrollEl(el, 'unified')}
+          onScroll={(e) => props.onScroll(e.currentTarget)}
+          onWheel={input}
+          onTouchMove={input}
+          onPointerDown={input}
+          onKeyDown={input}
+        >
+          {/* Inside the canvas, not the scroller: the sticky head needs a canvas-wide containing
             block to stay put when the wide unified canvas scrolls sideways. */}
-        <div class="diff-rows" style={{ '--diff-cols': props.maxCols() }} ref={(el) => props.layout.attachCanvas(el)}>
-          {props.stickyHead()}
-          {canvas()}
+          <div class="diff-rows" style={{ '--diff-cols': props.maxCols() }} ref={(el) => props.layout.attachCanvas(el)}>
+            {props.stickyHead()}
+            {canvas()}
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <div
         class="diff diff-split"
         ref={(el) => props.publishScrollEl(el, 'split')}
@@ -177,7 +219,13 @@ export function DiffCanvas(props: {
         onPointerDown={input}
         onKeyDown={input}
       >
-        <div class="diff-split-rows" ref={(el) => { splitScroll.attach(el); props.layout.attachCanvas(el) }}>
+        <div
+          class="diff-split-rows"
+          ref={(el) => {
+            splitScroll.attach(el)
+            props.layout.attachCanvas(el)
+          }}
+        >
           {props.stickyHead()}
           {canvas()}
         </div>
@@ -197,10 +245,22 @@ function FullRow(props: { split: boolean; class: string; children: JSX.Element }
   )
 }
 
-function FileRowView(props: { file: DiffDocumentFile; split: boolean; collapsed: boolean; onToggleCollapse: (path: string) => void; marks: readonly number[] | undefined }) {
+function FileRowView(props: {
+  file: DiffDocumentFile
+  split: boolean
+  collapsed: boolean
+  onToggleCollapse: (path: string) => void
+  marks: readonly number[] | undefined
+}) {
   return (
     <FullRow split={props.split} class="diff-file-row">
-      <FileHead file={props.file} anchorId={`diff-file:${props.file.path}`} collapsed={props.collapsed} onToggleCollapse={props.onToggleCollapse} marks={props.marks} />
+      <FileHead
+        file={props.file}
+        anchorId={`diff-file:${props.file.path}`}
+        collapsed={props.collapsed}
+        onToggleCollapse={props.onToggleCollapse}
+        marks={props.marks}
+      />
     </FullRow>
   )
 }
@@ -215,7 +275,9 @@ function SegmentPlaceholder(props: { height: number; failed: boolean; onRetry: (
       <span class="diff-load" classList={{ 'diff-load-error': props.failed }}>
         <span>{props.failed ? "Couldn't load this part." : 'Loading…'}</span>
         <Show when={props.failed}>
-          <Button variant="ghost" size="xs" onPress={props.onRetry}>Try again</Button>
+          <Button variant="ghost" size="xs" onPress={props.onRetry}>
+            Try again
+          </Button>
         </Show>
       </span>
     </div>
@@ -294,12 +356,26 @@ function UnifiedRow(props: { row: Row; ctx: DiffRowContext; itemKey: string }) {
 
 /** One segment's rows as split bands. Paired inside the segment, which is exact: the segmenter never
  *  separates a deletion run from its insertions when it can avoid it, and counted the same way. */
-function Bands(props: { rows: readonly Row[]; ctx: DiffRowContext; adopt: (band: HTMLElement) => void; itemKey: string }) {
+function Bands(props: {
+  rows: readonly Row[]
+  ctx: DiffRowContext
+  adopt: (band: HTMLElement) => void
+  itemKey: string
+}) {
   const bands = createMemo(() => toBands([...props.rows]))
-  return <Index each={bands()}>{(band) => <SplitBandView band={band()} ctx={props.ctx} adopt={props.adopt} itemKey={props.itemKey} />}</Index>
+  return (
+    <Index each={bands()}>
+      {(band) => <SplitBandView band={band()} ctx={props.ctx} adopt={props.adopt} itemKey={props.itemKey} />}
+    </Index>
+  )
 }
 
-function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (band: HTMLElement) => void; itemKey: string }) {
+function SplitBandView(props: {
+  band: SplitBand
+  ctx: DiffRowContext
+  adopt: (band: HTMLElement) => void
+  itemKey: string
+}) {
   let bandEl: HTMLDivElement | undefined
   // onMount, not the ref: the cells are not in the DOM yet when the ref for their band fires. A band
   // scrolling in while its column is scrolled right must not start at 0.
@@ -316,7 +392,13 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
     return id ? { id, base: DIFF_LINE_HEIGHT } : null
   }
   return (
-    <div class="diff-split-band" ref={(element) => { bandEl = element; props.ctx.observeBlock(element, block) }}>
+    <div
+      class="diff-split-band"
+      ref={(element) => {
+        bandEl = element
+        props.ctx.observeBlock(element, block)
+      }}
+    >
       <Show
         when={pair()}
         fallback={
@@ -372,7 +454,9 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
             <Show when={extra(band().left) || extra(band().right)}>
               <div class="diff-line-extra">
                 <Show when={extra(band().left) ? band().left : null}>{(left) => props.ctx.lineExtra?.(left())}</Show>
-                <Show when={extra(band().right) && band().right !== band().left ? band().right : null}>{(right) => props.ctx.lineExtra?.(right())}</Show>
+                <Show when={extra(band().right) && band().right !== band().left ? band().right : null}>
+                  {(right) => props.ctx.lineExtra?.(right())}
+                </Show>
               </div>
             </Show>
           </>

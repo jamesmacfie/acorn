@@ -6,10 +6,10 @@ import { _resetFleet, refreshFleet } from '../../infra/node/fleet'
 
 // The chip is the one place on screen that says whether the node behind this window is there, and
 // since the window opens before the node does (docs/frontend/data-and-startup.md § Startup readiness) it has a
-// state it never used to need: a supervised node the broker has not reported on at all.
+// state for a supervised node the broker has not reported on at all.
 //
-// Rendered rather than asserted on a predicate, because the thing that was wrong before was the WORD
-// in the chip, and a word is only wrong on screen.
+// Rendered rather than asserted on a predicate, because what matters is the word in the chip, and a
+// word is only wrong on screen.
 
 vi.mock('idb-keyval', () => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 
@@ -69,9 +69,6 @@ it('reads the node as live once its first status lands', async () => {
 
 it('lets a hard error win over starting', async () => {
   // A fingerprint that changed is a security stop (docs/security.md), and "Starting" would hide it.
-  await seed(
-    [record('local-1', true)],
-    [{ nodeId: 'local-1', state: 'offline', error: { code: 'identity_mismatch' } }],
-  )
+  await seed([record('local-1', true)], [{ nodeId: 'local-1', state: 'offline', error: { code: 'identity_mismatch' } }])
   expect(chipText('local-1')).toContain('Identity changed')
 })

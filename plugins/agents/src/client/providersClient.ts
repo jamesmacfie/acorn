@@ -10,7 +10,7 @@ import { managedAgentApi } from './sessions/managedClient'
 export const agentProvidersQueryKey = ['agents', 'providers'] as const
 
 // A minute: install and sign-in state changes rarely, the node serves its own last answer at once, and
-// the Refresh button below asks for a fresh probe when the owner has just changed something.
+// Refresh (`refreshAgentProviders` below) asks for a fresh probe when the owner has just changed something.
 export const AGENT_PROVIDERS_STALE_MS = 60_000
 
 export const agentProvidersOptions = () => ({

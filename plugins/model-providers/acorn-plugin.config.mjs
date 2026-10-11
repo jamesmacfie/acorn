@@ -7,7 +7,7 @@
 // No `client` key, because there is no frame — the plugin registers two connection providers and two
 // model adapters and stops. Nothing of it executes on the device, so no client bundle is built, no
 // hash is cached, and no trust prompt is ever raised; the integrations settings list is drawn by the
-// host from the connection providers the node reports, exactly as it was when this was compiled in.
+// host from the connection providers the node reports.
 //
 // `secrets: false`, because the adapter never fetches a credential. Core resolves the `integrations`
 // row inside its own secret scope and hands `generateText` the key, so `ctx.core.secrets` would be a

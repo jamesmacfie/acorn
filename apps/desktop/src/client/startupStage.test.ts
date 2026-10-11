@@ -17,12 +17,20 @@ const say = (over: Partial<StartupInputs>) => startupMessage(at(over))
 
 describe('the startup stage', () => {
   it('names the first part still holding progress, so the message changes as each settles', () => {
-    const launch: Partial<StartupInputs> = { node: { kind: 'starting' }, plugins: { kind: 'pending' }, cacheRestoring: true, restored: false, readsMissing: true }
+    const launch: Partial<StartupInputs> = {
+      node: { kind: 'starting' },
+      plugins: { kind: 'pending' },
+      cacheRestoring: true,
+      restored: false,
+      readsMissing: true,
+    }
     expect(say(launch)).toBe('Connecting to your computer…')
     expect(say({ ...launch, node: { kind: 'ready' }, nodeStarting: true })).toBe("Starting Acorn's services…")
     expect(say({ ...launch, node: { kind: 'ready' } })).toBe('Preparing your workspace…')
     expect(say({ ...launch, node: { kind: 'ready' }, plugins: { kind: 'ready' } })).toBe('Restoring your workspace…')
-    expect(say({ ...launch, node: { kind: 'ready' }, plugins: { kind: 'ready' }, cacheRestoring: false })).toBe('Restoring your workspace…')
+    expect(say({ ...launch, node: { kind: 'ready' }, plugins: { kind: 'ready' }, cacheRestoring: false })).toBe(
+      'Restoring your workspace…',
+    )
     expect(at({}).kind).toBe('ready')
   })
 
@@ -34,12 +42,17 @@ describe('the startup stage', () => {
 
   it('shows a roster failure while the Node is still starting, because waiting will not fix it', () => {
     const error = new Error('Duplicate client plugin: changes')
-    expect(at({ nodeStarting: true, plugins: { kind: 'failed', error } })).toEqual({ kind: 'failed', step: 'registration', error })
+    expect(at({ nodeStarting: true, plugins: { kind: 'failed', error } })).toEqual({
+      kind: 'failed',
+      step: 'registration',
+      error,
+    })
   })
 
   it('keeps a Node failure apart from a roster failure', () => {
-    expect(at({ node: { kind: 'failed', reason: 'broker closed' }, plugins: { kind: 'failed', error: 'x' } }))
-      .toMatchObject({ kind: 'failed', step: 'node', error: 'broker closed' })
+    expect(
+      at({ node: { kind: 'failed', reason: 'broker closed' }, plugins: { kind: 'failed', error: 'x' } }),
+    ).toMatchObject({ kind: 'failed', step: 'node', error: 'broker closed' })
   })
 
   it('says an offline remote Node with nothing cached is offline, not starting, and holds only the content', () => {

@@ -8,12 +8,14 @@ export { AGENT_PANE_ID } from './paneIdentity'
 
 const AgentPaneDetail = lazy(() => import('./sessions/AgentPane'))
 const AgentTaskSidebar = lazy(() => import('./sessions/AgentTaskSidebar'))
-const AgentSidebarHeader = lazy(async () => ({ default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader }))
+const AgentSidebarHeader = lazy(async () => ({
+  default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader,
+}))
 
 // `list-detail`, with the sessions in this task on the left and the open one on the right
-// (docs/panes/layout.md § Layout model). The header over the list is its own region so it stays put while
-// the list scrolls; the conversation's own header, transcript and composer are siblings inside the
-// detail region, because the transcript owns the scroll and the other two are pinned by sitting
+// (docs/panes/layout.md § Layout model). The header over the list is its own region so it stays put
+// while the list scrolls; the conversation's own header, transcript and composer are siblings inside
+// the detail region, because the transcript owns the scroll and the other two are pinned by sitting
 // beside it.
 export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   id: AGENT_PANE_ID,
@@ -24,25 +26,21 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   defaultChord: 'meta+shift+a',
   requires: { plugin: 'agents' },
   // Transcripts are stored rows, so an archived task's sessions read as they were. The detail region
-  // turns the composer off for one (./sessions/AgentPane.tsx).
+  // turns the composer off for one.
   readsArchived: true,
-  // The detail region says when the pane is usable (./sessions/AgentPane.tsx).
+  // The detail region says when the pane is usable.
   reportsUsable: true,
   minWidth: 640,
   layout: 'list-detail',
   // The session list, which one is open, its snapshot subscription and the rename/archive dialog,
-  // held once per task by the host (client-core registries/paneModels.ts).
+  // held once per task by the host (client-core's `paneModel`).
   model: (task, pane) => createAgentPaneModel(task, pane),
   // The session list, which is the first thing the model asks for. The store deduplicates it over a
-  // five-second window, so opening the task right after the hover costs nothing and the snapshot the
-  // pane opens on is the only request left. Not the snapshot itself. Warming it moves a first visit's
-  // read earlier by only the part of the hover past the settle, usually 100 to 300 ms. But a hover
-  // with no click then reads the whole transcript, 11 requests and 12 MB for a 16,000-event session,
-  // and the store keeps it until the app quits. A session the store already holds draws from memory
-  // on the click anyway.
+  // short window (`TASK_LOAD_WINDOW_MS`), so opening the task right after the hover costs nothing. Not
+  // the snapshot: warming it gains little, but a hover with no click would then read the whole
+  // transcript, which the store keeps until the app quits.
   prefetch: (task) => void managedAgentStore.loadTask(task.id).catch(() => {}),
-  // The sidebar gives each row its run-state glyph back as a rail form
-  // (./sessions/AgentTaskSidebar.tsx).
+  // The sidebar gives each row its run-state glyph back as a rail form.
   collapsible: true,
   regions: {
     'list-header': AgentSidebarHeader,

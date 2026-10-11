@@ -2,9 +2,15 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { pluginStyleBlock, pluginStyleId, pluginStyleStyleSheet, registerPluginStyle } from './chromeStyles'
 import { resolveStyle } from '../../features/settings/uiStyles'
 
-const descriptor = { id: 'dense', label: 'Dense', tokens: { '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' } }
+const descriptor = {
+  id: 'dense',
+  label: 'Dense',
+  tokens: { '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' },
+}
 const disposers: Array<() => void> = []
-afterEach(() => { for (const dispose of disposers.splice(0)) dispose() })
+afterEach(() => {
+  for (const dispose of disposers.splice(0)) dispose()
+})
 
 describe('plugin styles', () => {
   it('generates only a namespaced token block', () => {
@@ -14,9 +20,13 @@ describe('plugin styles', () => {
   })
 
   it('refuses the entire pack when any token is invalid', () => {
-    expect(() => registerPluginStyle('board', { ...descriptor, tokens: { '--row-h': '28px', '--shadow-2': '0 4px 8px red' } })).toThrow()
+    expect(() =>
+      registerPluginStyle('board', { ...descriptor, tokens: { '--row-h': '28px', '--shadow-2': '0 4px 8px red' } }),
+    ).toThrow()
     expect(pluginStyleStyleSheet()).toBe('')
-    expect(() => pluginStyleBlock('plugin:board:dense', { ...descriptor, tokens: { '--surface-border': '1px solid' } })).toThrow('host-derived')
+    expect(() =>
+      pluginStyleBlock('plugin:board:dense', { ...descriptor, tokens: { '--surface-border': '1px solid' } }),
+    ).toThrow('host-derived')
   })
 
   it('falls back without changing the saved id, and resumes when registered', () => {

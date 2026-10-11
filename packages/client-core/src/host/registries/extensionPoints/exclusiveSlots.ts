@@ -45,9 +45,6 @@ export const noteExclusiveSlotFailure = (slot: CoreExclusiveSlot, pluginId: stri
 export const exclusiveSlotFailed = (slot: CoreExclusiveSlot, pluginId: string): boolean =>
   (failures.get(`${slot}:${pluginId}`) ?? 0) >= 3
 
-export const exclusiveSlotFailureCount = (slot: CoreExclusiveSlot, pluginId: string): number =>
-  failures.get(`${slot}:${pluginId}`) ?? 0
-
 /** Cleared by the contribution sync, which is the one moment the bytes behind a provider can have
  *  changed. Also the test seam. */
 export const clearExclusiveSlotFailures = (pluginId?: string): void => {
@@ -57,15 +54,14 @@ export const clearExclusiveSlotFailures = (pluginId?: string): void => {
 }
 
 /** Core uses the same registration and resolution path as every replacement. */
-export const registerCoreExclusiveSlot = (
-  slot: CoreExclusiveSlot,
-  component: ExclusiveSlotProvider['component'],
-) => exclusiveSlotRegistry.register({ id: `core:${slot}`, pluginId: CORE_SLOT_PROVIDER, slot, label: 'acorn', component })
+export const registerCoreExclusiveSlot = (slot: CoreExclusiveSlot, component: ExclusiveSlotProvider['component']) =>
+  exclusiveSlotRegistry.register({ id: `core:${slot}`, pluginId: CORE_SLOT_PROVIDER, slot, label: 'acorn', component })
 
 /** Every plugin offering to replace this surface, for the settings picker. These are offers, so
  *  nothing here is on screen unless the user said so. */
 export const exclusiveSlotOffers = (slot: CoreExclusiveSlot): ExclusiveSlotProvider[] =>
-  exclusiveSlotRegistry.entries()
+  exclusiveSlotRegistry
+    .entries()
     .filter((entry) => entry.slot === slot && entry.pluginId !== CORE_SLOT_PROVIDER && (entry.when?.() ?? true))
     .sort((a, b) => a.pluginId.localeCompare(b.pluginId))
 
@@ -74,10 +70,7 @@ export const exclusiveSlotOffers = (slot: CoreExclusiveSlot): ExclusiveSlotProvi
  *
  * `choice` is what the user picked. Every path that is not an eligible chosen provider returns core.
  */
-export function resolveExclusiveSlot(
-  slot: CoreExclusiveSlot,
-  choice: string | undefined,
-): ExclusiveSlotProvider {
+export function resolveExclusiveSlot(slot: CoreExclusiveSlot, choice: string | undefined): ExclusiveSlotProvider {
   const core = exclusiveSlotRegistry.get(`core:${slot}`)
   if (!core) throw new Error(`Core provider for ${slot} is not registered`)
   if (!choice || choice === CORE_SLOT_PROVIDER || exclusiveSlotFailed(slot, choice)) return core
@@ -113,11 +106,7 @@ export function exclusiveSlotChoices(raw: string | undefined): Partial<Record<Co
 
 /** The inverse, for the settings picker's write. Choosing core removes the entry rather than storing
  *  the sentinel, so the preference holds only the replacements the owner actually asked for. */
-export function withExclusiveSlotChoice(
-  raw: string | undefined,
-  slot: CoreExclusiveSlot,
-  choice: string,
-): string {
+export function withExclusiveSlotChoice(raw: string | undefined, slot: CoreExclusiveSlot, choice: string): string {
   const next = exclusiveSlotChoices(raw)
   if (choice === CORE_SLOT_PROVIDER) delete next[slot]
   else next[slot] = choice

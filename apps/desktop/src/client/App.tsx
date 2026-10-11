@@ -2,28 +2,83 @@ import { Portal } from 'solid-js/web'
 // The desktop's own chrome, and why it is here rather than in client-core: it is the arrangement, not
 // the parts. Routing and the overlay slots are what this composition root decides. The topbar and rail
 // are exclusive slots it fills with core's provider or a device plugin's (docs/frontend.md).
-import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  lazy,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  untrack,
+} from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
-import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
+import {
+  integrationsOptions,
+  prefsOptions,
+  type Project,
+  projectsKey,
+  projectsOptions,
+  type Task,
+  tasksKey,
+  tasksOptions,
+  type Workspace,
+  workspacesOptions,
+} from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createProjectAddNavigation, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace, workspaceWords,
-  viewToRemember, workspaceForProject, workspaceOwnsPath,
+  addProjectFromFolder,
+  canAddProjectFromFolder,
+  createFleetWorkspaces,
+  createProjectAddNavigation,
+  createWorkspacesMode,
+  noProjectsScreenVisible,
+  onboardingWizardVisible,
+  noteWorkspaceVisit,
+  planWorkspaceViewTransition,
+  selectFleetWorkspace,
+  workspaceWords,
+  viewToRemember,
+  workspaceForProject,
+  workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
-import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
 import { sessionSummaries } from '@acorn/client-core/features/tasks'
 import { workspaceRailShown } from '@acorn/client-core/features/workspaces/workspaceRailPrefs.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
 import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
-import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/features/tasks/tasks.ts'
+import {
+  activeTaskId,
+  focusedPane,
+  isTerminalMax,
+  isTerminalOpen,
+  rememberWorkspaceView,
+  selectedSource,
+  setMaximizedPane,
+  setSelectedSource,
+  setTerminalMax,
+  setTerminalOpen,
+  toggleFocusedPaneMax,
+  workspaceView,
+} from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/host/keys'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { desktopExtras } from '@acorn/client-core/infra/platform'
-import { activeNodeId, activeNodeStarting, nodeGateHolds, nodeReadiness, nodeReady, selectActiveNode, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import {
+  activeNodeId,
+  activeNodeStarting,
+  nodeGateHolds,
+  nodeReadiness,
+  nodeReady,
+  selectActiveNode,
+  setActiveNode,
+} from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPlugins, clientPluginsReady, retryClientPlugins } from './activate'
@@ -36,21 +91,36 @@ import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands'
 import { registerCommands } from '@acorn/client-core/host/registries/commands'
-import { appearanceCommands, notificationCommands, settingsPageCommands } from '@acorn/client-core/host/registries/commands'
+import {
+  appearanceCommands,
+  notificationCommands,
+  settingsPageCommands,
+} from '@acorn/client-core/host/registries/commands'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
-import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
+import {
+  confirmWillEvent,
+  registerWillHandler,
+  WillConfirmationHost,
+} from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 import { taskBridge } from '@acorn/client-core/features/tasks'
 import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
 import { createLinkPreviewBoundary } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 import { LinkPreviewHost } from '@acorn/client-core/host/linkPreview/LinkPreviewHost.tsx'
-import { startClientSchedules } from '@acorn/client-core/host/registries/shell'
-import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import { SlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import type { UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
 import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
-import { CREATE_TASK_ROUTE, copyLink, projectPath, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
+import {
+  CREATE_TASK_ROUTE,
+  copyLink,
+  projectPath,
+  sourcePlaceFromPath,
+  taskPlace,
+  type Place,
+} from '@acorn/client-core/host/registries/commands'
 import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -69,18 +139,26 @@ import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import type { SettingsRequest } from '@acorn/client-core/features/settings/SettingsView.tsx'
 import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio/studioOpen.ts'
 
-// The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
+// The shell is the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
 const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
 const NoProjects = lazy(() => import('@acorn/client-core/features/workspaces/NoProjects.tsx'))
-const WorkspaceRail = lazy(() => import('@acorn/client-core/features/workspaces/WorkspaceRail.tsx').then((module) => ({ default: module.WorkspaceRail })))
+const WorkspaceRail = lazy(() =>
+  import('@acorn/client-core/features/workspaces/WorkspaceRail.tsx').then((module) => ({
+    default: module.WorkspaceRail,
+  })),
+)
 // Opened by an acorn:// link that promotes an item. Its code arrives in a few milliseconds from the app
 // bundle, so it has no placeholder; a failed import draws the boundary's Try again below.
-const PromoteToTaskModal = lazy(() => import('@acorn/client-core/features/integrations/PromoteToTaskModal.tsx').then((module) => ({ default: module.PromoteToTaskModal })))
+const PromoteToTaskModal = lazy(() =>
+  import('@acorn/client-core/features/integrations/PromoteToTaskModal.tsx').then((module) => ({
+    default: module.PromoteToTaskModal,
+  })),
+)
 
-// Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
-// and PullDetail (mid) read useParams() directly; routes exist only to populate params.
+// The Router root: the top bar, the rails, and a content region that draws the selected source or the
+// active task. Routes render nothing themselves; they exist to populate params.
 export default function App() {
   const linkLog = createLogger('links')
   const queryClient = useQueryClient()
@@ -89,19 +167,28 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted
-  // (client-core/features/settings/SettingsView.tsx). `null` is closed. A request is a fresh object per
+  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted.
+  // `null` is closed. A request is a fresh object per
   // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
   // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
-  const [settingsLink, setSettingsLink] = createSignal<{ nodeId: string; place: Extract<Place, { kind: 'settings' }> } | null>(null)
-  const [linkPromotion, setLinkPromotion] = createSignal<{ projectId: string; sourceId: string; item: unknown; itemTitle: string } | null>(null)
+  const [settingsLink, setSettingsLink] = createSignal<{
+    nodeId: string
+    place: Extract<Place, { kind: 'settings' }>
+  } | null>(null)
+  const [linkPromotion, setLinkPromotion] = createSignal<{
+    projectId: string
+    sourceId: string
+    item: unknown
+    itemTitle: string
+  } | null>(null)
   // Settings' opening record starts at the request rather than in SettingsView, so a first opening
   // also counts loading the view's code (docs/telemetry/renderer.md § Feature openings).
   let cancelSettingsOpening = () => {}
   onCleanup(() => cancelSettingsOpening())
   const openSettings = (target?: string): void => {
-    if (!settingsRequest()) cancelSettingsOpening = openFeature('settings', 'core', { kind: 'settings', reportsUsable: true })
+    if (!settingsRequest())
+      cancelSettingsOpening = openFeature('settings', 'core', { kind: 'settings', reportsUsable: true })
     setSettingsRequest(target ? { target } : {})
   }
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
@@ -144,29 +231,51 @@ export default function App() {
   }
 
   // The one place that holds both the QueryClient and the whole mounted app, which is what
-  // client-core's module-level task lookup needs (tasks/taskLookup.ts states why it cannot reach
-  // either itself). Installed before anything is clickable, so a content-link click can ask whether a
+  // client-core's module-level task lookup needs (`setTaskLookup` states why it cannot reach either
+  // itself). Installed before anything is clickable, so a content-link click can ask whether a
   // pane is available on the task it names rather than claiming the event and rendering nothing.
   setTaskLookup((taskId) => queryClient.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
   // Same argument, one entity over: a content-link path resolver asks whether an external URL names a
-  // repo acorn tracks, and only the project rows know (projects/projectLookup.ts).
+  // repo acorn tracks, and only the project rows know.
   setProjectsLookup(() => queryClient.getQueryData<Project[]>(projectsKey) ?? [])
 
   // Shell-owned commands are registered once; the single dispatcher below owns the only global
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
     const commands = registerCommands([
-      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
-        when: () => settingsRequest() ? !!settingsLink() : !!visibleLinkPlace(), run: copyVisibleLink },
-      { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
       {
-        id: 'core.project.add', title: 'Add project', hint: 'from a folder', category: 'workspace', palette: true,
+        id: 'core.copy-link',
+        title: 'Copy link',
+        category: 'action',
+        palette: true,
+        when: () => (settingsRequest() ? !!settingsLink() : !!visibleLinkPlace()),
+        run: copyVisibleLink,
+      },
+      {
+        id: 'core.settings.open',
+        title: 'Open settings',
+        hint: 'on the page you used last',
+        category: 'navigation',
+        palette: true,
+        run: () => openSettings(),
+      },
+      {
+        id: 'core.project.add',
+        title: 'Add project',
+        hint: 'from a folder',
+        category: 'workspace',
+        palette: true,
         when: () => canAddProjectFromFolder() && !!workspaceMode(),
-        run: () => { const mode = workspaceMode(); if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined) },
+        run: () => {
+          const mode = workspaceMode()
+          if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined)
+        },
       },
       { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
-        id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
+        id: 'core.surface.toggle-maximize',
+        title: 'Toggle focused surface maximize',
+        category: 'pane',
         when: inTaskView,
         run: () => {
           const taskId = activeTaskId()
@@ -187,29 +296,59 @@ export default function App() {
       },
     ])
     const bindings = registerKeybindings([
-      { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
-      { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Toggle rail', category: 'Global', defaultChord: 'meta+b', when: 'global' },
-      { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Maximize or restore the focused pane', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
+      {
+        id: 'core.settings.open',
+        command: 'core.settings.open',
+        description: 'Open settings',
+        category: 'Global',
+        defaultChord: 'meta+,',
+        when: 'global',
+      },
+      {
+        id: 'core.rail.toggle',
+        command: 'core.rail.toggle',
+        description: 'Toggle rail',
+        category: 'Global',
+        defaultChord: 'meta+b',
+        when: 'global',
+      },
+      {
+        id: 'core.surface.toggle-maximize',
+        command: 'core.surface.toggle-maximize',
+        description: 'Maximize or restore the focused pane',
+        category: 'Panes',
+        defaultChord: 'meta+shift+enter',
+        when: 'task',
+      },
       // The command is the palette's own Last workspace row, registered with the rest of the Go to
-      // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
+      // group (client-core/host/registries/commands/navigationCommands.ts); this is the chord that reaches it.
     ])
     createEffect(() => {
       const description = `Switch to the last ${workspaceWords(workspaceMode()).singular}`
       const binding = registerKeybindings([
-        { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description, category: 'Global', defaultChord: 'meta+;', when: 'global' },
+        {
+          id: 'core.goto.workspace-last',
+          command: 'core.goto.workspace-last',
+          description,
+          category: 'Global',
+          defaultChord: 'meta+;',
+          when: 'global',
+        },
       ])
       onCleanup(() => binding.dispose())
     })
     // The two settings core owns, as bounded choices with the current value marked. Both write through
-    // the same accessors Settings → Appearance and Settings → Notifications call
-    // (client-core/host/registries/commands/coreCommands.ts), so there is one persistence path per
-    // value and not two.
+    // the same accessors Settings → Appearance and Settings → Notifications call, so there is one
+    // persistence path per value and not two.
     //
-    // Registered here rather than in client-core because this app is what contributes those pages
-    // (./pageContributions.tsx): a host with no Appearance page has nothing for an Appearance command
-    // to agree with.
+    // Registered here rather than in client-core because this app is what contributes those pages: a
+    // host with no Appearance page has nothing for an Appearance command to agree with.
     const settings = registerCommands([...appearanceCommands(queryClient), ...notificationCommands(queryClient)])
-    onCleanup(() => { settings.dispose(); bindings.dispose(); commands.dispose() })
+    onCleanup(() => {
+      settings.dispose()
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   // One row per registered Settings page, rebuilt when the roster changes: a plugin contributes pages,
@@ -220,10 +359,8 @@ export default function App() {
   })
 
   onMount(() => {
-    // The one archive producer left on the client, and it produces nothing of its own: it asks the
-    // node, which is where every plugin now declares what it has to say about archiving a task
-    // (node-core/server/pluginHost/taskChecks.ts). The docker, changes and terminal warnings that used to
-    // be registered here and in the docker client bundle all arrive through this.
+    // The client's only archive producer, and it produces nothing of its own: it asks the node, which
+    // is where every plugin declares what it has to say about archiving a task.
     //
     // Mapped rather than passed through because a node concern carries no callback: the cleanup the
     // owner ticks is a route the node runs at the right point in the archive, and the id below is
@@ -237,63 +374,54 @@ export default function App() {
         ...(concern.details ? { details: concern.details } : {}),
         ...(concern.detailsMore ? { detailsMore: concern.detailsMore } : {}),
         ...(concern.action ? { checkbox: concern.action } : {}),
-      })))
+      })),
+    )
     // Quitting has no node meaning: a node does not know a window is closing, so this one stays a
     // client handler over the session store.
     const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
       const active = sessionSummaries().filter((session) => session.running)
       return active.length
-        ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} terminal${active.length === 1 ? ' is' : 's are'} still running`, severity: 'warn' }
+        ? {
+            id: 'sessions:all',
+            feature: 'Terminal',
+            message: `${active.length} terminal${active.length === 1 ? ' is' : 's are'} still running`,
+            severity: 'warn',
+          }
         : null
     })
-    onCleanup(() => { offQuit(); offNode() })
+    onCleanup(() => {
+      offQuit()
+      offNode()
+    })
   })
   onMount(() => {
-    const off = desktopExtras()?.onWillQuit(async () => (await confirmWillEvent({
-      kind: 'app:quit', payload: {}, title: 'Quit acorn', actionLabel: 'Quit',
-    })).confirmed)
+    const off = desktopExtras()?.onWillQuit(
+      async () =>
+        (
+          await confirmWillEvent({
+            kind: 'app:quit',
+            payload: {},
+            title: 'Quit acorn',
+            actionLabel: 'Quit',
+          })
+        ).confirmed,
+    )
     if (off) onCleanup(off)
   })
 
-  // The session-source owners start their own roster subscriptions at activation. The shell starts
-  // its schedules once the node can answer. App mounts before the startup gate releases, and each
-  // schedule runs once on start and then waits for its interval or an event. Started at mount, the
-  // first run went to a local node the broker had not adopted yet, failed, and left task statuses
-  // empty for up to 10 s and workflow run counts for up to 2 min.
-  //
-  // Started once and kept, because the gate can briefly hold again while Settings → Nodes re-reads
-  // the fleet.
-  let stopSchedules: (() => void) | undefined
-  createEffect(() => {
-    if (!stopSchedules && nodeReady()) stopSchedules = startClientSchedules()
-  })
-  onCleanup(() => stopSchedules?.())
-
-  // Workflow notices are broadcast over `/v1/events` by main, not by the terminal plugin, and a node
-  // without a terminal still runs workflows. They were inside the guard above, which meant no gate
-  // notice at all on such a node.
-  onMount(() => onCleanup(initWorkflowNotices()))
-
-  // The sound channel. Every unseen notice the gate lets through, whatever raised it.
+  // The sound channel. Every unseen notice the gate lets through, whatever raised it. The workflow and
+  // system channels are the shared runtime's.
   onMount(() => onCleanup(initSoundNotices()))
-
-  // The system channel, on the same terms. The dock badge is the bell's, because it is the bell's
-  // number (features/notifications/NotificationBell.tsx).
-  onMount(() => onCleanup(initSystemNotices()))
 
   // Which plugins the node this shell is showing runs.
   //
-  // Not `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
-  // mounts App inside a `<Show keyed>` on the active node, so a switch disposes this component and
-  // builds a new one: the fresh effect records the new node and defers, the dying one is disposed
-  // during Solid's pure pass before user effects flush, and `applyNodePlugins` ran exactly once per
-  // window, at boot, from index.tsx. Every node after the first kept the previous node's
-  // contributions, so a plugin disabled on node B still had its pane, source, poller and settings
-  // page. The comment claiming "for the second one onwards" was precisely backwards.
+  // Not `on(activeNodeId, …, { defer: true })`, which never fires. index.tsx mounts App inside a
+  // `<Show keyed>` on the active node, so a switch disposes this component and builds a new one: the
+  // fresh effect records the new node and defers, and the dying one is disposed during Solid's pure
+  // pass before user effects flush. A plain effect reading the signal runs once on mount, which is once
+  // per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node whose list
+  // it has already applied.
   //
-  // A plain effect reading the signal is right because of that remount: it runs once on mount, which
-  // is once per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node
-  // whose list it has already applied.
   // Re-reads on the node's connection state as well as its identity, which is what makes it a retry.
   // The boot attempt in index.tsx starts before the local node is up and can fail against nothing
   // listening; `applyNodePlugins` leaves itself unapplied when the node did not answer, so this runs
@@ -312,7 +440,7 @@ export default function App() {
   // can never be the thing that fails a boot or repeats every launch.
   //
   // Gated on `nodeReady()`, because a read that fails counts as "do not warn": asked at mount, before
-  // the local node was adopted, the warning never ran at all.
+  // the local node is adopted, the warning would never run.
   createEffect(() => {
     const nodeId = activeNodeId()
     if (!nodeId || !nodeReady()) return
@@ -333,14 +461,19 @@ export default function App() {
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
-  const showNoProjects = () => noProjectsScreenVisible({
-    projectCount: projects.data?.length,
-    projectsError: projects.isError,
-    wizardVisible: onboardingWizardVisible(),
-  })
+  const showNoProjects = () =>
+    noProjectsScreenVisible({
+      projectCount: projects.data?.length,
+      projectsError: projects.isError,
+      wizardVisible: onboardingWizardVisible(),
+    })
   // Drawers mount in a body portal, so shell geometry must also reach those siblings.
-  createEffect(() => document.documentElement.style.setProperty('--left-rails-w',
-    showNoProjects() ? '0px' : workspaceRailShown(prefs.data) ? 'calc(2 * var(--tabrail-w))' : 'var(--tabrail-w)'))
+  createEffect(() =>
+    document.documentElement.style.setProperty(
+      '--left-rails-w',
+      showNoProjects() ? '0px' : workspaceRailShown(prefs.data) ? 'calc(2 * var(--tabrail-w))' : 'var(--tabrail-w)',
+    ),
+  )
   onCleanup(() => document.documentElement.style.removeProperty('--left-rails-w'))
   const openAddedProject = (id: string) => {
     const source = defaultSourceId()
@@ -362,8 +495,9 @@ export default function App() {
     // Timestamps rather than `isFetchedAfterMount`, which also counts the cache arriving from IndexedDB
     // after this component subscribed. A failed fetch counts, and so does a node known to be offline:
     // in both the cache is all there is.
-    prefsSettled: () => Math.max(prefs.dataUpdatedAt, prefs.errorUpdatedAt) >= mountedAt
-      || (!nodeGateHolds() && nodeState(activeNodeId() ?? '') === 'offline'),
+    prefsSettled: () =>
+      Math.max(prefs.dataUpdatedAt, prefs.errorUpdatedAt) >= mountedAt ||
+      (!nodeGateHolds() && nodeState(activeNodeId() ?? '') === 'offline'),
     cacheRestoring: isRestoring,
     contributionsReady: clientPluginsReady,
     projects: () => projects.data,
@@ -372,16 +506,13 @@ export default function App() {
   })
 
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
-  // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
+  // (`createTaskDeepLink`).
   createTaskDeepLink({
-    taskId: () => startup.restored() ? activeTaskId() : null,
+    taskId: () => (startup.restored() ? activeTaskId() : null),
     search: () => location.query,
     navigate,
   })
 
-  // Active workspace is derived from the current project. The active node's list, because the route
-  // carries no node, so the workspace the shell is showing is whichever one the active node has for
-  // this repo.
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
   // TaskView registers callbacks with the keymap, whose layer can still be evaluated while Solid is
   // disposing the view. Keep the last row available for that teardown tick after an archive removes
@@ -390,28 +521,32 @@ export default function App() {
   // refetch changes task metadata without changing which task is open.
   const taskForView = createMemo<Task | null>((previous) => activeTask() ?? previous ?? null)
   // Which project the shell is "in". The generic task route (`/t/:taskId`) carries no projectId, so
-  // without the task fallback the workspace and project pickers went blank the moment you opened a
-  // task, and the per-workspace view memory below never saw a workspace change.
+  // without the task fallback the workspace and project pickers go blank the moment you open a task,
+  // and the per-workspace view memory below never sees a workspace change.
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
   // Links on a project's own surfaces preview against the project. A task's panes claim their links
-  // first, with the task's scope (features/tasks/TaskPaneHost.tsx).
+  // first, with the task's scope.
   const sourceLinkPreviews = createLinkPreviewBoundary(() => {
     const projectId = contextProjectId()
     return projectId ? { projectId } : {}
   })
+  // Active workspace is derived from the current project, from the active node's list: the route
+  // carries no node, so the workspace on screen is whichever one the active node has for this repo.
+  //
   // A memo, and one that holds its last answer, for two reasons that both belong to the transition
   // effect below.
   //
-  // `on` re-fires on identity, not on value, so keying it on a plain derivation re-planned the whole
+  // `on` re-fires on identity, not on value, so keying it on a plain derivation would re-plan the whole
   // workspace change on every tasks, projects or params tick.
   //
   // And the derivation reports nothing for a beat in ordinary use: while the workspaces query is
   // cold, and between a task path and its task row landing. `on` would record that nothing as the
-  // workspace we were leaving, and the guard below then dropped the next real switch, which is one
-  // way the last view fails to come back. Holding the last known workspace also stops the topbar
-  // pickers and the rail's scope blinking through the same gap.
-  const activeWorkspace = createMemo<Workspace | null>((previous) =>
-    workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null)
+  // workspace we were leaving, and the guard below would then drop the next real switch, so the last
+  // view would fail to come back. Holding the last known workspace also stops the topbar pickers and
+  // the rail's scope blinking through the same gap.
+  const activeWorkspace = createMemo<Workspace | null>(
+    (previous) => workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null,
+  )
   const sourceScope = createSourceScope(() => activeWorkspace()?.id, nodeReady)
 
   // The one switch, read off the node and handed to the client's emitter (docs/telemetry/model.md § The
@@ -494,9 +629,10 @@ export default function App() {
       const urlTask = params.taskId ? tasks.data?.find((task) => task.id === params.taskId) : undefined
       if (urlTask) activateTaskSignals(urlTask)
       const all = workspaces.data ?? []
-      const ws = activeWorkspace()
-        ?? all.find((candidate) => candidate.id === startup.lastWorkspaceId() && candidate.projects.length)
-        ?? all.find((candidate) => candidate.projects.length)
+      const ws =
+        activeWorkspace() ??
+        all.find((candidate) => candidate.id === startup.lastWorkspaceId() && candidate.projects.length) ??
+        all.find((candidate) => candidate.projects.length)
       if (ws) openWorkspaceView(ws)
     })
     setPlaceRestored(true)
@@ -506,20 +642,25 @@ export default function App() {
   // Where the launch is, for the startup screen and the content region (./startupStage.ts). The reads
   // are the ones the restore waits on: without them it can't choose where to land.
   const initialReads = [prefs, projects, tasks, workspaces]
-  const stage = createStartupStage(() => {
-    const missing = initialReads.filter((query) => query.data === undefined)
-    return {
-      node: nodeReadiness(),
-      nodeStarting: activeNodeStarting(),
-      nodeOffline: nodeState(activeNodeId() ?? '') === 'offline',
-      plugins: clientPlugins(),
-      cacheRestoring: isRestoring(),
-      restored: placeRestored(),
-      readsMissing: missing.length > 0,
-      readError: missing.find((query) => query.isError)?.error ?? undefined,
-    }
-  }, (step) => startupAccount.stopped(step, step === 'offline' ? 'offline' : 'error'))
-  createEffect(() => { if (!stageHoldsShell(stage())) markShellDrawn() })
+  const stage = createStartupStage(
+    () => {
+      const missing = initialReads.filter((query) => query.data === undefined)
+      return {
+        node: nodeReadiness(),
+        nodeStarting: activeNodeStarting(),
+        nodeOffline: nodeState(activeNodeId() ?? '') === 'offline',
+        plugins: clientPlugins(),
+        cacheRestoring: isRestoring(),
+        restored: placeRestored(),
+        readsMissing: missing.length > 0,
+        readError: missing.find((query) => query.isError)?.error ?? undefined,
+      }
+    },
+    (step) => startupAccount.stopped(step, step === 'offline' ? 'offline' : 'error'),
+  )
+  createEffect(() => {
+    if (!stageHoldsShell(stage())) markShellDrawn()
+  })
   // Each failure retries the thing that failed: the fleet selection, the roster, or the missing reads.
   const retryStartup = () => {
     const current = stage()
@@ -533,31 +674,39 @@ export default function App() {
   // restore their remembered view.
   createEffect(() => {
     if (!mountedNodeId || !placeRestored() || !clientPluginsReady()) return
-    const unregister = registerAddressHostWhenReady({
-      nodeId: mountedNodeId,
-      navigate: (path) => navigate(path),
-      openProject: (path, source) => {
-        setLinkPromotion(null)
-        explicitProjectPath = path
-        setSelectedSource(source)
-        navigate(path)
+    const unregister = registerAddressHostWhenReady(
+      {
+        nodeId: mountedNodeId,
+        navigate: (path) => navigate(path),
+        openProject: (path, source) => {
+          setLinkPromotion(null)
+          explicitProjectPath = path
+          setSelectedSource(source)
+          navigate(path)
+        },
+        openTask: (taskId, path, linkedTask) => {
+          setLinkPromotion(null)
+          const task = linkedTask ?? tasks.data?.find((candidate) => candidate.id === taskId)
+          if (!task) return false
+          if (linkedTask)
+            queryClient.setQueryData<Task[]>(tasksKey, (current = []) =>
+              current.some((candidate) => candidate.id === linkedTask.id)
+                ? current.map((candidate) => (candidate.id === linkedTask.id ? linkedTask : candidate))
+                : [...current, linkedTask],
+            )
+          activateTaskSignals(task)
+          navigate(path)
+          return true
+        },
+        hasProject: (projectId) =>
+          !!queryClient.getQueryData<Project[]>(projectsKey)?.some((project) => project.id === projectId),
+        loadProjects: async () => {
+          await queryClient.ensureQueryData(projectsOptions(true))
+        },
+        showPromotion: setLinkPromotion,
       },
-      openTask: (taskId, path, linkedTask) => {
-        setLinkPromotion(null)
-        const task = linkedTask ?? tasks.data?.find((candidate) => candidate.id === taskId)
-        if (!task) return false
-        if (linkedTask) queryClient.setQueryData<Task[]>(tasksKey, (current = []) =>
-          current.some((candidate) => candidate.id === linkedTask.id)
-            ? current.map((candidate) => candidate.id === linkedTask.id ? linkedTask : candidate)
-            : [...current, linkedTask])
-        activateTaskSignals(task)
-        navigate(path)
-        return true
-      },
-      hasProject: (projectId) => !!queryClient.getQueryData<Project[]>(projectsKey)?.some((project) => project.id === projectId),
-      loadProjects: async () => { await queryClient.ensureQueryData(projectsOptions(true)) },
-      showPromotion: setLinkPromotion,
-    }, (error) => linkLog.warn('Could not prepare loaded plugin routes for an Acorn link', error))
+      (error) => linkLog.warn('Could not prepare loaded plugin routes for an Acorn link', error),
+    )
     onCleanup(unregister)
   })
 
@@ -574,9 +723,8 @@ export default function App() {
   // selection does, so a separate recorder could write the old workspace's source into the new
   // one's memory before the switch read it.
   let enteredWorkspaceId: string | undefined
-  createEffect(on(
-    [activeWorkspace, selectedSource, activeTask, () => location.pathname, placeRestored],
-    ([ws, , , , ready]) => {
+  createEffect(
+    on([activeWorkspace, selectedSource, activeTask, () => location.pathname, placeRestored], ([ws, , , , ready]) => {
       if (!ws || !ready) return
       if (enteredWorkspaceId && enteredWorkspaceId !== ws.id) openWorkspaceView(ws)
       if (explicitProjectPath === location.pathname && workspaceOwnsPath(ws, location.pathname)) {
@@ -587,8 +735,8 @@ export default function App() {
       // just changed them.
       const view = viewToRemember(ws, selectedSource(), activeTask(), location.pathname)
       if (view) rememberWorkspaceView(ws.id, view)
-    },
-  ))
+    }),
+  )
 
   const slotContext = (): UiSlotContext => ({
     taskActive: inTaskView(),
@@ -607,8 +755,8 @@ export default function App() {
 
   // The project picker appears where choosing a project changes something: a source that declared
   // itself project-scoped. A task's project cannot change, so the task view names it in the
-  // breadcrumb instead. On Home the picker used to sit there looking like navigation and move nothing
-  // but the breadcrumb.
+  // breadcrumb instead. Elsewhere, such as Home, the picker would look like navigation and move
+  // nothing but the breadcrumb.
   //
   // Through `sourceIsProjectScoped` rather than a local check, so a palette command that switches
   // project can ask the same question and the two can never disagree.
@@ -620,7 +768,7 @@ export default function App() {
     const empty = showNoProjects()
     const project = empty ? undefined : scopedProjects().find((candidate) => candidate.id === contextProjectId())
     const breadcrumb = topbarBreadcrumb({
-      task: inTaskView() ? activeTask() ?? null : null,
+      task: inTaskView() ? (activeTask() ?? null) : null,
       params: { projectId: params.projectId, number: params.number },
       isNew: isNew(),
       projectScoped: sourceIsProjectScoped(selectedSource()),
@@ -631,23 +779,38 @@ export default function App() {
     return {
       workspacesMode: workspaceMode() ?? null,
       workspacePickerVisible: !workspaceRailShown(prefs.data),
-      workspace: !empty && activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name, appearance: activeWorkspace()!.appearance } : null,
+      workspace:
+        !empty && activeWorkspace()
+          ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name, appearance: activeWorkspace()!.appearance }
+          : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
-        id: entry.workspace.id, label: entry.workspace.name, appearance: entry.workspace.appearance, nodeId: entry.nodeId,
-        nodeLabel: entry.node.label, projectCount: entry.workspace.projects.length,
+        id: entry.workspace.id,
+        label: entry.workspace.name,
+        appearance: entry.workspace.appearance,
+        nodeId: entry.nodeId,
+        nodeLabel: entry.node.label,
+        projectCount: entry.workspace.projects.length,
       })),
       project: project ? { id: project.id, label: project.name } : null,
       projects: empty ? [] : scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
       projectPickerVisible: workspaceMode() === 'on' && showProjectPicker(),
       projectPickerDisabled: false,
       breadcrumb,
-      node: active ? { id: active, label: nodes().find((entry) => entry.nodeId === active)?.label ?? active, state: nodeState(active) } : null,
+      node: active
+        ? {
+            id: active,
+            label: nodes().find((entry) => entry.nodeId === active)?.label ?? active,
+            state: nodeState(active),
+          }
+        : null,
       nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
       account: null,
       canAddProject: !!workspaceMode() && canAddProjectFromFolder(),
       slots: { right: rightSlotRef },
       pickWorkspace: (id, nodeId) => {
-        const entry = fleetWorkspaces().entries.find((candidate) => candidate.workspace.id === id && candidate.nodeId === nodeId)
+        const entry = fleetWorkspaces().entries.find(
+          (candidate) => candidate.workspace.id === id && candidate.nodeId === nodeId,
+        )
         if (entry) selectFleetWorkspace(entry, navigate)
       },
       pickProject: (id) => {
@@ -658,7 +821,9 @@ export default function App() {
         }
         navigate(projectPath(id))
       },
-      pickNode: (id) => { if (nodes().some((candidate) => candidate.nodeId === id)) setActiveNode(id) },
+      pickNode: (id) => {
+        if (nodes().some((candidate) => candidate.nodeId === id)) setActiveNode(id)
+      },
       openSettings: () => openSettings(),
       navigate: (route) => {
         if (!breadcrumb.some((item) => item.route === route)) return
@@ -671,7 +836,10 @@ export default function App() {
         navigate(route)
       },
       clearCache: () => clearCache(queryClient),
-      addProject: () => { const mode = workspaceMode(); if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined) },
+      addProject: () => {
+        const mode = workspaceMode()
+        if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined)
+      },
       copyLink: visibleLinkPlace()?.kind === 'project' ? copyVisibleLink : undefined,
     }
   }
@@ -680,7 +848,7 @@ export default function App() {
 
   // The source on screen, when it has something to draw. A source that contributed neither a component
   // nor regions is a rail row and nothing else, and the Switch's empty state below is the honest
-  // answer for it — which is what asking for `?.component` used to get us before `regions` existed.
+  // answer for it.
   const drawnSource = () => {
     const source = sourceRegistry.get(selectedSource() ?? '')
     return source && (source.component || source.regions) ? source : undefined
@@ -696,109 +864,163 @@ export default function App() {
   // IndexedDB read holds it too, because painting in front of it would show the empty shell and then
   // fill it. Restoring holds only the content region, so the rail and top bar draw as soon as they can.
   return (
-    <Show when={!stageHoldsShell(stage())} fallback={<main class="node-gate"><StartupScreen stage={stage()} onRetry={retryStartup} /></main>}>
-    <div class="shell">
-      {/* Install the keymap before chrome collections run their mount callbacks. A rail enabled
+    <Show
+      when={!stageHoldsShell(stage())}
+      fallback={
+        <main class="node-gate">
+          <StartupScreen stage={stage()} onRetry={retryStartup} />
+        </main>
+      }
+    >
+      <div class="shell">
+        {/* Install the keymap before chrome collections run their mount callbacks. A rail enabled
           at startup must register its intent layer against the same engine as a later toggle.
           Settings and the panel studio cover the task, so its chords stand down while either is
           open; otherwise they could move focus into a terminal under the layer. */}
-      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest() && !isPanelStudioOpen()} focusedPane={focusedPane(activeTaskId())} />
-    <header class="topbar-host">
-      <ExclusiveSlotHost slot="topbar" value={topbarProps()}
-        nestedSlots={[{ ref: rightSlotRef, render: () => <SlotHost slot="topbar.right" context={slotContext()} /> }]} />
-    </header>
-    <div class="shell-body">
-    <Show when={!showNoProjects()}>
-      <Show when={workspaceRailShown(prefs.data)}><WorkspaceRail value={topbarProps()} /></Show>
-      <TabRail />
-    </Show>
-    <div class="app" {...sourceLinkPreviews}>
-      <Show when={showNoProjects()}><NoProjects beginAdd={beginProjectAdd} /></Show>
-      <Show when={!showNoProjects()}>
-      <Switch fallback={
-        <main class="panes panes-empty">
-          <Show when={stage().kind !== 'ready'} fallback={<Acorn />}>
-            <div class="startup-region"><StartupScreen stage={stage()} onRetry={retryStartup} /></div>
+        <KeybindingDispatcher
+          prefs={prefs.data ?? {}}
+          taskActive={inTaskView() && !settingsRequest() && !isPanelStudioOpen()}
+          focusedPane={focusedPane(activeTaskId())}
+        />
+        <header class="topbar-host">
+          <ExclusiveSlotHost
+            slot="topbar"
+            value={topbarProps()}
+            nestedSlots={[
+              { ref: rightSlotRef, render: () => <SlotHost slot="topbar.right" context={slotContext()} /> },
+            ]}
+          />
+        </header>
+        <div class="shell-body">
+          <Show when={!showNoProjects()}>
+            <Show when={workspaceRailShown(prefs.data)}>
+              <WorkspaceRail value={topbarProps()} />
+            </Show>
+            <TabRail />
           </Show>
-        </main>
-      }
-      >
-        <Match when={drawnSource()}>
-          {(source) => <SourceSurface source={source()} />}
-        </Match>
-        <Match when={!selectedSource() && activeTask()}>
-          {/* Key by identity so task metadata refreshes do not remount its panes. `taskForView` holds
+          <div class="app" {...sourceLinkPreviews}>
+            <Show when={showNoProjects()}>
+              <NoProjects beginAdd={beginProjectAdd} />
+            </Show>
+            <Show when={!showNoProjects()}>
+              <Switch
+                fallback={
+                  <main class="panes panes-empty">
+                    <Show when={stage().kind !== 'ready'} fallback={<Acorn />}>
+                      <div class="startup-region">
+                        <StartupScreen stage={stage()} onRetry={retryStartup} />
+                      </div>
+                    </Show>
+                  </main>
+                }
+              >
+                <Match when={drawnSource()}>{(source) => <SourceSurface source={source()} />}</Match>
+                <Match when={!selectedSource() && activeTask()}>
+                  {/* Key by identity so task metadata refreshes do not remount its panes. `taskForView` holds
               the last non-null row until this keyed scope and its command matchers have disposed. */}
-          <Show keyed when={activeTaskId()}>
-            {(_taskId) => (
-              <TaskView
-                task={taskForView()!}
-                terminalOpen={termOpen()}
-                onToggleTerminal={() => void toggleTerm()}
-                onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
-              />
-            )}
-          </Show>
-        </Match>
-      </Switch>
-      </Show>
-      {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
-          from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
+                  <Show keyed when={activeTaskId()}>
+                    {(_taskId) => (
+                      <TaskView
+                        task={taskForView()!}
+                        terminalOpen={termOpen()}
+                        onToggleTerminal={() => void toggleTerm()}
+                        onOpenTerminal={() => {
+                          if (!termOpen()) void toggleTerm()
+                        }}
+                      />
+                    )}
+                  </Show>
+                </Match>
+              </Switch>
+            </Show>
+            {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
+          from the dispatcher because the keybindings registry is deliberately `.ts` and may not
           hold markup. */}
-      <CheatSheet />
-      {/* A referenced item from another provider, opened by any surface that renders content
-          (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
-          Before this, the only place in the app that could open one was github's PR conversation. */}
-      <RefPanelHost />
-      <LinkPreviewHost />
-      {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
+            <CheatSheet />
+            {/* A referenced item from another provider, opened by any surface that renders content.
+          Mounted at the shell because the state is the shell's. */}
+            <RefPanelHost />
+            <LinkPreviewHost />
+            {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
           before mounting so a cold Node does not offer an empty attachment/branch context. */}
-      <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId
-        && projects.data?.some((project) => project.id === linkPromotion()!.projectId)
-        && tasks.data && workspaces.data ? linkPromotion() : null}>
-        {(promotion) => {
-          const projectTasks = (tasks.data ?? []).filter((task) => task.projectId === promotion.projectId)
-          const workspaceProjects = new Set(workspaceForProject(workspaces.data, promotion.projectId)?.projects.map((project) => project.id) ?? [])
-          const ready = (task: Task) => {
-            setLinkPromotion(null)
-            void queryClient.invalidateQueries({ queryKey: tasksKey })
-            activateTaskSignals(task)
-            navigate(pathForTask(task))
-          }
-          return <ContributionBoundary contributionId="core:promote-to-task">
-            <PromoteToTaskModal
-              providerId={promotion.sourceId}
-              item={promotion.item}
-              itemTitle={promotion.itemTitle}
-              headerLabel="Create task"
-              attachTasks={(tasks.data ?? []).filter((task) => task.status === 'active' && workspaceProjects.has(task.projectId))}
-              existingBranches={projectTasks.flatMap((task) => task.branch ? [task.branch] : [])}
-              onClose={() => setLinkPromotion(null)}
-              onCreated={ready}
-              onAttached={ready}
-            />
-          </ContributionBoundary>
-        }}
-      </Show>
-      <Show when={settingsRequest()}>
-        {(request) => <Portal><SettingsView request={request()} onClose={() => { cancelSettingsOpening(); setSettingsRequest(null); setSettingsLink(null) }}
-          onLinkPlace={setSettingsLink} onCopyLink={copyVisibleLink} /></Portal>}
-      </Show>
-      {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
-      <WillConfirmationHost />
-      {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
-          shell still owns the per-task `terminalOpen` flag, which the tab rail and topbar badge read
-          too, and passes it through slotContext; it no longer knows what fills the drawer. Order
-          matters: this host sits before the overlay host, so a dialog still paints above the drawer. */}
-      <SlotHost slot="drawer" context={slotContext()} />
-      <SlotHost slot="overlay" context={slotContext()} />
-    </div>
-    </div>
-    <Portal><Tips /></Portal>
-    {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast
+            <Show
+              keyed
+              when={
+                linkPromotion() &&
+                params.projectId === linkPromotion()!.projectId &&
+                projects.data?.some((project) => project.id === linkPromotion()!.projectId) &&
+                tasks.data &&
+                workspaces.data
+                  ? linkPromotion()
+                  : null
+              }
+            >
+              {(promotion) => {
+                const projectTasks = (tasks.data ?? []).filter((task) => task.projectId === promotion.projectId)
+                const workspaceProjects = new Set(
+                  workspaceForProject(workspaces.data, promotion.projectId)?.projects.map((project) => project.id) ??
+                    [],
+                )
+                const ready = (task: Task) => {
+                  setLinkPromotion(null)
+                  void queryClient.invalidateQueries({ queryKey: tasksKey })
+                  activateTaskSignals(task)
+                  navigate(pathForTask(task))
+                }
+                return (
+                  <ContributionBoundary contributionId="core:promote-to-task">
+                    <PromoteToTaskModal
+                      providerId={promotion.sourceId}
+                      item={promotion.item}
+                      itemTitle={promotion.itemTitle}
+                      headerLabel="Create task"
+                      attachTasks={(tasks.data ?? []).filter(
+                        (task) => task.status === 'active' && workspaceProjects.has(task.projectId),
+                      )}
+                      existingBranches={projectTasks.flatMap((task) => (task.branch ? [task.branch] : []))}
+                      onClose={() => setLinkPromotion(null)}
+                      onCreated={ready}
+                      onAttached={ready}
+                    />
+                  </ContributionBoundary>
+                )
+              }}
+            </Show>
+            <Show when={settingsRequest()}>
+              {(request) => (
+                <Portal>
+                  <SettingsView
+                    request={request()}
+                    onClose={() => {
+                      cancelSettingsOpening()
+                      setSettingsRequest(null)
+                      setSettingsLink(null)
+                    }}
+                    onLinkPlace={setSettingsLink}
+                    onCopyLink={copyVisibleLink}
+                  />
+                </Portal>
+              )}
+            </Show>
+            {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
+            <WillConfirmationHost />
+            {/* The terminal drawer arrives as a contribution from the terminal plugin. The shell owns
+          the per-task `terminalOpen` flag, which the tab rail and topbar badge read too, and passes it
+          through slotContext; it doesn't know what fills the drawer. Order matters: this host sits
+          before the overlay host, so a dialog still paints above the drawer. */}
+            <SlotHost slot="drawer" context={slotContext()} />
+            <SlotHost slot="overlay" context={slotContext()} />
+          </div>
+        </div>
+        <Portal>
+          <Tips />
+        </Portal>
+        {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast
         lands here too. */}
-    <Portal><ToastHost /></Portal>
-    </div>
+        <Portal>
+          <ToastHost />
+        </Portal>
+      </div>
     </Show>
   )
 }

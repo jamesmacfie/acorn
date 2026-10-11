@@ -4,16 +4,24 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { StepKindDescription, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_EXAMPLES } from './generate'
 import { BUILTIN_STEP_KINDS } from '../steps/builtins'
-import { extractJsonObject, groundWorkflow, parseGeneratedWorkflow, stripJsonFences, type GroundedWorkflow } from './ground'
+import {
+  extractJsonObject,
+  groundWorkflow,
+  parseGeneratedWorkflow,
+  stripJsonFences,
+  type GroundedWorkflow,
+} from './ground'
 
-// One test per row of the grounding table, driven from a fixture catalog: the module is pure, so
-// none of this needs a runner, a provider or a database.
+// Driven from a fixture catalog: the module is pure, so none of this needs a runner, a provider or a
+// database.
 
 // The real `http:request` fields, `auth` and `vars` deliberately absent, so the known false positive
 // below is pinned against the shape it actually has (../../../../http/src/server/workflowStep.ts).
 const httpKind: StepKindDescription = {
   label: 'Call an HTTP endpoint',
-  description: 'Call an HTTP endpoint.', icon: 'globe', output: { description: 'HTTP response.' },
+  description: 'Call an HTTP endpoint.',
+  icon: 'globe',
+  output: { description: 'HTTP response.' },
   fields: [
     { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }] },
     { id: 'url', label: 'URL', type: 'text', required: true },
@@ -25,7 +33,11 @@ const httpKind: StepKindDescription = {
 const catalog: WorkflowCatalog = {
   kinds: [
     ...BUILTIN_STEP_KINDS.map((id) => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
-    ...['workflow', 'workflow-map'].map(id => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
+    ...['workflow', 'workflow-map'].map((id) => ({
+      id,
+      pluginId: null,
+      describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null,
+    })),
     { id: 'http:request', pluginId: 'http', describe: httpKind },
     // A contributed kind with no description at all: its `with` is unreadable, so nothing in it is dropped.
     { id: 'notes:write', pluginId: 'notes', describe: null },
@@ -46,8 +58,13 @@ const parsed = (text: string): GroundedWorkflow => {
   return result
 }
 
-const workflow = (steps: unknown[], over: Record<string, unknown> = {}): unknown =>
-  ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Investigate', ...over, steps })
+const workflow = (steps: unknown[], over: Record<string, unknown> = {}): unknown => ({
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
+  name: 'Investigate',
+  ...over,
+  steps,
+})
 
 describe('reading the reply', () => {
   const body = '{"name":"W","steps":[{"name":"a","prompt":"Do it."}]}'
@@ -69,8 +86,9 @@ describe('reading the reply', () => {
 
   it('keeps counting braces through a prompt that holds one', () => {
     // The case that breaks a naive brace count: every reference in a prompt closes a brace.
-    const withReference = '{"name":"W","steps":[{"name":"a","after":[],"prompt":"Do it."},'
-      + '{"name":"b","after":["a"],"prompt":"Read ${steps.a.output} and answer with {json}."}]}'
+    const withReference =
+      '{"name":"W","steps":[{"name":"a","after":[],"prompt":"Do it."},' +
+      '{"name":"b","after":["a"],"prompt":"Read ${steps.a.output} and answer with {json}."}]}'
     const def = parsed(withReference).def
     expect(def.steps).toHaveLength(2)
     expect(def.steps[1]?.prompt).toContain('${steps.a.output}')
@@ -103,8 +121,10 @@ describe('reading the reply', () => {
     { address: { from: 'step', stepId: 'plan', pointer: '/issues', unknown: true } },
     { address: { from: 'input', name: 'issues', pointer: '' } },
     { address: { from: 'step', stepId: 'plan', pointer: '/__proto__' } },
-  ])('leaves a map binding that cannot be converted without changing its meaning for validation: %j', items => {
-    const result = parsed(JSON.stringify(workflow([{ name: 'fix', kind: 'workflow-map', items, agent: { prompt: 'Fix it.' } }])))
+  ])('leaves a map binding that cannot be converted without changing its meaning for validation: %j', (items) => {
+    const result = parsed(
+      JSON.stringify(workflow([{ name: 'fix', kind: 'workflow-map', items, agent: { prompt: 'Fix it.' } }])),
+    )
     expect(result.def.steps[0]?.items).toEqual(items)
     expect(result.notes).toEqual([])
   })
@@ -112,7 +132,9 @@ describe('reading the reply', () => {
 
 describe('what cannot be applied', () => {
   it('refuses a reply that is not JSON', () => {
-    expect(parseGeneratedWorkflow('I cannot write that workflow.')).toEqual({ error: 'The model did not answer with JSON.' })
+    expect(parseGeneratedWorkflow('I cannot write that workflow.')).toEqual({
+      error: 'The model did not answer with JSON.',
+    })
   })
 
   it('refuses a reply that is not an object', () => {
@@ -120,8 +142,12 @@ describe('what cannot be applied', () => {
   })
 
   it('refuses a workflow with no name', () => {
-    expect(parseGeneratedWorkflow('{"steps":[{"name":"a"}]}')).toEqual({ error: 'The workflow the model wrote has no name.' })
-    expect(parseGeneratedWorkflow('{"name":"  ","steps":[{"name":"a"}]}')).toEqual({ error: 'The workflow the model wrote has no name.' })
+    expect(parseGeneratedWorkflow('{"steps":[{"name":"a"}]}')).toEqual({
+      error: 'The workflow the model wrote has no name.',
+    })
+    expect(parseGeneratedWorkflow('{"name":"  ","steps":[{"name":"a"}]}')).toEqual({
+      error: 'The workflow the model wrote has no name.',
+    })
   })
 
   it('refuses a workflow with no steps', () => {
@@ -165,14 +191,25 @@ describe('identifiers the catalog can refute', () => {
 
   it('leaves a real profile alone, even an unstructured one on a decide', () => {
     // The checker says decide needs a structured profile, and its message is better than any note.
-    const def = workflow([{ name: 'pick', kind: 'decide', after: [], profileId: 'plain', prompt: 'Verdict?', branches: { yes: 'pick' } }])
+    const def = workflow([
+      { name: 'pick', kind: 'decide', after: [], profileId: 'plain', prompt: 'Verdict?', branches: { yes: 'pick' } },
+    ])
     const result = ground(def)
     expect(result.notes).toEqual([])
     expect(JSON.stringify(result.def)).toBe(JSON.stringify(def))
   })
 
   it('drops a with key the contributed kind does not take', () => {
-    const result = ground(workflow([{ name: 'call', kind: 'http:request', after: [], with: { method: 'GET', url: 'https://example.com', retries: 3 } }]))
+    const result = ground(
+      workflow([
+        {
+          name: 'call',
+          kind: 'http:request',
+          after: [],
+          with: { method: 'GET', url: 'https://example.com', retries: 3 },
+        },
+      ]),
+    )
     expect(result.def.steps[0]?.with).toEqual({ method: 'GET', url: 'https://example.com' })
     expect(codes(result)).toEqual(['unknown-with-key'])
     expect(messages(result)).toContain("Step 'call' set 'retries' inside `with`")
@@ -181,7 +218,16 @@ describe('identifiers the catalog can refute', () => {
   it("drops http:request's auth, which is the known false positive", () => {
     // `auth` is deliberately not one of the kind's fields, so grounding cannot tell it from a key the
     // model invented. Accepted: an unknown `with` key is otherwise silent everywhere.
-    const result = ground(workflow([{ name: 'call', kind: 'http:request', after: [], with: { method: 'GET', url: 'https://example.com', auth: { mode: 'bearer' } } }]))
+    const result = ground(
+      workflow([
+        {
+          name: 'call',
+          kind: 'http:request',
+          after: [],
+          with: { method: 'GET', url: 'https://example.com', auth: { mode: 'bearer' } },
+        },
+      ]),
+    )
     expect(result.def.steps[0]?.with).toEqual({ method: 'GET', url: 'https://example.com' })
     expect(codes(result)).toEqual(['unknown-with-key'])
   })
@@ -194,17 +240,21 @@ describe('identifiers the catalog can refute', () => {
   })
 
   it('drops a with table from a built-in, hoisting its prompt first', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], kind: 'agent', with: { prompt: 'Do the thing.' } },
-      { name: 'b', after: ['a'], prompt: 'Already has one.', with: { prompt: 'Ignored.' } },
-    ]))
+    const result = ground(
+      workflow([
+        { name: 'a', after: [], kind: 'agent', with: { prompt: 'Do the thing.' } },
+        { name: 'b', after: ['a'], prompt: 'Already has one.', with: { prompt: 'Ignored.' } },
+      ]),
+    )
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], kind: 'agent', prompt: 'Do the thing.' })
     expect(result.def.steps[1]).toEqual({ name: 'b', after: ['a'], prompt: 'Already has one.' })
     expect(codes(result)).toEqual(['with-on-builtin', 'with-on-builtin'])
   })
 
   it('has nothing to hoist into a gate', () => {
-    const result = ground(workflow([{ name: 'approve', kind: 'gate-human', after: [], with: { prompt: 'Please look.' } }]))
+    const result = ground(
+      workflow([{ name: 'approve', kind: 'gate-human', after: [], with: { prompt: 'Please look.' } }]),
+    )
     expect(result.def.steps[0]).toEqual({ name: 'approve', kind: 'gate-human', after: [] })
     expect(codes(result)).toEqual(['with-on-builtin'])
   })
@@ -232,40 +282,57 @@ describe('child workflow grounding', () => {
     workflows: [target],
   }
   const grounded = (steps: unknown[], inputs?: WorkflowDef['inputs']) =>
-    groundWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', inputs, steps } as WorkflowDef, withTarget)
+    groundWorkflow(
+      { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', inputs, steps } as WorkflowDef,
+      withTarget,
+    )
 
   it('drops a target that the scoped catalog does not offer', () => {
-    const result = grounded([{ name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'invented' } } }])
+    const result = grounded([
+      { name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'invented' } } },
+    ])
     expect(result.def.steps[0]?.childWorkflow).toBeUndefined()
     expect(codes(result)).toContain('unknown-workflow')
   })
 
   it('drops every generated target when the scoped catalog is empty', () => {
-    const result = groundWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
-      name: 'Parent',
-      steps: [{
-        name: 'child',
-        kind: 'workflow',
-        childWorkflow: { ref: target.ref },
-      }],
-    }, { ...withTarget, workflows: [] })
+    const result = groundWorkflow(
+      {
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
+        name: 'Parent',
+        steps: [
+          {
+            name: 'child',
+            kind: 'workflow',
+            childWorkflow: { ref: target.ref },
+          },
+        ],
+      },
+      { ...withTarget, workflows: [] },
+    )
     expect(result.def.steps[0]?.childWorkflow).toBeUndefined()
     expect(codes(result)).toContain('unknown-workflow')
   })
 
   it('drops undeclared and unsupported bindings but keeps a valid parent input binding', () => {
-    const result = grounded([{
-      name: 'child',
-      kind: 'workflow',
-      childWorkflow: {
-        ref: target.ref,
-        inputs: {
-          ticket: { from: 'input', name: 'ticket' },
-          extra: { from: 'literal', value: 'x' },
-          item: { from: 'item', pointer: '/number' },
+    const result = grounded(
+      [
+        {
+          name: 'child',
+          kind: 'workflow',
+          childWorkflow: {
+            ref: target.ref,
+            inputs: {
+              ticket: { from: 'input', name: 'ticket' },
+              extra: { from: 'literal', value: 'x' },
+              item: { from: 'item', pointer: '/number' },
+            },
+          },
         },
-      },
-    }], [{ name: 'ticket', required: true }])
+      ],
+      [{ name: 'ticket', required: true }],
+    )
     expect(result.def.steps[0]?.childWorkflow?.inputs).toEqual({ ticket: { from: 'input', name: 'ticket' } })
     expect(codes(result).filter((code) => code === 'unsupported-binding')).toHaveLength(2)
   })
@@ -280,22 +347,26 @@ describe('child workflow grounding', () => {
         items: { step: 'plain', pointer: '/tickets' },
         itemKey: '/id',
         childWorkflow: { ref: target.ref, inputs: { ticket: { from: 'step', step: 'plain', pointer: '/ticket' } } },
-        title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'step', step: 'plain', pointer: '/ticket' } } },
+        title: {
+          template: 'Review ${ticket}',
+          bindings: { ticket: { from: 'step', step: 'plain', pointer: '/ticket' } },
+        },
       },
     ])
     expect(result.def.steps[1]?.items).toBeUndefined()
     expect(result.def.steps[1]?.childWorkflow?.inputs).toBeUndefined()
     expect(result.def.steps[1]?.title?.bindings).toBeUndefined()
   })
-
 })
 
 describe('keys outside the vocabulary', () => {
   it('drops keys that are not part of a workflow, step, or input', () => {
-    const result = ground(workflow(
-      [{ name: 'a', after: [], prompt: 'Go.', retries: 2, childStep: { prompt: 'Fix.', timeout: 5 } }],
-      { schedule: 'daily', inputs: [{ name: 'issue', kind: 'text' }] },
-    ))
+    const result = ground(
+      workflow([{ name: 'a', after: [], prompt: 'Go.', retries: 2, childStep: { prompt: 'Fix.', timeout: 5 } }], {
+        schedule: 'daily',
+        inputs: [{ name: 'issue', kind: 'text' }],
+      }),
+    )
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.' })
     expect(result.def.inputs).toEqual([{ name: 'issue' }])
     expect(codes(result)).toEqual(['unknown-key', 'unknown-key', 'unknown-key', 'unknown-key'])
@@ -306,18 +377,22 @@ describe('keys outside the vocabulary', () => {
   })
 
   it('drops protected execution keys', () => {
-    const result = ground(workflow(
-      [{
-        name: 'a',
-        after: [],
-        prompt: 'Go.',
-        model: 'claude-4',
-        configOptions: { reasoning: 'high' },
-        requiresRun: 'web',
-        tools: { allow: ['bash'], maxRisk: 'write' },
-      }],
-      { trigger: 'on-push', tools: { allow: ['bash'], maxRisk: 'execute' } },
-    ))
+    const result = ground(
+      workflow(
+        [
+          {
+            name: 'a',
+            after: [],
+            prompt: 'Go.',
+            model: 'claude-4',
+            configOptions: { reasoning: 'high' },
+            requiresRun: 'web',
+            tools: { allow: ['bash'], maxRisk: 'write' },
+          },
+        ],
+        { trigger: 'on-push', tools: { allow: ['bash'], maxRisk: 'execute' } },
+      ),
+    )
     expect(result.def.tools).toEqual({ maxRisk: 'execute' })
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.', tools: { maxRisk: 'write' } })
     expect(codes(result)).toEqual(Array<string>(6).fill('forbidden-key'))
@@ -356,10 +431,22 @@ describe('where grounding stops', () => {
 describe('the two properties that matter', () => {
   const wrong = workflow(
     [
-      { name: 'Read the issue', after: [], kind: 'code-review', model: 'claude-4', with: { prompt: 'Read ${inputs.issue}.' } },
+      {
+        name: 'Read the issue',
+        after: [],
+        kind: 'code-review',
+        model: 'claude-4',
+        with: { prompt: 'Read ${inputs.issue}.' },
+      },
       { name: 'check', kind: 'gate-policy', after: ['Read the issue'], policy: 'all-green', retries: 2 },
       { name: 'call', kind: 'http:request', after: [], with: { method: 'GET', url: 'https://example.com', auth: {} } },
-      { name: 'write-it-up', after: ['check'], profileId: 'gpt-9', prompt: 'Read ${steps.call.output} and ${steps.ghost.output}.', schema: 3 },
+      {
+        name: 'write-it-up',
+        after: ['check'],
+        profileId: 'gpt-9',
+        prompt: 'Read ${steps.call.output} and ${steps.ghost.output}.',
+        schema: 3,
+      },
     ],
     { trigger: 'on-push', schedule: 'daily' },
   )
@@ -385,26 +472,38 @@ describe('the two properties that matter', () => {
 })
 
 describe('a generated gate form', () => {
-  const draft = { id: 'draft', name: 'draft', prompt: 'Draft it.', schema: { type: 'object', properties: { title: { type: 'string' } } } }
-  const form = { fields: [{ name: 'title', schema: { type: 'string' }, required: true }], values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } } }
+  const draft = {
+    id: 'draft',
+    name: 'draft',
+    prompt: 'Draft it.',
+    schema: { type: 'object', properties: { title: { type: 'string' } } },
+  }
+  const form = {
+    fields: [{ name: 'title', schema: { type: 'string' }, required: true }],
+    values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } },
+  }
 
   it('keeps a form that would load, and a later binding to its values', () => {
-    const def = workflow([
-      draft,
-      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form },
-    ])
+    const def = workflow([draft, { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form }])
     const result = ground(def)
     expect(result.notes).toEqual([])
     expect(result.def).toBe(def)
   })
 
   it('drops a form that would not load and keeps the gate', () => {
-    const result = ground(workflow([
-      draft,
-      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form: { fields: [{ name: 'title' }] } },
-    ]))
+    const result = ground(
+      workflow([
+        draft,
+        { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form: { fields: [{ name: 'title' }] } },
+      ]),
+    )
     expect(codes(result)).toEqual(['dropped-form'])
     expect(messages(result)).toContain('still waits for a person')
-    expect((result.def as WorkflowDef).steps[1]).toEqual({ id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'] })
+    expect((result.def as WorkflowDef).steps[1]).toEqual({
+      id: 'approve',
+      name: 'approve',
+      kind: 'gate-human',
+      after: ['draft'],
+    })
   })
 })

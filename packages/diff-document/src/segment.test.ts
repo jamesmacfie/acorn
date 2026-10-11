@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { documentCache } from './cache'
-import { SEGMENT_MAX_BYTES, SEGMENT_MAX_ROWS, segmentContentKey, type DiffDocumentFile, type PlainDiffRow } from './model'
+import {
+  SEGMENT_MAX_BYTES,
+  SEGMENT_MAX_ROWS,
+  segmentContentKey,
+  type DiffDocumentFile,
+  type PlainDiffRow,
+} from './model'
 import { parsePatch } from './parse'
 import { bandCount, documentTopology, fileDocument, rowBytes, segmentRows } from './segment'
 
@@ -28,9 +34,19 @@ function patchOf(seed: number, hunks: number, width = 40): string {
     let newLines = 0
     const blocks = 1 + Math.floor(next() * 12)
     for (let b = 0; b < blocks; b++) {
-      for (let i = 0; i < 1 + Math.floor(next() * 3); i++) { lines.push(` ctx ${h}.${b}.${i}`); oldLines++; newLines++ }
-      for (let i = 0; i < Math.floor(next() * 6); i++) { lines.push(`-${'d'.repeat(Math.floor(next() * width))}`); oldLines++ }
-      for (let i = 0; i < Math.floor(next() * 8); i++) { lines.push(`+${'a'.repeat(Math.floor(next() * width))}`); newLines++ }
+      for (let i = 0; i < 1 + Math.floor(next() * 3); i++) {
+        lines.push(` ctx ${h}.${b}.${i}`)
+        oldLines++
+        newLines++
+      }
+      for (let i = 0; i < Math.floor(next() * 6); i++) {
+        lines.push(`-${'d'.repeat(Math.floor(next() * width))}`)
+        oldLines++
+      }
+      for (let i = 0; i < Math.floor(next() * 8); i++) {
+        lines.push(`+${'a'.repeat(Math.floor(next() * width))}`)
+        newLines++
+      }
     }
     out.push(`@@ -${oldAt},${oldLines} +${newAt},${newLines} @@`, ...lines)
     // Sometimes adjacent, usually a gap.
@@ -44,7 +60,10 @@ function patchOf(seed: number, hunks: number, width = 40): string {
 const code = (row: PlainDiffRow) => row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'
 
 describe('segmenting a patch', () => {
-  const corpus = Array.from({ length: 40 }, (_, seed) => ({ path: `src/file-${seed}.ts`, patch: patchOf(seed + 1, 1 + (seed % 9) * 4, seed % 5 === 0 ? 3_000 : 60) }))
+  const corpus = Array.from({ length: 40 }, (_, seed) => ({
+    path: `src/file-${seed}.ts`,
+    patch: patchOf(seed + 1, 1 + (seed % 9) * 4, seed % 5 === 0 ? 3_000 : 60),
+  }))
 
   it('keeps every row, in order, and cuts the same way every time', () => {
     for (const { path, patch } of corpus) {
@@ -86,7 +105,9 @@ describe('segmenting a patch', () => {
         expect(descriptor.rows).toBe(segment.length)
         expect(descriptor.bands).toBe(bandCount(segment))
         expect(descriptor.gaps).toBe(segment.filter((row) => row.kind === 'gap').length)
-        const lines = segment.filter(code).flatMap((row) => (row.kind === 'hunk' || row.kind === 'gap' ? [] : [row.raw.length]))
+        const lines = segment
+          .filter(code)
+          .flatMap((row) => (row.kind === 'hunk' || row.kind === 'gap' ? [] : [row.raw.length]))
         expect(descriptor.columns).toBe(Math.max(0, ...lines))
         const newNos = segment.flatMap((row) => (code(row) && 'newNo' in row && row.newNo != null ? [row.newNo] : []))
         expect(descriptor.lines[2]).toBe(newNos[0] ?? 0)
@@ -111,8 +132,18 @@ describe('segmenting a patch', () => {
     const rows: PlainDiffRow[] = [
       { kind: 'hunk', text: '@@ -1,70 +1,70 @@' },
       ...Array.from({ length: 40 }, (_, i): PlainDiffRow => ({ kind: 'normal', oldNo: i + 1, newNo: i + 1, raw: 'x' })),
-      ...Array.from({ length: 20 }, (_, i): PlainDiffRow => ({ kind: 'delete', oldNo: 41 + i, newNo: null, raw: 'old' })),
-      ...Array.from({ length: 20 }, (_, i): PlainDiffRow => ({ kind: 'insert', oldNo: null, newNo: 41 + i, raw: 'new' })),
+      ...Array.from({ length: 20 }, (_, i): PlainDiffRow => ({
+        kind: 'delete',
+        oldNo: 41 + i,
+        newNo: null,
+        raw: 'old',
+      })),
+      ...Array.from({ length: 20 }, (_, i): PlainDiffRow => ({
+        kind: 'insert',
+        oldNo: null,
+        newNo: 41 + i,
+        raw: 'new',
+      })),
     ]
     const { segments } = segmentRows(rows)
     expect(segments.map((segment) => segment.length)).toEqual([41, 40])
@@ -144,7 +175,13 @@ describe('segmenting a patch', () => {
 
 describe('segment and document identity', () => {
   const file = (path: string, patchKey: string | null, patch: string): DiffDocumentFile => ({
-    path, status: 'modified', additions: 0, deletions: 0, sha: null, viewed: false, patchKey,
+    path,
+    status: 'modified',
+    additions: 0,
+    deletions: 0,
+    sha: null,
+    viewed: false,
+    patchKey,
     segments: fileDocument(path, patch).descriptors,
   })
 
@@ -163,8 +200,9 @@ describe('segment and document identity', () => {
 
   it('keys the same new file differently when its patch differs', () => {
     expect(segmentContentKey('sha256:against-main', 0)).not.toBe(segmentContentKey('sha256:against-release', 0))
-    expect(documentTopology([file('a.ts', 'sha256:one', '@@ -1 +1 @@\n+x')]).revision)
-      .not.toBe(documentTopology([file('a.ts', 'sha256:two', '@@ -1 +1 @@\n+x')]).revision)
+    expect(documentTopology([file('a.ts', 'sha256:one', '@@ -1 +1 @@\n+x')]).revision).not.toBe(
+      documentTopology([file('a.ts', 'sha256:two', '@@ -1 +1 @@\n+x')]).revision,
+    )
   })
 })
 

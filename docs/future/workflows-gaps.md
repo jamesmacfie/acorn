@@ -39,9 +39,12 @@ without duplicating the external action. A manual retry must retain its authoriz
 
 ## Add dedicated agent control tools
 
-Implemented October 10, 2026 as the [workflow tools](../agent-tools/workflow-tools.md), from the
-[workflow agent tools](./workflow-agent-tools.md) PRD. Publication, human gates, and retries stay
-device actions. `agent_*` tools continue to control managed sessions.
+Implemented October 10, 2026 as the [workflow tools](../agent-tools/workflow-tools.md). Publication,
+human gates, and retries stay device actions. `agent_*` tools continue to control managed sessions.
+
+Open acceptance: run the tools from managed Claude and Codex sessions on both hosts through the
+isolated agent drivers. Terminal sessions can read definitions but can't draft, start, read, or
+cancel runs. That stays deferred.
 
 ## Define file-owned trigger consent
 

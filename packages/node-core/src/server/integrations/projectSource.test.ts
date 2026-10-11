@@ -12,29 +12,35 @@ const OWNER = 'project-source-owner'
 const USER = 'owner-1'
 const SECRETS = new SecretService('31'.repeat(32))
 
-const provider = (id: string, projects?: ProviderProjectSource) => publicConnectionProvider({
-  id,
-  label: 'Tracker',
-  glyph: 'T',
-  kind: 'issue-tracker',
-  connection: {
-    authKind: 'api-key' as const,
-    fields: [],
-    connectable: true,
-    disconnectable: true,
-    async validate() { return 'secret' },
-    normalize(_credentials, secret) {
-      return { secret, label: 'Tracker', account: null, scopes: [], config: {}, capabilities: {} }
+const provider = (id: string, projects?: ProviderProjectSource) =>
+  publicConnectionProvider({
+    id,
+    label: 'Tracker',
+    glyph: 'T',
+    kind: 'issue-tracker',
+    connection: {
+      authKind: 'api-key' as const,
+      fields: [],
+      connectable: true,
+      disconnectable: true,
+      async validate() {
+        return 'secret'
+      },
+      normalize(_credentials, secret) {
+        return { secret, label: 'Tracker', account: null, scopes: [], config: {}, capabilities: {} }
+      },
+      async test() {
+        return { ok: true as const }
+      },
     },
-    async test() { return { ok: true as const } },
-  },
-  capabilities: { browse: true },
-  ...(projects ? { projects } : {}),
-  budgets: defaultBudgets,
-})
+    capabilities: { browse: true },
+    ...(projects ? { projects } : {}),
+    budgets: defaultBudgets,
+  })
 
-const register = (id: string, projects?: ProviderProjectSource): void =>
+const register = (id: string, projects?: ProviderProjectSource): void => {
   connectionProviderRegistry.register(provider(id, projects), OWNER)
+}
 
 const seedConnection = async (
   testDb: TestDb,
@@ -64,10 +70,12 @@ afterEach(() => connectionProviderRegistry.removeForPlugin(OWNER))
 
 describe('boundProviderProjects', () => {
   it('keeps well-formed entries, trimming and falling back to the id for a label', () => {
-    expect(boundProviderProjects([
-      { id: ' proj-1 ', label: '  Platform  ' },
-      { id: 'proj-2', label: '' },
-    ])).toEqual([
+    expect(
+      boundProviderProjects([
+        { id: ' proj-1 ', label: '  Platform  ' },
+        { id: 'proj-2', label: '' },
+      ]),
+    ).toEqual([
       { id: 'proj-1', label: 'Platform' },
       { id: 'proj-2', label: 'proj-2' },
     ])
@@ -75,29 +83,38 @@ describe('boundProviderProjects', () => {
 
   it('drops what cannot become a row, and never invents one', () => {
     const overLongId = 'x'.repeat(PROVIDER_PROJECT_LIMITS.maxIdBytes + 1)
-    expect(boundProviderProjects([
-      { id: '', label: 'blank' },
-      { id: '   ', label: 'whitespace' },
-      { id: 42, label: 'not a string' },
-      { id: overLongId, label: 'too long' },
-      'not an object',
-      null,
-      { id: 'keep', label: 'kept' },
-    ])).toEqual([{ id: 'keep', label: 'kept' }])
+    expect(
+      boundProviderProjects([
+        { id: '', label: 'blank' },
+        { id: '   ', label: 'whitespace' },
+        { id: 42, label: 'not a string' },
+        { id: overLongId, label: 'too long' },
+        'not an object',
+        null,
+        { id: 'keep', label: 'kept' },
+      ]),
+    ).toEqual([{ id: 'keep', label: 'kept' }])
   })
 
   it('collapses duplicate ids, which would render as two checkboxes over one primary key', () => {
-    expect(boundProviderProjects([
-      { id: 'proj-1', label: 'First' },
-      { id: 'proj-1', label: 'Second' },
-    ])).toEqual([{ id: 'proj-1', label: 'First' }])
+    expect(
+      boundProviderProjects([
+        { id: 'proj-1', label: 'First' },
+        { id: 'proj-1', label: 'Second' },
+      ]),
+    ).toEqual([{ id: 'proj-1', label: 'First' }])
   })
 
   it('caps the list and truncates a label rather than trusting a provider for either', () => {
-    const many = Array.from({ length: PROVIDER_PROJECT_LIMITS.maxProjects + 25 }, (_, index) => ({ id: `p${index}`, label: 'x' }))
+    const many = Array.from({ length: PROVIDER_PROJECT_LIMITS.maxProjects + 25 }, (_, index) => ({
+      id: `p${index}`,
+      label: 'x',
+    }))
     expect(boundProviderProjects(many)).toHaveLength(PROVIDER_PROJECT_LIMITS.maxProjects)
 
-    const [bounded] = boundProviderProjects([{ id: 'p', label: 'y'.repeat(PROVIDER_PROJECT_LIMITS.maxLabelBytes + 40) }])
+    const [bounded] = boundProviderProjects([
+      { id: 'p', label: 'y'.repeat(PROVIDER_PROJECT_LIMITS.maxLabelBytes + 40) },
+    ])
     expect(bounded!.label).toHaveLength(PROVIDER_PROJECT_LIMITS.maxLabelBytes)
   })
 
@@ -114,12 +131,20 @@ describe('listConnectionProjects', () => {
     register('tracker-a', {
       list: ({ connection, secret }) => {
         seen.push(`${connection.id}:${secret}`)
-        return Promise.resolve([{ id: 'proj-1', label: 'Platform' }, { id: '', label: 'dropped' }] as ProviderProject[])
+        return Promise.resolve([
+          { id: 'proj-1', label: 'Platform' },
+          { id: '', label: 'dropped' },
+        ] as ProviderProject[])
       },
     })
     await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-a' })
 
-    const result = await listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId: 'connection-1' })
+    const result = await listConnectionProjects({
+      db: testDb.db,
+      userId: USER,
+      secrets: SECRETS,
+      connectionId: 'connection-1',
+    })
 
     expect(result).toEqual({ ok: true, value: [{ id: 'proj-1', label: 'Platform' }] })
     expect(seen).toEqual(['connection-1:live-token'])
@@ -131,7 +156,12 @@ describe('listConnectionProjects', () => {
     register('tracker-a', { list: () => Promise.resolve([{ id: 'proj-1', label: 'Platform' }]) })
     await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-a' })
 
-    const result = await listConnectionProjects({ db: testDb.db, userId: 'someone-else', secrets: SECRETS, connectionId: 'connection-1' })
+    const result = await listConnectionProjects({
+      db: testDb.db,
+      userId: 'someone-else',
+      secrets: SECRETS,
+      connectionId: 'connection-1',
+    })
 
     expect(result).toEqual({ ok: false, failure: { error: 'provider_not_connected', status: 403 } })
     testDb.cleanup()
@@ -142,7 +172,12 @@ describe('listConnectionProjects', () => {
     register('tracker-quiet')
     await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-quiet' })
 
-    const result = await listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId: 'connection-1' })
+    const result = await listConnectionProjects({
+      db: testDb.db,
+      userId: USER,
+      secrets: SECRETS,
+      connectionId: 'connection-1',
+    })
 
     expect(result).toEqual({ ok: false, failure: { error: 'provider_bad_config', status: 502 } })
     testDb.cleanup()
@@ -180,7 +215,8 @@ describe('listConnectionProjects', () => {
     await seedConnection(testDb, { id: 'b', provider: 'tracker-b' })
     await seedConnection(testDb, { id: 'c', provider: 'tracker-c' })
 
-    const run = (connectionId: string) => listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId })
+    const run = (connectionId: string) =>
+      listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId })
 
     expect(await run('a')).toEqual({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })
     // A provider rejecting its own request is this node's problem; 400 must not reach the client.
@@ -192,9 +228,18 @@ describe('listConnectionProjects', () => {
   it('records needs-auth when the credential cannot be read, so Settings agrees with the picker', async () => {
     const testDb = makeTestDb()
     register('tracker-a', { list: () => Promise.resolve([{ id: 'proj-1', label: 'Platform' }]) })
-    await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-a', encryptedCredentials: 'not-a-sealed-secret' })
+    await seedConnection(testDb, {
+      id: 'connection-1',
+      provider: 'tracker-a',
+      encryptedCredentials: 'not-a-sealed-secret',
+    })
 
-    const result = await listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId: 'connection-1' })
+    const result = await listConnectionProjects({
+      db: testDb.db,
+      userId: USER,
+      secrets: SECRETS,
+      connectionId: 'connection-1',
+    })
 
     expect(result).toEqual({ ok: false, failure: { error: 'provider_secret_unreadable', status: 401 } })
     const [row] = await testDb.db.select().from(schema.integrations).where(eq(schema.integrations.id, 'connection-1'))

@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { branchSlug, isContainedPath, isValidRepoIdent, worktreeBranchDirName, worktreeDirName } from './pathGuards'
+import { branchSlug, isContainedPath, isValidRepoIdent, worktreeBranchDirName } from './pathGuards'
 
 describe('worktrees', () => {
-  it('builds the per-PR dir name', () => {
-    expect(worktreeDirName('acme', 'widget', 42)).toBe('acme-widget-pr-42')
-  })
   it('builds the per-branch dir name through the slug', () => {
     expect(worktreeBranchDirName('acme', 'widget', 'feat/login')).toBe('acme-widget-feat-login')
   })

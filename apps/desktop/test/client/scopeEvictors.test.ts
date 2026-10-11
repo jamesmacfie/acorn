@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { scopeEvictorCount } from '@acorn/client-core/host/registries/shell'
 
-// An empty registry would make every eviction silently do nothing, which is precisely the bug class
-// this mechanism replaced, so the one thing worth asserting at the app level is that booting the
-// client graph actually populates it.
+// An empty registry would make every eviction silently do nothing, so the one thing worth asserting
+// at the app level is that booting the client graph actually populates it.
 //
 // A count rather than a list: which owners register is a property of what has been imported, and the
 // lazy panes register only once they load. Pinning names here would fail for the right code every time

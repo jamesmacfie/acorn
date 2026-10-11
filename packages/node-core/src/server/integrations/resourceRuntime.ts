@@ -1,10 +1,7 @@
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
-import type { Context } from 'hono'
 import type { AppDatabase } from '../db'
-import { getDb, schema } from '../db'
-import type { AppEnv } from '../middleware/auth'
-import { ownerId } from '../middleware/requireUser'
+import { schema } from '../db'
 import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import { serveThenRevalidate, type RouteFailure, type RouteResult } from '../sync/engine'
 import { getConnection } from './connections'
@@ -42,7 +39,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
   // Built once per call, scoped to this owner and provider; see docs/integrations/contributions.md § Connection
-  // and integration contributions for why this replaced a raw database handle here.
+  // and integration contributions for why a provider gets this store rather than a raw database handle.
   const items = createExternalItemStore(args.db, args.userId, args.providerId)
   const context = (): ProviderResourceContext => ({
     items,
@@ -78,16 +75,20 @@ export async function runProviderResource<TInput, TOutput>(args: {
         // The provider call runs inside the secret scope (docs/integrations/provider-boundaries.md § Provider
         // boundaries), so a credential echoed back in an error body is scrubbed before this failure
         // is logged or surfaced.
-        const refreshed = await args.secrets.use(connection.encryptedCredentials, `${connection.provider}: read ${resource.id}`, (secret) =>
-          providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
-            resource.refresh({ ...context(), secret }, args.input),
-          ),
+        const refreshed = await args.secrets.use(
+          connection.encryptedCredentials,
+          `${connection.provider}: read ${resource.id}`,
+          (secret) =>
+            providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
+              resource.refresh({ ...context(), secret }, args.input),
+            ),
         )
         // The provider's own `items-changed` verb (docs/plugins/events.md § Hearing another plugin), sent from here
         // because core owns the mirror write every provider converges on: one site instead of one per
         // plugin, and a loaded provider never has to reach for `ctx.events` from inside a refresh.
         // Once per refresh, not per row, so a list of two hundred items is one frame.
-        if (refreshed.ok) wsBroadcast({ channel: pluginChannel(provider.id, 'items-changed'), connectionId: connection.id })
+        if (refreshed.ok)
+          wsBroadcast({ channel: pluginChannel(provider.id, 'items-changed'), connectionId: connection.id })
         return refreshed
       } catch (error) {
         if (!(error instanceof SecretUnavailableError)) throw error
@@ -95,20 +96,14 @@ export async function runProviderResource<TInput, TOutput>(args: {
           .update(schema.integrations)
           .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
           .where(eq(schema.integrations.id, connection.id))
-        broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
+        broadcastConnectionChanged({
+          integrationId: connection.id,
+          providerId: connection.provider,
+          status: 'needs-auth',
+        })
         return { ok: false, failure: { error: 'provider_secret_unreadable', status: 401 } }
       }
     },
   })
   return !result.ok && fallback ? { ok: true, value: fallback.data } : result
 }
-
-// The request-context form, for a provider plugin's routes: the same function, with core supplying
-// the database handle, the owner id and the secret service instead of eight call sites in linear and
-// rollbar assembling them by hand. That assembly is what put both plugins on the schema ratchet
-// described in docs/integrations/contributions.md § Connection and integration contributions.
-export const providerResource = <TInput, TOutput>(
-  c: Context<AppEnv>,
-  args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },
-): Promise<RouteResult<TOutput>> =>
-  runProviderResource<TInput, TOutput>({ db: getDb(c.env), userId: ownerId(c), secrets: c.env.SECRETS, ...args })

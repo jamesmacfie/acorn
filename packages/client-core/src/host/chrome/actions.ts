@@ -16,10 +16,9 @@ import type { AgentMessageTarget, AgentTurnTarget, ContentSelectionTarget } from
 // The closed verb set the host executes on a descriptor's behalf. See docs/plugins.md.
 //
 // Closed is the point. Every plugin composes the same few verbs, each one is a thing the host does in its
-// own realm, and adding a verb later is additive. What is not here in v1 is `invoke`, an RPC into the
-// plugin's frame, mounting it if none is up. It needs a headless frame lifecycle the shell does not have,
-// and the phase doc says not to block on it; a manifest naming it fails to parse, so an author is told
-// rather than shipping a row that silently does nothing.
+// own realm, and adding a verb later is additive. There is no `invoke`, an RPC into the plugin's frame:
+// it needs a headless frame lifecycle the shell doesn't have. A manifest naming it fails to parse, so an
+// author is told rather than shipping a row that silently does nothing.
 
 export type ChromeActionContext = {
   pluginId: string
@@ -33,7 +32,15 @@ export type ChromeActionContext = {
     | { location: 'rail.pane'; paneId: string; taskId: string; projectId: string }
   /** Host-derived identity for a file row or document tab menu. The path is the owner's confined
    *  worktree-relative one; no absolute path and no file bytes ever travel here. */
-  resource?: { kind: 'file'; taskId: string; projectId: string; path: string; directory: boolean; readOnly: boolean; revision?: string }
+  resource?: {
+    kind: 'file'
+    taskId: string
+    projectId: string
+    path: string
+    directory: boolean
+    readOnly: boolean
+    revision?: string
+  }
   /** Host-derived identity for an agent transcript message, with the text its card shows (at most
    *  64 KiB). Never the raw event, hidden reasoning, or the turn's other messages. */
   message?: Omit<AgentMessageTarget, 'location' | 'nodeId'>
@@ -43,10 +50,10 @@ export type ChromeActionContext = {
    *  revision. Read-only: nothing here can replace the text or reach the rest of the document. */
   selection?: Omit<ContentSelectionTarget, 'location' | 'nodeId'>
   promote?: (item: PluginRailItem) => void
-  // The task this click is about, when the click site knows one and it is not the task on screen. Only a
-  // dashboard record supplies it today from its task link: a panel is drawn outside every
-  // task, so without this `openPane` had only the active task to work with, which is never the task the
-  // row is about, and usually there is none at all.
+  // The task this click is about, when the click site knows one and it is not the task on screen. A
+  // dashboard record supplies it from its task link: a panel is drawn outside every task, so without
+  // this `openPane` has only the active task to work with, which is never the task the row is about,
+  // and usually there is none at all.
   taskId?: string
   // The routed project and the shell's navigator, for `navigate`. Supplied only by the callers that have
   // them, which is why the manifest refuses to let a command name that verb at all: a command registry row
@@ -73,17 +80,21 @@ export type ChromeActionResult = { ok: true } | { ok: false; message: string }
 
 const DONE: ChromeActionResult = { ok: true }
 
-// A refusal is the answer to a click, so it has to be visible where the click was. This posted a notice
-// only, which lands in the bell behind a badge, so every refusal below read as "the button is broken",
-// and one of them cost an afternoon proving otherwise. The notice stays, because it is the durable record
-// and it carries the detail; the toast is the part the clicker actually sees.
+// A refusal is the answer to a click, so it has to be visible where the click was. A notice alone lands
+// in the bell behind a badge, and the refusal reads as "the button is broken". The notice stays, because
+// it is the durable record and it carries the detail; the toast is the part the clicker actually sees.
 //
 // The toast fires for every caller, including the palette's. Suppressing it there would mean a command
-// run from a shortcut — which is `executeCommand` with no palette drawing — reporting nothing at all,
-// and losing an error at an existing click site is exactly what this change is not allowed to do.
+// run from a shortcut, which is `executeCommand` with no palette drawing, reports nothing at all.
 const toast = (pluginId: string, title: string, detail?: string): ChromeActionResult => {
   pushToast(`${pluginId}: ${title}`, { tone: 'danger' })
-  void pushNotice({ taskId: activeTaskId() ?? '', kind: 'plugin', title: `${pluginId}: ${title}`, at: Date.now(), ...(detail ? { detail } : {}) })
+  void pushNotice({
+    taskId: activeTaskId() ?? '',
+    kind: 'plugin',
+    title: `${pluginId}: ${title}`,
+    at: Date.now(),
+    ...(detail ? { detail } : {}),
+  })
   return { ok: false, message: detail ? `${title}: ${detail}` : title }
 }
 
@@ -94,10 +105,9 @@ const UNKNOWN_TASK = 'that task is not on this node'
  *  task this node does not have and the refusal has already been shown.
  *
  *  `activeTaskId()` is sticky: it's whichever task you last had open, not whichever screen you're looking
- *  at now, so it stays put after you leave for a Source browse or the dashboard (tasks/tasks.ts,
- *  `selectedSource`). Skipping the navigate just because it happens to still name this task was the bug:
- *  a dashboard row for the task you left behind looked like a dead click, because the pane opened in a
- *  task the reader wasn't looking at. */
+ *  at now, so it stays put after you leave for a Source browse or the dashboard (`selectedSource`). So
+ *  never skip the navigate because it still names this task: a dashboard row for the task you left
+ *  behind would look like a dead click, because the pane opens in a task the reader isn't looking at. */
 function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefined {
   const named = context.taskId ? taskById(context.taskId) : undefined
   if (context.taskId && !named) {
@@ -119,32 +129,38 @@ function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefin
  * the answer; the palette awaits it so a command that failed keeps its frame open with the reason
  * instead of closing over it.
  */
-export async function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): Promise<ChromeActionResult> {
+export async function runChromeAction(
+  action: PluginChromeAction,
+  context: ChromeActionContext,
+): Promise<ChromeActionResult> {
   switch (action.verb) {
     case 'openPane': {
-      if (context.rail?.location === 'rail.source') return toast(context.pluginId, 'open a task first', 'A source icon does not name a task.')
+      if (context.rail?.location === 'rail.source')
+        return toast(context.pluginId, 'open a task first', 'A source icon does not name a task.')
       // A task-scoped pane lives in a task's layout, so there is nothing to open into outside a task.
       // Saying so is better than a click that appears to do nothing, since the rail is reachable with no
-      // task open. This refusal used to fire for every rail row of a plugin whose detail belonged to the
-      // project rather than to a task, which was the carrier gap and not the message being wrong: the
-      // manifest now only lets this verb name a task-scoped pane, and a project-scoped one has `navigate`.
+      // task open. The manifest only lets this verb name a task-scoped pane; a project-scoped one has
+      // `navigate`.
       //
       // A click site that names a task is taken there first. Opening the pane alone would not be enough
       // and would not be honest: the layout event lands in a task the reader is not looking at, so the
       // click appears to do nothing. Activate then navigate, which is what the notification bell and every
       // task link in the app do. The pane opens on arrival, from the retained intent below.
       //
-      // ponytail: the lookup is the active node's task cache, so a row from a panel pointed at another node
-      // lands on the refusal below rather than switching nodes first the way the attention inbox does.
-      // Switch here too if panels over remote nodes become a thing people click.
+      // The lookup is the active node's task cache, so a row from a panel pointed at another node lands
+      // on the refusal below rather than switching nodes first the way the attention inbox does.
       const named = goToTask(context)
       if (named === 'unknown-task') return { ok: false, message: UNKNOWN_TASK }
       const taskId = named?.id ?? activeTaskId()
-      if (!taskId) return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
-      // The row id travels as a retained pane intent, which is the mechanism that already closed this
-      // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the
+      if (!taskId)
+        return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
+      // The row id travels as a retained pane intent (`consumePaneIntent`): the intent is held until the
       // pane consumes it, so a pane opening for the first time is not a race against its own mount.
-      openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id })
+      openPane(
+        taskId,
+        action.pane,
+        context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id },
+      )
       return DONE
     }
     case 'openTask': {
@@ -152,7 +168,8 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // reader, and picking a pane for them would be this verb pretending to be `openPane`.
       const named = goToTask(context)
       if (named === 'unknown-task') return { ok: false, message: UNKNOWN_TASK }
-      if (!named) return toast(context.pluginId, 'that row names no task', 'This opens a task, so the row has to say which one.')
+      if (!named)
+        return toast(context.pluginId, 'that row names no task', 'This opens a task, so the row has to say which one.')
       return DONE
     }
     case 'navigate': {
@@ -165,28 +182,41 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       const item = context.item?.id
       const path = context.projectId && item ? projectSurfacePath(action.surface, context.projectId, item) : null
       if (!path || !context.navigate) {
-        return toast(context.pluginId, 'pick a project first', 'This opens beside a project’s list, so it needs one selected.')
+        return toast(
+          context.pluginId,
+          'pick a project first',
+          'This opens beside a project’s list, so it needs one selected.',
+        )
       }
       context.navigate(path)
       return DONE
     }
     case 'runNodeAction': {
       // Repeated on this side for the same reason every read is: the path came off a roster row.
-      if (!ownsRoute(context.pluginId, action.path)) return toast(context.pluginId, 'refused an action outside its own namespace')
-      // Awaited rather than dispatched. The click sites that came before this discard the promise and
-      // keep exactly the behaviour they had, because the toast still fires from in here; what the wait
-      // buys is a caller that can wait for the answer — the palette closes on success and stays open
-      // with the failure, which it could not do while this was fire-and-forget.
+      if (!ownsRoute(context.pluginId, action.path))
+        return toast(context.pluginId, 'refused an action outside its own namespace')
+      // Awaited rather than dispatched, so a caller can wait for the answer: the palette closes on success
+      // and stays open with the failure. Click sites that discard the promise still get the toast.
       try {
         const result = await sendRaw(action.path, {
           method: 'POST',
           nodeId: context.nodeId,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(context.resource ? { resource: context.resource }
-            : context.message ? { message: context.message }
-              : context.turn ? { turn: context.turn }
-                : context.selection ? { selection: context.selection }
-                  : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
+          body: JSON.stringify(
+            context.resource
+              ? { resource: context.resource }
+              : context.message
+                ? { message: context.message }
+                : context.turn
+                  ? { turn: context.turn }
+                  : context.selection
+                    ? { selection: context.selection }
+                    : context.rail
+                      ? { rail: context.rail }
+                      : context.item === undefined
+                        ? {}
+                        : { item: context.item.id },
+          ),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.
@@ -213,7 +243,7 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // The one verb whose effect lands inside a plugin. No task check and no mount check: the event is
       // fire-and-forget, and a pane nobody has open simply has no frame listening, which is the honest
       // outcome, because the command means "do this in the thing I am looking at". Deliberately not
-      // retained the way a pane intent is (registries/clientEvents.ts says why).
+      // retained the way a pane intent is (the `plugin:surface-action` client event says why).
       //
       // The surface named here was checked against this manifest's own composed panes when the node parsed
       // it; the frame that receives it re-checks that the event is addressed to its plugin and its
@@ -222,8 +252,17 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // What the frame receives is the command's own id, so there is one id rather than two that can drift.
       // That is also why this verb is only useful on a command: a footer badge's click has no command in
       // scope, and rather than invent a second name for the thing being delivered, the verb refuses there.
-      if (!context.commandId) return toast(context.pluginId, 'surfaceAction needs a command', 'This verb delivers a command id, so it only works from a command.')
-      clientEvents.emit('plugin:surface-action', { pluginId: context.pluginId, surface: action.surface, command: context.commandId })
+      if (!context.commandId)
+        return toast(
+          context.pluginId,
+          'surfaceAction needs a command',
+          'This verb delivers a command id, so it only works from a command.',
+        )
+      clientEvents.emit('plugin:surface-action', {
+        pluginId: context.pluginId,
+        surface: action.surface,
+        command: context.commandId,
+      })
       return DONE
     case 'openUrl':
       // Repeated on this side for the same reason `runNodeAction` re-checks its path: the URL came off a
@@ -234,18 +273,21 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // A URL acorn has its own surface for stays inside acorn. A dashboard row for one of my pull requests
       // names github.com because that is the durable identity of the thing, not because the browser is
       // where the owner wanted to end up. Which destination it gets is entirely the owning plugin's
-      // declaration (registries/contentLinks.ts, openInAppUrl); this only asks, and a URL nobody claims
-      // falls through to the browser exactly as before.
+      // declaration (`openInAppUrl`); this only asks, and a URL nobody claims falls through to the
+      // browser.
       //
       // The click site chooses, never this switch and never the plugin. A dashboard row is somewhere you
       // leave from, so it asks for the route; a badge or a command sits beside work in progress and asks
       // for the glance. `refPanel` is the default because that is every caller that has not thought about
       // it, and moving a reader who did not ask to be moved is the worse mistake.
-      if (openInAppUrl(action.url, {
-        taskId: activeTaskId(),
-        prefer: context.prefer ?? 'refPanel',
-        ...(context.navigate ? { navigate: context.navigate } : {}),
-      })) return DONE
+      if (
+        openInAppUrl(action.url, {
+          taskId: activeTaskId(),
+          prefer: context.prefer ?? 'refPanel',
+          ...(context.navigate ? { navigate: context.navigate } : {}),
+        })
+      )
+        return DONE
       window.open(action.url, '_blank', 'noopener,noreferrer')
       return DONE
   }

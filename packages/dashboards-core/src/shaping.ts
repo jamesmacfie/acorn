@@ -14,12 +14,16 @@ import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } 
 const fieldsById = (schema: DashboardDisplaySchema): Map<string, DashboardDisplayField> =>
   new Map(schema.fields.map((field) => [field.id, field]))
 
-const isBlank = (value: DashboardDisplayCell | undefined): boolean => value === null || value === undefined || value === ''
+const isBlank = (value: DashboardDisplayCell | undefined): boolean =>
+  value === null || value === undefined || value === ''
 
 /** What a cell equals. `enum` keys off the declared value id, never its label: the label is the part a
- *  workspace gets to rename (plugins/linear/src/shared/collections.ts), so a filter written against it
+ *  workspace gets to rename (linear's workflow states, for one), so a filter written against it
  *  would break the day someone renamed a column. */
-const matchKey = (field: DashboardDisplayField | undefined, value: DashboardDisplayCell | undefined): string | number | null => {
+const matchKey = (
+  field: DashboardDisplayField | undefined,
+  value: DashboardDisplayCell | undefined,
+): string | number | null => {
   if (isBlank(value)) return null
   switch (field?.type) {
     case 'number':
@@ -38,7 +42,10 @@ const matchKey = (field: DashboardDisplayField | undefined, value: DashboardDisp
  *  A plugin declares its values in the order the thing moves (draft, open, ready), so that order is
  *  real information and alphabetising it would throw it away. A value the schema never declared sorts
  *  after every one it did. */
-const sortKey = (field: DashboardDisplayField | undefined, value: DashboardDisplayCell | undefined): string | number | null => {
+const sortKey = (
+  field: DashboardDisplayField | undefined,
+  value: DashboardDisplayCell | undefined,
+): string | number | null => {
   if (isBlank(value)) return null
   if (field?.type === 'enum' && field.values?.length) {
     const index = field.values.findIndex((declared) => declared.id === String(value))
@@ -63,14 +70,20 @@ const relational = (
   keep: (ordered: number) => boolean,
 ): boolean => cell !== null && wanted !== null && keep(compare(cell, wanted))
 
-const matches = (field: DashboardDisplayField | undefined, cell: DashboardDisplayCell | undefined, filter: PanelFilter): boolean => {
+const matches = (
+  field: DashboardDisplayField | undefined,
+  cell: DashboardDisplayCell | undefined,
+  filter: PanelFilter,
+): boolean => {
   switch (filter.op) {
     case 'is-empty':
       return isBlank(cell)
     case 'is-not-empty':
       return !isBlank(cell)
     case 'contains':
-      return String(cell ?? '').toLowerCase().includes(String(filter.value ?? '').toLowerCase())
+      return String(cell ?? '')
+        .toLowerCase()
+        .includes(String(filter.value ?? '').toLowerCase())
     case 'eq':
       return matchKey(field, cell) === matchKey(field, filter.value)
     case 'ne':
@@ -94,7 +107,9 @@ export function shapeRows(
   // All-AND: a filter list is a narrowing, and anything that needs alternatives has outgrown the
   // generic layer (model.ts, `PanelFilterOp`).
   let out = filters.length
-    ? rows.filter((row) => filters.every((filter) => matches(fields.get(filter.field), row.values[filter.field], filter)))
+    ? rows.filter((row) =>
+        filters.every((filter) => matches(fields.get(filter.field), row.values[filter.field], filter)),
+      )
     : [...rows]
 
   const sort = (shaping.sort ?? []).filter((key) => fields.has(key.field))
@@ -138,15 +153,12 @@ export function visibleFields(schema: DashboardDisplaySchema, shaping: PanelShap
 /** What a list row leads with: the declared `title` role, then the first text field, then whatever
  *  there is. */
 export function titleField(schema: DashboardDisplaySchema): DashboardDisplayField | undefined {
-  return schema.fields.find((field) => field.role === 'title')
-    ?? schema.fields.find((field) => field.type === 'text')
-    ?? schema.fields[0]
+  return (
+    schema.fields.find((field) => field.role === 'title') ??
+    schema.fields.find((field) => field.type === 'text') ??
+    schema.fields[0]
+  )
 }
-
-export const fieldWithRole = (
-  schema: DashboardDisplaySchema,
-  role: NonNullable<DashboardDisplayField['role']>,
-): DashboardDisplayField | undefined => schema.fields.find((field) => field.role === role)
 
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
@@ -170,9 +182,11 @@ export const groupableFields = (schema: DashboardDisplaySchema): DashboardDispla
  *  The editor always writes `groupBy` explicitly, so nothing reaches them by default. */
 export function groupField(schema: DashboardDisplaySchema, shaping: PanelShaping): DashboardDisplayField | undefined {
   const groupable = groupableFields(schema)
-  return groupable.find((field) => field.id === shaping.groupBy)
-    ?? groupable.find((field) => field.role === 'status')
-    ?? groupable[0]
+  return (
+    groupable.find((field) => field.id === shaping.groupBy) ??
+    groupable.find((field) => field.role === 'status') ??
+    groupable[0]
+  )
 }
 
 /** The catch-all column's id. Leading space, because every other column id is a plugin-authored enum
@@ -194,12 +208,9 @@ export type PanelBoardColumn = {
  *  docs/dashboards/views.md § Views are derived, not chosen from a menu.
  *
  *  One case is worth spelling here: an undeclared value gets a column of its own after the declared
- *  ones, and a query-shaped collection cannot always know its values ahead of the data
- *  (@acorn/protocol/collections.ts), so that is the ordinary case there and schema drift here. */
-export function boardColumns(
-  rows: readonly DashboardDisplayRow[],
-  field: DashboardDisplayField,
-): PanelBoardColumn[] {
+ *  ones, and a query-shaped collection cannot always know its values ahead of the data, so that is
+ *  the ordinary case there and schema drift here. */
+export function boardColumns(rows: readonly DashboardDisplayRow[], field: DashboardDisplayField): PanelBoardColumn[] {
   const declared = field.values ?? []
   const buckets = new Map<string, DashboardDisplayRow[]>(declared.map((value) => [value.id, []]))
   const order = declared.map((value) => value.id)

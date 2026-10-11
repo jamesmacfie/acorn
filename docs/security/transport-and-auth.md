@@ -10,9 +10,9 @@ route or a socket channel. It's part of the [security model](../security.md).
 - A Node binds `127.0.0.1` over TLS 1.3 and rejects an unexpected `Host` header.
   [Node distribution](../node-distribution.md#reaching-a-node-from-another-machine) covers binding
   beyond loopback.
-- An internal credential is accepted only when the TCP socket peer is loopback. This applies to HTTP,
-  `/v1/events`, and `/v1/tunnel`, including an advertised listener. `Host`, `Forwarded`, and
-  `X-Forwarded-For` cannot establish the peer. A missing peer address fails closed. Paired device
+- An internal credential is accepted only when the TCP socket peer is loopback. This applies to HTTP
+  and `/v1/events`, including an advertised listener. `Host`, `Forwarded`, and `X-Forwarded-For`
+  cannot establish the peer. A missing peer address fails closed. Paired device
   bearers remain valid from remote peers.
 - The certificate is self-signed, kept in the Node's data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
@@ -22,7 +22,8 @@ route or a socket channel. It's part of the [security model](../security.md).
 - The broker bounds each HTTP answer to 64 MiB, the `/v1/node` probe to 16 KiB, and each WebSocket
   message to 8 MiB before it parses or forwards it. It opens at most four HTTP sockets per Node
   (`packages/custody/src/broker/`). Automatic agent image previews ask for an 8 MiB ceiling and
-  refuse oversized metadata or bytes before raster encoding.
+  refuse oversized metadata or bytes before raster encoding. The helper's own request limit is in
+  [the shell contract](../shell/process.md#the-shell-process).
 - The bearer rides the `/v1/events` upgrade headers, which a browser can't set. That's why the
   desktop's socket belongs to the helper. The terminal client is one Node process, so it sets the
   header itself, and an architecture rule keeps custody out of every `apps/tui` module that draws a
@@ -31,9 +32,6 @@ route or a socket channel. It's part of the [security model](../security.md).
   Node enforces the 8 MiB ceiling before parsing. Upgrade, lookup, and handler failures stay inside
   their connection. A failed activity lookup closes the affected sockets. Disconnect cleanup runs
   every owner's hook on its own, including hooks that reject.
-- The preview tunnel enforces 64 KiB per message at the Node and custody receivers
-  ([WebSocket](../api-reference/websocket.md#preview-tunnel)). The helper's request limit is in
-  [the shell contract](../shell/process.md#the-shell-process).
 - Revoking a device closes its live sockets and fails its in-flight requests. A device may revoke
   its own row, which is the same as unpairing itself.
 - A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token

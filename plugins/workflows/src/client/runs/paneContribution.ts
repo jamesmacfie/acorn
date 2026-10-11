@@ -7,7 +7,7 @@ import { taskHasWorkflowRuns } from './runStore'
 // (docs/panes/layout.md § Layout model).
 //
 // `when` hides it on a task that has never run a workflow, which is most of them, so the pane strip
-// does not grow a button per task (./runStore.ts holds the answer in memory).
+// does not grow a button per task (`taskHasWorkflowRuns` answers from memory).
 const RunPaneHeader = lazy(async () => ({ default: (await import('./RunPane')).RunPaneHeader }))
 const RunPaneList = lazy(async () => ({ default: (await import('./RunPane')).RunPaneList }))
 const RunPaneFooter = lazy(async () => ({ default: (await import('./RunPane')).RunPaneFooter }))
@@ -22,11 +22,10 @@ export const workflowsPaneContribution: PaneLayoutContribution<RunPaneModel> = {
   requires: { plugin: 'workflows' },
   when: (task) => taskHasWorkflowRuns(task.id),
   // The same floor the agents pane declares, for the same reason: an agent node draws the whole
-  // conversation here now, and a composer in a narrow column is unusable.
+  // conversation here, and a composer in a narrow column is unusable.
   minWidth: 640,
   layout: 'list-detail',
-  // The runs, the selection, the live tail and the four verbs, built once per task by the host
-  // (client-core registries/panes/paneModels.ts).
+  // The runs, the selection, the live tail and the four verbs, built once per task by the host.
   model: (task) => createRunPaneModel(task),
   regions: { 'list-header': RunPaneHeader, list: RunPaneList, 'list-footer': RunPaneFooter, detail: NodeDetail },
 }

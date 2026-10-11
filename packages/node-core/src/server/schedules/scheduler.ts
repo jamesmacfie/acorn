@@ -29,13 +29,13 @@ import { createLogger } from '../telemetry/logger'
 /** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one line
  *  for the run row. The same signal shape source fetches already take. */
 export type ScheduleRunReason = 'due' | 'manual' | 'catch-up'
-export type ScheduleRunContext = {
+type ScheduleRunContext = {
   scheduleKey: string
   reason: ScheduleRunReason
   dueAt?: number
   requestKey?: string
 }
-export type ScheduleRunner = (signal: AbortSignal, context?: ScheduleRunContext) => Promise<string | void>
+type ScheduleRunner = (signal: AbortSignal, context?: ScheduleRunContext) => Promise<string | void>
 
 /** A schedule declared in code (core) or by a plugin. Registry-truth: this object is the definition, and
  *  the database stores only the owner's overrides and the run state. */
@@ -68,7 +68,12 @@ export type ScheduleTarget = {
   /** Throw `ScheduleSkipped` to record a run that deliberately did nothing: a target that no longer
    *  resolves, or one whose declared risk has risen past the consent stamped on the row. That is a
    *  different fact from a failure. It must not start a backoff, and it must not read as broken. */
-  run(target: unknown, signal: AbortSignal, consent: ScheduleConsent, context: ScheduleRunContext): Promise<string | void>
+  run(
+    target: unknown,
+    signal: AbortSignal,
+    consent: ScheduleConsent,
+    context: ScheduleRunContext,
+  ): Promise<string | void>
   timezone?(target: unknown): string | undefined
   remove?(target: unknown): Promise<void>
 }
@@ -76,7 +81,7 @@ export type ScheduleTarget = {
 /** What the row remembers about the one time the owner was asked. Handed to every run because a target
  *  cannot see its own row, and checking that the stamp still covers the target's current declared tier is
  *  the whole of "consent is taken once and honoured forever". */
-export type ScheduleConsent = { risk?: ToolRisk }
+type ScheduleConsent = { risk?: ToolRisk }
 
 /** "I ran, and deliberately did nothing." Recorded as `skipped` with the message as the reason, and not
  *  as an error: a schedule failing closed on a risk change is behaving correctly, and backing it off
@@ -121,7 +126,7 @@ type Owner = { owner: 'core' | 'user' } | { owner: 'plugin'; pluginId: string }
 
 /** Which of the three parties declared a key. The format is the whole mechanism: one registry, one
  *  settings list, and an owner badge that needs no extra column. */
-export function keyOwner(key: string): Owner {
+function keyOwner(key: string): Owner {
   const separator = key.indexOf(':')
   if (separator < 0) return { owner: 'core' }
   const head = key.slice(0, separator)
@@ -197,7 +202,11 @@ export class Scheduler {
     if (this.#targets.has(target.kind)) throw new Error(`Schedule target already registered: ${target.kind}`)
     this.#targets.set(target.kind, target)
     if (this.#started) void this.#sync()
-    return { dispose: () => { if (this.#targets.get(target.kind) === target) this.#targets.delete(target.kind) } }
+    return {
+      dispose: () => {
+        if (this.#targets.get(target.kind) === target) this.#targets.delete(target.kind)
+      },
+    }
   }
 
   async start(): Promise<void> {
@@ -257,9 +266,11 @@ export class Scheduler {
   /** Create a user schedule (docs/schedules/user-schedules.md § Routes): the one non-tolerant edge in this module. */
   async create(input: CreateScheduleInput): Promise<ScheduleRow> {
     const target = this.#targets.get(input.kind)
-    if (!target) throw new BridgeError(400, 'bad_request', `This node has nothing that can run a '${input.kind}' schedule.`)
+    if (!target)
+      throw new BridgeError(400, 'bad_request', `This node has nothing that can run a '${input.kind}' schedule.`)
     const parsed = target.parse(input.target)
-    if (parsed === null) throw new BridgeError(400, 'bad_request', `That is not a valid target for a '${input.kind}' schedule.`)
+    if (parsed === null)
+      throw new BridgeError(400, 'bad_request', `That is not a valid target for a '${input.kind}' schedule.`)
     const id = randomUUID()
     const cadence = clampCadence(input.cadence)
     await this.#db.insert(schema.userSchedules).values({
@@ -280,8 +291,12 @@ export class Scheduler {
     if (input.name !== undefined) {
       // A declared schedule's name belongs to the code or manifest that declares it; renaming it here
       // would be a second source of truth that a reload silently wins.
-      if (keyOwner(key).owner !== 'user') throw new BridgeError(409, 'conflict', 'Only a schedule you created can be renamed.')
-      await this.#db.update(schema.userSchedules).set({ name: input.name }).where(eq(schema.userSchedules.id, key.slice(5)))
+      if (keyOwner(key).owner !== 'user')
+        throw new BridgeError(409, 'conflict', 'Only a schedule you created can be renamed.')
+      await this.#db
+        .update(schema.userSchedules)
+        .set({ name: input.name })
+        .where(eq(schema.userSchedules.id, key.slice(5)))
     }
     const patch: Partial<StateRow> = {}
     if (input.enabled !== undefined) patch.enabledOverride = input.enabled ? 1 : 0
@@ -294,32 +309,52 @@ export class Scheduler {
     }
     // Resuming a schedule that has been off for a week must not fire the moment it comes back for every
     // interval it slept through. Catch-up-once applies, and the tick loop is where that happens.
-    if (Object.keys(patch).length > 0) await this.#writeState(key, { ...patch, nextRunAt: patch.nextRunAt ?? entry.state.nextRunAt })
+    if (Object.keys(patch).length > 0)
+      await this.#writeState(key, { ...patch, nextRunAt: patch.nextRunAt ?? entry.state.nextRunAt })
     this.#arm()
     return this.#row(key)
   }
 
   /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the
-   *  row from the registry's current answer. Takes no tier from the caller (docs/schedules.md
+   *  row from the registry's current answer. Takes no tier from the caller (docs/schedules/user-schedules.md
    *  § Routes, `confirm`). */
   async confirm(key: string): Promise<ScheduleRow> {
-    if (keyOwner(key).owner !== 'user') throw new BridgeError(409, 'conflict', 'Only a schedule you created carries a consent stamp.')
-    const row = (await this.#db.select().from(schema.userSchedules).where(eq(schema.userSchedules.id, key.slice(5))))[0]
+    if (keyOwner(key).owner !== 'user')
+      throw new BridgeError(409, 'conflict', 'Only a schedule you created carries a consent stamp.')
+    const row = (
+      await this.#db
+        .select()
+        .from(schema.userSchedules)
+        .where(eq(schema.userSchedules.id, key.slice(5)))
+    )[0]
     if (!row) throw new BridgeError(404, 'not_found', 'No such schedule.')
     const target = this.#targets.get(row.kind)
     if (!target) throw new BridgeError(409, 'conflict', `This node has nothing that can run a '${row.kind}' schedule.`)
     const parsed = target.parse(safeJson(row.target))
-    if (parsed === null) throw new BridgeError(409, 'conflict', 'That schedule points at something this node cannot resolve right now.')
-    await this.#db.update(schema.userSchedules).set({ risk: target.risk?.(parsed) ?? null }).where(eq(schema.userSchedules.id, key.slice(5)))
+    if (parsed === null)
+      throw new BridgeError(409, 'conflict', 'That schedule points at something this node cannot resolve right now.')
+    await this.#db
+      .update(schema.userSchedules)
+      .set({ risk: target.risk?.(parsed) ?? null })
+      .where(eq(schema.userSchedules.id, key.slice(5)))
     return this.#row(key)
   }
 
   async remove(key: string): Promise<void> {
     if (keyOwner(key).owner !== 'user') {
-      throw new BridgeError(409, 'conflict', 'A schedule declared by acorn or a plugin cannot be deleted — pause it instead.')
+      throw new BridgeError(
+        409,
+        'conflict',
+        'A schedule declared by acorn or a plugin cannot be deleted — pause it instead.',
+      )
     }
     await this.#entry(key)
-    const row = (await this.#db.select().from(schema.userSchedules).where(eq(schema.userSchedules.id, key.slice(5))))[0]
+    const row = (
+      await this.#db
+        .select()
+        .from(schema.userSchedules)
+        .where(eq(schema.userSchedules.id, key.slice(5)))
+    )[0]
     const target = row && this.#targets.get(row.kind)
     const parsed = row && target?.parse(safeJson(row.target))
     if (parsed && target?.remove) await target.remove(parsed)
@@ -337,7 +372,8 @@ export class Scheduler {
       throw new BridgeError(409, 'conflict', 'Nothing on this node can run that schedule right now.')
     }
     if (this.#inflight.has(key)) throw new BridgeError(409, 'conflict', 'That schedule is already running.')
-    if (this.#inflight.size >= CONCURRENCY) throw new BridgeError(409, 'conflict', 'The node is already running as many scheduled jobs as it allows.')
+    if (this.#inflight.size >= CONCURRENCY)
+      throw new BridgeError(409, 'conflict', 'The node is already running as many scheduled jobs as it allows.')
     await this.#execute(entry, 'manual', requestKey)
     return (await this.runs(key))[0]!
   }
@@ -357,7 +393,7 @@ export class Scheduler {
       if (candidates.length === 0) return
       const soonest = Math.min(...candidates.map((entry) => entry.state.nextRunAt))
       let delay = Math.max(0, soonest - this.#clock.now())
-      // ponytail: at the cap, back off a second rather than arming a zero-delay timer that would spin
+      // At the cap, back off a second rather than arming a zero-delay timer that would spin
       // until a slot frees. Completions re-arm anyway, so this only covers the case where every slot is
       // held by a long run.
       if (this.#inflight.size >= CONCURRENCY) delay = Math.max(delay, 1_000)
@@ -437,8 +473,11 @@ export class Scheduler {
             reason,
             ...(reason === 'manual' ? { requestKey } : { dueAt: entry.state.nextRunAt }),
           }),
-          new Promise<never>((_, reject) => timeout.addEventListener('abort', () => reject(new Error('timed out')), { once: true })),
-        ]))
+          new Promise<never>((_, reject) =>
+            timeout.addEventListener('abort', () => reject(new Error('timed out')), { once: true }),
+          ),
+        ]),
+      )
       if (typeof result === 'string' && result) detail = detail ? `${detail}; ${result}` : result
     } catch (error) {
       // A deliberate no-op is not a failure. It resumes on the normal cadence, no backoff and no red row,
@@ -456,7 +495,12 @@ export class Scheduler {
 
   /** What the state row becomes after a run: the next fire time, the last-run facts, and on failure a
    *  visible backoff, because a silent retry loop is how rate limits die. */
-  async #afterRun(entry: Entry, status: ScheduleStatus, finishedAt: number, detail?: string): Promise<Partial<StateRow>> {
+  async #afterRun(
+    entry: Entry,
+    status: ScheduleStatus,
+    finishedAt: number,
+    detail?: string,
+  ): Promise<Partial<StateRow>> {
     const normal = nextRunAtForTarget(entry.cadence, finishedAt, this.#clock.random, entry.timezone)
     // A skip takes the ok path for timing and keeps its reason visible: the row says why it did nothing,
     // and the next run is the one the cadence would have produced anyway.
@@ -472,7 +516,10 @@ export class Scheduler {
     const failures = await this.#consecutiveFailures(entry.key)
     // Never earlier than the cadence would have fired anyway: a failing daily job must not start retrying
     // every six hours just because the cap is six hours.
-    const backoffUntil = Math.max(normal, finishedAt + Math.min(cadencePeriodMs(entry.cadence) * 2 ** failures, MAX_BACKOFF_MS))
+    const backoffUntil = Math.max(
+      normal,
+      finishedAt + Math.min(cadencePeriodMs(entry.cadence) * 2 ** failures, MAX_BACKOFF_MS),
+    )
     return {
       nextRunAt: backoffUntil,
       lastRunAt: finishedAt,
@@ -496,13 +543,24 @@ export class Scheduler {
   async #recordSkip(entry: Entry, why: string): Promise<void> {
     const at = this.#clock.now()
     await this.#recordRun(entry.key, { startedAt: at, finishedAt: at, status: 'skipped', detail: why })
-    await this.#writeState(entry.key, { nextRunAt: nextRunAtForTarget(entry.cadence, at, this.#clock.random, entry.timezone) })
+    await this.#writeState(entry.key, {
+      nextRunAt: nextRunAtForTarget(entry.cadence, at, this.#clock.random, entry.timezone),
+    })
   }
 
-  async #recordRun(key: string, run: { startedAt: number; finishedAt: number; status: ScheduleStatus; detail?: string }): Promise<void> {
+  async #recordRun(
+    key: string,
+    run: { startedAt: number; finishedAt: number; status: ScheduleStatus; detail?: string },
+  ): Promise<void> {
     await this.#db
       .insert(schema.scheduleRuns)
-      .values({ key, startedAt: run.startedAt, finishedAt: run.finishedAt, status: run.status, detail: run.detail ?? null })
+      .values({
+        key,
+        startedAt: run.startedAt,
+        finishedAt: run.finishedAt,
+        status: run.status,
+        detail: run.detail ?? null,
+      })
       // Two runs of one key inside the same millisecond cannot overlap (serialization), but a fast job run
       // twice by hand can land on the same timestamp. Overwrite rather than lose the newer one.
       .onConflictDoUpdate({
@@ -541,11 +599,15 @@ export class Scheduler {
   /** Mint a state row for anything that has just become declarable, then re-arm. Idempotent, and the only
    *  place a nextRunAt is invented. */
   async #sync(): Promise<void> {
-    const known = new Set((await this.#db.select({ key: schema.scheduleState.key }).from(schema.scheduleState)).map((row) => row.key))
+    const known = new Set(
+      (await this.#db.select({ key: schema.scheduleState.key }).from(schema.scheduleState)).map((row) => row.key),
+    )
     const now = this.#clock.now()
     for (const entry of await this.#entries()) {
       if (known.has(entry.key)) continue
-      await this.#writeState(entry.key, { nextRunAt: nextRunAtForTarget(entry.cadence, now, this.#clock.random, entry.timezone) })
+      await this.#writeState(entry.key, {
+        nextRunAt: nextRunAtForTarget(entry.cadence, now, this.#clock.random, entry.timezone),
+      })
     }
     this.#arm()
   }
@@ -554,7 +616,10 @@ export class Scheduler {
    *  cheaper than any cache that could go stale behind a plugin reload or a second writer. */
   async #entries(): Promise<Entry[]> {
     const [stateRows, userRows] = await Promise.all([
-      this.#db.select().from(schema.scheduleState).where(notInArray(schema.scheduleState.key, [PAUSE_KEY])),
+      this.#db
+        .select()
+        .from(schema.scheduleState)
+        .where(notInArray(schema.scheduleState.key, [PAUSE_KEY])),
       this.#db.select().from(schema.userSchedules),
     ])
     const state = new Map(stateRows.map((row) => [row.key, row]))
@@ -563,15 +628,17 @@ export class Scheduler {
 
     for (const declared of this.#declared.values()) {
       seen.add(declared.key)
-      entries.push(this.#entryFor(declared.key, state.get(declared.key), {
-        name: declared.name,
-        kind: keyOwner(declared.key).owner === 'core' ? 'core' : 'plugin',
-        cadence: declared.cadence,
-        enabled: declared.enabled ?? true,
-        registered: true,
-        timeoutMs: Math.min(declared.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS),
-        run: declared.run,
-      }))
+      entries.push(
+        this.#entryFor(declared.key, state.get(declared.key), {
+          name: declared.name,
+          kind: keyOwner(declared.key).owner === 'core' ? 'core' : 'plugin',
+          cadence: declared.cadence,
+          enabled: declared.enabled ?? true,
+          registered: true,
+          timeoutMs: Math.min(declared.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS),
+          run: declared.run,
+        }),
+      )
     }
 
     for (const row of userRows) {
@@ -579,26 +646,30 @@ export class Scheduler {
       seen.add(key)
       const target = this.#targets.get(row.kind)
       const parsed = target?.parse(safeJson(row.target)) ?? null
-      entries.push(this.#entryFor(key, state.get(key), {
-        name: row.name,
-        kind: row.kind,
-        // A stored cadence that no longer parses falls back to the floor rather than making the row
-        // unreadable, the tolerant codec, same as an unknown panel view kind.
-        cadence: parseCadence(safeJson(row.cadence)) ?? { every: CADENCE_MIN_SECONDS },
-        enabled: true,
-        registered: target !== undefined,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
-        ...(row.risk ? { risk: row.risk as ToolRisk } : {}),
-        ...(parsed !== null && target?.timezone?.(parsed) ? { timezone: target.timezone(parsed) } : {}),
-        ...(target
-          ? { run: (signal: AbortSignal, context?: ScheduleRunContext) => {
-              const current = target.parse(safeJson(row.target))
-              return current === null
-                ? Promise.reject(new ScheduleSkipped('the target is not available on this node'))
-                : target.run(current, signal, { ...(row.risk ? { risk: row.risk as ToolRisk } : {}) }, context!)
-            } }
-          : {}),
-      }))
+      entries.push(
+        this.#entryFor(key, state.get(key), {
+          name: row.name,
+          kind: row.kind,
+          // A stored cadence that no longer parses falls back to the floor rather than making the row
+          // unreadable, the tolerant codec, same as an unknown panel view kind.
+          cadence: parseCadence(safeJson(row.cadence)) ?? { every: CADENCE_MIN_SECONDS },
+          enabled: true,
+          registered: target !== undefined,
+          timeoutMs: DEFAULT_TIMEOUT_MS,
+          ...(row.risk ? { risk: row.risk as ToolRisk } : {}),
+          ...(parsed !== null && target?.timezone?.(parsed) ? { timezone: target.timezone(parsed) } : {}),
+          ...(target
+            ? {
+                run: (signal: AbortSignal, context?: ScheduleRunContext) => {
+                  const current = target.parse(safeJson(row.target))
+                  return current === null
+                    ? Promise.reject(new ScheduleSkipped('the target is not available on this node'))
+                    : target.run(current, signal, { ...(row.risk ? { risk: row.risk as ToolRisk } : {}) }, context!)
+                },
+              }
+            : {}),
+        }),
+      )
     }
 
     // Retained state rows whose declaration is currently absent: a disabled plugin, an uninstalled one, a
@@ -606,23 +677,21 @@ export class Scheduler {
     // history are waiting for the plugin's return.
     for (const row of stateRows) {
       if (seen.has(row.key)) continue
-      entries.push(this.#entryFor(row.key, row, {
-        name: row.key,
-        kind: 'unknown',
-        cadence: { every: CADENCE_MIN_SECONDS },
-        enabled: true,
-        registered: false,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
-      }))
+      entries.push(
+        this.#entryFor(row.key, row, {
+          name: row.key,
+          kind: 'unknown',
+          cadence: { every: CADENCE_MIN_SECONDS },
+          enabled: true,
+          registered: false,
+          timeoutMs: DEFAULT_TIMEOUT_MS,
+        }),
+      )
     }
     return entries
   }
 
-  #entryFor(
-    key: string,
-    row: StateRow | undefined,
-    declared: Omit<Entry, 'key' | 'state' | 'declaredCadence'>,
-  ): Entry {
+  #entryFor(key: string, row: StateRow | undefined, declared: Omit<Entry, 'key' | 'state' | 'declaredCadence'>): Entry {
     const state: StateRow = row ?? {
       key,
       enabledOverride: null,

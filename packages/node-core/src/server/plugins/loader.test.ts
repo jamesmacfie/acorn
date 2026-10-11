@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
-import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin } from './loader'
+import {
+  installedPluginInfo,
+  loadExternalPlugins,
+  pluginInstallDir,
+  readClientBundle,
+  snapshotActivePlugin,
+} from './loader'
 import { PluginMigrationsError } from './migrations'
 import { Hono } from 'hono'
 import { testGate } from '../../testkit/auth'
@@ -40,14 +46,15 @@ const manifest = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   name: `${id} plugin`,
   version: '1.0.0',
-  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1',
+  apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
   ...over,
 })
 
 beforeEach(() => {
   // A path with a space on purpose: the loader must reach the bundle through pathToFileURL, and a
-  // bare `import('/a b/c.js')` fails on exactly this input (and on every Windows path).
+  // bare `import()` of a path with a space in it fails on exactly this input (and on every Windows path).
   root = mkdtempSync(join(tmpdir(), 'acorn loader-'))
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -102,13 +109,22 @@ describe('loading a plugin', () => {
   })
 
   it('carries the declared node permissions through untouched', async () => {
-    install('ntfy', manifest('ntfy', { permissions: { node: { core: ['projects:read'], secrets: true } } }), BUNDLE('ntfy'))
+    install(
+      'ntfy',
+      manifest('ntfy', { permissions: { node: { core: ['projects:read'], secrets: true } } }),
+      BUNDLE('ntfy'),
+    )
     const { loaded } = await loadExternalPlugins(root, { builtins: [] })
     expect(loaded[0].manifest.permissions.node).toMatchObject({ core: ['projects:read'], secrets: true, exec: false })
   })
 
   it('takes a client-only package without complaint and loads nothing for it', async () => {
-    install('widget', manifest('widget', { node: undefined, client: './dist/client.js' }), undefined, 'export default {}')
+    install(
+      'widget',
+      manifest('widget', { node: undefined, client: './dist/client.js' }),
+      undefined,
+      'export default {}',
+    )
     const { loaded, installed, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect({ loaded, failures }).toEqual({ loaded: [], failures: [] })
     // Nothing to run, but everything to distribute, which is why `installed` is a separate list.
@@ -116,12 +132,17 @@ describe('loading a plugin', () => {
   })
 
   it('runs a skills-only package as a plugin, with its skills read, and fails a broken skill by name', async () => {
-    const dir = install('procedures', manifest('procedures', { node: undefined, contributions: { skills: [{ id: 'review', path: 'skills/review' }] } }))
+    const dir = install(
+      'procedures',
+      manifest('procedures', { node: undefined, contributions: { skills: [{ id: 'review', path: 'skills/review' }] } }),
+    )
     mkdirSync(join(dir, 'skills/review'), { recursive: true })
     writeFileSync(join(dir, 'skills/review/SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nBody\n')
     const ok = await loadExternalPlugins(root, { builtins: [] })
     expect(ok.failures).toEqual([])
-    expect(ok.loaded.map((entry) => [entry.manifest.id, entry.skills?.map((skill) => [skill.id, skill.name])])).toEqual([['procedures', [['review', 'review']]]])
+    expect(ok.loaded.map((entry) => [entry.manifest.id, entry.skills?.map((skill) => [skill.id, skill.name])])).toEqual(
+      [['procedures', [['review', 'review']]]],
+    )
     expect((await snapshotActivePlugin(ok.installed[0]!)).identity.activation).toBe('node')
 
     writeFileSync(join(dir, 'skills/review/SKILL.md'), '---\nname: review\n---\nBody\n')
@@ -169,9 +190,14 @@ describe('loaded-plugin migration ownership', () => {
       `export default { name: 'keeper', init: (ctx) => ctx.storage.open().$client.exec('INSERT INTO realm_proof VALUES (1)') }\n`,
     )
     const migrations = chain(join(dir, 'migrations'))
-    writeFileSync(join(migrations, 'meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [
-      { idx: 0, version: '6', when: 1, tag: '0000_keeper', breakpoints: true },
-    ] }))
+    writeFileSync(
+      join(migrations, 'meta/_journal.json'),
+      JSON.stringify({
+        version: '7',
+        dialect: 'sqlite',
+        entries: [{ idx: 0, version: '6', when: 1, tag: '0000_keeper', breakpoints: true }],
+      }),
+    )
     writeFileSync(join(migrations, '0000_keeper.sql'), 'CREATE TABLE realm_proof (id INTEGER)')
     const databasePath = join(pluginInstallDir(root), 'keeper.sqlite')
     for (let lifetime = 0; lifetime < 2; lifetime++) {
@@ -181,7 +207,9 @@ describe('loaded-plugin migration ownership', () => {
       try {
         await loaded[0].plugin.init({ routes: {}, schedules: {}, providers: {}, events: {} } as never)
         for (const suffix of ['', '-wal', '-shm']) expect(statSync(databasePath + suffix).mode & 0o777).toBe(0o600)
-      } finally { await loaded[0].plugin.dispose?.() }
+      } finally {
+        await loaded[0].plugin.dispose?.()
+      }
       // Closing the last handle retires its sidecars. Reload must recreate the exact granted files
       // without granting their parent directory or losing permission on an aliased data root.
       expect(existsSync(databasePath + '-wal')).toBe(false)
@@ -199,7 +227,10 @@ describe('the isolated node realm', () => {
   it('uses package-scoped bootstrap grants while retaining plugin import provenance', async () => {
     const metadata = fileURLToPath(new URL('../../../node_modules/@acorn/protocol/package.json', import.meta.url))
     const policy = import.meta.resolve('@acorn/protocol/plugin/nodeBuiltins.ts')
-    install('bootstrap-alias', manifest('bootstrap-alias'), `
+    install(
+      'bootstrap-alias',
+      manifest('bootstrap-alias'),
+      `
       import { readFileSync } from 'node:fs'
       let policyImportDenied = false
       try { await import(${JSON.stringify(policy)}) } catch { policyImportDenied = true }
@@ -209,67 +240,121 @@ describe('the isolated node realm', () => {
         runtimeGrants: process.execArgv,
         policyImportDenied,
       }
-    `)
+    `,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     try {
       expect(loaded[0].plugin).toMatchObject({
-        bootstrapPackage: '@acorn/protocol', policyImportDenied: true,
+        bootstrapPackage: '@acorn/protocol',
+        policyImportDenied: true,
       })
       const grants = (loaded[0].plugin as { runtimeGrants?: string[] }).runtimeGrants
       expect(grants).toEqual(expect.any(Array))
-      expect(grants).not.toContain(`--allow-fs-read=${fileURLToPath(new URL('../../../node_modules', import.meta.url))}`)
-    } finally { await loaded[0].plugin.dispose?.() }
+      expect(grants).not.toContain(
+        `--allow-fs-read=${fileURLToPath(new URL('../../../node_modules', import.meta.url))}`,
+      )
+    } finally {
+      await loaded[0].plugin.dispose?.()
+    }
   })
 
   it.each<Principal>([
     { kind: 'device', userId: 'synthetic-owner', deviceId: 'synthetic-device' },
     { kind: 'internal', scope: 'service', userId: 'synthetic-owner' },
     { kind: 'internal', scope: 'task', userId: 'synthetic-owner', taskId: 'synthetic-task' },
-  ])('forwards the verified $kind principal without transport credentials to the worker', async principal => {
-    install('request-reader', manifest('request-reader'), `export default {
+  ])('forwards the verified $kind principal without transport credentials to the worker', async (principal) => {
+    install(
+      'request-reader',
+      manifest('request-reader'),
+      `export default {
       name: 'request-reader', init(ctx) {
         ctx.routes.fetch(async (request, context) => Response.json({
           headers: Object.fromEntries(request.headers), principal: context.principal,
           body: await request.text(), url: request.url,
         }))
       }
-    }`)
+    }`,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     let handler!: PluginFetchHandler
     try {
-      await loaded[0].plugin.init({ routes: { fetch: (fetch: PluginFetchHandler) => { handler = fetch } }, schedules: {}, providers: {}, events: {} } as never)
-      const app = new Hono<AppEnv>().use('*', ...testGate(principal)).post('/v1/p/request-reader/echo', c =>
-        servePluginFetch(c, { pluginId: 'request-reader', mount: '/v1/p/request-reader', fetch: handler }))
-      const response = await app.fetch(new Request('http://acorn.test/v1/p/request-reader/echo?mode=one', {
-        method: 'POST', body: 'synthetic request body', headers: {
-          Authorization: 'Bearer synthetic-device-secret', 'X-Acorn-Internal': 'synthetic-internal-secret',
-          Cookie: 'synthetic-cookie=secret', 'Proxy-Authorization': 'synthetic-proxy-secret', 'X-Application': 'retained',
+      await loaded[0].plugin.init({
+        routes: {
+          fetch: (fetch: PluginFetchHandler) => {
+            handler = fetch
+          },
         },
-      }), {} as Env)
+        schedules: {},
+        providers: {},
+        events: {},
+      } as never)
+      const app = new Hono<AppEnv>()
+        .use('*', ...testGate(principal))
+        .post('/v1/p/request-reader/echo', (c) =>
+          servePluginFetch(c, { pluginId: 'request-reader', mount: '/v1/p/request-reader', fetch: handler }),
+        )
+      const response = await app.fetch(
+        new Request('http://acorn.test/v1/p/request-reader/echo?mode=one', {
+          method: 'POST',
+          body: 'synthetic request body',
+          headers: {
+            Authorization: 'Bearer synthetic-device-secret',
+            'X-Acorn-Internal': 'synthetic-internal-secret',
+            Cookie: 'synthetic-cookie=secret',
+            'Proxy-Authorization': 'synthetic-proxy-secret',
+            'X-Application': 'retained',
+          },
+        }),
+        {} as Env,
+      )
       expect(response.status).toBe(200)
-      const seen = await response.json() as { headers: Record<string, string>; principal: Principal; body: string; url: string }
+      const seen = (await response.json()) as {
+        headers: Record<string, string>
+        principal: Principal
+        body: string
+        url: string
+      }
       expect(seen.principal).toEqual(principal)
       expect(seen.body).toBe('synthetic request body')
       expect(seen.url).toBe('http://acorn.test/echo?mode=one')
       expect(seen.headers['x-application']).toBe('retained')
-      for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization']) expect(seen.headers).not.toHaveProperty(name)
-    } finally { await loaded[0].plugin.dispose?.() }
+      for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization'])
+        expect(seen.headers).not.toHaveProperty(name)
+    } finally {
+      await loaded[0].plugin.dispose?.()
+    }
   })
 
   it('refuses non-file dependency schemes while retaining package-local imports', async () => {
-    const dir = install('local-import', manifest('local-import'), `import { marker } from './local.js'; export default { name: 'local-import', marker, init() {} }`)
+    const dir = install(
+      'local-import',
+      manifest('local-import'),
+      `import { marker } from './local.js'; export default { name: 'local-import', marker, init() {} }`,
+    )
     writeFileSync(join(dir, 'dist/local.js'), 'export const marker = 42')
-    install('non-file-import', manifest('non-file-import'), `import 'data:text/javascript,export default 42'; ${BUNDLE('non-file-import')}`)
+    install(
+      'non-file-import',
+      manifest('non-file-import'),
+      `import 'data:text/javascript,export default 42'; ${BUNDLE('non-file-import')}`,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(loaded[0].plugin).toMatchObject({ name: 'local-import', marker: 42 })
-    expect(failures).toEqual([expect.objectContaining({ id: 'non-file-import', reason: expect.stringContaining('dependencies must be package files or approved builtins') })])
+    expect(failures).toEqual([
+      expect.objectContaining({
+        id: 'non-file-import',
+        reason: expect.stringContaining('dependencies must be package files or approved builtins'),
+      }),
+    ])
     await loaded[0].plugin.dispose?.()
   })
 
   it('uses the same family policy for ESM, CommonJS, and builtin lookup', async () => {
-    install('classified', manifest('classified'), `
+    install(
+      'classified',
+      manifest('classified'),
+      `
       import { getBuiltinModule as namedAccessor } from 'node:process'
       const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
       const names = ['node:dns/promises', '_http_client', 'node:inspector/promises']
@@ -281,7 +366,8 @@ describe('the isolated node realm', () => {
         try { await import(name); denied.push(false) } catch { denied.push(true) }
       }
       export default { name: 'classified', denied, init() {} }
-    `)
+    `,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     expect(loaded[0].plugin).toMatchObject({ denied: Array(12).fill(true) })
@@ -289,7 +375,10 @@ describe('the isolated node realm', () => {
   })
 
   it('keeps every builtin entry point gated after a plugin rewrites policy intrinsics', async () => {
-    install('tamper-builtins', manifest('tamper-builtins'), `
+    install(
+      'tamper-builtins',
+      manifest('tamper-builtins'),
+      `
       const rewritten = []
       for (const [target, key, value] of [
         [Set.prototype, 'has', () => true],
@@ -311,7 +400,8 @@ describe('the isolated node realm', () => {
         }
       }
       export default { name: 'tamper-builtins', rewritten, errors, init() {} }
-    `)
+    `,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     expect(loaded[0].plugin).toMatchObject({
@@ -332,7 +422,10 @@ describe('the isolated node realm', () => {
   })
 
   it('checks the native URL after a plugin changes Web API globals and accessors', async () => {
-    install('tamper-network', manifest('tamper-network', { permissions: { node: { net: ['allowed.example'] } } }), `
+    install(
+      'tamper-network',
+      manifest('tamper-network', { permissions: { node: { net: ['allowed.example'] } } }),
+      `
       const NativeRequest = Request
       const check = (input) => {
         try {
@@ -365,7 +458,8 @@ describe('the isolated node realm', () => {
         allowedRequest: check(allowedRequest),
         init() {},
       }
-    `)
+    `,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     expect(loaded[0].plugin).toMatchObject({
@@ -379,7 +473,10 @@ describe('the isolated node realm', () => {
   })
 
   it('keeps declared builtin and hostname grants while refusing undeclared builtins', async () => {
-    install('granted', manifest('granted', { permissions: { node: { sockets: true, net: ['allowed.example'] } } }), `
+    install(
+      'granted',
+      manifest('granted', { permissions: { node: { sockets: true, net: ['allowed.example'] } } }),
+      `
       const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
       const granted = [typeof require('node:net').createConnection,
         typeof process.getBuiltinModule('node:net').createConnection,
@@ -393,7 +490,8 @@ describe('the isolated node realm', () => {
         host = 'allowed'
       } catch (error) { host = error.message }
       export default { name: 'granted', granted, denied, host, init() {} }
-    `)
+    `,
+    )
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     expect(loaded[0].plugin).toMatchObject({
@@ -405,25 +503,42 @@ describe('the isolated node realm', () => {
   })
 
   it('retains dependency provenance when a previously loaded package file is removed', async () => {
-    const dir = install('removed-parent', manifest('removed-parent'), `import { loadLater } from './later.js';
+    const dir = install(
+      'removed-parent',
+      manifest('removed-parent'),
+      `import { loadLater } from './later.js';
       export default { name: 'removed-parent', init(ctx) {
         ctx.routes.fetch(async () => {
           try { await loadLater(); return Response.json({ allowed: true }) }
           catch (error) { return Response.json({ error: error.message }) }
         })
       } }
-    `)
+    `,
+    )
     const later = join(dir, 'dist/later.js')
     writeFileSync(later, "export const loadLater = () => import('data:text/javascript,export default 42')")
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
     let handler!: PluginFetchHandler
     try {
-      await loaded[0].plugin.init({ routes: { fetch: (fetch: PluginFetchHandler) => { handler = fetch } }, schedules: {}, providers: {}, events: {} } as never)
+      await loaded[0].plugin.init({
+        routes: {
+          fetch: (fetch: PluginFetchHandler) => {
+            handler = fetch
+          },
+        },
+        schedules: {},
+        providers: {},
+        events: {},
+      } as never)
       rmSync(later)
       const response = await handler(new Request('http://acorn.test/'), {} as never)
-      expect(await response.json()).toEqual({ error: expect.stringContaining('dependencies must be package files or approved builtins') })
-    } finally { await loaded[0].plugin.dispose?.() }
+      expect(await response.json()).toEqual({
+        error: expect.stringContaining('dependencies must be package files or approved builtins'),
+      })
+    } finally {
+      await loaded[0].plugin.dispose?.()
+    }
   })
 
   it('applies wildcard network grants to one subdomain label', async () => {
@@ -490,7 +605,7 @@ export default {
     expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
   })
 
-  // A penetration review read a marker core.sqlite through both of these with real plugin workers.
+  // Each case below tries to read a marker core.sqlite from a real plugin worker through a file grant.
   const snoop = (path: string) => {
     writeFileSync(join(root, 'core.sqlite'), 'core')
     vi.stubEnv('PLUGIN_FILE', path)
@@ -534,11 +649,16 @@ export default {
       ]
       for (const [path, accepted] of cases) {
         vi.stubEnv('PLUGIN_FILE', path)
-        install('file-grant', manifest('file-grant', { permissions: { node: { files: [{ env: 'PLUGIN_FILE', access: 'read-write' }] } } }), BUNDLE('file-grant'))
+        install(
+          'file-grant',
+          manifest('file-grant', { permissions: { node: { files: [{ env: 'PLUGIN_FILE', access: 'read-write' }] } } }),
+          BUNDLE('file-grant'),
+        )
         const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
         for (const entry of loaded) await entry.plugin.dispose?.()
         expect({ path, failure: failures[0]?.reason ?? null }).toEqual({
-          path, failure: accepted ? null : expect.stringContaining('file grant PLUGIN_FILE must name a single regular file'),
+          path,
+          failure: accepted ? null : expect.stringContaining('file grant PLUGIN_FILE must name a single regular file'),
         })
       }
     } finally {
@@ -609,7 +729,7 @@ export default { name: ${JSON.stringify(name)}, init() {} }
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
 
     expect(loaded).toEqual([])
-    expect(failures.map(failure => failure.reason)).toEqual([
+    expect(failures.map((failure) => failure.reason)).toEqual([
       expect.stringContaining("may not require non-builtin 'some-package'"),
       expect.stringContaining("may not require 'node:sqlite'"),
     ])
@@ -643,7 +763,11 @@ describe('the installed enumeration', () => {
     install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installed[0].client).toEqual({ hash: sha256('export default {}'), bytes: 17 })
-    expect(installedPluginInfo(installed[0])).toMatchObject({ id: 'ntfy', version: '1.0.0', apiVersion: PLUGIN_API_MAJOR })
+    expect(installedPluginInfo(installed[0])).toMatchObject({
+      id: 'ntfy',
+      version: '1.0.0',
+      apiVersion: PLUGIN_API_MAJOR,
+    })
     // The projection the route takes must not carry the node's filesystem layout.
     expect(installedPluginInfo(installed[0])).not.toHaveProperty('dir')
   })
@@ -652,7 +776,10 @@ describe('the installed enumeration', () => {
     install('plain', manifest('plain'), BUNDLE('plain'))
     install('missing', manifest('missing', { client: './dist/client.js' }), BUNDLE('missing'))
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
-    expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([['missing', null], ['plain', null]])
+    expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([
+      ['missing', null],
+      ['plain', null],
+    ])
   })
 
   it('reports no bundle for a client entrypoint that symlinks out of the plugin directory', async () => {
@@ -689,11 +816,20 @@ describe('the installed enumeration', () => {
   })
 
   it('keeps an active declaration and its bytes together after the package changes', async () => {
-    const dir = install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default { version: 1 }')
+    const dir = install(
+      'ntfy',
+      manifest('ntfy', { client: './dist/client.js' }),
+      BUNDLE('ntfy'),
+      'export default { version: 1 }',
+    )
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     const active = await snapshotActivePlugin(installed[0]!)
     writeFileSync(join(dir, 'dist', 'client.js'), 'export default { version: 2 }')
-    expect(active.identity).toMatchObject({ version: '1.0.0', activation: 'node', client: { hash: sha256('export default { version: 1 }') } })
+    expect(active.identity).toMatchObject({
+      version: '1.0.0',
+      activation: 'node',
+      client: { hash: sha256('export default { version: 1 }') },
+    })
     expect(new TextDecoder().decode(active.bundle!.bytes)).toBe('export default { version: 1 }')
     expect((await readClientBundle(installed, 'ntfy'))?.hash).toBe(sha256('export default { version: 2 }'))
   })
@@ -709,19 +845,26 @@ describe('the installed enumeration', () => {
 // The manifest is the only place a shell contribution can be declared, so what it parses is the whole
 // vocabulary a third-party plugin's UI has (docs/plugins/loaded-plugins.md § Loaded plugins).
 describe('declared frame contributions', () => {
-  const withFrames = (frames: unknown[]) =>
-    manifest('board', { client: './dist/client.js', contributions: { frames } })
+  const withFrames = (frames: unknown[]) => manifest('board', { client: './dist/client.js', contributions: { frames } })
 
   it('defaults a surface to a desktop pane at order 500', async () => {
     // `layout` and `regions` are not defaulted: a pane has to say how it is drawn, and the plainest
-    // true answer is still a sentence the author writes (pluginManifest.ts).
+    // true answer is still a sentence the author writes (the manifest schema).
     const declared = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
     install('board', withFrames([declared]), BUNDLE('board'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installedPluginInfo(installed[0]).contributions.frames).toEqual([
       // `scope: 'task'` is part of the default set: a pane written before the field existed is a pane
       // in a task's layout, which is the only thing a pane has ever been.
-      { ...declared, glyph: 'puzzle', order: 500, scope: 'task', formFactor: ['desktop'], claimsKeys: [], destinations: [] },
+      {
+        ...declared,
+        glyph: 'puzzle',
+        order: 500,
+        scope: 'task',
+        formFactor: ['desktop'],
+        claimsKeys: [],
+        destinations: [],
+      },
     ])
   })
 
@@ -730,14 +873,44 @@ describe('declared frame contributions', () => {
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
-    expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], commands: [], cliCommands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], documentServices: [] })
+    expect(installedPluginInfo(installed[0]).contributions).toEqual({
+      frames: [],
+      sources: [],
+      slots: [],
+      commands: [],
+      cliCommands: [],
+      keybindings: [],
+      attention: [],
+      nodeStats: [],
+      contentLinks: [],
+      agentContexts: [],
+      refResolvers: [],
+      routes: [],
+      themes: [],
+      styles: [],
+      contextMenus: [],
+      extensionPoints: [],
+      extensions: [],
+      schedules: [],
+      taskChecks: [],
+      auditActions: [],
+      harnesses: [],
+      customAgents: [],
+      skills: [],
+      agentTools: [],
+      contextSections: [],
+      documentServices: [],
+    })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {
-    // Phase 4's declarative chrome lands under sibling keys. A strict object here would turn "this
-    // acorn contributes less" into "this plugin does not parse".
-    install('board', manifest('board', { contributions: { frames: [], descriptors: [{ kind: 'badge' }] } }), BUNDLE('board'))
+    // Contribution kinds this acorn does not know land under sibling keys. A strict object here would
+    // turn "this acorn contributes less" into "this plugin does not parse".
+    install(
+      'board',
+      manifest('board', { contributions: { frames: [], descriptors: [{ kind: 'badge' }] } }),
+      BUNDLE('board'),
+    )
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installed[0].manifest.contributions).toMatchObject({ descriptors: [{ kind: 'badge' }] })
   })
@@ -770,8 +943,8 @@ describe('rejections', () => {
   })
 
   it('names the field a bad manifest broke, not just the schema', async () => {
-    // The whole reason this reason exists. One collapsed sentence sent an author looking through ~30
-    // rules by hand; the path is what tells them which line to open.
+    // The path in the reason is what tells an author which manifest line to open, rather than one
+    // collapsed sentence covering every rule.
     const bad = manifest('board', { contributions: { frames: [{ target: 'toolbar', id: 'board', label: 'Board' }] } })
     install('board', bad, BUNDLE('board'))
     const reason = await reasonFor('board')
@@ -806,7 +979,11 @@ describe('rejections', () => {
 
   it('rejects a migrations directory that symlinks outside the plugin package', async () => {
     const outside = chain(join(root, 'outside-migrations'))
-    const dir = install('escape-migrations', manifest('escape-migrations', { migrations: './migrations' }), BUNDLE('escape-migrations'))
+    const dir = install(
+      'escape-migrations',
+      manifest('escape-migrations', { migrations: './migrations' }),
+      BUNDLE('escape-migrations'),
+    )
     symlinkSync(outside, join(dir, 'migrations'))
     expect(await reasonFor('escape-migrations')).toMatch(/resolves outside the plugin directory/)
   })
@@ -883,7 +1060,11 @@ describe('evaluating a fresh isolated package realm', () => {
   })
 
   it('evaluates imported modules again with the rest of the realm', async () => {
-    const dir = install('acme', manifest('acme'), `import { marker } from './dep.js'\nexport default { name: 'acme', init: () => {}, marker }\n`)
+    const dir = install(
+      'acme',
+      manifest('acme'),
+      `import { marker } from './dep.js'\nexport default { name: 'acme', init: () => {}, marker }\n`,
+    )
     writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v1'\n`)
     expect(await markerOf({ builtins: [] })).toBe('dep-v1')
 
@@ -892,8 +1073,8 @@ describe('evaluating a fresh isolated package realm', () => {
   })
 })
 
-// `requires.plugins` in the manifest. Before it, a package that consumed another plugin's capability
-// failed at whichever route reached for it first, with a message naming a missing capability and
+// `requires.plugins` in the manifest. Without it, a package that consumes another plugin's capability
+// fails at whichever route reaches for it first, with a message naming a missing capability and
 // nothing naming the package that should have provided it.
 describe('declared plugin dependencies', () => {
   it('refuses a package whose dependency is not installed, and names it', async () => {

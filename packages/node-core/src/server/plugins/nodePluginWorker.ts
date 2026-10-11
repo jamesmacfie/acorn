@@ -27,9 +27,7 @@ type WorkerOptions = {
 }
 
 const options = workerData as WorkerOptions
-const openWorkerPluginDb = options.migrationsFolder
-  ? (await import('./workerStorage.ts')).openWorkerPluginDb
-  : null
+const openWorkerPluginDb = options.migrationsFolder ? (await import('./workerStorage.ts')).openWorkerPluginDb : null
 const builtinGrants = { sockets: options.allowSockets, exec: options.allowExec }
 const builtinAllowed = (specifier: string) => pluginBuiltinAllowed(specifier, builtinGrants)
 
@@ -39,7 +37,7 @@ const builtinAllowed = (specifier: string) => pluginBuiltinAllowed(specifier, bu
 // builtin family policy, and non-builtin packages cannot escape the package's bundled dependency graph.
 const safeRequireSymbol = Symbol.for('acorn.plugin.safe-require.v1')
 const nativeRequire = createRequire(import.meta.url)
-const builtins = new Set(builtinModules.map(name => name.replace(/^node:/, '')))
+const builtins = new Set(builtinModules.map((name) => name.replace(/^node:/, '')))
 Object.defineProperty(globalThis, safeRequireSymbol, {
   configurable: false,
   writable: false,
@@ -64,12 +62,18 @@ registerHooks({
       throw new Error(`acorn: loaded plugin '${options.plugin}' may not import '${specifier}'`)
     }
     const resolved = next(specifier, context)
-    if (context.parentURL && (pluginModuleUrls.has(context.parentURL) ||
-      (context.parentURL.startsWith('file:') && isPluginFile(context.parentURL)))) {
+    if (
+      context.parentURL &&
+      (pluginModuleUrls.has(context.parentURL) ||
+        (context.parentURL.startsWith('file:') && isPluginFile(context.parentURL)))
+    ) {
       if (resolved.url.startsWith('node:')) {
-        if (!builtinAllowed(resolved.url)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not import '${specifier}'`)
+        if (!builtinAllowed(resolved.url))
+          throw new Error(`acorn: loaded plugin '${options.plugin}' may not import '${specifier}'`)
       } else if (!resolved.url.startsWith('file:')) {
-        throw new Error(`acorn: loaded plugin '${options.plugin}' dependencies must be package files or approved builtins`)
+        throw new Error(
+          `acorn: loaded plugin '${options.plugin}' dependencies must be package files or approved builtins`,
+        )
       } else if (!isPluginFile(resolved.url)) {
         throw new Error(`acorn: loaded plugin '${options.plugin}' may not import files outside its package`)
       } else {
@@ -118,13 +122,18 @@ if (options.allowNetwork) {
   const anyHost = hosts.has('*')
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
     let requestAddress: string | undefined
-    try { requestAddress = requestUrl.call(input) } catch { /* A URL or string, not a native Request. */ }
+    try {
+      requestAddress = requestUrl.call(input)
+    } catch {
+      /* A URL or string, not a native Request. */
+    }
     const url = new NativeURL(requestAddress ?? (input as string | URL))
     const hostname = urlHostname.call(url) as string
-    if (!networkHostAllowed(hostname, hosts)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${hostname}'`)
+    if (!networkHostAllowed(hostname, hosts))
+      throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${hostname}'`)
     // Use the checked spelling for non-Request inputs. Their string conversion can change between
     // policy evaluation and native fetch; a Request's internal URL is immutable.
-    const fetchInput = requestAddress === undefined ? urlHref.call(url) as string : input
+    const fetchInput = requestAddress === undefined ? (urlHref.call(url) as string) : input
     // An explicit any-host grant also permits redirects to any host. Keep the caller's redirect
     // policy instead of forcing manual redirects on an API client.
     if (anyHost) return nativeFetch(fetchInput, init)
@@ -146,9 +155,14 @@ let database: WorkerPluginDatabase | null = null
 try {
   const mod = await import(pathToFileURL(options.entrypoint).href)
   const plugin = (mod as { default?: unknown }).default as Partial<NodePlugin> | undefined
-  if (!plugin || typeof plugin !== 'object' || typeof plugin.name !== 'string' || typeof plugin.init !== 'function'
-    || (plugin.ready !== undefined && typeof plugin.ready !== 'function')
-    || (plugin.dispose !== undefined && typeof plugin.dispose !== 'function')) {
+  if (
+    !plugin ||
+    typeof plugin !== 'object' ||
+    typeof plugin.name !== 'string' ||
+    typeof plugin.init !== 'function' ||
+    (plugin.ready !== undefined && typeof plugin.ready !== 'function') ||
+    (plugin.dispose !== undefined && typeof plugin.dispose !== 'function')
+  ) {
     throw new Error('node entrypoint must default-export { name, init, ready?, dispose? } from an ESM bundle')
   }
   if (plugin.name !== options.plugin) {
@@ -182,7 +196,11 @@ try {
                 : options.migrationsFolder
                   ? {
                       open: () => {
-                        database ??= openWorkerPluginDb!(options.databasePath, options.plugin, options.migrationsFolder!)
+                        database ??= openWorkerPluginDb!(
+                          options.databasePath,
+                          options.plugin,
+                          options.migrationsFolder!,
+                        )
                         return database
                       },
                     }

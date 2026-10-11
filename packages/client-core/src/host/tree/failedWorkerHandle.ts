@@ -6,9 +6,15 @@ export function failedWorkerHandle(reason: string, onRefused: (reason: string) =
   let active = true
   let refuse: ((reason: string) => void) | null = onRefused
   const listeners = new Set<(reason: string) => void>()
-  queueMicrotask(() => { if (active) refuse?.(reason) })
+  queueMicrotask(() => {
+    if (active) refuse?.(reason)
+  })
   return {
-    mount() {}, unmount() {}, select() {}, surfaceAction() {}, appearance() {},
+    mount() {},
+    unmount() {},
+    select() {},
+    surfaceAction() {},
+    appearance() {},
     bridgePort: () => null,
     onHostRequest: () => () => {},
     transport: () => ({
@@ -16,11 +22,19 @@ export function failedWorkerHandle(reason: string, onRefused: (reason: string) =
       onFailed(listener) {
         if (!active) return () => {}
         listeners.add(listener)
-        queueMicrotask(() => { if (active && listeners.has(listener)) listener(reason) })
-        return () => { listeners.delete(listener) }
+        queueMicrotask(() => {
+          if (active && listeners.has(listener)) listener(reason)
+        })
+        return () => {
+          listeners.delete(listener)
+        }
       },
       send() {},
     }),
-    release() { active = false; refuse = null; listeners.clear() },
+    release() {
+      active = false
+      refuse = null
+      listeners.clear()
+    },
   }
 }

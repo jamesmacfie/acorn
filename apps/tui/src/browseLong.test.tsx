@@ -20,10 +20,10 @@ const caretOn = async (
 
 // A list longer than the panel it draws in.
 //
-// The failure this pins is the whole left column: the Browse panel grew to the height of its list,
-// pushed the Tasks panel off the bottom and drew over the footer, and the rows inside it squeezed
-// every field into an illegible smear — the caret column with them, so a focused list looked exactly
-// like an unfocused one (../panel.tsx, ./kit/showing/collection.tsx § Rows).
+// This pins the whole left column. A Browse panel that grows to the height of its list pushes the
+// Tasks panel off the bottom and draws over the footer, and its rows squeeze every field into an
+// illegible smear, the caret column with them, so a focused list looks exactly like an unfocused one
+// (./panel.tsx, ./kit/showing/collection.tsx § Rows).
 describe('a browse list longer than its panel', () => {
   it('windows to the panel, shows where it is, and leaves the panels below it alone', async () => {
     process.env.ACORN_FIXTURE_PULLS = '40'
@@ -44,12 +44,16 @@ describe('a browse list longer than its panel', () => {
       expect(caretLine(await screen.frame())).toContain('Invalidate')
 
       // Then walk it. Each move loads a different pull into the main panel. The 'destroyed' filter
-      // below is a canary from the era when a re-suspending boundary destroyed its own subtree
-      // (./browseSlow.test.tsx is the test that reaches that shape on purpose) — kept because it is one line and it catches a regression for free.
+      // below is a cheap canary for a re-suspending boundary that destroys its own subtree
+      // (./browseSlow.test.tsx reaches that shape on purpose).
       const logged: string[] = []
       const [error, warn] = [console.error, console.warn]
-      console.error = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
-      console.warn = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
+      console.error = (...args: unknown[]) => {
+        logged.push(args.map(String).join(' '))
+      }
+      console.warn = (...args: unknown[]) => {
+        logged.push(args.map(String).join(' '))
+      }
       for (let step = 0; step < 6; step += 1) await screen.press('ARROW_DOWN')
       await screen.frame()
       screen.done()

@@ -81,8 +81,13 @@ export const externalIdsFor = (providerId: string) => ({
   fromDisplay: (connectionId: string, displayId: string): ExternalRef => ({ providerId, connectionId, displayId }),
   parse(raw: unknown, fallback: ExternalRef): ExternalRef | null {
     if (!isRecord(raw)) return fallback
-    if (raw.providerId !== providerId || typeof raw.connectionId !== 'string' || typeof raw.displayId !== 'string') return null
-    if (raw.locator !== undefined && (!isRecord(raw.locator) || Object.values(raw.locator).some((value) => typeof value !== 'string'))) return null
+    if (raw.providerId !== providerId || typeof raw.connectionId !== 'string' || typeof raw.displayId !== 'string')
+      return null
+    if (
+      raw.locator !== undefined &&
+      (!isRecord(raw.locator) || Object.values(raw.locator).some((value) => typeof value !== 'string'))
+    )
+      return null
     return {
       providerId,
       connectionId: raw.connectionId,

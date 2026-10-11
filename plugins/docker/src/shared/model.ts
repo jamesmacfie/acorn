@@ -28,7 +28,7 @@ export type DockerContainerSummary = {
   composeWorkingDir: string | null
   labels: Record<string, string>
   // The compose working_dir no longer exists on disk, meaning the worktree behind this stack is
-  // gone (the stale-cleanup signal). Computed main-side; absent when there is no working_dir label.
+  // gone (the stale-cleanup signal). Computed on the node; absent when there is no working_dir label.
   workingDirMissing?: boolean
 }
 
@@ -57,7 +57,7 @@ export type DockerNetwork = {
   internal: boolean
 }
 
-export type DockerMount = { type: string; source: string; destination: string; rw: boolean }
+type DockerMount = { type: string; source: string; destination: string; rw: boolean }
 
 export type DockerContainerDetail = DockerContainerSummary & {
   command: string
@@ -73,7 +73,14 @@ export type DockerContainerDetail = DockerContainerSummary & {
 }
 
 export type DockerContainerAction = 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause'
-export const dockerContainerActions: readonly DockerContainerAction[] = ['start', 'stop', 'restart', 'kill', 'pause', 'unpause']
+export const dockerContainerActions: readonly DockerContainerAction[] = [
+  'start',
+  'stop',
+  'restart',
+  'kill',
+  'pause',
+  'unpause',
+]
 
 // Compose bulk ops act on the recorded project (labels), so they work without compose files. That
 // rules out `up`; `start` restarts the project's existing containers.
@@ -111,21 +118,27 @@ export type DockerProjectMatcher = {
   effective: DockerMatcherKeys
 }
 
-// Route helpers (loopback HTTP; mounted at /v1/p/docker in app/server/routes.ts).
+// Route helpers (loopback HTTP; mounted at /v1/p/docker).
 export const dockerInfoRoute = (): string => '/v1/p/docker/info'
 export const dockerContainersRoute = (): string => '/v1/p/docker/containers'
-export const dockerContainerInspectRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/inspect`
-export const dockerContainerActionRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/action`
-export const dockerContainerRemoveRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/remove`
+export const dockerContainerInspectRoute = (ref: string): string =>
+  `/v1/p/docker/containers/${encodeURIComponent(ref)}/inspect`
+export const dockerContainerActionRoute = (ref: string): string =>
+  `/v1/p/docker/containers/${encodeURIComponent(ref)}/action`
+export const dockerContainerRemoveRoute = (ref: string): string =>
+  `/v1/p/docker/containers/${encodeURIComponent(ref)}/remove`
 export const dockerImagesRoute = (): string => '/v1/p/docker/images'
 export const dockerImageRemoveRoute = (ref: string): string => `/v1/p/docker/images/${encodeURIComponent(ref)}/remove`
 export const dockerVolumesRoute = (): string => '/v1/p/docker/volumes'
-export const dockerVolumeRemoveRoute = (name: string): string => `/v1/p/docker/volumes/${encodeURIComponent(name)}/remove`
+export const dockerVolumeRemoveRoute = (name: string): string =>
+  `/v1/p/docker/volumes/${encodeURIComponent(name)}/remove`
 export const dockerNetworksRoute = (): string => '/v1/p/docker/networks'
-export const dockerNetworkRemoveRoute = (ref: string): string => `/v1/p/docker/networks/${encodeURIComponent(ref)}/remove`
+export const dockerNetworkRemoveRoute = (ref: string): string =>
+  `/v1/p/docker/networks/${encodeURIComponent(ref)}/remove`
 export const dockerPruneRoute = (): string => '/v1/p/docker/prune'
 export const dockerComposeActionRoute = (): string => '/v1/p/docker/compose/action'
 export const dockerTaskSummaryRoute = (): string => '/v1/p/docker/task-summary'
-export const dockerProjectMatcherRoute = (projectId: string): string => `/v1/p/docker/projects/${encodeURIComponent(projectId)}/matcher`
-export const dockerTaskContainersRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/containers`
-export const dockerTaskTeardownRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/teardown`
+export const dockerProjectMatcherRoute = (projectId: string): string =>
+  `/v1/p/docker/projects/${encodeURIComponent(projectId)}/matcher`
+export const dockerTaskContainersRoute = (taskId: string): string =>
+  `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/containers`

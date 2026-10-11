@@ -26,10 +26,14 @@ describe('what an item fills in', () => {
   })
 
   it('offers nothing for a name outside the rule', () => {
-    // The point of the phase's decision: guessing at `focus` from an error title puts words in a
-    // prompt nobody chose.
-    expect(Object.keys(prefillFromItem({ title: 'a', body: 'b', link: 'c' })).sort())
-      .toEqual(['context', 'issue', 'item', 'link', 'url'])
+    // Guessing at `focus` from an error title puts words in a prompt nobody chose.
+    expect(Object.keys(prefillFromItem({ title: 'a', body: 'b', link: 'c' })).sort()).toEqual([
+      'context',
+      'issue',
+      'item',
+      'link',
+      'url',
+    ])
   })
 
   it('says nothing at all about an item with nothing on it', () => {
@@ -49,7 +53,9 @@ describe('item workflow input controls', () => {
     expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: '' }))).toBe(false)
     expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: 'ENG-42', count: 'many' }))).toBe(false)
     expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: 'ENG-42', count: '3' }))).toBe(true)
-    expect(collectItemWorkflowInputs(inputs, answers({ issue: 'ENG-42', count: '3' })))
-      .toEqual({ issue: 'ENG-42', count: 3 })
+    expect(collectItemWorkflowInputs(inputs, answers({ issue: 'ENG-42', count: '3' }))).toEqual({
+      issue: 'ENG-42',
+      count: 3,
+    })
   })
 })

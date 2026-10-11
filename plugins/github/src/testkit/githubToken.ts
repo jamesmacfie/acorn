@@ -9,7 +9,7 @@ import { GITHUB_PROVIDER } from '../server/githubToken'
 // The credential half of the mount contract for github route tests, alongside node-core's testDb and
 // testAuth. It binds this plugin's provider id onto core's seeding helper. The seeded row lives in
 // core's `integrations` table, which this plugin does not own, so the insert stays on core's side of
-// the seam (server/routes/testIntegration.ts), and `AppDatabase` is core's handle.
+// the seam (`seedProviderConnection`), and `AppDatabase` is core's handle.
 export const seedGithubIntegration = (
   db: AppDatabase,
   userId: string,

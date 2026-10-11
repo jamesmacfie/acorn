@@ -1,5 +1,5 @@
 /* The style axis: shape, typography, space, density, chrome, motion. Never colour.
- * Selected by `data-style` on <html> (persistence/appStartup.ts). See docs/ui-design.md
+ * Selected by `data-style` on <html> (persistence/appStartup.ts). See docs/ui-design/tokens.md
  * § Token axes for the contract with tokens-theme.css and for why this file is also the
  * Terminal pack.
  */

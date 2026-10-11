@@ -1,17 +1,17 @@
 // What one telemetry record looks like, and what a batch of them looks like on the wire.
 //
-// Here rather than in node-core because from phase 1 the renderer, the terminal client and the
-// desktop helper all build batches and post them to the node, and protocol is the one package every
-// runtime imports (docs/telemetry/model.md § The five kinds).
+// Here rather than in node-core because the renderer, the terminal client and the desktop helper all
+// build batches and post them to the node, and protocol is the one package every runtime imports
+// (docs/telemetry/model.md § The five kinds).
 //
-// The field names are OpenTelemetry's and none of its code is here. That is the whole reason a
-// second exporter is cheap: Better Stack, Coralogix and Datadog all take OTLP, so a sink that speaks
-// one of them maps these names across rather than inventing a translation.
+// The field names are OpenTelemetry's and none of its code is here. Better Stack, Coralogix and Datadog
+// all take OTLP, so a sink that speaks one of them maps these names across rather than inventing a
+// translation.
 //
-// Two rules run through every shape below, and both come from the audit trail
-// (node-core server/audit.ts § AuditEntry.details): an attribute is a scalar, and a record never
-// quotes the work it describes. A record that carried a prompt, a diff or a query would be a second
-// copy of the thing it is supposed to be measuring.
+// Two rules run through every shape below, and both come from the audit trail (node-core's
+// `AuditEntry.details`): an attribute is a scalar, and a record never quotes the work it describes. A record
+// that carried a prompt, a diff or a query would be a second copy of the thing it is supposed to be
+// measuring.
 import { z } from 'zod'
 
 /** The one node preference that turns collection on. Off unless the row says `'1'`. */
@@ -33,7 +33,7 @@ export const LOG_BODY_MAX = 2_000
 
 /** Scalars only. An object here would be a place for a request body to hide, and a nested shape is
  *  something no sink's column model can index anyway. */
-export const telemetryAttrsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+const telemetryAttrsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 export type TelemetryAttrs = z.infer<typeof telemetryAttrsSchema>
 
 /** Typed, sorted labels and length-prefixed dimensions keep distinct legal series apart.
@@ -41,7 +41,14 @@ export type TelemetryAttrs = z.infer<typeof telemetryAttrsSchema>
 export function telemetryHistogramKey(owner: string, seam: string, unit: string, attrs?: TelemetryAttrs): string {
   const dimensions = `${owner.length}:${owner}${seam.length}:${seam}${unit.length}:${unit}`
   if (!attrs || Object.keys(attrs).length === 0) return dimensions
-  return dimensions + JSON.stringify(Object.keys(attrs).sort().map(key => [key, attrs[key]]))
+  return (
+    dimensions +
+    JSON.stringify(
+      Object.keys(attrs)
+        .sort()
+        .map((key) => [key, attrs[key]]),
+    )
+  )
 }
 
 /** W3C sizes: 32 hex characters for a trace, 16 for a span, so a `traceparent` header round-trips
@@ -49,7 +56,7 @@ export function telemetryHistogramKey(owner: string, seam: string, unit: string,
 const traceIdSchema = z.string().regex(/^[0-9a-f]{32}$/)
 const spanIdSchema = z.string().regex(/^[0-9a-f]{16}$/)
 
-export const telemetrySpanSchema = z.object({
+const telemetrySpanSchema = z.object({
   kind: z.literal('span'),
   traceId: traceIdSchema,
   spanId: spanIdSchema,
@@ -64,7 +71,7 @@ export const telemetrySpanSchema = z.object({
   attrs: telemetryAttrsSchema,
 })
 
-export const telemetryLogSchema = z.object({
+const telemetryLogSchema = z.object({
   kind: z.literal('log'),
   at: z.number(),
   level: z.enum(['debug', 'info', 'warn', 'error']),
@@ -75,7 +82,7 @@ export const telemetryLogSchema = z.object({
   traceId: traceIdSchema.optional(),
 })
 
-export const telemetryEventSchema = z.object({
+const telemetryEventSchema = z.object({
   kind: z.literal('event'),
   at: z.number(),
   name: z.string().min(1),
@@ -85,7 +92,7 @@ export const telemetryEventSchema = z.object({
 /** A histogram arrives pre-aggregated over one flush window. That is how a seam firing a thousand
  *  times a second costs one record every five seconds instead of a thousand spans a sink has to
  *  drop (docs/telemetry/model.md § Hot seams are metrics). */
-export const telemetryHistogramSchema = z.object({
+const telemetryHistogramSchema = z.object({
   count: z.number(),
   sum: z.number(),
   min: z.number(),
@@ -93,9 +100,8 @@ export const telemetryHistogramSchema = z.object({
   p50: z.number(),
   p95: z.number(),
 })
-export type TelemetryHistogram = z.infer<typeof telemetryHistogramSchema>
 
-export const telemetryMetricSchema = z.object({
+const telemetryMetricSchema = z.object({
   kind: z.literal('metric'),
   at: z.number(),
   name: z.string().min(1),
@@ -105,7 +111,7 @@ export const telemetryMetricSchema = z.object({
   attrs: telemetryAttrsSchema,
 })
 
-export const telemetryErrorSchema = z.object({
+const telemetryErrorSchema = z.object({
   kind: z.literal('error'),
   at: z.number(),
   name: z.string(),
@@ -133,7 +139,6 @@ export const telemetryRecordSchema = z.discriminatedUnion('kind', [
 
 export type TelemetrySpan = z.infer<typeof telemetrySpanSchema>
 export type TelemetryLog = z.infer<typeof telemetryLogSchema>
-export type TelemetryEvent = z.infer<typeof telemetryEventSchema>
 export type TelemetryMetric = z.infer<typeof telemetryMetricSchema>
 export type TelemetryError = z.infer<typeof telemetryErrorSchema>
 export type TelemetryRecord = z.infer<typeof telemetryRecordSchema>
@@ -205,7 +210,6 @@ export function parseTraceparent(header: string | undefined | null): Traceparent
 export const formatTraceparent = (traceId: string, spanId: string, sampled = true): string =>
   `00-${traceId}-${spanId}-${sampled ? '01' : '00'}`
 
-
 /** Split on encoded bytes, not record count: multibyte messages and a full attribute map can
  * exceed the route cap even in an ordinary flush. A single oversized record is dropped with a
  * counter, so it cannot keep an otherwise valid queue retrying a 413 forever. */
@@ -220,7 +224,10 @@ export function encodeTelemetryBatches(runtime: PostedTelemetryRuntime, records:
   const append = (record: TelemetryRecord) => {
     const json = JSON.stringify(record)
     const size = encoder.encode(json).byteLength
-    if (size + overhead > TELEMETRY_BATCH_MAX_BYTES) { dropped += 1; return }
+    if (size + overhead > TELEMETRY_BATCH_MAX_BYTES) {
+      dropped += 1
+      return
+    }
     if (bytes + size + (parts.length ? 1 : 0) > TELEMETRY_BATCH_MAX_BYTES) {
       batches.push(prefix + parts.join(',') + ']}')
       parts = []
@@ -230,7 +237,15 @@ export function encodeTelemetryBatches(runtime: PostedTelemetryRuntime, records:
     parts.push(json)
   }
   for (const record of records) append(record)
-  if (dropped) append({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: { owner: 'core', runtime, reason: 'record-too-large' } })
+  if (dropped)
+    append({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.dropped',
+      type: 'count',
+      value: dropped,
+      attrs: { owner: 'core', runtime, reason: 'record-too-large' },
+    })
   if (parts.length) batches.push(prefix + parts.join(',') + ']}')
   return batches
 }

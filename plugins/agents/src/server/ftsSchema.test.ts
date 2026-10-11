@@ -7,8 +7,8 @@ import { AgentSearchProjection } from './sessions/searchProjection'
 // FTS5 schema drift guard. See docs/data-layer/migrations.md § Migrations for why this table and its triggers are
 // hand-written into the migration instead of the Drizzle schema.
 //
-// Uses a per-plugin database, because the migration chain that creates these four objects
-// (migrations/0000_*.sql) is this plugin's own.
+// Uses a per-plugin database, because the migration chain that creates these four objects is this
+// plugin's own.
 describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 
@@ -73,16 +73,23 @@ describe('agent_events_fts schema drift guard', () => {
   })
 
   it('repairs missing derived objects with the same schema as the migration', () => {
-    const objects = () => t.db.all<{ name: string; sql: string }>(sql`
+    const objects = () =>
+      t.db
+        .all<{ name: string; sql: string }>(sql`
       SELECT name, sql FROM sqlite_master
       WHERE name LIKE 'agent_search_%' OR name LIKE 'agent_events_fts_%' AND type = 'trigger'
       ORDER BY name
-    `).map((row) => ({ name: row.name, sql: row.sql.replaceAll('`', '').replace(/\s+/g, ' ').trim() }))
+    `)
+        .map((row) => ({ name: row.name, sql: row.sql.replaceAll('`', '').replace(/\s+/g, ' ').trim() }))
     const migrated = objects()
-    for (const row of migrated.filter((row) => row.name !== 'agent_search_dirty')) t.db.run(sql.raw(`DROP TRIGGER ${row.name}`))
+    for (const row of migrated.filter((row) => row.name !== 'agent_search_dirty'))
+      t.db.run(sql.raw(`DROP TRIGGER ${row.name}`))
     t.db.run(sql`DROP TABLE agent_search_dirty`)
     new AgentSearchProjection(t.db)
     expect(objects()).toEqual(migrated)
-    expect(t.db.all(sql`SELECT name FROM pragma_table_info('agent_search_dirty')`)).toEqual([{ name: 'session_id' }, { name: 'from_seq' }])
+    expect(t.db.all(sql`SELECT name FROM pragma_table_info('agent_search_dirty')`)).toEqual([
+      { name: 'session_id' },
+      { name: 'from_seq' },
+    ])
   })
 })

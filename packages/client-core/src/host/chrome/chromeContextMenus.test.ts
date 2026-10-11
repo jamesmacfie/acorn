@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 // Type-only, so it is erased and does not evaluate the module before the mock below is installed.
-import type { AgentMessageTarget, AgentTurnTarget, ContentSelectionTarget, TaskRowTarget } from '../registries/panes/contextMenus'
+import type {
+  AgentMessageTarget,
+  AgentTurnTarget,
+  ContentSelectionTarget,
+  TaskRowTarget,
+} from '../registries/panes/contextMenus'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 vi.mock('../../infra/node/apiClient', () => ({
@@ -57,25 +62,34 @@ describe('what the host refuses', () => {
     // The version-skew case, and the reason `location` is a plain string on the wire: a newer node can
     // describe a location this client cannot draw, and the answer is a named refusal rather than a row
     // registered against nothing.
-    expect(() => pluginContextMenuItem('board', descriptor({ location: 'task.footer' }), binding()))
-      .toThrow(/unknown location 'task.footer'/)
+    expect(() => pluginContextMenuItem('board', descriptor({ location: 'task.footer' }), binding())).toThrow(
+      /unknown location 'task.footer'/,
+    )
     expect(() => pluginContextMenuItem('board', descriptor({ location: '' }), binding())).toThrow(/unknown location/)
   })
 
   it('refuses a `when` naming a fact the location does not have', () => {
     // Including the identity fields, which the target genuinely carries: they are deliberately not
     // facts, so matching on one would be a menu row keyed to a single task.
-    expect(() => pluginContextMenuItem('board', descriptor({ when: { branch: 'main' } }), binding()))
-      .toThrow(/does not have: branch/)
-    expect(() => pluginContextMenuItem('board', descriptor({ when: { id: 't1' } }), binding()))
-      .toThrow(/does not have: id/)
-    expect(() => pluginContextMenuItem('board', descriptor({ when: { origin: 'github', title: 'x' } }), binding()))
-      .toThrow(/does not have: title/)
+    expect(() => pluginContextMenuItem('board', descriptor({ when: { branch: 'main' } }), binding())).toThrow(
+      /does not have: branch/,
+    )
+    expect(() => pluginContextMenuItem('board', descriptor({ when: { id: 't1' } }), binding())).toThrow(
+      /does not have: id/,
+    )
+    expect(() =>
+      pluginContextMenuItem('board', descriptor({ when: { origin: 'github', title: 'x' } }), binding()),
+    ).toThrow(/does not have: title/)
   })
 
   it('accepts the facts the location does have', () => {
-    expect(pluginContextMenuItem('board', descriptor({ when: { origin: 'github', pinned: true, projectId: 'p1' } }), binding()).id)
-      .toBe('plugin:board:open-card')
+    expect(
+      pluginContextMenuItem(
+        'board',
+        descriptor({ when: { origin: 'github', pinned: true, projectId: 'p1' } }),
+        binding(),
+      ).id,
+    ).toBe('plugin:board:open-card')
   })
 })
 
@@ -106,11 +120,14 @@ describe('what the host binds', () => {
     const entry = contextMenuItems('task.row', target())[0]!
     entry.run(target({ id: 'task-42' }))
     await Promise.resolve()
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/open', expect.objectContaining({
-      method: 'POST',
-      nodeId: 'node-a',
-      body: JSON.stringify({ item: 'task-42' }),
-    }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/board/open',
+      expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-a',
+        body: JSON.stringify({ item: 'task-42' }),
+      }),
+    )
   })
 
   it('carries no tone: a red row is core’s claim about core’s resources', () => {
@@ -119,15 +136,45 @@ describe('what the host binds', () => {
 })
 
 describe('rail menu ownership and execution', () => {
-  const sourceTarget = { location: 'rail.source' as const, id: 'feed', title: 'Feed', nodeId: 'node-a', projectId: 'project-1' }
-  const paneTarget = { location: 'rail.pane' as const, id: 'board-pane', title: 'Board', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', pinned: false, shown: true }
+  const sourceTarget = {
+    location: 'rail.source' as const,
+    id: 'feed',
+    title: 'Feed',
+    nodeId: 'node-a',
+    projectId: 'project-1',
+  }
+  const paneTarget = {
+    location: 'rail.pane' as const,
+    id: 'board-pane',
+    title: 'Board',
+    nodeId: 'node-a',
+    taskId: 'task-1',
+    projectId: 'project-1',
+    pinned: false,
+    shown: true,
+  }
   const railBinding = () => ({ ...binding(), sources: new Set(['feed']), panes: new Set(['board-pane']) })
 
   it('dispatches loaded source and pane actions with only host-derived rail context', async () => {
-    disposables.push(sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'board'))
-    disposables.push(paneRegistry.register({ id: 'board-pane', label: 'Board', glyph: 'list', order: 1, component: () => null }, 'board'))
-    disposables.push(registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()))
-    disposables.push(registerPluginContextMenu('board', descriptor({ id: 'pane-action', location: 'rail.pane', surface: 'board-pane' }), railBinding()))
+    disposables.push(
+      sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'board'),
+    )
+    disposables.push(
+      paneRegistry.register(
+        { id: 'board-pane', label: 'Board', glyph: 'list', order: 1, component: () => null },
+        'board',
+      ),
+    )
+    disposables.push(
+      registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()),
+    )
+    disposables.push(
+      registerPluginContextMenu(
+        'board',
+        descriptor({ id: 'pane-action', location: 'rail.pane', surface: 'board-pane' }),
+        railBinding(),
+      ),
+    )
     const source = contextMenuItems('rail.source', sourceTarget)[0]!
     const pane = contextMenuItems('rail.pane', paneTarget)[0]!
     source.run(sourceTarget)
@@ -144,9 +191,15 @@ describe('rail menu ownership and execution', () => {
   })
 
   it('refuses foreign or undeclared surfaces and stale target nodes', () => {
-    expect(() => pluginContextMenuItem('board', descriptor({ location: 'rail.source', surface: 'other' }), railBinding())).toThrow(/undeclared/)
-    disposables.push(sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'foreign'))
-    disposables.push(registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()))
+    expect(() =>
+      pluginContextMenuItem('board', descriptor({ location: 'rail.source', surface: 'other' }), railBinding()),
+    ).toThrow(/undeclared/)
+    disposables.push(
+      sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'foreign'),
+    )
+    disposables.push(
+      registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()),
+    )
     expect(contextMenuItems('rail.source', sourceTarget)).toEqual([])
     const entry = contextMenuRegistry.get('plugin:board:open-card')!
     entry.run({ ...sourceTarget, nodeId: 'other-node' })
@@ -155,11 +208,24 @@ describe('rail menu ownership and execution', () => {
 })
 
 describe('file and document menus', () => {
-  const inspect = descriptor({ id: 'inspect', location: 'file.row', when: { extension: 'json', directory: false }, action: { verb: 'runNodeAction', path: '/v1/p/inspector/inspect' } })
-  const fileTarget = (over: Partial<Parameters<typeof fileMenuTarget>[1]> = {}) => fileMenuTarget('file.row', {
-    nodeId: 'node-a', ownerPluginId: 'editor', taskId: 'task-1', projectId: 'project-1',
-    path: 'src/Data.json', title: 'Data.json', directory: false, readOnly: false, ...over,
+  const inspect = descriptor({
+    id: 'inspect',
+    location: 'file.row',
+    when: { extension: 'json', directory: false },
+    action: { verb: 'runNodeAction', path: '/v1/p/inspector/inspect' },
   })
+  const fileTarget = (over: Partial<Parameters<typeof fileMenuTarget>[1]> = {}) =>
+    fileMenuTarget('file.row', {
+      nodeId: 'node-a',
+      ownerPluginId: 'editor',
+      taskId: 'task-1',
+      projectId: 'project-1',
+      path: 'src/Data.json',
+      title: 'Data.json',
+      directory: false,
+      readOnly: false,
+      ...over,
+    })
   afterEach(() => setTaskLookup(() => undefined))
   const tasks = (rows: { id: string; projectId: string }[]) =>
     setTaskLookup((id) => rows.find((row) => row.id === id) as never)
@@ -170,11 +236,22 @@ describe('file and document menus', () => {
     const entry = contextMenuItems('file.row', fileTarget())[0]!
     entry.run(fileTarget({ revision: 'sha-1' }))
     await Promise.resolve()
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/inspector/inspect', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/inspector/inspect',
+      expect.objectContaining({ method: 'POST', nodeId: 'node-a' }),
+    )
     // No absolute path, no title, no owner, no bytes: the route reads through a capability if it
     // needs the file.
     expect(JSON.parse((sendRaw.mock.calls[0]![1] as { body: string }).body)).toEqual({
-      resource: { kind: 'file', taskId: 'task-1', projectId: 'project-1', path: 'src/Data.json', directory: false, readOnly: false, revision: 'sha-1' },
+      resource: {
+        kind: 'file',
+        taskId: 'task-1',
+        projectId: 'project-1',
+        path: 'src/Data.json',
+        directory: false,
+        readOnly: false,
+        revision: 'sha-1',
+      },
     })
   })
 
@@ -185,8 +262,12 @@ describe('file and document menus', () => {
     expect(contextMenuItems('file.row', fileTarget({ path: 'fixtures.json', directory: true }))).toEqual([])
     // Each location keeps its own rows.
     expect(contextMenuItems('document.tab', { ...fileTarget(), location: 'document.tab' })).toEqual([])
-    expect(() => pluginContextMenuItem('inspector', { ...inspect, surface: 'files' }, binding())).toThrow(/gives a surface/)
-    expect(() => pluginContextMenuItem('inspector', { ...inspect, when: { path: 'a.json' } }, binding())).toThrow(/does not have: path/)
+    expect(() => pluginContextMenuItem('inspector', { ...inspect, surface: 'files' }, binding())).toThrow(
+      /gives a surface/,
+    )
+    expect(() => pluginContextMenuItem('inspector', { ...inspect, when: { path: 'a.json' } }, binding())).toThrow(
+      /does not have: path/,
+    )
   })
 
   it('refuses a changed Node, a task no longer in its project, and an unloaded contributor', () => {
@@ -217,14 +298,35 @@ describe('file and document menus', () => {
 })
 
 describe('agent message and turn menus', () => {
-  const note = descriptor({ id: 'note', location: 'agent.message', when: { role: 'assistant' }, action: { verb: 'runNodeAction', path: '/v1/p/notes/file' } })
+  const note = descriptor({
+    id: 'note',
+    location: 'agent.message',
+    when: { role: 'assistant' },
+    action: { verb: 'runNodeAction', path: '/v1/p/notes/file' },
+  })
   const message = (over: Partial<AgentMessageTarget> = {}): AgentMessageTarget => ({
-    location: 'agent.message', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1',
-    itemId: 'event-7', turnId: 'turn-2', role: 'assistant', status: 'completed', text: 'Ship it.', revision: 9, ...over,
+    location: 'agent.message',
+    nodeId: 'node-a',
+    taskId: 'task-1',
+    projectId: 'project-1',
+    sessionId: 'session-1',
+    itemId: 'event-7',
+    turnId: 'turn-2',
+    role: 'assistant',
+    status: 'completed',
+    text: 'Ship it.',
+    revision: 9,
+    ...over,
   })
   const turn: AgentTurnTarget = {
-    location: 'agent.turn', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1',
-    turnId: 'turn-2', status: 'failed', revision: 12,
+    location: 'agent.turn',
+    nodeId: 'node-a',
+    taskId: 'task-1',
+    projectId: 'project-1',
+    sessionId: 'session-1',
+    turnId: 'turn-2',
+    status: 'failed',
+    revision: 12,
   }
   beforeEach(() => setTaskLookup((id) => (id === 'task-1' ? { id, projectId: 'project-1' } : undefined) as never))
   afterEach(() => setTaskLookup(() => undefined))
@@ -232,14 +334,41 @@ describe('agent message and turn menus', () => {
 
   it('sends the message’s identity and shown text, and the turn’s identity, and nothing else', async () => {
     disposables.push(registerPluginContextMenu('notes', note, binding()))
-    disposables.push(registerPluginContextMenu('notes', { ...note, id: 'turn', location: 'agent.turn', when: { status: 'failed' } }, binding()))
+    disposables.push(
+      registerPluginContextMenu(
+        'notes',
+        { ...note, id: 'turn', location: 'agent.turn', when: { status: 'failed' } },
+        binding(),
+      ),
+    )
     contextMenuItems('agent.message', message())[0]!.run(message({ text: 'Ship', textTruncated: true }))
     contextMenuItems('agent.turn', turn)[0]!.run(turn)
     await Promise.resolve()
     expect(bodies()).toEqual([
-      { message: { taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1', itemId: 'event-7', turnId: 'turn-2',
-        role: 'assistant', status: 'completed', text: 'Ship', textTruncated: true, revision: 9 } },
-      { turn: { taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1', turnId: 'turn-2', status: 'failed', revision: 12 } },
+      {
+        message: {
+          taskId: 'task-1',
+          projectId: 'project-1',
+          sessionId: 'session-1',
+          itemId: 'event-7',
+          turnId: 'turn-2',
+          role: 'assistant',
+          status: 'completed',
+          text: 'Ship',
+          textTruncated: true,
+          revision: 9,
+        },
+      },
+      {
+        turn: {
+          taskId: 'task-1',
+          projectId: 'project-1',
+          sessionId: 'session-1',
+          turnId: 'turn-2',
+          status: 'failed',
+          revision: 12,
+        },
+      },
     ])
   })
 
@@ -268,11 +397,26 @@ describe('agent message and turn menus', () => {
 })
 
 describe('selection menus', () => {
-  const explain = descriptor({ id: 'explain', location: 'content.selection', when: { contentKind: 'document' }, action: { verb: 'runNodeAction', path: '/v1/p/explain/run' } })
+  const explain = descriptor({
+    id: 'explain',
+    location: 'content.selection',
+    when: { contentKind: 'document' },
+    action: { verb: 'runNodeAction', path: '/v1/p/explain/run' },
+  })
   const selection = (over: Partial<ContentSelectionTarget> = {}): ContentSelectionTarget => ({
-    location: 'content.selection', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', ownerId: 'editor',
-    contentKind: 'document', languageId: 'typescript', readOnly: false, text: 'const a = 1', revision: 4,
-    resource: { kind: 'file', path: 'src/a.ts' }, range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } }, ...over,
+    location: 'content.selection',
+    nodeId: 'node-a',
+    taskId: 'task-1',
+    projectId: 'project-1',
+    ownerId: 'editor',
+    contentKind: 'document',
+    languageId: 'typescript',
+    readOnly: false,
+    text: 'const a = 1',
+    revision: 4,
+    resource: { kind: 'file', path: 'src/a.ts' },
+    range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } },
+    ...over,
   })
   beforeEach(() => setTaskLookup((id) => (id === 'task-1' ? { id, projectId: 'project-1' } : undefined) as never))
   afterEach(() => setTaskLookup(() => undefined))
@@ -286,11 +430,32 @@ describe('selection menus', () => {
     contextMenuItems('content.selection', projectDocument)[0]!.run(projectDocument)
     await Promise.resolve()
     expect(bodies()).toEqual([
-      { selection: { taskId: 'task-1', projectId: 'project-1', ownerId: 'editor', contentKind: 'document', languageId: 'typescript',
-        readOnly: false, text: 'const a = 1', revision: 4, resource: { kind: 'file', path: 'src/a.ts' },
-        range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } } } },
-      { selection: { projectId: 'project-1', ownerId: 'database', contentKind: 'document', languageId: 'typescript',
-        readOnly: false, text: 'const a = 1', revision: 4, range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } } } },
+      {
+        selection: {
+          taskId: 'task-1',
+          projectId: 'project-1',
+          ownerId: 'editor',
+          contentKind: 'document',
+          languageId: 'typescript',
+          readOnly: false,
+          text: 'const a = 1',
+          revision: 4,
+          resource: { kind: 'file', path: 'src/a.ts' },
+          range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } },
+        },
+      },
+      {
+        selection: {
+          projectId: 'project-1',
+          ownerId: 'database',
+          contentKind: 'document',
+          languageId: 'typescript',
+          readOnly: false,
+          text: 'const a = 1',
+          revision: 4,
+          range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } },
+        },
+      },
     ])
   })
 

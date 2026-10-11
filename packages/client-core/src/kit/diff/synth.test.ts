@@ -55,16 +55,7 @@ describe('synth + gitdiff-parser pipeline', () => {
   })
 
   it('handles multiple hunks', () => {
-    const multi = [
-      '@@ -1,2 +1,2 @@',
-      ' a',
-      '-b',
-      '+B',
-      '@@ -10,2 +10,3 @@',
-      ' x',
-      '+y',
-      ' z',
-    ].join('\n')
+    const multi = ['@@ -1,2 +1,2 @@', ' a', '-b', '+B', '@@ -10,2 +10,3 @@', ' x', '+y', ' z'].join('\n')
     const hunks = gitdiffParser.parse(synth('f.txt', multi))[0]!.hunks
     expect(hunks).toHaveLength(2)
     expect(hunks[0]!.oldStart).toBe(1)

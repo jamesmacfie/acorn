@@ -15,7 +15,7 @@ import { notesApi, requestNoteOpen } from './notesClient'
 // **One search over three lists.** A reader looking for "the deploy runbook" does not know whether
 // they filed it against this task, this workspace or globally, and the pane draws all three in one
 // column anyway (./NotesPane.tsx). The three lists load once when the frame opens and are filtered
-// here (client-core/host/registries/commands/localSearch.ts).
+// here (client-core's `localSearch`).
 //
 // **Ids are scope-qualified, and that is load-bearing.** A slug is unique inside a scope and nowhere
 // else, so `deploy` can exist as a task note and a global one at the same time. `task:deploy` and
@@ -43,7 +43,12 @@ const notSeed = (note: NoteSummary): boolean => !(note.author === 'workflow' && 
 const noteItem = (scope: NoteScope, note: NoteSummary): CommandSearchItem => ({
   id: `${scope}:${note.slug}`,
   title: note.title,
-  subtitle: note.kind === 'scratch' ? (scope === 'workspace' ? 'shared' : scope) : `${scope === 'workspace' ? 'shared' : scope} · ${note.kind}`,
+  subtitle:
+    note.kind === 'scratch'
+      ? scope === 'workspace'
+        ? 'shared'
+        : scope
+      : `${scope === 'workspace' ? 'shared' : scope} · ${note.kind}`,
   ref: note.slug,
 })
 
@@ -72,14 +77,19 @@ export const notesCommands: readonly ContributedCommand[] = [
     placeholder: 'Find a note…',
     ...localSearch(async (context) => {
       const api = notesApi()
-      const lists = await Promise.all(SCOPES.map(async (scope): Promise<ScopeList> => {
-        const location = locationFor(scope, context)
-        if (!location) return { scope, rows: [] }
-        const result = await api.list(location)
-        return 'error' in result ? { scope, error: result.error } : { scope, rows: result }
-      }))
+      const lists = await Promise.all(
+        SCOPES.map(async (scope): Promise<ScopeList> => {
+          const location = locationFor(scope, context)
+          if (!location) return { scope, rows: [] }
+          const result = await api.list(location)
+          return 'error' in result ? { scope, error: result.error } : { scope, rows: result }
+        }),
+      )
       return lists.flatMap((list) =>
-        'error' in list ? [problemItem(list.scope, list.error)] : list.rows.filter(notSeed).map((note) => noteItem(list.scope, note)))
+        'error' in list
+          ? [problemItem(list.scope, list.error)]
+          : list.rows.filter(notSeed).map((note) => noteItem(list.scope, note)),
+      )
     }),
     select: (item, context): CommandOutcome => {
       const taskId = context.taskId

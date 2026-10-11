@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { issuesFilter, linearData, linearError, linearFetch, linearTeamScopeId, linearUploadTarget, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
+import {
+  issuesFilter,
+  linearData,
+  linearError,
+  linearFetch,
+  linearTeamScopeId,
+  linearUploadTarget,
+  parseIdentifier,
+  projectIssueSearchFilter,
+  projectIssuesFilter,
+} from './index'
 
 describe('linear server helpers', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -8,7 +18,10 @@ describe('linear server helpers', () => {
     expect(parseIdentifier('ENG-42')).toEqual({ key: 'ENG', number: 42 })
     expect(parseIdentifier('eng-42')).toBeNull()
     expect(parseIdentifier('ENG-')).toBeNull()
-    expect(issuesFilter(['not-an-issue', 'ENG-42', 'ENG-7'])).toEqual({ team: { key: { eq: 'ENG' } }, number: { in: [42, 7] } })
+    expect(issuesFilter(['not-an-issue', 'ENG-42', 'ENG-7'])).toEqual({
+      team: { key: { eq: 'ENG' } },
+      number: { in: [42, 7] },
+    })
     expect(issuesFilter(['nope'])).toBeNull()
   })
 
@@ -60,10 +73,7 @@ describe('linear server helpers', () => {
       { team: { key: { eq: 'ENG' } }, number: { eq: 42 } },
     ])
     // A bare number, with or without the hash it was copied with.
-    expect(typed(['p-1'], '#42')).toEqual([
-      { title: { containsIgnoreCase: '#42' } },
-      { number: { eq: 42 } },
-    ])
+    expect(typed(['p-1'], '#42')).toEqual([{ title: { containsIgnoreCase: '#42' } }, { number: { eq: 42 } }])
     // The regression this shape exists for: a scope that maps both kinds carries its own `or`, and
     // merging the typed clauses into it would replace the scope with them.
     const mixed = projectIssueSearchFilter(['p-1', linearTeamScopeId('t-1')], 'login')
@@ -80,8 +90,12 @@ describe('linear server helpers', () => {
   })
 
   it('accepts GraphQL data and rejects GraphQL or empty responses', async () => {
-    await expect(linearData<{ value: number }>(new Response(JSON.stringify({ data: { value: 3 } })))).resolves.toEqual({ value: 3 })
-    await expect(linearData(new Response(JSON.stringify({ errors: [{ message: 'bad key' }] })))).rejects.toThrow('bad key')
+    await expect(linearData<{ value: number }>(new Response(JSON.stringify({ data: { value: 3 } })))).resolves.toEqual({
+      value: 3,
+    })
+    await expect(linearData(new Response(JSON.stringify({ errors: [{ message: 'bad key' }] })))).rejects.toThrow(
+      'bad key',
+    )
     await expect(linearData(new Response(JSON.stringify({ data: null })))).rejects.toThrow('empty response')
   })
 })
@@ -100,7 +114,9 @@ describe('linearUploadTarget', () => {
   })
 
   it('accepts only https uploads.linear.app', () => {
-    expect(linearUploadTarget('https://uploads.linear.app/w/f/a.png')?.href).toBe('https://uploads.linear.app/w/f/a.png')
+    expect(linearUploadTarget('https://uploads.linear.app/w/f/a.png')?.href).toBe(
+      'https://uploads.linear.app/w/f/a.png',
+    )
     // Every one of these would otherwise be a request this route makes with the owner's Linear key.
     expect(linearUploadTarget('http://uploads.linear.app/a.png')).toBeNull()
     expect(linearUploadTarget('https://evil.example.com/a.png')).toBeNull()

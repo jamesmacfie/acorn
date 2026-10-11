@@ -1,12 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { z } from 'zod'
 import {
   ServiceRpcPeer,
-  previewBrowserRuleSchema,
   serviceStartConfigSchema,
   serviceStartResultSchema,
   serviceStateEventSchema,
-  type PreviewBrowserRule,
   type ServiceMessage,
   type ServiceMessageTransport,
   type NodeKeys,
@@ -45,8 +42,11 @@ const SECRET_SHAPED = /_(KEY|SECRET|TOKEN)$/
 // environment already held is visible on every ancestor process anyway, and a harness may pass it on
 // to its agent (`envPassthrough`), so it stays in.
 export function serviceEnvironment(env: NodeJS.ProcessEnv, fromEnvFiles: ReadonlySet<string>): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([name]) =>
-    !SECRET_NAMES.has(name) && !(fromEnvFiles.has(name) && SECRET_SHAPED.test(name))))
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([name]) => !SECRET_NAMES.has(name) && !(fromEnvFiles.has(name) && SECRET_SHAPED.test(name)),
+    ),
+  )
 }
 
 export class ServiceHost {
@@ -131,17 +131,14 @@ export class ServiceHost {
     })
     child.on('exit', (code) => this.handleExit(child, code ?? 0))
     await spawned
-    const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken, keys }, 60_000)
+    const result = await peer.request(
+      'service.start',
+      { ...this.config, deviceToken: rememberedDeviceToken, keys },
+      60_000,
+    )
     // Parsed, not cast. A malformed handoff would otherwise surface much later as an unreachable node
     // with no explanation.
     return serviceStartResultSchema.parse(result)
-  }
-
-  async previewRules(taskId: string): Promise<PreviewBrowserRule[]> {
-    const peer = this.peer
-    if (!peer) return []
-    const value = await peer.request('service.preview-rules', { taskId })
-    return z.array(previewBrowserRuleSchema).parse(value)
   }
 
   async stop(): Promise<void> {
@@ -160,16 +157,15 @@ export class ServiceHost {
 
   // SIGTERM, then SIGKILL if it is ignored. The service installs its own SIGTERM handler to drain
   // cleanly, so the polite signal is the one that matters. A wedged child holding the data root's
-  // exclusive lock blocks the next launch, though, and a signal with no follow-up once left a probe
-  // alive as an orphan for four days.
+  // exclusive lock blocks the next launch, though, and a signal with no follow-up can leave it alive as
+  // an orphan indefinitely.
   //
   // Awaited, and the escalation timer is not unref'd. Both matter, and for the same reason: this
-  // process must not exit while the service is still alive. It used to, every time. The caller's
-  // shutdown runs `process.exit` as soon as this resolves, an unref'd timer does not hold the event
-  // loop open, and `process.exit` does not wait for one anyway, so the SIGKILL was guaranteed never
-  // to be sent on the path that needed it most. A service that ignored SIGTERM was then orphaned
-  // holding the data root's lock, and the next launch refused to start until somebody killed a pid
-  // by hand.
+  // process must not exit while the service is still alive. The caller's shutdown runs `process.exit`
+  // as soon as this resolves, an unref'd timer does not hold the event loop open, and `process.exit`
+  // does not wait for one anyway, so otherwise the SIGKILL would never be sent on the path that needs it
+  // most. A service that ignored SIGTERM would be orphaned holding the data root's lock, and the next
+  // launch would refuse to start until somebody killed a pid by hand.
   private terminate(child: ChildProcess): Promise<void> {
     if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
     return new Promise<void>((resolve) => {

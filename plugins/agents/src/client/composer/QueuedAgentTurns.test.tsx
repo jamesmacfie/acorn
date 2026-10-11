@@ -4,7 +4,7 @@ import type { AgentTurn } from '../../contract/wire.ts'
 
 const labels = vi.hoisted(() => ({ singular: 'project' }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   createWorkspaceWords: () => () => ({ singular: labels.singular }),
 }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { provider: 2, workspace: 3 } }) }))
@@ -12,14 +12,22 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { provider
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
     attachment: async (id: string) => ({
-      id, taskId: 'task', filename: id === 'image' ? 'screenshot.png' : 'notes.pdf',
-      mediaType: id === 'image' ? 'image/png' : 'application/pdf', byteSize: 2048, createdAt: 0,
+      id,
+      taskId: 'task',
+      filename: id === 'image' ? 'screenshot.png' : 'notes.pdf',
+      mediaType: id === 'image' ? 'image/png' : 'application/pdf',
+      byteSize: 2048,
+      createdAt: 0,
     }),
     attachmentContent: async () => ({
-      bytes: new Uint8Array([137, 80, 78, 71]), type: 'image/png', filename: 'screenshot.png',
+      bytes: new Uint8Array([137, 80, 78, 71]),
+      type: 'image/png',
+      filename: 'screenshot.png',
     }),
     attachmentPreview: async () => ({
-      bytes: new Uint8Array([137, 80, 78, 71]), type: 'image/png', filename: 'screenshot.png',
+      bytes: new Uint8Array([137, 80, 78, 71]),
+      type: 'image/png',
+      filename: 'screenshot.png',
     }),
   },
 }))
@@ -27,24 +35,42 @@ vi.mock('../sessions/managedClient', () => ({
 const { default: QueuedAgentTurns } = await import('./QueuedAgentTurns')
 
 const turn = (input: AgentTurn['input']): AgentTurn => ({
-  id: 'turn', sessionId: 'session', ordinal: 0, source: 'interactive', status: 'queued', input,
-  effectivePolicy: {}, providerTurnRef: null, stopReason: null, usage: null, error: null,
-  attempt: 0, createdAt: 0, startedAt: null, completedAt: null,
+  id: 'turn',
+  sessionId: 'session',
+  ordinal: 0,
+  source: 'interactive',
+  status: 'queued',
+  input,
+  effectivePolicy: {},
+  providerTurnRef: null,
+  stopReason: null,
+  usage: null,
+  error: null,
+  attempt: 0,
+  createdAt: 0,
+  startedAt: null,
+  completedAt: null,
 })
 
 const mount = (queued: AgentTurn, runtimeState: 'working' | 'ready' = 'working') => {
   const host = document.createElement('div')
   document.body.append(host)
-  const unmount = render(() => (
-    <QueuedAgentTurns
-      sessionId="session"
-      runtimeState={runtimeState}
-      turns={[queued]}
-      onChanged={() => {}}
-      onError={() => {}}
-    />
-  ), host)
-  const dispose = () => { unmount(); host.remove() }
+  const unmount = render(
+    () => (
+      <QueuedAgentTurns
+        sessionId="session"
+        runtimeState={runtimeState}
+        turns={[queued]}
+        onChanged={() => {}}
+        onError={() => {}}
+      />
+    ),
+    host,
+  )
+  const dispose = () => {
+    unmount()
+    host.remove()
+  }
   return { host, dispose }
 }
 
@@ -53,15 +79,19 @@ it.each(['project', 'workspace'])('names a blocked queue limit per %s', (singula
   const { host, dispose } = mount(turn([{ type: 'text', text: 'Next step' }]), 'ready')
   try {
     expect(host.textContent).toContain(`2 turns at once per provider and 3 per ${singular}.`)
-  } finally { dispose() }
+  } finally {
+    dispose()
+  }
 })
 
 it('shows image and file attachments beside a queued prompt, including while editing', async () => {
-  const { host, dispose } = mount(turn([
-    { type: 'text', text: 'Please check these' },
-    { type: 'image', attachmentId: 'image', alt: 'screenshot.png' },
-    { type: 'attachment', attachmentId: 'file' },
-  ]))
+  const { host, dispose } = mount(
+    turn([
+      { type: 'text', text: 'Please check these' },
+      { type: 'image', attachmentId: 'image', alt: 'screenshot.png' },
+      { type: 'attachment', attachmentId: 'file' },
+    ]),
+  )
   try {
     await vi.waitFor(() => expect(host.textContent).toContain('screenshot.png'))
     expect(host.textContent).toContain('Please check these')
@@ -73,7 +103,9 @@ it('shows image and file attachments beside a queued prompt, including while edi
     expect(host.querySelector('textarea')?.value).toBe('Please check these')
     expect(host.textContent).toContain('screenshot.png')
     expect(host.textContent).toContain('notes.pdf')
-  } finally { dispose() }
+  } finally {
+    dispose()
+  }
 })
 
 it('shows an attachment-only follow-up as its file tile', async () => {
@@ -81,5 +113,7 @@ it('shows an attachment-only follow-up as its file tile', async () => {
   try {
     await vi.waitFor(() => expect(host.textContent).toContain('notes.pdf'))
     expect(host.textContent).not.toContain('1 attached input item')
-  } finally { dispose() }
+  } finally {
+    dispose()
+  }
 })

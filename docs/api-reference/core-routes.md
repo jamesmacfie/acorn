@@ -110,7 +110,6 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET`, `POST` | `/v1/core/workspaces` | List workspaces with project membership, or create one |
-| `POST` | `/v1/core/workspaces/bootstrap` | Create the default workspace |
 | `PATCH`, `DELETE` | `/v1/core/workspaces/:id` | Rename or set appearance; delete a non-default workspace |
 | `POST` | `/v1/core/workspaces/:id/icon-image` | [Normalize and save a workspace image crop](../workspaces-and-tasks/workspace-icons.md#images-and-limits) |
 | `GET` | `/v1/core/workspaces/icon-images/:imageId` | Read a durable workspace PNG thumbnail |
@@ -128,7 +127,7 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `POST` | `/v1/core/projects/:id/mcp/starter` | Write an empty `.mcp.json` into the project folder |
 | `GET`, `POST` | `/v1/core/tasks` | List tasks, or create one. `?status=archived` lists archived tasks, newest first |
 | `PATCH` | `/v1/core/tasks/:id` | Update task metadata |
-| `POST`, `DELETE` | `/v1/core/tasks/:id/links` | Add or remove an external item link |
+| `POST` | `/v1/core/tasks/:id/links` | Add an external item link |
 | `GET` | `/v1/core/task-statuses` | Git status for active tasks |
 | `GET`, `POST` | `/v1/core/tasks/:id/config-trust` | Read the executable config snapshot, or acknowledge it |
 | `POST` | `/v1/core/tasks/:id/preview-url` | Resolve the task's preview URL |

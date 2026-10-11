@@ -9,7 +9,7 @@
 // the thing a developer already has open, and it keeps `console.warn` and `console.error` for the
 // two levels the console filters on.
 //
-// A second argument is allowed and is not an attribute. Half the renderer's log sites pass a caught
+// A second argument is allowed and is not an attribute. Many of the renderer's log sites pass a caught
 // error as a second argument to get the console's expandable object, and the record takes the
 // error's name and message instead, because a record cannot carry an object
 // (docs/telemetry/model.md § The attribute vocabulary).
@@ -46,14 +46,18 @@ const detailAttrs = (detail: unknown): TelemetryAttrs => {
 
 /**
  * A logger bound to one tag. `createLogger('fleet').warn('could not delete the persisted cache')`
- * prints `[fleet] could not delete the persisted cache`, which is what the hand-written prefix
- * printed before.
+ * prints `[fleet] could not delete the persisted cache`.
  *
  * `owner` defaults to `core`. A compiled plugin's client half passes its own id, which is what makes
  * the line answer "whose is this" without anyone reading the call site.
  */
 export function createLogger(tag: string, owner = 'core'): Logger {
-  const write = (level: 'debug' | 'info' | 'warn' | 'error', message: string, detail?: unknown, attrs?: TelemetryAttrs): void => {
+  const write = (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    detail?: unknown,
+    attrs?: TelemetryAttrs,
+  ): void => {
     const line = `[${tag}] ${message}`
     // The console's own two channels, so a devtools filter on warnings and errors keeps working.
     // `debug` and `info` share `log`, which is where every renderer line went before. The detail is

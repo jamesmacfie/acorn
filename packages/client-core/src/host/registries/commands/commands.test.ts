@@ -25,11 +25,9 @@ import {
 // The command contract, as the two things everything else builds on: what the palette shows, and what
 // running one does.
 //
-// The first half is characterization, written before the shared session existed so that the session
-// could be held to it. It is: `./sessionStore.test.tsx` asserts the same order over real rows, and neither
-// host composes a list of its own any more. What stays here is the registry's own half — which
-// commands are discoverable, when a dynamic title is read, and that a palette row and a shortcut
-// reach one registration by the same id.
+// `./sessionStore.test.tsx` asserts the palette's order over real rows. What stays here is the
+// registry's own half — which commands are discoverable, when a dynamic title is read, and that a palette row and a
+// shortcut reach one registration by the same id.
 
 const held: Disposable[] = []
 const register = (command: CommandContribution): CommandContribution => {
@@ -42,14 +40,15 @@ afterEach(() => {
   for (const disposable of held.splice(0).reverse()) disposable.dispose()
 })
 
-const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id,
-  title: id,
-  category: 'action',
-  palette: true,
-  run: () => {},
-  ...over,
-} as CommandContribution)
+const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    run: () => {},
+    ...over,
+  }) as CommandContribution
 
 /** The action rows, built exactly as both hosts build them. */
 const paletteActions = (): { id: string; label: string; hint?: string }[] =>
@@ -111,27 +110,34 @@ describe('executing a command', () => {
 
   it('awaits an asynchronous leaf before answering', async () => {
     const done: string[] = []
-    register(leaf('cmd.async', {
-      run: async () => {
-        await Promise.resolve()
-        done.push('ran')
-      },
-    }))
+    register(
+      leaf('cmd.async', {
+        run: async () => {
+          await Promise.resolve()
+          done.push('ran')
+        },
+      }),
+    )
     expect(await executeCommand('cmd.async')).toEqual(COMMAND_CLOSED)
     expect(done).toEqual(['ran'])
   })
 
   it('keeps a zero-argument callback working and hands a detached context to one that wants it', async () => {
-    // The compatibility case the whole union exists to preserve: every registration in the repo was
-    // written as `run: () => …`, and a function that ignores its argument is still assignable to one
-    // that is handed a context.
+    // Most registrations are written as `run: () => …`, and a function that ignores its argument is
+    // still assignable to one that is handed a context.
     const legacy = vi.fn(() => {})
     register(leaf('cmd.legacy', { run: legacy }))
     await executeCommand('cmd.legacy')
     expect(legacy).toHaveBeenCalledWith(DETACHED_COMMAND_CONTEXT)
 
     let seen: CommandExecutionContext | undefined
-    register(leaf('cmd.context', { run: (context) => { seen = context } }))
+    register(
+      leaf('cmd.context', {
+        run: (context) => {
+          seen = context
+        },
+      }),
+    )
     await executeCommand('cmd.context')
     // No session captured it, so every identity is absent rather than borrowed from the ambient state.
     expect(seen).toEqual({
@@ -172,7 +178,13 @@ describe('executing a command', () => {
   it('rejects rather than throwing, whichever way the leaf failed', async () => {
     // Both spellings become a rejection. Every caller writes `.catch`, and a synchronous throw used
     // to go straight past all of them into the key dispatcher.
-    register(leaf('cmd.throws', { run: () => { throw new Error('nope') } }))
+    register(
+      leaf('cmd.throws', {
+        run: () => {
+          throw new Error('nope')
+        },
+      }),
+    )
     register(leaf('cmd.rejects', { run: () => Promise.reject(new Error('later')) }))
     await expect(executeCommand('cmd.throws')).rejects.toThrow('nope')
     await expect(executeCommand('cmd.rejects')).rejects.toThrow('later')
@@ -237,7 +249,13 @@ describe('the command span', () => {
 
   it('takes its status from the outcome, so a command that threw reads as one', async () => {
     collecting()
-    register(leaf('cmd.throws', { run: () => { throw new Error('nope') } }))
+    register(
+      leaf('cmd.throws', {
+        run: () => {
+          throw new Error('nope')
+        },
+      }),
+    )
     await expect(executeCommand('cmd.throws')).rejects.toThrow('nope')
     await flushTelemetry()
     const [span] = spans()
@@ -247,7 +265,14 @@ describe('the command span', () => {
   it('waits for a command that returns a promise', async () => {
     collecting()
     let settle = () => {}
-    register(leaf('cmd.slow', { run: () => new Promise<void>((resolve) => { settle = resolve }) }))
+    register(
+      leaf('cmd.slow', {
+        run: () =>
+          new Promise<void>((resolve) => {
+            settle = resolve
+          }),
+      }),
+    )
     const running = executeCommand('cmd.slow')
     await flushTelemetry()
     // Nothing yet: the command has not finished, so there is no duration to report.

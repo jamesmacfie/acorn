@@ -13,7 +13,10 @@ export function lazyEditorBridge(
   fileStatusProviders: () => readonly EditorFileStatusProvider[],
 ): EditorBridge {
   let loaded: Promise<EditorBridge> | undefined
-  const bridge = () => loaded ??= import('./editor').then(({ editorBridge }) => editorBridge(core, changed, hooks, markerProviders, fileStatusProviders))
+  const bridge = () =>
+    (loaded ??= import('./editor').then(({ editorBridge }) =>
+      editorBridge(core, changed, hooks, markerProviders, fileStatusProviders),
+    ))
   return {
     root: (...args) => bridge().then((owner) => owner.root(...args)),
     list: (...args) => bridge().then((owner) => owner.list(...args)),

@@ -117,33 +117,18 @@ instructions, first-time approval, and recovery when a managed turn is blocked.
 
 ## Pages
 
-<a id="transport-and-auth"></a>
-
 [Transport and auth](./security/transport-and-auth.md) covers TLS and pins, broker limits, the
 `requireUser`, `requireDevice`, and provider-access gates, the mount coverage test, task scope, and
 the WebSocket hub.
 
-<a id="credential-handling"></a>
-
 [Credential handling](./security/credentials.md) covers encrypted provider credentials,
 `SecretService.use`, child environments, harness generation, and internal token scopes.
-
-<a id="process-path-and-configuration-controls"></a>
 
 [Process, path, and configuration controls](./security/process-and-paths.md) covers `resolveInRoot`,
 the process broker, config trust, workflow authority, Docker, and force push.
 
-<a id="the-control-plane-and-the-inversion-it-costs"></a>
-
 [The control plane](./security/control-plane.md) covers what enrollment and node providers cost, and
 what bounds it.
-
-<a id="third-party-plugin-bundles"></a>
-<a id="installing-from-a-folder"></a>
-<a id="the-dev-grant"></a>
-<a id="node-half-plugin-security"></a>
-<a id="rung-1--permission-shaped-context-phase-1-shipped-with-the-loader"></a>
-<a id="the-same-rule-for-what-a-plugin-can-reach-into"></a>
 
 [Plugin security](./security/node-plugin-security.md) owns the plugin threat model, the containment ladder, and the
 summary table. Its topic pages cover [client bundle trust](./security/plugin-bundles.md),
@@ -162,20 +147,11 @@ nothing in the worktree ([skills](./managed-agents/skills.md#approval)). Claude 
 per-process copy of the approved bytes natively. Codex's skill roots stay in its memory, and its home and
 login are never moved ([native delivery](./managed-agents/native-skills.md)).
 
-<a id="the-renderers-policy-and-its-dangerous-sinks"></a>
-<a id="untrusted-provider-data"></a>
-
 [The renderer and untrusted content](./security/renderer.md) covers the CSP, the provider HTML and
 markdown sinks, provider payload projections, and AI authoring input.
 
-<a id="host-owned-webviews-and-browser-automation"></a>
-
 [Host-owned webviews and browser automation](./security/webviews.md) covers child webviews, the
 preview pane's remote refusal, and agent browser tools.
-
-<a id="filesystem-and-backup"></a>
-<a id="audit"></a>
-<a id="the-vocabulary-is-closed-and-a-plugin-can-add-to-it"></a>
 
 [Audit](./security/audit.md) covers the audit trail, plugin audit verbs, why secret use isn't
 recorded, and on-disk permissions and backups.

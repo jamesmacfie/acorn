@@ -2,13 +2,12 @@
 // sandboxed-frame SDK. Chords are persisted strings, so accepting a spelling that eventChord can
 // never produce would create a setting that looks valid and can never fire.
 
-export const CHORD_MODIFIERS = ['meta', 'ctrl', 'alt', 'shift'] as const
-export type ChordModifier = (typeof CHORD_MODIFIERS)[number]
+const CHORD_MODIFIERS = ['meta', 'ctrl', 'alt', 'shift'] as const
+type ChordModifier = (typeof CHORD_MODIFIERS)[number]
 
 export type ParsedChord = { modifiers: ChordModifier[]; key: string }
 
-const singleKey = (value: string): boolean =>
-  value !== '+' && value.trim() === value && Array.from(value).length === 1
+const singleKey = (value: string): boolean => value !== '+' && value.trim() === value && Array.from(value).length === 1
 
 export function parseChord(value: string): ParsedChord | null {
   if (!value || value !== value.toLowerCase() || value.trim() !== value) return null
@@ -31,13 +30,12 @@ export const hasCommandModifier = (chord: string): boolean => {
   return !!parsed?.modifiers.some((modifier) => modifier === 'meta' || modifier === 'ctrl' || modifier === 'alt')
 }
 
-export const isPluginShortcutChord = (chord: string): boolean =>
-  isNormalizedChord(chord) && hasCommandModifier(chord)
+export const isPluginShortcutChord = (chord: string): boolean => isNormalizedChord(chord) && hasCommandModifier(chord)
 
 // Clipboard, undo and select-all are implemented by the browser (on macOS, by the Edit menu's roles)
 // against whatever is selected or focused. They carry a command modifier, so anything that cancels
-// "modified chords" on principle cancels these too. That is why copying out of a sandboxed frame
-// silently did nothing. Shift is ignored so redo (meta+shift+z) is covered with undo.
+// "modified chords" on principle cancels these too, and copying out of a sandboxed frame then silently
+// does nothing. Shift is ignored so redo (meta+shift+z) is covered with undo.
 const EDITING_CHORD_KEYS = new Set(['a', 'c', 'v', 'x', 'z', 'y'])
 export const isBrowserEditingChord = (chord: string): boolean => {
   const parsed = parseChord(chord)
@@ -88,8 +86,7 @@ export function eventChord(event: KeyboardEventShape): string | null {
 }
 
 // Structural rather than instanceof-based: this runs in the shell, a sandboxed frame, and Node
-// tests. It intentionally recognizes the same EditContext surface a code editor uses as the old client-only
-// predicate did.
+// tests. `editContext` covers a code editor that takes input through the EditContext API.
 export function isTypingTarget(target: unknown): boolean {
   if (!target || typeof target !== 'object') return false
   const element = target as {
@@ -98,14 +95,17 @@ export function isTypingTarget(target: unknown): boolean {
     isContentEditable?: unknown
     editContext?: unknown
   }
-  const name = typeof element.nodeName === 'string'
-    ? element.nodeName.toUpperCase()
-    : typeof element.tagName === 'string'
-      ? element.tagName.toUpperCase()
-      : ''
-  return name === 'INPUT'
-    || name === 'TEXTAREA'
-    || name === 'SELECT'
-    || element.isContentEditable === true
-    || element.editContext != null
+  const name =
+    typeof element.nodeName === 'string'
+      ? element.nodeName.toUpperCase()
+      : typeof element.tagName === 'string'
+        ? element.tagName.toUpperCase()
+        : ''
+  return (
+    name === 'INPUT' ||
+    name === 'TEXTAREA' ||
+    name === 'SELECT' ||
+    element.isContentEditable === true ||
+    element.editContext != null
+  )
 }

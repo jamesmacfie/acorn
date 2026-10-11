@@ -11,7 +11,10 @@ import { memoryApi, memoryTypeLabel } from './memoryClient'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 
 // Search results open this project's Memory page.
-const openMemory = (context: { projectId: string | null; navigate?: (path: string) => void }, projectId = context.projectId): void => {
+const openMemory = (
+  context: { projectId: string | null; navigate?: (path: string) => void },
+  projectId = context.projectId,
+): void => {
   setSelectedSource(MEMORY_SOURCE_ID)
   if (projectId) context.navigate?.(projectPath(projectId))
 }
@@ -33,14 +36,16 @@ export const memoryCommands: readonly ContributedCommand[] = [
     query: async (text, context) => {
       const found = await memoryApi().search(text, context.projectId ?? undefined)
       if ('error' in found) throw new Error(found.error)
-      return found.filter((memory) => memory.scope === 'project' && memory.projectId === context.projectId).map((memory): CommandSearchItem => ({
-        id: memory.id,
-        title: memory.name,
-        subtitle: memory.description,
-        badge: memoryTypeLabel(memory.type),
-        // Name and scope distinguish same-named private and project memories.
-        ref: JSON.stringify({ name: memory.name, scope: memory.scope }),
-      }))
+      return found
+        .filter((memory) => memory.scope === 'project' && memory.projectId === context.projectId)
+        .map((memory): CommandSearchItem => ({
+          id: memory.id,
+          title: memory.name,
+          subtitle: memory.description,
+          badge: memoryTypeLabel(memory.type),
+          // Name and scope distinguish same-named private and project memories.
+          ref: JSON.stringify({ name: memory.name, scope: memory.scope }),
+        }))
     },
     select: (item, context): CommandOutcome => {
       if (!item.ref) return COMMAND_CLOSED
@@ -48,7 +53,9 @@ export const memoryCommands: readonly ContributedCommand[] = [
         const selected = JSON.parse(item.ref) as { name: string; scope: string }
         selectMemory({ ...selected, projectId: context.projectId })
         openMemory(context)
-      } catch { /* An obsolete search row is safe to ignore. */ }
+      } catch {
+        /* An obsolete search row is safe to ignore. */
+      }
       return COMMAND_CLOSED
     },
   },

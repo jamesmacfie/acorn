@@ -4,14 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { PrefKeys, savePref, type Task } from '@acorn/plugin-api/client'
-import { extensionPointRegistry, extensionRegistry, type Disposable, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type Disposable,
+  type ExtensionContribution,
+} from '@acorn/plugin-api/testkit/client'
 import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '../contract/toolbarActions'
 
-// What a terminal tab switch costs, in jsdom. This is the tier the drawer never had, and phase 6 of
-// the performance programme is the reason it needs one: the panel used to mount the active tab alone,
-// so every switch destroyed an xterm and its WebGL context and asked the node to serialize a
-// thousand-line framebuffer, and nothing short of a person clicking tabs would notice a regression
-// back to that.
+// What a terminal tab switch costs, in jsdom. A switch must not destroy an xterm and its WebGL context
+// or ask the node to serialize a thousand-line framebuffer, and nothing short of a person clicking tabs
+// would notice that regression.
 //
 // The real `TerminalSurface` runs here. What is stubbed is xterm, because it draws to a canvas and
 // jsdom has no layout to draw into; everything this file is about — when a surface is built, when it
@@ -56,18 +59,28 @@ class StubWebgl {
   static made: StubWebgl[] = []
   disposed = false
   lose: (() => void) | undefined
-  constructor() { StubWebgl.made.push(this) }
-  onContextLoss(listener: () => void): void { this.lose = listener }
-  dispose(): void { this.disposed = true }
+  constructor() {
+    StubWebgl.made.push(this)
+  }
+  onContextLoss(listener: () => void): void {
+    this.lose = listener
+  }
+  dispose(): void {
+    this.disposed = true
+  }
 }
 
 vi.mock('@xterm/xterm', () => ({ Terminal: StubTerminal }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit(): void {} } }))
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit(): void {}
+  },
+}))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: StubWebgl }))
 // These tests exercise terminal rendering and session lifetime with a running terminal service.
-// The shared host gate now withholds an unknown roster, so supply that premise explicitly.
+// The shared host gate withholds an unknown roster, so supply that premise explicitly.
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   hasHostCapability: () => true,
 }))
 // Shiki sits behind the real one, and an ANSI palette is not what this file is about.
@@ -92,14 +105,21 @@ vi.mock('./terminalClient', () => ({
       if (offline) throw new Error('node unreachable')
       return roster
     },
-    profiles: async () => loadProfiles ? loadProfiles() : [],
-    create: async (body: { title: string }) => { created.push('create'); createdTitles.push(body.title); return createSession ? createSession() : session(A, 'new') },
+    profiles: async () => (loadProfiles ? loadProfiles() : []),
+    create: async (body: { title: string }) => {
+      created.push('create')
+      createdTitles.push(body.title)
+      return createSession ? createSession() : session(A, 'new')
+    },
     resize: async (id: string, cols: number, rows: number) => {
       resizes.push(`${id} ${cols}x${rows}`)
       return true
     },
     write: () => {},
-    interrupt: async (id: string) => { interrupts.push(id); return true },
+    interrupt: async (id: string) => {
+      interrupts.push(id)
+      return true
+    },
     remove: async () => true,
     attach: (id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }) => {
       attaches.push(id)
@@ -156,10 +176,20 @@ let roster: TerminalSession[] = []
 const cleanups: (() => void)[] = []
 
 beforeEach(() => {
-  loadProfiles = undefined; loadRoster = undefined; createSession = undefined; created.length = 0; createdTitles.length = 0; offline = false
+  loadProfiles = undefined
+  loadRoster = undefined
+  createSession = undefined
+  created.length = 0
+  createdTitles.length = 0
+  offline = false
   roster = [session(A, 'first'), session(B, 'second')]
-  vi.stubGlobal('fetch', async (url: string) =>
-    new Response(JSON.stringify(String(url).endsWith('/sessions') ? roster : {}), { status: 200, headers: { 'content-type': 'application/json' } }),
+  vi.stubGlobal(
+    'fetch',
+    async (url: string) =>
+      new Response(JSON.stringify(String(url).endsWith('/sessions') ? roster : {}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
   )
 })
 
@@ -287,7 +317,9 @@ describe('the terminal drawer keeps every open session on screen', () => {
 
 describe('a surface attaches in one request', () => {
   // One session, so the tab an earlier test left active for this task cannot be the one shown.
-  beforeEach(() => { roster = [session(A, 'first')] })
+  beforeEach(() => {
+    roster = [session(A, 'first')]
+  })
 
   it('sends its size with the attach and posts no resize when the node took it', async () => {
     mount()
@@ -318,7 +350,9 @@ describe('a surface attaches in one request', () => {
 // The drawer's open state is per task, so going to a task without it open unmounts the whole panel.
 // The xterms are held outside it (./heldTerminals.ts), until the session leaves the roster.
 describe('a terminal outlives the drawer that drew it', () => {
-  beforeEach(() => { roster = [session(A, 'first')] })
+  beforeEach(() => {
+    roster = [session(A, 'first')]
+  })
 
   it('reuses the same attached xterm when the drawer comes back', async () => {
     const [open, setOpen] = createSignal(true)
@@ -402,7 +436,9 @@ describe('a terminal outlives the drawer that drew it', () => {
 
 describe('the WebGL contexts stay bounded', () => {
   const ids = Array.from({ length: WEBGL_TERMINALS + 3 }, (_, index) => `${index}0000000-0000-4000-8000-000000000000`)
-  beforeEach(() => { roster = ids.map((id, index) => session(id, `tab ${index}`, `task-${index}`)) })
+  beforeEach(() => {
+    roster = ids.map((id, index) => session(id, `tab ${index}`, `task-${index}`))
+  })
 
   it('keeps a renderer on the terminals shown most recently and none past the bound', async () => {
     // One task per session, visited in turn with the drawer open on each: every terminal stays alive.
@@ -444,11 +480,12 @@ describe('the WebGL contexts stay bounded', () => {
   })
 })
 
-
 describe('deferred panel work stays with its view', () => {
   it('settles a failed initial roster without auto-creating and permits a later valid mount', async () => {
     roster = []
-    loadRoster = async () => { throw Error('roster offline') }
+    loadRoster = async () => {
+      throw Error('roster offline')
+    }
     mount({ defaultProfile: 'shell' })
     await settle()
     expect(document.body.textContent).toContain('roster offline')
@@ -463,7 +500,10 @@ describe('deferred panel work stays with its view', () => {
 
   it('ignores a held profile rejection after disposal', async () => {
     let reject!: (reason: Error) => void
-    loadProfiles = () => new Promise((_resolve, no) => { reject = no })
+    loadProfiles = () =>
+      new Promise((_resolve, no) => {
+        reject = no
+      })
     const [open, setOpen] = createSignal(true)
     mount({ open, defaultProfile: 'shell' })
     await settle()
@@ -475,11 +515,13 @@ describe('deferred panel work stays with its view', () => {
   })
 })
 
-
 it('does not publish a held creation into a newer task after the task changes', async () => {
   roster = [session(B, 'incoming', 't2')]
   let finish!: (value: TerminalSession) => void
-  createSession = () => new Promise((resolve) => { finish = resolve })
+  createSession = () =>
+    new Promise((resolve) => {
+      finish = resolve
+    })
   const [current, setCurrent] = createSignal(task)
   mount({ task: current, defaultProfile: 'shell' })
   await settle()
@@ -501,7 +543,9 @@ it('numbers a new shell after the shells the task already has', async () => {
   await settle()
   ;(document.querySelector('button[aria-label="New terminal"]') as HTMLButtonElement).click()
   await settle()
-  ;([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === 'Shell') as HTMLElement).click()
+  ;(
+    [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === 'Shell') as HTMLElement
+  ).click()
   await settle()
   expect(createdTitles).toEqual(['Shell 3'])
 })
@@ -518,11 +562,19 @@ describe('the terminal:toolbar-actions point', () => {
 
   const contributor = (pluginId: string) => {
     const registration = extensionRegistry.register({
-      id: `plugin:${pluginId}:interrupt`, pluginId, point: TERMINAL_TOOLBAR_ACTIONS_POINT, label: pluginId, order: 500,
+      id: `plugin:${pluginId}:interrupt`,
+      pluginId,
+      point: TERMINAL_TOOLBAR_ACTIONS_POINT,
+      label: pluginId,
+      order: 500,
       carrier: 'component',
       component: (props: Drawn['props']) => {
         drawn.push({ pluginId, props })
-        return <button type="button" data-contributor={pluginId}>{pluginId}</button>
+        return (
+          <button type="button" data-contributor={pluginId}>
+            {pluginId}
+          </button>
+        )
       },
     } as ExtensionContribution)
     registered.push(registration)
@@ -533,19 +585,31 @@ describe('the terminal:toolbar-actions point', () => {
    *  capturing listener the slot registered on that contributor's element with the browser's bit. */
   const press = (pluginId: string): void => {
     const button = document.querySelector(`[data-contributor="${pluginId}"]`)!
-    const index = listen.mock.calls.findIndex(([type]: unknown[], call: number) => type === 'pointerdown'
-      && (listen.mock.contexts[call] as Element).tagName === 'SPAN' && (listen.mock.contexts[call] as Element).contains(button))
+    const index = listen.mock.calls.findIndex(
+      ([type]: unknown[], call: number) =>
+        type === 'pointerdown' &&
+        (listen.mock.contexts[call] as Element).tagName === 'SPAN' &&
+        (listen.mock.contexts[call] as Element).contains(button),
+    )
     ;(listen.mock.calls[index]![1] as EventListener)({ isTrusted: true } as Event)
   }
-  const latest = (pluginId: string): Drawn['props'] => drawn.filter((entry) => entry.pluginId === pluginId).at(-1)!.props
+  const latest = (pluginId: string): Drawn['props'] =>
+    drawn.filter((entry) => entry.pluginId === pluginId).at(-1)!.props
 
   beforeEach(() => {
     interrupts.length = 0
     drawn.length = 0
-    registered.push(extensionPointRegistry.register({
-      id: TERMINAL_TOOLBAR_ACTIONS_POINT, ownerId: 'terminal', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: 4,
-      actions: ['interrupt'],
-    }))
+    registered.push(
+      extensionPointRegistry.register({
+        id: TERMINAL_TOOLBAR_ACTIONS_POINT,
+        ownerId: 'terminal',
+        label: 'Terminal toolbar',
+        kind: 'remote',
+        mode: 'stack',
+        max: 4,
+        actions: ['interrupt'],
+      }),
+    )
     listen = vi.spyOn(HTMLElement.prototype, 'addEventListener')
   })
   afterEach(() => {
@@ -559,7 +623,9 @@ describe('the terminal:toolbar-actions point', () => {
     await settle()
 
     const actions = document.querySelector('.ui-doctabs-actions')!
-    const labels = [...actions.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)
+    const labels = [...actions.querySelectorAll('button')].map(
+      (button) => button.getAttribute('aria-label') ?? button.textContent,
+    )
     expect(labels).toEqual(['New terminal', 'Stop', 'a', 'b', 'c', 'd', 'Hide terminals'])
     expect(actions.textContent).toContain('1 more from other plugins')
     expect(latest('a')).toMatchObject({ taskId: 't1', session: { id: A, title: 'first', running: true } })
@@ -572,10 +638,16 @@ describe('the terminal:toolbar-actions point', () => {
     await settle()
     const host = latest('stopper').host
 
-    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({
+      ok: false,
+      reason: 'needs_person',
+    })
     // A press in another plugin's control is not a press in this one.
     press('other')
-    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({
+      ok: false,
+      reason: 'needs_person',
+    })
     press('stopper')
     // A supplied ID that isn't the selected session is refused, even though that session is running.
     await expect(host.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
@@ -628,7 +700,10 @@ describe('the terminal:toolbar-actions point', () => {
     await settle()
     expect(latest('stopper')).toMatchObject({ taskId: 't2', session: { id: B } })
     expect(latest('stopper').host).not.toBe(before)
-    await expect(before.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
+    await expect(before.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({
+      ok: false,
+      reason: 'changed',
+    })
     expect(interrupts).toEqual([])
   })
 

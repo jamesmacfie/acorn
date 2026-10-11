@@ -9,11 +9,16 @@ const NotesList = lazy(async () => ({ default: (await import('./NotesPane')).Not
 const NoteBody = lazy(async () => ({ default: (await import('./NotesPane')).NoteBody }))
 
 export const notesPaneContribution: PaneLayoutContribution<NotesModel> = {
-  id: 'notes', label: 'Notes', glyph: 'notepad-text', description: 'Task and shared notes', order: 30,
-  defaultChord: 'meta+shift+d', requires: { plugin: 'notes' },
+  id: 'notes',
+  label: 'Notes',
+  glyph: 'notepad-text',
+  description: 'Task and shared notes',
+  order: 30,
+  defaultChord: 'meta+shift+d',
+  requires: { plugin: 'notes' },
   layout: 'list-detail',
   // The selection, the note being edited and its autosave timer, held once per task by the host so
-  // collapsing the library cannot take them with it (client-core registries/paneModels.ts).
+  // collapsing the library cannot take them with it (client-core's `paneModel`).
   model: (task) => createNotesModel(task.id, task.projectId),
   regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
   collapsible: true,

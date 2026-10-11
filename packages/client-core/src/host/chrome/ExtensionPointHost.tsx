@@ -14,7 +14,7 @@ import './extension-points.css'
 // `Row`, `Badge`, `SectionHeader` and `Icon` are the same primitives the descriptor rail list uses, so a
 // contributed section is pixel-identical to a first-party one under every appearance pack.
 //
-// The decisions are all in registries/extensionPoints.ts, which is JSX-free and has a test: which point
+// The decisions are all in `extensionDeliveries`, which is JSX-free and has a test: which point
 // resolves, whether either side is running, the ordering. This file is a `<For>` over the answer.
 
 function ExtensionGroup(props: { contribution: ExtensionContribution }) {
@@ -29,7 +29,8 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
     // fetch failure; the node's own banner already covers an unreachable node.
     // `fetch` is bound for every `items` carrier and for no other, and only `items` carriers are
     // delivered into a `rows` point, so the guard is a type narrowing rather than a real branch.
-    (_node, _revision, signal) => props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
+    (_node, _revision, signal) =>
+      props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
     () => chromeDeps(props.contribution.pluginId),
     { nodeIds: [nodeId] },
   )

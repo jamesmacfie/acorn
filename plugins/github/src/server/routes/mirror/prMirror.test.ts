@@ -32,7 +32,13 @@ const store: PatchBlobStore = {
 }
 
 const fileRows = () => plugin.db.select().from(prFiles).where(eq(prFiles.number, 7)).orderBy(asc(prFiles.position))
-const filesSync = async () => (await plugin.db.select().from(syncState).where(and(eq(syncState.userId, USER), eq(syncState.resource, filesResource(REPO_ID, 7)))))[0]
+const filesSync = async () =>
+  (
+    await plugin.db
+      .select()
+      .from(syncState)
+      .where(and(eq(syncState.userId, USER), eq(syncState.resource, filesResource(REPO_ID, 7))))
+  )[0]
 
 beforeEach(() => {
   plugin = makeTestPluginDb('github')
@@ -59,7 +65,11 @@ describe('files mirror', () => {
     expect(sync && filesCompleteness(sync)).toEqual(COMPLETE)
 
     const read = await readFiles(store, plugin.db, key, { includePatches: false })
-    expect(read.ok && read.files.map((f) => f.path).slice(0, 3)).toEqual(['src/file-0.ts', 'src/file-1.ts', 'src/file-2.ts'])
+    expect(read.ok && read.files.map((f) => f.path).slice(0, 3)).toEqual([
+      'src/file-0.ts',
+      'src/file-1.ts',
+      'src/file-2.ts',
+    ])
   })
 
   it('leaves every old row, the sync time and completeness alone when page 12 fails', async () => {
@@ -69,12 +79,20 @@ describe('files mirror', () => {
     expect(await refreshPullFiles('token', plugin.db, store, refreshKey)).toEqual({ ok: true })
     const before = await fileRows()
     const syncBefore = await filesSync()
-    expect(syncBefore && filesCompleteness(syncBefore)).toMatchObject({ kind: 'incomplete', received: 3000, reportedTotal: 3500 })
+    expect(syncBefore && filesCompleteness(syncBefore)).toMatchObject({
+      kind: 'incomplete',
+      received: 3000,
+      reportedTotal: 3500,
+    })
 
     vi.setSystemTime(2_000)
-    vi.stubGlobal('fetch', fakeGithub(makeFakePull({ files: 2200 }), {
-      override: (r) => (r.kind === 'files' && r.page === 12 ? new Response('unavailable', { status: 502 }) : undefined),
-    }).fetch)
+    vi.stubGlobal(
+      'fetch',
+      fakeGithub(makeFakePull({ files: 2200 }), {
+        override: (r) =>
+          r.kind === 'files' && r.page === 12 ? new Response('unavailable', { status: 502 }) : undefined,
+      }).fetch,
+    )
     expect(await refreshPullFiles('token', plugin.db, store, refreshKey)).toMatchObject({ ok: false })
 
     expect(await fileRows()).toEqual(before)
@@ -85,7 +103,14 @@ describe('files mirror', () => {
     vi.stubGlobal('fetch', fakeGithub(makeFakePull({ files: 3500, changedFiles: null })).fetch)
     await refreshPullFiles('token', plugin.db, store, refreshKey)
     const capped = await filesSync()
-    expect(capped && filesCompleteness(capped)).toEqual({ kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: 3000, reportedTotal: null, limit: 3000 })
+    expect(capped && filesCompleteness(capped)).toEqual({
+      kind: 'incomplete',
+      cause: 'upstream-cap',
+      resource: 'files',
+      received: 3000,
+      reportedTotal: null,
+      limit: 3000,
+    })
 
     vi.stubGlobal('fetch', fakeGithub(makeFakePull({ files: 40 })).fetch)
     await refreshPullFiles('token', plugin.db, store, refreshKey)
@@ -95,7 +120,19 @@ describe('files mirror', () => {
   })
 
   it('cuts an unchanged patch once, however often the pull refreshes', async () => {
-    const fetched = { files: [{ filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'head', patch: '@@ -1 +1 @@\n-a\n+b' }], completeness: COMPLETE }
+    const fetched = {
+      files: [
+        {
+          filename: 'src/app.ts',
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          sha: 'head',
+          patch: '@@ -1 +1 @@\n-a\n+b',
+        },
+      ],
+      completeness: COMPLETE,
+    }
     await mirrorFiles(store, plugin.db, key, fetched)
     await mirrorFiles(store, plugin.db, key, fetched)
     expect(puts.filter((k) => k.startsWith('diffdoc:'))).toHaveLength(1)
@@ -119,7 +156,9 @@ describe('files mirror', () => {
 
   it('reports a missing available body as an integrity failure, not as a file without a diff', async () => {
     await mirrorFiles(store, plugin.db, key, {
-      files: [{ filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'blob', patch: '@@ patch' }],
+      files: [
+        { filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'blob', patch: '@@ patch' },
+      ],
       completeness: COMPLETE,
     })
     blobs.clear()
@@ -128,13 +167,19 @@ describe('files mirror', () => {
 
   it('reads summaries without touching a blob and keeps the patch state', async () => {
     await mirrorFiles(store, plugin.db, key, {
-      files: [{ filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'blob', patch: '@@ patch' }],
+      files: [
+        { filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'blob', patch: '@@ patch' },
+      ],
       completeness: COMPLETE,
     })
     gets = []
     const read = await readFiles(store, plugin.db, key, { includePatches: false })
     expect(gets).toEqual([])
-    expect(read.ok && read.files[0]).toMatchObject({ patchState: 'available', patchKey: patchDigest('@@ patch'), patch: null })
+    expect(read.ok && read.files[0]).toMatchObject({
+      patchState: 'available',
+      patchKey: patchDigest('@@ patch'),
+      patch: null,
+    })
   })
 
   it('writes no blob for a file GitHub sent no patch for, and reads it back unavailable', async () => {
@@ -144,7 +189,12 @@ describe('files mirror', () => {
     })
     expect(puts).toEqual([])
     const read = await readFiles(store, plugin.db, key)
-    expect(read.ok && read.files[0]).toMatchObject({ path: 'logo.png', patchState: 'unavailable', patchKey: null, patch: null })
+    expect(read.ok && read.files[0]).toMatchObject({
+      path: 'logo.png',
+      patchState: 'unavailable',
+      patchKey: null,
+      patch: null,
+    })
     expect(gets).toEqual([])
     expect(patchBlobKey(patchDigest('x'))).toMatch(/^patch:sha256:[0-9a-f]{64}$/)
   })
@@ -152,18 +202,23 @@ describe('files mirror', () => {
 
 describe('detail mirror', () => {
   it('stores every thread comment in provider order and reads it back that way', async () => {
-    vi.stubGlobal('fetch', fakeGithub(makeFakePull({ threads: 400, commentsPerThread: (t) => (t === 0 ? 120 : 1), commits: 150 })).fetch)
+    vi.stubGlobal(
+      'fetch',
+      fakeGithub(makeFakePull({ threads: 400, commentsPerThread: (t) => (t === 0 ? 120 : 1), commits: 150 })).fetch,
+    )
     expect(await refreshPullDetail('token', plugin.db, refreshKey)).toEqual({ ok: true })
 
     const detail = await readComposite(plugin.db, key)
     expect(detail.threads).toHaveLength(400)
     expect(detail.threads.map((t) => t.threadId).slice(0, 3)).toEqual(['thread-0', 'thread-1', 'thread-2'])
-    expect(detail.threads[0]!.comments.map((c) => c.id)).toEqual(Array.from({ length: 120 }, (_, c) => `thread-0-comment-${c}`))
+    expect(detail.threads[0]!.comments.map((c) => c.id)).toEqual(
+      Array.from({ length: 120 }, (_, c) => `thread-0-comment-${c}`),
+    )
     expect(detail.commits.map((c) => c.sha)).toEqual(Array.from({ length: 150 }, (_, i) => `commit-${i}`))
   })
 
   it('keeps historical metadata and replies through the mirror and refreshes the other revision', async () => {
-    const pull = makeFakePull({ threads: 151, commentsPerThread: (t) => t === 150 ? 120 : 1, files: 1 })
+    const pull = makeFakePull({ threads: 151, commentsPerThread: (t) => (t === 150 ? 120 : 1), files: 1 })
     Object.assign(pull.threads[150]!, { isOutdated: true, line: null, originalLine: 275 })
     vi.stubGlobal('fetch', fakeGithub(pull).fetch)
     await refreshPullFiles('token', plugin.db, store, refreshKey)
@@ -188,15 +243,29 @@ describe('detail mirror', () => {
     vi.stubGlobal('fetch', fakeGithub(makeFakePull({ threads: 10 })).fetch)
     await refreshPullDetail('token', plugin.db, refreshKey)
     const before = await plugin.db.select().from(reviewThreads).orderBy(asc(reviewThreads.position))
-    const [syncBefore] = await plugin.db.select().from(syncState).where(eq(syncState.resource, prResource(REPO_ID, 7)))
+    const [syncBefore] = await plugin.db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.resource, prResource(REPO_ID, 7)))
 
     vi.setSystemTime(2_000)
-    vi.stubGlobal('fetch', fakeGithub(makeFakePull({ threads: 250 }), {
-      override: (r) => (r.kind === 'graphql-page' && r.after === '200' ? new Response('unavailable', { status: 502 }) : undefined),
-    }).fetch)
+    vi.stubGlobal(
+      'fetch',
+      fakeGithub(makeFakePull({ threads: 250 }), {
+        override: (r) =>
+          r.kind === 'graphql-page' && r.after === '200' ? new Response('unavailable', { status: 502 }) : undefined,
+      }).fetch,
+    )
     expect(await refreshPullDetail('token', plugin.db, refreshKey)).toMatchObject({ ok: false })
 
     expect(await plugin.db.select().from(reviewThreads).orderBy(asc(reviewThreads.position))).toEqual(before)
-    expect((await plugin.db.select().from(syncState).where(eq(syncState.resource, prResource(REPO_ID, 7))))[0]).toEqual(syncBefore)
+    expect(
+      (
+        await plugin.db
+          .select()
+          .from(syncState)
+          .where(eq(syncState.resource, prResource(REPO_ID, 7)))
+      )[0],
+    ).toEqual(syncBefore)
   })
 })

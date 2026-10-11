@@ -16,10 +16,9 @@ export type TabDef = {
 
 // Reusable tab strip. Renders only the tablist and drives the active id; the panels are the
 // caller's. Panel ids are `${idPrefix}-panel-${id}` and tab ids `${idPrefix}-tab-${id}` so callers
-// can wire aria-labelledby back. Extracted from the Rollbar item panel; also used by the create-task
-// modal and by the `tabs` layout.
+// can wire aria-labelledby back.
 //
-// A collection, so the arrows, Home, End and type-ahead come from ../keys/collection.ts rather than
+// A collection, so the arrows, Home, End and type-ahead come from `createCollection` rather than
 // from a key handler here. Selection follows focus, which is what a tab strip means.
 export function Tabs(props: {
   tabs: readonly TabDef[]
@@ -74,36 +73,44 @@ export function Tabs(props: {
         {...collection.containerProps}
         ref={bindStrip}
       >
-        <For each={tabs()}>{(t) => (
-          <button
-            {...collection.itemProps(t.id)}
-            type="button"
-            aria-selected={props.active === t.id}
-            aria-controls={`${props.idPrefix}-panel-${t.id}`}
-            class="ui-tab"
-            classList={{ active: props.active === t.id }}
-            data-tip={t.title}
-            onClick={() => props.onChange(t.id)}
-          >
-            <Show when={t.icon}>{(name) => <Icon name={name()} />}</Show>
-            {t.label}
-            <Show when={t.count != null}><span class="ui-tab-count">{t.count}</span></Show>
-          </button>
-        )}</For>
+        <For each={tabs()}>
+          {(t) => (
+            <button
+              {...collection.itemProps(t.id)}
+              type="button"
+              aria-selected={props.active === t.id}
+              aria-controls={`${props.idPrefix}-panel-${t.id}`}
+              class="ui-tab"
+              classList={{ active: props.active === t.id }}
+              data-tip={t.title}
+              onClick={() => props.onChange(t.id)}
+            >
+              <Show when={t.icon}>{(name) => <Icon name={name()} />}</Show>
+              {t.label}
+              <Show when={t.count != null}>
+                <span class="ui-tab-count">{t.count}</span>
+              </Show>
+            </button>
+          )}
+        </For>
       </div>
-      <Show when={trailing.toArray().length}><span class="ui-tabs-actions">{trailing()}</span></Show>
+      <Show when={trailing.toArray().length}>
+        <span class="ui-tabs-actions">{trailing()}</span>
+      </Show>
     </div>
   )
 }
 
-/** The panel half. Six attributes that have to agree with the strip's ids, hand-written twice in the
- *  rollbar frame before this existed. `hidden` rather than unmounting, so a panel keeps its scroll
- *  position and its in-flight state across a tab switch.
+/** The panel half: six attributes that have to agree with the strip's ids. `hidden` rather than
+ *  unmounting, so a panel keeps its scroll position and its in-flight state across a tab switch.
  *
  *  A name of its own as well as `Tabs.Panel`, because a remote tree names one type per node and has
  *  nowhere to put the dot. */
 export const TabPanel = (props: {
-  idPrefix: string; id: string; active: string; children: JSX.Element
+  idPrefix: string
+  id: string
+  active: string
+  children: JSX.Element
   /** The panel viewport's reading place, owned by the feature showing it. */
   scrollOffset?: number
   /** Inset document content while keeping the strip and footer at the pane edges. */
@@ -127,7 +134,10 @@ export const TabPanel = (props: {
     if (!panel || props.active !== props.id) return
     const desired = lastVisibleOffset || props.scrollOffset || 0
     panel.scrollTop = desired
-    if (panel.scrollTop >= desired || desired === 0) { stopRestore(); return }
+    if (panel.scrollTop >= desired || desired === 0) {
+      stopRestore()
+      return
+    }
     // A remote tree can mount the panel before its result rows arrive. Retry only while
     // content is changing, and retire the observer even if the result shrinks.
     if (!contentObserver) {
@@ -136,35 +146,42 @@ export const TabPanel = (props: {
       restoreDeadline = setTimeout(stopRestore, 5000)
     }
   }
-  createEffect(on(() => [props.active === props.id, props.scrollOffset] as const, ([active, offset], previous) => {
-    if (previous && active === previous[0] && offset === previous[1]) return
-    stopRestore()
-    if (!active && previous?.[0]) {
-      if (panel?.scrollTop) lastVisibleOffset = panel.scrollTop
-      props.onChange?.(lastVisibleOffset)
-    }
-    // Remote props can arrive after active. The retained offset is part of the source,
-    // so a panel that mounted before receiving it still restores its reading place.
-    restorePending = !!active && offset !== undefined
-    if (active && offset !== undefined) restoration = setTimeout(restore, 0)
-  }))
+  createEffect(
+    on(
+      () => [props.active === props.id, props.scrollOffset] as const,
+      ([active, offset], previous) => {
+        if (previous && active === previous[0] && offset === previous[1]) return
+        stopRestore()
+        if (!active && previous?.[0]) {
+          if (panel?.scrollTop) lastVisibleOffset = panel.scrollTop
+          props.onChange?.(lastVisibleOffset)
+        }
+        // Remote props can arrive after active. The retained offset is part of the source,
+        // so a panel that mounted before receiving it still restores its reading place.
+        restorePending = !!active && offset !== undefined
+        if (active && offset !== undefined) restoration = setTimeout(restore, 0)
+      },
+    ),
+  )
   onCleanup(stopRestore)
-  return <section
-    ref={panel}
-    id={`${props.idPrefix}-panel-${props.id}`}
-    class="ui-tab-panel"
-    data-padding={props.padding}
-    role="tabpanel"
-    aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
-    hidden={props.active !== props.id}
-    onScroll={(event) => {
-      if (props.active !== props.id || event.currentTarget.hidden || restorePending) return
-      lastVisibleOffset = event.currentTarget.scrollTop
-      props.onChange?.(lastVisibleOffset)
-    }}
-  >
-    {props.children}
-  </section>
+  return (
+    <section
+      ref={panel}
+      id={`${props.idPrefix}-panel-${props.id}`}
+      class="ui-tab-panel"
+      data-padding={props.padding}
+      role="tabpanel"
+      aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
+      hidden={props.active !== props.id}
+      onScroll={(event) => {
+        if (props.active !== props.id || event.currentTarget.hidden || restorePending) return
+        lastVisibleOffset = event.currentTarget.scrollTop
+        props.onChange?.(lastVisibleOffset)
+      }}
+    >
+      {props.children}
+    </section>
+  )
 }
 
 Tabs.Panel = TabPanel

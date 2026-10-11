@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
-  buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
-  generateReason, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, primaryRemote, remoteCounts,
-  remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, unstagedPathsOf,
-  viewNodes, visibleNodes, type ChangeView, type TreeNode,
+  buildTree,
+  changeKey,
+  commitMode,
+  DEFAULT_CHANGE_VIEW,
+  filesUnder,
+  folderState,
+  generateReason,
+  groupChanges,
+  groupSections,
+  isFolderKey,
+  patchKey,
+  pickSelected,
+  primaryRemote,
+  remoteCounts,
+  remoteReason,
+  sortRows,
+  stackFor,
+  stageableRows,
+  stagedState,
+  documentFile,
+  unstagedPathsOf,
+  viewNodes,
+  visibleNodes,
+  type ChangeView,
+  type TreeNode,
 } from './model'
 import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_POINT } from './extensionPoints'
 
@@ -16,7 +37,7 @@ const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modif
   deletions: null,
 })
 
-// What tells the viewer which patches a poll moved (DiffSource.contentKey).
+// What tells the node which patches a poll moved, as the per-file key of a document request.
 describe('patchKey', () => {
   const keyed = { ...c('a.ts', false), additions: 2, deletions: 1, contentKey: '100644 100644 abc 33188 12 1.5 1.5' }
 
@@ -82,7 +103,11 @@ describe('the staging state a checkbox draws', () => {
   })
 
   it('leaves conflicts out of what a staging action reaches', () => {
-    const groups = groupChanges([c('src/clash.ts', false, 'conflicted'), c('a.ts', false), c('n.md', false, 'untracked')])
+    const groups = groupChanges([
+      c('src/clash.ts', false, 'conflicted'),
+      c('a.ts', false),
+      c('n.md', false, 'untracked'),
+    ])
     expect(stageableRows(groups).map((r) => r.path)).toEqual(['a.ts', 'n.md'])
   })
 
@@ -131,7 +156,7 @@ describe('pickSelected', () => {
 
 describe('stackFor', () => {
   it('stacks one staging area, so no path appears twice', () => {
-    // src/both.ts is staged and then edited again, so it is in both groups.
+    // both.ts is staged and then edited again, so it is in both groups.
     const groups = groupChanges([c('src/both.ts', true), c('src/both.ts', false), c('src/only-dirty.ts', false)])
     const staged = stackFor(groups, groups.staged[0])
     const unstaged = stackFor(groups, groups.unstaged[0])
@@ -146,7 +171,10 @@ describe('stackFor', () => {
 })
 
 describe('documentFile', () => {
-  const cut = { patchKey: `sha256:${'c'.repeat(64)}`, segments: [{ rows: 2, bands: 2, gaps: 0, columns: 1, lines: [0, 0, 1, 1] as [number, number, number, number] }] }
+  const cut = {
+    patchKey: `sha256:${'c'.repeat(64)}`,
+    segments: [{ rows: 2, bands: 2, gaps: 0, columns: 1, lines: [0, 0, 1, 1] as [number, number, number, number] }],
+  }
 
   it('leaves a deleted file no new side, so its gaps stay inert', () => {
     expect(documentFile(c('src/gone.ts', false, 'deleted'), cut).sha).toBeNull()
@@ -174,7 +202,7 @@ describe('documentFile', () => {
   })
 })
 
-// The view menu's three choices, as pure functions over the rows phase 0 produces. Everything below
+// The view menu's three choices, as pure functions over the rows `groupChanges` produces. Everything below
 // is a table test because everything below is a table: the pane holds no state for any of it, and the
 // only reactive thing in the tree view is which folders the reader has closed.
 
@@ -184,7 +212,8 @@ const rowsOf = (...changes: LocalChange[]) => {
   return [...groups.tracked, ...groups.untracked]
 }
 /** A tree, flattened with every folder open, as `label` at `depth`. */
-const drawn = (nodes: TreeNode[]) => visibleNodes(nodes, new Set()).map((node) => `${'  '.repeat(node.depth)}${node.label}`)
+const drawn = (nodes: TreeNode[]) =>
+  visibleNodes(nodes, new Set()).map((node) => `${'  '.repeat(node.depth)}${node.label}`)
 
 describe('buildTree', () => {
   it('collapses a single-child chain into one row and keeps a root file at the top level', () => {
@@ -205,7 +234,14 @@ describe('buildTree', () => {
   })
 
   it('keeps the rename a row carries, so the row still reads `old → new`', () => {
-    const [row] = rowsOf({ path: 'src/new.ts', oldPath: 'src/old.ts', status: 'renamed', staged: true, additions: 1, deletions: 1 })
+    const [row] = rowsOf({
+      path: 'src/new.ts',
+      oldPath: 'src/old.ts',
+      status: 'renamed',
+      staged: true,
+      additions: 1,
+      deletions: 1,
+    })
     const tree = buildTree([row], view({ mode: 'tree' }))
     expect(tree[0].children[0].row).toMatchObject({ path: 'src/new.ts', oldPath: 'src/old.ts' })
   })
@@ -227,14 +263,24 @@ describe('visibleNodes', () => {
 describe('sortRows', () => {
   it('orders a flat list by basename across folders when the reader asks for a name sort', () => {
     const rows = rowsOf(c('src/zebra/a.ts', false), c('src/apple/z.ts', false), c('m.ts', false))
-    expect(sortRows(rows, view({ sort: 'name' })).map((row) => row.path)).toEqual(['src/zebra/a.ts', 'm.ts', 'src/apple/z.ts'])
-    expect(sortRows(rows, view({ sort: 'path' })).map((row) => row.path)).toEqual(['m.ts', 'src/apple/z.ts', 'src/zebra/a.ts'])
+    expect(sortRows(rows, view({ sort: 'name' })).map((row) => row.path)).toEqual([
+      'src/zebra/a.ts',
+      'm.ts',
+      'src/apple/z.ts',
+    ])
+    expect(sortRows(rows, view({ sort: 'path' })).map((row) => row.path)).toEqual([
+      'm.ts',
+      'src/apple/z.ts',
+      'src/zebra/a.ts',
+    ])
   })
 
   it('ignores the sort in tree view, where the folders are the order', () => {
     const rows = rowsOf(c('src/zebra/a.ts', false), c('src/apple/z.ts', false))
-    expect(sortRows(rows, view({ mode: 'tree', sort: 'name' })).map((row) => row.path))
-      .toEqual(['src/apple/z.ts', 'src/zebra/a.ts'])
+    expect(sortRows(rows, view({ mode: 'tree', sort: 'name' })).map((row) => row.path)).toEqual([
+      'src/apple/z.ts',
+      'src/zebra/a.ts',
+    ])
   })
 })
 
@@ -265,7 +311,10 @@ describe('groupSections', () => {
   const conflict = c('src/clash.ts', false, 'conflicted')
   const changes = [conflict, c('src/a.ts', true), c('src/b.ts', false), c('n.md', false, 'untracked')]
   const sectionsFor = (groupBy: ChangeView['groupBy']) =>
-    groupSections(groupChanges(changes), view({ groupBy })).map((section) => [section.key, section.rows.map((row) => row.path)])
+    groupSections(groupChanges(changes), view({ groupBy })).map((section) => [
+      section.key,
+      section.rows.map((row) => row.path),
+    ])
 
   it('draws the three default groups, conflicts first', () => {
     expect(sectionsFor('tracked')).toEqual([
@@ -300,26 +349,27 @@ describe('groupSections', () => {
 describe('viewNodes', () => {
   it('is the rows themselves in list view, in the order the section holds them', () => {
     const rows = rowsOf(c('src/a.ts', false), c('b.ts', false))
-    expect(viewNodes(rows, view()).map((node) => [node.kind, node.label, node.depth]))
-      .toEqual([['file', 'b.ts', 0], ['file', 'a.ts', 0]])
+    expect(viewNodes(rows, view()).map((node) => [node.kind, node.label, node.depth])).toEqual([
+      ['file', 'b.ts', 0],
+      ['file', 'a.ts', 0],
+    ])
   })
 })
 
-// The annotation point this pane opens on its diff lines (docs/plugins/cooperative-extension-points.md § Cooperative extension
-// points). The fields have to be the ones the shared viewer mints per row, in that order, or a
-// contributor's marks look up under a string nothing ever wrote and draw nothing — silently, because
-// an unmatched contribution is silent by design.
+// The annotation point this pane opens on its diff lines
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The fields have to be
+// the ones the shared viewer mints per row, in that order, or a contributor's marks look up under a
+// string nothing ever wrote and draw nothing, silently.
 //
 // Written out rather than compared against `DIFF_ANNOTATION_FIELDS`: that constant lives beside the
-// viewer in client-core, and importing across the plugin boundary to check a three-string list would be
-// the coupling this seam exists to avoid. The pairing is held from the other end too, in client-core's
-// annotationKey.test.ts.
+// viewer in client-core, and importing across the plugin boundary would be the coupling this seam
+// exists to avoid. Client-core's `annotationKey` tests hold the pairing from the other end.
 describe('the diff-line annotation point', () => {
-  it('is keyed by the three fields the viewer mints, in the viewer\'s order', () => {
+  it("is keyed by the three fields the viewer mints, in the viewer's order", () => {
     expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side'])
   })
 
-  it('is addressed under this plugin\'s own name, which the host mints', () => {
+  it("is addressed under this plugin's own name, which the host mints", () => {
     expect(DIFF_LINE_POINT).toBe('git:diff-line')
   })
 })
@@ -328,7 +378,7 @@ describe('the diff-line annotation point', () => {
 // this string by hand, because a plugin may not import another plugin, so a rename here is a silent
 // empty slot over there.
 describe('the push-actions point', () => {
-  it('is addressed under this plugin\'s own name, which the host mints', () => {
+  it("is addressed under this plugin's own name, which the host mints", () => {
     expect(PUSH_ACTIONS_POINT).toBe('git:push-actions')
   })
 })
@@ -406,9 +456,11 @@ describe('remoteReason', () => {
 })
 
 describe('generateReason', () => {
-  // Matched on the envelope\'s `code`, because `ApiError` is not on the plugin surface.
+  // Matched on the envelope's `code`, because `ApiError` is not on the plugin surface.
   it('turns the two provider codes into a next step', () => {
-    expect(generateReason({ code: 'provider_needs_auth', message: 'provider_needs_auth' })).toContain('Reconnect it in Settings')
+    expect(generateReason({ code: 'provider_needs_auth', message: 'provider_needs_auth' })).toContain(
+      'Reconnect it in Settings',
+    )
     expect(generateReason({ code: 'provider_rate_limited', message: 'x' })).toContain('rate-limiting')
     expect(generateReason({ code: 'provider_unavailable', message: 'x' })).toContain('did not answer')
   })
@@ -417,13 +469,15 @@ describe('generateReason', () => {
   // "try again shortly" is the wrong advice: nothing changes until somebody runs it in a terminal.
   it('sends a harness to a terminal instead of telling it to try again', () => {
     const unavailable = { code: 'provider_unavailable', message: 'x' }
-    expect(generateReason(unavailable, { kind: 'harness', label: 'Claude Code' }))
-      .toBe('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
-    expect(generateReason(unavailable, { kind: 'connection', label: 'Anthropic' }))
-      .toBe('The provider did not answer. Try again shortly.')
+    expect(generateReason(unavailable, { kind: 'harness', label: 'Claude Code' })).toBe(
+      'Claude Code did not answer. Run it once in a terminal to check it is signed in.',
+    )
+    expect(generateReason(unavailable, { kind: 'connection', label: 'Anthropic' })).toBe(
+      'The provider did not answer. Try again shortly.',
+    )
   })
 
-  it('keeps the node\'s own prose for a refusal it wrote itself', () => {
+  it("keeps the node's own prose for a refusal it wrote itself", () => {
     const error = Object.assign(new Error('Nothing staged or changed to describe.'), { code: 'nothing_to_commit' })
     expect(generateReason(error)).toBe('Nothing staged or changed to describe.')
   })

@@ -9,31 +9,43 @@ const root = new URL('../../', import.meta.url)
 const loader = createRequire(new URL('apps/desktop/package.json', root)).resolve('tsx')
 // Each caller with the assertions for a malformed document, then for a large valid one.
 const callers = [
-  ['packages/node-core/src/server/runConfig.ts', `
+  [
+    'packages/node-core/src/server/projects/runConfig.ts',
+    `
     const result = caller.loadRepoConfig(null, null, { devScript: 'owner-command' }, text)
     assert.equal(result.errors.length, 1)
     assert.equal(result.runTargets[0].command, 'owner-command')
-  `, `
+  `,
+    `
     const result = caller.loadRepoConfig(null, null, { devScript: 'owner-command' }, text)
     assert.deepEqual(result.errors, [])
     assert.equal(result.runTargets[0].command, 'owner-command')
-  `],
-  ['plugins/docker/src/server/dockerConfig.ts', `
+  `,
+  ],
+  [
+    'plugins/docker/src/server/dockerConfig.ts',
+    `
     assert.deepEqual(caller.parseDockerConfig(text), {})
-  `, `
+  `,
+    `
     assert.deepEqual(caller.parseDockerConfig(text), {})
-  `],
-  ['plugins/workflows/src/server/definitions/files.ts', `
+  `,
+  ],
+  [
+    'plugins/workflows/src/server/definitions/files.ts',
+    `
     const errors = []
     assert.equal(caller.parseWorkflowToml(text, 'regression', 'repo', errors), null)
     assert.equal(errors.length, 1)
     assert.equal(errors[0].source, 'repo:regression')
-  `, `
+  `,
+    `
     const errors = []
     assert.equal(caller.parseWorkflowToml(text, 'regression', 'repo', errors), null)
     assert.equal(errors.length, 1)
     assert.match(errors[0].message, /Incompatible workflow/)
-  `],
+  `,
+  ],
 ] as const
 
 function runCaller(path: string, body: string) {
@@ -56,12 +68,20 @@ function runCaller(path: string, body: string) {
   expect(result.stdout).toContain('caller finished')
 }
 
-it.each(callers)('%s rejects an unterminated final comment within the child deadline', (path, malformed) => {
-  runCaller(path, `for (const text of ['a=[1 #', 'a={b=1 #']) { ${malformed} }`)
-}, 15_000)
+it.each(callers)(
+  '%s rejects an unterminated final comment within the child deadline',
+  (path, malformed) => {
+    runCaller(path, `for (const text of ['a=[1 #', 'a={b=1 #']) { ${malformed} }`)
+  },
+  15_000,
+)
 
 // GHSA-r4xh-jqrq-34v2: smol-toml up to 1.8.0 scanned the rest of the document for every key, so a
-// flat list of plain keys parsed in quadratic time. This document took over 20 seconds on 1.8.0.
-it.each(callers)('%s parses a few megabytes of plain keys within the child deadline', (path, _malformed, large) => {
-  runCaller(path, `const text = Array.from({ length: 400_000 }, (_, i) => 'k' + i + ' = 1').join('\\n'); ${large}`)
-}, 15_000)
+// flat list of plain keys parsed in quadratic time.
+it.each(callers)(
+  '%s parses a few megabytes of plain keys within the child deadline',
+  (path, _malformed, large) => {
+    runCaller(path, `const text = Array.from({ length: 400_000 }, (_, i) => 'k' + i + ' = 1').join('\\n'); ${large}`)
+  },
+  15_000,
+)

@@ -10,9 +10,8 @@ import { slotColor } from '../../appearance'
 import { boxBorder } from '../roles'
 import { fieldRef, type FieldApi } from './fieldRef'
 
-/** The two colours a field would otherwise invent. A field that names neither draws its text opaque
- *  white and its placeholder `#666666` — neither is one of the sixteen a terminal has or comes from
- *  any theme, so both say a slot out loud
+/** The two colours a field draws in, said as slots rather than left to paint, so neither is a colour
+ *  outside the sixteen a terminal has or one no theme chose
  *  (../../appearance.ts, docs/ui-design/appearance.md § Roles, and what each host makes of them). */
 const fieldColors = () => ({
   textColor: slotColor('default'),
@@ -22,9 +21,11 @@ const fieldColors = () => ({
 export function Input(props: InputProps) {
   let field: Renderable | undefined
   const autofocus = createMemo(() => props.autofocus)
-  createEffect(on(autofocus, (active) => {
-    if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
-  }))
+  createEffect(
+    on(autofocus, (active) => {
+      if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
+    }),
+  )
   const install = fieldRef({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
@@ -39,11 +40,13 @@ export function Input(props: InputProps) {
       flexGrow={props.width === 'narrow' ? 0 : 1}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
-      ref={(element: Renderable) => { field = element; install(element) }}
+      ref={(element: Renderable) => {
+        field = element
+        install(element)
+      }}
     />
   )
 }
-
 
 type TextareaProps = {
   size?: Extract<Size, 'sm' | 'md'>
@@ -83,40 +86,48 @@ type TextareaProps = {
  *  that reaches a field while somebody is typing. Its own function because it is the half of the
  *  component that has nothing to do with what is typed into it. */
 function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void {
-  // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
-  // buffer's text when its submit button is pressed, and there is no other way to ask.
+  // The `ref` prop hands over the renderable: a `Composer` reads the buffer's text when its submit
+  // button is pressed, and there is no other way to ask.
   if (typeof props.ref === 'function') (props.ref as (node: Renderable & FieldApi) => void)(element)
   // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
   // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
   // in `focus` mode, so a composer inside a list does not answer for the list.
-  onCleanup(registerIntentLayer(element, ['commit', ...(props.onToggleExpand ? ['maximize'] as const : [])], (intent) => {
-    if (intent === 'maximize') {
-      if (props.disabled || !props.onToggleExpand) return false
-      props.onToggleExpand()
-      return true
-    }
-    if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
-    if (props.onCommit) props.onCommit()
-    else props.onSubmit?.(element.plainText)
-    return true
-  }, { priority: STOP, mode: 'focus' }))
+  onCleanup(
+    registerIntentLayer(
+      element,
+      ['commit', ...(props.onToggleExpand ? (['maximize'] as const) : [])],
+      (intent) => {
+        if (intent === 'maximize') {
+          if (props.disabled || !props.onToggleExpand) return false
+          props.onToggleExpand()
+          return true
+        }
+        if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
+        if (props.onCommit) props.onCommit()
+        else props.onSubmit?.(element.plainText)
+        return true
+      },
+      { priority: STOP, mode: 'focus' },
+    ),
+  )
 }
 
 export function Textarea(props: TextareaProps) {
   const [box, setBox] = createSignal<Renderable>()
-  // The two callbacks the shared props declare and the DOM half has always fired. They were declared
-  // here and never called, so a caller that gated something on "the keys are in this field" got one
-  // answer on the desktop and none here — the changes pane's commit chords are gated on exactly
-  // that.
+  // The two callbacks the shared props declare and the DOM half fires. A caller that gates something
+  // on "the keys are in this field" needs the same answer on both hosts — the changes pane's commit
+  // chords are gated on exactly that.
   //
   // Read off the region store rather than off an event, because that is where focus is on a host with
   // no pointer (../../keys/regions.ts). Deferred, so a field that mounts unfocused does not report a
   // blur nobody performed.
-  createEffect(on(
-    () => focusWithin(box()),
-    (has) => (has ? props.onFocus?.() : props.onBlur?.()),
-    { defer: true },
-  ))
+  createEffect(
+    on(
+      () => focusWithin(box()),
+      (has) => (has ? props.onFocus?.() : props.onBlur?.()),
+      { defer: true },
+    ),
+  )
   const install = fieldRef({
     value: () => props.value ?? '',
     newline: true,
@@ -124,7 +135,7 @@ export function Textarea(props: TextareaProps) {
   })
   // The box the node's own sentence promises, and it earns its two rows twice over. It is the only
   // thing separating a message box from whatever is stacked above it — on the agents pane that is a
-  // transcript, a row of provider pickers and an expand toggle, and unboxed the field read as one
+  // transcript, a row of provider pickers and an expand toggle, and unboxed the field reads as one
   // more line of that pile. And it is where a reader looks to see whether the keys are in the field,
   // which a caret alone cannot say once the field is empty.
   //
@@ -147,11 +158,10 @@ export function Textarea(props: TextareaProps) {
     >
       <textarea
         flexGrow={props.grow ? 1 : 0}
-        // `rows` is "visible lines" on the shared props and was dropped here, so every field was
-        // exactly as tall as what was in it: an empty message box was one line, and the composer's
-        // own "Expand the message box" toggle — which is a swap from 3 rows to 18 — did nothing at
-        // all. A floor rather than a height, because a field taller than its `rows` should still show
-        // what has been typed into it (../../layout/measure.ts § measureField).
+        // `rows` is "visible lines" on the shared props. Without it every field is exactly as tall as what is
+        // in it, and the composer's own "Expand the message box" toggle — a swap from 3 rows to 18 — does
+        // nothing at all. A floor rather than a height, because a field taller than its `rows` should still
+        // show what has been typed into it (../../layout/measure.ts § measureField).
         {...(props.grow ? {} : { minHeight: Math.max(1, props.rows ?? 1) })}
         {...fieldColors()}
         placeholder={props.placeholder ?? ''}

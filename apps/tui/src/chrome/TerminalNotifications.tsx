@@ -3,7 +3,11 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { createSettingSave, type SettingSave } from '@acorn/client-core/features/settings'
-import { parseNotificationSettings, saveNotificationEvent, type NotificationSettings } from '@acorn/client-core/features/notifications'
+import {
+  parseNotificationSettings,
+  saveNotificationEvent,
+  type NotificationSettings,
+} from '@acorn/client-core/features/notifications'
 import { defaultDeliveryContext, deliverNotice } from '@acorn/client-core/features/notifications/deliver.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
 import { Line } from '../kit/cells'
@@ -34,7 +38,8 @@ function alertSource(env: NodeJS.ProcessEnv): string {
   const raw = env.ACORN_TUI_NOTIFY
   const change = 'Set ACORN_TUI_NOTIFY to off, bell, terminal, or both, then restart acorn.'
   if (raw === undefined || raw === '') return `The default. ${change}`
-  if (notifyMode(env) === 'both' && raw !== 'both') return `ACORN_TUI_NOTIFY is "${raw}", which acorn does not recognise, so it uses the default. ${change}`
+  if (notifyMode(env) === 'both' && raw !== 'both')
+    return `ACORN_TUI_NOTIFY is "${raw}", which acorn does not recognise, so it uses the default. ${change}`
   return `From ACORN_TUI_NOTIFY. ${change}`
 }
 
@@ -63,10 +68,11 @@ export default function TerminalNotifications() {
 
   // Unseen on purpose, as on the desktop: the point is to fire every channel the mode allows, and a
   // notice about the task you are looking at is meant to be quiet.
-  const sendTest = () => deliverNotice(
-    { taskId: activeTaskId() ?? '', kind: 'agent-needs-input', title: 'Test agent needs you', at: Date.now() },
-    { ...defaultDeliveryContext, focused: () => false },
-  )
+  const sendTest = () =>
+    deliverNotice(
+      { taskId: activeTaskId() ?? '', kind: 'agent-needs-input', title: 'Test agent needs you', at: Date.now() },
+      { ...defaultDeliveryContext, focused: () => false },
+    )
 
   return (
     <>
@@ -75,20 +81,41 @@ export default function TerminalNotifications() {
           <Line>{MODE_LABEL[notifyMode(env)]}</Line>
         </SettingRow>
       </SettingsSection>
-      <SettingsSection id="events" label="Notify me when" description="Turning an event off also keeps it out of the notification list.">
+      <SettingsSection
+        id="events"
+        label="Notify me when"
+        description="Turning an event off also keeps it out of the notification list."
+      >
         <SettingRow label="An agent needs me" error={blocked.error()}>
-          <Checkbox switch ariaLabel="An agent needs me" checked={settings().events.blocked} onChange={(on) => saveEvent(blocked, { blocked: on })} />
+          <Checkbox
+            switch
+            ariaLabel="An agent needs me"
+            checked={settings().events.blocked}
+            onChange={(on) => saveEvent(blocked, { blocked: on })}
+          />
         </SettingRow>
         <SettingRow label="An agent finishes" error={finished.error()}>
-          <Checkbox switch ariaLabel="An agent finishes" checked={settings().events.finished} onChange={(on) => saveEvent(finished, { finished: on })} />
+          <Checkbox
+            switch
+            ariaLabel="An agent finishes"
+            checked={settings().events.finished}
+            onChange={(on) => saveEvent(finished, { finished: on })}
+          />
         </SettingRow>
         <SettingRow label="An agent fails" error={failed.error()}>
-          <Checkbox switch ariaLabel="An agent fails" checked={settings().events.error} onChange={(on) => saveEvent(failed, { error: on })} />
+          <Checkbox
+            switch
+            ariaLabel="An agent fails"
+            checked={settings().events.error}
+            onChange={(on) => saveEvent(failed, { error: on })}
+          />
         </SettingRow>
       </SettingsSection>
       <SettingsSection id="test" label="Test">
         <SettingRow label="Test notification" description="Uses every channel the terminal alerts row allows.">
-          <Button label="Send a test notification" onPress={sendTest}>Send a test notification</Button>
+          <Button label="Send a test notification" onPress={sendTest}>
+            Send a test notification
+          </Button>
         </SettingRow>
       </SettingsSection>
     </>

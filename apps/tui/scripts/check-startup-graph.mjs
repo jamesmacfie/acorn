@@ -12,17 +12,10 @@ if (graph.entry !== 'main.js' || !graph.roots.includes(graph.entry) || !graph.ch
   throw new Error('[tui-startup] startup graph must include main.js. Rebuild the terminal client.')
 }
 
-// Complete minified startup graph, including bundled Zod. Updated from the App-only unminified
-// metric in October 2026; external runtime packages are reported separately, never hidden as bytes.
-// Phase 01's Git roster stays behind the first frame. Shared-chunk reshaping raised the measured
-// pre-render closure to 729,573 B on October 9, 2026, including the terminal project lookup but
-// without putting Git modules in that closure. Phase 05's task-launch request adds a small
-// signal and terminal overlay dispatch before render; the form, Git rows, and Workflows stay lazy.
-// Phase 05's pure address parser and the linked-source Menu identity add about 2.5 KB to the
-// measured pre-render closure. The roster and linked-place resolver still load after first frame.
-// 673,918 B on 2026-10-09, down from 730,269 B, once loaded-plugin frame and chrome registration
-// loaded on the first distribution pass (docs/testing/selective-renderer-loading-2026-10-09.md). The
-// ceiling is about 4% above.
+// Complete minified startup graph, including bundled Zod. External runtime packages are reported
+// separately, never hidden as bytes. The roster, the linked-place resolver, the Git rows and the
+// task-launch form load after the first frame. The ceiling sits a few percent above the closure this
+// script prints on every `pnpm --filter @acorn/tui build`.
 const CEILING = 700_000
 const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes', 'drizzle-orm', 'RemoteTree-', 'TreeHost-', 'roster-', 'chromeRegister']
 

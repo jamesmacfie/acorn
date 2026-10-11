@@ -17,8 +17,8 @@ export type PluginCompletionRequest = { text: string; position: { line: number; 
 /** LSP's `CompletionItemKind`, narrowed to the handful a host can render meaningfully and spelled as
  * names rather than LSP's magic numbers: this wire is read by plugin authors, not by an LSP client. An
  * unknown kind renders as `text` rather than failing the whole popup. */
-export const COMPLETION_KINDS = ['text', 'keyword', 'field', 'class', 'function', 'value'] as const
-export type PluginCompletionKind = (typeof COMPLETION_KINDS)[number]
+const COMPLETION_KINDS = ['text', 'keyword', 'field', 'class', 'function', 'value'] as const
+type PluginCompletionKind = (typeof COMPLETION_KINDS)[number]
 
 /** One suggestion. `insertText` defaults to `label`, which is the common case. */
 export type PluginCompletionItem = {
@@ -46,9 +46,6 @@ export type PluginPosition = { line: number; column: number }
 /** A span of the document. `end` is exclusive, the convention `content.selection` ranges use. */
 export type PluginRange = { start: PluginPosition; end: PluginPosition }
 
-/** POSTed to a hover route. `revision` is the host's edit counter for this buffer; echo it back. */
-export type PluginHoverRequest = { text: string; position: PluginPosition; revision: number }
-
 /** What a hover route answers. `range` says which text the hover is about; absent means the position.
  *  Markdown is drawn sanitized: no images, no HTML, links only to http, https, and mailto. */
 export type PluginHoverResponse = {
@@ -60,20 +57,6 @@ export type PluginHoverResponse = {
 /** LSP's `DiagnosticSeverity`, spelled as names for the reason completion kinds are. */
 export const DIAGNOSTIC_SEVERITIES = ['error', 'warning', 'information', 'hint'] as const
 export type PluginDiagnosticSeverity = (typeof DIAGNOSTIC_SEVERITIES)[number]
-
-export type PluginDiagnostic = {
-  range: PluginRange
-  severity: PluginDiagnosticSeverity
-  message: string
-  code?: string
-  source?: string
-}
-
-/** POSTed to a diagnostics route: the whole live buffer, saved or not. */
-export type PluginDiagnosticsRequest = { text: string; revision: number }
-
-/** What a diagnostics route answers. An empty list clears the provider's marks. */
-export type PluginDiagnosticsResponse = { revision: number; items: PluginDiagnostic[] }
 
 /** Hover contents past this many UTF-8 bytes are refused, not cut: a cut Markdown body can change
  *  meaning. */

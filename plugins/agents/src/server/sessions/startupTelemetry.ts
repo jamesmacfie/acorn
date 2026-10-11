@@ -38,14 +38,17 @@ export function sessionStartupTelemetry(
       signal.removeEventListener('abort', cancelled)
     }
   }
-  const phases = (parent: SpanHandle): MeasureAgentStartup =>
-    (phase, run) => measure('agent.session.phase', phase, parent, run)
+  const phases =
+    (parent: SpanHandle): MeasureAgentStartup =>
+    (phase, run) =>
+      measure('agent.session.phase', phase, parent, run)
   return {
     phase: phases(total),
     provider: <T>(run: (phase: MeasureAgentStartup) => Promise<T>): Promise<T> =>
       measure('agent.session', undefined, total, (span) => run(phases(span))),
-    end: (status: 'ok' | 'error') => total.end(status, {
-      outcome: signal.aborted ? 'cancelled' : status === 'ok' ? 'ready' : 'error',
-    }),
+    end: (status: 'ok' | 'error') =>
+      total.end(status, {
+        outcome: signal.aborted ? 'cancelled' : status === 'ok' ? 'ready' : 'error',
+      }),
   }
 }

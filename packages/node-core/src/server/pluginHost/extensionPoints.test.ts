@@ -15,7 +15,7 @@ describe('node extension points', () => {
     for (const name of ['owner', 'other', 'thief']) clearRegistrations(name)
   })
 
-  it('refuses a point outside the opening plugin\'s namespace', () => {
+  it("refuses a point outside the opening plugin's namespace", () => {
     const thief = context('thief')
     try {
       expect(() => thief.extensionPoints.declare(POINT, 'Things')).toThrow(/only open points under 'thief:'/)
@@ -24,26 +24,7 @@ describe('node extension points', () => {
     }
   })
 
-  it('still answers to the names it carried before 2026-08-31', () => {
-    // `open`, `contribute` and `entries` are deprecated aliases for one major, so a plugin outside this
-    // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). One test rather than a
-    // second copy of the suite: the aliases share their implementations with the new names, so what is
-    // worth proving is that all three are wired and reach the same registry.
-    const owner = context('owner')
-    const other = context('other')
-    try {
-      owner.extensionPoints.open(POINT, 'Things')
-      other.extensionPoints.contribute(POINT, { id: 'thing', value: 'a' })
-      expect(owner.extensionPoints.entries(POINT).map((entry) => entry.id)).toEqual(['other:thing'])
-      // And the two spellings are one registry, not two.
-      expect(owner.extensionPoints.handlers(POINT).map((entry) => entry.id)).toEqual(['other:thing'])
-    } finally {
-      owner.cleanup()
-      other.cleanup()
-    }
-  })
-
-  it('delivers other plugins\' entries in order, under host-minted ids', () => {
+  it("delivers other plugins' entries in order, under host-minted ids", () => {
     const owner = context('owner')
     const other = context('other')
     try {

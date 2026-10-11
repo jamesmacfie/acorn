@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Project, ProjectConfigResponse, Task, Workspace } from '@acorn/protocol/api.ts'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
-import { createProjectRef } from '../../projects'
+import { createProjectRef } from '../../projects/projects'
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -41,7 +41,11 @@ const makeApp = () => {
 }
 
 const jsonReq = (url: string, method: string, body: unknown) =>
-  new Request(`http://acorn.test${url}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  new Request(`http://acorn.test${url}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
 describe('project rows own workspace membership and visibility', () => {
   let t: TestDb
@@ -63,7 +67,10 @@ describe('project rows own workspace membership and visibility', () => {
   })
 
   const call = (url: string, method: string, body?: unknown) =>
-    app.fetch(body === undefined ? new Request(`http://acorn.test${url}`, { method }) : jsonReq(url, method, body), {} as Env)
+    app.fetch(
+      body === undefined ? new Request(`http://acorn.test${url}`, { method }) : jsonReq(url, method, body),
+      {} as Env,
+    )
 
   const projectRows = () => t.db.select().from(schema.projects)
 
@@ -89,11 +96,18 @@ describe('project rows own workspace membership and visibility', () => {
     const { workspaceId, otherId } = await seedOrderedProjects()
     const url = `/api/workspaces/${workspaceId}/project-order`
     expect((await call(url, 'PUT', { projectIds: ['c', 'a', 'b'] })).status).toBe(200)
-    const workspace = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find((row) => row.id === workspaceId)!
+    const workspace = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find(
+      (row) => row.id === workspaceId,
+    )!
     expect(workspace.projects.map((project) => project.id)).toEqual(['c', 'a', 'b'])
     const listed = (await (await call('/api/projects', 'GET')).json()) as { projects: Project[] }
-    expect(listed.projects.filter((project) => project.workspaceId === workspaceId).map((project) => project.id)).toEqual(['c', 'a', 'b'])
-    expect((await projectRows()).find((project) => project.id === 'other')).toMatchObject({ workspaceId: otherId, sort: 0 })
+    expect(
+      listed.projects.filter((project) => project.workspaceId === workspaceId).map((project) => project.id),
+    ).toEqual(['c', 'a', 'b'])
+    expect((await projectRows()).find((project) => project.id === 'other')).toMatchObject({
+      workspaceId: otherId,
+      sort: 0,
+    })
     expect(broadcasts).toEqual([
       { channel: 'project:changed', projectId: 'a' },
       { channel: 'project:changed', projectId: 'b' },
@@ -102,10 +116,18 @@ describe('project rows own workspace membership and visibility', () => {
     await call(url, 'PUT', { projectIds: ['c', 'a', 'b'] })
     expect(broadcasts).toEqual([])
 
-    const added = (await (await call('/api/projects', 'POST', { path: dir, workspaceId, name: 'Added' })).json()) as { project: Project }
-    const imported = await createProjectRef(t.db, { name: 'Imported', workspaceId, github: { owner: 'acme', name: 'imported' } })
+    const added = (await (await call('/api/projects', 'POST', { path: dir, workspaceId, name: 'Added' })).json()) as {
+      project: Project
+    }
+    const imported = await createProjectRef(t.db, {
+      name: 'Imported',
+      workspaceId,
+      github: { owner: 'acme', name: 'imported' },
+    })
     expect((await call('/api/projects/other', 'PATCH', { workspaceId })).status).toBe(200)
-    const after = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find((row) => row.id === workspaceId)!
+    const after = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find(
+      (row) => row.id === workspaceId,
+    )!
     expect(after.projects.map((project) => project.id)).toEqual(['c', 'a', 'b', added.project.id, imported.id, 'other'])
   })
 
@@ -125,9 +147,13 @@ describe('project rows own workspace membership and visibility', () => {
   it('rolls back every sort update when one project cannot be written', async () => {
     const { workspaceId } = await seedOrderedProjects()
     const before = await projectRows()
-    t.db.$client.exec("CREATE TRIGGER fail_sort BEFORE UPDATE OF sort ON projects WHEN NEW.id = 'b' BEGIN SELECT RAISE(ABORT, 'write failed'); END")
+    t.db.$client.exec(
+      "CREATE TRIGGER fail_sort BEFORE UPDATE OF sort ON projects WHEN NEW.id = 'b' BEGIN SELECT RAISE(ABORT, 'write failed'); END",
+    )
     app.onError(() => new Response('write failed', { status: 500 }))
-    expect((await call(`/api/workspaces/${workspaceId}/project-order`, 'PUT', { projectIds: ['c', 'a', 'b'] })).status).toBe(500)
+    expect(
+      (await call(`/api/workspaces/${workspaceId}/project-order`, 'PUT', { projectIds: ['c', 'a', 'b'] })).status,
+    ).toBe(500)
     expect(await projectRows()).toEqual(before)
     expect(broadcasts).toEqual([])
   })
@@ -137,14 +163,31 @@ describe('project rows own workspace membership and visibility', () => {
     const w2 = await createWorkspace('Two')
     const now = Date.now()
     await t.db.insert(schema.projects).values({
-      id: 'project-web', name: 'web', path: null, workspaceId: w1, sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-web',
+      name: 'web',
+      path: null,
+      workspaceId: w1,
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/acme/web.git',
+      githubOwner: 'acme',
+      githubName: 'web',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
 
     expect((await call('/api/projects/project-web', 'PATCH', { workspaceId: w2 })).status).toBe(200)
     let [project] = await projectRows()
-    expect(project).toMatchObject({ githubOwner: 'acme', githubName: 'web', workspaceId: w2, path: null, hidden: false })
+    expect(project).toMatchObject({
+      githubOwner: 'acme',
+      githubName: 'web',
+      workspaceId: w2,
+      path: null,
+      hidden: false,
+    })
 
     await call('/api/projects/project-web', 'PATCH', { hidden: true })
     ;[project] = await projectRows()
@@ -160,9 +203,20 @@ describe('project rows own workspace membership and visibility', () => {
     const w1 = await createWorkspace('Doomed')
     const now = Date.now()
     await t.db.insert(schema.projects).values({
-      id: 'project-web', name: 'web', path: null, workspaceId: w1, sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-web',
+      name: 'web',
+      path: null,
+      workspaceId: w1,
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/acme/web.git',
+      githubOwner: 'acme',
+      githubName: 'web',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     // Creating any workspace does not create Default; deleting one must.
     broadcasts.length = 0
@@ -214,7 +268,7 @@ describe('project rows own workspace membership and visibility', () => {
 
     expect((await call(`/api/projects/${project.id}`, 'PATCH', { hidden: true })).status).toBe(200)
     expect((await call(`/api/projects/${project.id}`, 'DELETE')).status).toBe(200)
-    expect((await (await call('/api/projects', 'GET')).json() as { projects: Project[] }).projects).toHaveLength(0)
+    expect(((await (await call('/api/projects', 'GET')).json()) as { projects: Project[] }).projects).toHaveLength(0)
   })
 
   it('stores project config and run targets through project-keyed routes', async () => {
@@ -227,29 +281,45 @@ describe('project rows own workspace membership and visibility', () => {
       patch: { setupScript: 'pnpm install', previewMode: 'port', previewValue: '3000' },
     })
     expect(config.status).toBe(200)
-    const targets = await call(`/api/projects/${project.id}/run-targets`, 'PUT', { runTargets: '[{"id":"dev","command":"pnpm dev"}]' })
+    const targets = await call(`/api/projects/${project.id}/run-targets`, 'PUT', {
+      runTargets: '[{"id":"dev","command":"pnpm dev"}]',
+    })
     expect(targets.status).toBe(200)
 
     const [row] = await projectRows()
-    expect(row).toMatchObject({ setupScript: 'pnpm install', previewMode: 'port', previewValue: '3000', runTargets: '[{"id":"dev","command":"pnpm dev"}]' })
+    expect(row).toMatchObject({
+      setupScript: 'pnpm install',
+      previewMode: 'port',
+      previewValue: '3000',
+      runTargets: '[{"id":"dev","command":"pnpm dev"}]',
+    })
   })
 
-  it('says which values the checkout\'s committed .acorn/config.toml sets, beside the row it overrides', async () => {
+  it("says which values the checkout's committed .acorn/config.toml sets, beside the row it overrides", async () => {
     const folder = join(dir, 'with-repo-config')
     mkdirSync(join(folder, '.acorn'), { recursive: true })
     const created = await call('/api/projects', 'POST', { path: folder })
     const { project } = (await created.json()) as { project: Project }
-    await call(`/api/projects/${project.id}/config`, 'PUT', { patch: { dbUrlScript: './local-db.sh', previewMode: 'port', previewValue: '3000' } })
+    await call(`/api/projects/${project.id}/config`, 'PUT', {
+      patch: { dbUrlScript: './local-db.sh', previewMode: 'port', previewValue: '3000' },
+    })
 
     // No file: the read carries no repo layer at all, which is what an older node sends too.
     const plain = (await (await call(`/api/projects/${project.id}/config`, 'GET')).json()) as ProjectConfigResponse
     expect(plain.repoConfig).toBeUndefined()
 
-    writeFileSync(join(folder, '.acorn', 'config.toml'), [
-      '[scripts.run.dev]', 'command = "./scripts/dev.sh"', 'default = true',
-      '[database]', 'url_script = "./scripts/db-url.sh"',
-      '[preview]', 'mode = "url"',
-    ].join('\n'))
+    writeFileSync(
+      join(folder, '.acorn', 'config.toml'),
+      [
+        '[scripts.run.dev]',
+        'command = "./scripts/dev.sh"',
+        'default = true',
+        '[database]',
+        'url_script = "./scripts/db-url.sh"',
+        '[preview]',
+        'mode = "url"',
+      ].join('\n'),
+    )
     const read = (await (await call(`/api/projects/${project.id}/config`, 'GET')).json()) as ProjectConfigResponse
     // The machine's own values are still what `config` holds; the file's are beside them, and only the
     // keys the file sets are there.

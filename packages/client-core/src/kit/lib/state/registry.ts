@@ -9,13 +9,12 @@ type Identified = { id: string }
 // real work. A duplicate id is a programming error because silently replacing a contribution would
 // make activation order observable.
 //
-// It also answers who contributed each entry. Eight of the contribution types have no plugin id on
-// them, and a telemetry record has to name an owner (docs/telemetry/model.md § The attribute vocabulary),
-// so the owner is a side-map here rather than a field added to eight types and every registration
-// site. The three passes that know the owner fill it: the descriptor pass in
-// host/chrome/chromeRegister.ts, the frame pass in host/frames/register.ts, and `makeContext` in
-// host/registries/extensionPoints/plugin.ts. Everything else is core's, and `ownerOf` answers
-// undefined for those rather than guessing.
+// It also answers who contributed each entry. Most contribution types have no plugin id on them, and a
+// telemetry record has to name an owner (docs/telemetry/model.md § The attribute vocabulary), so the owner is
+// a side-map here rather than a field added to every type and registration site. The three passes that know
+// the owner fill it: the descriptor pass in host/chrome/chromeRegister.ts, the frame pass in
+// host/frames/register.ts, and `makeContext` in host/registries/extensionPoints/plugin.ts. Everything else is
+// core's, and `ownerOf` answers undefined for those rather than guessing.
 export class Registry<T extends Identified> {
   readonly #entries: Accessor<readonly T[]>
   readonly #setEntries: (next: readonly T[] | ((prev: readonly T[]) => readonly T[])) => readonly T[]

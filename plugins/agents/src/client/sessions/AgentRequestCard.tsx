@@ -7,7 +7,7 @@ import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
-// point the agent asked, by the card for its own `request` event (./AgentEventCard.tsx), so that
+// point the agent asked, by the card for its own `request` event (`AgentEventCard`), so that
 // answering it happens where the reader is already looking and the thread keeps the interruption in
 // order. The task sidebar's "Needs you" list is how a reader reaches one in a session they are not on.
 export default function AgentRequestCard(props: {
@@ -36,19 +36,19 @@ export default function AgentRequestCard(props: {
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const payload = () => props.request.payload
-  const options = () => Array.isArray(payload().options)
-    ? payload().options as Array<{ id: string; label: string; kind?: string }>
-    : []
-  const questions = () => Array.isArray(payload().questions)
-    ? payload().questions as Array<{
-      id: string
-      header?: string
-      prompt: string
-      multiple?: boolean
-      secret?: boolean
-      options?: Array<{ id: string; label: string }>
-    }>
-    : []
+  const options = () =>
+    Array.isArray(payload().options) ? (payload().options as Array<{ id: string; label: string; kind?: string }>) : []
+  const questions = () =>
+    Array.isArray(payload().questions)
+      ? (payload().questions as Array<{
+          id: string
+          header?: string
+          prompt: string
+          multiple?: boolean
+          secret?: boolean
+          options?: Array<{ id: string; label: string }>
+        }>)
+      : []
   const approval = () => appApprovalOf(payload().approval)
 
   async function resolve(resolution: unknown) {
@@ -70,16 +70,28 @@ export default function AgentRequestCard(props: {
     // `focus` is how the notice that opened this pane lands the reader on the request it named.
     <Card stripe="warn" pad="sm" selected={props.focused} focus={props.focused ?? false}>
       <Stack gap="row">
-        <Heading level={3} eyebrow={props.request.kind.replace('_', ' ')}>{props.request.title}</Heading>
+        <Heading level={3} eyebrow={props.request.kind.replace('_', ' ')}>
+          {props.request.title}
+        </Heading>
         <Show when={props.request.status === 'resolving'}>
-          <Text emphasis="muted" wrap>Response sent; waiting for the provider to acknowledge it…</Text>
+          <Text emphasis="muted" wrap>
+            Response sent; waiting for the provider to acknowledge it…
+          </Text>
         </Show>
-        <Show when={props.request.detail}>{(detail) => <Text emphasis="muted" wrap>{detail()}</Text>}</Show>
+        <Show when={props.request.detail}>
+          {(detail) => (
+            <Text emphasis="muted" wrap>
+              {detail()}
+            </Text>
+          )}
+        </Show>
         <Show when={approval()}>
           {(shown) => (
             <Stack gap="row">
               <Text wrap>{`App: ${approvalTarget(shown())}`}</Text>
-              <Text emphasis="muted" wrap>{approvalScopeNote(shown())}</Text>
+              <Text emphasis="muted" wrap>
+                {approvalScopeNote(shown())}
+              </Text>
               <Show when={shown().warning}>{(warning) => <Alert tone="warn">{warning()}</Alert>}</Show>
             </Stack>
           )}

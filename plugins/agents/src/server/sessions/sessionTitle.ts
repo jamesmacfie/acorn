@@ -22,7 +22,10 @@ const OMITTED_MARKER = '\n[middle omitted]\n'
 const normalizedWhitespace = (value: string): string => value.trim().replace(/\s+/g, ' ')
 
 export const generationText = (parts: readonly AgentInputPart[]): string =>
-  parts.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n').trim()
+  parts
+    .flatMap((part) => (part.type === 'text' ? [part.text] : []))
+    .join('\n')
+    .trim()
 
 export const isSessionTitlePromptEligible = (text: string): boolean =>
   normalizedWhitespace(text).split(' ').filter(Boolean).length >= 5
@@ -33,14 +36,13 @@ export const boundSessionTitlePrompt = (text: string): string => {
   return `${text.slice(0, headChars)}${OMITTED_MARKER}${text.slice(-GENERATION_TAIL_CHARS)}`
 }
 
-export const buildSessionTitlePrompt = (text: string): string =>
-  `First user request:\n${boundSessionTitlePrompt(text)}`
+export const buildSessionTitlePrompt = (text: string): string => `First user request:\n${boundSessionTitlePrompt(text)}`
 
 export const deterministicSessionTitle = (
   parts: readonly AgentInputPart[],
   attachmentFilename?: string,
 ): string | null => {
-  const text = parts.flatMap((part) => part.type === 'text' && part.text.trim() ? [part.text] : [])[0]
+  const text = parts.flatMap((part) => (part.type === 'text' && part.text.trim() ? [part.text] : []))[0]
   const source = text ?? attachmentFilename
   return source ? normalizedWhitespace(source).slice(0, 96) || null : null
 }
@@ -65,7 +67,13 @@ export const normalizeGeneratedSessionTitle = (value: string, excludedTitle?: st
     .replace(/^(?:session\s+)?title\s*:\s*/i, '')
     .trim()
 
-  const wrappers: Array<[string, string]> = [['"', '"'], ["'", "'"], ['`', '`'], ['“', '”'], ['‘', '’']]
+  const wrappers: Array<[string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ['`', '`'],
+    ['“', '”'],
+    ['‘', '’'],
+  ]
   for (const [opening, closing] of wrappers) {
     if (title.startsWith(opening) && title.endsWith(closing) && title.length >= opening.length + closing.length) {
       title = title.slice(opening.length, -closing.length).trim()

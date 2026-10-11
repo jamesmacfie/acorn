@@ -2,9 +2,23 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationMapping, IntegrationProject, Project, Workspace } from '@acorn/protocol/api.ts'
 import { connectionName } from '@acorn/protocol/integrations.ts'
-import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../../infra/queries'
+import {
+  integrationMappingsKey,
+  integrationMappingsOptions,
+  integrationProjectsOptions,
+  workspacesOptions,
+} from '../../infra/queries'
 import { setIntegrationMappings } from '../workspaces/workspaceMutations'
-import { Alert, Button, EmptyState, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Select,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { createSettingSave } from './settingSave'
 import { createWorkspacesMode } from '../workspaces/workspacesMode'
@@ -24,7 +38,8 @@ import { createWorkspacesMode } from '../workspaces/workspacesMode'
 // is why the unfiltered list is what gets written.
 
 // A dropdown value has to be one string, and a target is two. The workspace alone is the wide form.
-const encodeTarget = (workspaceId: string, projectId?: string) => projectId ? `${workspaceId}/${projectId}` : workspaceId
+const encodeTarget = (workspaceId: string, projectId?: string) =>
+  projectId ? `${workspaceId}/${projectId}` : workspaceId
 const decodeTarget = (value: string): { workspaceId: string; projectId?: string } => {
   const [workspaceId, projectId] = value.split('/')
   return projectId ? { workspaceId, projectId } : { workspaceId }
@@ -75,16 +90,23 @@ export default function ConnectionProjectMap(props: {
   // draws its own list and has no notion of an option group; carrying the workspace because that is
   // what makes the list's filter box answer "everything under Runn". One list, so a stored row and
   // the picker always name a target the same way.
-  const targets = createMemo(() => !mode() ? [] : mode() === 'off'
-    ? spaces().filter((workspace) => !props.workspace || workspace.id === props.workspace.id)
-      .flatMap((workspace) => workspace.projects.map((project) => ({ value: workspace.id, label: project.name })))
-    : spaces().filter((workspace) => !props.workspace || workspace.id === props.workspace.id).flatMap((workspace) => [
-    { value: workspace.id, label: `${workspace.name} · All projects` },
-    ...workspace.projects.map((project) => ({
-      value: encodeTarget(workspace.id, project.id),
-      label: `${workspace.name} · ${project.name}`,
-    })),
-  ]))
+  const targets = createMemo(() =>
+    !mode()
+      ? []
+      : mode() === 'off'
+        ? spaces()
+            .filter((workspace) => !props.workspace || workspace.id === props.workspace.id)
+            .flatMap((workspace) => workspace.projects.map((project) => ({ value: workspace.id, label: project.name })))
+        : spaces()
+            .filter((workspace) => !props.workspace || workspace.id === props.workspace.id)
+            .flatMap((workspace) => [
+              { value: workspace.id, label: `${workspace.name} · All projects` },
+              ...workspace.projects.map((project) => ({
+                value: encodeTarget(workspace.id, project.id),
+                label: `${workspace.name} · ${project.name}`,
+              })),
+            ]),
+  )
   const names = createMemo(() => new Map(targets().map((target) => [target.value, target.label])))
 
   const write = async (next: IntegrationMapping[]): Promise<void> => {
@@ -96,16 +118,18 @@ export default function ConnectionProjectMap(props: {
         } catch (cause) {
           // Every row here is drawn from the server's answer, so a failed write leaves the list where
           // it was; all this has to do is say why nothing moved. Read the status rather than blaming
-          // the connection for everything: "check the connection" sent someone hunting a credential
-          // problem when the node had simply not restarted into the schema the write needed.
+          // the connection for everything: "check the connection" sends someone hunting a credential
+          // problem when the node has simply not restarted into the schema the write needs.
           const status = Number((cause as Error).message.match(/(\d{3})$/)?.[1])
-          throw new Error(status === 403
-            ? 'That connection is no longer available. Sign in to it again on its page, then try again.'
-            : "Couldn't save that change. If it keeps happening, restart acorn.")
+          throw new Error(
+            status === 403
+              ? 'That connection is no longer available. Sign in to it again on its page, then try again.'
+              : "Couldn't save that change. If it keeps happening, restart acorn.",
+          )
         }
         await queryClient.invalidateQueries({ queryKey: integrationMappingsKey(props.connection.id) })
         // The rail decides whether to draw this provider's source from the workspace-side read of the
-        // same rows (tabs/sources.ts), so that key has to go too, for every workspace at once.
+        // same rows (`createSourceScope`), so that key has to go too, for every workspace at once.
         await queryClient.invalidateQueries({ queryKey: ['workspace-external-projects'] })
       })
     } finally {
@@ -116,9 +140,15 @@ export default function ConnectionProjectMap(props: {
   const add = (): void => {
     if (!mode()) return
     const chosen = props.project
-      ? mode() === 'off' ? { workspaceId: props.project.workspaceId } : { workspaceId: props.project.workspaceId, projectId: props.project.id }
+      ? mode() === 'off'
+        ? { workspaceId: props.project.workspaceId }
+        : { workspaceId: props.project.workspaceId, projectId: props.project.id }
       : decodeTarget(target())
-    const mapping: IntegrationMapping = { workspaceId: chosen.workspaceId, externalId: externalId(), ...(chosen.projectId ? { projectId: chosen.projectId } : {}) }
+    const mapping: IntegrationMapping = {
+      workspaceId: chosen.workspaceId,
+      externalId: externalId(),
+      ...(chosen.projectId ? { projectId: chosen.projectId } : {}),
+    }
     if (all().some((row) => sameMapping(row, mapping))) return
     setExternalId('')
     setTarget('')
@@ -129,12 +159,22 @@ export default function ConnectionProjectMap(props: {
     <div class="integration-map">
       <SettingRow
         label={props.project || props.workspace ? connectionName(props.connection) : 'Projects'}
-        description={props.project
-          ? undefined
-          : props.workspace
-            ? mode() === 'off' ? undefined : 'Pick All projects to show it across this workspace, or one project to show it only there.'
-            : mode() === 'off' ? 'Choose the project where this service shows up.' : 'Follow a project in a whole workspace, or in one project only.'}
-        help={props.project && mode() === 'on' ? "Projects followed by the whole workspace show here too. Change those on the workspace's page." : undefined}
+        description={
+          props.project
+            ? undefined
+            : props.workspace
+              ? mode() === 'off'
+                ? undefined
+                : 'Pick All projects to show it across this workspace, or one project to show it only there.'
+              : mode() === 'off'
+                ? 'Choose the project where this service shows up.'
+                : 'Follow a project in a whole workspace, or in one project only.'
+        }
+        help={
+          props.project && mode() === 'on'
+            ? "Projects followed by the whole workspace show here too. Change those on the workspace's page."
+            : undefined
+        }
         layout="stacked"
         savedAt={save.savedAt()}
         error={save.error()}
@@ -142,7 +182,11 @@ export default function ConnectionProjectMap(props: {
         <Show when={projects.isError}>
           <Alert>
             Couldn't load this service's projects.
-            {props.connection.status === 'needs-auth' ? (props.manage ? ' Sign in to it again on its page.' : ' Sign in to it again above.') : ''}
+            {props.connection.status === 'needs-auth'
+              ? props.manage
+                ? ' Sign in to it again on its page.'
+                : ' Sign in to it again above.'
+              : ''}
             <Button size="sm" disabled={projects.isFetching} onPress={() => void projects.refetch()}>
               {projects.isFetching ? 'Retrying…' : 'Retry'}
             </Button>
@@ -161,13 +205,21 @@ export default function ConnectionProjectMap(props: {
         {/* A small table, the shape the page's other lists of records take (run targets). */}
         <Show
           when={rows().length}
-          fallback={<Show when={mappings.isSuccess}><EmptyState align="start" size="sm">Not following any projects.</EmptyState></Show>}
+          fallback={
+            <Show when={mappings.isSuccess}>
+              <EmptyState align="start" size="sm">
+                Not following any projects.
+              </EmptyState>
+            </Show>
+          }
         >
           <Table size="sm">
             <TableRow head>
               <TableHead>Project</TableHead>
               <TableHead>Shows up in</TableHead>
-              <TableHead align="end"><span class="sr-only">Remove</span></TableHead>
+              <TableHead align="end">
+                <span class="sr-only">Remove</span>
+              </TableHead>
             </TableRow>
             <For each={rows()}>
               {(row) => (
@@ -198,18 +250,36 @@ export default function ConnectionProjectMap(props: {
             value={externalId()}
             disabled={busy() || !offered().length}
             label={`${connectionName(props.connection)} projects`}
-            onChange={(value) => setExternalId(value)} options={[{ value: '', label: projects.isPending ? 'Loading projects…' : 'Choose a project…' }, ...offered().map((project) => ({ value: project.id, label: project.label }))]} />
+            onChange={(value) => setExternalId(value)}
+            options={[
+              { value: '', label: projects.isPending ? 'Loading projects…' : 'Choose a project…' },
+              ...offered().map((project) => ({ value: project.id, label: project.label })),
+            ]}
+          />
           <Show when={!props.project}>
             <Select
               value={target()}
               disabled={busy() || !targets().length}
               label="Where it shows up"
-              onChange={(value) => setTarget(value)} options={[{ value: '', label: 'Choose where…' }, ...targets().map((entry) => ({ value: entry.value, label: entry.label }))]} />
+              onChange={(value) => setTarget(value)}
+              options={[
+                { value: '', label: 'Choose where…' },
+                ...targets().map((entry) => ({ value: entry.value, label: entry.label })),
+              ]}
+            />
           </Show>
-          <Button disabled={locked() || !externalId() || (!props.project && !target())} onPress={add}>Follow</Button>
+          <Button disabled={locked() || !externalId() || (!props.project && !target())} onPress={add}>
+            Follow
+          </Button>
         </div>
         <Show when={props.manage}>
-          {(manage) => <div><Button variant="ghost" size="sm" onPress={manage()}>Manage {connectionName(props.connection)}</Button></div>}
+          {(manage) => (
+            <div>
+              <Button variant="ghost" size="sm" onPress={manage()}>
+                Manage {connectionName(props.connection)}
+              </Button>
+            </div>
+          )}
         </Show>
       </SettingRow>
     </div>

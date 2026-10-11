@@ -22,12 +22,12 @@ import { galleryCards, providerAsks, type GalleryCard } from './connections'
 // Nothing here names a provider, so a plugin that registers one gets a card with no change here.
 //
 // A provider at its `maxConnections` stays in the gallery, marked as connected, and its card opens the
-// connection. Hiding it left the reader looking for a provider that was already there.
+// connection. Hiding it would leave the reader looking for a provider that is already there.
 //
 // The steps are what the descriptor asks for. Typed fields are a form with Connect and Cancel, and
 // anything typed counts as unsaved. A device-flow provider shows the code to enter at the provider, and
 // a code that is still waiting counts as unsaved too, because leaving stops the polling that would
-// finish it. The fields, the write and the pacing live in ../../integrations/, because first-run
+// finish it. The fields, the write and the pacing live in the integrations feature, because first-run
 // onboarding connects a provider the same way.
 
 export type AddConnectionProps = {
@@ -54,7 +54,9 @@ const limitText = (card: GalleryCard): string => {
 export function AddConnection(props: AddConnectionProps) {
   const qc = useQueryClient()
   const [chosen, setChosen] = createSignal<PublicIntegrationProvider>()
-  const cards = createMemo(() => galleryCards(props.providers, props.connections).filter((card) => props.offers?.(card.provider) ?? true))
+  const cards = createMemo(() =>
+    galleryCards(props.providers, props.connections).filter((card) => props.offers?.(card.provider) ?? true),
+  )
 
   const connected = async () => {
     await qc.invalidateQueries({ queryKey: integrationsKey })
@@ -62,7 +64,9 @@ export function AddConnection(props: AddConnectionProps) {
   }
   const form = createCredentialForm(chosen, connected)
   const deviceFlow = createDeviceFlow(() => chosen()?.id, connected)
-  useUnsavedChanges(() => !!chosen() && (!!deviceFlow.device() || form.fields().some((field) => !!form.value(field.id).trim())))
+  useUnsavedChanges(
+    () => !!chosen() && (!!deviceFlow.device() || form.fields().some((field) => !!form.value(field.id).trim())),
+  )
 
   const pick = (card: GalleryCard) => {
     if (card.full) {
@@ -91,24 +95,47 @@ export function AddConnection(props: AddConnectionProps) {
   return (
     <>
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={() => (chosen() ? backToGallery() : props.onClose())}>‹ {chosen() ? props.title : props.listLabel}</Button></Inline>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={() => (chosen() ? backToGallery() : props.onClose())}>
+            ‹ {chosen() ? props.title : props.listLabel}
+          </Button>
+        </Inline>
       </Show>
       <Show
         when={chosen()}
         fallback={
           <SettingsSection id="gallery" label="Providers">
-            <Show when={cards().length} fallback={<EmptyState align="start" size="sm">No services can be connected here. Plugins add them.</EmptyState>}>
+            <Show
+              when={cards().length}
+              fallback={
+                <EmptyState align="start" size="sm">
+                  No services can be connected here. Plugins add them.
+                </EmptyState>
+              }
+            >
               <div class="connection-gallery">
                 <For each={cards()}>
                   {(card) => (
-                    <Card onPress={() => pick(card)} stripe={card.full ? 'ok' : undefined} title={card.full ? `Open ${card.provider.label}` : `Connect ${card.provider.label}`}>
+                    <Card
+                      onPress={() => pick(card)}
+                      stripe={card.full ? 'ok' : undefined}
+                      title={card.full ? `Open ${card.provider.label}` : `Connect ${card.provider.label}`}
+                    >
                       <span class="connection-card">
                         <ConnectionLogo glyph={card.provider.glyph || card.provider.label[0] || '?'} />
                         <span class="connection-card-text">
                           <span class="connection-card-title">{card.provider.label}</span>
                           <span class="connection-card-sub">{providerAsks(card.provider)}</span>
-                          <Show when={limitText(card)}>{(text) => <span class="connection-card-state" data-full={card.full ? '' : undefined}>{text()}</span>}</Show>
-                          <Show when={props.listedOn?.(card.provider)}>{(where) => <span class="connection-card-sub">{where()}</span>}</Show>
+                          <Show when={limitText(card)}>
+                            {(text) => (
+                              <span class="connection-card-state" data-full={card.full ? '' : undefined}>
+                                {text()}
+                              </span>
+                            )}
+                          </Show>
+                          <Show when={props.listedOn?.(card.provider)}>
+                            {(where) => <span class="connection-card-sub">{where()}</span>}
+                          </Show>
                         </span>
                       </span>
                     </Card>
@@ -123,9 +150,11 @@ export function AddConnection(props: AddConnectionProps) {
           <SettingsSection
             id="steps"
             label={provider().connection.kind === 'device-flow' ? 'Sign in' : 'Credentials'}
-            description={provider().connection.kind === 'device-flow'
-              ? `${provider().label} opens a page in your browser where you enter a code.`
-              : `acorn checks with ${provider().label} before it saves anything.`}
+            description={
+              provider().connection.kind === 'device-flow'
+                ? `${provider().label} opens a page in your browser where you enter a code.`
+                : `acorn checks with ${provider().label} before it saves anything.`
+            }
           >
             <Show
               when={provider().connection.kind === 'device-flow'}
@@ -134,8 +163,18 @@ export function AddConnection(props: AddConnectionProps) {
                   <CredentialFields form={form}>
                     <Show when={form.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
                     <Inline gap="row">
-                      <Button variant="solid" tone="accent" busy={form.busy()} disabled={!form.complete()} onPress={() => void form.submit()}>Connect</Button>
-                      <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>Cancel</Button>
+                      <Button
+                        variant="solid"
+                        tone="accent"
+                        busy={form.busy()}
+                        disabled={!form.complete()}
+                        onPress={() => void form.submit()}
+                      >
+                        Connect
+                      </Button>
+                      <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>
+                        Cancel
+                      </Button>
                     </Inline>
                   </CredentialFields>
                 </>
@@ -145,27 +184,43 @@ export function AddConnection(props: AddConnectionProps) {
                 when={deviceFlow.device()}
                 fallback={
                   <Inline gap="row">
-                    <Button variant="solid" tone="accent" onPress={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
+                    <Button
+                      variant="solid"
+                      tone="accent"
+                      onPress={() => void deviceFlow.start()}
+                      disabled={deviceFlow.busy()}
+                    >
                       {deviceFlow.busy() ? 'Starting…' : `Connect ${provider().label}`}
                     </Button>
-                    <Button variant="ghost" onPress={backToGallery}>Cancel</Button>
+                    <Button variant="ghost" onPress={backToGallery}>
+                      Cancel
+                    </Button>
                   </Inline>
                 }
               >
                 {(started) => (
                   <div class="integration-device">
-                    <Text emphasis="muted" wrap>Enter this code on the {provider().label} page. Keep this page open until it finishes.</Text>
+                    <Text emphasis="muted" wrap>
+                      Enter this code on the {provider().label} page. Keep this page open until it finishes.
+                    </Text>
                     <div class="integration-device-code copyable">
                       <code>{started().userCode}</code>
                       <CopyButton text={() => started().userCode} title="Copy the code" />
                     </div>
                     {/* A real link, not a fetch: the shell opens it in the owner's browser. Safe under the
                         CSP because it is a navigation, not a frame or a connect-src. */}
-                    <Show when={safeVerificationUrl(started().verificationUri)} fallback={<Alert>{provider().label} sent a sign-in address acorn won't open. Cancel and try again.</Alert>}>
+                    <Show
+                      when={safeVerificationUrl(started().verificationUri)}
+                      fallback={
+                        <Alert>{provider().label} sent a sign-in address acorn won't open. Cancel and try again.</Alert>
+                      }
+                    >
                       {(url) => <Button href={url().href}>Open {url().host}</Button>}
                     </Show>
                     <Text emphasis="muted">Waiting for approval…</Text>
-                    <Button variant="ghost" onPress={deviceFlow.cancel}>Cancel</Button>
+                    <Button variant="ghost" onPress={deviceFlow.cancel}>
+                      Cancel
+                    </Button>
                   </div>
                 )}
               </Show>

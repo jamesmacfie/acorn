@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import {
   ServiceRpcError,
   ServiceRpcPeer,
@@ -43,12 +42,6 @@ peer.register('service.start', async (payload) => {
   })
   // The endpoint, certificate identity, and device bearer the parent needs to adopt the local Node.
   return runtime.started
-})
-
-peer.register('service.preview-rules', async (payload) => {
-  if (!runtime) throw new ServiceRpcError('not_ready', 'Service has not started')
-  const { taskId } = z.strictObject({ taskId: z.string().min(1) }).parse(payload)
-  return runtime.previewRules(taskId)
 })
 
 peer.register('service.stop', async () => {

@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import { envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName, type McpCommands } from './mcpRegister'
+import { agentProfileRegistry } from './agentProfiles'
+import {
+  envFlags,
+  launcherSpec,
+  refreshAcornMcpRegistrations,
+  registerAcornMcp,
+  registerAcornMcpBeforeSpawn,
+  resolveMcpEntry,
+  serverName,
+  type McpCommands,
+} from './mcpRegister'
 
 const launcher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js', 'acorn')
 const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js', 'acorn-dev')
@@ -7,7 +17,10 @@ const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', 
 // A stand-in for a harness's declaration. The real ones live beside their harnesses
 // (plugins/agents/src/server/profiles/mcpCommands.ts, and its test); core is only meant to run them.
 const cli: McpCommands = {
-  add: (name, spec) => ({ file: 'toy', args: ['mcp', 'add', name, ...envFlags(spec), '--', spec.command, ...spec.args] }),
+  add: (name, spec) => ({
+    file: 'toy',
+    args: ['mcp', 'add', name, ...envFlags(spec), '--', spec.command, ...spec.args],
+  }),
   remove: (name) => ({ file: 'toy', args: ['mcp', 'remove', name] }),
 }
 
@@ -34,12 +47,53 @@ describe('register/remove round-trip through a stubbed exec', () => {
     const res = await registerAcornMcp(cli, 'acorn', launcher, exec)
     expect(res).toEqual({ ok: true })
     expect(calls[0]).toEqual(['toy', 'mcp', 'remove', 'acorn'])
-    expect(calls[1]).toEqual(['toy', 'mcp', 'add', 'acorn', '--env', 'ACORN_MCP_NAME=acorn', '--', '/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js'])
+    expect(calls[1]).toEqual([
+      'toy',
+      'mcp',
+      'add',
+      'acorn',
+      '--env',
+      'ACORN_MCP_NAME=acorn',
+      '--',
+      '/Applications/acorn.app/Contents/MacOS/node',
+      '/app/helper/mcp.js',
+    ])
   })
   it('missing CLI → a reason naming the command the harness declared', async () => {
     const exec = vi.fn(async () => {
       throw new Error('spawn toy ENOENT')
     })
-    expect(await registerAcornMcp(cli, 'acorn', launcher, exec)).toEqual({ ok: false, reason: "'toy' CLI not found on PATH." })
+    expect(await registerAcornMcp(cli, 'acorn', launcher, exec)).toEqual({
+      ok: false,
+      reason: "'toy' CLI not found on PATH.",
+    })
+  })
+})
+
+describe('registration bookkeeping shared by boot and spawn', () => {
+  it('a spawn skips a profile the boot refresh registered, and retries one that failed', async () => {
+    const outcomes = { toy: true, broken: false }
+    const register = vi.fn(async (id: 'toy' | 'broken') => ({ ok: outcomes[id] }))
+    const profile = (id: 'toy' | 'broken') =>
+      ({
+        id,
+        label: id,
+        kind: 'agent',
+        command: id,
+        backendPreference: 'node-pty',
+        transport: 'pty',
+        mcpRegistration: () => register(id),
+      }) as const
+    const undo = [agentProfileRegistry.register(profile('toy')), agentProfileRegistry.register(profile('broken'))]
+    try {
+      await refreshAcornMcpRegistrations('acorn', launcher)
+      expect(register.mock.calls).toEqual([['toy'], ['broken']])
+
+      registerAcornMcpBeforeSpawn(profile('toy'), 'acorn', launcher)
+      registerAcornMcpBeforeSpawn(profile('broken'), 'acorn', launcher)
+      expect(register.mock.calls).toEqual([['toy'], ['broken'], ['broken']])
+    } finally {
+      for (const dispose of undo) dispose()
+    }
   })
 })

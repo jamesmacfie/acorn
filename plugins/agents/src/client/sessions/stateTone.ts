@@ -100,9 +100,8 @@ export const usageMeterTone = (health: string): 'accent' | 'ok' | 'warn' | 'dang
   return 'accent'
 }
 
-/** What a session is waiting on, as a mark rather than a word. The sidebar used to print the reason
- *  in a pill, which put a second block of text on a row that already carries a title, a provider, a
- *  model and a state, and the pill was the widest thing on it.
+/** What a session is waiting on, as a mark rather than a word. A pill would put a second block of text
+ *  on a row that already carries a title, a provider, a model and a state, and be the widest thing on it.
  *
  *  One table for two vocabularies: an attention reason and a request kind are the same words apart
  *  from `elicitation`, which only ever arrives as a request. `unread` and `none` are absent because

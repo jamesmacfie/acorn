@@ -11,7 +11,9 @@ describe('a patched <Show>', () => {
       const [session, setSession] = createSignal<{ id: string } | undefined>({ id: 'a' })
       let seen: () => string = () => ''
       Show({
-        get when() { return session() },
+        get when() {
+          return session()
+        },
         children: (narrowed: () => { id: string }) => {
           seen = createMemo(() => narrowed().id)
           return null

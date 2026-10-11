@@ -10,7 +10,12 @@ import { Button } from './buttons'
 // `always` is accepted and ignored. On the DOM host it turns off a hover reveal; a terminal has no
 // hover, so this copy is drawn either way and a caller that needs the button visible on both hosts
 // should not have to ask twice.
-export function CopyButton(props: { text: () => string; onCopy?: (text: string) => void; title?: string; always?: boolean }) {
+export function CopyButton(props: {
+  text: () => string
+  onCopy?: (text: string) => void
+  title?: string
+  always?: boolean
+}) {
   const [shown, setShown] = createSignal(false)
   const copy = () => {
     const text = props.text()
@@ -20,7 +25,9 @@ export function CopyButton(props: { text: () => string; onCopy?: (text: string) 
   return (
     <box flexDirection="column">
       <Button variant="bare" label="Copy" onPress={copy} />
-      <Show when={shown()}><Line role="mono">{props.text()}</Line></Show>
+      <Show when={shown()}>
+        <Line role="mono">{props.text()}</Line>
+      </Show>
     </box>
   )
 }

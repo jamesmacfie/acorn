@@ -45,7 +45,7 @@ export function savedQuerySearchScore(query: DbSavedQuery, text: string): number
 /** One row, as the palette draws it: display facts and the saved query's own id, which is the id the
  *  pane's editor path loads by. The same summary the agent composer's option list shows
  *  (../server/agentContext.ts), so a person sees one description of a saved query rather than two. */
-export const savedQuerySearchItem = (query: DbSavedQuery): CommandSearchItem => ({
+const savedQuerySearchItem = (query: DbSavedQuery): CommandSearchItem => ({
   id: query.id,
   title: query.name.slice(0, TITLE),
   subtitle: (query.notes?.trim() || query.sql.replace(/\s+/g, ' ').trim()).slice(0, SUBTITLE) || 'No notes',

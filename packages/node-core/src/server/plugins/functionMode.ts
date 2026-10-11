@@ -14,12 +14,15 @@ const SYNC_METHODS = ['normalize', 'toPublic', 'key', 'encode', 'decode', 'enabl
 
 // The two synchronous contracts that are objects of methods rather than methods
 // (integrations/types.ts § ExternalIdContract, ReferenceResolver). A path ends at the method, so
-// naming the container classified nothing: `provider.externalIds.parse` crossed as a promise, and
-// `externalRefForConnection` refused every link it stamped with `provider_bad_config`.
+// naming the container would classify nothing: `provider.externalIds.parse` would cross as a promise,
+// and `externalRefForConnection` would refuse every link it stamps with `provider_bad_config`.
 const SYNC_CONTRACTS = /\.(externalIds|refs)\.[A-Za-z0-9_$]+$/
 
 const leafOf = (path: string): string =>
-  path.match(/\.([A-Za-z0-9_$]+)(?:\]|$)/g)?.at(-1)?.replace(/[.\]]/g, '') ?? ''
+  path
+    .match(/\.([A-Za-z0-9_$]+)(?:\]|$)/g)
+    ?.at(-1)
+    ?.replace(/[.\]]/g, '') ?? ''
 
 /** How a plugin-side function at `path` crosses to the host. Everything unnamed crosses as a promise,
  *  including route handlers, schedules, hooks and capability implementations. */

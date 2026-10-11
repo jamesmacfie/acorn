@@ -16,9 +16,20 @@ const fakeProvider = (id: string, detail?: ProviderItemDetail): IntegrationProvi
     label: id === 'tracker' ? 'Tracker' : id,
     glyph: 'brand:linear',
     kind: 'issue-tracker',
-    connection: { authKind: 'api-key', connectable: true, disconnectable: true, fields: [], validate: async () => ({}), normalize: () => ({}), test: async () => ({ ok: true }) },
+    connection: {
+      authKind: 'api-key',
+      connectable: true,
+      disconnectable: true,
+      fields: [],
+      validate: async () => ({}),
+      normalize: () => ({}),
+      test: async () => ({ ok: true }),
+    },
     capabilities: {},
-    externalIds: { fromDisplay: (connectionId: string, displayId: string) => ({ providerId: id, connectionId, displayId }), parse: () => null },
+    externalIds: {
+      fromDisplay: (connectionId: string, displayId: string) => ({ providerId: id, connectionId, displayId }),
+      parse: () => null,
+    },
     resources: [],
     budgets: defaultBudgets,
     memory: {},
@@ -29,7 +40,14 @@ const ctx = { taskId: 'task-1', userLogin: 'owner' }
 
 async function connect(db: TestDb, id: string, provider: string, status = 'connected'): Promise<void> {
   await db.db.insert(schema.integrations).values({
-    id, userId: 'owner', provider, status, encryptedCredentials: `secret:${id}`, label: id, createdAt: 1, updatedAt: 1,
+    id,
+    userId: 'owner',
+    provider,
+    status,
+    encryptedCredentials: `secret:${id}`,
+    label: id,
+    createdAt: 1,
+    updatedAt: 1,
   } as never)
 }
 
@@ -53,14 +71,18 @@ describe('issue_detail', () => {
 
   it('asks each connection in turn and returns the first that has the item', async () => {
     const asked: string[] = []
-    register(fakeProvider('tracker', async (_context, identifier) => {
-      asked.push(identifier)
-      return asked.length === 1 ? null : { identifier, description: 'the brief' }
-    }))
+    register(
+      fakeProvider('tracker', async (_context, identifier) => {
+        asked.push(identifier)
+        return asked.length === 1 ? null : { identifier, description: 'the brief' }
+      }),
+    )
     await connect(db, 'conn-a', 'tracker')
     await connect(db, 'conn-b', 'tracker')
 
-    await expect(issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx)).resolves.toEqual({
+    await expect(
+      issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx),
+    ).resolves.toEqual({
       provider: 'tracker',
       connectionId: 'conn-b',
       identifier: 'ENG-42',
@@ -71,28 +93,34 @@ describe('issue_detail', () => {
 
   it('skips a connection the owner disabled or that needs re-auth', async () => {
     const asked: string[] = []
-    register(fakeProvider('tracker', async (_context, identifier) => {
-      asked.push(identifier)
-      return { identifier }
-    }))
+    register(
+      fakeProvider('tracker', async (_context, identifier) => {
+        asked.push(identifier)
+        return { identifier }
+      }),
+    )
     await connect(db, 'conn-off', 'tracker', 'disabled')
     await connect(db, 'conn-stale', 'tracker', 'needs-auth')
 
-    await expect(issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx))
-      .rejects.toThrow(/no connected tracker account has 'ENG-42'/i)
+    await expect(
+      issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx),
+    ).rejects.toThrow(/no connected tracker account has 'ENG-42'/i)
     expect(asked).toEqual([])
   })
 
   // A 401 from the one workspace that owns the ticket must not read as "no such ticket", which is
   // what every other connection legitimately answers.
   it('reports a provider refusal rather than not-found', async () => {
-    register(fakeProvider('tracker', async () => {
-      throw new Error('provider_needs_auth')
-    }))
+    register(
+      fakeProvider('tracker', async () => {
+        throw new Error('provider_needs_auth')
+      }),
+    )
     await connect(db, 'conn-a', 'tracker')
 
-    await expect(issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx))
-      .rejects.toThrow('provider_needs_auth')
+    await expect(
+      issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx),
+    ).rejects.toThrow('provider_needs_auth')
   })
 
   it('is unavailable, and refuses a named provider, when nothing can return detail', async () => {

@@ -8,9 +8,13 @@ export function formatRelativeTime(ms: number | null | undefined, now = Date.now
   const month = 30 * day
 
   if (distance < minute) return 'now'
-  const span = distance < hour ? `${Math.floor(distance / minute)}m`
-    : distance < day ? `${Math.floor(distance / hour)}h`
-      : distance < month ? `${Math.floor(distance / day)}d`
-        : `${Math.floor(distance / month)}mo`
+  const span =
+    distance < hour
+      ? `${Math.floor(distance / minute)}m`
+      : distance < day
+        ? `${Math.floor(distance / hour)}h`
+        : distance < month
+          ? `${Math.floor(distance / day)}d`
+          : `${Math.floor(distance / month)}mo`
   return ms > now ? `in ${span}` : `${span} ago`
 }

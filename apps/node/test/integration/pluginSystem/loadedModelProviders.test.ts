@@ -34,10 +34,16 @@ it('loads and registers both model adapters through the worker context', async (
   const connections: string[] = []
   const adapters: ModelProviderAdapter[] = []
   await plugin.init({
-    routes: {}, schedules: {}, events: {},
+    routes: {},
+    schedules: {},
+    events: {},
     providers: {
-      connection: (provider: { id: string }) => { connections.push(provider.id) },
-      model: (adapter: ModelProviderAdapter) => { adapters.push(adapter) },
+      connection: (provider: { id: string }) => {
+        connections.push(provider.id)
+      },
+      model: (adapter: ModelProviderAdapter) => {
+        adapters.push(adapter)
+      },
     },
   } as never)
   expect(connections.sort()).toEqual(['anthropic', 'openai'])

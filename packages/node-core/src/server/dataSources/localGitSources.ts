@@ -6,59 +6,142 @@ import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/d
 import type { Env } from '../bindings'
 import { gitText } from '../core/git'
 import { getDb, schema } from '../db'
-import { parseGithubRemote } from '../projects'
+import { parseGithubRemote } from '../projects/projects'
 import { worktreeCounts } from './localGitRead'
 import { createDataSelectionPager, selectDataRecords } from './selection'
 
 const branchDescription: DataSourceDescription = {
-  revision: '2', schema: { type: 'object', additionalProperties: false, properties: {
-    projectId: { type: 'string' }, name: { type: 'string' }, upstream: { type: ['string', 'null'] },
-    githubRepository: { type: ['string', 'null'] },
-    aheadUpstream: { type: ['number', 'null'] }, behindUpstream: { type: ['number', 'null'] },
-    aheadDefault: { type: ['number', 'null'] }, behindDefault: { type: ['number', 'null'] },
-    lastCommitAt: { type: ['number', 'null'] }, observedAt: { type: 'number' },
-  }, required: ['projectId', 'name', 'upstream', 'githubRepository', 'aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault', 'lastCommitAt', 'observedAt'] },
+  revision: '2',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      projectId: { type: 'string' },
+      name: { type: 'string' },
+      upstream: { type: ['string', 'null'] },
+      githubRepository: { type: ['string', 'null'] },
+      aheadUpstream: { type: ['number', 'null'] },
+      behindUpstream: { type: ['number', 'null'] },
+      aheadDefault: { type: ['number', 'null'] },
+      behindDefault: { type: ['number', 'null'] },
+      lastCommitAt: { type: ['number', 'null'] },
+      observedAt: { type: 'number' },
+    },
+    required: [
+      'projectId',
+      'name',
+      'upstream',
+      'githubRepository',
+      'aheadUpstream',
+      'behindUpstream',
+      'aheadDefault',
+      'behindDefault',
+      'lastCommitAt',
+      'observedAt',
+    ],
+  },
   fields: [
     { pointer: '/name', label: 'Branch', origin: 'declared', display: { kind: 'text', role: 'title' } },
     { pointer: '/upstream', label: 'Upstream', origin: 'declared' },
     { pointer: '/githubRepository', label: 'GitHub remote repository', origin: 'declared' },
-    ...(['aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault'] as const).map(key => ({ pointer: `/${key}`, label: key, origin: 'declared' as const, display: { kind: 'number' as const } })),
+    ...(['aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault'] as const).map((key) => ({
+      pointer: `/${key}`,
+      label: key,
+      origin: 'declared' as const,
+      display: { kind: 'number' as const },
+    })),
     { pointer: '/lastCommitAt', label: 'Last commit', origin: 'declared', display: { kind: 'datetime' } },
     { pointer: '/observedAt', label: 'Observed', origin: 'declared', display: { kind: 'datetime' } },
   ],
   parameters: { type: 'object', additionalProperties: false, properties: { project: { type: 'string' } } },
-  parameterFields: [{ pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
+  parameterFields: [
+    { pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } },
+  ],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
-  consistency: 'Local refs as last observed. Ahead and behind use the last fetched refs; this read never fetches. Repository identity comes from the tracked remote, or origin without an upstream.',
+  consistency:
+    'Local refs as last observed. Ahead and behind use the last fetched refs; this read never fetches. Repository identity comes from the tracked remote, or origin without an upstream.',
 }
 
 // A starter panel for the Add panel launcher (docs/data-sources.md). Its scope names no workspace or
 // project: the launcher moves it onto the scope the person picked, and the source inspector asks for
 // the project.
-const worktreeColumn = (id: string, label: string, type: PanelPlan['columns'][number]['type']): PanelPlan['columns'][number] =>
-  ({ id, label, type, bind: { worktrees: { field: `/${id}` } } })
-const hasCount = (id: string): Extract<PanelPlan['stages'][number], { op: 'filter' }>['where'] =>
-  ({ kind: 'comparison', left: { address: { from: 'item', pointer: `/${id}` } }, operator: 'gt', right: { address: { from: 'literal', value: 0 } } })
-export const worktreeStarterPlans: PanelPlan[] = [{
-  version: 2, title: 'Worktrees with uncommitted changes', time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' },
-  sources: [{ id: 'worktrees', label: 'Local worktrees', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
-    name: 'Local worktrees', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
-    query: { source: { pluginId: 'core', sourceId: 'local-worktrees' }, scope: { parameters: {} }, sort: [] },
-  } } }],
-  columns: [worktreeColumn('path', 'Worktree', 'text'), worktreeColumn('branch', 'Branch', 'text'), worktreeColumn('modifiedCount', 'Modified files', 'number'),
-    worktreeColumn('untrackedCount', 'Untracked files', 'number'), worktreeColumn('lastCommitAt', 'Last commit', 'datetime')],
-  stages: [{ op: 'filter', where: { kind: 'any', predicates: [hasCount('modifiedCount'), hasCount('untrackedCount')] } }],
-  sort: [{ column: 'lastCommitAt', direction: 'desc' }], view: { kind: 'list' },
-}]
+const worktreeColumn = (
+  id: string,
+  label: string,
+  type: PanelPlan['columns'][number]['type'],
+): PanelPlan['columns'][number] => ({ id, label, type, bind: { worktrees: { field: `/${id}` } } })
+const hasCount = (id: string): Extract<PanelPlan['stages'][number], { op: 'filter' }>['where'] => ({
+  kind: 'comparison',
+  left: { address: { from: 'item', pointer: `/${id}` } },
+  operator: 'gt',
+  right: { address: { from: 'literal', value: 0 } },
+})
+export const worktreeStarterPlans: PanelPlan[] = [
+  {
+    version: 2,
+    title: 'Worktrees with uncommitted changes',
+    time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'worktrees',
+        label: 'Local worktrees',
+        role: 'primary',
+        reference: {
+          kind: 'inline',
+          bindings: {},
+          content: {
+            name: 'Local worktrees',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            sourceParameters: {},
+            query: { source: { pluginId: 'core', sourceId: 'local-worktrees' }, scope: { parameters: {} }, sort: [] },
+          },
+        },
+      },
+    ],
+    columns: [
+      worktreeColumn('path', 'Worktree', 'text'),
+      worktreeColumn('branch', 'Branch', 'text'),
+      worktreeColumn('modifiedCount', 'Modified files', 'number'),
+      worktreeColumn('untrackedCount', 'Untracked files', 'number'),
+      worktreeColumn('lastCommitAt', 'Last commit', 'datetime'),
+    ],
+    stages: [
+      { op: 'filter', where: { kind: 'any', predicates: [hasCount('modifiedCount'), hasCount('untrackedCount')] } },
+    ],
+    sort: [{ column: 'lastCommitAt', direction: 'desc' }],
+    view: { kind: 'list' },
+  },
+]
 
 export const worktreeDescription: DataSourceDescription = {
-  revision: '1', schema: { type: 'object', additionalProperties: false, properties: {
-    projectId: { type: 'string' }, path: { type: 'string' }, branch: { type: ['string', 'null'] },
-    detachedHead: { type: ['string', 'null'] }, modifiedCount: { type: ['number', 'null'] },
-    untrackedCount: { type: ['number', 'null'] }, lastCommitAt: { type: ['number', 'null'] },
-    taskId: { type: ['string', 'null'] }, observedAt: { type: 'number' },
-  }, required: ['projectId', 'path', 'branch', 'detachedHead', 'modifiedCount', 'untrackedCount', 'lastCommitAt', 'taskId', 'observedAt'] },
+  revision: '1',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      projectId: { type: 'string' },
+      path: { type: 'string' },
+      branch: { type: ['string', 'null'] },
+      detachedHead: { type: ['string', 'null'] },
+      modifiedCount: { type: ['number', 'null'] },
+      untrackedCount: { type: ['number', 'null'] },
+      lastCommitAt: { type: ['number', 'null'] },
+      taskId: { type: ['string', 'null'] },
+      observedAt: { type: 'number' },
+    },
+    required: [
+      'projectId',
+      'path',
+      'branch',
+      'detachedHead',
+      'modifiedCount',
+      'untrackedCount',
+      'lastCommitAt',
+      'taskId',
+      'observedAt',
+    ],
+  },
   fields: [
     { pointer: '/path', label: 'Worktree path', origin: 'declared', display: { kind: 'text', role: 'title' } },
     { pointer: '/branch', label: 'Branch', origin: 'declared' },
@@ -70,35 +153,57 @@ export const worktreeDescription: DataSourceDescription = {
     { pointer: '/observedAt', label: 'Observed', origin: 'declared', display: { kind: 'datetime' } },
   ],
   parameters: { type: 'object', additionalProperties: false, properties: { project: { type: 'string' } } },
-  parameterFields: [{ pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
+  parameterFields: [
+    { pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } },
+  ],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
   starterPlans: worktreeStarterPlans,
-  consistency: 'All live Git worktrees for the selected local project, including unmanaged and detached worktrees. Status is observed without fetching.',
+  consistency:
+    'All live Git worktrees for the selected local project, including unmanaged and detached worktrees. Status is observed without fetching.',
 }
 
 const pager = createDataSelectionPager()
 const key = (projectId: string, value: string) => createHash('sha256').update(`${projectId}\0${value}`).digest('hex')
 const time = async (path: string): Promise<number | null> => {
-  try { const value = Number(await gitText(['show', '-s', '--format=%ct', 'HEAD'], { cwd: path, timeoutMs: 10_000 })); return Number.isFinite(value) ? value * 1000 : null }
-  catch { return null }
+  try {
+    const value = Number(await gitText(['show', '-s', '--format=%ct', 'HEAD'], { cwd: path, timeoutMs: 10_000 }))
+    return Number.isFinite(value) ? value * 1000 : null
+  } catch {
+    return null
+  }
 }
-const divergence = async (path: string, branch: string, base: string | null): Promise<{ ahead: number; behind: number } | null> => {
+const divergence = async (
+  path: string,
+  branch: string,
+  base: string | null,
+): Promise<{ ahead: number; behind: number } | null> => {
   if (!base) return null
   try {
-    const [ahead, behind] = (await gitText(['rev-list', '--left-right', '--count', `${branch}...${base}`], { cwd: path, timeoutMs: 10_000 })).split(/\s+/).map(Number)
+    const [ahead, behind] = (
+      await gitText(['rev-list', '--left-right', '--count', `${branch}...${base}`], { cwd: path, timeoutMs: 10_000 })
+    )
+      .split(/\s+/)
+      .map(Number)
     return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead: ahead!, behind: behind! } : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export function parseLocalWorktrees(roster: string): { path: string; branch: string | null; head: string | null }[] {
-  return roster.split('\0\0').flatMap(entry => {
+  return roster.split('\0\0').flatMap((entry) => {
     const fields = entry.split('\0')
-    if (fields.includes('bare') || fields.some(field => field.startsWith('prunable'))) return []
-    const path = fields.find(field => field.startsWith('worktree '))?.slice(9)
+    if (fields.includes('bare') || fields.some((field) => field.startsWith('prunable'))) return []
+    const path = fields.find((field) => field.startsWith('worktree '))?.slice(9)
     if (!path) return []
-    return [{ path, branch: fields.find(field => field.startsWith('branch refs/heads/'))?.slice(18) ?? null,
-      head: fields.find(field => field.startsWith('HEAD '))?.slice(5) ?? null }]
+    return [
+      {
+        path,
+        branch: fields.find((field) => field.startsWith('branch refs/heads/'))?.slice(18) ?? null,
+        head: fields.find((field) => field.startsWith('HEAD '))?.slice(5) ?? null,
+      },
+    ]
   })
 }
 
@@ -106,9 +211,11 @@ async function projectPath(request: Extract<DataSourceRequest, { operation: 'que
   const selected = request.query.scope.parameters.project
   const id = request.query.scope.projectId ?? (typeof selected === 'string' ? selected : undefined)
   if (!id) throw new Error('Choose a local project.')
-  if (request.query.scope.projectId && selected && selected !== request.query.scope.projectId) throw new Error('project_scope_mismatch')
+  if (request.query.scope.projectId && selected && selected !== request.query.scope.projectId)
+    throw new Error('project_scope_mismatch')
   const [project] = await getDb(env).select().from(schema.projects).where(eq(schema.projects.id, id))
-  if (!project || project.workspaceId !== request.query.scope.workspaceId || project.vcs !== 'git' || !project.path) throw new Error('git_project_unavailable')
+  if (!project || project.workspaceId !== request.query.scope.workspaceId || project.vcs !== 'git' || !project.path)
+    throw new Error('git_project_unavailable')
   return project
 }
 
@@ -116,25 +223,43 @@ async function projectOptions(request: Extract<DataSourceRequest, { operation: '
   if (request.target !== 'parameter' || request.pointer !== '/project') throw new Error('unsupported_options')
   const workspaceId = request.scope.workspaceId
   if (!workspaceId) throw new Error('workspace_required')
-  const projects = await getDb(env).select({ id: schema.projects.id, name: schema.projects.name, vcs: schema.projects.vcs,
-    path: schema.projects.path, hidden: schema.projects.hidden }).from(schema.projects)
+  const projects = await getDb(env)
+    .select({
+      id: schema.projects.id,
+      name: schema.projects.name,
+      vcs: schema.projects.vcs,
+      path: schema.projects.path,
+      hidden: schema.projects.hidden,
+    })
+    .from(schema.projects)
     .where(eq(schema.projects.workspaceId, workspaceId))
-  const matching = projects.filter(project => project.vcs === 'git' && project.path && !project.hidden
-    && project.name.toLowerCase().includes(request.search.toLowerCase()))
+  const matching = projects
+    .filter(
+      (project) =>
+        project.vcs === 'git' &&
+        project.path &&
+        !project.hidden &&
+        project.name.toLowerCase().includes(request.search.toLowerCase()),
+    )
     .sort((left, right) => left.name.localeCompare(right.name))
   const offset = Number(request.cursor ?? 0)
   if (!Number.isInteger(offset) || offset < 0) throw new Error('invalid_cursor')
   const page = matching.slice(offset, offset + request.pageSize)
   const next = offset + page.length
-  return { options: page.map(project => ({ id: project.id, label: project.name.slice(0, 80) })),
-    ...(next < matching.length ? { nextCursor: String(next) } : {}), exhausted: next >= matching.length }
+  return {
+    options: page.map((project) => ({ id: project.id, label: project.name.slice(0, 80) })),
+    ...(next < matching.length ? { nextCursor: String(next) } : {}),
+    exhausted: next >= matching.length,
+  }
 }
 
 async function remoteGithubRepository(path: string, remote: string): Promise<string | null> {
   try {
     const repository = parseGithubRemote(await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000 }))
     return repository ? `${repository.owner}/${repository.name}`.toLowerCase() : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export async function localBranches(request: DataSourceRequest, env: Env) {
@@ -145,28 +270,56 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
     const project = await projectPath(request, env)
     const path = project.path!
     const observedAt = Date.now()
-    const refs = await gitText(['for-each-ref', '--format=%(refname:short)%00%(upstream:short)%00%(upstream:remotename)%00%(committerdate:unix)', 'refs/heads'], { cwd: path, timeoutMs: 10_000 })
+    const refs = await gitText(
+      [
+        'for-each-ref',
+        '--format=%(refname:short)%00%(upstream:short)%00%(upstream:remotename)%00%(committerdate:unix)',
+        'refs/heads',
+      ],
+      { cwd: path, timeoutMs: 10_000 },
+    )
     const rows = refs.split('\n').filter(Boolean)
-    const remotes = [...new Set(rows.map(row => row.split('\0')[2] || 'origin'))]
-    const repositories = new Map(await Promise.all(remotes.map(async remote =>
-      [remote, await remoteGithubRepository(path, remote)] as const)))
+    const remotes = [...new Set(rows.map((row) => row.split('\0')[2] || 'origin'))]
+    const repositories = new Map(
+      await Promise.all(remotes.map(async (remote) => [remote, await remoteGithubRepository(path, remote)] as const)),
+    )
     const records = []
     for (let index = 0; index < rows.length; index += 4) {
-      records.push(...await Promise.all(rows.slice(index, index + 4).map(async row => {
-        const [name = '', upstream = '', upstreamRemote = '', stamp = ''] = row.split('\0')
-        const branch = `refs/heads/${name}`
-        const [againstUpstream, againstDefault] = await Promise.all([
-          divergence(path, branch, upstream || null),
-          divergence(path, branch, project.defaultBranch ? `refs/heads/${project.defaultBranch}` : null),
-        ])
-        return { recordId: key(project.id, name), data: { projectId: project.id, name, upstream: upstream || null,
-          githubRepository: repositories.get(upstreamRemote || 'origin') ?? null,
-          aheadUpstream: againstUpstream?.ahead ?? null, behindUpstream: againstUpstream?.behind ?? null,
-          aheadDefault: againstDefault?.ahead ?? null, behindDefault: againstDefault?.behind ?? null,
-          lastCommitAt: stamp ? Number(stamp) * 1000 : null, observedAt }, display: { title: name } }
-      })))
+      records.push(
+        ...(await Promise.all(
+          rows.slice(index, index + 4).map(async (row) => {
+            const [name = '', upstream = '', upstreamRemote = '', stamp = ''] = row.split('\0')
+            const branch = `refs/heads/${name}`
+            const [againstUpstream, againstDefault] = await Promise.all([
+              divergence(path, branch, upstream || null),
+              divergence(path, branch, project.defaultBranch ? `refs/heads/${project.defaultBranch}` : null),
+            ])
+            return {
+              recordId: key(project.id, name),
+              data: {
+                projectId: project.id,
+                name,
+                upstream: upstream || null,
+                githubRepository: repositories.get(upstreamRemote || 'origin') ?? null,
+                aheadUpstream: againstUpstream?.ahead ?? null,
+                behindUpstream: againstUpstream?.behind ?? null,
+                aheadDefault: againstDefault?.ahead ?? null,
+                behindDefault: againstDefault?.behind ?? null,
+                lastCommitAt: stamp ? Number(stamp) * 1000 : null,
+                observedAt,
+              },
+              display: { title: name },
+            }
+          }),
+        )),
+      )
     }
-    return { ...selectDataRecords(records, request.query), revision: branchDescription.revision, readTime: observedAt, observedAt }
+    return {
+      ...selectDataRecords(records, request.query),
+      revision: branchDescription.revision,
+      readTime: observedAt,
+      observedAt,
+    }
   })
 }
 
@@ -177,20 +330,46 @@ export async function localWorktrees(request: DataSourceRequest, env: Env) {
   return pager(env.ACTIVE_IDENTITY.get() ?? '', request, async () => {
     const project = await projectPath(request, env)
     const observedAt = Date.now()
-    const roster = parseLocalWorktrees(await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: project.path!, timeoutMs: 10_000 }))
-    const tasks = await getDb(env).select({ id: schema.tasks.id, path: schema.tasks.worktreePath }).from(schema.tasks).where(eq(schema.tasks.projectId, project.id))
-    const owners = new Map(tasks.flatMap(task => task.path ? [[resolve(task.path), task.id] as const] : []))
+    const roster = parseLocalWorktrees(
+      await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: project.path!, timeoutMs: 10_000 }),
+    )
+    const tasks = await getDb(env)
+      .select({ id: schema.tasks.id, path: schema.tasks.worktreePath })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.projectId, project.id))
+    const owners = new Map(tasks.flatMap((task) => (task.path ? [[resolve(task.path), task.id] as const] : [])))
     const records = []
     for (let index = 0; index < roster.length; index += 4) {
-      records.push(...await Promise.all(roster.slice(index, index + 4).map(async tree => {
-        const [counts, lastCommitAt] = await Promise.all([worktreeCounts(tree.path), time(tree.path)])
-        const taskId = owners.get(resolve(tree.path)) ?? null
-        return { recordId: key(project.id, resolve(tree.path)), data: { projectId: project.id, path: tree.path,
-          branch: tree.branch, detachedHead: tree.branch ? null : tree.head,
-          modifiedCount: counts?.modifiedCount ?? null, untrackedCount: counts?.untrackedCount ?? null,
-          lastCommitAt, taskId, observedAt }, display: { title: tree.path }, ...(taskId ? { taskId } : {}) }
-      })))
+      records.push(
+        ...(await Promise.all(
+          roster.slice(index, index + 4).map(async (tree) => {
+            const [counts, lastCommitAt] = await Promise.all([worktreeCounts(tree.path), time(tree.path)])
+            const taskId = owners.get(resolve(tree.path)) ?? null
+            return {
+              recordId: key(project.id, resolve(tree.path)),
+              data: {
+                projectId: project.id,
+                path: tree.path,
+                branch: tree.branch,
+                detachedHead: tree.branch ? null : tree.head,
+                modifiedCount: counts?.modifiedCount ?? null,
+                untrackedCount: counts?.untrackedCount ?? null,
+                lastCommitAt,
+                taskId,
+                observedAt,
+              },
+              display: { title: tree.path },
+              ...(taskId ? { taskId } : {}),
+            }
+          }),
+        )),
+      )
     }
-    return { ...selectDataRecords(records, request.query), revision: worktreeDescription.revision, readTime: observedAt, observedAt }
+    return {
+      ...selectDataRecords(records, request.query),
+      revision: worktreeDescription.revision,
+      readTime: observedAt,
+      observedAt,
+    }
   })
 }

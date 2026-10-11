@@ -21,7 +21,7 @@ export function parseToolCeiling(value: unknown): ToolCeiling | undefined {
   return parsed.success ? normalizeToolCeiling(parsed.data) : undefined
 }
 
-export function riskWithinCeiling(risk: ToolRisk, ceiling: ToolCeiling | undefined): boolean {
+function riskWithinCeiling(risk: ToolRisk, ceiling: ToolCeiling | undefined): boolean {
   return !ceiling?.maxRisk || RISK_ORDER[risk] <= RISK_ORDER[ceiling.maxRisk]
 }
 
@@ -31,36 +31,4 @@ export function isToolWithinCeiling(tool: { name: string; risk: ToolRisk }, ceil
   const normalized = normalizeToolCeiling(ceiling)
   if (normalized.allow && !normalized.allow.includes(tool.name)) return false
   return riskWithinCeiling(tool.risk, normalized)
-}
-
-// base64url via web-standard APIs rather than Buffer. Protocol is the one package both runtimes
-// import, so it may not depend on Node globals. Today's callers happen to be node-side, but a
-// renderer importing this would have hit `Buffer is not defined` at runtime. btoa/atob and
-// TextEncoder/TextDecoder exist in both Node and the browser.
-function toBase64Url(text: string): string {
-  const bytes = new TextEncoder().encode(text)
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromBase64Url(raw: string): string {
-  const b64 = raw.replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '='))
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
-  return new TextDecoder().decode(bytes)
-}
-
-export function encodeToolCeiling(ceiling: ToolCeiling): string {
-  return toBase64Url(JSON.stringify(normalizeToolCeiling(ceiling)))
-}
-
-export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefined {
-  if (!raw) return undefined
-  try {
-    const parsed = toolCeilingSchema.safeParse(JSON.parse(fromBase64Url(raw)))
-    return parsed.success ? normalizeToolCeiling(parsed.data) : undefined
-  } catch {
-    return undefined
-  }
 }

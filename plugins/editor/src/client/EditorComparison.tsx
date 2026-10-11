@@ -8,8 +8,10 @@ export default function EditorComparison(props: { path: string; disk: string; dr
     const start = unified.indexOf('@@ ')
     return start < 0 ? '' : unified.slice(start)
   }
-  return <Stack>
-    <Text>Disk snapshot → Live draft</Text>
-    <StackedDiff path={props.path} patch={patch()} />
-  </Stack>
+  return (
+    <Stack>
+      <Text>Disk snapshot → Live draft</Text>
+      <StackedDiff path={props.path} patch={patch()} />
+    </Stack>
+  )
 }

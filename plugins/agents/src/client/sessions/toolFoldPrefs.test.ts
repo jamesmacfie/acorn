@@ -40,8 +40,10 @@ describe('foldStartsOpen', () => {
 
 describe('foldPrefsAfterToggle', () => {
   it('learns from a toggle under sticky', () => {
-    expect(foldPrefsAfterToggle({ mode: 'sticky', last: 'collapsed' }, true))
-      .toEqual({ mode: 'sticky', last: 'expanded' })
+    expect(foldPrefsAfterToggle({ mode: 'sticky', last: 'collapsed' }, true)).toEqual({
+      mode: 'sticky',
+      last: 'expanded',
+    })
   })
 
   it('writes nothing under a fixed mode, so a card cannot rewrite the setting', () => {
@@ -72,8 +74,9 @@ describe('createAgentToolFoldSetting', () => {
     const { queryClient, fold } = setting('sticky')
     fold.onToggle(true)
     await Promise.resolve()
-    expect(queryClient.getQueryData<Record<string, string>>(prefsKey)?.[PrefKeys.agentToolFold])
-      .toBe(JSON.stringify({ mode: 'sticky', last: 'expanded' }))
+    expect(queryClient.getQueryData<Record<string, string>>(prefsKey)?.[PrefKeys.agentToolFold]).toBe(
+      JSON.stringify({ mode: 'sticky', last: 'expanded' }),
+    )
   })
 
   it('stores nothing under a fixed mode', async () => {

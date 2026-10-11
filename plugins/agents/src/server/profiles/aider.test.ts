@@ -10,7 +10,13 @@ import { aiderProfile } from './aider'
 
 describe('the aider profile', () => {
   it('declares the identity terminal resolves it by', () => {
-    expect(aiderProfile).toMatchObject({ id: 'aider', label: 'Aider', kind: 'agent', command: 'aider', transport: 'pty' })
+    expect(aiderProfile).toMatchObject({
+      id: 'aider',
+      label: 'Aider',
+      kind: 'agent',
+      command: 'aider',
+      transport: 'pty',
+    })
   })
 
   it('offers no headless, resume, stream or MCP surface', () => {

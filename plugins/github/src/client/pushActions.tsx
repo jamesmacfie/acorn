@@ -6,10 +6,10 @@ import { Button } from '@acorn/plugin-api/ui'
 import { githubCreateRoute } from './clientRoutes'
 
 // What this plugin offers under the Changes tab's branch bar, once a task's branch is on its remote
-// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `remote` kind). One button, and it opens this
-// plugin's own create form with the head branch already chosen.
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `remote` kind).
+// One button, and it opens this plugin's own create form with the head branch already chosen.
 //
-// The git plugin declared the point and knows none of this. It could not import this plugin, and
+// The git plugin declared the point and knows none of this. It cannot import this plugin, and
 // should not have to learn what a pull request is to leave room for one; it hands over the branch,
 // the upstream and the two ids, and every word here is written on this side.
 
@@ -43,7 +43,7 @@ export function GithubPushActions(props: PushActionsProps) {
   const task = () => tasks.data?.find((row) => row.id === props.taskId)
   // The repository this task's project mirrors, which is also the answer to "is this a GitHub project
   // at all". Core derives it from the project row, so a task on a mirrored project carries it whatever
-  // the task's origin was (node-core routes/projects/tasks.ts).
+  // the task's origin was.
   const repo = () => task()?.github
   /**
    * Four questions, and only two of them come from the props.
@@ -64,7 +64,7 @@ export function GithubPushActions(props: PushActionsProps) {
         onPress={() => {
           // The rail source first, then the route. The shell draws from the selected source rather
           // than from the location, so navigating alone would move the address bar and leave the
-          // task's layout on screen (./commands.ts § github.pull.list).
+          // task's layout on screen.
           setSelectedSource('github')
           navigate(createPath(props.projectId, props.branch!))
         }}

@@ -1,4 +1,11 @@
-import { currentActivity, emitEvent, onTelemetryActivity, recordDuration, telemetryEnabled, type TelemetryActivity } from './emitter'
+import {
+  currentActivity,
+  emitEvent,
+  onTelemetryActivity,
+  recordDuration,
+  telemetryEnabled,
+  type TelemetryActivity,
+} from './emitter'
 
 export type ResponsivenessPulse = { active: boolean; activity: TelemetryActivity | null }
 
@@ -9,7 +16,13 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
   let frame: number | null = null
   let previousFrame = 0
   const isActive = () => telemetryEnabled() && document.visibilityState === 'visible' && document.hasFocus()
-  const safelySend = (value: ResponsivenessPulse) => { try { send(value) } catch { /* diagnostics cannot fail the UI */ } }
+  const safelySend = (value: ResponsivenessPulse) => {
+    try {
+      send(value)
+    } catch {
+      /* diagnostics cannot fail the UI */
+    }
+  }
   const pulse = () => {
     const next = isActive()
     // Always send the disarm transition, even when consent has just been revoked.
@@ -18,7 +31,10 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
   }
   const paint = (now: number) => {
     frame = null
-    if (!isActive()) { previousFrame = 0; return }
+    if (!isActive()) {
+      previousFrame = 0
+      return
+    }
     if (previousFrame) recordDuration('core', 'ui.frame.gap', now - previousFrame)
     previousFrame = now
     frame = requestAnimationFrame(paint)
@@ -27,7 +43,11 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
     last = performance.now()
     pulse()
     if (isActive() && frame === null) frame = requestAnimationFrame(paint)
-    if (!isActive() && frame !== null) { cancelAnimationFrame(frame); frame = null; previousFrame = 0 }
+    if (!isActive() && frame !== null) {
+      cancelAnimationFrame(frame)
+      frame = null
+      previousFrame = 0
+    }
   }
   const off = onTelemetryActivity(() => {
     pulse()

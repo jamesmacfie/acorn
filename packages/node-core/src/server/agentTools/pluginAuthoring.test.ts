@@ -18,10 +18,7 @@ import {
   pluginAuthoringTool,
   pluginAuthoringSection,
 } from './pluginAuthoringContribution.ts'
-import {
-  pluginAuthoringVocabulary,
-  renderPluginAuthoring,
-} from './pluginAuthoring.ts'
+import { pluginAuthoringVocabulary, renderPluginAuthoring } from './pluginAuthoring.ts'
 import type { CoreServices } from '../core/index.ts'
 
 // This file is about drift: every test below re-derives an answer from the source of truth and
@@ -46,10 +43,15 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     // does not.
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.contextMenuLocations).toEqual([...CONTEXT_MENU_LOCATIONS])
-    const withSlot = (slot: string) => pluginManifestShape.safeParse({
-      id: 'pp', name: 'P', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-      contributions: { slots: [{ id: 's', slot, data: '/v1/p/pp/badge' }] },
-    }).success
+    const withSlot = (slot: string) =>
+      pluginManifestShape.safeParse({
+        id: 'pp',
+        name: 'P',
+        version: '1',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+        contributions: { slots: [{ id: 's', slot, data: '/v1/p/pp/badge' }] },
+      }).success
     expect(v.manifest.slots.length).toBeGreaterThan(1)
     for (const slot of v.manifest.slots) expect(withSlot(slot), slot).toBe(true)
     expect(withSlot('overlay')).toBe(false)
@@ -73,13 +75,18 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(renderPluginAuthoring(v)).toContain('{ message: { taskId,')
     expect(renderPluginAuthoring(v)).toContain('{ turn: { taskId, projectId, sessionId, turnId, status, revision } }')
     // A selection's facts, its body, and where each host can invoke it.
-    for (const fact of CONTEXT_MENU_FACTS['content.selection']) expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
-    expect(renderPluginAuthoring(v)).toContain('`{ selection: { taskId?, projectId?, ownerId, contentKind, languageId?, readOnly,')
+    for (const fact of CONTEXT_MENU_FACTS['content.selection'])
+      expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
+    expect(renderPluginAuthoring(v)).toContain(
+      '`{ selection: { taskId?, projectId?, ownerId, contentKind, languageId?, readOnly,',
+    )
     expect(renderPluginAuthoring(v)).toContain('the terminal has no text selection')
     // Hover and diagnostics: both declarations, both bodies, and every severity.
     expect(renderPluginAuthoring(v)).toContain('`documentServices: [{ id, label, languageId, hover?, diagnostics? }]`')
     for (const severity of DIAGNOSTIC_SEVERITIES) expect(renderPluginAuthoring(v)).toContain(`"${severity}"`)
-    expect(renderPluginAuthoring(v)).toContain('`{ revision, contents: { kind: "plaintext" | "markdown", value }, range? }`')
+    expect(renderPluginAuthoring(v)).toContain(
+      '`{ revision, contents: { kind: "plaintext" | "markdown", value }, range? }`',
+    )
     // Detail regions: the field, every region, what a contributor is mounted with, and the two points.
     for (const region of DETAIL_REGIONS) expect(renderPluginAuthoring(v)).toContain(`\`${region}\``)
     expect(renderPluginAuthoring(v)).toContain('`mounts: [{ surface, region }]`')
@@ -104,10 +111,12 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(v.points).toBe(PUBLIC_EXTENSION_POINTS)
     const guide = renderPluginAuthoring(v)
     for (const point of v.points) {
-      expect(guide, point.id).toContain(point.kind === 'remote' ? `\`${point.id}\` — remote` : `\`${point.id}\` \`{ ${point.key.join(', ')} }\``)
+      expect(guide, point.id).toContain(
+        point.kind === 'remote' ? `\`${point.id}\` — remote` : `\`${point.id}\` \`{ ${point.key.join(', ')} }\``,
+      )
       if (point.kind === 'remote') expect(guide, point.id).toContain(`Props \`${point.props}\``)
     }
-    expect(guide).toContain('`editor:document` — remote, `replace`, keyed by the file\'s lowercased basename')
+    expect(guide).toContain("`editor:document` — remote, `replace`, keyed by the file's lowercased basename")
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {
@@ -116,7 +125,9 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect([...v.manifest.required, ...v.manifest.optional].sort()).toEqual([...shape].sort())
     // A key moving between required and optional changes what a hand-written manifest must carry, so the
     // split is derived rather than declared here too.
-    const required = shape.filter((key) => !pluginManifestShape.shape[key as keyof typeof pluginManifestShape.shape].safeParse(undefined).success)
+    const required = shape.filter(
+      (key) => !pluginManifestShape.shape[key as keyof typeof pluginManifestShape.shape].safeParse(undefined).success,
+    )
     expect(v.manifest.required).toEqual([...required].sort())
   })
 
@@ -126,13 +137,20 @@ describe('the derived vocabulary tracks the manifest schema', () => {
       const one = { id: 'x', label: 'x', title: 'x', order: 1, items: '/v1/p/p/x', data: '/v1/p/p/x' }
       const overflowing = Array.from({ length: cap + 1 }, () => one)
       const parsed = pluginManifestShape.safeParse({
-        id: 'p', name: 'P', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, contributions: { [key]: overflowing },
+        id: 'p',
+        name: 'P',
+        version: '1',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+        contributions: { [key]: overflowing },
       })
       // Specifically the cap, not the entries' shape. The placeholder above is not a valid descriptor
       // for most of these keys, so "it failed" alone proves nothing about the number.
       const tooBig = parsed.success
         ? []
-        : parsed.error.issues.filter((issue) => issue.code === 'too_big' && issue.path.join('.') === `contributions.${key}`)
+        : parsed.error.issues.filter(
+            (issue) => issue.code === 'too_big' && issue.path.join('.') === `contributions.${key}`,
+          )
       expect(tooBig.length, `${key} did not refuse ${cap + 1} entries as too many`).toBe(1)
     }
   })
@@ -160,7 +178,9 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     // vocabulary itself looks for it.
     const union = (descriptor: string, field: string) => {
       const items = json.properties.contributions.properties[descriptor].items
-      const carrier = items.properties?.[field] ?? (items.anyOf ?? items.oneOf ?? []).map((member) => member.properties?.[field]).find(Boolean)
+      const carrier =
+        items.properties?.[field] ??
+        (items.anyOf ?? items.oneOf ?? []).map((member) => member.properties?.[field]).find(Boolean)
       return (carrier?.oneOf ?? []).map((option) => option.properties.verb.const).sort()
     }
     const v = pluginAuthoringVocabulary()
@@ -182,12 +202,33 @@ describe('the permission facets are the ones scopeCore honours', () => {
   // debugs. `scopeCore` gates by omission, so "this token grants something" is exactly "the returned
   // object is not empty", which is also why an unknown token has to come back empty.
   const core = {
-    fs: {}, git: {}, tasks: {}, context: {}, models: { forPlugin: () => ({}) }, data: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
-    projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
-    secrets: {}, proc: {}, telemetry: { onBatch: () => ({ dispose: () => {} }) },
+    fs: {},
+    git: {},
+    tasks: {},
+    context: {},
+    models: { forPlugin: () => ({}) },
+    data: {},
+    identity: {},
+    prefs: { read: () => {}, write: () => {} },
+    projects: {
+      byId: 1,
+      byGithub: 1,
+      checkouts: 1,
+      externalProjects: 1,
+      config: 1,
+      assertConfigTrusted: 1,
+      setup: 1,
+      create: 1,
+      update: 1,
+    },
+    secrets: {},
+    proc: {},
+    telemetry: { onBatch: () => ({ dispose: () => {} }) },
   } as unknown as CoreServices
   const scope = (token: string) =>
-    scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [], sockets: false }, 'p', { idsForOwner: () => [] })
+    scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [], sockets: false }, 'p', {
+      idsForOwner: () => [],
+    })
 
   it('grants something for every facet the guide lists', () => {
     for (const token of NODE_CORE_FACETS) expect(Object.keys(scope(token)), token).not.toEqual([])
@@ -242,7 +283,10 @@ describe('the two doors', () => {
     // A text read, not an import: node must not import the client, and this is the only way a rename
     // here can go red over there. The seeded prompt is the entry point to the loop, so a stale tool
     // name fails the first thing a new plugin author's agent does.
-    const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/features/settings/plugins/PluginsSettings.tsx')
+    const settings = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../client-core/src/features/settings/plugins/PluginsSettings.tsx',
+    )
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
   })
 
@@ -255,8 +299,8 @@ describe('the two doors', () => {
     expect(guide).toContain('`ctx.telemetry`')
     expect(guide).toContain('`ctx.core.telemetry.onBatch`')
     expect(guide).toContain('permissions.node.core: ["telemetry"]')
-    // The line that used to be here said there is no `ctx.log` and to use `console`. It was true
-    // until 2026-09-10 and is the kind of stale instruction an agent follows for a whole session.
+    // "There is no `ctx.log`, use `console`" is wrong, and it is the kind of stale instruction an agent
+    // follows for a whole session.
     expect(guide).not.toContain('There is no `ctx.log`')
     expect(pluginAuthoringVocabulary().permissions.core).toContain('telemetry')
     expect(Object.keys(pluginAuthoringVocabulary().bridge.kinds)).toContain('telemetry')
@@ -275,6 +319,7 @@ describe('the two doors', () => {
     const v = pluginAuthoringVocabulary()
     for (const verb of v.actions.railOnSelect) expect(guide).toContain(`\`${verb}\``)
     for (const kind of Object.keys(v.bridge.kinds)) expect(guide).toContain(`\`${kind}\``)
-    for (const [key, cap] of Object.entries(v.manifest.contributionCaps)) expect(guide).toContain(`\`${key}\` — max ${cap}`)
+    for (const [key, cap] of Object.entries(v.manifest.contributionCaps))
+      expect(guide).toContain(`\`${key}\` — max ${cap}`)
   })
 })

@@ -114,14 +114,26 @@ export function fieldRef(spec: {
   })
 
   const api: FieldApi = {
-    get value() { return model().text },
-    get plainText() { return model().text },
-    get cursor() { return untrack(model).cursor },
-    set value(text: string) { write(text) },
+    get value() {
+      return model().text
+    },
+    get plainText() {
+      return model().text
+    },
+    get cursor() {
+      return untrack(model).cursor
+    },
+    set value(text: string) {
+      write(text)
+    },
     setText: write,
-    insertText: (text: string) => { apply(paste(untrack(model), text, spec.newline)) },
+    insertText: (text: string) => {
+      apply(paste(untrack(model), text, spec.newline))
+    },
     handleKeyPress,
-    handlePaste: (event: { text: string }) => { apply(paste(untrack(model), event.text, spec.newline)) },
+    handlePaste: (event: { text: string }) => {
+      apply(paste(untrack(model), event.text, spec.newline))
+    },
   }
 
   // Tab walks controls while one is available; at the edge it passes to the region layer.
@@ -137,9 +149,14 @@ export function fieldRef(spec: {
     // Preserve live getters; spreading would copy their value at mount.
     Object.defineProperties(node, Object.getOwnPropertyDescriptors(api))
     // STOP is above the typing shadow and bound to the field itself.
-    bindKeys(node as unknown as Renderable, [
-      { key: 'tab', cmd: step(1) },
-      { key: 'shift+tab', cmd: step(-1) },
-    ], STOP, { mode: 'focus' })
+    bindKeys(
+      node as unknown as Renderable,
+      [
+        { key: 'tab', cmd: step(1) },
+        { key: 'shift+tab', cmd: step(-1) },
+      ],
+      STOP,
+      { mode: 'focus' },
+    )
   }
 }

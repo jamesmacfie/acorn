@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { DashboardDisplayField } from './display'
 import { cellText, formatCell, personInitials } from './format'
 
-const field = (over: Partial<DashboardDisplayField> & Pick<DashboardDisplayField, 'type'>): DashboardDisplayField =>
-  ({ id: 'f', name: 'F', ...over })
+const field = (over: Partial<DashboardDisplayField> & Pick<DashboardDisplayField, 'type'>): DashboardDisplayField => ({
+  id: 'f',
+  name: 'F',
+  ...over,
+})
 
 const NOW = 1_700_000_000_000
 
@@ -25,8 +28,14 @@ describe('formatCell', () => {
     const locale = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, useGrouping: true })
     expect(formatCell(field({ type: 'number' }), 10 / 3)).toEqual({ kind: 'number', text: locale.format(3.33) })
     expect((formatCell(field({ type: 'number' }), 10 / 3) as { text: string }).text).toMatch(/^3\D33$/)
-    expect(formatCell(field({ type: 'number' }), 1234567.891)).toEqual({ kind: 'number', text: locale.format(1234567.89) })
-    expect(formatCell(field({ type: 'number', unit: '%' }), 12.5)).toEqual({ kind: 'number', text: `${locale.format(12.5)}%` })
+    expect(formatCell(field({ type: 'number' }), 1234567.891)).toEqual({
+      kind: 'number',
+      text: locale.format(1234567.89),
+    })
+    expect(formatCell(field({ type: 'number', unit: '%' }), 12.5)).toEqual({
+      kind: 'number',
+      text: `${locale.format(12.5)}%`,
+    })
   })
 
   it('gives a datetime both an age and an absolute time', () => {
@@ -34,15 +43,22 @@ describe('formatCell', () => {
     expect(cell).toMatchObject({ kind: 'datetime', relative: '2h ago' })
     expect(cell.kind === 'datetime' && cell.absolute.length).toBeGreaterThan(0)
     expect(formatCell(field({ type: 'datetime' }), NOW - 30_000, NOW)).toMatchObject({ relative: 'now' })
-    expect(formatCell(field({ type: 'datetime' }), NOW - 40 * 24 * 3600_000, NOW)).toMatchObject({ relative: '1mo ago' })
+    expect(formatCell(field({ type: 'datetime' }), NOW - 40 * 24 * 3600_000, NOW)).toMatchObject({
+      relative: '1mo ago',
+    })
     expect(formatCell(field({ type: 'datetime' }), 'yesterday')).toEqual({ kind: 'empty' })
   })
 
   it('keeps calendar days unchanged and formats instants in the plan zone', () => {
-    expect(formatCell(field({ type: 'datetime' }), '2026-10-03')).toMatchObject({ kind: 'datetime', absolute: '2026-10-03' })
+    expect(formatCell(field({ type: 'datetime' }), '2026-10-03')).toMatchObject({
+      kind: 'datetime',
+      absolute: '2026-10-03',
+    })
     const inUtc = formatCell(field({ type: 'datetime', zone: 'UTC' }), Date.UTC(2026, 9, 3, 0, 30))
     const inAuckland = formatCell(field({ type: 'datetime', zone: 'Pacific/Auckland' }), Date.UTC(2026, 9, 3, 0, 30))
-    expect(inUtc.kind === 'datetime' && inAuckland.kind === 'datetime' && inUtc.absolute).not.toBe(inAuckland.kind === 'datetime' ? inAuckland.absolute : '')
+    expect(inUtc.kind === 'datetime' && inAuckland.kind === 'datetime' && inUtc.absolute).not.toBe(
+      inAuckland.kind === 'datetime' ? inAuckland.absolute : '',
+    )
   })
 
   it('tones an enum from its declared value, and still renders one that was never declared', () => {
@@ -53,16 +69,25 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'enum' }), 'open')).toEqual({ kind: 'enum', label: 'open', tone: 'muted' })
     // The icon rides along with the value that declared it, and a value nobody declared has none, so
     // the cell falls back to the dot rather than to an icon borrowed from a neighbour.
-    const iconed = field({ type: 'enum', values: [{ id: 'working', label: 'Working', tone: 'ok', icon: 'loader-circle' }] })
+    const iconed = field({
+      type: 'enum',
+      values: [{ id: 'working', label: 'Working', tone: 'ok', icon: 'loader-circle' }],
+    })
     expect(formatCell(iconed, 'working')).toMatchObject({ icon: 'loader-circle' })
     expect(formatCell(iconed, 'surprise')).toEqual({ kind: 'enum', label: 'surprise', tone: 'muted' })
   })
 
   it('only calls a link a link when the host would actually open it', () => {
-    expect(formatCell(field({ type: 'link' }), 'https://github.com/a/b/pull/1'))
-      .toEqual({ kind: 'link', url: 'https://github.com/a/b/pull/1', text: 'github.com/a/b/pull/1' })
+    expect(formatCell(field({ type: 'link' }), 'https://github.com/a/b/pull/1')).toEqual({
+      kind: 'link',
+      url: 'https://github.com/a/b/pull/1',
+      text: 'github.com/a/b/pull/1',
+    })
     // The same refusal `openUrl` makes: anything but https is a string, not a link.
-    expect(formatCell(field({ type: 'link' }), 'file:///etc/passwd')).toEqual({ kind: 'text', text: 'file:///etc/passwd' })
+    expect(formatCell(field({ type: 'link' }), 'file:///etc/passwd')).toEqual({
+      kind: 'text',
+      text: 'file:///etc/passwd',
+    })
     expect(formatCell(field({ type: 'link' }), 'not a url')).toEqual({ kind: 'text', text: 'not a url' })
   })
 
@@ -70,8 +95,11 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'boolean' }), true)).toEqual({ kind: 'boolean', value: true, text: 'Yes' })
     // `false` is an answer, not an absence. "Auto-merge: No" is worth a cell.
     expect(formatCell(field({ type: 'boolean' }), false)).toEqual({ kind: 'boolean', value: false, text: 'No' })
-    expect(formatCell(field({ type: 'person' }), 'jamesmacfie'))
-      .toEqual({ kind: 'person', name: 'jamesmacfie', initials: 'J' })
+    expect(formatCell(field({ type: 'person' }), 'jamesmacfie')).toEqual({
+      kind: 'person',
+      name: 'jamesmacfie',
+      initials: 'J',
+    })
   })
 })
 

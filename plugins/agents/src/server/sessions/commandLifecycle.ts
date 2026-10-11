@@ -17,7 +17,8 @@ export function commandStatus(
   // A background command outlives its turn on purpose, and the harness reports its exit later. It
   // runs while the harness that owns it does. Once that process is gone, reconnecting included, no
   // exit can arrive, and whether the command finished is unknown.
-  if (tool.background) return stopped || session.runtimeState === 'reconnecting' ? 'unknown' : tool.status ?? 'running'
+  if (tool.background)
+    return stopped || session.runtimeState === 'reconnecting' ? 'unknown' : (tool.status ?? 'running')
   if (tool.subagentId) {
     const child = session.subagents.find((entry) => entry.id === tool.subagentId)
     if (!stopped && child && isActiveSubagent(child)) return tool.status ?? 'running'
@@ -34,21 +35,35 @@ export function commandStatus(
 
 /** Node read projection for histories written before lifecycle endings updated command cards. */
 export function projectCommandEvents(
-  records: AgentEventRecord[], session: AgentSession, turns: AgentTurn[],
+  records: AgentEventRecord[],
+  session: AgentSession,
+  turns: AgentTurn[],
 ): AgentEventRecord[] {
   const byId = new Map(turns.map((turn) => [turn.id, turn]))
   return records.map((record) => {
     if (record.event.type !== 'tool' || record.event.tool.status === undefined) return record
     const status = commandStatus(record.event.tool, byId.get(record.turnId ?? ''), session)
-    return status === record.event.tool.status ? record : {
-      ...record, event: { type: 'tool', tool: { ...record.event.tool, status } },
-    }
+    return status === record.event.tool.status
+      ? record
+      : {
+          ...record,
+          event: { type: 'tool', tool: { ...record.event.tool, status } },
+        }
   })
 }
 
 /** Latest unfinished command states only; output stays in its original ledger rows. */
 export function unfinishedCommands(tx: Transaction, sessionId?: string): AgentEventRecord[] {
-  return tx.all<{ id: string; sessionId: string; turnId: string | null; seq: number; eventJson: string; openerJson: string; createdAt: number }>(sql`
+  return tx
+    .all<{
+      id: string
+      sessionId: string
+      turnId: string | null
+      seq: number
+      eventJson: string
+      openerJson: string
+      createdAt: number
+    }>(sql`
     WITH commands AS (
       SELECT session_id, min(seq) AS opener,
         coalesce(max(CASE WHEN json_extract(event_json, '$.tool.status') IS NOT NULL THEN seq END), max(seq)) AS seq
@@ -65,9 +80,15 @@ export function unfinishedCommands(tx: Transaction, sessionId?: string): AgentEv
     WHERE json_extract(e.event_json, '$.tool.status') IN ('pending', 'running')
       OR json_extract(e.event_json, '$.tool.status') IS NULL
     ORDER BY e.session_id, e.seq
-  `).map(({ eventJson, openerJson, ...row }) => ({ ...row, schemaVersion: 1, event: {
-    type: 'tool', tool: mergeToolCall(JSON.parse(openerJson).tool, JSON.parse(eventJson).tool),
-  } }))
+  `)
+    .map(({ eventJson, openerJson, ...row }) => ({
+      ...row,
+      schemaVersion: 1,
+      event: {
+        type: 'tool',
+        tool: mergeToolCall(JSON.parse(openerJson).tool, JSON.parse(eventJson).tool),
+      },
+    }))
 }
 
 /** A late update with no turn can join a card only when its stream has one unambiguous owner. */

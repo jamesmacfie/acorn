@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { clientEvents, consumePaneIntent, consumeTerminalFocusIntent, openPane, requestTerminalFocusIntent } from './clientEvents'
+import {
+  clientEvents,
+  consumePaneIntent,
+  consumeTerminalFocusIntent,
+  openPane,
+  requestTerminalFocusIntent,
+} from './clientEvents'
 
 vi.mock('../../../features/tasks/tasks', () => ({ dispatchLayout: vi.fn() }))
 

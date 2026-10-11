@@ -26,7 +26,7 @@ const holds = (node: Node, x: number, y: number): boolean =>
 
 /** The deepest node whose rectangle contains the cell, or nothing where the point is outside the
  *  tree altogether. */
-export function hit(node: Renderable, x: number, y: number): Renderable | null {
+function hit(node: Renderable, x: number, y: number): Renderable | null {
   if (node.props.visible === false || !holds(node, x, y)) return null
   for (let at = node.children.length - 1; at >= 0; at -= 1) {
     const child = node.children[at]!
@@ -56,17 +56,16 @@ export type Wheel = {
  *
  *  Three rows, which is what a reader's finger expects of every other terminal application and what
  *  `../kit/scrolling.test.tsx` measures: four steps over a five-row viewport of 24 rows has to leave
- *  the first row behind without reaching the end. There is no acceleration — OpenTUI's scrollbox had
- *  a curve keyed on how fast the events arrived, and a wheel that moves a different distance
- *  depending on how hard somebody spun it is a thing to add when somebody asks for it. */
+ *  the first row behind without reaching the end. There is no acceleration: a wheel that moves a
+ *  different distance depending on how hard somebody spun it is a thing to add when somebody asks
+ *  for it. */
 const WHEEL_ROWS = 3
 
 /**
  * Deliver one wheel step at a cell: from the node under the pointer upwards, each node's own handler,
  * and the first viewport on the way up moves its offset.
  *
- * The order is the old painter's, where a mouse event runs each renderable's handler before it hands
- * the event to its parent, and both halves of it are load-bearing.
+ * Each node's handler runs before its parent's, and both halves of that order are load-bearing.
  *
  *   a handler below wins    a virtual `Rows` is inside a viewport and owns its own window, so it
  *                           takes the wheel and stops it before the viewport underneath it moves as
@@ -84,7 +83,9 @@ export function wheelAt(root: Renderable, x: number, y: number, direction: 'up' 
     y,
     scroll: { direction, delta: WHEEL_ROWS },
     preventDefault: () => {},
-    stopPropagation: () => { stopped = true },
+    stopPropagation: () => {
+      stopped = true
+    },
   }
   let scrolled = false
   for (let at: Node | null = target; at && !stopped; at = at.parent) {
@@ -120,11 +121,10 @@ type Pressed = { onMouseDown?: (event: Press) => void }
 /**
  * Deliver one left press at a cell: from the node under the pointer upwards, each node's own handler.
  *
- * The order is the old painter's, where a mouse event runs each renderable's handler before it hands
- * the event to its parent, and both ends of the walk are load-bearing. A stop's own handler presses
- * what was clicked; the root's is the store's, which walks back up from `target` to the nearest thing
- * that can hold the keys and focuses it. So a click focuses and presses, in that order, which is the
- * whole of this host's pointer model (docs/tui/rectangles.md § What the TUI never does).
+ * Each node's handler runs before its parent's, and both ends of the walk are load-bearing. A stop's own
+ * handler presses what was clicked; the root's is the store's, which walks back up from `target` to the
+ * nearest thing that can hold the keys and focuses it. So a click focuses and presses, in that order, which
+ * is the whole of this host's pointer model (docs/tui/rectangles.md § What the TUI never does).
  */
 export function pressAt(root: Renderable, x: number, y: number): void {
   const target = hit(root, x, y)
@@ -136,9 +136,11 @@ export function pressAt(root: Renderable, x: number, y: number): void {
     button: LEFT,
     target,
     preventDefault: () => {},
-    stopPropagation: () => { stopped = true },
+    stopPropagation: () => {
+      stopped = true
+    },
   }
   for (let at: Node | null = target; at && !stopped; at = at.parent) {
-    (at as Pressed).onMouseDown?.(event)
+    ;(at as Pressed).onMouseDown?.(event)
   }
 }

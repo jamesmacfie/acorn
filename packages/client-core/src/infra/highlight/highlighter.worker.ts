@@ -2,8 +2,8 @@
 // docs/diff-rendering/loading.md § Syntax highlighting for why it needs to be a worker (the WASM engine
 // versus the renderer's CSP) and why it takes a whole document rather than a line.
 //
-// `shiki/wasm` has to stay the inlined build: it is 622 KB of base64 inside the module, which is
-// what lets this worker's policy keep `connect-src 'none'`. A non-inlined build fetches the
+// `shiki/wasm` has to stay the inlined build: it carries the WASM as base64 inside the module, which
+// is what lets this worker's policy keep `connect-src 'none'`. A non-inlined build fetches the
 // .wasm at runtime and would need a network permission this worker is better off without.
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
@@ -32,7 +32,9 @@ async function tokenize(lang: string, code: string): Promise<HighlightLines> {
   // One call for the whole document: docs/diff-rendering/loading.md § Syntax highlighting covers why that
   // is what lets Shiki thread grammar state from line to line correctly.
   const lines = hl.codeToTokensWithThemes(code, { lang: lang as never, themes: THEMES })
-  return lines.map((line) => line.map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' })))
+  return lines.map((line) =>
+    line.map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' })),
+  )
 }
 
 const post = (message: HighlightResponse) => (self as unknown as Worker).postMessage(message)
@@ -41,7 +43,7 @@ self.onmessage = (event: MessageEvent<HighlightRequest>) => {
   const { id, lang, code, sentAt } = event.data
   const started = sentAt === undefined ? 0 : performance.now()
   const queueMs = sentAt === undefined ? undefined : Math.max(0, performance.timeOrigin + started - sentAt)
-  const timing = () => sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started }
+  const timing = () => (sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started })
   void tokenize(lang, code).then(
     (lines) => post({ id, ok: true, lines, ...timing() }),
     // A grammar that fails to load or a pattern the engine rejects takes out one request, not the

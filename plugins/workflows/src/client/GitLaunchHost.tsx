@@ -3,7 +3,9 @@ import { closeWorkflowGitLaunch, workflowGitLaunchRequest } from '../contract/gi
 import GitLaunchDialog from './GitLaunchDialog'
 
 export default function GitLaunchHost() {
-  return <Show when={workflowGitLaunchRequest()} keyed>{(request) =>
-    <GitLaunchDialog request={request} onClose={() => closeWorkflowGitLaunch(request)} />
-  }</Show>
+  return (
+    <Show when={workflowGitLaunchRequest()} keyed>
+      {(request) => <GitLaunchDialog request={request} onClose={() => closeWorkflowGitLaunch(request)} />}
+    </Show>
+  )
 }

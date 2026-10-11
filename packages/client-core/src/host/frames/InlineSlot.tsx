@@ -28,7 +28,10 @@ export function InlineSlot(props: {
   taskId?: string
   projectId?: string | null
 }) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -37,8 +40,8 @@ export function InlineSlot(props: {
   })
 
   // How many the owner's own ceiling left out. Read here for the same reason `Slot` reads it: each
-  // occupant of a rectangle point is a whole iframe, so `max` is a real limit and a point past it was
-  // dropping contributors with nothing on screen to say so.
+  // occupant of a rectangle point is a whole iframe, so `max` is a real limit, and without the count a
+  // point past it would drop contributors with nothing on screen to say so.
   const overflow = () => (resolved()?.why === 'match' ? resolved()!.overflow : 0)
 
   const occupants = createMemo(() => {
@@ -78,9 +81,7 @@ export function InlineSlot(props: {
       {/* A count and no names, exactly as the remote slot's disclosure does it: the owner set the
           ceiling because it is the owner's screen, and listing who was left out would be inviting a
           person to fix somebody else's arithmetic. */}
-      <Show when={overflow()}>
-        {(count) => <span class="muted">{count()} more from other plugins</span>}
-      </Show>
+      <Show when={overflow()}>{(count) => <span class="muted">{count()} more from other plugins</span>}</Show>
     </Show>
   )
 }

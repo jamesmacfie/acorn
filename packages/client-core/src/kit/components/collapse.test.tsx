@@ -58,7 +58,14 @@ describe('a collapsed ListDetail', () => {
   })
 
   it('takes the rail width and drops the grip, and the drag cannot override it', () => {
-    render(() => <ListDetail collapseKey="github" list={<span>the list</span>}>the detail</ListDetail>, host)
+    render(
+      () => (
+        <ListDetail collapseKey="github" list={<span>the list</span>}>
+          the detail
+        </ListDetail>
+      ),
+      host,
+    )
     const root = host.querySelector<HTMLElement>('.ui-listdetail')!
     const handle = host.querySelector<HTMLElement>('[role="separator"]')!
     Object.defineProperty(root, 'offsetWidth', { configurable: true, value: 800 })
@@ -82,9 +89,14 @@ describe('a collapsed ListDetail', () => {
       mounted += 1
       return <input value="retained search" />
     }
-    render(() => (
-      <ListDetail collapseKey="editor" collapseContent="empty" list={<List />}>the detail</ListDetail>
-    ), host)
+    render(
+      () => (
+        <ListDetail collapseKey="editor" collapseContent="empty" list={<List />}>
+          the detail
+        </ListDetail>
+      ),
+      host,
+    )
     const list = host.querySelector<HTMLElement>('.ui-listdetail-list')!
     const input = list.querySelector('input')!
     const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
@@ -108,15 +120,18 @@ describe('a pull request Sections sidebar', () => {
       mounted += 1
       return <input value="pull request details" />
     }
-    render(() => (
-      <Sections
-        id="github.pull"
-        ariaLabel="Pull request"
-        header={{ id: 'details', label: 'Details', render: () => <Overview /> }}
-        sections={[]}
-        main={{ id: 'diff', label: 'Diff', render: () => <span>diff</span> }}
-      />
-    ), host)
+    render(
+      () => (
+        <Sections
+          id="github.pull"
+          ariaLabel="Pull request"
+          header={{ id: 'details', label: 'Details', render: () => <Overview /> }}
+          sections={[]}
+          main={{ id: 'diff', label: 'Diff', render: () => <span>diff</span> }}
+        />
+      ),
+      host,
+    )
     const root = host.querySelector<HTMLElement>('.ui-listdetail')!
     const input = host.querySelector<HTMLInputElement>('.ui-listdetail-list input')!
     const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
@@ -141,9 +156,7 @@ describe('a pane that does not offer the control', () => {
     // A flag left by a build where the pane was collapsible must not strand a reader in a 48px column
     // with no way to widen it.
     sidebarCollapse(paneCollapseKey('http'))[1](true)
-    render(() => (
-      <ListDetail list={<span>the list</span>}>the detail</ListDetail>
-    ), host)
+    render(() => <ListDetail list={<span>the list</span>}>the detail</ListDetail>, host)
     expect(host.querySelector<HTMLElement>('.ui-listdetail')!.dataset.list).toBe('default')
     expect(host.querySelector('.ui-listdetail-edge')).toBe(null)
   })
@@ -151,11 +164,19 @@ describe('a pane that does not offer the control', () => {
 
 describe('a row in a rail', () => {
   it('draws the slot instead of the row, and still answers to its name', () => {
-    render(() => (
-      <Row title="Fix the parser" label="Fix the parser" collapsed={<span class="mark">●</span>} meta={<span>meta</span>}>
-        Fix the parser
-      </Row>
-    ), host)
+    render(
+      () => (
+        <Row
+          title="Fix the parser"
+          label="Fix the parser"
+          collapsed={<span class="mark">●</span>}
+          meta={<span>meta</span>}
+        >
+          Fix the parser
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector<HTMLElement>('.ui-row')!
     expect(row.dataset.collapsed).toBe('')
     expect(host.querySelector('.ui-row-collapsed .mark')).not.toBe(null)
@@ -166,7 +187,14 @@ describe('a row in a rail', () => {
   })
 
   it('drops the depth it has no width for', () => {
-    render(() => <Row depth={2} nested reveal collapsed={<span>●</span>}>child</Row>, host)
+    render(
+      () => (
+        <Row depth={2} nested reveal collapsed={<span>●</span>}>
+          child
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector<HTMLElement>('.ui-row')!
     expect(row.dataset.depth).toBe(undefined)
     expect(row.dataset.nested).toBe(undefined)
@@ -174,7 +202,14 @@ describe('a row in a rail', () => {
   })
 
   it('is the row it always was without the slot', () => {
-    render(() => <Row depth={2} title="Fix the parser">Fix the parser</Row>, host)
+    render(
+      () => (
+        <Row depth={2} title="Fix the parser">
+          Fix the parser
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector<HTMLElement>('.ui-row')!
     expect(row.dataset.collapsed).toBe(undefined)
     expect(row.getAttribute('data-tip')).toBe(null)
@@ -186,11 +221,19 @@ describe('a row in a rail', () => {
 describe('a row with a tip', () => {
   it('shows the tip at full width, its name in a rail, and never the browser tooltip too', () => {
     const [rail, setRail] = createSignal(false)
-    render(() => (
-      <Row title="Fix the parser" tip="Last active today" tipAt={1000} collapsed={rail() ? <span>●</span> : undefined}>
-        Fix the parser
-      </Row>
-    ), host)
+    render(
+      () => (
+        <Row
+          title="Fix the parser"
+          tip="Last active today"
+          tipAt={1000}
+          collapsed={rail() ? <span>●</span> : undefined}
+        >
+          Fix the parser
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector<HTMLElement>('.ui-row')!
     expect(row.getAttribute('data-tip')).toBe('Last active today')
     expect(row.getAttribute('data-tip-at')).toBe('1000')
@@ -204,7 +247,14 @@ describe('a row with a tip', () => {
 describe('a stacked row', () => {
   it('drops its variant in a rail, which would pin the mark to the top', () => {
     const [rail, setRail] = createSignal(false)
-    render(() => <Row variant="stacked" collapsed={rail() ? <span>●</span> : undefined}>Fix the parser</Row>, host)
+    render(
+      () => (
+        <Row variant="stacked" collapsed={rail() ? <span>●</span> : undefined}>
+          Fix the parser
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector<HTMLElement>('.ui-row')!
     expect(row.dataset.variant).toBe('stacked')
     setRail(true)
@@ -214,7 +264,14 @@ describe('a stacked row', () => {
 
 describe('a rail form sent as data', () => {
   it('collapses a row from an icon name alone and keeps the label as its tip', () => {
-    render(() => <Row collapsedIcon="git-branch" label="feature/login" onPress={() => {}}>the full row</Row>, host)
+    render(
+      () => (
+        <Row collapsedIcon="git-branch" label="feature/login" onPress={() => {}}>
+          the full row
+        </Row>
+      ),
+      host,
+    )
     const row = host.querySelector('.ui-row')!
     expect(row.hasAttribute('data-collapsed')).toBe(true)
     expect(row.getAttribute('data-tip')).toBe('feature/login')

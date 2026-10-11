@@ -41,9 +41,7 @@ export function createRailDrag(options: {
     }
     event.preventDefault()
     const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('.tabrail-item')
-    const target = row?.dataset.taskId
-      ? options.items().find((item) => item.id === row.dataset.taskId)
-      : undefined
+    const target = row?.dataset.taskId ? options.items().find((item) => item.id === row.dataset.taskId) : undefined
     if (!row || !target || !canDropOn(gesture.id, target)) return setDropTarget(null)
     setDropTarget({ id: target.id, position: positionAt(event.clientY, row) })
   }

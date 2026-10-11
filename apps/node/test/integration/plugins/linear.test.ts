@@ -27,7 +27,8 @@ vi.mock('@acorn/plugin-linear/server/index.ts', async (importOriginal) => {
 
 const ENC_KEY = 'b'.repeat(64)
 const env = () => ({ ...testSecretEnv(ENC_KEY) }) as unknown as Env
-const graphQl = (data: unknown) => new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } })
+const graphQl = (data: unknown) =>
+  new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } })
 
 const node = (title: string, overrides: Partial<LinearNode> = {}): LinearNode => ({
   id: `issue-${title}`,
@@ -57,18 +58,28 @@ describe('Linear provider parity', () => {
       await next()
     })
     // Through the portable carrier, exactly as production mounts it: linear has no compiled router
-    // to hand `app.route` any more. `servePluginFetch` builds the identity-bound request context the
+    // to hand `app.route`. `servePluginFetch` builds the identity-bound request context the
     // routes' helpers require.
     const fetch = createLinearFetch()
     app.all('/api/linear/*', (c) => servePluginFetch(c, { pluginId: 'linear', mount: '/api/linear', fetch }))
     await t.db.insert(schema.integrations).values([
       {
-        id: 'linear-a', userId: 'james', provider: 'linear', label: 'Linear A',
-        encryptedCredentials: await encryptSecret('token-a', ENC_KEY), createdAt: 1, updatedAt: 1,
+        id: 'linear-a',
+        userId: 'james',
+        provider: 'linear',
+        label: 'Linear A',
+        encryptedCredentials: await encryptSecret('token-a', ENC_KEY),
+        createdAt: 1,
+        updatedAt: 1,
       },
       {
-        id: 'linear-b', userId: 'james', provider: 'linear', label: 'Linear B',
-        encryptedCredentials: await encryptSecret('token-b', ENC_KEY), createdAt: 2, updatedAt: 2,
+        id: 'linear-b',
+        userId: 'james',
+        provider: 'linear',
+        label: 'Linear B',
+        encryptedCredentials: await encryptSecret('token-b', ENC_KEY),
+        createdAt: 2,
+        updatedAt: 2,
       },
     ])
   })
@@ -88,15 +99,26 @@ describe('Linear provider parity', () => {
       activity: [],
     }
     const summary: LinearIssueSummary = detail
-    const cached = linearProvider.codec!.withDetail(linearRef(connectionId, 'ENG-42', detail.url), summary, detail, fetchedAt)
+    const cached = linearProvider.codec!.withDetail(
+      linearRef(connectionId, 'ENG-42', detail.url),
+      summary,
+      detail,
+      fetchedAt,
+    )
     await t.db.insert(schema.issues).values({
-      userId: 'james', integrationId: connectionId, provider: 'linear', identifier: 'ENG-42',
-      data: JSON.stringify(cached), fetchedAt,
+      userId: 'james',
+      integrationId: connectionId,
+      provider: 'linear',
+      identifier: 'ENG-42',
+      data: JSON.stringify(cached),
+      fetchedAt,
     })
   }
 
   it('uses connectionId for task-scoped detail reads', async () => {
-    vi.mocked(linearFetch).mockImplementation(async (secret) => graphQl({ issues: { nodes: [node(secret === 'token-b' ? 'Workspace B' : 'Workspace A')] } }))
+    vi.mocked(linearFetch).mockImplementation(async (secret) =>
+      graphQl({ issues: { nodes: [node(secret === 'token-b' ? 'Workspace B' : 'Workspace A')] } }),
+    )
 
     const response = await app.fetch(
       new Request('http://acorn.test/api/linear/issues/ENG-42?refresh=1&integration=linear-b'),
@@ -110,11 +132,11 @@ describe('Linear provider parity', () => {
 
   // The reference-panel path, and the one with no connection to name: github scans `ENG-42` out of a
   // PR body and cannot know which connected Linear owns it. Asking each workspace in turn is the
-  // resolution. It replaced a hand-rolled cache read plus a second fan-out, so this is the case that
-  // has to keep working, and the one nothing covered before.
+  // resolution.
   it('resolves a bare identifier by asking each connection until one answers', async () => {
     vi.mocked(linearFetch).mockImplementation(async (secret) =>
-      graphQl({ issues: { nodes: secret === 'token-b' ? [node('Workspace B')] : [] } }))
+      graphQl({ issues: { nodes: secret === 'token-b' ? [node('Workspace B')] : [] } }),
+    )
 
     const response = await app.fetch(new Request('http://acorn.test/api/linear/issues/ENG-42?refresh=1'), env())
 
@@ -135,8 +157,8 @@ describe('Linear provider parity', () => {
   // The declarative rail source. This router carries no `projects` scope, the loaded package's does,
   // so nothing is mapped for any connection here.
   it('contributes no rows when a connection has no linked projects, rather than the viewer’s own issues', async () => {
-    // The fallback this replaces showed whatever was assigned to you, which answered a question nobody
-    // asked and whose rows belonged to no project in the workspace. The rail says so instead, through the
+    // Falling back to whatever is assigned to you would answer a question nobody asked, with rows that
+    // belong to no project in the workspace. The rail says so instead, through the
     // source's authored `emptyState` (docs/integrations/linear.md § Linear).
     vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [node('Urgent')] } }))
 
@@ -144,7 +166,7 @@ describe('Linear provider parity', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ items: [] })
-    // And it costs no provider call at all, which the fallback did once per connection on every visit.
+    // And it costs no provider call at all, where a fallback would cost one per connection on every visit.
     expect(linearFetch).not.toHaveBeenCalled()
   })
 
@@ -184,9 +206,14 @@ describe('Linear provider parity', () => {
     await cacheDetail('linear-b', 'Workspace B')
     await cacheDetail('linear-a', 'Workspace A')
 
-    const response = await app.fetch(new Request('http://acorn.test/api/linear/issues', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifiers: ['ENG-42'] }),
-    }), env())
+    const response = await app.fetch(
+      new Request('http://acorn.test/api/linear/issues', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identifiers: ['ENG-42'] }),
+      }),
+      env(),
+    )
 
     expect(response.status).toBe(200)
     // The host's ref-resolver shape, not a Linear-flavoured one: a bare array, `label` rather than
@@ -196,11 +223,18 @@ describe('Linear provider parity', () => {
   })
 
   it('uses first-hit-wins for uncached bare identifiers', async () => {
-    vi.mocked(linearFetch).mockImplementation(async (secret) => graphQl({ issues: { nodes: [node(secret === 'token-a' ? 'Workspace A' : 'Workspace B')] } }))
+    vi.mocked(linearFetch).mockImplementation(async (secret) =>
+      graphQl({ issues: { nodes: [node(secret === 'token-a' ? 'Workspace A' : 'Workspace B')] } }),
+    )
 
-    const response = await app.fetch(new Request('http://acorn.test/api/linear/issues', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifiers: ['ENG-42'] }),
-    }), env())
+    const response = await app.fetch(
+      new Request('http://acorn.test/api/linear/issues', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identifiers: ['ENG-42'] }),
+      }),
+      env(),
+    )
 
     expect(response.status).toBe(200)
     expect((await response.json()) as PluginRefResolutionBody[]).toMatchObject([{ label: 'Workspace A' }])
@@ -222,7 +256,9 @@ describe('Linear provider parity', () => {
   })
 
   it('keeps project browse explicit, active-only, and preserves suggested branches', async () => {
-    vi.mocked(linearFetch).mockResolvedValueOnce(graphQl({ issues: { nodes: [node('Project issue', { branchName: 'eng-42-project' })] } }))
+    vi.mocked(linearFetch).mockResolvedValueOnce(
+      graphQl({ issues: { nodes: [node('Project issue', { branchName: 'eng-42-project' })] } }),
+    )
 
     const response = await app.fetch(
       new Request('http://acorn.test/api/linear/project-issues?integration=linear-b&ids=project-1'),

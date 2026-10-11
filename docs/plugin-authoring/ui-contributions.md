@@ -62,7 +62,7 @@ revision the owner checks before your row runs. [An extension example](./extensi
 `file.row` row.
 
 Rail menus are desktop-only, so use a command or a visible control when an action must also work in
-the terminal. These locations need a Node and desktop release that knows them. API major 3 alone
+the terminal. These locations need a Node and desktop release that knows them. The API major alone
 doesn't make an older release accept a location. [Context menus](../plugins/menus-and-markers.md#context-menus)
 covers what the host binds.
 

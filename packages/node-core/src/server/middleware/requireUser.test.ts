@@ -24,9 +24,7 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v1/core/plugins'], // node administration: which plugins this node runs (routes/plugins.ts)
   ['GET', '/v1/p/changes/tasks/t1/review-notes'],
   ['GET', '/v1/p/notes/tasks/t1/notes'],
-  ['GET', '/v1/p/linear/projects'],
   ['GET', '/v1/p/rollbar/items'],
-  ['GET', '/v1/p/github/pins'],
   ['GET', '/v1/p/github/repos'],
   ['GET', '/v1/p/github/repos/o/r/labels'],
   ['GET', '/v1/p/github/repos/o/r/pulls'],
@@ -63,7 +61,7 @@ describe('requireUser gate over the protected router table', () => {
 
   it('leaves the two pairing routes outside the gate (they are how a client gets a credential)', async () => {
     // GET /v1/node is the one /v1 route an unpaired client may read; it answers 200 with the
-    // pairing-only projection. Behaviour lives in apps/node/test/integration/pairing.test.ts; here we
+    // pairing-only projection. Behaviour lives in apps/node/test/integration/auth/pairing.test.ts; here we
     // only assert it is not behind requireUser, because that is this file's contract.
     const res = await createApp().fetch(new Request('http://127.0.0.1:4317/v1/node'), {} as Env)
     expect(res.status).toBe(200)
@@ -71,16 +69,20 @@ describe('requireUser gate over the protected router table', () => {
 
   it('shows the background instance ID only to an authenticated device', async () => {
     const env = {
-      NODE_ID: 'node-one', NODE_FINGERPRINT: 'fingerprint', SERVICE_INSTANCE_ID: '00000000-0000-4000-8000-000000000001',
+      NODE_ID: 'node-one',
+      NODE_FINGERPRINT: 'fingerprint',
+      SERVICE_INSTANCE_ID: '00000000-0000-4000-8000-000000000001',
       DEVICES: { authenticate: async () => ({ deviceId: 'device-one' }) },
       ACTIVE_IDENTITY: { get: () => 'owner-one' },
     } as unknown as Env
     const app = createApp()
     const url = 'http://127.0.0.1:4317/v1/node'
-    const publicInfo = await (await app.fetch(new Request(url), env)).json() as Record<string, unknown>
+    const publicInfo = (await (await app.fetch(new Request(url), env)).json()) as Record<string, unknown>
     expect(publicInfo.nodeId).toBeUndefined()
     expect(publicInfo.serviceInstanceId).toBeUndefined()
-    const privateInfo = await (await app.fetch(new Request(url, { headers: { authorization: 'Bearer device-token' } }), env)).json() as Record<string, unknown>
+    const privateInfo = (await (
+      await app.fetch(new Request(url, { headers: { authorization: 'Bearer device-token' } }), env)
+    ).json()) as Record<string, unknown>
     expect(privateInfo).toMatchObject({ nodeId: 'node-one', serviceInstanceId: env.SERVICE_INSTANCE_ID })
   })
 

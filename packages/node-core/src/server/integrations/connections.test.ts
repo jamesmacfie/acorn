@@ -55,9 +55,7 @@ const connectionOnlyProvider = publicConnectionProvider({
       }
     },
     async test(secret) {
-      return secret === 'rejected'
-        ? { ok: false, error: 'provider_needs_auth' as const }
-        : { ok: true }
+      return secret === 'rejected' ? { ok: false, error: 'provider_needs_auth' as const } : { ok: true }
     },
   },
   capabilities: { textGeneration: true },
@@ -103,8 +101,9 @@ describe('connection-only provider lifecycle', () => {
     expect(afterRotate.name).toBe('Work')
     expect(connectionName(afterRotate)).toBe('Work')
 
-    await expect(renameConnection(testDb.db, 'alice', connected.id, 'x'.repeat(MAX_CONNECTION_NAME + 1)))
-      .rejects.toMatchObject({ code: 'provider_bad_config' })
+    await expect(
+      renameConnection(testDb.db, 'alice', connected.id, 'x'.repeat(MAX_CONNECTION_NAME + 1)),
+    ).rejects.toMatchObject({ code: 'provider_bad_config' })
 
     // Blank and null both mean "go back to the provider's label" rather than storing an empty name.
     // The summary drops the key rather than sending `name: null`, so a client reads one absent field.
@@ -134,20 +133,11 @@ describe('connection-only provider lifecycle', () => {
     expect(await SECRETS.reveal(stored.encryptedCredentials, 'test')).toBe('first-key')
     expect(stored.config).toBe('{"safe":true}')
 
-    await expect(connectProvider(
-      testDb.db,
-      'alice',
-      { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } },
-      SECRETS,
-    )).rejects.toMatchObject({ code: 'provider_bad_config' })
+    await expect(
+      connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } }, SECRETS),
+    ).rejects.toMatchObject({ code: 'provider_bad_config' })
 
-    await rotateConnection(
-      testDb.db,
-      'alice',
-      connected.id,
-      { credentials: { apiKey: 'rotated-key' } },
-      SECRETS,
-    )
+    await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: 'rotated-key' } }, SECRETS)
     const [rotated] = await testDb.db.select().from(schema.integrations)
     expect(await SECRETS.reveal(rotated.encryptedCredentials, 'test')).toBe('rotated-key')
 
@@ -163,18 +153,26 @@ describe('connection-only provider lifecycle', () => {
     expect(() => externalRefForConnection(rotated, 'ITEM-1')).toThrow(ProviderOperationError)
     // The code is the contract; the message is the reason, and a connection-only provider has no
     // entry in the integration registry to stamp a reference with.
-    expect(() => externalRefForConnection(rotated, 'ITEM-1'))
-      .toThrow(expect.objectContaining({ code: 'provider_bad_config', message: expect.stringContaining('No integration provider named') }))
+    expect(() => externalRefForConnection(rotated, 'ITEM-1')).toThrow(
+      expect.objectContaining({
+        code: 'provider_bad_config',
+        message: expect.stringContaining('No integration provider named'),
+      }),
+    )
 
     await disconnectConnection(testDb.db, 'alice', connected.id)
     expect(await testDb.db.select().from(schema.integrations)).toEqual([])
   })
 
-  // Every status write announces itself, which is what defect 4 in docs/plugins/events.md § Hearing a core event was
-  // about: four writers flipped a connection to `needs-auth` and none of them said so, so a second
-  // client and every integration plugin found out from the next 401.
+  // Every status write announces itself (docs/plugins/events.md § Hearing a core event), so a second
+  // client and every integration plugin hear about `needs-auth` before the next 401.
   it('broadcasts connection:changed on every status write', async () => {
-    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } }, SECRETS)
+    const connected = await connectProvider(
+      testDb.db,
+      'alice',
+      { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
+      SECRETS,
+    )
     await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: 'rotated-key' } }, SECRETS)
     await testConnection(testDb.db, 'alice', connected.id, SECRETS)
     await setConnectionDisabled(testDb.db, 'alice', connected.id, true)
@@ -192,23 +190,69 @@ describe('connection-only provider lifecycle', () => {
 
   it('broadcasts the demotion nobody asked for', async () => {
     // `rejected` is what this provider's `test` treats as a revoked credential, so this is the shape of
-    // the failure a client currently discovers by getting a 401 back.
-    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'rejected' } }, SECRETS)
+    // the failure a client would otherwise discover by getting a 401 back.
+    const connected = await connectProvider(
+      testDb.db,
+      'alice',
+      { providerId: PROVIDER_ID, credentials: { apiKey: 'rejected' } },
+      SECRETS,
+    )
     broadcasts.length = 0
 
-    await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({ status: 'needs-auth' })
+    await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({
+      status: 'needs-auth',
+    })
 
-    expect(broadcasts).toEqual([{ channel: 'connection:changed', integrationId: connected.id, providerId: PROVIDER_ID, status: 'needs-auth' }])
+    expect(broadcasts).toEqual([
+      { channel: 'connection:changed', integrationId: connected.id, providerId: PROVIDER_ID, status: 'needs-auth' },
+    ])
   })
 
   it('announces deletion after cascading connection-owned mappings and task links', async () => {
-    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } }, SECRETS)
+    const connected = await connectProvider(
+      testDb.db,
+      'alice',
+      { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
+      SECRETS,
+    )
     const now = Date.now()
-    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-one', name: 'One', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-    await testDb.db.insert(schema.projects).values({ id: 'project-one', name: 'One', path: null, workspaceId: 'workspace-one', sort: 0, hidden: false, createdAt: now, updatedAt: now })
-    await testDb.db.insert(schema.tasks).values({ id: 'task-one', title: 'One', origin: 'local', projectId: 'project-one', status: 'active', sort: 0, createdAt: now, updatedAt: now })
-    await testDb.db.insert(schema.workspaceExternalProjects).values({ workspaceId: 'workspace-one', integrationId: connected.id, externalId: 'remote-one', projectId: '', createdAt: now })
-    await testDb.db.insert(schema.taskLinks).values({ taskId: 'task-one', integrationId: connected.id, provider: PROVIDER_ID, identifier: 'ITEM-1', createdAt: now })
+    await testDb.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-one', name: 'One', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.projects).values({
+      id: 'project-one',
+      name: 'One',
+      path: null,
+      workspaceId: 'workspace-one',
+      sort: 0,
+      hidden: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await testDb.db.insert(schema.tasks).values({
+      id: 'task-one',
+      title: 'One',
+      origin: 'local',
+      projectId: 'project-one',
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await testDb.db.insert(schema.workspaceExternalProjects).values({
+      workspaceId: 'workspace-one',
+      integrationId: connected.id,
+      externalId: 'remote-one',
+      projectId: '',
+      createdAt: now,
+    })
+    await testDb.db.insert(schema.taskLinks).values({
+      taskId: 'task-one',
+      integrationId: connected.id,
+      provider: PROVIDER_ID,
+      identifier: 'ITEM-1',
+      createdAt: now,
+    })
     broadcasts.length = 0
 
     await disconnectConnection(testDb.db, 'alice', connected.id)
@@ -224,18 +268,8 @@ describe('connection-only provider lifecycle', () => {
 
   it('serializes concurrent creates when a provider limits connection count', async () => {
     const attempts = await Promise.allSettled([
-      connectProvider(
-        testDb.db,
-        'alice',
-        { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
-        SECRETS,
-      ),
-      connectProvider(
-        testDb.db,
-        'alice',
-        { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } },
-        SECRETS,
-      ),
+      connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } }, SECRETS),
+      connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } }, SECRETS),
     ])
 
     expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1)

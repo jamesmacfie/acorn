@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 
-export type ConfigTrustRequest = { taskId: string; retry?: () => Promise<unknown> }
+type ConfigTrustRequest = { taskId: string; retry?: () => Promise<unknown> }
 
 const [configTrustRequest, setConfigTrustRequest] = createSignal<ConfigTrustRequest | null>(null)
 export { configTrustRequest }

@@ -6,19 +6,12 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { Disposable } from '../../../kit/lib/state/registry'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
-import {
-  appearanceStyle,
-  themeFollowsSystem,
-} from '../../../features/settings/appearancePrefs'
+import { appearanceStyle, themeFollowsSystem } from '../../../features/settings/appearancePrefs'
 import { parseNotificationSettings, readNotificationSettings } from '../../../features/notifications/settings'
 import { settingsRegistry } from '../shell/settings'
 import { CORE_SETTINGS_PAGES } from '../../../features/settings/corePages'
 import { buildCommandGraph } from './graph'
-import {
-  appearanceCommands,
-  notificationCommands,
-  settingsPageCommands,
-} from './coreCommands'
+import { appearanceCommands, notificationCommands, settingsPageCommands } from './coreCommands'
 import { commandRegistry, type CommandContribution, type SettingCommand } from './commands'
 import { DETACHED_COMMAND_CONTEXT } from './commands'
 
@@ -82,9 +75,10 @@ describe('the appearance settings', () => {
 
   it('shows the theme the follow switch makes applicable, and only that one', () => {
     register(appearanceCommands(qc))
-    const available = (): string[] => [...buildCommandGraph(commandRegistry.entries()).nodes.values()]
-      .filter((node) => node.available && node.id.startsWith('core.appearance.theme'))
-      .map((node) => node.id)
+    const available = (): string[] =>
+      [...buildCommandGraph(commandRegistry.entries()).nodes.values()]
+        .filter((node) => node.available && node.id.startsWith('core.appearance.theme'))
+        .map((node) => node.id)
     // Following the OS: a light theme and a dark theme.
     expect(available()).toEqual(['core.appearance.theme-light', 'core.appearance.theme-dark'])
 
@@ -109,8 +103,9 @@ describe('the notification settings', () => {
     expect(stored.events.blocked).toBe(true)
     expect(stored.events.error).toBe(true)
     // And the page's parser reads back what the command wrote.
-    expect(parseNotificationSettings(qc.getQueryData<Record<string, string>>(prefsKey)?.[PrefKeys.notifications]))
-      .toEqual(stored)
+    expect(
+      parseNotificationSettings(qc.getQueryData<Record<string, string>>(prefsKey)?.[PrefKeys.notifications]),
+    ).toEqual(stored)
   })
 
   it('is idempotent, and reports the value that was actually stored', async () => {
@@ -148,40 +143,77 @@ describe('the Settings pages', () => {
     }
     const off = install('off')
     expect(off.rows.find((row) => row.id === 'core.settings.pages.workspaces')?.command.hint).toBe('Projects')
-    expect(off.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords)
-      .toContain('Switch to the last project')
+    expect(off.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords).toContain(
+      'Switch to the last project',
+    )
     expect(off.rows.some((row) => row.command.keywords?.includes('new workspace'))).toBe(false)
     for (const registration of off.registrations.reverse()) registration.dispose()
 
     const on = install('on')
-    expect(on.rows.find((row) => row.id === 'core.settings.pages.workspaces')?.command.hint).toBe('Workspaces and projects')
-    expect(on.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords)
-      .toContain('Switch to the last workspace')
+    expect(on.rows.find((row) => row.id === 'core.settings.pages.workspaces')?.command.hint).toBe(
+      'Workspaces and projects',
+    )
+    expect(on.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords).toContain(
+      'Switch to the last workspace',
+    )
     for (const registration of on.registrations.reverse()) registration.dispose()
   })
 
-  it('generates one row per page in the rail\'s order, whatever group the page is in', () => {
+  it("generates one row per page in the rail's order, whatever group the page is in", () => {
     const opened: string[] = []
-    held.push(settingsRegistry.register({
-      id: 'runs', label: 'Run history', category: 'automation', order: 20, component: () => null,
-    }))
-    held.push(settingsRegistry.register({
-      id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', category: 'general', scope: 'device', order: 30, component: () => null,
-    }))
-    held.push(settingsRegistry.register({
-      id: 'appearance', label: 'Appearance', category: 'general', scope: 'device', order: 10, component: () => null,
-    }))
+    held.push(
+      settingsRegistry.register({
+        id: 'runs',
+        label: 'Run history',
+        category: 'automation',
+        order: 20,
+        component: () => null,
+      }),
+    )
+    held.push(
+      settingsRegistry.register({
+        id: 'shortcuts',
+        label: 'Shortcuts',
+        title: 'Keyboard shortcuts',
+        category: 'general',
+        scope: 'device',
+        order: 30,
+        component: () => null,
+      }),
+    )
+    held.push(
+      settingsRegistry.register({
+        id: 'appearance',
+        label: 'Appearance',
+        category: 'general',
+        scope: 'device',
+        order: 10,
+        component: () => null,
+      }),
+    )
     // A workspace page names no workspace on its own; settings draws it inside the workspace it picks.
-    held.push(settingsRegistry.register({
-      id: 'workspace.detail', label: 'Workspace', group: 'workspace', order: 0, component: () => null,
-    }))
+    held.push(
+      settingsRegistry.register({
+        id: 'workspace.detail',
+        label: 'Workspace',
+        group: 'workspace',
+        order: 0,
+        component: () => null,
+      }),
+    )
 
     register(settingsPageCommands((page) => opened.push(page)))
     const graph = buildCommandGraph(commandRegistry.entries())
-    expect(graph.children('core.settings.pages').map((node) => node.title))
-      .toEqual(['Appearance', 'Keyboard shortcuts', 'Run history'])
-    expect(graph.children('core.settings.pages').map((node) => node.command.hint))
-      .toEqual(['General', 'General', 'Automation'])
+    expect(graph.children('core.settings.pages').map((node) => node.title)).toEqual([
+      'Appearance',
+      'Keyboard shortcuts',
+      'Run history',
+    ])
+    expect(graph.children('core.settings.pages').map((node) => node.command.hint)).toEqual([
+      'General',
+      'General',
+      'Automation',
+    ])
 
     createRoot((dispose) => {
       const row = graph.children('core.settings.pages')[0]
@@ -193,10 +225,17 @@ describe('the Settings pages', () => {
 
   it('adds a row per declared section after the page rows, matching its rows and keywords', () => {
     const opened: string[] = []
-    held.push(settingsRegistry.register({
-      id: 'terminal', label: 'Terminal', category: 'features', scope: 'device', order: 10, component: () => null,
-      sections: [{ id: 'drawer', label: 'Drawer', rows: ['Default profile'], keywords: ['shell'] }],
-    }))
+    held.push(
+      settingsRegistry.register({
+        id: 'terminal',
+        label: 'Terminal',
+        category: 'features',
+        scope: 'device',
+        order: 10,
+        component: () => null,
+        sections: [{ id: 'drawer', label: 'Drawer', rows: ['Default profile'], keywords: ['shell'] }],
+      }),
+    )
 
     register(settingsPageCommands((target) => opened.push(target)))
     const rows = buildCommandGraph(commandRegistry.entries()).children('core.settings.pages')
@@ -204,7 +243,9 @@ describe('the Settings pages', () => {
     expect(rows[1].command.keywords).toEqual(['Default profile', 'shell'])
 
     createRoot((dispose) => {
-      void (rows[1].command as { run: (context: typeof DETACHED_COMMAND_CONTEXT) => void }).run(DETACHED_COMMAND_CONTEXT)
+      void (rows[1].command as { run: (context: typeof DETACHED_COMMAND_CONTEXT) => void }).run(
+        DETACHED_COMMAND_CONTEXT,
+      )
       dispose()
     })
     expect(opened).toEqual(['terminal#drawer'])

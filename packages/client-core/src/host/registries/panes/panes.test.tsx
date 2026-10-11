@@ -2,7 +2,14 @@ import { createResource, createSignal, ErrorBoundary, lazy, onCleanup, type Comp
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
-import { PANE_PREFETCH_HOVER_MS, paneAvailable, paneRegistry, schedulePanePrefetch, type PaneContribution, type PaneLayoutContribution } from './panes'
+import {
+  PANE_PREFETCH_HOVER_MS,
+  paneAvailable,
+  paneRegistry,
+  schedulePanePrefetch,
+  type PaneContribution,
+  type PaneLayoutContribution,
+} from './panes'
 import type { Task } from '../../../infra/queries'
 import { _resetPaneModels } from './paneModels'
 import {
@@ -22,7 +29,10 @@ const task = { id: 't1', projectId: 'p1' } as unknown as Task
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the registry is heterogeneous by construction
 const pane = (over: Partial<PaneLayoutContribution<any>> = {}): PaneLayoutContribution<any> => ({
-  id: 'notes', label: 'Notes', glyph: 'notepad-text', order: 30,
+  id: 'notes',
+  label: 'Notes',
+  glyph: 'notepad-text',
+  order: 30,
   layout: 'list-detail',
   regions: { list: () => <span data-region="list" />, detail: () => <span data-region="detail" /> },
   ...over,
@@ -64,33 +74,33 @@ describe('a pane that declares a layout', () => {
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
     // `lazy` on the layout module, so the first paint is empty and the regions arrive once the
-    // dynamic import settles. The budget is two seconds rather than a quarter of one: this used to
-    // fail intermittently in a full `pnpm test`, where a cold dynamic import competes with every other
-    // project's workers, and never on its own. A generous ceiling on a condition poll costs nothing
-    // when it is met on the first try.
+    // dynamic import settles. The budget is two seconds rather than a quarter of one: in a full
+    // `pnpm test` a cold dynamic import competes with every other project's workers. A generous
+    // ceiling on a condition poll costs nothing when it is met on the first try.
     for (let tries = 0; tries < 400 && !host.querySelector('[data-region]'); tries++) {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
-    expect([...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region')))
-      .toEqual(['list', 'detail'])
+    expect([...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region'))).toEqual([
+      'list',
+      'detail',
+    ])
   })
 
   // At registration rather than at render: finding it when someone opens the pane means finding it in
   // front of a user.
   it('throws at registration for a missing required region', () => {
-    expect(() => register(pane({ regions: { list: () => <span /> } })))
-      .toThrow(/needs a detail region/)
+    expect(() => register(pane({ regions: { list: () => <span /> } }))).toThrow(/needs a detail region/)
     expect(paneRegistry.get('notes')).toBeUndefined()
   })
 
   it('throws at registration for a region the layout does not have', () => {
-    expect(() => register(pane({ layout: 'single', regions: { body: () => <span />, sidebar: () => <span /> } })))
-      .toThrow(/has no sidebar region/)
+    expect(() =>
+      register(pane({ layout: 'single', regions: { body: () => <span />, sidebar: () => <span /> } })),
+    ).toThrow(/has no sidebar region/)
   })
 
   it('throws at registration for a layout this build does not draw', () => {
-    expect(() => register(pane({ layout: 'carousel' as PaneLayoutContribution['layout'] })))
-      .toThrow(/unknown layout/)
+    expect(() => register(pane({ layout: 'carousel' as PaneLayoutContribution['layout'] }))).toThrow(/unknown layout/)
   })
 })
 
@@ -105,10 +115,12 @@ describe('the model a pane’s regions share', () => {
       seen.push(props.model)
       return <span data-region="r" />
     }
-    register(pane({
-      model: () => ({ id: ++built }),
-      regions: { list: Region, detail: Region },
-    }))
+    register(
+      pane({
+        model: () => ({ id: ++built }),
+        regions: { list: Region, detail: Region },
+      }),
+    )
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
     // The layout module is behind `lazy`, so the regions arrive once the dynamic import settles. Same
@@ -125,14 +137,22 @@ describe('the model a pane’s regions share', () => {
   // it shows as read, and doing that from a held model cleared "Needs you" on unseen sessions.
   it('tells the model whether its pane is drawing the task', async () => {
     let shown: (() => boolean) | undefined
-    register(pane({
-      model: (_task: Task, view: { shown: () => boolean }) => {
-        shown = view.shown
-        return {}
-      },
-      // Read, because the model is built when a region first asks for it.
-      regions: { list: (props: { model: object }) => { void props.model; return <span /> }, detail: () => <span /> },
-    }))
+    register(
+      pane({
+        model: (_task: Task, view: { shown: () => boolean }) => {
+          shown = view.shown
+          return {}
+        },
+        // Read, because the model is built when a region first asks for it.
+        regions: {
+          list: (props: { model: object }) => {
+            void props.model
+            return <span />
+          },
+          detail: () => <span />,
+        },
+      }),
+    )
     const Pane = paneRegistry.get('notes')!.component
     const [open, setOpen] = createSignal(true)
     dispose = render(() => <>{open() ? <Pane task={task} /> : null}</>, host)
@@ -163,14 +183,13 @@ describe('the model a pane’s regions share', () => {
   })
 })
 
-// A region draws under a `Suspense` of its own, and that boundary exists for exactly one thing: a
-// `lazy()` region renders as an empty string until its module lands, which the cell host refuses
-// (./panes.ts). Everything else under it shares the boundary, and `@tanstack/solid-query` suspends
-// whenever `.data` is read on an empty cache. So a query that only starts once the region has drawn —
-// a pull request's conflicts, the Linear issues found in its body — used to take the whole region out
-// of the document again for the length of its fetch. The reader watched a rendered diff vanish, and
-// the virtualized scroller inside it came back detached and at the top with no event to say so
-// (docs/diff-rendering.md).
+// A region draws under a `Suspense` of its own, and that boundary exists for one thing: a `lazy()`
+// region renders as an empty string until its module lands (./panes.ts). Everything else under it
+// shares the boundary, and `@tanstack/solid-query` suspends whenever `.data` is read on an empty cache.
+// So a query that only starts once the region has drawn — a pull request's conflicts, the Linear issues
+// found in its body — would take the whole region out of the document again for the length of its
+// fetch: a rendered diff vanishes, and the virtualized scroller inside it comes back detached and at
+// the top with no event to say so (docs/diff-rendering.md).
 //
 // Held by the solid-js patch rather than by anything here: a boundary that has drawn never swaps back
 // to its fallback (patches/README.md). This is the test for it.
@@ -178,16 +197,29 @@ describe('a region that has already drawn', () => {
   it('stays in the document while a later query inside it is in flight', async () => {
     let releaseLate: () => void = () => {}
     const [lateStarted, startLate] = createSignal(false)
-    register(pane({
-      layout: 'single',
-      regions: { body: () => {
-        const [files] = createResource(async () => 'diff')
-        const [late] = createResource(lateStarted, () => new Promise<string>((resolve) => {
-          releaseLate = () => resolve('conflicts')
-        }))
-        return <span data-region="body">{files()}{lateStarted() ? late() : ''}</span>
-      } },
-    }))
+    register(
+      pane({
+        layout: 'single',
+        regions: {
+          body: () => {
+            const [files] = createResource(async () => 'diff')
+            const [late] = createResource(
+              lateStarted,
+              () =>
+                new Promise<string>((resolve) => {
+                  releaseLate = () => resolve('conflicts')
+                }),
+            )
+            return (
+              <span data-region="body">
+                {files()}
+                {lateStarted() ? late() : ''}
+              </span>
+            )
+          },
+        },
+      }),
+    )
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
 
@@ -215,7 +247,12 @@ describe('a region whose code is loading', () => {
   it('draws the host placeholder with the pane label while its neighbour draws', async () => {
     setRegionPlaceholder((props) => <span data-loading>{props.label}</span>)
     let arrive: (module: { default: Component }) => void = () => {}
-    const Detail = lazy(() => new Promise<{ default: Component }>((resolve) => { arrive = resolve }))
+    const Detail = lazy(
+      () =>
+        new Promise<{ default: Component }>((resolve) => {
+          arrive = resolve
+        }),
+    )
     register(pane({ regions: { list: () => <span data-region="list" />, detail: Detail } }))
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
@@ -235,10 +272,11 @@ describe('a region whose code is loading', () => {
 describe('a hover over a task row', () => {
   it('loads the code of the panes the task opens with', async () => {
     const loaded: string[] = []
-    const region = (id: string) => lazy(async () => {
-      loaded.push(id)
-      return { default: () => <span /> }
-    })
+    const region = (id: string) =>
+      lazy(async () => {
+        loaded.push(id)
+        return { default: () => <span /> }
+      })
     register(pane({ regions: { list: () => <span />, detail: region('notes') } }))
     register(pane({ id: 'other', label: 'Other', regions: { list: () => <span />, detail: region('other') } }))
     schedulePanePrefetch(task, {} as never, ['notes'])
@@ -259,11 +297,19 @@ describe('a lazy import that failed', () => {
       return { default: () => <span data-loaded /> }
     })
     let retry: () => void = () => {}
-    dispose = render(() => (
-      <ErrorBoundary fallback={(_error, reset) => { retry = reset; return <span data-failed /> }}>
-        <Flaky />
-      </ErrorBoundary>
-    ), host)
+    dispose = render(
+      () => (
+        <ErrorBoundary
+          fallback={(_error, reset) => {
+            retry = reset
+            return <span data-failed />
+          }}
+        >
+          <Flaky />
+        </ErrorBoundary>
+      ),
+      host,
+    )
     await until(() => !!host.querySelector('[data-failed]'))
     retry()
     await until(() => !!host.querySelector('[data-loaded]'))
@@ -279,7 +325,10 @@ describe('a lazy import that failed', () => {
 describe('the pane contract', () => {
   it('has no keepAlive for a contribution to declare', () => {
     const refused = {
-      id: 'ghost', label: 'Ghost', glyph: 'ghost', order: 99,
+      id: 'ghost',
+      label: 'Ghost',
+      glyph: 'ghost',
+      order: 99,
       component: () => <span />,
       // @ts-expect-error -- the field is deleted; ./paneModels.ts and the query cache are the keep-alive.
       keepAlive: 'dom',
@@ -292,7 +341,9 @@ describe('paneAvailable', () => {
   // The gate the rail and the pane switcher both read (../../../features/tasks/TaskPaneHost.tsx).
   // The seam arm is what keeps the browser preview off a shell that ships without preview views:
   // `'desktop'` said yes to that shell, and the pane then rendered a dead end.
-  afterEach(() => { delete (window as unknown as { acorn?: unknown }).acorn })
+  afterEach(() => {
+    delete (window as unknown as { acorn?: unknown }).acorn
+  })
 
   it('a seam gate follows the host, not the shell', () => {
     const gated = pane({ id: 'preview', requires: { seam: 'preview' } })
@@ -303,7 +354,17 @@ describe('paneAvailable', () => {
     ;(window as unknown as { acorn?: unknown }).acorn = {
       desktop: true,
       platform: 'darwin',
-      preview: { ensure() {}, setBounds() {}, show() {}, hide() {}, load() {}, command() {}, evict() {}, evictAll() {}, onEvent: () => () => {} },
+      preview: {
+        ensure() {},
+        setBounds() {},
+        show() {},
+        hide() {},
+        load() {},
+        command() {},
+        evict() {},
+        evictAll() {},
+        onEvent: () => () => {},
+      },
     }
     expect(paneAvailable(entry)).toBe(true)
   })
@@ -327,22 +388,27 @@ describe('the pane spans', () => {
    *  as far as calling the region, which is the only visible sign of it: a suspended region draws
    *  nothing at all. */
   type Gate = { asked: boolean; resolve: () => void }
-  const suspending = (gate: Gate) => pane({
-    layout: 'single',
-    model: () => ({ built: true }),
-    regions: { body: (props: { model: { built: boolean } }) => {
-      gate.asked = true
-      // Read, because the model is behind a getter on purpose: a pane that switches task hands its
-      // regions the new task's model without remounting them, so nothing is built until a region
-      // asks.
-      const built = props.model.built
-      const [ready] = createResource(async () => {
-        await new Promise<void>((resolve) => { gate.resolve = resolve })
-        return built ? 'drawn' : 'no model'
-      })
-      return <span data-region="body">{ready()}</span>
-    } },
-  })
+  const suspending = (gate: Gate) =>
+    pane({
+      layout: 'single',
+      model: () => ({ built: true }),
+      regions: {
+        body: (props: { model: { built: boolean } }) => {
+          gate.asked = true
+          // Read, because the model is behind a getter on purpose: a pane that switches task hands its
+          // regions the new task's model without remounting them, so nothing is built until a region
+          // asks.
+          const built = props.model.built
+          const [ready] = createResource(async () => {
+            await new Promise<void>((resolve) => {
+              gate.resolve = resolve
+            })
+            return built ? 'drawn' : 'no model'
+          })
+          return <span data-region="body">{ready()}</span>
+        },
+      },
+    })
 
   // The layout module is behind `lazy`, so nothing happens on the first paint. Same generous poll as
   // the tests above, for the same reason.
@@ -373,7 +439,12 @@ describe('the pane spans', () => {
     gate.resolve()
     await until(() => spansNamed('pane.region').length > 0)
     const [span] = spansNamed('pane.region')
-    expect(span?.attrs).toMatchObject({ 'pane.id': 'notes', 'pane.region': 'body', owner: 'notes', runtime: 'renderer' })
+    expect(span?.attrs).toMatchObject({
+      'pane.id': 'notes',
+      'pane.region': 'body',
+      owner: 'notes',
+      runtime: 'renderer',
+    })
     expect(host.querySelector('[data-region]')?.textContent).toBe('drawn')
   })
 

@@ -1,8 +1,8 @@
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 
 // Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect. See
-// docs/ui-design/interaction.md § Menus and right-click for why this exists, what it leaves to focus.ts and the
-// call site, and why the portal matters.
+// docs/ui-design/interaction.md § Menus and right-click for why this exists, what it leaves to the
+// focus trap and the call site, and why the portal matters.
 
 export type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
 
@@ -58,20 +58,34 @@ export function anchoredPosition(
   const above = rect.top
   const right = viewport.width - rect.right
   const leftRoom = rect.left
-  let top = placement === 'top-start' ? rect.top - surface.height - GAP
-    : placement === 'right-start' ? rect.top
-    : rect.bottom + GAP
-  let left = placement === 'bottom-end' ? rect.right - Math.max(surface.width, rect.width)
-    : placement === 'right-start' ? rect.right + GAP
-    : rect.left
+  let top =
+    placement === 'top-start'
+      ? rect.top - surface.height - GAP
+      : placement === 'right-start'
+        ? rect.top
+        : rect.bottom + GAP
+  let left =
+    placement === 'bottom-end'
+      ? rect.right - Math.max(surface.width, rect.width)
+      : placement === 'right-start'
+        ? rect.right + GAP
+        : rect.left
 
-  if (canFlip && (placement === 'bottom-start' || placement === 'bottom-end')
-    && top + surface.height + GAP > viewport.height && above > below) {
+  if (
+    canFlip &&
+    (placement === 'bottom-start' || placement === 'bottom-end') &&
+    top + surface.height + GAP > viewport.height &&
+    above > below
+  ) {
     top = rect.top - surface.height - GAP
   } else if (canFlip && placement === 'top-start' && top < GAP && below > above) {
     top = rect.bottom + GAP
-  } else if (canFlip && placement === 'right-start'
-    && left + surface.width + GAP > viewport.width && leftRoom > right) {
+  } else if (
+    canFlip &&
+    placement === 'right-start' &&
+    left + surface.width + GAP > viewport.width &&
+    leftRoom > right
+  ) {
     left = rect.left - surface.width - GAP
   }
 
@@ -149,18 +163,26 @@ export function createAnchoredPopover(opts: {
           elementOf(target) !== undefined,
         )
       : {
-          top: placement === 'top-start' ? rect.top - height - GAP
-            : placement === 'right-start' ? rect.top
-            : rect.bottom + GAP,
-          left: placement === 'bottom-end' ? rect.right - Math.max(width, rect.width)
-            : placement === 'right-start' ? rect.right + GAP
-            : rect.left,
+          top:
+            placement === 'top-start'
+              ? rect.top - height - GAP
+              : placement === 'right-start'
+                ? rect.top
+                : rect.bottom + GAP,
+          left:
+            placement === 'bottom-end'
+              ? rect.right - Math.max(width, rect.width)
+              : placement === 'right-start'
+                ? rect.right + GAP
+                : rect.left,
         }
     setPos({
       ...placed,
-      ...(minWidth === 'anchor' ? { width: rect.width }
-        : typeof minWidth === 'number' ? { width: Math.max(rect.width, minWidth) }
-        : {}),
+      ...(minWidth === 'anchor'
+        ? { width: rect.width }
+        : typeof minWidth === 'number'
+          ? { width: Math.max(rect.width, minWidth) }
+          : {}),
     })
   }
 
@@ -235,7 +257,9 @@ export function createAnchoredPopover(opts: {
     close,
     show,
     position: pos,
-    setSurface: (element) => { surface = element },
+    setSurface: (element) => {
+      surface = element
+    },
     surfaceStyle: () => {
       const p = pos()
       return {

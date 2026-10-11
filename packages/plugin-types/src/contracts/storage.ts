@@ -12,4 +12,3 @@ export type PluginStorage = {
  *  one framework that crosses the loaded-tier line (docs/plugins/publishing.md § What is published). Declare
  *  `drizzle-orm` as your own dependency and narrow it: `ctx.storage.open() as MyHandle`. */
 export type PluginDatabase = HostOwned<'node-core/main/pluginStorage.PluginDatabase'>
-

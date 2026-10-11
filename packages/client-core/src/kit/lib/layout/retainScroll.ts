@@ -31,7 +31,9 @@ const keyedOffsets = new Map<string, number>()
 export const keyedScrollStore = (key: () => string): ScrollStore => ({
   key,
   read: (at) => keyedOffsets.get(at) ?? 0,
-  write: (at, offset) => { keyedOffsets.set(at, offset) },
+  write: (at, offset) => {
+    keyedOffsets.set(at, offset)
+  },
 })
 
 /** Call from a component, with its scroller, for example from the scroller's `ref`. */
@@ -50,7 +52,10 @@ export function retainScroll(element: HTMLElement, store: ScrollStore): void {
   }
   const restore = (desired: number) => {
     element.scrollTop = desired
-    if (Math.abs(element.scrollTop - desired) < 1) { stop(); return }
+    if (Math.abs(element.scrollTop - desired) < 1) {
+      stop()
+      return
+    }
     if (observer) return
     // `style` as well as children, because a virtual list grows by its canvas's inline height.
     observer = new MutationObserver(() => restore(desired))
@@ -60,14 +65,16 @@ export function retainScroll(element: HTMLElement, store: ScrollStore): void {
 
   // The first attempt waits a task, so the scroller is in the document. A timer rather than an
   // animation frame, because a hidden window runs no frames at all and the restore would never start.
-  createEffect(on(store.key, (key) => {
-    stop()
-    current = key
-    pending = setTimeout(() => {
-      pending = undefined
-      restore(untrack(() => store.read(key)))
-    }, 0)
-  }))
+  createEffect(
+    on(store.key, (key) => {
+      stop()
+      current = key
+      pending = setTimeout(() => {
+        pending = undefined
+        restore(untrack(() => store.read(key)))
+      }, 0)
+    }),
+  )
 
   const onScroll = () => {
     // A restore in flight is the host scrolling, and its clamped steps are not a place to keep.

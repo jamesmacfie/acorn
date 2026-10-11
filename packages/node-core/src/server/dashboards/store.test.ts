@@ -4,23 +4,36 @@ import { makeTestDb } from '../../testkit/db'
 import { dashboardStore } from './store'
 
 const cleanups: (() => void)[] = []
-afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup() })
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup()
+})
 const scope = { workspaceId: 'workspace' }
 const content = (title = 'Issues'): DashboardPanelContent => ({
   title,
-  queries: [{
-    id: 'mine', label: 'Mine', reference: { kind: 'inline', bindings: {}, content: {
-      name: 'Mine', parameters: { type: 'object', properties: {}, additionalProperties: false },
-      query: { source: { pluginId: 'linear', sourceId: 'issues' }, scope: { ...scope, parameters: {} }, sort: [] }, sourceParameters: {},
-    } },
-  }],
+  queries: [
+    {
+      id: 'mine',
+      label: 'Mine',
+      reference: {
+        kind: 'inline',
+        bindings: {},
+        content: {
+          name: 'Mine',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          query: { source: { pluginId: 'linear', sourceId: 'issues' }, scope: { ...scope, parameters: {} }, sort: [] },
+          sourceParameters: {},
+        },
+      },
+    },
+  ],
   mapping: { columns: [], fields: {}, values: {}, unmapped: 'catch-all' },
   display: { view: { kind: 'list' }, fields: [] },
 })
 
 describe('dashboard draft and publication store', () => {
   it('uses compare-and-swap saves and immutable revisions', () => {
-    const test = makeTestDb(); cleanups.push(test.cleanup)
+    const test = makeTestDb()
+    cleanups.push(test.cleanup)
     const store = dashboardStore(test.db)
     const draft = store.create(scope, content())
     const saved = store.save(scope, draft.id, draft.draftRevision, content('Team issues'))
@@ -35,11 +48,17 @@ describe('dashboard draft and publication store', () => {
   })
 
   it('keeps project drafts out of workspace-wide reads', () => {
-    const test = makeTestDb(); cleanups.push(test.cleanup)
+    const test = makeTestDb()
+    cleanups.push(test.cleanup)
     const store = dashboardStore(test.db)
     store.create(scope, content('Workspace'))
     store.create({ ...scope, projectId: 'project' }, content('Project'))
-    expect(store.list(scope).map(draft => draft.content.title)).toEqual(['Workspace'])
-    expect(store.list({ ...scope, projectId: 'project' }).map(draft => draft.content.title).sort()).toEqual(['Project', 'Workspace'])
+    expect(store.list(scope).map((draft) => draft.content.title)).toEqual(['Workspace'])
+    expect(
+      store
+        .list({ ...scope, projectId: 'project' })
+        .map((draft) => draft.content.title)
+        .sort(),
+    ).toEqual(['Project', 'Workspace'])
   })
 })

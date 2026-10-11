@@ -1,17 +1,16 @@
 // The node's logger, and the only file under `packages/node-core/src` and `apps/node/src` allowed to
 // call `console.*` (tools/arch/boundaries.test.ts § the console rule).
 //
-// Why a logger at all, when `ctx.log` was removed on 2026-08-27 for being interchangeable with
-// `console`: a line written through here carries the tag that wrote it, reaches every subscribed
-// sink, and is scrubbed on the way. None of that is true of a bare `console.error`, and the
-// attribution is the whole point — "which plugin logged this" is the question a person asks first
-// and could not previously answer (docs/telemetry/logging.md § Logging).
+// Why a logger rather than `console`: a line written through here carries the tag that wrote it,
+// reaches every subscribed sink, and is scrubbed on the way. None of that is true of a bare
+// `console.error`, and the attribution is the point: "which plugin logged this" is the question a
+// person asks first (docs/telemetry/logging.md § Logging).
 //
 // Everything goes to stderr, including `info` and `debug`. Stdout is a wire: the standalone entry
 // prints its handshake JSON there and the desktop helper speaks a line protocol on it, so a log line
 // on stdout is a corrupted handshake. `console.error` and `console.warn` rather than
-// `process.stderr.write`, because thirty-one node tests spy on those two and a logger that wrote
-// underneath them would pass every one of those tests vacuously.
+// `process.stderr.write`, because node tests spy on those two and a logger that wrote underneath
+// them would pass every one of those tests vacuously.
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 import { ATTR_VALUE_MAX } from '@acorn/protocol/telemetry.ts'
 import { emitLog, onTelemetryBatch, PERF, flushTelemetry } from './collector'
@@ -48,7 +47,7 @@ const suffix = (attrs: TelemetryAttrs | undefined): string => {
 
 /**
  * A logger bound to one tag. `createLogger('schedules').warn('github:refresh timed out')` prints
- * `[schedules] github:refresh timed out`, which is what the hand-written prefix printed before.
+ * `[schedules] github:refresh timed out`.
  *
  * `owner` defaults to `core`. The plugin host passes the plugin id, which is what makes `ctx.log`
  * worth having, and a `tap` that keeps lines for a plugin in development mode.
@@ -82,14 +81,14 @@ export function createLogger(tag: string, owner = 'core', tap?: (level: LogLevel
  * global handlers, and both build their error record directly.
  */
 export function describeError(error: unknown): { name: string; message: string } {
-  if (error instanceof Error) return { name: error.name || 'Error', message: scrub(error.message, error.name || 'Error') }
+  if (error instanceof Error)
+    return { name: error.name || 'Error', message: scrub(error.message, error.name || 'Error') }
   return { name: 'Error', message: scrub(error, 'unknown error') }
 }
 
 // ── The ACORN_PERF console sink ───────────────────────────────────────────────────────────────────
 //
-// `ACORN_PERF=1` was a printer of its own until the collector existed (`server/perf.ts`, deleted).
-// It is a sink now, and prints the same two shapes: a line per request, and a histogram table per
+// `ACORN_PERF=1` is a sink, and prints two shapes: a line per request, and a histogram table per
 // dump. The request line is printed at the seam rather than from here, because a sink is called on
 // the flush timer and a developer watching a dev server wants the line when the request finishes,
 // not in a burst five seconds later.
@@ -119,9 +118,9 @@ export function installPerfSink(): void {
       if (record.kind !== 'metric' || typeof record.value === 'number') continue
       const value = record.value
       console.error(
-        `[perf] ${scrubLine(record.name, 'metric', ATTR_VALUE_MAX)} count=${value.count} total=${ms(value.sum)}ms`
-        + ` mean=${ms(value.sum / Math.max(value.count, 1))}ms p50=${ms(value.p50)}ms`
-        + ` p95=${ms(value.p95)}ms max=${ms(value.max)}ms`,
+        `[perf] ${scrubLine(record.name, 'metric', ATTR_VALUE_MAX)} count=${value.count} total=${ms(value.sum)}ms` +
+          ` mean=${ms(value.sum / Math.max(value.count, 1))}ms p50=${ms(value.p50)}ms` +
+          ` p95=${ms(value.p95)}ms max=${ms(value.max)}ms`,
       )
     }
   })

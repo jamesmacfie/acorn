@@ -21,8 +21,12 @@ describe('content-link patterns', () => {
   it('rejects non-https, overlong patterns and too many captures without evaluating regex-like literals', () => {
     expect(() => compileContentLinkPattern('http://tracker.example/issues/{key}')).toThrow('https')
     expect(() => compileContentLinkPattern('https://tracker.example/issues/(a+)+')).not.toThrow()
-    expect(() => compileContentLinkPattern(`https://tracker.example/${'x'.repeat(CONTENT_LINK_PATTERN_MAX_LENGTH)}`)).toThrow('characters')
-    const captures = Array.from({ length: CONTENT_LINK_PATTERN_MAX_CAPTURES + 1 }, (_, index) => `{c${index}}`).join('/')
+    expect(() =>
+      compileContentLinkPattern(`https://tracker.example/${'x'.repeat(CONTENT_LINK_PATTERN_MAX_LENGTH)}`),
+    ).toThrow('characters')
+    const captures = Array.from({ length: CONTENT_LINK_PATTERN_MAX_CAPTURES + 1 }, (_, index) => `{c${index}}`).join(
+      '/',
+    )
     expect(() => compileContentLinkPattern(`https://tracker.example/${captures}`)).toThrow('at most')
   })
 

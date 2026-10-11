@@ -22,13 +22,18 @@ describe('the tool-card fold preference', () => {
 
   it('starts collapsed, and reads a corrupt value as the default rather than as a mode', () => {
     expect(readAgentToolFoldPrefs(undefined)).toEqual(defaultAgentToolFoldPrefs)
-    expect(readAgentToolFoldPrefs({ [PrefKeys.agentToolFold]: '{"mode":"sideways"}' })).toEqual(defaultAgentToolFoldPrefs)
+    expect(readAgentToolFoldPrefs({ [PrefKeys.agentToolFold]: '{"mode":"sideways"}' })).toEqual(
+      defaultAgentToolFoldPrefs,
+    )
     expect(AGENT_TOOL_FOLD_CHOICES.map((choice) => choice.value)).toEqual(['collapsed', 'expanded', 'sticky'])
   })
 
   it('keeps the reader’s last toggle when the mode changes', async () => {
     const qc = new QueryClient()
-    localStorage.setItem(`acorn-pref:${ACORN_BASELINE}:${PrefKeys.agentToolFold}`, JSON.stringify({ mode: 'sticky', last: 'expanded' }))
+    localStorage.setItem(
+      `acorn-pref:${ACORN_BASELINE}:${PrefKeys.agentToolFold}`,
+      JSON.stringify({ mode: 'sticky', last: 'expanded' }),
+    )
     await saveAgentToolFoldMode(qc, stored(), 'collapsed')
     expect(readAgentToolFoldPrefs(stored())).toEqual({ mode: 'collapsed', last: 'expanded' })
   })

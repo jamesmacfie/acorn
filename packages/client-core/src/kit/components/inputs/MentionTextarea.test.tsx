@@ -14,17 +14,19 @@ const SOURCES: MentionSource[] = [
     sigil: '@',
     label: 'Worktree files',
     emptyText: 'No matching files.',
-    suggest: (query) => ['src/app.ts', 'src/agent/state.ts']
-      .filter((path) => path.includes(query))
-      .map((path) => ({ value: `@${path}`, label: path })),
+    suggest: (query) =>
+      ['src/app.ts', 'src/agent/state.ts']
+        .filter((path) => path.includes(query))
+        .map((path) => ({ value: `@${path}`, label: path })),
   },
   {
     sigil: '/',
     label: 'Provider commands',
     emptyText: 'No matching commands.',
-    suggest: (query) => ['review', 'commit']
-      .filter((name) => name.startsWith(query))
-      .map((name) => ({ value: `/${name}`, label: `/${name}`, detail: 'a command' })),
+    suggest: (query) =>
+      ['review', 'commit']
+        .filter((name) => name.startsWith(query))
+        .map((name) => ({ value: `/${name}`, label: `/${name}`, detail: 'a command' })),
   },
 ]
 
@@ -53,14 +55,7 @@ const type = (text: string) => {
 
 function mount(extra: Partial<Parameters<typeof MentionTextarea>[0]> = {}) {
   const [value, setValue] = createSignal('')
-  dispose = render(() => (
-    <MentionTextarea
-      value={value()}
-      onInput={setValue}
-      sources={SOURCES}
-      {...extra}
-    />
-  ), host)
+  dispose = render(() => <MentionTextarea value={value()} onInput={setValue} sources={SOURCES} {...extra} />, host)
   field().dispatchEvent(new FocusEvent('focus', { bubbles: true }))
   return value
 }
@@ -103,9 +98,8 @@ describe('MentionTextarea', () => {
 
   it('draws a coloured copy of the draft, and drops it when there is nothing to colour', () => {
     mount({
-      segments: (text) => text.includes('/review')
-        ? [{ text: 'run ' }, { text: '/review', tone: 'warn', caret: 11 }]
-        : null,
+      segments: (text) =>
+        text.includes('/review') ? [{ text: 'run ' }, { text: '/review', tone: 'warn', caret: 11 }] : null,
     })
     expect(host.querySelector('.ui-mentionfield-mirror')).toBeNull()
     type('run /review')
@@ -116,7 +110,9 @@ describe('MentionTextarea', () => {
 
   it('keeps the field focused after an asynchronous file paste moves its caller', async () => {
     let finishUpload: (() => void) | undefined
-    const uploaded = new Promise<void>((resolve) => { finishUpload = resolve })
+    const uploaded = new Promise<void>((resolve) => {
+      finishUpload = resolve
+    })
     const onFiles = vi.fn(async () => {
       await uploaded
       const composer = field().parentElement!
@@ -143,7 +139,9 @@ describe('MentionTextarea', () => {
 
   it('does not reclaim focus from another control after an asynchronous file paste', async () => {
     let finishUpload: (() => void) | undefined
-    const uploaded = new Promise<void>((resolve) => { finishUpload = resolve })
+    const uploaded = new Promise<void>((resolve) => {
+      finishUpload = resolve
+    })
     const elsewhere = document.createElement('button')
     host.append(elsewhere)
     mount({ onFiles: async () => uploaded })

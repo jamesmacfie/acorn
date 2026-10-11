@@ -15,6 +15,6 @@ export const custody = (dir: string = configDir()): Custody => {
 }
 
 export { configDir, dataRootDir } from './paths'
-export { knownNodeId, runningNode, type RunningNode } from './attach'
+export { knownNodeId, runningNode } from './attach'
 export { pairInteractively } from './pair'
 export { AmbiguousNodeError, rememberedNode } from './selection'

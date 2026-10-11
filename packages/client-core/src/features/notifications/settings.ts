@@ -1,11 +1,9 @@
 // The notification switches, as one JSON device preference
 // (docs/notifications/channels.md § Settings).
 //
-// One key holding six booleans, not six keys, for the reason `docker_prefs` and `exclusive_slots`
-// give: a value that is read together is stored together, and six keys would mean six `DEVICE_KEYS`
-// lines and a migration the day a seventh appears. The parser below is the migration: every field
-// that is missing, or is not a boolean, reads as `true`, so a fresh install and a blob written by an
-// older build both behave the way the design intends.
+// One key holding six booleans, not six keys: a value that is read together is stored together. The
+// parser below is the migration: every field that is missing, or is not a boolean, reads as `true`,
+// so a fresh install and a blob written by an older build both behave as intended.
 //
 // The device's, like `theme`. A sound on this machine is not a fact about the node.
 import type { QueryClient } from '@tanstack/solid-query'
@@ -21,7 +19,10 @@ export type NotificationSettings = {
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  sound: true, system: true, badge: true, events: { blocked: true, finished: true, error: true },
+  sound: true,
+  system: true,
+  badge: true,
+  events: { blocked: true, finished: true, error: true },
 }
 
 // Absent, malformed, and "some other writer put a string here" all mean on. Only an explicit `false`
@@ -29,7 +30,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 const on = (value: unknown): boolean => value !== false
 
 const object = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === 'object' ? value as Record<string, unknown> : {}
+  value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 
 export function parseNotificationSettings(json: string | undefined): NotificationSettings {
   let raw: Record<string, unknown> = {}
@@ -57,7 +58,7 @@ export const readNotificationSettings = (): NotificationSettings =>
  * One switch, written as a merge onto the whole record.
  *
  * A merge and not a replace, because the six booleans share one key: writing `{ sound: false }` on its
- * own would turn the other five off, since every absent field reads as `true`. Settings → Notifications
+ * own would turn the other five back on, since every absent field reads as `true`. Settings → Notifications
  * and the palette's setting commands both come through here so there is one merge rule and not two.
  */
 export const saveNotificationSettings = (

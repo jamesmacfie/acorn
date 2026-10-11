@@ -46,12 +46,15 @@ describe('providerError', () => {
     expect(line).toContain('r76-1789377618767')
   })
 
-  // The bug this shape check exists for. A bundled plugin inlines its whole dependency graph, so the
-  // class its provider throws is compiled into the plugin's own bundle and is not the class this
-  // module holds. `instanceof` was false for every one of them, and a rejected Linear key came back
-  // as "provider unavailable" with nothing anywhere saying otherwise.
+  // Why the check is by shape. A bundled plugin inlines its whole dependency graph, so the class its
+  // provider throws is compiled into the plugin's own bundle and is not the class this module holds.
+  // `instanceof` is false for every one of them, and a rejected Linear key would come back as
+  // "provider unavailable" with nothing anywhere saying otherwise.
   class ForeignProviderOperationError extends Error {
-    constructor(readonly code: string, readonly status: number) {
+    constructor(
+      readonly code: string,
+      readonly status: number,
+    ) {
       super(code)
       this.name = 'ProviderOperationError'
     }

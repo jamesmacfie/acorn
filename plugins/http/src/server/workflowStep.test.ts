@@ -17,7 +17,11 @@ const context: StepValidationContext = {
   precedes: () => false,
 }
 
-const step = (withTable: unknown) => ({ name: 'call', kind: 'http:request', with: withTable as Record<string, unknown> })
+const step = (withTable: unknown) => ({
+  name: 'call',
+  kind: 'http:request',
+  with: withTable as Record<string, unknown>,
+})
 
 describe('the http:request step', () => {
   it('accepts a method in any case, and a url', () => {
@@ -31,24 +35,33 @@ describe('the http:request step', () => {
   })
 
   it('names what is missing rather than saying the step is invalid', () => {
-    expect(validateHttpStep(step(undefined), context)).toEqual(["step 'call' needs a [steps.with] table with a method and a url"])
+    expect(validateHttpStep(step(undefined), context)).toEqual([
+      "step 'call' needs a [steps.with] table with a method and a url",
+    ])
     expect(validateHttpStep(step({ method: 'GET' }), context)).toEqual(["step 'call' has no url"])
-    expect(validateHttpStep(step({ url: 'https://example.test' }), context))
-      .toEqual(["step 'call' needs one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS as its method"])
-    expect(validateHttpStep(step({ method: 'TRACE', url: 'https://example.test' }), context))
-      .toEqual(["step 'call' needs one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS as its method"])
+    expect(validateHttpStep(step({ url: 'https://example.test' }), context)).toEqual([
+      "step 'call' needs one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS as its method",
+    ])
+    expect(validateHttpStep(step({ method: 'TRACE', url: 'https://example.test' }), context)).toEqual([
+      "step 'call' needs one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS as its method",
+    ])
   })
 
   it('refuses headers that are neither a table nor lines', () => {
-    expect(validateHttpStep(step({ method: 'GET', url: 'https://x.test', headers: ['a: b'] }), context))
-      .toEqual(["step 'call' headers must be a table of strings, or one 'Name: value' per line"])
+    expect(validateHttpStep(step({ method: 'GET', url: 'https://x.test', headers: ['a: b'] }), context)).toEqual([
+      "step 'call' headers must be a table of strings, or one 'Name: value' per line",
+    ])
   })
 
   it('describes the fields the handler reads, and nothing it does not', () => {
     // The whole contract of `describe`: the host writes what it draws into `[steps.with]` under these
     // ids, and the handler finds it there. A drift here is a field the editor fills and nothing reads.
     expect(describeHttpStep.fields.map((field) => field.id)).toEqual(['method', 'url', 'headers', 'bodyMode', 'body'])
-    expect(describeHttpStep.fields.find((field) => field.id === 'method')?.options?.map((option) => option.value)).toEqual([...httpMethods])
-    expect(describeHttpStep.fields.find((field) => field.id === 'bodyMode')?.options?.map((option) => option.value)).toEqual([...bodyModes])
+    expect(
+      describeHttpStep.fields.find((field) => field.id === 'method')?.options?.map((option) => option.value),
+    ).toEqual([...httpMethods])
+    expect(
+      describeHttpStep.fields.find((field) => field.id === 'bodyMode')?.options?.map((option) => option.value),
+    ).toEqual([...bodyModes])
   })
 })

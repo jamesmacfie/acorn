@@ -9,7 +9,9 @@ export function AddedTally(props: { added: Project[] }) {
   return (
     <Show when={props.added.length}>
       <Inline gap="stack" wrap>
-        <Badge tone="ok">{props.added.length} project{props.added.length === 1 ? '' : 's'} added</Badge>
+        <Badge tone="ok">
+          {props.added.length} project{props.added.length === 1 ? '' : 's'} added
+        </Badge>
         <ChipRow ariaLabel="Projects added">
           <For each={props.added}>{(project) => <Chip>{project.name}</Chip>}</For>
         </ChipRow>

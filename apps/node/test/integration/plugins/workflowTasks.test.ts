@@ -43,13 +43,18 @@ const succeeded = (result: string, structuredOutput: unknown) => ({
 })
 
 const ticketMap = (childId: string): WorkflowDef => ({
-  baseline: 'acorn-1', formatVersion: 1,
+  baseline: 'acorn-1',
+  formatVersion: 1,
   name: 'Review selected tickets',
   steps: [
     { id: 'select', name: 'select', after: [], prompt: 'Select tickets.', schema: { type: 'object' } },
     {
-      id: 'review', name: 'review', kind: 'workflow-map', after: ['select'],
-      items: { step: 'select', pointer: '/tickets' }, itemKey: '/id',
+      id: 'review',
+      name: 'review',
+      kind: 'workflow-map',
+      after: ['select'],
+      items: { step: 'select', pointer: '/tickets' },
+      itemKey: '/id',
       childWorkflow: {
         ref: { source: 'database', id: childId },
         inputs: { ticket: { address: { from: 'item', pointer: '/number' } } },
@@ -74,17 +79,42 @@ describe('workflow task acceptance', () => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-workflow-tasks-'))
     const at = Date.now()
     await core.db.insert(coreSchema.workspaces).values({
-      id: 'workspace-one', name: 'Workspace', isDefault: true, sort: 0, createdAt: at, updatedAt: at,
+      id: 'workspace-one',
+      name: 'Workspace',
+      isDefault: true,
+      sort: 0,
+      createdAt: at,
+      updatedAt: at,
     })
     await core.db.insert(coreSchema.projects).values({
-      id: 'project-one', name: 'Project', path: dir, workspaceId: 'workspace-one', sort: 0,
-      hidden: false, vcs: 'none', defaultBranch: 'main', remoteUrl: null, githubOwner: null,
-      githubName: null, githubRepoId: null, createdAt: at, updatedAt: at,
+      id: 'project-one',
+      name: 'Project',
+      path: dir,
+      workspaceId: 'workspace-one',
+      sort: 0,
+      hidden: false,
+      vcs: 'none',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await core.db.insert(coreSchema.tasks).values({
-      id: 'parent-task', title: 'Ticket batch', origin: 'local', projectId: 'project-one', branch: null,
-      worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0,
-      createdAt: at, updatedAt: at,
+      id: 'parent-task',
+      title: 'Ticket batch',
+      origin: 'local',
+      projectId: 'project-one',
+      branch: null,
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: at,
+      updatedAt: at,
     })
   })
 
@@ -98,10 +128,13 @@ describe('workflow task acceptance', () => {
 
   it('runs the ticket map from generated and hand-authored definitions without duplicate work after restart', async () => {
     const child = await createPublishedDef(workflows.db, {
-      workspaceId: 'workspace-one', projectId: 'project-one',
+      workspaceId: 'workspace-one',
+      projectId: 'project-one',
       def: {
-        baseline: 'acorn-1', formatVersion: 1,
-        name: 'Review ticket', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+        baseline: 'acorn-1',
+        formatVersion: 1,
+        name: 'Review ticket',
+        inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
         steps: [
           { id: 'approve', name: 'approve', kind: 'gate-human' },
           { id: 'review-ticket', name: 'review-ticket', prompt: 'Review ${inputs.ticket}.' },
@@ -117,12 +150,21 @@ describe('workflow task acceptance', () => {
       ],
       policies: [],
       profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
-      workflows: [{ ref: { source: 'database', id: child.id }, name: child.name, inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }] }],
+      workflows: [
+        {
+          ref: { source: 'database', id: child.id },
+          name: child.name,
+          inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+        },
+      ],
     }
     const generated = await generateWorkflowRequest({
       request: {
-        mode: 'overwrite', backendId: 'connection:fixture', description: 'Review each selected ticket.',
-        workspaceId: 'workspace-one', projectId: 'project-one',
+        mode: 'overwrite',
+        backendId: 'connection:fixture',
+        description: 'Review each selected ticket.',
+        workspaceId: 'workspace-one',
+        projectId: 'project-one',
       },
       catalog,
       validation: catalogValidation(catalog),
@@ -131,7 +173,9 @@ describe('workflow task acceptance', () => {
     if (!('def' in generated)) throw new Error(generated.error)
 
     mkdirSync(join(dir, '.acorn', 'workflows'), { recursive: true })
-    writeFileSync(join(dir, '.acorn', 'workflows', 'ticket-map.toml'), `
+    writeFileSync(
+      join(dir, '.acorn', 'workflows', 'ticket-map.toml'),
+      `
 baseline = "acorn-1"
 format_version = 1
 name = "Review selected tickets"
@@ -159,7 +203,8 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 template = "Review \${ticket}"
 [steps.title.bindings.ticket]
 binding_json = '{"address":{"from":"item","pointer":"/number"}}'
-`)
+`,
+    )
     const handAuthored = loadWorkflowFiles(dir, null, catalogValidation(catalog)).workflows[0]
     if (!handAuthored) throw new Error('The hand-authored ticket workflow did not load.')
 
@@ -195,18 +240,26 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
       }
 
       const graph = await resolveWorkflowGraph(workflows.db, definition, {
-        scope: taskScope, catalog: catalogValidation(catalog),
+        scope: taskScope,
+        catalog: catalogValidation(catalog),
       })
       let active = makeRunner()
       const rootRunId = await active.runner.start('parent-task', graph.root, { resolvedGraph: graph })
       await vi.waitFor(async () => expect((await active.runner.run(rootRunId))?.status).toBe('gated'))
-      const runsBeforeRestart = await workflows.db.select().from(workflowRuns).where(eq(workflowRuns.parentRunId, rootRunId))
-      const dispatchesBeforeRestart = await workflows.db.select().from(workflowDispatches).where(eq(workflowDispatches.parentRunId, rootRunId))
+      const runsBeforeRestart = await workflows.db
+        .select()
+        .from(workflowRuns)
+        .where(eq(workflowRuns.parentRunId, rootRunId))
+      const dispatchesBeforeRestart = await workflows.db
+        .select()
+        .from(workflowDispatches)
+        .where(eq(workflowDispatches.parentRunId, rootRunId))
       expect(runsBeforeRestart).toHaveLength(tickets.length)
       expect(dispatchesBeforeRestart).toHaveLength(tickets.length)
-      expect(dispatchesBeforeRestart
-        .map((dispatch) => (JSON.parse(dispatch.payloadJson) as { inputs?: Record<string, string> }).inputs)
-        .sort((left, right) => (left?.ticket ?? '').localeCompare(right?.ticket ?? '')),
+      expect(
+        dispatchesBeforeRestart
+          .map((dispatch) => (JSON.parse(dispatch.payloadJson) as { inputs?: Record<string, string> }).inputs)
+          .sort((left, right) => (left?.ticket ?? '').localeCompare(right?.ticket ?? '')),
       ).toEqual([{ ticket: 'ACORN-42' }, { ticket: 'ACORN-43' }])
       active.runner.stop()
 
@@ -221,11 +274,24 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
         await active.runner.resolveGate(childRun.id, gate!.id, true)
       }
       await vi.waitFor(async () => expect((await active.runner.run(rootRunId))?.status).toBe('done'))
-      const dispatches = await workflows.db.select().from(workflowDispatches).where(eq(workflowDispatches.parentRunId, rootRunId))
+      const dispatches = await workflows.db
+        .select()
+        .from(workflowDispatches)
+        .where(eq(workflowDispatches.parentRunId, rootRunId))
       expect(dispatches).toHaveLength(tickets.length)
-      expect(dispatches.map(({ taskId, runId }) => ({ taskId, runId })).sort((left, right) => left.runId.localeCompare(right.runId)))
-        .toEqual(dispatchesBeforeRestart.map(({ taskId, runId }) => ({ taskId, runId })).sort((left, right) => left.runId.localeCompare(right.runId)))
-      const childTasks = await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.parentId, 'parent-task'))
+      expect(
+        dispatches
+          .map(({ taskId, runId }) => ({ taskId, runId }))
+          .sort((left, right) => left.runId.localeCompare(right.runId)),
+      ).toEqual(
+        dispatchesBeforeRestart
+          .map(({ taskId, runId }) => ({ taskId, runId }))
+          .sort((left, right) => left.runId.localeCompare(right.runId)),
+      )
+      const childTasks = await core.db
+        .select()
+        .from(coreSchema.tasks)
+        .where(eq(coreSchema.tasks.parentId, 'parent-task'))
       expect(childTasks).toHaveLength((definitionIndex + 1) * tickets.length)
     }
 

@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js'
 import { roleVar } from '../../tokens/roles'
 import type { Space } from '../../tokens/tokens'
 
-/* Inline: children side by side. Stack's sibling, and the other half of what a raw `div` was doing.
+/* Inline: children side by side. Stack's sibling, for what would otherwise be a raw `div`.
 
    Not Toolbar, which is a bar with a role and a border; this is grouping and nothing else.
 
@@ -10,7 +10,13 @@ import type { Space } from '../../tokens/tokens'
    match. A child narrower than about 12rem wraps to a new line, so a narrow window stacks them.
 
    At 80×24: children on one line separated by a space, wrapping to a Stack when too wide. */
-export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; even?: boolean; children: JSX.Element }) {
+export function Inline(props: {
+  gap?: Space
+  wrap?: boolean
+  spread?: boolean
+  even?: boolean
+  children: JSX.Element
+}) {
   return (
     <div
       class="ui-inline"

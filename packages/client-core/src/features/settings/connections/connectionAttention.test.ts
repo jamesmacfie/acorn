@@ -9,7 +9,14 @@ vi.mock('../../../infra/node/apiClient', () => ({
       { id: 'anthropic', label: 'Anthropic', kind: 'model-provider', connection: { kind: 'fields' } },
     ],
     integrations: [
-      { id: 'c-1', providerId: 'linear', label: 'Linear · Acme', status: 'needs-auth', updatedAt: 5, lastValidatedAt: 4 },
+      {
+        id: 'c-1',
+        providerId: 'linear',
+        label: 'Linear · Acme',
+        status: 'needs-auth',
+        updatedAt: 5,
+        lastValidatedAt: 4,
+      },
       { id: 'c-2', providerId: 'anthropic', label: 'Anthropic', name: 'Work key', status: 'needs-auth', updatedAt: 7 },
       { id: 'c-3', providerId: 'linear', label: 'Linear · Other', status: 'disabled', updatedAt: 1 },
     ],

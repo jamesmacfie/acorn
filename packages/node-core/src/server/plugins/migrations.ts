@@ -37,7 +37,9 @@ export function assertPluginMigrationHistory(
 /** Validate an already-confined, manifest-declared migration directory. */
 export function pluginMigrationsChain(plugin: string, dir: string): string {
   if (!isChain(dir)) {
-    throw new PluginMigrationsError(`Plugin '${plugin}' declares migrations at '${dir}', but no Drizzle migration chain exists there.`)
+    throw new PluginMigrationsError(
+      `Plugin '${plugin}' declares migrations at '${dir}', but no Drizzle migration chain exists there.`,
+    )
   }
   return dir
 }
@@ -67,11 +69,15 @@ export function pluginMigrationsFolder(plugin: string, moduleUrl: string): strin
     const bare = join(dir, 'migrations')
     if (isChain(bare)) return bare
     if (dir === packageRoot) {
-      throw new PluginMigrationsError(`No migrations chain found for plugin '${plugin}' inside its package directory '${packageRoot}'.`)
+      throw new PluginMigrationsError(
+        `No migrations chain found for plugin '${plugin}' inside its package directory '${packageRoot}'.`,
+      )
     }
     const parent = dirname(dir)
     if (parent === dir) {
-      throw new PluginMigrationsError(`No migrations chain found for plugin '${plugin}' (searched ancestors of ${moduleUrl} and ${packaged ?? 'no packaged path'}).`)
+      throw new PluginMigrationsError(
+        `No migrations chain found for plugin '${plugin}' (searched ancestors of ${moduleUrl} and ${packaged ?? 'no packaged path'}).`,
+      )
     }
     dir = parent
   }

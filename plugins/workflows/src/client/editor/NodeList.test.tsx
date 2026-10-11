@@ -6,10 +6,11 @@ import NodeList from './NodeList'
 
 // The list in jsdom, for one claim: a mouse press picks a row. A `Row` inside a `Rows` collection
 // has no click of its own unless the body gives it one — `onSelect` and `onActivate` are the
-// keyboard's — so this list was arrow-keys-only and nothing happened when anybody clicked it
-// (client-core kit/components/layout/Row.tsx).
+// keyboard's — so without one the list is arrow-keys-only.
 
-const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+const def: WorkflowDef = {
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'PR review',
   steps: [
     { name: 'understand-pr', kind: 'agent', with: { prompt: 'read it' } },
@@ -28,14 +29,10 @@ describe('the node list', () => {
     const onSelect = vi.fn()
     const host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <NodeList
-        draft={newDraft(def)}
-        catalog={undefined}
-        onSelect={onSelect}
-        onAdd={vi.fn()}
-      />
-    ), host)
+    dispose = render(
+      () => <NodeList draft={newDraft(def)} catalog={undefined} onSelect={onSelect} onAdd={vi.fn()} />,
+      host,
+    )
 
     const rows = [...host.querySelectorAll<HTMLElement>('.ui-row')]
     const labels = rows.map((row) => row.textContent)

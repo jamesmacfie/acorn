@@ -13,7 +13,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 const log = createLogger('service:boot')
 
 // Long enough for a slow profile, short enough that a broken shell cannot wedge the first spawn
-// forever. Unchanged from when the probe ran in front of the whole boot.
+// forever.
 const PROBE_TIMEOUT_MS = 5_000
 
 let pending: Promise<unknown> | null = null
@@ -53,10 +53,15 @@ async function readLoginShellPath(): Promise<void> {
   const shell = process.env.SHELL || '/bin/zsh'
   try {
     const path = await new Promise<string>((resolve, reject) => {
-      execFile(shell, ['-lic', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: PROBE_TIMEOUT_MS }, (error, stdout) => {
-        if (error) reject(error)
-        else resolve(stdout.trim())
-      })
+      execFile(
+        shell,
+        ['-lic', 'printf %s "$PATH"'],
+        { encoding: 'utf8', timeout: PROBE_TIMEOUT_MS },
+        (error, stdout) => {
+          if (error) reject(error)
+          else resolve(stdout.trim())
+        },
+      )
     })
     if (path) process.env.PATH = path
   } catch (error) {

@@ -64,9 +64,13 @@ describe('bounded Node responses', () => {
 
   it('aborts a streaming response and closes the connection', async () => {
     let started!: () => void
-    const responseStarted = new Promise<void>((resolve) => { started = resolve })
+    const responseStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
     let closed!: () => void
-    const responseClosed = new Promise<void>((resolve) => { closed = resolve })
+    const responseClosed = new Promise<void>((resolve) => {
+      closed = resolve
+    })
     const url = await start((_req, res) => {
       res.on('close', closed)
       res.write('12345')
@@ -75,7 +79,14 @@ describe('bounded Node responses', () => {
     const agent = new Agent({ keepAlive: true })
     agents.push(agent)
     const controller = new AbortController()
-    const pending = nodeRequest({ url, method: 'GET', headers: {}, agent, signal: controller.signal, maxResponseBytes: 5 })
+    const pending = nodeRequest({
+      url,
+      method: 'GET',
+      headers: {},
+      agent,
+      signal: controller.signal,
+      maxResponseBytes: 5,
+    })
     await responseStarted
     controller.abort()
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })

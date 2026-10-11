@@ -37,9 +37,8 @@ import type { TelemetrySummary } from '@acorn/protocol/api.ts'
 import { currentTelemetryContext, runWithTelemetryContext, type TelemetryContext } from './context'
 import { scrub, scrubAttrs, scrubLine } from './scrub'
 
-/** The developer switch that predates all of this. With it on, the collector runs with no sink
- *  subscribed and prints to stderr, which is what `ACORN_PERF=1` has always meant
- *  (docs/local-development/profiling.md § Timing a cold start). */
+/** The developer switch. With `ACORN_PERF=1`, the collector runs with no sink subscribed and prints
+ *  to stderr (docs/local-development/profiling.md § Timing a cold start). */
 export const PERF = process.env.ACORN_PERF === '1'
 
 /** Enough records that a burst survives a flush window, and small enough that a node nobody is
@@ -134,7 +133,11 @@ export const telemetryEnabled = (): boolean => PERF || (state.sinks.size > 0 && 
 // Truncate rather than drop, and count what was truncated, so a chatty seam shows up as a metric
 // instead of quietly losing its tail (docs/telemetry/model.md § The attribute vocabulary).
 
-function cleanAttrs(attrs: TelemetryAttrs | undefined, owner: string, runtime: TelemetryRuntime = 'node'): TelemetryAttrs {
+function cleanAttrs(
+  attrs: TelemetryAttrs | undefined,
+  owner: string,
+  runtime: TelemetryRuntime = 'node',
+): TelemetryAttrs {
   const { attrs: out, truncated } = scrubAttrs(attrs)
   state.truncated += truncated
   out.owner = owner
@@ -189,7 +192,10 @@ function safely(run: () => void): void {
 
 const hex = (bytes: number): string => {
   let out = ''
-  for (let index = 0; index < bytes; index += 1) out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+  for (let index = 0; index < bytes; index += 1)
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0')
   return out
 }
 export const newTraceId = (): string => hex(16)
@@ -208,7 +214,8 @@ export const newSpanId = (): string => hex(8)
 
 /** The owner to file a record under. `'core'` is the "I have nothing better" spelling, and the one
  *  the ambient context is allowed to override. */
-const resolveOwner = (owner: string): string => (owner === 'core' ? (currentTelemetryContext()?.owner ?? 'core') : owner)
+const resolveOwner = (owner: string): string =>
+  owner === 'core' ? (currentTelemetryContext()?.owner ?? 'core') : owner
 
 /**
  * Enter the ambient context for one seam, or do nothing when nothing is collecting.
@@ -223,13 +230,20 @@ export function runWithTelemetry<T>(context: TelemetryContext, run: () => T): T 
 
 // ── The emit verbs ────────────────────────────────────────────────────────────────────────────────
 
-export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
+export function emitSpan(
+  owner: string,
+  span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
   safely(() => push({ ...span, kind: 'span', attrs: cleanAttrs(span.attrs, resolveOwner(owner)) }))
 }
 
 // The logger sanitizes attributes before either sink and passes the truncation count separately.
-export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }, attributeTruncations = 0): void {
+export function emitLog(
+  owner: string,
+  log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs },
+  attributeTruncations = 0,
+): void {
   if (!telemetryEnabled()) return
   safely(() => {
     state.truncated += attributeTruncations
@@ -252,9 +266,19 @@ export function emitEvent(owner: string, name: string, attrs?: TelemetryAttrs): 
   safely(() => push({ kind: 'event', at: Date.now(), name, attrs: cleanAttrs(attrs, resolveOwner(owner)) }))
 }
 
-export function emitMetric(owner: string, metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs }): void {
+export function emitMetric(
+  owner: string,
+  metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
-  safely(() => push({ ...metric, kind: 'metric', at: metric.at ?? Date.now(), attrs: cleanAttrs(metric.attrs, resolveOwner(owner)) }))
+  safely(() =>
+    push({
+      ...metric,
+      kind: 'metric',
+      at: metric.at ?? Date.now(),
+      attrs: cleanAttrs(metric.attrs, resolveOwner(owner)),
+    }),
+  )
 }
 
 export function emitError(owner: string, error: ErrorInput): void {
@@ -323,8 +347,8 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
 /**
  * One sample into a histogram, aggregated over the flush window.
  *
- * This is the seam `perf.ts` used to be. A seam firing thousands of times a second is a metric and
- * never a span (docs/telemetry/model.md § Hot seams are metrics), and pre-aggregating here is what makes
+ * A seam firing thousands of times a second is a metric and never a span
+ * (docs/telemetry/model.md § Hot seams are metrics), and pre-aggregating here is what makes
  * the difference between one record per window and a thousand records a sink has to throw away.
  */
 export function recordDuration(owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void {
@@ -342,7 +366,12 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
       return
     }
     if (!slot) {
-      slot = { owner: resolved, seam, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
+      slot = {
+        owner: resolved,
+        seam,
+        attrs: { ...attrs, seam },
+        histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] },
+      }
       state.histograms.set(key, slot)
     }
     const h = slot.histogram
@@ -358,7 +387,7 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
  * Time one call and hand back its own result untouched. Promise-aware, and timed to settlement
  * rather than to the call that started it, which for a git spawn is the whole of the duration.
  *
- * The replacement for `perf.ts`'s `timed`. A caller with nothing better to say than `'core'` gets
+ * A caller with nothing better to say than `'core'` gets
  * the ambient owner, so `git.ts` and `sqlite.ts` name the plugin whose request they are serving
  * without either file learning anything about its callers (docs/telemetry/runtimes.md § Ambient attribution).
  */
@@ -409,8 +438,20 @@ export function ingestTelemetry(runtime: PostedTelemetryRuntime, records: readon
     safely(() => {
       const owner = typeof record.attrs.owner === 'string' ? record.attrs.owner : 'core'
       const attrs = cleanAttrs(record.attrs, owner, runtime)
-      if (record.kind === 'log') push({ ...record, logger: scrubLine(record.logger, 'logger', ATTR_VALUE_MAX), body: scrub(record.body).slice(0, LOG_BODY_MAX), attrs })
-      else if (record.kind === 'error') push({ ...record, message: scrub(record.message), ...(record.stack ? { stack: scrub(record.stack) } : {}), attrs })
+      if (record.kind === 'log')
+        push({
+          ...record,
+          logger: scrubLine(record.logger, 'logger', ATTR_VALUE_MAX),
+          body: scrub(record.body).slice(0, LOG_BODY_MAX),
+          attrs,
+        })
+      else if (record.kind === 'error')
+        push({
+          ...record,
+          message: scrub(record.message),
+          ...(record.stack ? { stack: scrub(record.stack) } : {}),
+          attrs,
+        })
       else push({ ...record, attrs })
       taken += 1
     })
@@ -430,7 +471,7 @@ export function ingestTelemetry(runtime: PostedTelemetryRuntime, records: readon
 export function onTelemetryBatch(sink: TelemetrySink, owner = 'core'): Disposable {
   // The owner is the host's to state, the same rule every record follows: a plugin subscribes
   // through `ctx.core.telemetry`, which closes over its id (../core/telemetry.ts). It is kept so
-  // Settings can say who is reading the stream and so a rollback can find this subscription again.
+  // Settings can say who is reading the stream.
   state.sinks.set(sink, owner)
   arm()
   return {
@@ -439,15 +480,6 @@ export function onTelemetryBatch(sink: TelemetrySink, owner = 'core'): Disposabl
       if (state.sinks.size === 0 && !PERF) disarm()
     },
   }
-}
-
-/** Drop every sink one plugin registered. Called when the host rolls a plugin's registrations back,
- *  so a reloaded plugin does not leave the previous instance reading the stream. */
-export function clearTelemetrySinks(owner: string): void {
-  for (const [sink, sinkOwner] of state.sinks) {
-    if (sinkOwner === owner) state.sinks.delete(sink)
-  }
-  if (state.sinks.size === 0 && !PERF) disarm()
 }
 
 /**
@@ -490,7 +522,8 @@ function foldHistograms(): void {
   for (const slot of state.histograms.values()) {
     const h = slot.histogram
     const sorted = [...h.samples].sort((a, b) => a - b)
-    const at_ = (fraction: number) => (sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))])
+    const at_ = (fraction: number) =>
+      sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]
     push({
       kind: 'metric',
       at,
@@ -518,19 +551,40 @@ export function flushTelemetry(): void {
     if (state.refused > 0) {
       const refused = state.refused
       state.refused = 0
-      push({ kind: 'metric', at: Date.now(), name: 'telemetry.histogram.refused', type: 'count', value: refused, attrs: cleanAttrs({}, 'core') })
+      push({
+        kind: 'metric',
+        at: Date.now(),
+        name: 'telemetry.histogram.refused',
+        type: 'count',
+        value: refused,
+        attrs: cleanAttrs({}, 'core'),
+      })
     }
     if (state.dropped > 0) {
       const dropped = state.dropped
       state.dropped = 0
       state.droppedTotal += dropped
-      state.ring.push({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: cleanAttrs({}, 'core') })
+      state.ring.push({
+        kind: 'metric',
+        at: Date.now(),
+        name: 'telemetry.dropped',
+        type: 'count',
+        value: dropped,
+        attrs: cleanAttrs({}, 'core'),
+      })
     }
     if (state.truncated > 0) {
       const truncated = state.truncated
       state.truncated = 0
       state.truncatedTotal += truncated
-      state.ring.push({ kind: 'metric', at: Date.now(), name: 'telemetry.truncated', type: 'count', value: truncated, attrs: cleanAttrs({}, 'core') })
+      state.ring.push({
+        kind: 'metric',
+        at: Date.now(),
+        name: 'telemetry.truncated',
+        type: 'count',
+        value: truncated,
+        attrs: cleanAttrs({}, 'core'),
+      })
     }
     if (state.ring.length === 0) return
     state.lastFlushAt = Date.now()
@@ -561,12 +615,15 @@ function refreshPreference(): Promise<void> {
   const read = state.readPref
   if (!read) return Promise.resolve()
   const generation = preferenceGeneration
-  const pending = read().catch(() => false).then(on => {
-    if (generation !== preferenceGeneration) return
-    applyPreference(on)
-  }).finally(() => {
-    if (pendingPreference === pending) pendingPreference = null
-  })
+  const pending = read()
+    .catch(() => false)
+    .then((on) => {
+      if (generation !== preferenceGeneration) return
+      applyPreference(on)
+    })
+    .finally(() => {
+      if (pendingPreference === pending) pendingPreference = null
+    })
   pendingPreference = pending
   return pending
 }

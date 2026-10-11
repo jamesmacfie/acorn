@@ -51,7 +51,7 @@ describe('frame delivery', () => {
     expect(alerts).toEqual([{ level: 'warn' }])
   })
 
-  it('accepts another plugin\'s channel (the broker holds the grant), and refuses a non-channel', () => {
+  it("accepts another plugin's channel (the broker holds the grant), and refuses a non-channel", () => {
     // Cross-plugin subscription (docs/plugins/events.md § Hearing another plugin). Whether the manifest named the
     // channel is checked upstream in the broker; this layer only cares that it parses.
     const seen: unknown[] = []

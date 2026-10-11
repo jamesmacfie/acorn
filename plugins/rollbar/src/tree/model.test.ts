@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { RollbarItemMetadata, RollbarOccurrenceDetail } from '../shared/api'
-import { failureReason, levelWord, occurrenceContext, relativeTime, statusWord, taskRollbarTargets, traceText } from './model'
+import {
+  failureReason,
+  levelWord,
+  occurrenceContext,
+  relativeTime,
+  statusWord,
+  taskRollbarTargets,
+  traceText,
+} from './model'
 
 describe('Rollbar frame model', () => {
   it('keeps only Rollbar links from the host task projection', () => {
@@ -22,12 +30,20 @@ describe('Rollbar frame model', () => {
 
   it('copies a privacy-bounded context projection', () => {
     const item = {
-      identifier: '142', level: 'error', title: 'Checkout failed', totalOccurrences: 5,
-      environment: 'production', url: 'https://rollbar.com/item/9/',
+      identifier: '142',
+      level: 'error',
+      title: 'Checkout failed',
+      totalOccurrences: 5,
+      environment: 'production',
+      url: 'https://rollbar.com/item/9/',
     } as RollbarItemMetadata
     const occurrence = {
-      exceptionClass: 'Error', message: 'boom', environment: 'production', codeVersion: 'abc',
-      request: { method: 'POST', url: '/checkout' }, context: 'purchase',
+      exceptionClass: 'Error',
+      message: 'boom',
+      environment: 'production',
+      codeVersion: 'abc',
+      request: { method: 'POST', url: '/checkout' },
+      context: 'purchase',
       frames: [{ filename: 'src/checkout.ts', line: 12, method: 'run', inProject: true, column: null, code: [] }],
       person: { id: '7', username: 'sam', email: 'private@example.com' },
     } as unknown as RollbarOccurrenceDetail
@@ -39,18 +55,27 @@ describe('Rollbar frame model', () => {
 
   it('draws the stack as one block, with source lines under their frame', () => {
     const frames = [
-      { filename: 'app/models/contract.rb', line: 12, method: 'validate', inProject: true, column: null, code: [
-        { line: 11, text: 'def validate' },
-        { line: 12, text: '  raise Invalid' },
-      ] },
+      {
+        filename: 'app/models/contract.rb',
+        line: 12,
+        method: 'validate',
+        inProject: true,
+        column: null,
+        code: [
+          { line: 11, text: 'def validate' },
+          { line: 12, text: '  raise Invalid' },
+        ],
+      },
       { filename: 'gems/rails/base.rb', line: null, method: null, inProject: false, column: null, code: [] },
     ] as unknown as RollbarOccurrenceDetail['frames']
-    expect(traceText(frames)).toBe([
-      'app/models/contract.rb:12 · validate',
-      '      11  def validate',
-      '  ›   12    raise Invalid',
-      'gems/rails/base.rb',
-    ].join('\n'))
+    expect(traceText(frames)).toBe(
+      [
+        'app/models/contract.rb:12 · validate',
+        '      11  def validate',
+        '  ›   12    raise Invalid',
+        'gems/rails/base.rb',
+      ].join('\n'),
+    )
   })
 
   it('reads levels and statuses as sentence-case words with their own tone', () => {
@@ -62,8 +87,9 @@ describe('Rollbar frame model', () => {
   })
 
   it('turns a route code into a sentence', () => {
-    expect(failureReason(Object.assign(new Error('provider_rate_limited'), { code: 'provider_rate_limited' })))
-      .toBe('Rollbar is limiting requests. Try again in a minute.')
+    expect(failureReason(Object.assign(new Error('provider_rate_limited'), { code: 'provider_rate_limited' }))).toBe(
+      'Rollbar is limiting requests. Try again in a minute.',
+    )
     expect(failureReason(new Error('rollbar said no'))).toBe('rollbar said no')
   })
 })

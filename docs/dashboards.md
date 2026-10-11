@@ -155,32 +155,15 @@ See also [data layer](./data-layer.md), [schedules](./schedules.md), and
 
 ## Pages
 
-<a id="panels"></a>
-<a id="the-two-vocabularies-and-the-budget"></a>
-<a id="provenance-and-what-a-row-may-not-claim"></a>
-
 - [Panels](./dashboards/panels.md) covers a panel's layers, the field vocabulary, provenance, and row
   actions.
-
-<a id="views-are-derived-not-chosen-from-a-menu"></a>
-<a id="trends-the-stat-that-earns-a-sparkline"></a>
 
 - [Views and trends](./dashboards/views.md) covers which views a schema allows, charts, and stat
   trends.
 
-<a id="the-mapping-layer-and-cross-source-panels"></a>
-<a id="the-generated-editor"></a>
-<a id="editor"></a>
-
 - [Mapping and the editor](./dashboards/mapping-and-editor.md) covers cross-source panels and the
   editor.
 
-<a id="placements"></a>
-<a id="the-grid"></a>
-<a id="placement-regions"></a>
-
 - [Placements](./dashboards/placements.md) covers Home tabs, plugin regions, and the grid.
-
-<a id="sampling-and-retention"></a>
 
 - [Sampling and retention](./dashboards/sampling.md) covers the measure history behind a stat trend.

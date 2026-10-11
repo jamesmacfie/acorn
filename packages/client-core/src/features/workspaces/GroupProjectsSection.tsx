@@ -21,7 +21,10 @@ export function GroupProjectsSection() {
     try {
       await save.run(async () => {
         await setPref(WORKSPACES_PREF_KEY, 'on', nodeId)
-        client.setQueryData<Record<string, string>>(prefsKey, (previous) => ({ ...previous, [WORKSPACES_PREF_KEY]: 'on' }))
+        client.setQueryData<Record<string, string>>(prefsKey, (previous) => ({
+          ...previous,
+          [WORKSPACES_PREF_KEY]: 'on',
+        }))
       })
     } finally {
       setBusy(false)
@@ -35,7 +38,11 @@ export function GroupProjectsSection() {
         description="Put several projects in one workspace so they share a task list, notes, and dashboards. Each project you have now becomes its own workspace. You can't switch back to separate projects."
         error={save.error()}
       >
-        <ConfirmButton disabled={busy()} confirmLabel="Group projects? This can't be undone." onConfirm={() => void group()}>
+        <ConfirmButton
+          disabled={busy()}
+          confirmLabel="Group projects? This can't be undone."
+          onConfirm={() => void group()}
+        >
           Group projects
         </ConfirmButton>
       </SettingRow>

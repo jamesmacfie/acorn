@@ -24,7 +24,7 @@ import { MAX_WAIT_MS } from './tools'
 type RunRow = typeof workflowRuns.$inferSelect
 type StepRow = typeof workflowSteps.$inferSelect
 
-export const MAX_STEP_SUMMARIES = 100
+const MAX_STEP_SUMMARIES = 100
 const MAX_VALUE_BYTES = 16 * 1024
 const MAX_TEXT = 1_000
 const POLL_MS = 500
@@ -37,11 +37,20 @@ export type WorkflowRunReadDeps = {
   requests(): AgentRequestsCapability | undefined
 }
 
-type Attention = { kind: 'gate' | 'question' | 'failure' | 'safety-rail'; step?: string; detail?: string; target: ReturnType<typeof runTarget> & { subresourceId?: string } }
+type Attention = {
+  kind: 'gate' | 'question' | 'failure' | 'safety-rail'
+  step?: string
+  detail?: string
+  target: ReturnType<typeof runTarget> & { subresourceId?: string }
+}
 type Withheld = { name: string; reason: 'likely-secret' | 'too-large' }
 
 const bounded = (text: string | null | undefined): string | undefined =>
-  text ? (text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}… (shortened; open the run for the rest)` : text) : undefined
+  text
+    ? text.length > MAX_TEXT
+      ? `${text.slice(0, MAX_TEXT)}… (shortened; open the run for the rest)`
+      : text
+    : undefined
 
 /** A value whole, or the reason it is not here. Never a shortened value posing as the real one. */
 function shareable(value: DataValue): { value: DataValue } | { withheld: Withheld['reason'] } {
@@ -72,9 +81,13 @@ export class WorkflowRunReads {
     const run = this.deps.db.select().from(workflowRuns).where(eq(workflowRuns.id, runId)).get()
     const own = this.deps.launches.bySession(context.taskId, caller.sessionId)
     const enclosing = caller.workflowRunId
-      ? this.deps.db.select({ rootRunId: workflowRuns.rootRunId }).from(workflowRuns).where(eq(workflowRuns.id, caller.workflowRunId)).get()?.rootRunId
+      ? this.deps.db
+          .select({ rootRunId: workflowRuns.rootRunId })
+          .from(workflowRuns)
+          .where(eq(workflowRuns.id, caller.workflowRunId))
+          .get()?.rootRunId
       : undefined
-    const root = run ? run.rootRunId ?? run.id : runId
+    const root = run ? (run.rootRunId ?? run.id) : runId
     const launch = own.find((candidate) => candidate.id === root)
     // A launch not yet started has no run row, so only its own receipt makes it readable.
     if (!launch && (!run || root !== enclosing)) throw new ToolError('not_found', 'No run you may read has that ID.')
@@ -82,20 +95,40 @@ export class WorkflowRunReads {
   }
 
   private async attention(run: RunRow, steps: StepRow[]): Promise<Attention[]> {
-    const items: Attention[] = steps.filter((step) => step.status === 'waiting-gate')
-      .map((step) => ({ kind: 'gate', step: step.name, target: { ...runTarget(run.id, run.taskId), subresourceId: step.id } }))
-    const sessions = new Map(steps.flatMap((step) => step.agentSessionId ? [[step.agentSessionId, step] as const] : []))
+    const items: Attention[] = steps
+      .filter((step) => step.status === 'waiting-gate')
+      .map((step) => ({
+        kind: 'gate',
+        step: step.name,
+        target: { ...runTarget(run.id, run.taskId), subresourceId: step.id },
+      }))
+    const sessions = new Map(
+      steps.flatMap((step) => (step.agentSessionId ? [[step.agentSessionId, step] as const] : [])),
+    )
     if (sessions.size) {
-      const pending = (await this.deps.requests()?.list({ taskId: run.taskId }).catch(() => [])) ?? []
+      const pending =
+        (await this.deps
+          .requests()
+          ?.list({ taskId: run.taskId })
+          .catch(() => [])) ?? []
       for (const request of pending) {
         const step = sessions.get(request.sessionId)
         if (step && request.status === 'pending') {
-          items.push({ kind: 'question', step: step.name, detail: bounded(request.title), target: { ...runTarget(run.id, run.taskId), subresourceId: step.id } })
+          items.push({
+            kind: 'question',
+            step: step.name,
+            detail: bounded(request.title),
+            target: { ...runTarget(run.id, run.taskId), subresourceId: step.id },
+          })
         }
       }
     }
     if (run.status === 'failed' || run.status === 'safety-rail') {
-      items.push({ kind: run.status === 'failed' ? 'failure' : 'safety-rail', detail: bounded(run.error), target: runTarget(run.id, run.taskId) })
+      items.push({
+        kind: run.status === 'failed' ? 'failure' : 'safety-rail',
+        detail: bounded(run.error),
+        target: runTarget(run.id, run.taskId),
+      })
     }
     return items
   }
@@ -104,11 +137,19 @@ export class WorkflowRunReads {
     const { run, launch } = await this.permitted(runId, context)
     if (!run) {
       // Admitted, not started: waiting for the caller's turn, or refused at dispatch.
-      const status = launch!.state === 'awaiting-caller' ? 'awaiting-caller' : launch!.state === 'cancelled' ? 'cancelled' : 'not-started'
+      const status =
+        launch!.state === 'awaiting-caller'
+          ? 'awaiting-caller'
+          : launch!.state === 'cancelled'
+            ? 'cancelled'
+            : 'not-started'
       return {
-        run: null, steps: [] as StepRow[],
+        run: null,
+        steps: [] as StepRow[],
         summary: {
-          runId, status, ...(launch!.error ? { error: launch!.error } : {}),
+          runId,
+          status,
+          ...(launch!.error ? { error: launch!.error } : {}),
           launch: { state: launch!.state, admittedAt: launch!.createdAt },
           attention: [] as Attention[],
           observation: workflowContentFingerprint({ status, error: launch!.error }).slice(0, 16),
@@ -116,10 +157,16 @@ export class WorkflowRunReads {
         },
       }
     }
-    const steps = this.deps.db.select().from(workflowSteps).where(eq(workflowSteps.runId, run.id)).all().sort((left, right) => left.idx - right.idx)
+    const steps = this.deps.db
+      .select()
+      .from(workflowSteps)
+      .where(eq(workflowSteps.runId, run.id))
+      .all()
+      .sort((left, right) => left.idx - right.idx)
     const attention = await this.attention(run, steps)
     return {
-      run, steps,
+      run,
+      steps,
       summary: {
         runId: run.id,
         name: run.name,
@@ -132,7 +179,11 @@ export class WorkflowRunReads {
         deadlineAt: run.deadlineAt,
         effective: { budget: JSON.parse(run.effectiveBudgetJson), tools: JSON.parse(run.effectiveToolsJson) },
         attention,
-        observation: workflowContentFingerprint({ status: run.status, steps: steps.map((step) => [step.id, step.status]), attention: attention.map((item) => [item.kind, item.step]) }).slice(0, 16),
+        observation: workflowContentFingerprint({
+          status: run.status,
+          steps: steps.map((step) => [step.id, step.status]),
+          attention: attention.map((item) => [item.kind, item.step]),
+        }).slice(0, 16),
         target: runTarget(run.id, run.taskId),
       },
     }
@@ -147,7 +198,16 @@ export class WorkflowRunReads {
       kind: step.kind,
       status: step.status,
       ...(step.error ? { error: bounded(step.error) } : {}),
-      ...(children.length ? { children: children.map((child) => ({ runId: child.runId, name: child.name, status: child.runStatus ?? child.dispatchState, target: runTarget(child.runId, child.taskId) })) } : {}),
+      ...(children.length
+        ? {
+            children: children.map((child) => ({
+              runId: child.runId,
+              name: child.name,
+              status: child.runStatus ?? child.dispatchState,
+              target: runTarget(child.runId, child.taskId),
+            })),
+          }
+        : {}),
       target: { ...runTarget(run.id, run.taskId), subresourceId: step.id },
     }
   }
@@ -165,7 +225,7 @@ export class WorkflowRunReads {
       return {
         ...summary,
         step: {
-          ...await this.stepSummary(run, def, step),
+          ...(await this.stepSummary(run, def, step)),
           ...(output && 'value' in output ? { output: output.value } : {}),
           ...(output && 'withheld' in output ? { outputWithheld: output.withheld } : {}),
         },
@@ -175,15 +235,27 @@ export class WorkflowRunReads {
     let outputs: ReturnType<typeof shareAll> | null = null
     let outputsError: string | undefined
     if (run.status === 'done' || run.status === 'completed-with-failures') {
-      try { outputs = shareAll(workflowOutputs(def, steps)) } catch (error) { outputsError = bounded(error instanceof Error ? error.message : String(error)) }
+      try {
+        outputs = shareAll(workflowOutputs(def, steps))
+      } catch (error) {
+        outputsError = bounded(error instanceof Error ? error.message : String(error))
+      }
     }
     const room = MAX_TOOL_RESPONSE_BYTES - Buffer.byteLength(JSON.stringify({ summary, outputs })) - 2048
-    const page = boundedPage(summaries, (item) => String(steps.find((step) => step.id === item.stepId)!.idx).padStart(6, '0'), input.cursor, MAX_STEP_SUMMARIES, Math.max(room, 4096))
+    const page = boundedPage(
+      summaries,
+      (item) => String(steps.find((step) => step.id === item.stepId)!.idx).padStart(6, '0'),
+      input.cursor,
+      MAX_STEP_SUMMARIES,
+      Math.max(room, 4096),
+    )
     return {
       ...summary,
       steps: page.items,
       nextCursor: page.nextCursor,
-      ...(outputs ? { outputs: outputs.values, ...(outputs.withheld.length ? { outputsWithheld: outputs.withheld } : {}) } : {}),
+      ...(outputs
+        ? { outputs: outputs.values, ...(outputs.withheld.length ? { outputsWithheld: outputs.withheld } : {}) }
+        : {}),
       ...(outputsError ? { outputsError } : {}),
     }
   }
@@ -196,21 +268,41 @@ export class WorkflowRunReads {
     for (;;) {
       const { summary } = await this.snapshot(input.runId, context)
       if (summary.status === 'awaiting-caller') {
-        return { reason: 'awaiting-caller', next: 'The run starts after this turn ends. End your turn; read it again later.', ...summary }
+        return {
+          reason: 'awaiting-caller',
+          next: 'The run starts after this turn ends. End your turn; read it again later.',
+          ...summary,
+        }
       }
       if (TERMINAL.has(summary.status)) return { reason: 'finished', ...summary }
       if (baseline === undefined) {
-        if (summary.attention.length) return { reason: 'attention', next: 'A person needs to act. Tell them what the run needs, then end your turn.', ...summary }
+        if (summary.attention.length)
+          return {
+            reason: 'attention',
+            next: 'A person needs to act. Tell them what the run needs, then end your turn.',
+            ...summary,
+          }
         baseline = summary.observation
       } else if (summary.observation !== baseline) {
         return summary.attention.length
-          ? { reason: 'attention', next: 'A person needs to act. Tell them what the run needs, then end your turn.', ...summary }
+          ? {
+              reason: 'attention',
+              next: 'A person needs to act. Tell them what the run needs, then end your turn.',
+              ...summary,
+            }
           : { reason: 'changed', ...summary }
       }
       if (Date.now() >= deadline || context.signal?.aborted) return { reason: 'timeout', ...summary }
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, Math.min(POLL_MS, Math.max(0, deadline - Date.now())))
-        context.signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+        context.signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer)
+            resolve()
+          },
+          { once: true },
+        )
       })
     }
   }

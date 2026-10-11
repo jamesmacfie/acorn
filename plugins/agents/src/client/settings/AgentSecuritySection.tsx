@@ -8,12 +8,12 @@ import InstructionReviewPanel from './InstructionReviewPanel'
 const SecurityDiagnosticsPanel = lazy(() => import('./SecurityDiagnosticsPanel'))
 
 // This plugin's section of Settings > Security and backup, drawn in core's `core:security` point. The
-// switches enable required checks in the managed-turn dispatcher on the selected Node.
-// (../../server/sessions/instructionCheck.ts). The value is one field of the session defaults record,
-// whose write route takes only a device, so an agent can't turn the check off.
+// switches enable required checks in the managed-turn dispatcher on the selected node. Each value is a
+// field of the session defaults record, whose write route takes only a device, so an agent can't turn
+// a check off.
 //
 // It follows the settings header's node switcher, so it reads and writes the named node's record
-// directly. ./sessionDefaultsClient.ts always means the active node.
+// directly. `agentSessionDefaultsOptions` always means the active node.
 
 const LABEL = 'Check instruction files before each agent turn'
 
@@ -28,7 +28,10 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
   }))
   const save = createSettingSave()
 
-  const write = async (field: 'checkInstructionFiles' | 'reviewChangedInstructions' | 'blockDataRootReads', on: boolean) => {
+  const write = async (
+    field: 'checkInstructionFiles' | 'reviewChangedInstructions' | 'blockDataRootReads',
+    on: boolean,
+  ) => {
     const selectedNode = nodeId()
     const selectedKey = queryKey()
     const saved = await writeJson<AgentSessionDefaults>(
@@ -73,12 +76,19 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
           description="Ask you to approve instructions and skills before agents use them, and again whenever those files change."
           error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
         >
-          <Checkbox switch ariaLabel="Review changed instruction files"
+          <Checkbox
+            switch
+            ariaLabel="Review changed instruction files"
             checked={stored.data?.reviewChangedInstructions ?? false}
             disabled={!stored.isSuccess}
-            onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
+            onChange={(next) => save.run(() => write('reviewChangedInstructions', next))}
+          />
         </SettingRow>
-        <InstructionReviewPanel nodeId={props.nodeId} enabled={stored.data?.reviewChangedInstructions} preferredTaskId={activeTaskId()} />
+        <InstructionReviewPanel
+          nodeId={props.nodeId}
+          enabled={stored.data?.reviewChangedInstructions}
+          preferredTaskId={activeTaskId()}
+        />
       </SettingsSection>
       <SettingsSection
         id="agent-data-access"
@@ -90,10 +100,13 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
           description="Claude Code agents run in its sandbox. They can't read other sessions' tokens or the task database, and their commands can only write in their worktree, so package installs and SSH pushes may fail. Applies from each agent's next start."
           error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
         >
-          <Checkbox switch ariaLabel="Keep agents out of Acorn's data folder"
+          <Checkbox
+            switch
+            ariaLabel="Keep agents out of Acorn's data folder"
             checked={stored.data?.blockDataRootReads ?? false}
             disabled={!stored.isSuccess}
-            onChange={(next) => save.run(() => write('blockDataRootReads', next))} />
+            onChange={(next) => save.run(() => write('blockDataRootReads', next))}
+          />
         </SettingRow>
       </SettingsSection>
       <SettingsSection id="agent-security-check" label="Security check">

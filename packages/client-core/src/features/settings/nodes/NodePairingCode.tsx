@@ -74,7 +74,9 @@ export function NodePairingPanel(props: { node: NodeRecord; pairing: NodePairing
         {(active) => (
           <Card>
             <div class="integration-device">
-              <Text wrap>Enter this code on the other computer within {Math.ceil(active().expiresInMs / 60_000)} minutes.</Text>
+              <Text wrap>
+                Enter this code on the other computer within {Math.ceil(active().expiresInMs / 60_000)} minutes.
+              </Text>
               <div class="integration-device-code copyable">
                 <code>{active().code}</code>
                 <CopyButton text={() => active().code} title="Copy the code" always />
@@ -82,12 +84,21 @@ export function NodePairingPanel(props: { node: NodeRecord; pairing: NodePairing
               <Show when={fingerprintPhrase(props.node.fingerprint)}>
                 {(words) => (
                   <Stack gap="inline">
-                    <Text emphasis="muted" wrap>Check that its identity words match:</Text>
+                    <Text emphasis="muted" wrap>
+                      Check that its identity words match:
+                    </Text>
                     <span class="node-fingerprint-words">{words()}</span>
                   </Stack>
                 )}
               </Show>
-              <Button size="sm" variant="ghost" disabled={props.pairing.busy()} onPress={() => void props.pairing.close()}>Close pairing</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={props.pairing.busy()}
+                onPress={() => void props.pairing.close()}
+              >
+                Close pairing
+              </Button>
             </div>
           </Card>
         )}

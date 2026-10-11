@@ -84,8 +84,6 @@ now** on Settings → Schedules ([schedules](./schedules.md)).
 
 ## Pages
 
-<a id="execution-model"></a>
-
 - [Workflow execution](./workflows/execution.md): the execution model, the graph, what an agent step
   sees, isolation, retry, and human gates.
 - [Agent steps](./workflows/agent-steps.md): what an agent step sees, and a turn that ends early.
@@ -94,60 +92,30 @@ now** on Settings → Schedules ([schedules](./schedules.md)).
 - [Workflow tools](./agent-tools/workflow-tools.md): how an agent finds workflows, saves drafts, and
   starts one you approved for agents.
 
-<a id="authoring"></a>
-
 - [Workflow authoring](./workflows/authoring.md): the editor, scheduling, child workflows, and AI
   generation.
 - [AI authoring](./workflows/ai-authoring.md): generating and editing with a model.
 - [Editor details](./workflows/editor-details.md): the draft rules, the graph view, the JSON tab,
   saving, and where positions live.
 
-<a id="database-definitions"></a>
-<a id="draft-recovery-and-publication"></a>
-
 - [Workflow definitions](./workflows/definitions.md): the two stores, starting by ID, and drafts and
   publication.
 
-<a id="file-drafts-and-portable-export"></a>
-
 - [File drafts and portable export](./workflows/file-drafts.md).
-
-<a id="contributed-step-kinds"></a>
-<a id="a-kind-describes-its-own-form"></a>
-<a id="the-kinds-other-plugins-contribute"></a>
-<a id="progress-events"></a>
 
 - [Contributed step kinds](./workflows/step-kinds.md): kinds, policies, triggers, and progress events.
 
-<a id="routes-and-ui"></a>
-<a id="the-run-pane"></a>
-<a id="what-the-pane-listens-to"></a>
-<a id="getting-there-from-somewhere-else"></a>
-
 - [Routes and UI](./workflows/routes-and-ui.md): the run pane and its frames.
 
-<a id="starting-a-run-from-an-item"></a>
-<a id="from-the-command-palette"></a>
-
 - [Starting runs](./workflows/starting-runs.md): **Start workflow…** on a row, and palette rows.
-
-<a id="typed-data-and-conditions"></a>
 
 - [Typed data and conditions](./workflows/typed-data.md): `find-records`, `get-record-details`, and
   `if`.
 
-<a id="record-processing-history"></a>
-
 - [Record processing history](./workflows/record-history.md): the processing ledger and checkpoints.
-
-<a id="scheduled-roots"></a>
 
 - [Scheduled roots](./workflows/scheduled-roots.md): workflows on a Node schedule.
 
-<a id="what-workflows-refuses"></a>
-
 - [What workflows refuses](./workflows/refusals.md): settled decisions and what would reopen them.
-
-<a id="gaps"></a>
 
 Known gaps are in [docs/future/workflows-gaps.md](./future/workflows-gaps.md).

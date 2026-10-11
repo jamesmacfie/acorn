@@ -5,7 +5,7 @@
 //   pnpm dev:plugin rollbar -- --package-root ../desktop/dist/bundled-plugins  # into desktop staging
 //
 // This removes the remembered sequence, not the restart. Trust dialogs are skipped in a development
-// build (main/helper/bundledPluginTrust.ts), and the rebuild is this. The node restart is the one real
+// build (`bundledPluginTrust` in @acorn/custody), and the rebuild is this. The node restart is the one real
 // step, because a loaded plugin's routes, tables and jobs wire at init
 // (node-core/server/routes/plugins/plugins.ts), and under `pnpm dev:node` even that is automatic, because
 // node's own `--watch` sees the rewritten bundle.
@@ -15,7 +15,7 @@
 // startup is noise next to a Vite build. Not a Vite watch build and not a file-watching library:
 // `node:fs` already watches directories, and the builder already knows how to build.
 //
-// Ceiling: a rebuild is a full build of both bundles, ~1s, with no incremental graph. If that stops
+// Ceiling: a rebuild is a full build of both bundles, with no incremental graph. If that stops
 // being fast enough the upgrade path is Vite's own watch mode inside build-plugin.mjs, which keeps the
 // rollup graph warm; nothing here would need to change but this file.
 import { spawn } from 'node:child_process'

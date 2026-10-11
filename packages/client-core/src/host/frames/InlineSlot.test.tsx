@@ -1,7 +1,11 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InlineSlot } from './InlineSlot'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
 // Another plugin's rectangle, drawn as a sibling region of this one's pane (docs/plugins/cooperative-extension-points.md §
@@ -10,8 +14,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 // The counterpart to `tree/Slot.test.tsx`, and the same division: the arbitration rule is tested next
 // door in `arbitration.test.ts`, and what a render adds is what a person would see. What is particular
 // to this kind is that every occupant is a whole iframe, so the owner's ceiling is a real limit and a
-// point past it has to say so rather than dropping contributors in silence — which is what it did
-// until phase 10.
+// point past it has to say so rather than dropping contributors in silence.
 //
 // The other half is the gate. An occupant draws only if its own plugin is running here, its bytes are
 // trusted on this device, and the surface it named is really an `inline` one. Those are three separate
@@ -33,42 +36,47 @@ type Roster = { pluginId: string; trusted: boolean; hash: string; target: string
 let roster: Roster[] = []
 
 vi.mock('../plugins/contributions', () => ({
-  eligiblePlugins: () => roster.map((entry) => ({
-    pluginId: entry.pluginId,
-    trusted: entry.trusted,
-    hash: entry.hash,
-    row: {},
-    installed: { contributions: { frames: [{ id: 'preview', target: entry.target }] } },
-  })),
+  eligiblePlugins: () =>
+    roster.map((entry) => ({
+      pluginId: entry.pluginId,
+      trusted: entry.trusted,
+      hash: entry.hash,
+      row: {},
+      installed: { contributions: { frames: [{ id: 'preview', target: entry.target }] } },
+    })),
 }))
 
 const POINT = 'editor:beside'
 const registered: Disposable[] = []
 
 const point = (max = 4) =>
-  registered.push(extensionPointRegistry.register({
-    id: POINT,
-    ownerId: 'editor',
-    label: 'Beside the document',
-    kind: 'rectangle',
-    location: 'pane.inline-beside',
-    surface: 'editor',
-    mode: 'stack',
-    max,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: POINT,
+      ownerId: 'editor',
+      label: 'Beside the document',
+      kind: 'rectangle',
+      location: 'pane.inline-beside',
+      surface: 'editor',
+      mode: 'stack',
+      max,
+    }),
+  )
 
 const contributor = (pluginId: string, matches?: string[]) => {
   roster.push({ pluginId, trusted: true, hash: 'abc', target: 'inline' })
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:beside`,
-    pluginId,
-    point: POINT,
-    label: `${pluginId} preview`,
-    order: 500,
-    carrier: 'frame',
-    frame: 'preview',
-    ...(matches ? { matches } : {}),
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:beside`,
+      pluginId,
+      point: POINT,
+      label: `${pluginId} preview`,
+      order: 500,
+      carrier: 'frame',
+      frame: 'preview',
+      ...(matches ? { matches } : {}),
+    } as ExtensionContribution),
+  )
 }
 
 const draw = (key?: string) => {
@@ -105,8 +113,7 @@ describe('InlineSlot', () => {
     contributor('markdown')
     contributor('csv')
     contributor('images')
-    // One iframe drawn, and the other two disclosed as a count. A rectangle point past its ceiling
-    // used to draw the first and say nothing at all about the rest.
+    // One iframe drawn, and the other two disclosed as a count.
     //
     // `csv` is the one drawn because equal orders break on contribution id, which is what makes the
     // answer independent of the sequence the three plugins happened to register in.

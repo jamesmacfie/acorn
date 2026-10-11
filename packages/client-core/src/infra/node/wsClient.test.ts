@@ -10,7 +10,7 @@ import { activeToasts, dismissToast } from '../../features/notifications/toast'
 import { setActiveNode } from './activeNode'
 import { registerWsChannel } from './wsChannels'
 
-// The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the
+// The renderer does not own a socket, so this fakes the broker rather than a WebSocket: the
 // thing under test is the subscription bookkeeping and the reconnect behaviour, not a transport.
 
 type Bridge = {
@@ -39,7 +39,11 @@ function installBridge(): Bridge {
     desktop: true,
     nodeFetch: async (nodeId: string, request: { path: string }) => {
       if (request.path !== prefsRoute) throw new Error(`Unexpected request: ${request.path}`)
-      return { status: 200, headers: { 'content-type': 'application/json' }, body: new TextEncoder().encode(JSON.stringify(preferences[nodeId])) }
+      return {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: new TextEncoder().encode(JSON.stringify(preferences[nodeId])),
+      }
     },
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
@@ -54,7 +58,10 @@ function installBridge(): Bridge {
       statusHandlers.push(cb)
       return () => {}
     },
-    onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => { errorHandlers.push(cb); return () => {} },
+    onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => {
+      errorHandlers.push(cb)
+      return () => {}
+    },
   }
   ;(globalThis as { window?: unknown }).window = { acorn }
   return {
@@ -97,7 +104,8 @@ describe('wsClient', () => {
     second.setQueryData(prefsKey, { 'core.workspaces': 'off' })
     Object.assign(bridge.preferences, { n1: { 'core.workspaces': 'off' }, n2: { 'core.workspaces': 'on' } })
     const observer = new QueryObserver(second, {
-      ...prefsOptions(true), queryFn: ({ signal }) => readJson<Record<string, string>>(prefsRoute, { nodeId: 'n2', signal }),
+      ...prefsOptions(true),
+      queryFn: ({ signal }) => readJson<Record<string, string>>(prefsRoute, { nodeId: 'n2', signal }),
     })
     const unsubscribe = observer.subscribe(() => {})
     const off = watchWorkspaceChanges()
@@ -117,12 +125,19 @@ describe('wsClient', () => {
       first.setQueryData(prefsKey, { 'core.workspaces': 'off' })
       bridge.emitFrame({ channel: 'workspaces-mode:changed', mode: 'on' }, 'n1')
       expect(first.getQueryState(prefsKey)?.isInvalidated).toBe(false)
-    } finally { off(); offActive(); unsubscribe(); _resetFleet() }
+    } finally {
+      off()
+      offActive()
+      unsubscribe()
+      _resetFleet()
+    }
   })
   it('shows a generic transport refusal to the user without changing sibling Node status', () => {
     client.wsConnect()
     bridge.emitError({ code: 'viewers_unsupported', message: 'Upgrade this Node for another window.' })
-    expect(activeToasts()).toEqual([expect.objectContaining({ message: 'Upgrade this Node for another window.', tone: 'danger' })])
+    expect(activeToasts()).toEqual([
+      expect.objectContaining({ message: 'Upgrade this Node for another window.', tone: 'danger' }),
+    ])
     bridge.emitStatus('online', 'n2')
     expect(activeToasts()).toHaveLength(1)
   })
@@ -133,13 +148,16 @@ describe('wsClient', () => {
     client.wsOnNotice((n) => notices.push(n.kind ?? ''))
 
     bridge.emitFrame({ channel: 'term:status' })
-    bridge.emitFrame({ channel: 'workflow:notice', notice: { taskId: 't1', kind: 'repo-config-trust', title: 'review', action: 'review-config' } })
+    bridge.emitFrame({
+      channel: 'workflow:notice',
+      notice: { taskId: 't1', kind: 'repo-config-trust', title: 'review', action: 'review-config' },
+    })
 
     expect(statuses).toEqual([1])
     expect(notices).toEqual(['repo-config-trust'])
   })
 
-  // The old content-free `term:status` ping is split in two, and what is left of it names a plugin id.
+  // `term:status` names the plugin whose chrome moved, or nothing when core itself pinged.
   it('hands a status subscriber the plugin id the frame named, and nothing when it named none', () => {
     const named: (string | undefined)[] = []
     client.wsOnStatus((pluginId) => named.push(pluginId))
@@ -152,7 +170,8 @@ describe('wsClient', () => {
   })
 
   it('delivers fleet workspace changes with their owning Node while keeping ordinary subscriptions scoped', () => {
-    const fleet: string[] = [], active: string[] = []
+    const fleet: string[] = [],
+      active: string[] = []
     const off = client.wsOnFleetWorkspaceChanged((nodeId, event) => fleet.push(`${nodeId}:${event.workspaceId}`))
     client.wsOnNodeEvent('workspace:changed', (event) => active.push(event.workspaceId))
     bridge.emitFrame({ channel: 'workspace:changed', workspaceId: 'shared' }, 'n2')
@@ -254,7 +273,11 @@ describe('wsClient', () => {
 
   it('replays each channel owner only on a genuine reconnect of the active node', () => {
     const reconnects: number[] = []
-    const owner = registerWsChannel('probe', () => {}, () => [{ channel: 'probe:attach', id: 's1' }])
+    const owner = registerWsChannel(
+      'probe',
+      () => {},
+      () => [{ channel: 'probe:attach', id: 's1' }],
+    )
     client.wsOnReconnect(() => reconnects.push(1))
     bridge.emitStatus('online')
     bridge.emitStatus('online', 'n2')

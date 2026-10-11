@@ -9,21 +9,63 @@ import { prefsOptions, queryOwner } from '@acorn/plugin-api/client'
 import { wsOnDockerChanged } from './wsChannel'
 import { readDockerPrefs } from './dockerPrefs'
 import type { DockerComposeAction, DockerContainerSummary, DockerPruneKind } from '../shared/model'
-import { composeAction, containerAction, dockerPrune, fetchImages, fetchNetworks, fetchVolumes, removeContainer, removeImage, removeNetwork, removeVolume } from './dockerClient'
+import {
+  composeAction,
+  containerAction,
+  dockerPrune,
+  fetchImages,
+  fetchNetworks,
+  fetchVolumes,
+  removeContainer,
+  removeImage,
+  removeNetwork,
+  removeVolume,
+} from './dockerClient'
 import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRefresh } from './dockerStore'
 import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
-  Alert, Badge, Button, ConfirmButton, EmptyState, IconButton, Inline, Input, ListDetail, Row, Rows, Section,
-  SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, FilterBar, Toolbar, TreeRow,
+  Alert,
+  Badge,
+  Button,
+  ConfirmButton,
+  EmptyState,
+  IconButton,
+  Inline,
+  Input,
+  ListDetail,
+  Row,
+  Rows,
+  Section,
+  SectionHeader,
+  Stack,
+  StatusDot,
+  TabPanel,
+  Tabs,
+  Text,
+  FilterBar,
+  Toolbar,
+  TreeRow,
 } from '@acorn/plugin-api/ui'
 import { shortStatus } from './shortStatus'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { consumeDockerReveal, containerTone, dockerBrowseOffset, dockerBrowseState, dockerReveal, rememberDockerBrowseOffset, rememberDockerBrowseState } from './dockerViewStore'
+import {
+  consumeDockerReveal,
+  containerTone,
+  dockerBrowseOffset,
+  dockerBrowseState,
+  dockerReveal,
+  rememberDockerBrowseOffset,
+  rememberDockerBrowseState,
+} from './dockerViewStore'
 
 // What each prune runs, for the tip on its button.
 const PRUNE_COMMAND: Record<DockerPruneKind, string> = {
-  containers: 'docker container prune', images: 'docker image prune', volumes: 'docker volume prune', networks: 'docker network prune', builder: 'docker builder prune',
+  containers: 'docker container prune',
+  images: 'docker image prune',
+  volumes: 'docker volume prune',
+  networks: 'docker network prune',
+  builder: 'docker builder prune',
 }
 
 type SectionId = 'containers' | 'images' | 'volumes' | 'networks'
@@ -38,7 +80,8 @@ const BUILTIN_NETWORKS = new Set(['bridge', 'host', 'none'])
 
 type Group = { project: string | null; containers: DockerContainerSummary[]; running: number }
 
-const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
+const isActive = (c: DockerContainerSummary): boolean =>
+  c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
 function groupContainers(list: DockerContainerSummary[]): Group[] {
   const byProject = new Map<string, DockerContainerSummary[]>()
@@ -64,7 +107,9 @@ const label = (g: Group): string => g.project ?? g.containers[0]?.name ?? ''
 export default function DockerBrowse() {
   const owner = captureDockerScope(queryOwner(useQueryClient()))
   let mounted = true
-  onCleanup(() => { mounted = false })
+  onCleanup(() => {
+    mounted = false
+  })
   const current = () => mounted && owner.current()
   const saved = dockerBrowseState()
   const [section, setSection] = createSignal<SectionId>(saved?.section ?? 'containers')
@@ -72,7 +117,13 @@ export default function DockerBrowse() {
   const [filter, setFilter] = createSignal(saved?.filter ?? '')
   const [collapsed, setCollapsed] = createSignal<Set<string>>(new Set(saved?.collapsed))
   createEffect(() => {
-    if (current()) rememberDockerBrowseState({ section: section(), selected: selected(), filter: filter(), collapsed: [...collapsed()] })
+    if (current())
+      rememberDockerBrowseState({
+        section: section(),
+        selected: selected(),
+        filter: filter(),
+        collapsed: [...collapsed()],
+      })
   })
   const [rowBusy, setRowBusy] = createSignal<string | null>(null)
   const [groupBusy, setGroupBusy] = createSignal<string | null>(null)
@@ -97,9 +148,18 @@ export default function DockerBrowse() {
   })
 
   // Object lists load on section entry and refresh on their docker:changed scope.
-  const [images, imagesCtl] = createResource(() => (section() === 'images' ? 'images' : null), () => fetchImages(owner.nodeId))
-  const [volumes, volumesCtl] = createResource(() => (section() === 'volumes' ? 'volumes' : null), () => fetchVolumes(owner.nodeId))
-  const [networks, networksCtl] = createResource(() => (section() === 'networks' ? 'networks' : null), () => fetchNetworks(owner.nodeId))
+  const [images, imagesCtl] = createResource(
+    () => (section() === 'images' ? 'images' : null),
+    () => fetchImages(owner.nodeId),
+  )
+  const [volumes, volumesCtl] = createResource(
+    () => (section() === 'volumes' ? 'volumes' : null),
+    () => fetchVolumes(owner.nodeId),
+  )
+  const [networks, networksCtl] = createResource(
+    () => (section() === 'networks' ? 'networks' : null),
+    () => fetchNetworks(owner.nodeId),
+  )
   const offChanged = wsOnDockerChanged((scopes) => {
     if (current() && scopes.includes('images') && section() === 'images') void imagesCtl.refetch()
     if (current() && scopes.includes('volumes') && section() === 'volumes') void volumesCtl.refetch()
@@ -140,9 +200,13 @@ export default function DockerBrowse() {
   }
 
   // Stale stacks: compose projects whose worktree directory is gone.
-  const staleProjects = createMemo(() => [...new Set(
-    containers().filter((c) => c.workingDirMissing && c.composeProject).map((c) => c.composeProject!),
-  )])
+  const staleProjects = createMemo(() => [
+    ...new Set(
+      containers()
+        .filter((c) => c.workingDirMissing && c.composeProject)
+        .map((c) => c.composeProject!),
+    ),
+  ])
 
   async function cleanUpStale() {
     const projects = staleProjects()
@@ -157,8 +221,12 @@ export default function DockerBrowse() {
   const filtered = createMemo(() => {
     const q = filter().trim().toLowerCase()
     if (!q) return containers()
-    return containers().filter((c) =>
-      c.name.toLowerCase().includes(q) || c.image.toLowerCase().includes(q) || (c.composeProject ?? '').toLowerCase().includes(q))
+    return containers().filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.image.toLowerCase().includes(q) ||
+        (c.composeProject ?? '').toLowerCase().includes(q),
+    )
   })
   const groups = createMemo(() => groupContainers(filtered()))
   const activeGroups = () => groups().filter((g) => g.running > 0)
@@ -173,7 +241,10 @@ export default function DockerBrowse() {
   // the list does; `requestAnnotations` compares the key set and does nothing when it has already
   // asked (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind).
   createEffect(() => {
-    requestAnnotations(CONTAINER_POINT, filtered().map((c) => ({ container: c.id })))
+    requestAnnotations(
+      CONTAINER_POINT,
+      filtered().map((c) => ({ container: c.id })),
+    )
   })
 
   function toggleGroup(project: string) {
@@ -233,7 +304,9 @@ export default function DockerBrowse() {
               skipConfirm={skipConfirm()}
               disabled={rowBusy() === c.id}
               onConfirm={() => void rowAction(c, 'remove')}
-            >🗑</ConfirmButton>
+            >
+              🗑
+            </ConfirmButton>
           </>
         }
       >
@@ -259,7 +332,9 @@ export default function DockerBrowse() {
           meta={
             <Inline gap="inline">
               <Show when={g.containers.some((c) => c.workingDirMissing)}>
-                <Badge tone="warn" shape="pill" size="xs" tip="Its worktree was deleted">Left over</Badge>
+                <Badge tone="warn" shape="pill" size="xs" tip="Its worktree was deleted">
+                  Left over
+                </Badge>
               </Show>
               {g.running}/{g.containers.length} running
             </Inline>
@@ -285,7 +360,9 @@ export default function DockerBrowse() {
                 skipConfirm={skipConfirm()}
                 disabled={groupBusy() === g.project}
                 onConfirm={() => void groupAction(g.project!, 'down')}
-              >🗑</ConfirmButton>
+              >
+                🗑
+              </ConfirmButton>
             </>
           }
         >
@@ -301,7 +378,9 @@ export default function DockerBrowse() {
   // The prune is the one destructive button in the column, so it sits at the end of the bar.
   const ObjectBar = (barProps: { count: number; noun: string; kind: DockerPruneKind; confirmLabel: string }) => (
     <Toolbar size="sm" ariaLabel={`${barProps.noun} actions`}>
-      <Text emphasis="muted">{barProps.count} {barProps.noun}</Text>
+      <Text emphasis="muted">
+        {barProps.count} {barProps.noun}
+      </Text>
       <Show when={pruneNote()}>{(note) => <Text emphasis="muted">{note()}</Text>}</Show>
       <Toolbar.Spacer />
       <ConfirmButton
@@ -311,7 +390,9 @@ export default function DockerBrowse() {
         confirmLabel={barProps.confirmLabel}
         skipConfirm={skipConfirm()}
         onConfirm={() => void prune(barProps.kind)}
-      >Remove unused</ConfirmButton>
+      >
+        Remove unused
+      </ConfirmButton>
     </Toolbar>
   )
 
@@ -320,7 +401,15 @@ export default function DockerBrowse() {
       {/* The running count in the header's count slot, where every list header keeps its number. */}
       <SectionHeader
         count={dockerInfo()?.available ? runningCount() : undefined}
-        actions={<IconButton icon="refresh-cw" title="Refresh" label="Refresh" busy={loading()} onPress={() => void refreshDocker()} />}
+        actions={
+          <IconButton
+            icon="refresh-cw"
+            title="Refresh"
+            label="Refresh"
+            busy={loading()}
+            onPress={() => void refreshDocker()}
+          />
+        }
       >
         Docker
       </SectionHeader>
@@ -348,10 +437,21 @@ export default function DockerBrowse() {
         />
         <Show when={actionError()}>{(error) => <Alert>{error()}</Alert>}</Show>
 
-        <TabPanel id="containers" active={section()} idPrefix="docker-section"
-          scrollOffset={dockerBrowseOffset('containers')} onChange={(offset) => rememberDockerBrowseOffset('containers', offset)}>
+        <TabPanel
+          id="containers"
+          active={section()}
+          idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('containers')}
+          onChange={(offset) => rememberDockerBrowseOffset('containers', offset)}
+        >
           <FilterBar ariaLabel="Filter containers">
-            <Input kind="filter" label="Filter containers" placeholder="Filter name / image / project" value={filter()} onInput={(value) => setFilter(value)} />
+            <Input
+              kind="filter"
+              label="Filter containers"
+              placeholder="Filter name / image / project"
+              value={filter()}
+              onInput={(value) => setFilter(value)}
+            />
           </FilterBar>
           <Show when={staleProjects().length}>
             <Alert
@@ -363,13 +463,22 @@ export default function DockerBrowse() {
                   confirmLabel="Remove stale projects?"
                   skipConfirm={skipConfirm()}
                   onConfirm={() => void cleanUpStale()}
-                >Remove them</ConfirmButton>
+                >
+                  Remove them
+                </ConfirmButton>
               }
             >
               {staleProjects().length} project{staleProjects().length === 1 ? '' : 's'} left over from deleted worktrees
             </Alert>
           </Show>
-          <Show when={containers().length} fallback={<EmptyState align="start" busy={loading()}>{loading() ? 'Loading…' : 'No containers.'}</EmptyState>}>
+          <Show
+            when={containers().length}
+            fallback={
+              <EmptyState align="start" busy={loading()}>
+                {loading() ? 'Loading…' : 'No containers.'}
+              </EmptyState>
+            }
+          >
             <Stack gap="none">
               <For each={activeGroups()}>{groupBlock}</For>
               <Show when={dockerPrefs().showStopped && stoppedGroups().length}>
@@ -381,8 +490,13 @@ export default function DockerBrowse() {
           </Show>
         </TabPanel>
 
-        <TabPanel id="images" active={section()} idPrefix="docker-section"
-          scrollOffset={dockerBrowseOffset('images')} onChange={(offset) => rememberDockerBrowseOffset('images', offset)}>
+        <TabPanel
+          id="images"
+          active={section()}
+          idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('images')}
+          onChange={(offset) => rememberDockerBrowseOffset('images', offset)}
+        >
           <ObjectBar count={(images() ?? []).length} noun="images" kind="images" confirmLabel="Prune images?" />
           <Rows
             id="docker.images"
@@ -406,22 +520,41 @@ export default function DockerBrowse() {
                     title="Remove image"
                     confirmLabel="Remove image?"
                     skipConfirm={skipConfirm()}
-                    onConfirm={() => void failing(removeImage(entry.img.id, false, owner.nodeId)).then(() => { if (current()) return imagesCtl.refetch() })}
-                  >🗑</ConfirmButton>
+                    onConfirm={() =>
+                      void failing(removeImage(entry.img.id, false, owner.nodeId)).then(() => {
+                        if (current()) return imagesCtl.refetch()
+                      })
+                    }
+                  >
+                    🗑
+                  </ConfirmButton>
                 }
               >
-                {entry.img.repository}<Text emphasis="muted">:{entry.img.tag}</Text>
+                {entry.img.repository}
+                <Text emphasis="muted">:{entry.img.tag}</Text>
               </Row>
             )}
           </Rows>
           <Show when={!(images() ?? []).length}>
-            <EmptyState align="start" busy={images.loading}>{images.loading ? 'Loading…' : 'No images.'}</EmptyState>
+            <EmptyState align="start" busy={images.loading}>
+              {images.loading ? 'Loading…' : 'No images.'}
+            </EmptyState>
           </Show>
         </TabPanel>
 
-        <TabPanel id="volumes" active={section()} idPrefix="docker-section"
-          scrollOffset={dockerBrowseOffset('volumes')} onChange={(offset) => rememberDockerBrowseOffset('volumes', offset)}>
-          <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" confirmLabel="Remove unused volumes?" />
+        <TabPanel
+          id="volumes"
+          active={section()}
+          idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('volumes')}
+          onChange={(offset) => rememberDockerBrowseOffset('volumes', offset)}
+        >
+          <ObjectBar
+            count={(volumes() ?? []).length}
+            noun="volumes"
+            kind="volumes"
+            confirmLabel="Remove unused volumes?"
+          />
           <Rows
             id="docker.volumes"
             ariaLabel="Volumes"
@@ -444,8 +577,14 @@ export default function DockerBrowse() {
                     title="Remove volume (deletes its data)"
                     confirmLabel="Remove volume?"
                     skipConfirm={skipConfirm()}
-                    onConfirm={() => void failing(removeVolume(entry.volume.name, false, owner.nodeId)).then(() => { if (current()) return volumesCtl.refetch() })}
-                  >🗑</ConfirmButton>
+                    onConfirm={() =>
+                      void failing(removeVolume(entry.volume.name, false, owner.nodeId)).then(() => {
+                        if (current()) return volumesCtl.refetch()
+                      })
+                    }
+                  >
+                    🗑
+                  </ConfirmButton>
                 }
               >
                 {entry.volume.anonymous ? `${entry.volume.name.slice(0, 12)}… (anonymous)` : entry.volume.name}
@@ -453,12 +592,19 @@ export default function DockerBrowse() {
             )}
           </Rows>
           <Show when={!(volumes() ?? []).length}>
-            <EmptyState align="start" busy={volumes.loading}>{volumes.loading ? 'Loading…' : 'No volumes.'}</EmptyState>
+            <EmptyState align="start" busy={volumes.loading}>
+              {volumes.loading ? 'Loading…' : 'No volumes.'}
+            </EmptyState>
           </Show>
         </TabPanel>
 
-        <TabPanel id="networks" active={section()} idPrefix="docker-section"
-          scrollOffset={dockerBrowseOffset('networks')} onChange={(offset) => rememberDockerBrowseOffset('networks', offset)}>
+        <TabPanel
+          id="networks"
+          active={section()}
+          idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('networks')}
+          onChange={(offset) => rememberDockerBrowseOffset('networks', offset)}
+        >
           <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" confirmLabel="Prune networks?" />
           <Rows
             id="docker.networks"
@@ -483,8 +629,14 @@ export default function DockerBrowse() {
                       title="Remove network"
                       confirmLabel="Remove network?"
                       skipConfirm={skipConfirm()}
-                      onConfirm={() => void failing(removeNetwork(entry.network.id, owner.nodeId)).then(() => { if (current()) return networksCtl.refetch() })}
-                    >🗑</ConfirmButton>
+                      onConfirm={() =>
+                        void failing(removeNetwork(entry.network.id, owner.nodeId)).then(() => {
+                          if (current()) return networksCtl.refetch()
+                        })
+                      }
+                    >
+                      🗑
+                    </ConfirmButton>
                   </Show>
                 }
               >
@@ -493,7 +645,9 @@ export default function DockerBrowse() {
             )}
           </Rows>
           <Show when={!(networks() ?? []).length}>
-            <EmptyState align="start" busy={networks.loading}>{networks.loading ? 'Loading…' : 'No networks.'}</EmptyState>
+            <EmptyState align="start" busy={networks.loading}>
+              {networks.loading ? 'Loading…' : 'No networks.'}
+            </EmptyState>
           </Show>
         </TabPanel>
       </Show>
@@ -505,7 +659,11 @@ export default function DockerBrowse() {
       {/* Only containers have a detail, so the other tabs leave the column empty. */}
       <Show
         when={section() === 'containers' && selected()}
-        fallback={<Show when={section() === 'containers'}><EmptyState title="Choose a container" /></Show>}
+        fallback={
+          <Show when={section() === 'containers'}>
+            <EmptyState title="Choose a container" />
+          </Show>
+        }
       >
         {(id) => <ContainerDetail target={id()} onRemoved={() => setSelected(null)} />}
       </Show>

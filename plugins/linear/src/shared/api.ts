@@ -10,21 +10,46 @@
 import type { PluginRailItem } from '@acorn/protocol/api.ts'
 
 export type LinearIssueState = { name: string; type: string; color: string } | null
-export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
-export type LinearComment = { id: string; author: string | null; body: string; createdAt: number | null; parentId: string | null }
+export type LinearIssueSummary = {
+  identifier: string
+  title: string
+  url: string
+  state: LinearIssueState
+  assignee: string | null
+}
+export type LinearComment = {
+  id: string
+  author: string | null
+  body: string
+  createdAt: number | null
+  parentId: string | null
+}
 // One activity-feed entry. `icon` is a kind key (created|state|assignee|label|title) the client
 // maps to a glyph; `color` tints state changes.
-export type LinearActivity = { id: string; actor: string | null; text: string; createdAt: number | null; icon: string; color?: string }
+export type LinearActivity = {
+  id: string
+  actor: string | null
+  text: string
+  createdAt: number | null
+  icon: string
+  color?: string
+}
 export type LinearLabel = { id: string; name: string; color: string }
-export type LinearAttachment = { id: string; title: string; subtitle: string | null; url: string; sourceType: string | null }
+export type LinearAttachment = {
+  id: string
+  title: string
+  subtitle: string | null
+  url: string
+  sourceType: string | null
+}
 // A lightweight reference to another issue (parent, sub-issue, or relation target).
 export type LinearRelatedIssue = { id: string; identifier: string; title: string; state: LinearIssueState }
 // A typed link between issues. `kind` is direction-aware (blocked-by is the inverse of blocks);
 // `label` is the ready-to-render string ("Blocked by", "Blocks", "Duplicate of", "Related").
 export type LinearRelationKind = 'blocks' | 'blocked-by' | 'duplicate' | 'duplicated-by' | 'related'
 export type LinearRelation = { id: string; kind: LinearRelationKind; label: string; issue: LinearRelatedIssue }
-// Detail fields are optional so an older short-TTL cached row stays valid and self-heals on the next
-// fetch. Summary fields above stay lean for PR-reference resolution.
+// Detail fields past `activity` are optional, and readers default them. Summary fields above stay
+// lean for PR-reference resolution.
 export type LinearIssueDetail = LinearIssueSummary & {
   id: string
   description: string | null
@@ -80,12 +105,12 @@ export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
 export const linearIssuesRoute = '/v1/p/linear/issues'
-export const linearProjectsRoute = '/v1/p/linear/projects'
 // `scopeIds` holds what the workspace mapped, which is a Linear project id or a prefixed team id
 // (server/index.ts's `linearTeamScopeId`).
 export const linearProjectIssuesRoute = (integrationId: string, scopeIds: string[]) =>
   `/v1/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(scopeIds.join(','))}`
-const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
+const connectionQuery = (connectionId?: string) =>
+  connectionId ? `&integration=${encodeURIComponent(connectionId)}` : ''
 export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v1/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>

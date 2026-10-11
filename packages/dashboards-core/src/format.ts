@@ -44,8 +44,7 @@ export function personInitials(name: string): string {
   return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters[0]).toUpperCase()
 }
 
-/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision yet;
- *  workstream 2's units decide their own. */
+/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision. */
 const NUMBER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
 
 /** `%` reads wrong with a space and every other unit reads wrong without one. */
@@ -60,23 +59,43 @@ export function formatCell(
   // `null` means this row has no value here, which the wire distinguishes from an empty string.
   // Both draw as nothing; only the sort order tells them apart (shaping.ts).
   if (value === null || value === undefined || value === '') return EMPTY
-  if (Array.isArray(value)) return { kind: 'list', items: value.map(item => formatCell({ ...field, list: false }, item, now)) }
+  if (Array.isArray(value))
+    return { kind: 'list', items: value.map((item) => formatCell({ ...field, list: false }, item, now)) }
 
   switch (field.type) {
     case 'number': {
       const numeric = Number(value)
       if (!Number.isFinite(numeric)) return EMPTY
       const unit = field.unit
-      if (unit && /^[A-Z]{3}$/.test(unit)) return { kind: 'number', text: new Intl.NumberFormat(undefined, { style: 'currency', currency: unit, maximumFractionDigits: 2 }).format(numeric) }
+      if (unit && /^[A-Z]{3}$/.test(unit))
+        return {
+          kind: 'number',
+          text: new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency: unit,
+            maximumFractionDigits: 2,
+          }).format(numeric),
+        }
       if (unit === 'percent') return { kind: 'number', text: `${NUMBER.format(numeric)}%` }
-      if (unit === 'ms' || unit === 's') return { kind: 'number', text: withUnit(NUMBER.format(unit === 's' ? numeric * 1000 : numeric), 'ms') }
-      if (unit === 'bytes') return { kind: 'number', text: new Intl.NumberFormat(undefined, { style: 'unit', unit: 'byte', unitDisplay: 'short', maximumFractionDigits: 2 }).format(numeric) }
+      if (unit === 'ms' || unit === 's')
+        return { kind: 'number', text: withUnit(NUMBER.format(unit === 's' ? numeric * 1000 : numeric), 'ms') }
+      if (unit === 'bytes')
+        return {
+          kind: 'number',
+          text: new Intl.NumberFormat(undefined, {
+            style: 'unit',
+            unit: 'byte',
+            unitDisplay: 'short',
+            maximumFractionDigits: 2,
+          }).format(numeric),
+        }
       return { kind: 'number', text: withUnit(NUMBER.format(numeric), unit) }
     }
     case 'boolean':
       return { kind: 'boolean', value: Boolean(value), text: value ? 'Yes' : 'No' }
     case 'datetime': {
-      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return { kind: 'datetime', absolute: value, relative: value }
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+        return { kind: 'datetime', absolute: value, relative: value }
       // Epoch milliseconds, because that is what every other timestamp on this wire is. Both forms
       // are returned rather than one: the age is what a person reads and the absolute time is what
       // they check, so the age is the label and the absolute time is the tooltip.
@@ -84,7 +103,11 @@ export function formatCell(
       if (!Number.isFinite(at)) return EMPTY
       return {
         kind: 'datetime',
-        absolute: new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', ...(field.zone ? { timeZone: field.zone } : {}) }),
+        absolute: new Date(at).toLocaleString(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          ...(field.zone ? { timeZone: field.zone } : {}),
+        }),
         relative: formatRelativeTime(at, now),
       }
     }
@@ -102,7 +125,7 @@ export function formatCell(
     case 'link': {
       const url = String(value)
       // Host-mediated: the same check `openUrl` applies before handing a plugin's URL to the
-      // browser (plugins/chrome/actions.ts). A cell that fails it is a string, not a link.
+      // browser. A cell that fails it is a string, not a link.
       if (!isPluginOpenableUrl(url)) return { kind: 'text', text: url }
       return { kind: 'link', url, text: url.replace(/^https?:\/\//, '') }
     }

@@ -187,11 +187,6 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 
 ## Pages
 
-<a id="client-cache-and-conformance"></a>
-<a id="shared-authoring-controls"></a>
-<a id="workspace-query-library"></a>
-<a id="linear-issues-and-rollbar-error-groups"></a>
-
 - [Authoring controls](./data-sources/authoring-controls.md) covers the client cache, the conformance
   fixture, and the shared source and query editor.
 - [Workspace query library](./data-sources/query-library.md) covers saved queries.

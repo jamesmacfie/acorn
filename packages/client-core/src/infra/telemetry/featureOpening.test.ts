@@ -39,7 +39,15 @@ it('ends one span when the feature reports, and labels only the first opening as
   featureUsable('editor', 'empty')
   const spans = await openings()
   expect(spans.map((span) => span.attrs)).toMatchObject([
-    { 'feature.id': 'editor', 'feature.kind': 'pane', first: true, outcome: 'usable', state: 'content', cached: false, owner: 'editor' },
+    {
+      'feature.id': 'editor',
+      'feature.kind': 'pane',
+      first: true,
+      outcome: 'usable',
+      state: 'content',
+      cached: false,
+      owner: 'editor',
+    },
     { 'feature.id': 'editor', first: false, state: 'empty' },
   ])
 })
@@ -68,7 +76,8 @@ it('drops a cancelled opening and reports a timed-out one as an error', async ()
 
 it('holds at most a bounded number of pending records', async () => {
   const settled = whenOpenFeaturesSettle()
-  for (let index = 0; index <= MAX_PENDING_OPENINGS; index += 1) openFeature(`pane-${index}`, 'core', { kind: 'pane', reportsUsable: true })
+  for (let index = 0; index <= MAX_PENDING_OPENINGS; index += 1)
+    openFeature(`pane-${index}`, 'core', { kind: 'pane', reportsUsable: true })
   for (let index = 0; index <= MAX_PENDING_OPENINGS; index += 1) featureUsable(`pane-${index}`)
   // The oldest was evicted before it could report, so only the rest produce spans.
   expect(await openings()).toHaveLength(MAX_PENDING_OPENINGS)

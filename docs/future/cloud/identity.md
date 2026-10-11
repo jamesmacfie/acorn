@@ -35,10 +35,11 @@ For more information, see [Better Auth Hono integration](https://better-auth.com
 | TUI | The same plugin, the same flow. The TUI prints the code and URL. | The same connection row, on the Node the TUI attached to or started. |
 | CLI | Reads the same connection through the local Node. No separate sign-in. | Same. |
 
-Running sign-in on the local Node, not in the client, follows [security](../../security.md#the-control-plane-and-the-inversion-it-costs):
-a Node provider's credential is an ordinary connection held node-side, so the desktop renderer and
-the TUI's drawing code never touch it. The GitHub plugin already runs a device flow this way
-([authentication](../../authentication.md#github-connection)), so the UI pattern exists.
+Running sign-in on the local Node, not in the client, follows
+[security](../../security/control-plane.md): a Node provider's credential is an ordinary connection
+held node-side, so the desktop renderer and the TUI's drawing code never touch it. The GitHub plugin
+already runs a device flow this way ([authentication](../../authentication.md#github-connection)),
+so the UI pattern exists.
 
 Better Auth lists a device authorization plugin. Confirm it works with the organization plugin and
 issues refresh tokens before relying on it. If it does not, the account service implements RFC 8628

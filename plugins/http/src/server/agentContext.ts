@@ -24,16 +24,11 @@ export const requestOption = (request: HttpRequest): AgentContextOption => ({
 const TEMPLATE_ONLY = /^\{\{[A-Za-z0-9_.-]+\}\}$/
 
 /**
-/**
  * The URL with its query values redacted and its keys kept.
  *
  * The path is shape and stays; a query value is data and does not, because `?token=sk-live-...` is a
  * perfectly ordinary way for someone to have saved a request, and there is no way to recognise which
  * literal is a secret. Keys survive, so an agent still learns the endpoint takes `token`.
- *
- * Stricter than the client contribution it replaced, which sent the whole URL and leaked exactly
- * this way (docs/plugins/more-descriptors.md
- * § Agent contexts).
  *
  * String surgery rather than `new URL()`: the stored URL is frequently a template
  * (`{{BASE_URL}}/users`) and would not parse.
@@ -59,13 +54,15 @@ export function redactUrl(url: string): string {
 }
 
 /**
-/**
  * One saved request as markdown an agent can learn the API's shape from (docs/http-client/client.md §
  * Client). Method, URL, folder, auth mode, body mode, and header names survive; everything
  * credential-bearing does not.
  */
 export const requestSnapshot = (request: HttpRequest): PluginAgentContextSnapshotBody => {
-  const headerNames = request.headers.filter((header) => header.enabled).map((header) => header.name).join(', ')
+  const headerNames = request.headers
+    .filter((header) => header.enabled)
+    .map((header) => header.name)
+    .join(', ')
   return {
     // Stable rather than time-stamped: the composer replaces a snapshot by contextId, so re-capturing
     // the same request should update it instead of attaching it twice. The host prefixes the plugin id.

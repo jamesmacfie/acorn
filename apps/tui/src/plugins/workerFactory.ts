@@ -18,10 +18,10 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
 // this is the terminal's factory. The sandbox and deferred native lifetime are owned by this
 // factory and in ./pluginWorker.js.
 //
-// The measurement 06-isolation.md asked for, made on Node 24 and 26: a worker thread's `execArgv`
-// **does** take `--permission`, and the grants are the worker's own rather than the parent's. So the
-// design's fallback — a child process per plugin with the two ports over IPC — is not needed, and the
-// TUI process itself runs with no permission flags at all. Recorded in docs/security/plugin-client-sandbox.md § Three containers.
+// A worker thread's `execArgv` **does** take `--permission`, and the grants are the worker's own rather
+// than the parent's. So a child process per plugin with the two ports over IPC is not needed, and the
+// TUI process itself runs with no permission flags at all
+// (docs/security/plugin-client-sandbox.md § Three containers).
 
 /**
  * The bootstrap, as a path rather than a specifier: a worker is pointed at a file, and the worker this
@@ -34,7 +34,9 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
  */
 const bootstrapPath = (): string => {
   const here = dirname(fileURLToPath(import.meta.url))
-  const found = [join(here, 'pluginWorker.js'), join(here, '..', 'pluginWorker.js')].find((candidate) => existsSync(candidate))
+  const found = [join(here, 'pluginWorker.js'), join(here, '..', 'pluginWorker.js')].find((candidate) =>
+    existsSync(candidate),
+  )
   if (!found) throw new Error('the plugin sandbox bootstrap is missing from this build')
   return found
 }
@@ -53,8 +55,9 @@ const log = createLogger('plugins')
 
 function spawn(url: string): WorkerLike {
   assertSupportedNodeRuntime(process.versions.node)
-  // The host addresses a bundle by hash and never by path, on every host (docs/security/plugin-bundles.md §
-  // Third-party plugin bundles). Here the path is looked up from the hash rather than passed in.
+  // The host addresses a bundle by hash and never by path, on every host
+  // (docs/security/plugin-bundles.md § Third-party plugin bundles). Here the path is looked up from the
+  // hash rather than passed in.
   const hash = url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '')
   const claimed = bundlePath(hash)
   if (!claimed) throw new Error(`no cached bundle for ${hash.slice(0, 12)}`)
@@ -67,7 +70,10 @@ function spawn(url: string): WorkerLike {
   let pendingConstruct: (() => void) | null = null
   let readyResolve = () => {}
   let readyReject = (_error: unknown) => {}
-  const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject })
+  const ready = new Promise<void>((resolve, reject) => {
+    readyResolve = resolve
+    readyReject = reject
+  })
   // The host consumes readiness; retain a rejection observer even if setup fails before returning.
   void ready.catch(() => {})
   const deliver = (message: unknown, transfer: unknown[]): void => {
@@ -78,7 +84,8 @@ function spawn(url: string): WorkerLike {
     postMessage(message, transfer = []) {
       if (terminated) throw new Error('this plugin worker was retired')
       if (worker) return deliver(message, transfer)
-      if (hello || !(message as { acornBridge?: number })?.acornBridge) throw new Error('a deferred plugin worker owns only its initial hello')
+      if (hello || !(message as { acornBridge?: number })?.acornBridge)
+        throw new Error('a deferred plugin worker owns only its initial hello')
       hello = { message, ports: transfer }
     },
     terminate() {
@@ -92,28 +99,51 @@ function spawn(url: string): WorkerLike {
         pendingConstruct = null
       }
       readyReject(new Error('this plugin worker was retired before construction'))
-      for (const port of hello?.ports ?? []) { try { (port as MessagePort).close() } catch { /* close every owned endpoint */ } }
+      for (const port of hello?.ports ?? []) {
+        try {
+          ;(port as MessagePort).close()
+        } catch {
+          /* close every owned endpoint */
+        }
+      }
       hello = null
-      if (!worker) { termination = Promise.resolve(); return termination }
+      if (!worker) {
+        termination = Promise.resolve()
+        return termination
+      }
       const retiringWorker = worker
       const set = retiring.get(hash) ?? new Set<Promise<void>>()
       retiring.set(hash, set)
       let ending: Promise<number>
-      try { ending = retiringWorker.terminate() } catch (error) { ending = Promise.reject(error) }
-      termination = ending.then(() => {}, async (error: unknown) => {
-        try { log.warn('plugin worker termination failed', error, { 'plugin.hash': hash }) } catch { /* retain the exit owner */ }
-        // A rejected termination is not proof of death. Continue owning/draining the thread and
-        // block replacements until its actual exit; their host startup deadline remains in force.
-        if (retiringWorker.threadId !== -1) await new Promise<void>((resolve) => retiringWorker.once('exit', () => resolve()))
-      }).then(() => {
-        set.delete(termination!)
-        if (!set.size && retiring.get(hash) === set) {
-          retiring.delete(hash)
-          const waiting = pending.get(hash)
-          pending.delete(hash)
-          for (const construct of waiting ?? []) construct()
-        }
-      })
+      try {
+        ending = retiringWorker.terminate()
+      } catch (error) {
+        ending = Promise.reject(error)
+      }
+      termination = ending
+        .then(
+          () => {},
+          async (error: unknown) => {
+            try {
+              log.warn('plugin worker termination failed', error, { 'plugin.hash': hash })
+            } catch {
+              /* retain the exit owner */
+            }
+            // A rejected termination is not proof of death. Continue owning/draining the thread and
+            // block replacements until its actual exit; their host startup deadline remains in force.
+            if (retiringWorker.threadId !== -1)
+              await new Promise<void>((resolve) => retiringWorker.once('exit', () => resolve()))
+          },
+        )
+        .then(() => {
+          set.delete(termination!)
+          if (!set.size && retiring.get(hash) === set) {
+            retiring.delete(hash)
+            const waiting = pending.get(hash)
+            pending.delete(hash)
+            for (const construct of waiting ?? []) construct()
+          }
+        })
       set.add(termination)
       return termination
     },
@@ -122,7 +152,12 @@ function spawn(url: string): WorkerLike {
   const construct = (): void => {
     if (terminated) return
     worker = new NodeWorker(bootstrap, {
-      workerData: { bundle, builtins: builtinModules.filter((name) => pluginBuiltinAllowed(name, { sockets: false, exec: false })).map((name) => name.replace(/^node:/, '')) },
+      workerData: {
+        bundle,
+        builtins: builtinModules
+          .filter((name) => pluginBuiltinAllowed(name, { sockets: false, exec: false }))
+          .map((name) => name.replace(/^node:/, '')),
+      },
       env: {},
       execArgv: ['--permission', `--allow-fs-read=${bootstrap}`, `--allow-fs-read=${bundle}`],
       stdout: true,
@@ -132,7 +167,11 @@ function spawn(url: string): WorkerLike {
     worker.stderr?.resume()
     worker.unref()
     worker.on('error', (error: Error) => adapter.onerror?.({ message: error.message }))
-    if (hello) { const initial = hello; deliver(initial.message, initial.ports); hello = null }
+    if (hello) {
+      const initial = hello
+      deliver(initial.message, initial.ports)
+      hello = null
+    }
     readyResolve()
   }
   const deferredConstruct = (): void => {
@@ -145,12 +184,24 @@ function spawn(url: string): WorkerLike {
       return
     }
     pendingConstruct = null
-    try { construct() }
-    catch (error) { readyReject(error); const failed = adapter.onerror; void adapter.terminate(); failed?.({ message: error instanceof Error ? error.message : String(error) }) }
+    try {
+      construct()
+    } catch (error) {
+      readyReject(error)
+      const failed = adapter.onerror
+      void adapter.terminate()
+      failed?.({ message: error instanceof Error ? error.message : String(error) })
+    }
   }
   if (retiring.get(hash)?.size) deferredConstruct()
   else {
-    try { construct() } catch (error) { readyReject(error); void adapter.terminate(); throw error }
+    try {
+      construct()
+    } catch (error) {
+      readyReject(error)
+      void adapter.terminate()
+      throw error
+    }
   }
   return adapter
 }

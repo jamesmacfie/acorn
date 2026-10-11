@@ -1,10 +1,10 @@
 import { activeNodeId } from '../node/activeNode'
 import { Registry } from '../../kit/lib/state/registry'
 
-export type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
+type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
 export type RestorePhase = 'workspace' | 'view' | 'panes'
 
-export type PersistedStateCodec<T> = {
+type PersistedStateCodec<T> = {
   parse(raw: unknown): T
   serialize(value: T): unknown
 }
@@ -55,36 +55,25 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 // each slice's own binding speaking in bare resource ids.
 //
 // Both the node id and the scope id are percent-encoded, so the `/` between them is the only
-// unescaped slash in the key. A node id arrives from `GET /v1/node` unchecked, so writing it raw
-// would let a node reporting `a/b` produce a key this parser could never split correctly, and an
-// empty node id would produce an unqualified key that let one node read another node's layouts.
-// Encoding the scope id too keeps the split unambiguous, since a pane scope id can itself contain
-// a slash.
-export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, scopeId: string, nodeId: string | null = activeNodeId()): string => {
+// unescaped slash in the key. A node id arrives from `GET /v1/node` unchecked: written raw, a node
+// reporting `a/b` would produce a key that cannot be split, and an empty node id an unqualified key
+// that lets one node read another node's layouts. A pane scope id can itself contain a slash.
+export const storageKeyFor = (
+  slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>,
+  scopeId: string,
+  nodeId: string | null = activeNodeId(),
+): string => {
   if (slice.scope === 'app') return slice.key
   // Both halves encoded (see the note above). `encodeURIComponent` cannot emit a `/`, so the
   // separator stays the only unescaped slash in the key either way.
   return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
 }
 
-// Which node a storage key is qualified for, without knowing which slice wrote it: `null` for an
-// unqualified key (an `app` slice, or a pre-qualification leftover). The raw `/` is the qualifier's
-// tell, per the note above; slice keys never contain one, so the id is the segment between the
-// last `:` before that slash and the slash itself. Used by the device-storage drain, which has a
-// bag of keys and no slice to match them against, and must not hand one node's layouts to another.
-export const nodeIdFromStorageKey = (key: string): string | null => {
-  const slash = key.indexOf('/')
-  if (slash === -1) return null
-  const colon = key.lastIndexOf(':', slash)
-  if (colon === -1) return null
-  try {
-    return decodeURIComponent(key.slice(colon + 1, slash))
-  } catch {
-    return null
-  }
-}
-
-export const scopeIdFromStorageKey = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, key: string, nodeId: string | null = activeNodeId()): string | null => {
+export const scopeIdFromStorageKey = (
+  slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>,
+  key: string,
+  nodeId: string | null = activeNodeId(),
+): string | null => {
   if (slice.scope === 'app') return key === slice.key ? '' : null
   const prefix = `${slice.key}:`
   if (!key.startsWith(prefix)) return null

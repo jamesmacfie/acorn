@@ -1,7 +1,7 @@
 // `agents:session-messenger`: a plugin queues an attributed note on a session
 // (docs/managed-agents/session-messages.md). The host binds each sender to the entry's plugin id, so
 // a caller never names itself. A note on a workflow or delegated session joins the operation that owns
-// its origin turn (./turnFollowUps.ts).
+// its origin turn (TurnFollowUps).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, pastedContent } from '@acorn/plugin-api/node'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
@@ -16,7 +16,8 @@ import {
 } from '../../contract/sessionMessages.ts'
 import type { AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
-import { TurnVetoedError, type ManagedAgentRuntime } from './runtime'
+import type { ManagedAgentRuntime } from './runtime'
+import { TurnVetoedError } from './runtimeEngine'
 import type { TurnFollowUps } from './turnFollowUps'
 
 const log = createLogger('agents:session-messages', 'agents')
@@ -29,7 +30,15 @@ const UNSAFE_SUBJECT = /["\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u
 // What a note's turn takes from the turn it follows: the model and options it ran on, the operation's
 // correlation ids, and its result schema. Never `reportTo`, so a note doesn't report on its own. The
 // tool ceiling is the session's, so a note can't widen it.
-const INHERITED_POLICY = ['model', 'effort', 'configOptions', 'workflowRunId', 'workflowStepId', 'schema', 'resultSchema']
+const INHERITED_POLICY = [
+  'model',
+  'effort',
+  'configOptions',
+  'workflowRunId',
+  'workflowStepId',
+  'schema',
+  'resultSchema',
+]
 
 type Entry = { id: string; pluginId: string; value: SessionMessengerContribution }
 
@@ -42,18 +51,29 @@ export type SessionMessagePorts = {
   followUps(): Promise<TurnFollowUps>
 }
 
-const refusal = (reason: Extract<SessionMessageResult, { ok: false }>['reason']): SessionMessageResult => ({ ok: false, reason })
+const refusal = (reason: Extract<SessionMessageResult, { ok: false }>['reason']): SessionMessageResult => ({
+  ok: false,
+  reason,
+})
 
 /** A caller's mistake, not a refusal: the plugin sent something no session could accept. */
 function assertMessage(message: SessionMessage): void {
   const { taskId, sessionId, text, subject, idempotencyKey } = message ?? {}
-  if (typeof taskId !== 'string' || typeof sessionId !== 'string') throw new TypeError('A session message names a taskId and a sessionId.')
+  if (typeof taskId !== 'string' || typeof sessionId !== 'string')
+    throw new TypeError('A session message names a taskId and a sessionId.')
   if (typeof text !== 'string' || !text.trim()) throw new TypeError('A session message needs text.')
   if (Buffer.byteLength(text, 'utf8') > MAX_SESSION_MESSAGE_BYTES) {
     throw new TypeError(`A session message's text is limited to ${MAX_SESSION_MESSAGE_BYTES} bytes of UTF-8.`)
   }
-  if (typeof subject !== 'string' || !subject.trim() || subject.length > MAX_SESSION_MESSAGE_SUBJECT || UNSAFE_SUBJECT.test(subject)) {
-    throw new TypeError(`A session message's subject is one line of at most ${MAX_SESSION_MESSAGE_SUBJECT} characters, with no quotes or control characters.`)
+  if (
+    typeof subject !== 'string' ||
+    !subject.trim() ||
+    subject.length > MAX_SESSION_MESSAGE_SUBJECT ||
+    UNSAFE_SUBJECT.test(subject)
+  ) {
+    throw new TypeError(
+      `A session message's subject is one line of at most ${MAX_SESSION_MESSAGE_SUBJECT} characters, with no quotes or control characters.`,
+    )
   }
   if (typeof idempotencyKey !== 'string' || !idempotencyKey || idempotencyKey.length > MAX_IDEMPOTENCY_KEY) {
     throw new TypeError(`A session message needs an idempotencyKey of 1 to ${MAX_IDEMPOTENCY_KEY} characters.`)
@@ -61,14 +81,22 @@ function assertMessage(message: SessionMessage): void {
 }
 
 /** The host writes the visible text and the provenance. The plugin's words go only inside fenced context. */
-function pluginTurn(pluginId: string, message: SessionMessage, idempotencyKey: string, origin?: AgentTurn): EnqueueAgentTurnInput {
+function pluginTurn(
+  pluginId: string,
+  message: SessionMessage,
+  idempotencyKey: string,
+  origin?: AgentTurn,
+): EnqueueAgentTurnInput {
   const content = pastedContent(message.text)
   const bytes = Buffer.byteLength(content, 'utf8')
-  const inherited = origin ? Object.fromEntries(Object.entries(origin.effectivePolicy).filter(([key]) => INHERITED_POLICY.includes(key))) : {}
+  const inherited = origin
+    ? Object.fromEntries(Object.entries(origin.effectivePolicy).filter(([key]) => INHERITED_POLICY.includes(key)))
+    : {}
   // This turn's last message replaces the one the owner would have read, so it has to carry the result too.
-  const result = inherited.schema || inherited.resultSchema
-    ? ' Your reply replaces your last result, so end it with the fenced `json` result block again, changed or not.'
-    : ''
+  const result =
+    inherited.schema || inherited.resultSchema
+      ? ' Your reply replaces your last result, so end it with the fenced `json` result block again, changed or not.'
+      : ''
   return {
     input: [
       {
@@ -139,16 +167,20 @@ export class SessionMessages {
 
   // Checked on every call rather than at disconnect, so a removed or reloaded entry fails at once.
   #live(entry: Entry): boolean {
-    return !this.#disposed
-      && this.#connections.get(entry.id) === entry.value
-      && this.ports.entries().some((current) => current.id === entry.id && current.value === entry.value)
+    return (
+      !this.#disposed &&
+      this.#connections.get(entry.id) === entry.value &&
+      this.ports.entries().some((current) => current.id === entry.id && current.value === entry.value)
+    )
   }
 
   #serialized<T>(sessionId: string, run: () => Promise<T>): Promise<T> {
     const next = (this.#admissions.get(sessionId) ?? Promise.resolve()).then(run)
     const tail = next.catch(() => undefined)
     this.#admissions.set(sessionId, tail)
-    void tail.then(() => { if (this.#admissions.get(sessionId) === tail) this.#admissions.delete(sessionId) })
+    void tail.then(() => {
+      if (this.#admissions.get(sessionId) === tail) this.#admissions.delete(sessionId)
+    })
     return next
   }
 
@@ -162,15 +194,21 @@ export class SessionMessages {
     if (existing) return { ok: true, turnId: existing.id }
     const refused = this.#sessionRefusal(session)
     if (refused) return refused
-    if (await store.countPluginMessages(session.id, pluginId) >= MAX_PLUGIN_MESSAGES_PER_SESSION) {
+    if ((await store.countPluginMessages(session.id, pluginId)) >= MAX_PLUGIN_MESSAGES_PER_SESSION) {
       await this.#capReached(session, pluginId)
       return refusal('cap')
     }
     try {
-      const turn = session.kind === 'interactive'
-        ? await this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key))
-        : await (await this.ports.followUps()).admit(session.id, pluginId, message.originTurnId, (origin) =>
-            this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key, origin), { originTurnId: origin.id }))
+      const turn =
+        session.kind === 'interactive'
+          ? await this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key))
+          : await (
+              await this.ports.followUps()
+            ).admit(session.id, pluginId, message.originTurnId, (origin) =>
+              this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key, origin), {
+                originTurnId: origin.id,
+              }),
+            )
       if (!turn) return refusal('operation-closed')
       return { ok: true, turnId: turn.id }
     } catch (error) {

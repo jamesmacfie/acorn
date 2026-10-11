@@ -19,8 +19,8 @@ describe('secret box', () => {
     const sealed = await encryptSecret('s', KEY)
     // The tamper has to be guaranteed to change a decoded byte, and the obvious spellings do not.
     // Overwriting the last two characters with a fixed `xy` collides with the original roughly once in
-    // 4096 seals (base64url has 64 symbols), which is a red suite with no bug behind it. That has been
-    // seen in the wild and mistaken for the suite's load sensitivity. Flipping the final character is
+    // 4096 seals (base64url has 64 symbols), which is a red suite with no bug behind it. Flipping the
+    // final character is
     // worse: the tag is 16 bytes, so its base64url tail is 22 characters carrying 132 bits, and the
     // last character's low four bits are padding a lenient decoder discards. So tamper the first
     // character of the ciphertext segment, where every bit is significant.

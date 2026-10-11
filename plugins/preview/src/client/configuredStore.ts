@@ -5,13 +5,19 @@
 // frames below refresh it. Nothing reports a hand edit to `.acorn/config.toml`, so the interval and
 // window focus pick that up, as they do for the run-target buttons.
 import { createSignal } from 'solid-js'
-import { clientEvents, onPluginFrame, readJson, wsOnReconnect, type ClientScheduleContribution } from '@acorn/plugin-api/client'
+import {
+  clientEvents,
+  onPluginFrame,
+  readJson,
+  wsOnReconnect,
+  type ClientScheduleContribution,
+} from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { previewConfiguredRoute } from '../shared/api'
 
 // Null when the Node has no answer to give: a build older than the route, which is what an
-// unrestarted local Node or an out-of-date remote one is. It offers the pane on every task, as it did
-// before this gate, rather than hiding preview on a Node that can still draw it.
+// unrestarted local Node or an out-of-date remote one is. It offers the pane on every task rather
+// than hiding preview on a Node that can still draw it.
 const [configured, setConfigured] = createSignal<Record<string, boolean> | null>({})
 
 export const previewConfigured = (taskId: string): boolean => {
@@ -33,8 +39,8 @@ export const previewConfiguredSchedule: ClientScheduleContribution = {
     try {
       next = await readJson<Record<string, boolean>>(previewConfiguredRoute)
     } catch (error) {
-      // A 404 is a Node without the route. Any other failure keeps the last answer, so a dropped
-      // request does not flicker the button.
+      // A 404 is a Node without the route. Mixed-version path until 2026-12-29.
+      // Any other failure keeps the last answer, so a dropped request does not flicker the button.
       if ((error as { status?: number }).status === 404) setConfigured(null)
       return
     }

@@ -22,7 +22,10 @@ describe('task origin appearance', () => {
 describe('an origin a source declares but does not share an id with', () => {
   it('draws the glyph the source named for it', () => {
     dispose = sourceRegistry.register({
-      id: 'tracker', label: 'Tracker', glyph: 'square-check', order: 10,
+      id: 'tracker',
+      label: 'Tracker',
+      glyph: 'square-check',
+      order: 10,
       origins: { 'tracker-item': 'git-pull-request' },
     }).dispose
     expect(taskOriginAppearance('tracker-item')).toEqual({ glyph: 'git-pull-request' })

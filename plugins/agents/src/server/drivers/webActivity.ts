@@ -4,9 +4,8 @@ import type { AgentWebAction } from '../../contract/wire.ts'
  * The one thing about a web call that must not differ by harness: what the row is called.
  *
  * Providers each write their own: Codex sends no title at all, and Claude Code's adapter sends the
- * query in quotes with its domain filters appended. Both used to reach the transcript, so the same
- * activity read as two different things depending on which executable ran it. The action is what
- * happened, so the action names the row and the query goes in the card where a long one can wrap.
+ * query in quotes with its domain filters appended. The action is what happened, so the action names
+ * the row and the query goes in the card where a long one can wrap.
  *
  * Shared between drivers rather than owned by one, because a second driver importing the first is
  * how a provider name ends up somewhere it does not belong. A future harness maps its own wire shape

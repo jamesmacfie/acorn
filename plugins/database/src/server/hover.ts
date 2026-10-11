@@ -10,7 +10,8 @@ import { resolveQualifier } from './completions'
 // host's 64 KiB.
 const MAX_LISTED_COLUMNS = 40
 
-const label = (table: DbCatalogTable): string => (table.schema === 'public' ? table.name : `${table.schema}.${table.name}`)
+const label = (table: DbCatalogTable): string =>
+  table.schema === 'public' ? table.name : `${table.schema}.${table.name}`
 
 /** The hover for the name at a one-based position, or null when the position isn't on a known name. */
 export function hoverSql(
@@ -38,13 +39,25 @@ export function hoverSql(
     const listed = table.columns.slice(0, MAX_LISTED_COLUMNS).map((column) => `- \`${column.name}\` ${column.dataType}`)
     const more = table.columns.length - listed.length
     return {
-      contents: { kind: 'markdown', value: [`**${label(table)}**, ${table.columns.length} columns`, '', ...listed, ...(more > 0 ? [`- and ${more} more`] : [])].join('\n') },
+      contents: {
+        kind: 'markdown',
+        value: [
+          `**${label(table)}**, ${table.columns.length} columns`,
+          '',
+          ...listed,
+          ...(more > 0 ? [`- and ${more} more`] : []),
+        ].join('\n'),
+      },
       range,
     }
   }
   for (const entry of candidates) {
     const column = entry.columns.find((candidate) => candidate.name.toLowerCase() === word)
-    if (column) return { contents: { kind: 'markdown', value: `\`${column.name}\` ${column.dataType} · **${label(entry)}**` }, range }
+    if (column)
+      return {
+        contents: { kind: 'markdown', value: `\`${column.name}\` ${column.dataType} · **${label(entry)}**` },
+        range,
+      }
   }
   return null
 }

@@ -31,7 +31,7 @@ export const customAgentRegistry = {
 
 // A session row names a harness twice, as `providerId` and `profileId`, and the two differ only for
 // Claude Code, where both names predate the harness seam. Every other harness, built in or contributed,
-// uses one id for both (./harnessRegistry.ts § launchSpec).
+// uses one id for both (`launchSpec` in the harness registry).
 const PROFILE_FOR_PROVIDER: Readonly<Record<string, string>> = { [claudeHarness.id]: claudeHarness.profileId }
 
 /** A plugin's agent as the list holds it. The host already minted the id and qualified the harness. */
@@ -54,7 +54,7 @@ async function readOwn(prefs: PrefService, userId: string): Promise<CustomAgent[
 
 /** The owner's agents first, in their order, then every plugin's. */
 export async function readCustomAgents(prefs: PrefService, userId: string): Promise<CustomAgent[]> {
-  return [...await readOwn(prefs, userId), ...customAgentRegistry.list()]
+  return [...(await readOwn(prefs, userId)), ...customAgentRegistry.list()]
 }
 
 /**
@@ -69,7 +69,11 @@ export async function saveCustomAgent(
 ): Promise<CustomAgent> {
   const agents = await readOwn(prefs, userId)
   if (id && customAgentRegistry.list().some((agent) => agent.id === id)) {
-    throw new BridgeError(400, 'bad_request', 'A plugin provides this agent, so it cannot be edited. Duplicate it instead.')
+    throw new BridgeError(
+      400,
+      'bad_request',
+      'A plugin provides this agent, so it cannot be edited. Duplicate it instead.',
+    )
   }
   const index = id ? agents.findIndex((agent) => agent.id === id) : -1
   if (id && index < 0) throw new BridgeError(404, 'not_found', 'Custom agent not found.')
@@ -77,7 +81,7 @@ export async function saveCustomAgent(
     throw new BridgeError(400, 'bad_request', `You can keep at most ${MAX_CUSTOM_AGENTS} custom agents.`)
   }
   const saved: CustomAgent = { ...input, id: id ?? randomUUID(), source: { kind: 'user' } }
-  const next = index < 0 ? [...agents, saved] : agents.map((agent, at) => at === index ? saved : agent)
+  const next = index < 0 ? [...agents, saved] : agents.map((agent, at) => (at === index ? saved : agent))
   await prefs.write(userId, customAgentsPreferenceKey, serializeCustomAgents(next))
   return saved
 }

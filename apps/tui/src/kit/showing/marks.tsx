@@ -39,14 +39,25 @@ export function Chip(props: {
   // cycle. `activate` presses it and `delete` removes it, which is the split the `✕` already drew.
   const control = stop({
     ...(props.onPress ? { onPress: () => props.onPress!() } : {}),
-    ...(props.onRemove ? { on: { delete: () => { props.onRemove!(); return true } } } : {}),
+    ...(props.onRemove
+      ? {
+          on: {
+            delete: () => {
+              props.onRemove!()
+              return true
+            },
+          },
+        }
+      : {}),
   })
   const acts = () => !!props.onPress || !!props.onRemove
   return (
     <box
       flexDirection="row"
       flexShrink={0}
-      ref={(element: Renderable) => { if (acts()) control.ref(element) }}
+      ref={(element: Renderable) => {
+        if (acts()) control.ref(element)
+      }}
     >
       {slot(props.leading)}
       <Line {...litControl({ focused: control.focused(), strong: props.selected, tone: props.tone })}>
@@ -57,7 +68,11 @@ export function Chip(props: {
 }
 
 export function ChipRow(props: { ariaLabel?: string; children: JSX.Element }) {
-  return <box flexDirection="row" flexWrap="wrap" gap={spaceCells('inline')}>{props.children}</box>
+  return (
+    <box flexDirection="row" flexWrap="wrap" gap={spaceCells('inline')}>
+      {props.children}
+    </box>
+  )
 }
 
 /** `●` in the tone's colour, `○` for neutral. `pulse` is a state, not a motion: a terminal that has
@@ -88,7 +103,13 @@ export function UserAvatar(props: { login: string | null | undefined; size?: 'sm
 
 /** A shared icon name rendered as one cell. The host resolves its shape; callers keep their domain
  * state, tone and title in the same shared component they use on desktop. */
-export function Icon(props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) {
+export function Icon(props: {
+  name: string
+  size?: number | string
+  title?: string
+  tone?: Tone | 'brand'
+  spin?: boolean
+}) {
   const glyph = () => iconGlyph(props.name)
   return (
     <Show when={glyph()}>

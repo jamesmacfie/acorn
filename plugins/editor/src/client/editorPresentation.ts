@@ -23,7 +23,8 @@ export function setPresentation(nodeId: string | null, taskId: string, path: str
 export function movePresentation(nodeId: string | null, taskId: string, from: string, to: string): void {
   for (const [stored, value] of [...overrides]) {
     const address = JSON.parse(stored) as [string | null, string, string]
-    if (address[0] !== nodeId || address[1] !== taskId || address[2] !== from && !address[2].startsWith(`${from}/`)) continue
+    if (address[0] !== nodeId || address[1] !== taskId || (address[2] !== from && !address[2].startsWith(`${from}/`)))
+      continue
     overrides.delete(stored)
     overrides.set(key(nodeId, taskId, to + address[2].slice(from.length)), value)
   }
@@ -36,8 +37,12 @@ export function forgetPresentation(nodeId: string | null, taskId: string, path: 
 export function prunePresentation(nodeId: string | null, taskId?: string, path?: string): void {
   for (const stored of overrides.keys()) {
     const address = JSON.parse(stored) as [string | null, string, string]
-    if (address[0] === nodeId && (taskId === undefined || address[1] === taskId)
-      && (path === undefined || address[2] === path || address[2].startsWith(`${path}/`))) overrides.delete(stored)
+    if (
+      address[0] === nodeId &&
+      (taskId === undefined || address[1] === taskId) &&
+      (path === undefined || address[2] === path || address[2].startsWith(`${path}/`))
+    )
+      overrides.delete(stored)
   }
 }
 
@@ -53,12 +58,16 @@ export function inferIndentation(text: string, fallback: Indentation = { mode: '
     const prefix = /^[ \t]+/.exec(line)?.[0]
     if (!prefix) continue
     if (prefix.includes('\t') && prefix.includes(' ')) return fallback
-    if (prefix[0] === '\t') { tabs++; continue }
+    if (prefix[0] === '\t') {
+      tabs++
+      continue
+    }
     spaces++
     const width = prefix.length
-    for (const candidate of [2, 4, 8]) if (width % candidate === 0) widths.set(candidate, (widths.get(candidate) ?? 0) + 1)
+    for (const candidate of [2, 4, 8])
+      if (width % candidate === 0) widths.set(candidate, (widths.get(candidate) ?? 0) + 1)
   }
-  if (tabs && spaces || !tabs && !spaces) return fallback
+  if ((tabs && spaces) || (!tabs && !spaces)) return fallback
   if (tabs) return { mode: 'tabs', width: fallback.width }
   const exact = sample.map((line) => /^ +/.exec(line)?.[0].length ?? 0).filter(Boolean)
   const smallest = Math.min(...exact)
@@ -80,10 +89,23 @@ export function saveLabel(custody: DocumentCustody | undefined, disk: string | n
 
 export function languageName(id: LanguageId): string {
   const names: Partial<Record<LanguageId, string>> = {
-    plaintext: 'Plain text', typescript: 'TypeScript', typescriptreact: 'TypeScript React',
-    javascript: 'JavaScript', javascriptreact: 'JavaScript React', json: 'JSON',
-    css: 'CSS', scss: 'SCSS', less: 'Less', html: 'HTML', xml: 'XML',
-    sql: 'SQL', yaml: 'YAML', toml: 'TOML', ini: 'INI', cpp: 'C++', c: 'C',
+    plaintext: 'Plain text',
+    typescript: 'TypeScript',
+    typescriptreact: 'TypeScript React',
+    javascript: 'JavaScript',
+    javascriptreact: 'JavaScript React',
+    json: 'JSON',
+    css: 'CSS',
+    scss: 'SCSS',
+    less: 'Less',
+    html: 'HTML',
+    xml: 'XML',
+    sql: 'SQL',
+    yaml: 'YAML',
+    toml: 'TOML',
+    ini: 'INI',
+    cpp: 'C++',
+    c: 'C',
   }
   return names[id] ?? id[0].toUpperCase() + id.slice(1)
 }

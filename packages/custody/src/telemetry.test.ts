@@ -23,18 +23,19 @@ let prefValue: string
 let telemetry: HelperTelemetry | null
 
 /** A broker that answers the two routes this module calls and nothing else. */
-const stubBroker = (): NodeBroker => ({
-  fetch: async (_nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
-    const encode = (text: string) => new TextEncoder().encode(text)
-    if (request.method === 'GET') {
-      return { status: 200, headers: {}, body: encode(JSON.stringify({ 'telemetry.enabled': prefValue })) }
-    }
-    const body = request.body as { kind: 'bytes'; bytes: Uint8Array }
-    const batch = JSON.parse(new TextDecoder().decode(body.bytes)) as PostedTelemetryBatch
-    posted.push({ runtime: batch.runtime, records: batch.records })
-    return { status: 202, headers: {}, body: encode('{"accepted":1}') }
-  },
-} as unknown as NodeBroker)
+const stubBroker = (): NodeBroker =>
+  ({
+    fetch: async (_nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
+      const encode = (text: string) => new TextEncoder().encode(text)
+      if (request.method === 'GET') {
+        return { status: 200, headers: {}, body: encode(JSON.stringify({ 'telemetry.enabled': prefValue })) }
+      }
+      const body = request.body as { kind: 'bytes'; bytes: Uint8Array }
+      const batch = JSON.parse(new TextDecoder().decode(body.bytes)) as PostedTelemetryBatch
+      posted.push({ runtime: batch.runtime, records: batch.records })
+      return { status: 202, headers: {}, body: encode('{"accepted":1}') }
+    },
+  }) as unknown as NodeBroker
 
 /** Turn the switch on and let the poll, the first flush and the post settle. */
 const settle = async (): Promise<void> => {
@@ -65,7 +66,8 @@ const start = async (): Promise<void> => {
   await settle()
 }
 
-const records = (runtime: string): TelemetryRecord[] => posted.filter((batch) => batch.runtime === runtime).flatMap((batch) => batch.records)
+const records = (runtime: string): TelemetryRecord[] =>
+  posted.filter((batch) => batch.runtime === runtime).flatMap((batch) => batch.records)
 
 describe('the boot account', () => {
   it('becomes one root span with a child per mark, in the order they were taken', async () => {
@@ -157,7 +159,6 @@ describe("the shell's crash file", () => {
   })
 })
 
-
 it('contains a crash file truncated during a shell panic', async () => {
   writeFileSync(join(root, 'shell-crash.json'), '{"message":')
   await start()
@@ -170,7 +171,11 @@ describe('memory, measured by the shell', () => {
 
   const startMeasured = async (platform: NodeJS.Platform = 'darwin'): Promise<void> => {
     telemetry = startHelperTelemetry({
-      broker: stubBroker(), userDataDir: root, version: '1.2.3', platform, requestFootprint: () => (requests += 1),
+      broker: stubBroker(),
+      userDataDir: root,
+      version: '1.2.3',
+      platform,
+      requestFootprint: () => (requests += 1),
     })
     telemetry.setNode('n1')
     await settle()
@@ -217,8 +222,16 @@ describe('memory, measured by the shell', () => {
 
     const renderer = records('renderer')
     expect(renderer).toHaveLength(1)
-    expect(renderer[0]).toMatchObject({ kind: 'metric', name: 'runtime.memory.footprint', type: 'gauge', value: 900_000_000, unit: 'byte' })
-    const helper = records('helper').filter((record) => record.kind === 'metric' && record.name === 'runtime.memory.footprint')
+    expect(renderer[0]).toMatchObject({
+      kind: 'metric',
+      name: 'runtime.memory.footprint',
+      type: 'gauge',
+      value: 900_000_000,
+      unit: 'byte',
+    })
+    const helper = records('helper').filter(
+      (record) => record.kind === 'metric' && record.name === 'runtime.memory.footprint',
+    )
     expect(helper).toHaveLength(1)
     expect(helper[0]).toMatchObject({ type: 'gauge', value: 80_000_000, unit: 'byte' })
   })

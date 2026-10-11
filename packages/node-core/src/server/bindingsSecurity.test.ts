@@ -59,7 +59,9 @@ describe('local data permissions', () => {
     expect(() => openDb(path)).toThrow(/Core has tables without a migration history.*recoverable reset/)
     const unchanged = new DatabaseSync(path)
     expect(unchanged.prepare("SELECT name FROM sqlite_master WHERE name = 'preserved'").get()).toBeTruthy()
-    expect(unchanged.prepare("SELECT name FROM sqlite_master WHERE name = '__drizzle_migrations'").get()).toBeUndefined()
+    expect(
+      unchanged.prepare("SELECT name FROM sqlite_master WHERE name = '__drizzle_migrations'").get(),
+    ).toBeUndefined()
     unchanged.close()
   })
 
@@ -70,8 +72,7 @@ describe('local data permissions', () => {
     writeFileSync(old, 'old')
     chmodSync(old, 0o644)
     // Already right, and it has to stay untouched: `chmod` on a correct file is a syscall that changes
-    // nothing, and there are thousands of these on a real cache
-    // (2,975 of them cost 102 ms of boot, measured 2026-09-03).
+    // nothing, and there are thousands of these on a real cache, all in front of the listener at boot.
     const settled = join(dir, 'patch_settled')
     writeFileSync(settled, 'settled', { mode: 0o600 })
     const before = statSync(settled, { bigint: true }).ctimeNs

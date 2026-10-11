@@ -7,8 +7,7 @@ import { _resetPrModels } from './prModel'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
-// (docs/panes/layout.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
-// deferred it and the pane has been unexercised since.
+// (docs/panes/layout.md § Layout model).
 //
 // What this holds is the shape rather than the content. The pane mounts, both columns draw, and
 // nothing throws — which is the failure a broken import, a hook called outside a root, or a region
@@ -105,15 +104,14 @@ afterEach(() => {
 })
 
 describe('the PR pane', () => {
-  it('is one region, drawn as the host\'s `single` layout', () => {
+  it("is one region, drawn as the host's `single` layout", () => {
     expect(prPaneContribution.layout).toBe('single')
     expect(Object.keys(prPaneContribution.regions)).toEqual(['body'])
   })
 
   // The pane itself, not `regions.body`, which is the `lazy()` the contribution registers: a pending
-  // lazy component needs the `Suspense` the pane registry puts around every region
-  // (client-core host/registries/panes/panes.ts), and the assertion above is what holds the two to
-  // the same component.
+  // lazy component needs the `Suspense` the pane registry puts around every region, and the assertion
+  // above is what holds the two to the same component.
   const draw = () => {
     disposers.push(render(() => <PrPane task={task} />, host))
     return host
@@ -150,11 +148,7 @@ describe('the PR pane', () => {
 
   it('re-reads this pull when its background mirror refresh lands', () => {
     draw()
-    expect(seams.subscribe).toHaveBeenCalledWith(
-      'github',
-      'plugin:github:pr-synced',
-      expect.any(Function),
-    )
+    expect(seams.subscribe).toHaveBeenCalledWith('github', 'plugin:github:pr-synced', expect.any(Function))
 
     seams.prSynced?.({ repoOwner: 'other', repoName: 'acorn', pullNumber: 7 })
     seams.prSynced?.({ repoOwner: 'runn-fast', repoName: 'acorn', pullNumber: 8 })
@@ -172,7 +166,7 @@ describe('the PR pane', () => {
     expect(seams.offPrSynced).toHaveBeenCalledOnce()
   })
 
-  it('shows the selected pull\'s diff, read-only for a related pull', () => {
+  it("shows the selected pull's diff, read-only for a related pull", () => {
     const node = draw()
     const diff = () => node.querySelector<HTMLElement>('[data-diff]')!
     expect(diff().dataset.diff).toBe('7')

@@ -11,7 +11,7 @@ import {
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
 import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../telemetry/collector'
 
-// The chain rules (docs/plugins/hooks.md § Hooks, docs/plugins/hooks.md § Hooks). Every one of
+// The chain rules (docs/plugins/hooks.md § Hooks). Every one of
 // them is a decision about what happens when somebody else's code is between a plugin and something it
 // was about to do, so every one of them is here rather than left to the call sites.
 //
@@ -37,8 +37,7 @@ const handler = (
   mode: 'observe' | 'transform' | 'veto' | 'ask',
   call: (payload: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>,
   priority = 500,
-) =>
-  registerHookHandler({ id: `${id}:h`, pluginId: id, point: 'changes:before-push', mode, priority, call })
+) => registerHookHandler({ id: `${id}:h`, pluginId: id, point: 'changes:before-push', mode, priority, call })
 
 afterEach(() => {
   clearHooks('changes')
@@ -131,25 +130,41 @@ describe('the chain', () => {
   it('never asks at a point that does not allow it, and a stalled ask has asked nothing', async () => {
     point({ allows: ['veto'] })
     handler('scan', 'ask', async () => ({ ask: true, reason: 'x' }))
-    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({ ok: true, payload: { branch: 'main' } })
+    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({
+      ok: true,
+      payload: { branch: 'main' },
+    })
     clearHooks('changes')
     clearHooks('scan')
     point({ allows: ['ask'] })
     handler('slow', 'ask', () => new Promise(() => {}))
-    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({ ok: true, payload: { branch: 'main' } })
+    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({
+      ok: true,
+      payload: { branch: 'main' },
+    })
   })
 
   it('hands each handler the payload as it stands when its turn comes, and never the previous answer', async () => {
     point({ payload: { branch: 'string' } })
     const seen: string[] = []
-    handler('first', 'transform', async (payload) => {
-      seen.push(payload.branch as string)
-      return { payload: { branch: 'renamed' } }
-    }, 10)
-    handler('second', 'transform', async (payload) => {
-      seen.push(payload.branch as string)
-      return { payload }
-    }, 20)
+    handler(
+      'first',
+      'transform',
+      async (payload) => {
+        seen.push(payload.branch as string)
+        return { payload: { branch: 'renamed' } }
+      },
+      10,
+    )
+    handler(
+      'second',
+      'transform',
+      async (payload) => {
+        seen.push(payload.branch as string)
+        return { payload }
+      },
+      20,
+    )
     const verdict = await runHook('changes:before-push', { branch: 'main' })
     expect(seen).toEqual(['main', 'renamed'])
     expect(verdict.payload).toEqual({ branch: 'renamed' })
@@ -167,9 +182,14 @@ describe('the chain', () => {
   it('skips a handler that throws and carries on with the rest', async () => {
     point()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    handler('liar', 'transform', async () => {
-      throw new Error('boom')
-    }, 10)
+    handler(
+      'liar',
+      'transform',
+      async () => {
+        throw new Error('boom')
+      },
+      10,
+    )
     handler('lint', 'transform', async () => ({ payload: { branch: 'fixed' } }), 20)
     const verdict = await runHook('changes:before-push', { branch: 'main' })
     expect(verdict).toMatchObject({ ok: true, payload: { branch: 'fixed' } })
@@ -241,7 +261,7 @@ describe('the hook.run span', () => {
     clearHooks('memory')
   })
 
-  it('files one span per handler, under the handler\'s own plugin', async () => {
+  it("files one span per handler, under the handler's own plugin", async () => {
     resetTelemetryForTest()
     const seen: TelemetryRecord[] = []
     startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
@@ -256,7 +276,9 @@ describe('the hook.run span', () => {
     flushTelemetry()
 
     const spans = seen.filter((record): record is TelemetrySpan => record.kind === 'span' && record.name === 'hook.run')
-    expect(spans.map((span) => [span.attrs.owner, span.attrs['hook.handler'], span.attrs['hook.outcome']]).sort()).toEqual([
+    expect(
+      spans.map((span) => [span.attrs.owner, span.attrs['hook.handler'], span.attrs['hook.outcome']]).sort(),
+    ).toEqual([
       ['changes', 'changes:h', 'ok'],
       ['memory', 'memory:h', 'ok'],
     ])

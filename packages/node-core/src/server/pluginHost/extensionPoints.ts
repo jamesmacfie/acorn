@@ -1,11 +1,10 @@
-// The node-side twin of the client's extension points
-// (packages/client-core/src/host/registries/extensionPoints/extensionPoints.ts, docs/plugins/cooperative-extension-points.md § Cooperative extension
-// points), and the node's only many-to-many seam between plugins.
+// The node-side twin of the client's extension points (docs/plugins/cooperative-extension-points.md §
+// Cooperative extension points), and the node's only many-to-many seam between plugins.
 //
-// Capabilities are the other one and they are deliberately single-provider: one named typed function,
+// Capabilities are the other seam and they are deliberately single-provider: one named typed function,
 // one owner, a duplicate is a programming error. That is the wrong shape for "many plugins each add a
 // workflow step kind", and every private registry a plugin hand-rolls to get around it gets the
-// lifecycle slightly different (2026-08-27 extensibility review, finding 4).
+// lifecycle slightly different.
 //
 // Same rules as the client's: the owner declares a point in its own namespace, contributions are
 // ordered, a plugin cannot file two entries under one id, and everything goes when the plugin does.
@@ -37,7 +36,7 @@ export type Extension<T> = {
 }
 
 // Module singletons, like the route, tool, source and node-action registries beside them, with the
-// same lifecycle answer: the host clears a plugin's entries before re-registering them
+// same lifecycle answer: each registration hands back its own undo, and the host runs it on teardown
 // (./host.ts § clearRegistrations).
 const points = new Map<string, ExtensionPoint>()
 const extensions = new Map<string, Extension<unknown>[]>()
@@ -46,11 +45,16 @@ const extensions = new Map<string, Extension<unknown>[]>()
 export function openExtensionPoint(ownerId: string, id: ExtensionPointId<unknown>, label: string): Disposable {
   const ref = parseExtensionPointRef(id)
   if (!ref) throw new Error(`Extension point '${id}' is not a '<pluginId>:<pointId>' id.`)
-  if (ref.owner !== ownerId) throw new Error(`Plugin '${ownerId}' may only open points under '${ownerId}:', not '${id}'.`)
+  if (ref.owner !== ownerId)
+    throw new Error(`Plugin '${ownerId}' may only open points under '${ownerId}:', not '${id}'.`)
   if (points.has(id)) throw new Error(`Extension point already open: ${id}`)
   const point = { id, ownerId, label }
   points.set(id, point)
-  return { dispose: () => { if (points.get(id) === point) points.delete(id) } }
+  return {
+    dispose: () => {
+      if (points.get(id) === point) points.delete(id)
+    },
+  }
 }
 
 /** Contribute one entry to somebody else's point (or your own). Registering before the point is open
@@ -69,7 +73,11 @@ export function contributeExtension<T>(
   return {
     dispose: () => {
       const current = extensions.get(point)
-      if (current) extensions.set(point, current.filter((existing) => existing !== contribution))
+      if (current)
+        extensions.set(
+          point,
+          current.filter((existing) => existing !== contribution),
+        )
     },
   }
 }
@@ -80,7 +88,9 @@ export function contributeExtension<T>(
  *  owner to hand it to. */
 export function extensionsFor<T>(point: ExtensionPointId<T>): Extension<T>[] {
   if (!points.has(point)) return []
-  return [...(extensions.get(point) ?? [])].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)) as Extension<T>[]
+  return [...(extensions.get(point) ?? [])].sort(
+    (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+  ) as Extension<T>[]
 }
 
 /** Every point open on this node, for the disclosure surfaces and for tests. */

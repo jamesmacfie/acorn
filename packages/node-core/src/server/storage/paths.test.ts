@@ -31,8 +31,8 @@ describe('server runtime paths', () => {
     expect(findWorkspaceRoot(bundledModuleDir)).toBe(root)
   })
 
-  // The dev data root belongs to apps/node, which owns SQLite, blobs and node.json. There's no clientDir
-  // any more: the node serves no web assets.
+  // The dev data root belongs to apps/node, which owns SQLite, blobs and node.json. There's no
+  // clientDir: the node serves no web assets.
   it('derives the dev-data path from the workspace root', () => {
     const { root, sourceModuleDir } = fixture()
     const paths = resolveServerPaths(sourceModuleDir)
@@ -40,9 +40,9 @@ describe('server runtime paths', () => {
     expect(resolveDatabasePath(paths.devDataDir)).toBe(join(root, 'apps/node/.acorn', 'core.sqlite'))
   })
 
-  // Regression guard: the previous implementation walked for a package.json named "@acorn/desktop",
-  // which from packages/node-core matched nothing, so dev:node and db:locate threw and db:migrate
-  // quietly created a second database in the wrong package.
+  // Walking for a package.json named "@acorn/desktop" would match nothing from packages/node-core, so
+  // dev:node and db:locate would throw and db:migrate would quietly create a second database in the
+  // wrong package.
   it('resolves identically from anywhere inside the workspace', () => {
     const { root, sourceModuleDir, bundledModuleDir } = fixture()
     const scripts = join(root, 'packages/node-core/scripts')

@@ -64,7 +64,10 @@ describe('resolveInRoot', () => {
 
 describe('confineExistingFile', () => {
   it('resolves a real file to its realpath', async () => {
-    await expect(confineExistingFile(root, 'src/app.ts')).resolves.toEqual({ ok: true, path: join(root, 'src', 'app.ts') })
+    await expect(confineExistingFile(root, 'src/app.ts')).resolves.toEqual({
+      ok: true,
+      path: join(root, 'src', 'app.ts'),
+    })
   })
 
   it('rejects a symlinked LEAF pointing outside the root', async () => {

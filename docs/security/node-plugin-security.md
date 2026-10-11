@@ -11,20 +11,6 @@ of the binary and aren't sandboxed.
 
 ## Topic pages
 
-<a id="node-half-plugin-security"></a>
-<a id="the-broadcast-namespace"></a>
-<a id="rung-0--the-client-sandbox-shipped"></a>
-<a id="rung-1--permission-shaped-context-phase-1-shipped-with-the-loader"></a>
-<a id="telemetry-sinks"></a>
-<a id="rung-2--isolated-node-realm-shipped"></a>
-<a id="rung-3--os-level-sandboxing-the-last-door"></a>
-<a id="secrets-narrow-use-scoped-access"></a>
-<a id="tokens-routes-and-agents"></a>
-<a id="storage"></a>
-<a id="supply-chain"></a>
-<a id="resource-abuse"></a>
-<a id="design-rules-keep-the-boundary-intact"></a>
-
 | Page | What it covers |
 | --- | --- |
 | [Third-party plugin bundles](./plugin-bundles.md) | Hash-bound consent for client bundles, custody on the desktop and terminal, and the threats it closes |
@@ -75,8 +61,6 @@ Each rung is additive. Rungs 0 to 2 ship, and rung 3 is the OS boundary still to
 
 Rung 2 is a resource boundary, not an OS security claim. Node calls its permission model a seat belt
 rather than a sandbox for hostile code, and a worker isn't crash isolation.
-
-<a id="summary-table"></a>
 
 ## Summary
 

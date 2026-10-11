@@ -1,8 +1,8 @@
 // What the node says on its way out when nothing caught the error.
 //
-// Until this existed, an `uncaughtException` printed Node's own stack and the process died, which
-// is fine for a developer watching a terminal and invisible to everyone else: a supervised node's
-// stderr goes to the helper's log, and nothing correlated the death with what the owner was doing.
+// Without this, an `uncaughtException` prints Node's own stack and the process dies, which is fine
+// for a developer watching a terminal and invisible to everyone else: a supervised node's stderr goes
+// to the helper's log, and nothing correlates the death with what the owner was doing.
 //
 // **Installing a listener changes what Node does.** With any `uncaughtException` listener
 // registered, Node stops printing the stack and stops exiting, so a handler that only records would
@@ -19,7 +19,7 @@ const log = createLogger('crash')
 
 /** How long the flush gets. A crash is not the moment to wait on a network sink, and one second is
  *  long enough for an in-process one to write a file. */
-export const FLUSH_DEADLINE_MS = 1_000
+const FLUSH_DEADLINE_MS = 1_000
 
 export type CrashHandlerOptions = {
   /** Overridden in the test, which cannot call the real one. */
@@ -45,10 +45,12 @@ export function installCrashHandlers(options: CrashHandlerOptions = {}): void {
   // The collector hands batches off synchronously; exporters convert and post afterwards.
   // Returning from flushTelemetry is not a delivery acknowledgement. Give those asynchronous
   // sinks the bounded crash window before exiting, even when the collector itself returns at once.
-  const flush = options.flush ?? (() => {
-    flushTelemetry()
-    return new Promise<void>((resolve) => setTimeout(resolve, deadlineMs))
-  })
+  const flush =
+    options.flush ??
+    (() => {
+      flushTelemetry()
+      return new Promise<void>((resolve) => setTimeout(resolve, deadlineMs))
+    })
 
   const die = (kind: 'uncaughtException' | 'unhandledRejection', value: unknown): void => {
     const error = value instanceof Error ? value : new Error(String(value))

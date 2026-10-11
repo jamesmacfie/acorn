@@ -2,6 +2,7 @@ import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import type { Disposable } from '../pluginHost/capabilities'
 
 export type ToolRisk = SharedToolRisk
 
@@ -84,10 +85,18 @@ class AgentToolRegistry {
   // Duplicate names throw, like CapabilityRegistry.provide and the client-side Registry: two tools
   // answering to one name means the winner depends on plugin init order. A silent last-write-wins would
   // be an agent calling a tool it didn't mean to.
-  register(owner: string, tool: AgentToolContribution): void {
+  register(owner: string, tool: AgentToolContribution): Disposable {
     const clash = this.#registrations.find((r) => r.tool.name === tool.name)
-    if (clash) throw new Error(`Duplicate agent tool '${tool.name}': already registered by '${clash.owner}', now by '${owner}'.`)
-    this.#registrations.push({ owner, tool })
+    if (clash)
+      throw new Error(`Duplicate agent tool '${tool.name}': already registered by '${clash.owner}', now by '${owner}'.`)
+    const registration = { owner, tool }
+    this.#registrations.push(registration)
+    return {
+      dispose: () => {
+        const index = this.#registrations.indexOf(registration)
+        if (index >= 0) this.#registrations.splice(index, 1)
+      },
+    }
   }
 
   // Drop everything one owner contributed, as the HTTP route registry does. This registry
@@ -111,7 +120,8 @@ class AgentToolRegistry {
 
 const registry = new AgentToolRegistry()
 
-export const registerAgentTool = (owner: string, tool: AgentToolContribution): void => registry.register(owner, tool)
+export const registerAgentTool = (owner: string, tool: AgentToolContribution): Disposable =>
+  registry.register(owner, tool)
 export const removeAgentTools = (owner: string): void => registry.remove(owner)
 export const agentToolContributions = (): readonly AgentToolContribution[] => registry.list()
 /** Who contributed the tool of this name, for the `tool.call` span. `core` for a name nobody

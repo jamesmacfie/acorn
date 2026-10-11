@@ -1,7 +1,29 @@
 import { createSignal, For, Show, type JSX } from 'solid-js'
 import {
-  Alert, Badge, Button, Card, Chip, ChipRow, Composer, CopyButton, EmptyState, Facts, Heading, Icon, IconButton,
-  Inline, Markdown, Meter, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Chip,
+  ChipRow,
+  Composer,
+  CopyButton,
+  EmptyState,
+  Facts,
+  Heading,
+  Icon,
+  IconButton,
+  Inline,
+  Markdown,
+  Meter,
+  Row,
+  Section,
+  Stack,
+  TabPanel,
+  Tabs,
+  Text,
+  Toolbar,
+  ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
 import { priorityMeta, priorityTone, stateTone } from '../shared/triage'
@@ -10,17 +32,22 @@ import { formatDate, relativeTime } from './model'
 // One Linear ticket, as a tree of acorn's own components. Three tabs, Overview, Activity, and
 // Comments, all fed by one detail request.
 //
-// Nothing here draws a pixel: what used to be a header div with three classes is a `Heading`, the
-// sub-issue progress bar is a `Meter`, the related-issue buttons are `Row`s, and the comment boxes are
-// `Composer`s. The stylesheet this file needed is gone, and with it the job of keeping it in step with
-// the shell's appearance packs.
+// Nothing here draws a pixel: the header is a `Heading`, the sub-issue progress bar a `Meter`, the
+// related-issue buttons `Row`s, and the comment boxes `Composer`s, so the shell's appearance packs apply
+// with no stylesheet here to keep in step.
 //
 // Two things live outside this file. The panel chrome belongs to whoever opened the panel
 // (client-core/host/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
 // tickets sits in app.tsx beside the task read.
 
-// Icon per activity kind. Names, not typed glyphs: "○" used to mean both "assigned" and "not done".
-const ACTIVITY_ICON: Record<string, string> = { created: 'sparkles', state: 'circle-dot', assignee: 'user-round', label: 'tag', title: 'pencil' }
+// Icon per activity kind. Names, not typed glyphs, so one character never stands for two kinds.
+const ACTIVITY_ICON: Record<string, string> = {
+  created: 'sparkles',
+  state: 'circle-dot',
+  assignee: 'user-round',
+  label: 'tag',
+  title: 'pencil',
+}
 
 // An attachment's source, named only when it is one people know by name.
 const SOURCE_NAME: Record<string, string> = { github: 'GitHub' }
@@ -61,27 +88,36 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
   // Facts values are strings on this path, because a tree's props are JSON on a message port. The one
   // fact that carried a control — the branch name and its copy button — is a toolbar of its own below.
-  const facts = () => [
-    issue().assignee ? { label: 'Assignee', value: issue().assignee! } : null,
-    issue().creator ? { label: 'Opened by', value: `${issue().creator} ${relativeTime(issue().createdAt)}`.trim() } : null,
-    issue().estimate != null ? { label: 'Estimate', value: `${issue().estimate} points` } : null,
-    issue().cycle ? { label: 'Cycle', value: issue().cycle!.endsAt ? `Ends ${formatDate(issue().cycle!.endsAt)}` : `Cycle ${issue().cycle!.number}` } : null,
-    issue().dueDate ? { label: 'Due', value: formatDate(issue().dueDate) } : null,
-    issue().team ? { label: 'Team', value: issue().team!.name } : null,
-    issue().project ? { label: 'Project', value: issue().project!.name } : null,
-  ].filter((fact) => fact !== null)
+  const facts = () =>
+    [
+      issue().assignee ? { label: 'Assignee', value: issue().assignee! } : null,
+      issue().creator
+        ? { label: 'Opened by', value: `${issue().creator} ${relativeTime(issue().createdAt)}`.trim() }
+        : null,
+      issue().estimate != null ? { label: 'Estimate', value: `${issue().estimate} points` } : null,
+      issue().cycle
+        ? {
+            label: 'Cycle',
+            value: issue().cycle!.endsAt
+              ? `Ends ${formatDate(issue().cycle!.endsAt)}`
+              : `Cycle ${issue().cycle!.number}`,
+          }
+        : null,
+      issue().dueDate ? { label: 'Due', value: formatDate(issue().dueDate) } : null,
+      issue().team ? { label: 'Team', value: issue().team!.name } : null,
+      issue().project ? { label: 'Project', value: issue().project!.name } : null,
+    ].filter((fact) => fact !== null)
 
   // The done mark is an `Icon` in the body rather than `leading`, which a tree can only fill with text.
   const relatedRow = (related: LinearRelatedIssue, done?: boolean) => (
-    <Row
-      onPress={() => props.onOpenRelated(related.identifier)}
-      meta={related.state?.name}
-    >
+    <Row onPress={() => props.onOpenRelated(related.identifier)} meta={related.state?.name}>
       <Inline>
         <Show when={done !== undefined}>
           <Icon name={done ? 'circle-check' : 'circle'} tone={done ? 'ok' : undefined} />
         </Show>
-        <Text emphasis="mono" tone={done ? 'muted' : 'neutral'}>{related.identifier}</Text>
+        <Text emphasis="mono" tone={done ? 'muted' : 'neutral'}>
+          {related.identifier}
+        </Text>
         <Text tone={done ? 'muted' : 'neutral'}>{related.title}</Text>
       </Inline>
     </Row>
@@ -91,9 +127,9 @@ export function LinearIssueView(props: LinearIssueViewProps) {
     <Card pad="sm" stripe={isReply ? 'accent' : undefined}>
       <Stack gap="row">
         {/* An `Inline`, not a `Toolbar`: a bar inside a card is inset by the card's padding and then
-            pads itself again, so the author's name sat further in than their own words and the strip
-            stood taller than the line it holds. Github's inline threads put this meta line flush with
-            the comment body, and so does this one now. */}
+            pads itself again, so the author's name would sit further in than their own words and the
+            strip would stand taller than the line it holds. Github's inline threads put this meta line
+            flush with the comment body, and so does this one. */}
         <Inline>
           <Text emphasis="strong">{entry.author ?? 'Unknown'}</Text>
           <Show when={relativeTime(entry.createdAt)}>{(age) => <Text tone="muted">{age()}</Text>}</Show>
@@ -108,12 +144,13 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             </Button>
           </Show>
         </Inline>
-        {/* The host renders and sanitises the markdown. What used to be an `innerHTML` write inside the
-            frame is now a node with a `text` prop, which is the only way a stranger's markup can reach
-            the shell's DOM at all. */}
+        {/* The host renders and sanitises the markdown. A node with a `text` prop is the only way a
+            stranger's markup can reach the shell's DOM at all. */}
         <Markdown text={entry.body} onSelect={props.onLink} onCopy={props.onCopy} />
         <Show when={repliesOf(entry.id).length}>
-          <Stack gap="row"><For each={repliesOf(entry.id)}>{(child) => comment(child, true)}</For></Stack>
+          <Stack gap="row">
+            <For each={repliesOf(entry.id)}>{(child) => comment(child, true)}</For>
+          </Stack>
         </Show>
         <Show when={replyingId() === entry.id}>
           <Composer
@@ -136,34 +173,48 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   return (
     <Stack gap="section">
       <Toolbar variant="bar">
-        <Heading level={2} eyebrow={issue().identifier}>{issue().title}</Heading>
+        <Heading level={2} eyebrow={issue().identifier}>
+          {issue().title}
+        </Heading>
         <ToolbarSpacer />
         <Show when={props.backTo}>
           {(identifier) => (
-            <Button size="sm" variant="ghost" onPress={props.onBack}><Icon name="arrow-left" /> Back to {identifier()}</Button>
+            <Button size="sm" variant="ghost" onPress={props.onBack}>
+              <Icon name="arrow-left" /> Back to {identifier()}
+            </Button>
           )}
         </Show>
         <IconButton icon="refresh-cw" label="Refresh issue" busy={props.refreshing} onPress={props.onRefresh} />
         {/* The clipboard, not `ui.openUrl`. The host resolves a URL through its content-link ladder,
             linear's recogniser claims `linear.app/…/issue/…`, and it resolves to the ticket already on
             screen, so the button would re-open where the reader is. See docs/integrations/linear.md § Linear. */}
-        <Button size="sm" onPress={() => props.onCopy(issue().url)}>Copy link</Button>
+        <Button size="sm" onPress={() => props.onCopy(issue().url)}>
+          Copy link
+        </Button>
       </Toolbar>
 
       <Show when={props.refreshError}>
-        {(reason) => <Alert variant="banner" title="Couldn't refresh this issue. Showing the last data we got.">{reason()}</Alert>}
+        {(reason) => (
+          <Alert variant="banner" title="Couldn't refresh this issue. Showing the last data we got.">
+            {reason()}
+          </Alert>
+        )}
       </Show>
 
       <ChipRow ariaLabel="Issue status">
         <Show when={issue().state}>
-          {(state) => <Badge tone={stateTone(state().type)} size="xs">{state().name}</Badge>}
+          {(state) => (
+            <Badge tone={stateTone(state().type)} size="xs">
+              {state().name}
+            </Badge>
+          )}
         </Show>
         <Show when={priority().level !== 'none'}>
-          <Badge tone={priorityTone(priority().level)} size="xs">{priority().label}</Badge>
+          <Badge tone={priorityTone(priority().level)} size="xs">
+            {priority().label}
+          </Badge>
         </Show>
-        <For each={issue().labels ?? []}>
-          {(label) => <Chip color={label.color}>{label.name}</Chip>}
-        </For>
+        <For each={issue().labels ?? []}>{(label) => <Chip color={label.color}>{label.name}</Chip>}</For>
       </ChipRow>
 
       <Tabs
@@ -211,7 +262,13 @@ export function LinearIssueView(props: LinearIssueViewProps) {
                       <Text>{attachment.title}</Text>
                       {/* Alongside, because an attachment is what a reader most often pastes somewhere,
                           and unlike the header URL it does not point back to this view. */}
-                      <IconButton icon="copy" label="Copy link" size="xs" variant="ghost" onPress={() => props.onCopy(attachment.url)} />
+                      <IconButton
+                        icon="copy"
+                        label="Copy link"
+                        size="xs"
+                        variant="ghost"
+                        onPress={() => props.onCopy(attachment.url)}
+                      />
                     </Inline>
                   </Row>
                 )}
@@ -239,7 +296,14 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       </TabPanel>
 
       <TabPanel idPrefix="linear" id="activity" active={props.activeTab}>
-        <Show when={issue().activity.length} fallback={<EmptyState align="start" size="sm">No activity yet.</EmptyState>}>
+        <Show
+          when={issue().activity.length}
+          fallback={
+            <EmptyState align="start" size="sm">
+              No activity yet.
+            </EmptyState>
+          }
+        >
           <For each={issue().activity}>
             {(entry) => (
               <Row density="compact" meta={relativeTime(entry.createdAt)}>
@@ -256,7 +320,14 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
       <TabPanel idPrefix="linear" id="comments" active={props.activeTab}>
         <Stack gap="stack">
-          <Show when={topComments().length} fallback={<EmptyState align="start" size="sm">No comments yet.</EmptyState>}>
+          <Show
+            when={topComments().length}
+            fallback={
+              <EmptyState align="start" size="sm">
+                No comments yet.
+              </EmptyState>
+            }
+          >
             <For each={topComments()}>{(entry) => comment(entry, false)}</For>
           </Show>
           <Composer
@@ -273,8 +344,8 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   )
 }
 
-/** The parent-and-children block, with the done count as a `Meter`: the progress bar it replaces was a
- *  div whose width this plugin computed in percent, which is a pixel decision the kit now owns. */
+/** The parent-and-children block, with the done count as a `Meter`, so the bar's width is the kit's
+ *  pixel decision rather than this plugin's. */
 function SubIssues(props: {
   issue: LinearIssueDetail
   row: (related: LinearRelatedIssue, done?: boolean) => JSX.Element
@@ -287,8 +358,14 @@ function SubIssues(props: {
         {/* The count is drawn as well as announced. Above the bar rather than beside it, because a
             `Meter` fills its line. */}
         <Show when={children().length}>
-          <Text tone="muted">{doneCount()} of {children().length} done</Text>
-          <Meter value={doneCount() / children().length} label={`${doneCount()} of ${children().length} done`} size="sm" />
+          <Text tone="muted">
+            {doneCount()} of {children().length} done
+          </Text>
+          <Meter
+            value={doneCount() / children().length}
+            label={`${doneCount()} of ${children().length} done`}
+            size="sm"
+          />
         </Show>
         <Show when={props.issue.parent}>
           {(parent) => (

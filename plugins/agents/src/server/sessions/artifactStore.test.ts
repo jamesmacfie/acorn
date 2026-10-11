@@ -8,8 +8,7 @@ import * as schema from '../../node/schema'
 import { AgentArtifactStore } from './artifactStore'
 
 // This plugin's own migrated SQLite file, not core's. Not "makeTestDb with extra tables": a test that
-// could still see core's schema would keep passing after this store started reading a table it no longer
-// owns (server/routes/testDb.ts).
+// could still see core's schema would keep passing if this store read a table it doesn't own.
 let testDb: TestPluginDb
 let dataDir: string
 let store: AgentArtifactStore
@@ -35,10 +34,7 @@ describe('managed-agent artifact store', () => {
       title: '../../command.log',
       text,
     })
-    const [row] = await testDb.db
-      .select()
-      .from(schema.agentArtifacts)
-      .where(eq(schema.agentArtifacts.id, artifact.id))
+    const [row] = await testDb.db.select().from(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, artifact.id))
     expect(row.storageKey).not.toContain('command.log')
     expect(row.metadataJson).not.toContain(text)
     const content = await store.read(artifact.id)
@@ -81,15 +77,24 @@ describe('managed-agent artifact store', () => {
       text: 'same',
     })
     const [firstRow, secondRow] = await Promise.all([
-      testDb.db.select().from(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, first.id)).then((rows) => rows[0]!),
-      testDb.db.select().from(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, second.id)).then((rows) => rows[0]!),
+      testDb.db
+        .select()
+        .from(schema.agentArtifacts)
+        .where(eq(schema.agentArtifacts.id, first.id))
+        .then((rows) => rows[0]!),
+      testDb.db
+        .select()
+        .from(schema.agentArtifacts)
+        .where(eq(schema.agentArtifacts.id, second.id))
+        .then((rows) => rows[0]!),
     ])
     await testDb.db.delete(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, first.id))
     await store.collectRemoved([firstRow])
     expect(await store.read(second.id)).not.toBeNull()
     await testDb.db.delete(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, second.id))
     await store.collectRemoved([secondRow])
-    await expect(import('node:fs/promises').then((fs) => fs.readFile(join(store.root, secondRow.storageKey!))))
-      .rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      import('node:fs/promises').then((fs) => fs.readFile(join(store.root, secondRow.storageKey!))),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

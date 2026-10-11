@@ -18,15 +18,16 @@ const HASH = 'aaaaaaaabbbbbbbbccccccccddddddddaaaaaaaabbbbbbbbccccccccdddddddd'
 let port: MessagePort
 let seen: unknown[]
 
-const stubWorker = (): Worker => ({
-  postMessage: (_message: unknown, transfer?: Transferable[]) => {
-    port = ((transfer ?? []) as MessagePort[])[1]!
-    port.onmessage = (event: MessageEvent) => seen.push(event.data)
-    port.start()
-  },
-  terminate: () => {},
-  onerror: null,
-} as unknown as Worker)
+const stubWorker = (): Worker =>
+  ({
+    postMessage: (_message: unknown, transfer?: Transferable[]) => {
+      port = ((transfer ?? []) as MessagePort[])[1]!
+      port.onmessage = (event: MessageEvent) => seen.push(event.data)
+      port.start()
+    },
+    terminate: () => {},
+    onerror: null,
+  }) as unknown as Worker
 
 const acquire = () =>
   acquireTreeWorker({
@@ -43,16 +44,24 @@ const settle = async (): Promise<void> => {
 }
 
 /** Every reply the host has posted, in order. */
-const replies = () => seen.filter((message) => (message as { kind?: string }).kind === 'tree:host-reply') as {
-  slot: string
-  id: number
-  ok: boolean
-  body?: unknown
-  error?: { code: string; message: string }
-}[]
+const replies = () =>
+  seen.filter((message) => (message as { kind?: string }).kind === 'tree:host-reply') as {
+    slot: string
+    id: number
+    ok: boolean
+    body?: unknown
+    error?: { code: string; message: string }
+  }[]
 
 const ask = (slot: string, id: number, payload?: unknown): void => {
-  port.postMessage({ kind: 'tree:host-request', slot, id, op: 'owner.invoke', name: 'replace', ...(payload === undefined ? {} : { payload }) })
+  port.postMessage({
+    kind: 'tree:host-request',
+    slot,
+    id,
+    op: 'owner.invoke',
+    name: 'replace',
+    ...(payload === undefined ? {} : { payload }),
+  })
 }
 
 beforeEach(() => {
@@ -119,7 +128,11 @@ describe('a tree asking its host for something', () => {
     await settle()
 
     expect(replies()).toHaveLength(1)
-    expect(replies()[0]).toMatchObject({ id: TREE_LIMITS.hostRequestsPerSlot + 1, ok: false, error: { code: 'too_many' } })
+    expect(replies()[0]).toMatchObject({
+      id: TREE_LIMITS.hostRequestsPerSlot + 1,
+      ok: false,
+      error: { code: 'too_many' },
+    })
   })
 
   it('gives up on an owner that never answers', async () => {
@@ -137,7 +150,9 @@ describe('a tree asking its host for something', () => {
   it('reports a handler that threw as a refusal rather than dropping it', async () => {
     const worker = acquire()
     worker.mount('a', 'preview', {})
-    worker.onHostRequest('a', async () => { throw new Error('that attachment is no longer in this draft') })
+    worker.onHostRequest('a', async () => {
+      throw new Error('that attachment is no longer in this draft')
+    })
 
     ask('a', 1)
     await settle()
@@ -149,7 +164,13 @@ describe('a tree asking its host for something', () => {
     const worker = acquire()
     worker.mount('a', 'preview', {})
     let finish: (result: TreeHostResult) => void = () => {}
-    worker.onHostRequest('a', () => new Promise<TreeHostResult>((resolve) => { finish = resolve }))
+    worker.onHostRequest(
+      'a',
+      () =>
+        new Promise<TreeHostResult>((resolve) => {
+          finish = resolve
+        }),
+    )
 
     ask('a', 1)
     await settle()

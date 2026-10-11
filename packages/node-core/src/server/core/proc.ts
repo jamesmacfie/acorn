@@ -1,5 +1,5 @@
 // The process broker. See docs/security/process-and-paths.md § Process, path, and configuration controls for the
-// guarantee this gives every caller and the incidents that led to it.
+// guarantee this gives every caller.
 import { spawn } from 'node:child_process'
 import { basename } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
@@ -63,7 +63,10 @@ export type ProcResult = {
 
 // Which parent variables a child may see. Everything not named here is absent, including every ACORN_*
 // token the node injects into its own process and every secret binding.
-export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: NodeJS.ProcessEnv = process.env): Record<string, string> {
+export function brokerEnv(
+  spec: Pick<ProcSpec, 'env' | 'passthrough'>,
+  parent: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
   const out = childEnv(parent)
   for (const rule of spec.passthrough ?? []) {
     if (rule.endsWith('*')) {
@@ -215,14 +218,20 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
       clearTimeout(timer)
       // The SIGKILL escalation is not cleared here. The direct child exiting is exactly the case where a
       // group member that ignored SIGTERM is still alive: its parent is gone, the pipes closed, 'close'
-      // fired, and clearing the timer at that moment left the survivor running forever. Confirmed with a
-      // grandchild that traps TERM. The timer is unref'd, so letting it run costs nothing and cannot hold
-      // the process open.
+      // fired, and clearing the timer at that moment would leave the survivor running forever, as a
+      // grandchild that traps TERM shows. The timer is unref'd, so letting it run costs nothing and cannot
+      // hold the process open.
       spec.signal?.removeEventListener('abort', abort)
       // Events rather than attributes on the histogram: both are rare, both are worth seeing one at
       // a time, and neither belongs in a distribution.
-      if (timedOut) emitEvent('core', 'proc.timeout', { seam: 'proc.spawn', file: label, 'timeout.ms': spec.timeoutMs ?? DEFAULT_TIMEOUT_MS })
-      if (truncated) emitEvent('core', 'proc.truncated', { seam: 'proc.spawn', file: label, 'max.bytes': maxOutputBytes })
+      if (timedOut)
+        emitEvent('core', 'proc.timeout', {
+          seam: 'proc.spawn',
+          file: label,
+          'timeout.ms': spec.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        })
+      if (truncated)
+        emitEvent('core', 'proc.truncated', { seam: 'proc.spawn', file: label, 'max.bytes': maxOutputBytes })
       resolve({
         ...result,
         stdout: decode(buffers.out, spec.stdoutEncoding),
@@ -243,7 +252,7 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
 }
 
 // Decode accumulated chunks as one stream. StringDecoder carries a partial multi-byte sequence across
-// chunk boundaries, which is the property `chunk.toString()` lacked, and `.end()` is deliberately not
+// chunk boundaries, which `chunk.toString()` does not, and `.end()` is deliberately not
 // called, so a sequence left incomplete by the output cap is dropped rather than flushed as U+FFFD.
 // Dropping it is what keeps the result both valid UTF-8 and within maxOutputBytes.
 function decode(chunks: readonly Buffer[], encoding: 'utf8' | 'latin1' = 'utf8'): string {
@@ -266,16 +275,26 @@ export class ProcessError extends Error {
 // For the majority of call sites, which want stdout or an exception. `stderr` is truncated in the message
 // because it can be long, and because a failing command's stderr is the one place a credential passed on
 // a command line would surface.
-export async function runProcessOrThrow(spec: ProcSpec, allowedExitCodes: readonly number[] = [0]): Promise<ProcResult> {
+export async function runProcessOrThrow(
+  spec: ProcSpec,
+  allowedExitCodes: readonly number[] = [0],
+): Promise<ProcResult> {
   const result = await runProcess(spec)
   if (result.spawnError) throw new ProcessError(result, `${spec.file}: ${result.spawnError}`)
-  if (result.timedOut) throw new ProcessError(result, `${spec.file} timed out after ${spec.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)
+  if (result.timedOut)
+    throw new ProcessError(result, `${spec.file} timed out after ${spec.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)
   if (result.aborted) throw new ProcessError(result, `${spec.file} aborted`)
   if (result.truncated) {
-    throw new ProcessError(result, `${spec.file} produced more than ${spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES} bytes of output`)
+    throw new ProcessError(
+      result,
+      `${spec.file} produced more than ${spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES} bytes of output`,
+    )
   }
   if (result.code === null || !allowedExitCodes.includes(result.code)) {
-    throw new ProcessError(result, `${spec.file} exited ${result.code ?? result.signal}: ${result.stderr.trim().slice(0, 500)}`)
+    throw new ProcessError(
+      result,
+      `${spec.file} exited ${result.code ?? result.signal}: ${result.stderr.trim().slice(0, 500)}`,
+    )
   }
   return result
 }

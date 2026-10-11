@@ -1,14 +1,27 @@
 // Published declaration, hand-written and copied verbatim to dist/testing.d.ts. Runs under any test
 // runner. See docs/plugin-authoring/testing.md § Test a derived source.
 import type { DataRecordAction, DataSourceResult } from 'acorn-plugin-types'
-import type { DerivedQueryArgs, DerivedSource, FieldSpecs, FieldValues, InputRecord, InputSpecs } from 'acorn-plugin-sdk/data'
+import type {
+  DerivedQueryArgs,
+  DerivedSource,
+  FieldSpecs,
+  FieldValues,
+  InputRecord,
+  InputSpecs,
+} from 'acorn-plugin-sdk/data'
 
 /** Records for each input, by input name. An optional input you leave out is one the person skipped. */
-export type TestInputs<I extends InputSpecs> =
-  & { [K in keyof I as I[K]['optional'] extends true ? never : K]: InputRecord[] }
-  & { [K in keyof I as I[K]['optional'] extends true ? K : never]?: InputRecord[] }
+export type TestInputs<I extends InputSpecs> = {
+  [K in keyof I as I[K]['optional'] extends true ? never : K]: InputRecord[]
+} & { [K in keyof I as I[K]['optional'] extends true ? K : never]?: InputRecord[] }
 
-export type TestRow<F extends FieldSpecs> = { id: string; data: FieldValues<F>; action?: DataRecordAction; taskId?: string; display?: { url?: string } }
+export type TestRow<F extends FieldSpecs> = {
+  id: string
+  data: FieldValues<F>
+  action?: DataRecordAction
+  taskId?: string
+  display?: { url?: string }
+}
 export type TestResult<F extends FieldSpecs> = {
   rows: TestRow<F>[]
   /** Records that failed the declared fields, which the app drops and counts the same way. */

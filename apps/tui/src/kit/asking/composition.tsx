@@ -47,12 +47,16 @@ export function Composer(props: {
           rows={props.rows ?? 3}
           boxed={false}
           grow
-          ref={(element: Renderable) => { area = element as Renderable & FieldApi }}
+          ref={(element: Renderable) => {
+            area = element as Renderable & FieldApi
+          }}
           onInput={(value) => props.onInput?.(value)}
           onSubmit={(value) => send(value)}
         />
       </box>
-      <Show when={props.error}><Line tone="danger">{props.error!}</Line></Show>
+      <Show when={props.error}>
+        <Line tone="danger">{props.error!}</Line>
+      </Show>
       <box flexDirection="row" gap={1}>
         {slot(props.hint)}
         <box flexGrow={1} />
@@ -111,31 +115,48 @@ export function MentionTextarea(props: MentionTextareaProps) {
           // Entering the region focuses the composer; Escape or Tab reaches the transcript.
           markEntry(element)
           // Both keys belong to this field, even while typing. STOP outranks the typing shadow.
-          bindKeys(element, [{
-            key: 'down',
-            cmd: () => {
-              if (!list || !suggestions().length) return false
-              // The field is outside the list's stops, so enter at its first row.
-              return focusRenderable(stopsIn(list)[0])
-            },
-          }, {
-            // Enter submits, and Shift+Enter remains a newline when the terminal distinguishes them.
-            // Terminals without the kitty keyboard protocol send the same byte for both.
-            key: 'return',
-            cmd: () => {
-              // An open suggestion list takes Enter before the submit handler.
-              const [first] = suggestions()
-              if (first) { complete(first.value); return true }
-              if (!props.onSubmit) return false
-              props.onSubmit()
-              return true
-            },
-          }], STOP, { mode: 'focus' })
+          bindKeys(
+            element,
+            [
+              {
+                key: 'down',
+                cmd: () => {
+                  if (!list || !suggestions().length) return false
+                  // The field is outside the list's stops, so enter at its first row.
+                  return focusRenderable(stopsIn(list)[0])
+                },
+              },
+              {
+                // Enter submits, and Shift+Enter remains a newline when the terminal distinguishes them.
+                // Terminals without the kitty keyboard protocol send the same byte for both.
+                key: 'return',
+                cmd: () => {
+                  // An open suggestion list takes Enter before the submit handler.
+                  const [first] = suggestions()
+                  if (first) {
+                    complete(first.value)
+                    return true
+                  }
+                  if (!props.onSubmit) return false
+                  props.onSubmit()
+                  return true
+                },
+              },
+            ],
+            STOP,
+            { mode: 'focus' },
+          )
         }}
         onInput={props.onInput}
       />
       <Show when={suggestions().length}>
-        <box flexDirection="column" paddingLeft={2} ref={(element: Renderable) => { list = element }}>
+        <box
+          flexDirection="column"
+          paddingLeft={2}
+          ref={(element: Renderable) => {
+            list = element
+          }}
+        >
           <For each={suggestions()}>
             {(suggestion) => (
               <PickerRow

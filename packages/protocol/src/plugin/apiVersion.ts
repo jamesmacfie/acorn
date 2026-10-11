@@ -5,14 +5,13 @@
 // need more than type stripping to run.
 //
 // See docs/plugins/activation.md § Activation for what bumping this number costs.
-export const PLUGIN_API_MAJOR = '3'
+export const PLUGIN_API_MAJOR = '5'
 
 // What a manifest may write in `apiVersion`: one major ('4'), a list ('3 || 4'), or an inclusive span
 // ('2-4'). Mixed lists of both are fine ('2 || 4-6').
 //
-// A range rather than the exact string this used to compare, because the day PLUGIN_API_MAJOR moves,
-// every plugin built for the old one stops loading and no single build can work on both sides of the
-// move. An author who has checked their plugin against two majors can now say so and ship once.
+// A range, because the day PLUGIN_API_MAJOR moves every plugin built for the old one stops loading.
+// An author who has checked their plugin against two majors can say so and ship one build for both.
 //
 // Majors only. The published name guard in tools/arch/publishedPluginSurface.test.ts tracks the
 // SDK and declaration surfaces; the private facade has its own independent snapshot.

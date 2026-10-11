@@ -95,7 +95,8 @@ export function readPackageSkill(packageDir: string, descriptor: PluginSkillDesc
   if (!declared) return fail(`path '${descriptor.path}' resolves outside the package`)
   let dir: string
   try {
-    if (lstatSync(declared).isSymbolicLink() || !lstatSync(declared).isDirectory()) return fail(`path '${descriptor.path}' is not a folder`)
+    if (lstatSync(declared).isSymbolicLink() || !lstatSync(declared).isDirectory())
+      return fail(`path '${descriptor.path}' is not a folder`)
     dir = realpathSync(declared)
   } catch {
     return fail(`path '${descriptor.path}' is missing`)
@@ -112,17 +113,22 @@ export function readPackageSkill(packageDir: string, descriptor: PluginSkillDesc
   }
   const parsed = parseSkillFile(text)
   if (!parsed.ok) return fail(parsed.reason)
-  return { ok: true, skill: { id: descriptor.id, dir, file, name: parsed.name, description: parsed.description, digest: folder.digest } }
+  return {
+    ok: true,
+    skill: { id: descriptor.id, dir, file, name: parsed.name, description: parsed.description, digest: folder.digest },
+  }
 }
 
 /** The frontmatter's `name` and `description`, checked, and the body's size. */
-export function parseSkillFile(text: string): { ok: true; name: string; description: string } | { ok: false; reason: string } {
+function parseSkillFile(text: string): { ok: true; name: string; description: string } | { ok: false; reason: string } {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
-  if (lines[0]?.trim() !== '---') return { ok: false, reason: 'SKILL.md must start with YAML frontmatter between --- lines' }
+  if (lines[0]?.trim() !== '---')
+    return { ok: false, reason: 'SKILL.md must start with YAML frontmatter between --- lines' }
   const end = lines.indexOf('---', 1)
   if (end < 0) return { ok: false, reason: 'SKILL.md frontmatter has no closing --- line' }
   const body = lines.slice(end + 1).join('\n')
-  if (Buffer.byteLength(body, 'utf8') > SKILL_LIMITS.bodyBytes) return { ok: false, reason: 'SKILL.md body is larger than 64 KiB' }
+  if (Buffer.byteLength(body, 'utf8') > SKILL_LIMITS.bodyBytes)
+    return { ok: false, reason: 'SKILL.md body is larger than 64 KiB' }
   if (body.includes('\u0000')) return { ok: false, reason: 'SKILL.md body contains a NUL character' }
   const fields = frontmatterStrings(lines.slice(1, end))
   if (typeof fields === 'string') return { ok: false, reason: fields }
@@ -133,7 +139,8 @@ export function parseSkillFile(text: string): { ok: true; name: string; descript
     return { ok: false, reason: 'frontmatter name must be up to 64 lower-case letters, digits and dashes' }
   }
   if (!description) return { ok: false, reason: 'frontmatter has no description' }
-  if ([...description].length > SKILL_LIMITS.descriptionChars) return { ok: false, reason: 'frontmatter description is longer than 1,024 characters' }
+  if ([...description].length > SKILL_LIMITS.descriptionChars)
+    return { ok: false, reason: 'frontmatter description is longer than 1,024 characters' }
   if (XML_TAG_RE.test(description)) return { ok: false, reason: 'frontmatter description contains an XML tag' }
   if (CONTROL_RE.test(description)) return { ok: false, reason: 'frontmatter description contains a control character' }
   return { ok: true, name, description }
@@ -151,7 +158,8 @@ function frontmatterStrings(lines: string[]): Record<string, string> | string {
     if (key !== 'name' && key !== 'description') continue
     const value = match[2]!.trim()
     const continued: string[] = []
-    while (at + 1 < lines.length && (/^\s/.test(lines[at + 1]!) || lines[at + 1] === '')) continued.push(lines[++at]!.trim())
+    while (at + 1 < lines.length && (/^\s/.test(lines[at + 1]!) || lines[at + 1] === ''))
+      continued.push(lines[++at]!.trim())
     while (continued.length && continued[continued.length - 1] === '') continued.pop()
     if (/^[|>][+-]?$/.test(value)) {
       out[key] = value.startsWith('|') ? continued.join('\n') : continued.join(' ').replace(/ {2,}/g, '\n')
@@ -165,7 +173,8 @@ function frontmatterStrings(lines: string[]): Record<string, string> | string {
       }
     } else if (value.startsWith("'")) {
       const joined = [value, ...continued].join(' ')
-      if (!joined.endsWith("'") || joined.length < 2) return `frontmatter ${key} isn't a quoted string this host can read`
+      if (!joined.endsWith("'") || joined.length < 2)
+        return `frontmatter ${key} isn't a quoted string this host can read`
       out[key] = joined.slice(1, -1).replaceAll("''", "'")
     } else {
       out[key] = [value, ...continued].join(' ').replace(/\s+#.*$/, '')

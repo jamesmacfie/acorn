@@ -72,5 +72,5 @@ Three plugins ship a check:
   or discarding on the owner's behalf is what a confirmation exists to avoid.
 - Terminal reports running terminals as a disclosure, because core stops them itself.
 
-`registerWillHandler` on `@acorn/plugin-api/ui/host` is the client-side seam core uses for the two
+`registerWillHandler` in client-core is the client-side seam core uses for the two
 moments with no Node meaning: the app quitting and a workspace being removed. No plugin should use it.

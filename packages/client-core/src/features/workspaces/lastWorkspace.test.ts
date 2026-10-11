@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { byRecentVisit, currentWorkspaceId, hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace'
+import {
+  byRecentVisit,
+  currentWorkspaceId,
+  hydrateWorkspaceHistory,
+  noteWorkspaceVisit,
+  previousWorkspaceId,
+} from './lastWorkspace'
 
 describe('the last workspace', () => {
   beforeEach(() => hydrateWorkspaceHistory({ recent: [] }))

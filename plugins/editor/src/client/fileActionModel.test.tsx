@@ -1,34 +1,63 @@
 import { EditorState } from '@codemirror/state'
 import { afterEach, expect, it, vi } from 'vitest'
 import { documentCustody, fileDocumentCustodies } from '@acorn/plugin-api/ui/editor'
+import { latestSignal } from '@acorn/plugin-api/client'
 import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 import type { EditorApi } from './editorClient'
 import type { FileTarget } from '../contract/api'
 import { createFileActionModel } from './fileActionModel'
 import { flushEditorDocument, type EditorPool } from './editorDocumentPool'
-import { activeFile, editorOpen, editorSetDirty, evictEditorState, openFiles, type TaskEditorState } from './editorState'
+import {
+  activeFile,
+  editorOpen,
+  editorSetDirty,
+  evictEditorState,
+  openFiles,
+  type TaskEditorState,
+} from './editorState'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
 
 let serial = 0
 const task = () => `file-actions-${++serial}`
-const target = (path: string, kind: 'file' | 'folder' = 'file', identity = 'ctime-1', entryId = 'inode-1'): FileTarget =>
-  ({ root: '/work', path, kind, identity, entryId })
-const pool = (): EditorPool => ({ retired: false, files: new Map(), saved: new Map(), reading: new Map(), externalEditors: new Set() })
+const target = (
+  path: string,
+  kind: 'file' | 'folder' = 'file',
+  identity = 'ctime-1',
+  entryId = 'inode-1',
+): FileTarget => ({ root: '/work', path, kind, identity, entryId })
+const pool = (): EditorPool => ({
+  retired: false,
+  files: new Map(),
+  saved: new Map(),
+  reading: new Map(),
+  externalEditors: new Set(),
+})
 const api = (overrides: Partial<EditorApi> = {}): EditorApi => ({
-  root: async () => '/work', list: async () => [], files: async () => [], read: async () => ({ text: '', revision: 'rev0' }),
+  root: async () => '/work',
+  list: async () => [],
+  files: async () => [],
+  read: async () => ({ text: '', revision: 'rev0' }),
   ignored: async () => ({ available: true, ignored: [] }),
-  readImage: async () => ({ bytes: new Uint8Array(), type: 'image/png' }), lineMarkers: async () => null,
+  readImage: async () => ({ bytes: new Uint8Array(), type: 'image/png' }),
+  lineMarkers: async () => null,
   fileStatus: async () => ({ kind: 'unavailable' }),
-  write: async (_task, _path, text) => ({ ok: true, text, revision: 'rev1' }), entry: async (_task, path) => target(path),
-  trashAvailability: async () => ({ available: true }), renameAvailability: async () => ({ available: true }), create: async () => ({ ok: true, path: 'new.ts' }),
-  rename: async () => ({ ok: true, path: 'renamed' }), trash: async () => ({ ok: true, path: 'gone' }),
+  write: async (_task, _path, text) => ({ ok: true, text, revision: 'rev1' }),
+  entry: async (_task, path) => target(path),
+  trashAvailability: async () => ({ available: true }),
+  renameAvailability: async () => ({ available: true }),
+  create: async () => ({ ok: true, path: 'new.ts' }),
+  rename: async () => ({ ok: true, path: 'renamed' }),
+  trash: async () => ({ ok: true, path: 'gone' }),
   ...overrides,
 })
 const recoveryKey = (taskId: string, path: string, node: string | null = null) =>
   `acorn.document.recovery.${JSON.stringify([node, 'file', taskId, path])}`
 
-afterEach(() => { localStorage.clear(); setActiveNode(null) })
+afterEach(() => {
+  localStorage.clear()
+  setActiveNode(null)
+})
 
 it('holds old writers through a delayed folder rename, menu dismissal, and pane retirement', async () => {
   const taskId = task()
@@ -40,17 +69,42 @@ it('holds old writers through a delayed folder rename, menu dismissal, and pane 
   custody.flushRecovery()
   const owner = pool()
   const release = custody.retain()
-  owner.files.set('dir/a.ts', { custody, state: custody.state, release, language: [], indentation: { mode: 'spaces', width: 2 }, mount: {}, markersReadAt: 0, markersGeneration: 0 })
+  owner.files.set('dir/a.ts', {
+    custody,
+    state: custody.state,
+    release,
+    language: [],
+    indentation: { mode: 'spaces', width: 2 },
+    mount: {},
+    markersReadAt: 0,
+    markersRead: latestSignal(),
+  })
   editorOpen(taskId, 'dir/a.ts', true)
   editorSetDirty(taskId, 'dir/a.ts', true)
   editorOpen(taskId, 'dir/preview.ts', true)
   let finish!: (value: { ok: true; path: string }) => void
-  const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
-  const write = vi.fn(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
+  const rename = vi.fn(
+    () =>
+      new Promise<{ ok: true; path: string }>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const write = vi.fn(async (_task: string, _path: string, text: string) => ({
+    ok: true as const,
+    text,
+    revision: 'rev1',
+  }))
   const service = api({ rename, write })
-  const model = createFileActionModel(service, owner, taskId, null, () => {}, async (state) => {
-    expect(state.files.map((file) => file.path)).toEqual(['moved/a.ts', 'moved/preview.ts'])
-  })
+  const model = createFileActionModel(
+    service,
+    owner,
+    taskId,
+    null,
+    () => {},
+    async (state) => {
+      expect(state.files.map((file) => file.path)).toEqual(['moved/a.ts', 'moved/preview.ts'])
+    },
+  )
   const armed = model.arm(target('dir', 'folder'))
   const end = armed.hold()
   const pending = model.rename(armed, 'moved')
@@ -88,11 +142,18 @@ it('enumerates closed persisted drafts and moves their recovery without touching
   localStorage.setItem(recoveryKey(taskId, 'dir/other.ts', 'other-node'), JSON.stringify(stored))
   const found = fileDocumentCustodies(null, taskId, 'dir')
   expect([...found.keys()]).toEqual(['dir/closed.ts'])
-  const model = createFileActionModel(api({ rename: async () => ({ ok: true, path: 'moved' }) }), pool(), taskId, null, () => {})
+  const model = createFileActionModel(
+    api({ rename: async () => ({ ok: true, path: 'moved' }) }),
+    pool(),
+    taskId,
+    null,
+    () => {},
+  )
   const armed = model.arm(target('dir', 'folder'))
   const end = armed.hold()
   await model.rename(armed, 'moved')
-  armed.release(); end()
+  armed.release()
+  end()
   expect(localStorage.getItem(recoveryKey(taskId, 'moved/closed.ts'))).toContain('closed draft')
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/closed.ts'))).toBeNull()
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/other.ts', 'other-node'))).toContain('closed draft')
@@ -101,8 +162,17 @@ it('enumerates closed persisted drafts and moves their recovery without touching
 it('holds a document acquired after the menu arm until its folder move is reconciled', async () => {
   const taskId = task()
   let finish!: (result: { ok: true; path: string }) => void
-  const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
-  const write = vi.fn(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
+  const rename = vi.fn(
+    () =>
+      new Promise<{ ok: true; path: string }>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const write = vi.fn(async (_task: string, _path: string, text: string) => ({
+    ok: true as const,
+    text,
+    revision: 'rev1',
+  }))
   const service = api({ rename, write })
   const model = createFileActionModel(service, pool(), taskId, null, () => {})
   const armed = model.arm(target('dir', 'folder'))
@@ -132,14 +202,28 @@ it('moves captured custody after a Node switch without writing to the former pat
   custody.editText('unsaved')
   custody.flushRecovery()
   let finish!: (result: { ok: true; path: string }) => void
-  const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
+  const rename = vi.fn(
+    () =>
+      new Promise<{ ok: true; path: string }>((resolve) => {
+        finish = resolve
+      }),
+  )
   const write = vi.fn(async () => ({ ok: true as const, text: 'should not write', revision: 'rev1' }))
   const service = api({ rename, write })
   editorOpen(taskId, 'before.ts', false)
   setEditorTreeDirectoryOpen(taskId, 'before.ts', true, null)
   rememberEditorViewState(taskId, 'before.ts', { anchor: 1, head: 1, scrollTop: 7 }, null)
   let firstNodeTabs: TaskEditorState | undefined
-  const model = createFileActionModel(service, pool(), taskId, null, () => {}, async (state) => { firstNodeTabs = state })
+  const model = createFileActionModel(
+    service,
+    pool(),
+    taskId,
+    null,
+    () => {},
+    async (state) => {
+      firstNodeTabs = state
+    },
+  )
   const armed = model.arm(target('before.ts'))
   const end = armed.hold()
   const pending = model.rename(armed, 'after.ts')
@@ -173,9 +257,23 @@ it('retires captured tabs after trash succeeds on the previous Node with the sam
   const releaseCustody = custody.retain()
   editorOpen(taskId, 'doomed.ts', false)
   let finish!: (result: { ok: true; path: string }) => void
-  const trash = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
+  const trash = vi.fn(
+    () =>
+      new Promise<{ ok: true; path: string }>((resolve) => {
+        finish = resolve
+      }),
+  )
   let firstNodeTabs: TaskEditorState | undefined
-  const model = createFileActionModel(api({ trash }), pool(), taskId, null, () => {}, async (state) => { firstNodeTabs = state })
+  const model = createFileActionModel(
+    api({ trash }),
+    pool(),
+    taskId,
+    null,
+    () => {},
+    async (state) => {
+      firstNodeTabs = state
+    },
+  )
   const armed = model.arm(target('doomed.ts'))
   const end = armed.hold()
   const pending = model.trash(armed, false)
@@ -185,7 +283,8 @@ it('retires captured tabs after trash succeeds on the previous Node with the sam
   editorOpen(taskId, 'safe.ts', false)
   finish({ ok: true, path: 'doomed.ts' })
   await pending
-  armed.release(); end()
+  armed.release()
+  end()
   expect(firstNodeTabs).toEqual({ files: [], active: null })
   expect(openFiles(taskId).map((file) => file.path)).toEqual(['safe.ts'])
   expect(custody.ownsFile(taskId, 'doomed.ts')).toBe(false)
@@ -208,7 +307,12 @@ it('refreshes an admitted save for rename but rejects a same-kind replacement af
   const custody = documentCustody([null, 'file', taskId, 'old.ts'], 'disk', 'rev0')
   custody.editText('draft')
   let finishWrite!: (result: { ok: true; text: string; revision: string }) => void
-  const write = vi.fn(() => new Promise<{ ok: true; text: string; revision: string }>((resolve) => { finishWrite = resolve }))
+  const write = vi.fn(
+    () =>
+      new Promise<{ ok: true; text: string; revision: string }>((resolve) => {
+        finishWrite = resolve
+      }),
+  )
   const fresh = target('old.ts', 'file', 'ctime-2')
   const entry = vi.fn(async () => fresh)
   const rename = vi.fn(async () => ({ ok: true as const, path: 'new.ts' }))
@@ -221,7 +325,8 @@ it('refreshes an admitted save for rename but rejects a same-kind replacement af
   await saving
   await model.rename(armed, 'new.ts')
   expect(rename).toHaveBeenCalledWith(taskId, fresh, 'new.ts')
-  armed.release(); end()
+  armed.release()
+  end()
 
   const next = documentCustody([null, 'file', taskId, 'trash.ts'], 'disk', 'rev0')
   next.editText('to save')
@@ -233,19 +338,29 @@ it('refreshes an admitted save for rename but rejects a same-kind replacement af
   await expect(second.trash(captured, true)).rejects.toThrow('tree entry changed')
   expect(trash).not.toHaveBeenCalled()
   expect(next.current.toString()).toBe('to save')
-  captured.release(); endSecond()
+  captured.release()
+  endSecond()
 })
 
 it('keeps closed dirty recovery on a failed save, then retires all descendants after explicit saves', async () => {
   const taskId = task()
-  localStorage.setItem(recoveryKey(taskId, 'dir/closed.ts'), JSON.stringify({ text: 'draft', acknowledged: 'disk', acknowledgedRevision: 'rev0' }))
+  localStorage.setItem(
+    recoveryKey(taskId, 'dir/closed.ts'),
+    JSON.stringify({ text: 'draft', acknowledged: 'disk', acknowledgedRevision: 'rev0' }),
+  )
   const open = documentCustody([null, 'file', taskId, 'dir/open.ts'], 'disk', 'rev0')
   open.editText('open draft')
   open.flushRecovery()
   editorOpen(taskId, 'dir/open.ts', false)
   const trash = vi.fn(async () => ({ ok: true as const, path: 'dir' }))
-  const write = vi.fn().mockResolvedValueOnce({ ok: false as const, kind: 'failure' as const, reason: 'disk full' })
-    .mockImplementation(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
+  const write = vi
+    .fn()
+    .mockResolvedValueOnce({ ok: false as const, kind: 'failure' as const, reason: 'disk full' })
+    .mockImplementation(async (_task: string, _path: string, text: string) => ({
+      ok: true as const,
+      text,
+      revision: 'rev1',
+    }))
   const service = api({ write, trash, entry: async () => target('dir', 'folder', 'ctime-2') })
   const model = createFileActionModel(service, pool(), taskId, null, () => {})
   const first = model.arm(target('dir', 'folder'))
@@ -253,12 +368,14 @@ it('keeps closed dirty recovery on a failed save, then retires all descendants a
   await expect(model.trash(first, true)).rejects.toThrow('disk full')
   expect(trash).not.toHaveBeenCalled()
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/closed.ts'))).toContain('draft')
-  first.release(); endFirst()
+  first.release()
+  endFirst()
 
   const second = model.arm(target('dir', 'folder'))
   const endSecond = second.hold()
   await model.trash(second, true)
-  second.release(); endSecond()
+  second.release()
+  endSecond()
   expect(trash).toHaveBeenCalledOnce()
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/closed.ts'))).toBeNull()
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/open.ts'))).toBeNull()
@@ -273,8 +390,17 @@ it('blocks an edit made while the Node is moving a file to trash', async () => {
   const custody = documentCustody([null, 'file', taskId, 'doomed.ts'], 'disk', 'rev0')
   const releaseCustody = custody.retain()
   let finish!: (result: { ok: true; path: string }) => void
-  const trash = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
-  const write = vi.fn(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
+  const trash = vi.fn(
+    () =>
+      new Promise<{ ok: true; path: string }>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const write = vi.fn(async (_task: string, _path: string, text: string) => ({
+    ok: true as const,
+    text,
+    revision: 'rev1',
+  }))
   const service = api({ trash, write })
   const model = createFileActionModel(service, pool(), taskId, null, () => {})
   const armed = model.arm(target('doomed.ts'))

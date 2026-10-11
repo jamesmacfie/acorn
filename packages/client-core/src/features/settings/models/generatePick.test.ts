@@ -3,11 +3,15 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { effectiveModelPick, readGeneratePick } from './generatePick'
 
-// The shared "Generate with" default: which pick wins, and what a value this build cannot read counts
-// as. These invariants came from the commit wand, which was the only surface that remembered a pick
-// before every Generate control shared one.
+// The shared "Generate with" default: which pick wins, and what a value this build cannot read
+// counts as.
 
-const at = (id: string, models: string[], defaultModelId?: string, kind: ModelBackend['kind'] = 'connection'): ModelBackend => ({
+const at = (
+  id: string,
+  models: string[],
+  defaultModelId?: string,
+  kind: ModelBackend['kind'] = 'connection',
+): ModelBackend => ({
   id,
   kind,
   label: id,
@@ -22,36 +26,47 @@ describe('effectiveModelPick', () => {
   })
 
   it('opens on the first backend and its own default when nothing was remembered', () => {
-    expect(effectiveModelPick([at('c1', ['fast', 'slow'], 'slow'), at('c2', ['other'])], null))
-      .toEqual({ backendId: 'c1', modelId: 'slow' })
+    expect(effectiveModelPick([at('c1', ['fast', 'slow'], 'slow'), at('c2', ['other'])], null)).toEqual({
+      backendId: 'c1',
+      modelId: 'slow',
+    })
   })
 
   it('keeps a remembered pick that still resolves', () => {
     const backends = [at('c1', ['fast']), at('c2', ['slow'])]
-    expect(effectiveModelPick(backends, { backendId: 'c2', modelId: 'slow' }))
-      .toEqual({ backendId: 'c2', modelId: 'slow' })
+    expect(effectiveModelPick(backends, { backendId: 'c2', modelId: 'slow' })).toEqual({
+      backendId: 'c2',
+      modelId: 'slow',
+    })
   })
 
   // A disconnected provider or an uninstalled CLI in a device preference is a stale note, not a
   // decision to honour.
   it('falls back to the first backend when the remembered one has gone', () => {
-    expect(effectiveModelPick([at('c1', ['fast'])], { backendId: 'deleted', modelId: 'x' }))
-      .toEqual({ backendId: 'c1', modelId: 'fast' })
+    expect(effectiveModelPick([at('c1', ['fast'])], { backendId: 'deleted', modelId: 'x' })).toEqual({
+      backendId: 'c1',
+      modelId: 'fast',
+    })
   })
 
   // A provider that dropped a model between releases would otherwise be asked for one it no longer
   // serves.
   it('replaces a remembered model the backend no longer lists', () => {
-    expect(effectiveModelPick([at('c1', ['fast'], 'fast')], { backendId: 'c1', modelId: 'retired' }))
-      .toEqual({ backendId: 'c1', modelId: 'fast' })
+    expect(effectiveModelPick([at('c1', ['fast'], 'fast')], { backendId: 'c1', modelId: 'retired' })).toEqual({
+      backendId: 'c1',
+      modelId: 'fast',
+    })
   })
 
   it('keeps a saved CLI model when its catalog cannot be refreshed', () => {
     const backend = { ...at('harness:codex', [], '', 'harness'), catalogUnavailable: true }
-    expect(effectiveModelPick([backend], { backendId: backend.id, modelId: 'gpt-5' }))
-      .toEqual({ backendId: backend.id, modelId: 'gpt-5' })
-    expect(effectiveModelPick([{ ...backend, catalogUnavailable: false }], { backendId: backend.id, modelId: 'gpt-5' }))
-      .toEqual({ backendId: backend.id, modelId: '' })
+    expect(effectiveModelPick([backend], { backendId: backend.id, modelId: 'gpt-5' })).toEqual({
+      backendId: backend.id,
+      modelId: 'gpt-5',
+    })
+    expect(
+      effectiveModelPick([{ ...backend, catalogUnavailable: false }], { backendId: backend.id, modelId: 'gpt-5' }),
+    ).toEqual({ backendId: backend.id, modelId: '' })
   })
 
   // Empty is a real answer: the node omits the model and the backend picks. Which is also every
@@ -60,16 +75,23 @@ describe('effectiveModelPick', () => {
     expect(effectiveModelPick([at('c1', [])], null)).toEqual({ backendId: 'c1', modelId: '' })
   })
 
-  // The machine this whole programme is for: `claude` on PATH and no key connected. There is no
-  // connection to fall back to, so the first backend is a harness and the wand appears anyway.
+  // The common machine: `claude` on PATH and no key connected. There is no connection to fall back to, so the
+  // first backend is a harness and the wand appears anyway.
   it('resolves over a list that is nothing but installed CLIs', () => {
-    const harnesses = [at('harness:claude-code', ['sonnet', 'opus'], 'sonnet', 'harness'), at('harness:codex', [], '', 'harness')]
+    const harnesses = [
+      at('harness:claude-code', ['sonnet', 'opus'], 'sonnet', 'harness'),
+      at('harness:codex', [], '', 'harness'),
+    ]
     expect(effectiveModelPick(harnesses, null)).toEqual({ backendId: 'harness:claude-code', modelId: 'sonnet' })
-    expect(effectiveModelPick(harnesses, { backendId: 'harness:codex', modelId: '' }))
-      .toEqual({ backendId: 'harness:codex', modelId: '' })
+    expect(effectiveModelPick(harnesses, { backendId: 'harness:codex', modelId: '' })).toEqual({
+      backendId: 'harness:codex',
+      modelId: '',
+    })
     // A remembered key, on a machine that now has none: the CLI is what is left to spend.
-    expect(effectiveModelPick(harnesses, { backendId: 'connection:abc', modelId: 'gpt-5' }))
-      .toEqual({ backendId: 'harness:claude-code', modelId: 'sonnet' })
+    expect(effectiveModelPick(harnesses, { backendId: 'connection:abc', modelId: 'gpt-5' })).toEqual({
+      backendId: 'harness:claude-code',
+      modelId: 'sonnet',
+    })
   })
 })
 
@@ -96,15 +118,22 @@ describe('the remembered pick', () => {
   })
 
   it('reads back a stored pick, including a backend that declares no model', () => {
-    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow' }))).toEqual({ backendId: 'connection:c2', modelId: 'slow' })
-    expect(readGeneratePick(held({ backendId: 'harness:codex', modelId: '' })))
-      .toEqual({ backendId: 'harness:codex', modelId: '' })
+    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow' }))).toEqual({
+      backendId: 'connection:c2',
+      modelId: 'slow',
+    })
+    expect(readGeneratePick(held({ backendId: 'harness:codex', modelId: '' }))).toEqual({
+      backendId: 'harness:codex',
+      modelId: '',
+    })
   })
 
   // Extra keys are dropped rather than refusing the value: a build that remembers a fourth thing
   // beside the pick must not cost this one the pick it can read.
   it('ignores a field it does not know', () => {
-    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow', pickedAt: 12 })))
-      .toEqual({ backendId: 'connection:c2', modelId: 'slow' })
+    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow', pickedAt: 12 }))).toEqual({
+      backendId: 'connection:c2',
+      modelId: 'slow',
+    })
   })
 })

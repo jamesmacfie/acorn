@@ -9,12 +9,11 @@ import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 
 // Starting a node and owning its lifetime, for the case where nothing holds the data root yet.
 //
-// This is not `packages/custody/src/supervision/serviceHost.ts`, and that is a departure from the
-// plan. The helper's supervisor drives `service.js` over an fd-3 RPC channel it opens before the
-// service has bound anything; a standalone node announces itself with one JSON line on stdout and
-// speaks no RPC at all (apps/node/src/entries/standalone.ts). Two protocols in one class would be
-// worse than the forty lines below, and the part worth sharing — SIGTERM then SIGKILL — is six of
-// them.
+// This is not `packages/custody/src/supervision/serviceHost.ts`. The helper's supervisor drives
+// `service.js` over an fd-3 RPC channel it opens before the service has bound anything; a standalone
+// node announces itself with one JSON line on stdout and speaks no RPC at all
+// (apps/node/src/entries/standalone.ts). Two protocols in one class would be worse than the forty lines
+// below, and the part worth sharing — SIGTERM then SIGKILL — is six of them.
 
 /** The node's boot line, as the standalone entry prints it. */
 export type Handshake = {
@@ -59,14 +58,14 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
   const agentEntry = process.env.ACORN_TUI_NODE_ENTRY
   if (agentEntry) return { command: process.execPath, args: [agentEntry] }
   // Two candidates rather than one, because this file may end up in `dist/` or in `dist/chunks/`
-  // depending on how rollup splits it, and `standalone.js` sits in `dist/`. Phase 7 pins that layout
-  // and can drop whichever of these it does not use.
+  // depending on how rollup splits it, and `standalone.js` sits in `dist/`.
   const packaged = ['./standalone.js', '../standalone.js'].map((at) => fileURLToPath(new URL(at, import.meta.url)))
   const built = packaged.find((candidate) => existsSync(candidate))
   if (built) return { command: process.execPath, args: [built] }
   const app = join(findWorkspaceRoot(fileURLToPath(import.meta.url)), 'apps/node')
   const source = join(app, 'src/entries/standalone.ts')
-  if (!existsSync(source)) throw new Error(`acorn could not find a node to start: none of ${[...packaged, source].join(', ')} exists.`)
+  if (!existsSync(source))
+    throw new Error(`acorn could not find a node to start: none of ${[...packaged, source].join(', ')} exists.`)
   // From apps/node, because that is where `tsx` is a dependency and where `pnpm dev:node` runs it.
   return { command: process.execPath, args: ['--import', 'tsx', source], cwd: app }
 }
@@ -110,7 +109,11 @@ export function startNode(dataDir: string, deviceToken?: string): SupervisedNode
         const parsed = JSON.parse(line) as Partial<Handshake>
         if (!parsed.nodeId || !parsed.endpoint || !parsed.deviceToken) return
         if (parsed.baseline !== ACORN_BASELINE || parsed.protocolVersion !== NODE_PROTOCOL_VERSION) {
-          reject(new Error(`The node has no matching ${ACORN_BASELINE} baseline or protocol. Reset or rebuild it before starting.`))
+          reject(
+            new Error(
+              `The node has no matching ${ACORN_BASELINE} baseline or protocol. Reset or rebuild it before starting.`,
+            ),
+          )
           lines.close()
           child.kill('SIGTERM')
           return

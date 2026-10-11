@@ -1,5 +1,5 @@
 /** Version 1 of the shared typed-data contract. Bounds apply before consumer effects. */
-export const DATA_VERSION = 1 as const
+const DATA_VERSION = 1 as const
 export const DATA_LIMITS = {
   depth: 12,
   fields: 256,
@@ -22,16 +22,6 @@ export type DataValue = DataPrimitive | DataValue[] | { [key: string]: DataValue
 export type VersionedDataValue = { version: typeof DATA_VERSION; value: DataValue }
 export const MISSING = Symbol('missing data value')
 export type DataRead = DataValue | typeof MISSING
-
-export function parseVersionedDataValue(input: unknown): VersionedDataValue {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Expected versioned data value')
-  const descriptors = Object.getOwnPropertyDescriptors(input)
-  if (
-    Object.keys(descriptors).length !== 2 || descriptors.version?.value !== DATA_VERSION
-    || !descriptors.value || !('value' in descriptors.value)
-  ) throw new Error('Unsupported data value version or envelope')
-  return { version: DATA_VERSION, value: parseDataValue(descriptors.value.value) }
-}
 
 export function parseDataPointer(pointer: unknown): string[] | null {
   if (typeof pointer !== 'string' || pointer.length > DATA_LIMITS.pointerChars) return null
@@ -66,7 +56,11 @@ export function readDataPointer(value: DataValue, pointer: string): DataRead {
 }
 
 /** Validate and copy JSON without invoking toJSON, getters, or prototype properties. */
-export function parseDataValue(input: unknown, maxBytes: number = DATA_LIMITS.detailBytes, maxDepth: number = DATA_LIMITS.depth): DataValue {
+export function parseDataValue(
+  input: unknown,
+  maxBytes: number = DATA_LIMITS.detailBytes,
+  maxDepth: number = DATA_LIMITS.depth,
+): DataValue {
   function visit(value: unknown, depth: number): DataValue {
     if (depth > maxDepth) throw new Error('Data nesting exceeds limit')
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
@@ -84,10 +78,14 @@ export function parseDataValue(input: unknown, maxBytes: number = DATA_LIMITS.de
       if (!('value' in property) || !property.enumerable) throw new Error('Expected enumerable data properties')
       if (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key)) throw new Error('Invalid array property')
       Object.defineProperty(result, key, {
-        value: visit(property.value, depth + 1), enumerable: true, writable: true, configurable: true,
+        value: visit(property.value, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
       })
     }
-    if (Array.isArray(value) && Object.keys(entries).length !== value.length + 1) throw new Error('Sparse arrays are unsupported')
+    if (Array.isArray(value) && Object.keys(entries).length !== value.length + 1)
+      throw new Error('Sparse arrays are unsupported')
     return result
   }
   const value = visit(input, 0)
@@ -100,7 +98,9 @@ export function canonicalDataEncoding(value: DataValue): string {
   function encode(item: DataValue): string {
     if (Array.isArray(item)) return `[${item.map(encode).join(',')}]`
     if (item !== null && typeof item === 'object') {
-      const entries = Object.keys(item).sort().map(key => `${JSON.stringify(key)}:${encode(item[key]!)}`)
+      const entries = Object.keys(item)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${encode(item[key]!)}`)
       return `{${entries.join(',')}}`
     }
     return JSON.stringify(item)
@@ -110,8 +110,10 @@ export function canonicalDataEncoding(value: DataValue): string {
 
 /** Addresses are included; missing and null have distinct encodings, as do strings and numbers. */
 export function canonicalDataProjection(value: DataValue, pointers: readonly string[]): string {
-  return JSON.stringify([...new Set(pointers)].sort().map(pointer => {
-    const selected = readDataPointer(value, pointer)
-    return [pointer, selected === MISSING ? ['missing'] : ['value', canonicalDataEncoding(selected)]]
-  }))
+  return JSON.stringify(
+    [...new Set(pointers)].sort().map((pointer) => {
+      const selected = readDataPointer(value, pointer)
+      return [pointer, selected === MISSING ? ['missing'] : ['value', canonicalDataEncoding(selected)]]
+    }),
+  )
 }

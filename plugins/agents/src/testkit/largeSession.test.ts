@@ -19,7 +19,9 @@ describe('the generated session ledger', () => {
 
 describe('seeding a large session', () => {
   let ctx: TestNodeContext
-  beforeEach(() => { ctx = makeTestNodeContext({ plugin: { name: 'agents' } }) })
+  beforeEach(() => {
+    ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+  })
   afterEach(() => ctx.cleanup())
 
   it('writes real session, turn, event and request rows that settle and page like a live run', async () => {

@@ -34,9 +34,9 @@ Read three labels with care:
   runtime bindings. A slow `migrate` isn't necessarily a slow migration. Drizzle's `migrate` against an
   up-to-date journal is one `SELECT`.
 
-The Node's clock starts inside `startServiceRuntime`. Spawning the process and evaluating the service
+The Node's clock starts inside `bootNode`. Spawning the process and evaluating the service
 bundle happen before `+0ms`. On an M2 Pro that gap is about 100 ms, mostly evaluating the service
-chunk. Calling `startServiceRuntime` under `tsx` instead of launching the app inflates `graph` about
+chunk. Calling `bootNode` under `tsx` instead of launching the app inflates `graph` about
 sevenfold, because the loader then transpiles as it imports.
 
 `graph` also depends on the data root. A fresh root, like the one `apps/desktop/test/boot.test.ts`

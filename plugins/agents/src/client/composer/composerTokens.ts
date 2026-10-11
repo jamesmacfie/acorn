@@ -1,7 +1,7 @@
 import { fuzzyScore } from '@acorn/plugin-api/client'
 import { fileMentionMatches } from './fileMentions'
 
-export type ComposerTokenKind = 'file' | 'command' | 'skill'
+type ComposerTokenKind = 'file' | 'command' | 'skill'
 
 /** `name` is the token without its sigil, which is what a description is keyed by. */
 export type ComposerToken = { kind: ComposerTokenKind; name: string; start: number; end: number }
@@ -86,19 +86,14 @@ export function composerSegments(
  * because that is what is being typed, but a description match still qualifies: someone reaching for
  * the review command may type `/diff` before remembering what it is called.
  */
-export function advertisedSuggestions(
-  items: readonly AdvertisedItem[],
-  query: string,
-  limit = 10,
-): AdvertisedItem[] {
+export function advertisedSuggestions(items: readonly AdvertisedItem[], query: string, limit = 10): AdvertisedItem[] {
   const normalized = query.trim()
   if (!normalized) return items.slice(0, limit)
   const lowered = normalized.toLowerCase()
   return items
     .map((item) => ({
       item,
-      score: fuzzyScore(normalized, item.name)
-        ?? (item.description?.toLowerCase().includes(lowered) ? 0 : null),
+      score: fuzzyScore(normalized, item.name) ?? (item.description?.toLowerCase().includes(lowered) ? 0 : null),
     }))
     .filter((ranked): ranked is { item: AdvertisedItem; score: number } => ranked.score != null)
     .sort((left, right) => right.score - left.score || left.item.name.localeCompare(right.item.name))

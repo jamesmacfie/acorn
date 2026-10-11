@@ -27,7 +27,10 @@ describe('workflow files', () => {
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
   it('loads a baseline-1 graph with stable ids and typed inputs', () => {
-    write(repo, 'review', `
+    write(
+      repo,
+      'review',
+      `
 baseline = "acorn-1"
 format_version = 1
 name = "Review"
@@ -48,18 +51,27 @@ id = "approve"
 name = "Approve"
 kind = "gate-human"
 after = ["read"]
-`)
+`,
+    )
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.errors).toEqual([])
     expect(loaded.workflows[0]).toMatchObject({
-      id: 'review', baseline: 'acorn-1', formatVersion: 1,
+      id: 'review',
+      baseline: 'acorn-1',
+      formatVersion: 1,
       inputs: [{ name: 'issue', schema: { type: 'string' }, required: true }],
-      steps: [{ id: 'read', after: [] }, { id: 'approve', after: ['read'] }],
+      steps: [
+        { id: 'read', after: [] },
+        { id: 'approve', after: ['read'] },
+      ],
     })
   })
 
   it('expands sub-workflows and prefixes stable references', () => {
-    write(repo, 'pair', `
+    write(
+      repo,
+      'pair',
+      `
 baseline = "acorn-1"
 format_version = 1
 [[steps]]
@@ -70,8 +82,12 @@ after = []
 id = "right"
 name = "Right"
 after = ["left"]
-`)
-    write(repo, 'outer', `
+`,
+    )
+    write(
+      repo,
+      'outer',
+      `
 baseline = "acorn-1"
 format_version = 1
 [[steps]]
@@ -80,54 +96,77 @@ name = "Build"
 [[steps]]
 id = "pair"
 workflow = "pair"
-`)
+`,
+    )
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.errors).toEqual([])
-    expect(loaded.workflows.find(workflow => workflow.id === 'outer')?.steps.map(step => [step.id, step.after])).toEqual([
-      ['build', undefined], ['pair:left', []], ['pair:right', ['pair:left']],
+    expect(
+      loaded.workflows.find((workflow) => workflow.id === 'outer')?.steps.map((step) => [step.id, step.after]),
+    ).toEqual([
+      ['build', undefined],
+      ['pair:left', []],
+      ['pair:right', ['pair:left']],
     ])
   })
 
   it('refuses old files with an actionable transition diagnostic', () => {
-    write(repo, 'old', `
+    write(
+      repo,
+      'old',
+      `
 [[steps]]
 name = "Build"
 prompt = "Build it"
-`)
+`,
+    )
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.workflows).toEqual([])
     expect(loaded.errors[0]?.message).toContain('Set format_version = 1 and baseline = "acorn-1"')
   })
 
   it('refuses retired execution kinds instead of translating them', () => {
-    write(repo, 'retired', `
+    write(
+      repo,
+      'retired',
+      `
 baseline = "acorn-1"
 format_version = 1
 [[steps]]
 id = "parallel"
 name = "Parallel"
 kind = "fan-out"
-`)
+`,
+    )
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.workflows).toEqual([])
-    expect(loaded.errors.map(error => error.message).join('\n')).toContain("unknown kind 'fan-out'")
+    expect(loaded.errors.map((error) => error.message).join('\n')).toContain("unknown kind 'fan-out'")
   })
 
   it('keeps repository precedence without accepting an old shadow', () => {
-    write(repo, 'flow', `
+    write(
+      repo,
+      'flow',
+      `
 baseline = "acorn-1"
 format_version = 1
 [[steps]]
 id = "repo"
 name = "Repository"
-`)
-    write(user, 'flow', `
+`,
+    )
+    write(
+      user,
+      'flow',
+      `
 [[steps]]
 name = "Old user copy"
-`)
+`,
+    )
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.workflows).toHaveLength(1)
     expect(loaded.workflows[0]?.steps[0]?.id).toBe('repo')
-    expect(loaded.errors).toEqual([expect.objectContaining({ source: 'user:flow', message: expect.stringContaining('baseline = "acorn-1"') })])
+    expect(loaded.errors).toEqual([
+      expect.objectContaining({ source: 'user:flow', message: expect.stringContaining('baseline = "acorn-1"') }),
+    ])
   })
 })

@@ -57,37 +57,49 @@ describe('deciding whether a draft attachment may be replaced', () => {
   })
 
   it('refuses a replacement from another task', () => {
-    expect(decide({ replacement: file({ id: 'a2', taskId: 'other' }) }))
-      .toMatchObject({ kind: 'refuse', reason: expect.stringContaining('another task') })
+    expect(decide({ replacement: file({ id: 'a2', taskId: 'other' }) })).toMatchObject({
+      kind: 'refuse',
+      reason: expect.stringContaining('another task'),
+    })
   })
 
   it('refuses a replacement that is not an image', () => {
-    expect(decide({ replacement: file({ id: 'a2', mediaType: 'application/pdf' }) }))
-      .toMatchObject({ kind: 'refuse', reason: expect.stringContaining('image') })
+    expect(decide({ replacement: file({ id: 'a2', mediaType: 'application/pdf' }) })).toMatchObject({
+      kind: 'refuse',
+      reason: expect.stringContaining('image'),
+    })
   })
 
   // The reader removed it, sent the turn, or switched sessions while the editor was open.
   it('refuses when the source has left the draft', () => {
-    expect(decide({ current: [file({ id: 'other' })] }))
-      .toMatchObject({ kind: 'refuse', reason: expect.stringContaining('no longer in this draft') })
+    expect(decide({ current: [file({ id: 'other' })] })).toMatchObject({
+      kind: 'refuse',
+      reason: expect.stringContaining('no longer in this draft'),
+    })
   })
 
   it('refuses a replacement the draft already holds elsewhere', () => {
-    expect(decide({ current: [file({ id: 'a1' }), file({ id: 'a2' })] }))
-      .toMatchObject({ kind: 'refuse', reason: expect.stringContaining('already in this draft') })
+    expect(decide({ current: [file({ id: 'a1' }), file({ id: 'a2' })] })).toMatchObject({
+      kind: 'refuse',
+      reason: expect.stringContaining('already in this draft'),
+    })
   })
 
   it('counts the aggregate without the attachment being replaced', () => {
     const half = Math.floor(MAX_DRAFT_ATTACHMENT_BYTES / 2)
     // The source is being swapped out, so a same-sized replacement leaves the total where it was.
-    expect(decide({
-      current: [file({ id: 'a1', byteSize: half }), file({ id: 'a0', byteSize: half })],
-      replacement: file({ id: 'a2', byteSize: half }),
-    }).kind).toBe('replace')
+    expect(
+      decide({
+        current: [file({ id: 'a1', byteSize: half }), file({ id: 'a0', byteSize: half })],
+        replacement: file({ id: 'a2', byteSize: half }),
+      }).kind,
+    ).toBe('replace')
     // One byte more and it does not fit.
-    expect(decide({
-      current: [file({ id: 'a1', byteSize: half }), file({ id: 'a0', byteSize: half })],
-      replacement: file({ id: 'a2', byteSize: half + 1 }),
-    })).toMatchObject({ kind: 'refuse', reason: expect.stringContaining('25 MiB') })
+    expect(
+      decide({
+        current: [file({ id: 'a1', byteSize: half }), file({ id: 'a0', byteSize: half })],
+        replacement: file({ id: 'a2', byteSize: half + 1 }),
+      }),
+    ).toMatchObject({ kind: 'refuse', reason: expect.stringContaining('25 MiB') })
   })
 })

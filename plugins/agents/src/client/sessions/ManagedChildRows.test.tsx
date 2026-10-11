@@ -14,7 +14,7 @@ const tasks = [
 vi.mock('@solidjs/router', () => ({ useNavigate: () => navigate }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: tasks }) }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...await original<Record<string, unknown>>(),
+  ...(await original<Record<string, unknown>>()),
   activateTaskSignals: activate,
   activeNodeId: nodeId,
   pathForTask: (task: { id: string }) => `/tasks/${task.id}`,
@@ -26,17 +26,32 @@ const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [delegations, setDelegations] = createSignal<Record<string, AgentSessionDelegation>>({})
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
 const loadSnapshot = vi.fn(async () => undefined)
-vi.mock('./managedStore', () => ({ managedAgentStore: {
-  sessions, delegations, snapshots, loadSnapshot,
-} }))
+vi.mock('./managedStore', () => ({
+  managedAgentStore: {
+    sessions,
+    delegations,
+    snapshots,
+    loadSnapshot,
+  },
+}))
 
 const { default: ManagedChildRows } = await import('./ManagedChildRows')
-const child = (id: string, overrides: Partial<AgentSession> = {}) => ({
-  id, taskId: 'parent-task', title: id, runtimeState: 'working', attention: 'none',
-  queuedTurns: 0, archivedAt: null, ...overrides,
-}) as AgentSession
+const child = (id: string, overrides: Partial<AgentSession> = {}) =>
+  ({
+    id,
+    taskId: 'parent-task',
+    title: id,
+    runtimeState: 'working',
+    attention: 'none',
+    queuedTurns: 0,
+    archivedAt: null,
+    ...overrides,
+  }) as AgentSession
 const lineage = (id: string, parentSessionId: string): AgentSessionDelegation => ({
-  sessionId: id, depth: 1, isolation: 'shared', owner: { kind: 'managed', parentSessionId },
+  sessionId: id,
+  depth: 1,
+  isolation: 'shared',
+  owner: { kind: 'managed', parentSessionId },
 })
 
 const hosts: Array<() => void> = []
@@ -55,16 +70,27 @@ afterEach(() => {
 describe('live delegated child rows', () => {
   it('shows direct children and updates runtime and pending-request attention on the right row', () => {
     setSessions([child('one'), child('two', { taskId: 'child-task' }), child('stranger')])
-    setDelegations({ one: lineage('one', 'parent'), two: lineage('two', 'parent'), stranger: lineage('stranger', 'other') })
+    setDelegations({
+      one: lineage('one', 'parent'),
+      two: lineage('two', 'parent'),
+      stranger: lineage('stranger', 'other'),
+    })
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <ManagedChildRows parentSessionId="parent" parentTaskId="parent-task" />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
 
     expect(host.querySelectorAll('[role="option"]')).toHaveLength(2)
     expect(host.textContent).toContain('Inspect API')
     expect(host.textContent).not.toContain('stranger')
-    setSessions([child('one'), child('two', { taskId: 'child-task', runtimeState: 'waiting', attention: 'permission' }), child('stranger')])
+    setSessions([
+      child('one'),
+      child('two', { taskId: 'child-task', runtimeState: 'waiting', attention: 'permission' }),
+      child('stranger'),
+    ])
     const rows = host.querySelectorAll('[role="option"]')
     expect(rows[0]?.textContent).toContain('working')
     expect(rows[1]?.textContent).toContain('waiting')
@@ -93,7 +119,10 @@ describe('live delegated child rows', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <ManagedChildRows parentSessionId="parent" parentTaskId="parent-task" />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
 
     expect(host.querySelectorAll('[role="option"]')).toHaveLength(1)
     expect(host.textContent).not.toContain('orphan')
@@ -105,7 +134,10 @@ describe('live delegated child rows', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <ManagedChildRows parentSessionId="parent" parentTaskId="parent-task" />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
     const row = host.querySelector('[role="option"]') as HTMLElement
     row.click()
     expect(activate).toHaveBeenCalledWith(tasks[1], { pane: 'agents' })

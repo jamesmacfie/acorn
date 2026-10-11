@@ -7,7 +7,9 @@ import type { Task } from '@acorn/plugin-api/client'
 // Exporting a transcript, end to end through the platform seam. Like the composer's attach test, the
 // stub is a host on `window.acorn` rather than a mocked module, so the real `saveFile` is what runs.
 
-const exportSession = vi.fn(async (_sessionId: string, _format: string, _variant?: string) => ({ content: '# A session\n' }))
+const exportSession = vi.fn(async (_sessionId: string, _format: string, _variant?: string) => ({
+  content: '# A session\n',
+}))
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     export: (sessionId: string, format: string, variant?: string) => exportSession(sessionId, format, variant),
@@ -41,8 +43,14 @@ const runExport = async (id: 'export-markdown' | 'export-json' | 'export-redacte
     createRoot((dispose) => {
       managedAgentStore.upsertSession(session)
       const model = withQueryClient(() => createAgentPaneModel({ id: 't1' } as Task, { shown: () => true }))
-      model.sessionActions().find((entry) => entry.id === id)!.run()
-      queueMicrotask(() => { dispose(); resolve() })
+      model
+        .sessionActions()
+        .find((entry) => entry.id === id)!
+        .run()
+      queueMicrotask(() => {
+        dispose()
+        resolve()
+      })
     })
   })
 

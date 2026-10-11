@@ -1,5 +1,5 @@
-// Conservative per-statement bound-parameter budget for multi-row inserts. better-sqlite3 allows
-// far more (SQLITE_MAX_VARIABLE_NUMBER defaults to 32766), but 100 keeps statements small and
+// Conservative per-statement bound-parameter budget for multi-row inserts. SQLite allows far more
+// (SQLITE_MAX_VARIABLE_NUMBER defaults to 32766), but 100 keeps statements small and
 // predictable; raise it only if chunking ever shows up as a real cost.
 const MAX_BOUND_PARAMS = 100
 

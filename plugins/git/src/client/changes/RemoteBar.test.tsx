@@ -16,26 +16,30 @@ import { emptyLocalStatus } from '../../shared/changes/api'
 // The branch bar in jsdom, which is the tier that can answer what a press does. The pure half — which
 // verb is next, what the counts read, what a refusal turns into — is in model.test.ts next door.
 //
-// The model is a stand-in, for the reason phase 0's list test gives: `createChangesModel` fetches over
-// HTTP and subscribes to the task poll, and neither is what a button is about.
+// The model is a stand-in, for the reason the list test gives: `createChangesModel` fetches over HTTP
+// and subscribes to the task poll, and neither is what a button is about.
 
 // The one thing the slot under the bar reads that needs a shell behind it: the reader's arbitration
-// preference. Nothing else in this file touches the query layer, because the model is a stand-in
-// (plugins/agents/src/client/composer/AttachmentSlot.test.tsx set this shape).
+// preference. Nothing else in this file touches the query layer, because the model is a stand-in.
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 const remote = vi.fn()
 const [observedStatus, setObservedStatus] = createSignal<Partial<LocalStatus>>({})
 
-const model = (status: Partial<LocalStatus>, busy = false): ChangesModel => ({
-  task: { id: 't1', projectId: 'p1' },
-  isGit: () => true,
-  status: () => ({ ...emptyLocalStatus(), ...status, ...observedStatus() }),
-  project: () => ({ name: 'widget', path: '/src/widget' }),
-  remoteBusy: () => busy,
-  forceObservation: () => ({ nodeId: 'node-a', branch: status.branch ?? null, upstreamId: observedStatus().upstreamId ?? status.upstreamId ?? null }),
-  remote,
-} as unknown as ChangesModel)
+const model = (status: Partial<LocalStatus>, busy = false): ChangesModel =>
+  ({
+    task: { id: 't1', projectId: 'p1' },
+    isGit: () => true,
+    status: () => ({ ...emptyLocalStatus(), ...status, ...observedStatus() }),
+    project: () => ({ name: 'widget', path: '/src/widget' }),
+    remoteBusy: () => busy,
+    forceObservation: () => ({
+      nodeId: 'node-a',
+      branch: status.branch ?? null,
+      upstreamId: observedStatus().upstreamId ?? status.upstreamId ?? null,
+    }),
+    remote,
+  }) as unknown as ChangesModel
 
 let host: HTMLElement
 const disposers: (() => void)[] = []
@@ -68,7 +72,10 @@ const buttons = () => [...host.querySelectorAll<HTMLButtonElement>('button')]
 const byText = (label: string) => buttons().find((button) => button.textContent?.trim() === label)
 /** The bar's primary button: the one that is neither the menu trigger nor a copy button. */
 const primary = (): HTMLButtonElement =>
-  buttons().find((button) => button.classList.contains('ui-btn') && !button.getAttribute('aria-haspopup') && !button.closest('.ui-alert'))!
+  buttons().find(
+    (button) =>
+      button.classList.contains('ui-btn') && !button.getAttribute('aria-haspopup') && !button.closest('.ui-alert'),
+  )!
 const menuTrigger = () => host.querySelector<HTMLButtonElement>('button[aria-label="Remote actions"]')!
 const openMenu = () => {
   menuTrigger().click()
@@ -132,8 +139,13 @@ describe('the bar itself', () => {
 describe('the remote menu', () => {
   it('offers fetch, both pulls and both pushes', () => {
     draw({ upstream: 'origin/main', ahead: 0, behind: 0 })
-    expect(openMenu().map((item) => item.textContent?.trim()))
-      .toEqual(['Fetch', 'Pull fast-forward only', 'Pull with rebase', 'Push', 'Force push'])
+    expect(openMenu().map((item) => item.textContent?.trim())).toEqual([
+      'Fetch',
+      'Pull fast-forward only',
+      'Pull with rebase',
+      'Push',
+      'Force push',
+    ])
   })
 
   it('is shut while a verb is already running, and so is the primary button', () => {
@@ -144,12 +156,13 @@ describe('the remote menu', () => {
 
   it('sends the rebase form of a pull from its own item', () => {
     draw({ upstream: 'origin/main', ahead: 1, behind: 1 })
-    openMenu().find((item) => item.textContent?.trim() === 'Pull with rebase')!.click()
+    openMenu()
+      .find((item) => item.textContent?.trim() === 'Pull with rebase')!
+      .click()
     expect(remote).toHaveBeenCalledWith('rebase')
   })
 
-  // Armed rather than behind a dialog: the armed label is the prompt on every host, and a dialog was
-  // refused by the programme's decisions table.
+  // Armed rather than behind a dialog: the armed label is the prompt on every host.
   it('makes force push ask twice', () => {
     draw({ upstream: 'origin/main', ahead: 1, behind: 0 })
     const force = openMenu().find((item) => item.textContent?.trim() === 'Force push')!
@@ -163,7 +176,9 @@ describe('the remote menu', () => {
 
   it('retains the upstream observed when force push was armed after a status refresh', () => {
     draw({ branch: 'main', upstream: 'origin/main', upstreamId: 'a'.repeat(40) })
-    openMenu().find((item) => item.textContent?.trim() === 'Force push')!.click()
+    openMenu()
+      .find((item) => item.textContent?.trim() === 'Force push')!
+      .click()
     setObservedStatus({ upstreamId: 'b'.repeat(40) })
     document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
     expect(remote).toHaveBeenCalledWith('force', { nodeId: 'node-a', branch: 'main', upstreamId: 'a'.repeat(40) })
@@ -200,8 +215,9 @@ describe('the operation banner', () => {
   })
 })
 
-// The room another plugin has under the bar (docs/plugins/cooperative-extension-points.md § Cooperative extension points). What
-// belongs here is this owner's half: the point draws nothing on its own, and a contributor is handed
+// The room another plugin has under the bar
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). What belongs here is
+// this owner's half: the point draws nothing on its own, and a contributor is handed
 // the five facts the bar reads and no markup. Who wins a contested slot is `Slot`'s business and
 // client-core tests it.
 
@@ -216,32 +232,36 @@ const Contributor = (props: PushActionsProps) => {
 }
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: PUSH_ACTIONS_POINT,
-    ownerId: 'changes',
-    label: 'After a push',
-    kind: 'remote',
-    mode: 'stack',
-    max: PUSH_ACTIONS_MAX,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: PUSH_ACTIONS_POINT,
+      ownerId: 'changes',
+      label: 'After a push',
+      kind: 'remote',
+      mode: 'stack',
+      max: PUSH_ACTIONS_MAX,
+    }),
+  )
 
 const contributor = () =>
-  registered.push(extensionRegistry.register({
-    id: 'other.push-actions',
-    pluginId: 'other',
-    point: PUSH_ACTIONS_POINT,
-    label: 'Open pull request',
-    order: 10,
-    carrier: 'component',
-    component: Contributor,
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: 'other.push-actions',
+      pluginId: 'other',
+      point: PUSH_ACTIONS_POINT,
+      label: 'Open pull request',
+      order: 10,
+      carrier: 'component',
+      component: Contributor,
+    } as ExtensionContribution),
+  )
 
 describe('the push-actions slot', () => {
   it('draws nothing and takes no space when nobody fills it', () => {
     point()
     draw({ upstream: 'origin/main', ahead: 1, behind: 0 })
     // The bar and its two buttons, and no third element after the toolbar: an unfilled point has no
-    // wrapper, so the footer is the height it was before the slot existed.
+    // wrapper, so the footer keeps its own height.
     expect(host.textContent).not.toContain('Open pull request')
     expect(host.querySelector('.ui-toolbar')?.nextElementSibling).toBeNull()
   })

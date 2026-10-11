@@ -24,8 +24,22 @@ const result = (structuredOutput: unknown = null) => ({
 const resolved = (root: WorkflowDef, child: WorkflowDef): ResolvedWorkflowGraph => ({
   root,
   nodes: [
-    { path: ['$'], depth: 0, definition: root, provenance: { source: 'inline' }, defaultInputs: {}, fingerprint: 'root' },
-    { path: ['$', 'dispatch'], depth: 1, definition: child, provenance: { source: 'database', id: 'child-def', revision: 1 }, defaultInputs: {}, fingerprint: 'child' },
+    {
+      path: ['$'],
+      depth: 0,
+      definition: root,
+      provenance: { source: 'inline' },
+      defaultInputs: {},
+      fingerprint: 'root',
+    },
+    {
+      path: ['$', 'dispatch'],
+      depth: 1,
+      definition: child,
+      provenance: { source: 'database', id: 'child-def', revision: 1 },
+      defaultInputs: {},
+      fingerprint: 'child',
+    },
   ],
   fingerprint: 'graph',
   requiresRepoTrust: false,
@@ -83,7 +97,11 @@ describe('single-child workflow lifecycle', () => {
 
   const makeRunner = (
     overrides: Partial<RunnerDeps> = {},
-    createChild: (parentTaskId: string, seed: { title: string; branch: string }, intendedTaskId?: string) => Promise<string> = async (_parent, _seed, intended) => {
+    createChild: (
+      parentTaskId: string,
+      seed: { title: string; branch: string },
+      intendedTaskId?: string,
+    ) => Promise<string> = async (_parent, _seed, intended) => {
       taskIds.add(intended!)
       return intended!
     },
@@ -116,52 +134,108 @@ describe('single-child workflow lifecycle', () => {
 
   const childRun = async (parentRunId: string) => {
     await vi.waitFor(async () => {
-      const rows = await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId))
+      const rows = await store.db
+        .select()
+        .from(schema.workflowRuns)
+        .where(eq(schema.workflowRuns.parentRunId, parentRunId))
       expect(rows).toHaveLength(1)
     })
-    return (await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId)))[0]!
+    return (
+      await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId))
+    )[0]!
   }
 
   it('runs renamed stable steps, carries typed child inputs and returns declared named outputs', async () => {
-    const { runner } = makeRunner({ runStep: async (_taskId, step) => result(step.id === 'source-id'
-      ? { record: { id: 7, nullable: null }, count: 3, enabled: false }
-      : step.id === 'child-id' ? { accepted: false } : null) })
+    const { runner } = makeRunner({
+      runStep: async (_taskId, step) =>
+        result(
+          step.id === 'source-id'
+            ? { record: { id: 7, nullable: null }, count: 3, enabled: false }
+            : step.id === 'child-id'
+              ? { accepted: false }
+              : null,
+        ),
+    })
     const child: WorkflowDef = {
       baseline: 'acorn-1' as const,
-      formatVersion: 1 as const, name: 'Typed child',
+      formatVersion: 1 as const,
+      name: 'Typed child',
       inputs: [
         { name: 'record', required: true, schema: { type: 'object' } },
         { name: 'count', required: true, schema: { type: 'number' } },
         { name: 'enabled', required: true, schema: { type: 'boolean' } },
       ],
-      outputs: [{ name: 'accepted', schema: { type: 'boolean' }, binding: { address: { from: 'step', stepId: 'child-id', pointer: '/accepted' } } }],
-      steps: [{ id: 'child-id', name: 'Human child label', after: [], prompt: '${inputs.record}', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } }],
+      outputs: [
+        {
+          name: 'accepted',
+          schema: { type: 'boolean' },
+          binding: { address: { from: 'step', stepId: 'child-id', pointer: '/accepted' } },
+        },
+      ],
+      steps: [
+        {
+          id: 'child-id',
+          name: 'Human child label',
+          after: [],
+          prompt: '${inputs.record}',
+          schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] },
+        },
+      ],
     }
     const root: WorkflowDef = {
       baseline: 'acorn-1' as const,
-      formatVersion: 1 as const, name: 'Typed parent', steps: [
+      formatVersion: 1 as const,
+      name: 'Typed parent',
+      steps: [
         { id: 'source-id', name: 'Renamed source', after: [], prompt: 'Source', schema: { type: 'object' } },
-        { id: 'dispatch', name: 'Renamed dispatch', kind: 'workflow', after: ['source-id'], childWorkflow: {
-          ref: { source: 'database', id: 'child-def' },
-          inputs: Object.fromEntries(['record', 'count', 'enabled'].map(name => [name, { address: { from: 'step' as const, stepId: 'source-id', pointer: `/${name}` } }])),
-        } },
+        {
+          id: 'dispatch',
+          name: 'Renamed dispatch',
+          kind: 'workflow',
+          after: ['source-id'],
+          childWorkflow: {
+            ref: { source: 'database', id: 'child-def' },
+            inputs: Object.fromEntries(
+              ['record', 'count', 'enabled'].map((name) => [
+                name,
+                { address: { from: 'step' as const, stepId: 'source-id', pointer: `/${name}` } },
+              ]),
+            ),
+          },
+        },
       ],
     }
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
     await waitForRun(runner, runId, ['done'])
     const childRow = await childRun(runId)
-    expect(JSON.parse(childRow.defJson).inputs.map((input: { default: unknown }) => input.default)).toEqual([{ id: 7, nullable: null }, 3, false])
-    const dispatch = (await runner.steps(runId)).find(step => step.name === 'Renamed dispatch')!
+    expect(JSON.parse(childRow.defJson).inputs.map((input: { default: unknown }) => input.default)).toEqual([
+      { id: 7, nullable: null },
+      3,
+      false,
+    ])
+    const dispatch = (await runner.steps(runId)).find((step) => step.name === 'Renamed dispatch')!
     expect(JSON.parse(dispatch.structuredJson!)).toMatchObject({ outputs: { accepted: false } })
   })
 
   it('rejects a structured result on the Node before a successor executes', async () => {
     const calls: string[] = []
-    const { runner } = makeRunner({ runStep: async (_taskId, step) => { calls.push(step.id!); return result({ accepted: 'false' }) } })
+    const { runner } = makeRunner({
+      runStep: async (_taskId, step) => {
+        calls.push(step.id!)
+        return result({ accepted: 'false' })
+      },
+    })
     const runId = await runner.start('parent-task', {
       baseline: 'acorn-1' as const,
-      formatVersion: 1 as const, name: 'Validate result', steps: [
-        { id: 'first', name: 'A human label', prompt: 'Answer', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } },
+      formatVersion: 1 as const,
+      name: 'Validate result',
+      steps: [
+        {
+          id: 'first',
+          name: 'A human label',
+          prompt: 'Answer',
+          schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] },
+        },
         { id: 'next', name: 'Successor', after: ['first'], prompt: 'Continue' },
       ],
     })
@@ -176,7 +250,9 @@ describe('single-child workflow lifecycle', () => {
       childChanged,
       runStep: async (taskId, def, opts) => {
         seen.push({ taskId, prompt: opts.prompt, tools: opts.tools })
-        return result(def.name === 'source' ? { ticket: 'ABC-7' } : def.name === 'review' ? { reviewed: 'ABC-7' } : null)
+        return result(
+          def.name === 'source' ? { ticket: 'ABC-7' } : def.name === 'review' ? { reviewed: 'ABC-7' } : null,
+        )
       },
     })
     const child: WorkflowDef = {
@@ -208,22 +284,36 @@ describe('single-child workflow lifecycle', () => {
     ])
     const dispatchStep = (await runner.steps(runId))[1]!
     const [summary] = await runner.childRuns(dispatchStep.id)
-    expect(summary).toMatchObject({ taskId: childRow.taskId, runId: childRow.id, dispatchState: 'terminal', runStatus: 'done' })
-    expect(summary.resultSummary?.length).toBeLessThanOrEqual(2_000)
-    expect(childChanged).toHaveBeenCalledWith(expect.objectContaining({
-      ownerTaskId: 'parent-task',
-      taskId: expect.any(String),
+    expect(summary).toMatchObject({
+      taskId: childRow.taskId,
+      runId: childRow.id,
+      dispatchState: 'terminal',
       runStatus: 'done',
-    }))
+    })
+    expect(summary.resultSummary?.length).toBeLessThanOrEqual(2_000)
+    expect(childChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerTaskId: 'parent-task',
+        taskId: expect.any(String),
+        runStatus: 'done',
+      }),
+    )
   })
 
   it('preserves child failure detail and reuses the same task and run when the parent step is retried', async () => {
     const { runner } = makeRunner({
-      runStep: async (_taskId, def) => def.name === 'source'
-        ? result({ ticket: 'ABC-7' })
-        : { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'review failed' },
+      runStep: async (_taskId, def) =>
+        def.name === 'source'
+          ? result({ ticket: 'ABC-7' })
+          : { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'review failed' },
     })
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child review', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'review', name: 'review' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Child review',
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'review', name: 'review' }],
+    }
     const root = rootDefinition(false)
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
 
@@ -234,8 +324,9 @@ describe('single-child workflow lifecycle', () => {
     expect(await runner.retryStep(runId, dispatchStep.id)).toEqual({ ok: true })
     await waitForRun(runner, runId, ['failed'])
     const after = await runner.childRuns(dispatchStep.id)
-    expect(after.map(({ taskId, runId: childRunId }) => [taskId, childRunId]))
-      .toEqual(before.map(({ taskId, runId: childRunId }) => [taskId, childRunId]))
+    expect(after.map(({ taskId, runId: childRunId }) => [taskId, childRunId])).toEqual(
+      before.map(({ taskId, runId: childRunId }) => [taskId, childRunId]),
+    )
     expect(taskIds.size).toBe(1)
   })
 
@@ -245,7 +336,10 @@ describe('single-child workflow lifecycle', () => {
       formatVersion: 1 as const,
       name: 'Gated child',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
-      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
+      steps: [
+        { id: 'approve', name: 'approve', kind: 'gate-human' },
+        { id: 'finish', name: 'finish', prompt: 'Finish.' },
+      ],
     }
     const root = rootDefinition(false)
     const first = makeRunner()
@@ -268,7 +362,12 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('keeps the parent gated when a child finishes beside a parent gate', async () => {
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', steps: [{ id: 'finish', name: 'finish', prompt: 'Finish.' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Child',
+      steps: [{ id: 'finish', name: 'finish', prompt: 'Finish.' }],
+    }
     const root: WorkflowDef = {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
@@ -276,7 +375,8 @@ describe('single-child workflow lifecycle', () => {
       steps: [
         { id: 'approve-parent', name: 'approve-parent', kind: 'gate-human', after: [] },
         {
-          id: 'dispatch', name: 'dispatch',
+          id: 'dispatch',
+          name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -301,7 +401,10 @@ describe('single-child workflow lifecycle', () => {
       formatVersion: 1 as const,
       name: 'Gated child',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
-      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
+      steps: [
+        { id: 'approve', name: 'approve', kind: 'gate-human' },
+        { id: 'finish', name: 'finish', prompt: 'Finish.' },
+      ],
     }
     const root = rootDefinition(false)
     const first = makeRunner()
@@ -330,48 +433,100 @@ describe('single-child workflow lifecycle', () => {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Parent',
-      steps: [{
-        id: 'dispatch', name: 'dispatch',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'child-def' } },
-      }],
+      steps: [
+        {
+          id: 'dispatch',
+          name: 'dispatch',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'child-def' } },
+        },
+      ],
     }
     const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', steps: [] }
     const at = Date.now()
     await store.db.insert(schema.workflowRuns).values([
       {
-        id: 'parent-run', taskId: 'parent-task', name: root.name, status: 'running', posture: 'gated',
-        trigger: 'manual', defJson: JSON.stringify(root), resolvedGraphJson: JSON.stringify(resolved(root, child)),
-        rootRunId: 'parent-run', depth: 0, createdAt: at, updatedAt: at,
+        id: 'parent-run',
+        taskId: 'parent-task',
+        name: root.name,
+        status: 'running',
+        posture: 'gated',
+        trigger: 'manual',
+        defJson: JSON.stringify(root),
+        resolvedGraphJson: JSON.stringify(resolved(root, child)),
+        rootRunId: 'parent-run',
+        depth: 0,
+        createdAt: at,
+        updatedAt: at,
       },
       {
-        id: 'child-run', taskId: 'child-task', name: child.name, status: 'running', posture: 'gated',
-        trigger: 'manual', defJson: JSON.stringify(child), rootRunId: 'parent-run', parentRunId: 'parent-run',
-        parentStepId: 'parent-step', depth: 1, invocationKey: 'parent-run:parent-step:single',
-        payloadFingerprint: 'payload', createdAt: at, updatedAt: at,
+        id: 'child-run',
+        taskId: 'child-task',
+        name: child.name,
+        status: 'running',
+        posture: 'gated',
+        trigger: 'manual',
+        defJson: JSON.stringify(child),
+        rootRunId: 'parent-run',
+        parentRunId: 'parent-run',
+        parentStepId: 'parent-step',
+        depth: 1,
+        invocationKey: 'parent-run:parent-step:single',
+        payloadFingerprint: 'payload',
+        createdAt: at,
+        updatedAt: at,
       },
     ])
     await store.db.insert(schema.workflowSteps).values({
-      id: 'parent-step', runId: 'parent-run', idx: 0, name: 'dispatch', kind: 'workflow', mode: 'headless',
-      status: 'running', createdAt: at, updatedAt: at,
+      id: 'parent-step',
+      runId: 'parent-run',
+      idx: 0,
+      name: 'dispatch',
+      kind: 'workflow',
+      mode: 'headless',
+      status: 'running',
+      createdAt: at,
+      updatedAt: at,
     })
     await store.db.insert(schema.workflowDispatches).values({
-      id: 'dispatch', callerKey: 'parent-run:parent-step:single', payloadFingerprint: 'payload', payloadJson: '{}',
-      parentTaskId: 'parent-task', taskId: 'child-task', runId: 'child-run', rootRunId: 'parent-run',
-      parentRunId: 'parent-run', parentStepId: 'parent-step', state: 'run-started', createdAt: at, updatedAt: at,
+      id: 'dispatch',
+      callerKey: 'parent-run:parent-step:single',
+      payloadFingerprint: 'payload',
+      payloadJson: '{}',
+      parentTaskId: 'parent-task',
+      taskId: 'child-task',
+      runId: 'child-run',
+      rootRunId: 'parent-run',
+      parentRunId: 'parent-run',
+      parentStepId: 'parent-step',
+      state: 'run-started',
+      createdAt: at,
+      updatedAt: at,
     })
-    const [parentRun] = await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, 'parent-run'))
-    const [parentStep] = await store.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, 'parent-step'))
+    const [parentRun] = await store.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.id, 'parent-run'))
+    const [parentStep] = await store.db
+      .select()
+      .from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.id, 'parent-step'))
     const childChanged = vi.fn()
     const lifecycle = new WorkflowChildLifecycle(store.db, {
       dispatch: async () => ({ taskId: 'child-task', runId: 'child-run', state: 'run-started' }),
       dispatchMany: async () => [],
       steps: async (runId) => store.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.runId, runId)),
       setStep: async (stepId, patch) => {
-        await store.db.update(schema.workflowSteps).set({ ...patch, updatedAt: Date.now() }).where(eq(schema.workflowSteps.id, stepId))
+        await store.db
+          .update(schema.workflowSteps)
+          .set({ ...patch, updatedAt: Date.now() })
+          .where(eq(schema.workflowSteps.id, stepId))
       },
       setParentStatus: async (runId, status) => {
-        await store.db.update(schema.workflowRuns).set({ status, updatedAt: Date.now() }).where(eq(schema.workflowRuns.id, runId))
+        await store.db
+          .update(schema.workflowRuns)
+          .set({ status, updatedAt: Date.now() })
+          .where(eq(schema.workflowRuns.id, runId))
       },
       childChanged,
     })
@@ -388,10 +543,16 @@ describe('single-child workflow lifecycle', () => {
       upstream: [],
       emit: () => undefined,
     })
-    await vi.waitFor(async () => expect((await store.db.select().from(schema.workflowSteps)
-      .where(eq(schema.workflowSteps.id, 'parent-step')))[0]?.status).toBe('waiting-children'))
+    await vi.waitFor(async () =>
+      expect(
+        (await store.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, 'parent-step')))[0]
+          ?.status,
+      ).toBe('waiting-children'),
+    )
 
-    await store.db.update(schema.workflowRuns).set({ status: 'done', updatedAt: Date.now() })
+    await store.db
+      .update(schema.workflowRuns)
+      .set({ status: 'done', updatedAt: Date.now() })
       .where(eq(schema.workflowRuns.id, 'child-run'))
     await Promise.all([lifecycle.publish('child-run'), lifecycle.publish('child-run')])
 
@@ -403,13 +564,21 @@ describe('single-child workflow lifecycle', () => {
 
   it('stops admission during reservation and retains a task that commits while cancellation waits', async () => {
     let releaseCreation = () => {}
-    const creating = new Promise<void>((resolve) => { releaseCreation = resolve })
+    const creating = new Promise<void>((resolve) => {
+      releaseCreation = resolve
+    })
     const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => {
       await creating
       taskIds.add(intended!)
       return intended!
     })
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Child',
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'work', name: 'work' }],
+    }
     const root = rootDefinition(false)
     const { runner } = makeRunner({}, createChild)
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
@@ -424,23 +593,38 @@ describe('single-child workflow lifecycle', () => {
     expect(dispatch.state).toBe('terminal')
     expect(taskIds).toContain(dispatch.taskId)
     expect(cancelledTasks).not.toContain(dispatch.taskId)
-    expect(await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId))).toEqual([])
+    expect(
+      await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId)),
+    ).toEqual([])
   })
 
   it('cancels a child agent session before settling the parent run', async () => {
     const cancelledSessions: { taskId: string; sessionId: string }[] = []
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Child',
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'work', name: 'work' }],
+    }
     const root = rootDefinition(false)
     const { runner } = makeRunner({
       cancelAgentSession: async (taskId, sessionId) => void cancelledSessions.push({ taskId, sessionId }),
       runStep: async (_taskId, def, opts) => {
         if (def.name === 'source') return result({ ticket: 'ABC-7' })
         opts.onEvent?.({ type: 'managed-agent', sessionId: 'child-session', sequence: 1, event: {} })
-        return new Promise((resolve) => opts.signal?.addEventListener('abort', () => resolve({
-          ...result(),
-          status: 'cancelled' as const,
-          agentSessionId: 'child-session',
-        }), { once: true }))
+        return new Promise((resolve) =>
+          opts.signal?.addEventListener(
+            'abort',
+            () =>
+              resolve({
+                ...result(),
+                status: 'cancelled' as const,
+                agentSessionId: 'child-session',
+              }),
+            { once: true },
+          ),
+        )
       },
     })
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
@@ -456,15 +640,23 @@ describe('single-child workflow lifecycle', () => {
 
   it('cancels an admitted child before a parallel failure settles the parent', async () => {
     let fail = () => {}
-    const failure = new Promise<void>((resolve) => { fail = resolve })
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const failure = new Promise<void>((resolve) => {
+      fail = resolve
+    })
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Gated child',
+      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }],
+    }
     const root: WorkflowDef = {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Parallel failure',
       steps: [
         {
-          id: 'dispatch', name: 'dispatch',
+          id: 'dispatch',
+          name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -487,25 +679,37 @@ describe('single-child workflow lifecycle', () => {
     expect((await waitForRun(runner, parentRunId, ['failed'])).error).toContain('parallel failure')
     expect((await runner.run(childRow.id))?.status).toBe('cancelled')
     expect(cancelledTasks).not.toContain(childRow.taskId)
-    const [dispatch] = await store.db.select().from(schema.workflowDispatches)
+    const [dispatch] = await store.db
+      .select()
+      .from(schema.workflowDispatches)
       .where(eq(schema.workflowDispatches.runId, childRow.id))
     expect(dispatch?.state).toBe('terminal')
   })
 
   it('cancels a parallel sibling when the child fails and keeps the child task', async () => {
     let failChild = () => {}
-    const childFailure = new Promise<void>((resolve) => { failChild = resolve })
+    const childFailure = new Promise<void>((resolve) => {
+      failChild = resolve
+    })
     let siblingStarted = () => {}
-    const siblingStart = new Promise<void>((resolve) => { siblingStarted = resolve })
+    const siblingStart = new Promise<void>((resolve) => {
+      siblingStarted = resolve
+    })
     const siblingAborted = vi.fn()
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Failing child', steps: [{ id: 'child-work', name: 'child-work', prompt: 'Fail.' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Failing child',
+      steps: [{ id: 'child-work', name: 'child-work', prompt: 'Fail.' }],
+    }
     const root: WorkflowDef = {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Child failure',
       steps: [
         {
-          id: 'dispatch', name: 'dispatch',
+          id: 'dispatch',
+          name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -520,10 +724,16 @@ describe('single-child workflow lifecycle', () => {
           return { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'child failure' }
         }
         siblingStarted()
-        return new Promise((resolve) => opts.signal?.addEventListener('abort', () => {
-          siblingAborted()
-          resolve({ ...result(), status: 'cancelled' as const })
-        }, { once: true }))
+        return new Promise((resolve) =>
+          opts.signal?.addEventListener(
+            'abort',
+            () => {
+              siblingAborted()
+              resolve({ ...result(), status: 'cancelled' as const })
+            },
+            { once: true },
+          ),
+        )
       },
     })
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
@@ -539,7 +749,12 @@ describe('single-child workflow lifecycle', () => {
 
   it('waits for a child while all four agent slots are occupied', async () => {
     const blockers = new Set(['block-1', 'block-2', 'block-3', 'block-4'])
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Gated child',
+      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }],
+    }
     const root: WorkflowDef = {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
@@ -547,7 +762,8 @@ describe('single-child workflow lifecycle', () => {
       steps: [
         ...[...blockers].map((name) => ({ id: name, name, after: [] as string[], prompt: 'Wait.' })),
         {
-          id: 'dispatch', name: 'dispatch',
+          id: 'dispatch',
+          name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -555,10 +771,13 @@ describe('single-child workflow lifecycle', () => {
       ],
     }
     const { runner } = makeRunner({
-      runStep: async (_taskId, def, opts) => new Promise((resolve) => {
-        expect(blockers).toContain(def.name)
-        opts.signal?.addEventListener('abort', () => resolve({ ...result(), status: 'cancelled' as const }), { once: true })
-      }),
+      runStep: async (_taskId, def, opts) =>
+        new Promise((resolve) => {
+          expect(blockers).toContain(def.name)
+          opts.signal?.addEventListener('abort', () => resolve({ ...result(), status: 'cancelled' as const }), {
+            once: true,
+          })
+        }),
     })
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
 
@@ -569,7 +788,12 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('restores an expired absolute deadline as a tree safety rail after restart', async () => {
-    const definition: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Expired root', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const definition: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Expired root',
+      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }],
+    }
     const expiredAt = Date.now() - 1
     await store.db.insert(schema.workflowRuns).values({
       id: 'expired-root',
@@ -642,27 +866,42 @@ describe('single-child workflow lifecycle', () => {
       formatVersion: 1 as const,
       name: 'Deadline parent',
       budget: { maxWallTimeMs: 100 },
-      steps: [{
-        id: 'dispatch', name: 'dispatch',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'child-def' } },
-      }],
+      steps: [
+        {
+          id: 'dispatch',
+          name: 'dispatch',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'child-def' } },
+        },
+      ],
     }
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Slow child', steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Slow child',
+      steps: [{ id: 'work', name: 'work' }],
+    }
     const { runner } = makeRunner({
-      runStep: async (_taskId, _def, opts) => new Promise((resolve) => {
-        opts.signal?.addEventListener('abort', () => resolve({
-          ...result(),
-          status: 'cancelled' as const,
-        }), { once: true })
-      }),
+      runStep: async (_taskId, _def, opts) =>
+        new Promise((resolve) => {
+          opts.signal?.addEventListener(
+            'abort',
+            () =>
+              resolve({
+                ...result(),
+                status: 'cancelled' as const,
+              }),
+            { once: true },
+          )
+        }),
     })
     const rootRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
     const childRow = await childRun(rootRunId)
 
-    expect((await waitForRun(runner, rootRunId, ['safety-rail'])).error).toMatch(/deadline exhausted|Wall-time budget exhausted/)
+    expect((await waitForRun(runner, rootRunId, ['safety-rail'])).error).toMatch(
+      /deadline exhausted|Wall-time budget exhausted/,
+    )
     expect(['cancelled', 'safety-rail']).toContain((await runner.run(childRow.id))?.status)
     expect(cancelledTasks).not.toContain(childRow.taskId)
   })
-
 })

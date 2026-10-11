@@ -10,10 +10,24 @@ import { testCliCommandDescriptor } from '../../testkit/runtimeContributions'
 // in someone else's namespace, a pane it never declared, a non-https URL the shell would hand to the OS.
 
 const manifest = (contributions: Record<string, unknown>) =>
-  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions })
+  pluginManifestSchema.safeParse({
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+    contributions,
+  })
 
 const permissionManifest = (permissions: Record<string, unknown>) =>
-  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', permissions })
+  pluginManifestSchema.safeParse({
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+    permissions,
+  })
 
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
@@ -32,44 +46,79 @@ const PANE = { target: 'pane', id: 'board', label: 'Board', layout: 'single', re
 // cases declare a client one.
 const nodeManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', node: './dist/node.js', contributions,
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+    node: './dist/node.js',
+    contributions,
   })
 
 describe('CLI command declarations', () => {
   const command = testCliCommandDescriptor()
-  const parse = (cliCommands: unknown[], core = ['tasks']) => pluginManifestSchema.safeParse({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
-    node: './dist/node.js', permissions: { node: { core } }, contributions: { cliCommands },
-  })
+  const parse = (cliCommands: unknown[], core = ['tasks']) =>
+    pluginManifestSchema.safeParse({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      node: './dist/node.js',
+      permissions: { node: { core } },
+      contributions: { cliCommands },
+    })
 
   it('accepts a bounded read and a described write in its own command namespace', () => {
-    expect(parse([command, testCliCommandDescriptor({
-      name: 'set', title: 'Set probe', summary: 'Set a fixture value.', effects: 'Replaces only the fixture probe value.',
-      risk: 'write', route: { method: 'POST', path: '/cli/set' },
-    })]).success).toBe(true)
+    expect(
+      parse([
+        command,
+        testCliCommandDescriptor({
+          name: 'set',
+          title: 'Set probe',
+          summary: 'Set a fixture value.',
+          effects: 'Replaces only the fixture probe value.',
+          risk: 'write',
+          route: { method: 'POST', path: '/cli/set' },
+        }),
+      ]).success,
+    ).toBe(true)
   })
 
   it('rejects duplicates, cross-route references and undeclared capabilities', () => {
     expect(parse([command, command]).success).toBe(false)
     expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/v1/core/tasks' } })]).success).toBe(false)
     expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/cli/other' } })]).success).toBe(false)
-    expect(parse([testCliCommandDescriptor({ name: 'commands', route: { method: 'POST', path: '/cli/commands' } })]).success).toBe(false)
+    expect(
+      parse([testCliCommandDescriptor({ name: 'commands', route: { method: 'POST', path: '/cli/commands' } })]).success,
+    ).toBe(false)
     expect(parse([command], []).success).toBe(false)
     expect(parse([testCliCommandDescriptor({ capability: 'future:root' })], ['future:root']).success).toBe(false)
     for (const name of ['trailing-', 'double--hyphen']) {
-      expect(parse([testCliCommandDescriptor({ name, route: { method: 'POST', path: `/cli/${name}` } })]).success).toBe(false)
+      expect(parse([testCliCommandDescriptor({ name, route: { method: 'POST', path: `/cli/${name}` } })]).success).toBe(
+        false,
+      )
     }
   })
 
   it('requires a write effect and rejects unbounded schema language', () => {
     expect(parse([testCliCommandDescriptor({ risk: 'write' })]).success).toBe(false)
-    expect(parse([testCliCommandDescriptor({ inputSchema: { type: 'object', $ref: 'https://hostile.test/schema' } })]).success).toBe(false)
+    expect(
+      parse([testCliCommandDescriptor({ inputSchema: { type: 'object', $ref: 'https://hostile.test/schema' } })])
+        .success,
+    ).toBe(false)
   })
 })
 
 const webviewManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+    client: './dist/client.js',
+    contributions,
   })
 
 it('rejects an API-1 manifest without the current baseline', () => {
@@ -80,7 +129,14 @@ it('rejects an API-1 manifest without the current baseline', () => {
 
 describe('brand marks', () => {
   const withIcons = (icons: Record<string, unknown>) =>
-    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', ...icons })
+    pluginManifestSchema.safeParse({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      ...icons,
+    })
 
   it('accepts a path `d` and passes it through untouched', () => {
     const result = withIcons({ icon: { d: 'M12 .297c-6.63 0-12 5.373-12 12Z' } })
@@ -112,7 +168,9 @@ describe('brand marks', () => {
     // A key cannot reach out of the plugin's own namespace: the host stamps `brand:<pluginId>/` in front
     // of it, so a slash here would be a second segment, not an escape, but bound it anyway.
     expect(withIcons({ icons: { 'other/mark': { d: 'M0 0Z' } } }).success).toBe(false)
-    expect(withIcons({ icons: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`m${i}`, { d: 'M0 0Z' }])) }).success).toBe(false)
+    expect(
+      withIcons({ icons: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`m${i}`, { d: 'M0 0Z' }])) }).success,
+    ).toBe(false)
   })
 })
 
@@ -126,49 +184,94 @@ describe('runtime contribution descriptors', () => {
 
   it('accepts bounded tool and context carriers and applies their defaults', () => {
     const result = nodeManifest({
-      agentTools: [{
-        id: 'echo', description: 'Echo one message.', inputSchema, risk: 'read',
-        handler: '/v1/p/board/tools/echo',
-      }],
-      contextSections: [{
-        id: 'references', label: 'References', order: 25, read: '/v1/p/board/context',
-        maxBytes: 4096, maxTokens: 1024,
-      }],
+      agentTools: [
+        {
+          id: 'echo',
+          description: 'Echo one message.',
+          inputSchema,
+          risk: 'read',
+          handler: '/v1/p/board/tools/echo',
+        },
+      ],
+      contextSections: [
+        {
+          id: 'references',
+          label: 'References',
+          order: 25,
+          read: '/v1/p/board/context',
+          maxBytes: 4096,
+          maxTokens: 1024,
+        },
+      ],
     })
     expect(result.success && result.data.contributions.agentTools[0]).toMatchObject({
-      scope: 'task', timeoutMs: 10_000, maxOutputBytes: 64 * 1024, requiresSession: false,
+      scope: 'task',
+      timeoutMs: 10_000,
+      maxOutputBytes: 64 * 1024,
+      requiresSession: false,
     })
     expect(result.success && result.data.contributions.contextSections[0]).toMatchObject({
-      scope: 'task', timeoutMs: 5_000, defaultIncluded: false,
+      scope: 'task',
+      timeoutMs: 5_000,
+      defaultIncluded: false,
     })
   })
 
   it('rejects unsupported schemas, excessive nesting, and unowned/device routes at install', () => {
-    const tool = (schema: unknown, handler = '/v1/p/board/tool') => nodeManifest({
-      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema: schema, risk: 'read', handler }],
-    })
-    expect(messages(tool({ ...inputSchema, $ref: 'https://example.test/schema.json' }))).toContain("unsupported JSON Schema keyword '$ref'")
-    expect(messages(tool({ type: 'object', properties: { value: { oneOf: [{ type: 'string' }] } } }))).toContain("unsupported JSON Schema keyword 'oneOf'")
-    expect(messages(tool({ type: 'object', properties: { value: { type: 'string', maxLength: '40' } } }))).toContain('must be a non-negative integer')
-    expect(messages(tool({ type: 'object', properties: { value: { type: 'string' } }, required: ['missing'] }))).toContain("names unknown property 'missing'")
+    const tool = (schema: unknown, handler = '/v1/p/board/tool') =>
+      nodeManifest({
+        agentTools: [{ id: 'probe', description: 'Probe.', inputSchema: schema, risk: 'read', handler }],
+      })
+    expect(messages(tool({ ...inputSchema, $ref: 'https://example.test/schema.json' }))).toContain(
+      "unsupported JSON Schema keyword '$ref'",
+    )
+    expect(messages(tool({ type: 'object', properties: { value: { oneOf: [{ type: 'string' }] } } }))).toContain(
+      "unsupported JSON Schema keyword 'oneOf'",
+    )
+    expect(messages(tool({ type: 'object', properties: { value: { type: 'string', maxLength: '40' } } }))).toContain(
+      'must be a non-negative integer',
+    )
+    expect(
+      messages(tool({ type: 'object', properties: { value: { type: 'string' } }, required: ['missing'] })),
+    ).toContain("names unknown property 'missing'")
     let nested: Record<string, unknown> = { type: 'string' }
     for (let i = 0; i < 10; i++) nested = { type: 'array', items: nested }
-    expect(messages(tool({ type: 'object', properties: { nested } })).some((message) => message.includes('maximum nesting depth'))).toBe(true)
+    expect(
+      messages(tool({ type: 'object', properties: { nested } })).some((message) =>
+        message.includes('maximum nesting depth'),
+      ),
+    ).toBe(true)
     expect(messages(tool(inputSchema, '/v1/p/memory/approve'))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(tool(inputSchema, '/v1/core/devices'))).toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(nodeManifest({
-      contextSections: [{ id: 'r', label: 'R', order: 1, read: '/v1/p/other/context', maxBytes: 1024, maxTokens: 256 }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          contextSections: [
+            { id: 'r', label: 'R', order: 1, read: '/v1/p/other/context', maxBytes: 1024, maxTokens: 256 },
+          ],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('requires a node half and rejects duplicate local ids across carriers', () => {
-    expect(messages(manifest({
-      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
-    }))).toContain('an agent tool calls a node route; declare `node` in the manifest')
-    expect(messages(nodeManifest({
-      agentTools: [{ id: 'same', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
-      contextSections: [{ id: 'same', label: 'R', order: 1, read: '/v1/p/board/context', maxBytes: 1024, maxTokens: 256 }],
-    }))).toContain("duplicate contribution id 'same'")
+    expect(
+      messages(
+        manifest({
+          agentTools: [{ id: 'probe', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
+        }),
+      ),
+    ).toContain('an agent tool calls a node route; declare `node` in the manifest')
+    expect(
+      messages(
+        nodeManifest({
+          agentTools: [{ id: 'same', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
+          contextSections: [
+            { id: 'same', label: 'R', order: 1, read: '/v1/p/board/context', maxBytes: 1024, maxTokens: 256 },
+          ],
+        }),
+      ),
+    ).toContain("duplicate contribution id 'same'")
   })
 })
 
@@ -193,7 +296,10 @@ describe('permission identifier shape', () => {
     })
     expect(result.success && result.data.permissions.node).toMatchObject({
       env: ['DATABASE_URL'],
-      files: [{ env: 'ACORN_NODES_FILE', access: 'read' }, { env: '_PRIVATE_CACHE', access: 'read-write' }],
+      files: [
+        { env: 'ACORN_NODES_FILE', access: 'read' },
+        { env: '_PRIVATE_CACHE', access: 'read-write' },
+      ],
     })
     expect(permissionManifest({ node: { env: ['DATABASE_*'] } }).success).toBe(false)
     expect(permissionManifest({ node: { files: [{ env: 'nodes_file' }] } }).success).toBe(false)
@@ -220,94 +326,207 @@ describe('overlay surfaces', () => {
   it('refuses an overlay nothing opens, and an openOverlay naming something else', () => {
     // The same rule a project-scoped pane is held to: a surface that parses and can never appear is worse
     // than a parse error, because it looks installed.
-    expect(messages(manifest({ frames: [overlay] })))
-      .toContain(`overlay 'files' needs an action that opens it; a command with a keybinding is the usual one`)
-    expect(messages(manifest({ frames: [PANE], commands: [opener({ verb: 'openOverlay', overlay: 'board' })] })))
-      .toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
+    expect(messages(manifest({ frames: [overlay] }))).toContain(
+      `overlay 'files' needs an action that opens it; a command with a keybinding is the usual one`,
+    )
+    expect(
+      messages(manifest({ frames: [PANE], commands: [opener({ verb: 'openOverlay', overlay: 'board' })] })),
+    ).toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
   })
 
-  // The second opener, and the reason it had to be added to the same set: a plugin whose only opener is
-  // a companion overlay would otherwise fail the check above, which reads as a plugin bug rather than
-  // the missing platform rule it was.
+  // The second opener, in the same set: a plugin whose only opener is a companion overlay would
+  // otherwise fail the check above, which reads as a plugin bug when the plugin did nothing wrong.
   it('accepts an overlay opened by a remote contribution that associated it', () => {
     const result = webviewManifest({
       frames: [overlay],
-      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
+      extensions: [
+        {
+          id: 'preview',
+          point: 'agents:attachment',
+          label: 'Image markup',
+          remote: 'attachmentPreview',
+          overlay: 'files',
+        },
+      ],
     })
     expect(result.success).toBe(true)
   })
 
   it('refuses a companion overlay this manifest does not declare', () => {
-    expect(messages(webviewManifest({
-      frames: [PANE],
-      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
-    }))).toContain(`extension names overlay 'files', which this manifest does not declare as an overlay surface`)
+    expect(
+      messages(
+        webviewManifest({
+          frames: [PANE],
+          extensions: [
+            {
+              id: 'preview',
+              point: 'agents:attachment',
+              label: 'Image markup',
+              remote: 'attachmentPreview',
+              overlay: 'files',
+            },
+          ],
+        }),
+      ),
+    ).toContain(`extension names overlay 'files', which this manifest does not declare as an overlay surface`)
   })
 
   // A qualifier on the `remote` carrier, never a carrier of its own. A descriptor naming both would be
   // rejected by the exactly-one-carrier rule, which is the trap this pins shut.
   it('refuses a companion overlay on anything but a remote contribution', () => {
-    expect(messages(manifest({
-      frames: [overlay],
-      extensions: [{ id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v1/p/board/rows', overlay: 'files' }],
-    }))).toContain('overlay is only valid on a remote contribution')
+    expect(
+      messages(
+        manifest({
+          frames: [overlay],
+          extensions: [
+            { id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v1/p/board/rows', overlay: 'files' },
+          ],
+        }),
+      ),
+    ).toContain('overlay is only valid on a remote contribution')
   })
 
   it('keeps an overlay out of the pane sets', () => {
     // `openPane` puts a rectangle in a task's layout; an overlay has no layout to be put in.
-    expect(messages(manifest({
-      frames: [overlay],
-      commands: [opener({ verb: 'openOverlay', overlay: 'files' }), { id: 'x', kind: 'action', title: 'X', action: { verb: 'openPane', pane: 'files' } }],
-    }))).toContain(`openPane names 'files', which this manifest does not declare as a task-scoped pane`)
-    expect(messages(manifest({ frames: [{ ...overlay, scope: 'project' }], commands: [opener({ verb: 'openOverlay', overlay: 'files' })] })))
-      .toContain('only a pane surface can be project-scoped')
+    expect(
+      messages(
+        manifest({
+          frames: [overlay],
+          commands: [
+            opener({ verb: 'openOverlay', overlay: 'files' }),
+            { id: 'x', kind: 'action', title: 'X', action: { verb: 'openPane', pane: 'files' } },
+          ],
+        }),
+      ),
+    ).toContain(`openPane names 'files', which this manifest does not declare as a task-scoped pane`)
+    expect(
+      messages(
+        manifest({
+          frames: [{ ...overlay, scope: 'project' }],
+          commands: [opener({ verb: 'openOverlay', overlay: 'files' })],
+        }),
+      ),
+    ).toContain('only a pane surface can be project-scoped')
   })
 })
 
 describe('webview surfaces', () => {
   it('accepts literal and plugin-route URL sources', () => {
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com/start', hosts: ['docs.example.com'] }],
-    }).success).toBe(true)
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v1/p/board/webview-url', hosts: ['*.example.com'] }],
-    }).success).toBe(true)
+    expect(
+      webviewManifest({
+        frames: [
+          {
+            target: 'webview',
+            id: 'docs',
+            label: 'Docs',
+            url: 'https://docs.example.com/start',
+            hosts: ['docs.example.com'],
+          },
+        ],
+      }).success,
+    ).toBe(true)
+    expect(
+      webviewManifest({
+        frames: [
+          {
+            target: 'webview',
+            id: 'docs',
+            label: 'Docs',
+            urlSource: '/v1/p/board/webview-url',
+            hosts: ['*.example.com'],
+          },
+        ],
+      }).success,
+    ).toBe(true)
   })
 
   it('requires exactly one URL form and confines a source route to the plugin', () => {
-    expect(manifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', hosts: ['docs.example.com'] }],
-    }).success).toBe(false)
-    expect(manifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', urlSource: '/v1/p/board/url', hosts: ['docs.example.com'] }],
-    }).success).toBe(false)
-    expect(messages(manifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v1/p/other/url', hosts: ['docs.example.com'] }],
-    }))).toContain('route must be inside /v1/p/board/')
+    expect(
+      manifest({
+        frames: [{ target: 'webview', id: 'docs', label: 'Docs', hosts: ['docs.example.com'] }],
+      }).success,
+    ).toBe(false)
+    expect(
+      manifest({
+        frames: [
+          {
+            target: 'webview',
+            id: 'docs',
+            label: 'Docs',
+            url: 'https://docs.example.com',
+            urlSource: '/v1/p/board/url',
+            hosts: ['docs.example.com'],
+          },
+        ],
+      }).success,
+    ).toBe(false)
+    expect(
+      messages(
+        manifest({
+          frames: [
+            { target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v1/p/other/url', hosts: ['docs.example.com'] },
+          ],
+        }),
+      ),
+    ).toContain('route must be inside /v1/p/board/')
   })
 
   it('confines a source search route to the plugin and requires an items list to search', () => {
     const source = { id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items' }
     expect(manifest({ sources: [{ ...source, search: '/v1/p/board/search' }] }).success).toBe(true)
-    expect(messages(manifest({ sources: [{ ...source, search: '/v1/p/other/search' }] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(manifest({ sources: [{ id: 'cards', label: 'Cards', order: 1, tree: { list: 'l', detail: 'd' }, search: '/v1/p/board/search' }] }).success)
-      .toBe(false)
+    expect(messages(manifest({ sources: [{ ...source, search: '/v1/p/other/search' }] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(
+      manifest({
+        sources: [
+          { id: 'cards', label: 'Cards', order: 1, tree: { list: 'l', detail: 'd' }, search: '/v1/p/board/search' },
+        ],
+      }).success,
+    ).toBe(false)
   })
 
   it('validates hosts and requires a literal URL to stay inside them', () => {
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://other.example.com', hosts: ['docs.example.com'] }],
-    }).success).toBe(false)
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['*.*.example.com'] }],
-    }).success).toBe(false)
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'local', label: 'Local', url: 'http://localhost:3000', hosts: ['localhost'] }],
-    }).success).toBe(true)
-    expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'remote', label: 'Remote', url: 'http://docs.example.com', hosts: ['docs.example.com'] }],
-    }).success).toBe(false)
+    expect(
+      webviewManifest({
+        frames: [
+          {
+            target: 'webview',
+            id: 'docs',
+            label: 'Docs',
+            url: 'https://other.example.com',
+            hosts: ['docs.example.com'],
+          },
+        ],
+      }).success,
+    ).toBe(false)
+    expect(
+      webviewManifest({
+        frames: [
+          { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['*.*.example.com'] },
+        ],
+      }).success,
+    ).toBe(false)
+    expect(
+      webviewManifest({
+        frames: [
+          { target: 'webview', id: 'local', label: 'Local', url: 'http://localhost:3000', hosts: ['localhost'] },
+        ],
+      }).success,
+    ).toBe(true)
+    expect(
+      webviewManifest({
+        frames: [
+          {
+            target: 'webview',
+            id: 'remote',
+            label: 'Remote',
+            url: 'http://docs.example.com',
+            hosts: ['docs.example.com'],
+          },
+        ],
+      }).success,
+    ).toBe(false)
   })
 
   it('refuses a webview from a package with no client bundle', () => {
@@ -315,8 +534,16 @@ describe('webview surfaces', () => {
     // drive the view, so without one nothing steers it, and the trust queue holds bundles, so a
     // bundle-less package never reaches the prompt at all. Its declared hosts would be a disclosure nobody
     // was ever shown, for a surface that displays arbitrary web content.
-    const declared = { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }
-    expect(messages(manifest({ frames: [declared] }))).toContain('a webview surface needs a client bundle; declare `client` in the manifest')
+    const declared = {
+      target: 'webview',
+      id: 'docs',
+      label: 'Docs',
+      url: 'https://docs.example.com',
+      hosts: ['docs.example.com'],
+    }
+    expect(messages(manifest({ frames: [declared] }))).toContain(
+      'a webview surface needs a client bundle; declare `client` in the manifest',
+    )
     expect(webviewManifest({ frames: [declared] }).success).toBe(true)
   })
 })
@@ -325,22 +552,38 @@ describe('cooperative navigation destinations', () => {
   const pane = (destinations: unknown[]) => ({ ...PANE, destinations })
 
   it('accepts a bounded target mapping and applies an empty default', () => {
-    const declared = manifest({ frames: [pane([{
-      id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
-    }])] })
-    expect(declared.success && declared.data.contributions.frames[0]?.destinations).toEqual([{
-      id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
-    }])
+    const declared = manifest({
+      frames: [
+        pane([
+          {
+            id: 'memory-review',
+            label: 'Review in Memory',
+            targetKind: 'findings-candidate',
+            noticeKind: 'memory-proposal',
+          },
+        ]),
+      ],
+    })
+    expect(declared.success && declared.data.contributions.frames[0]?.destinations).toEqual([
+      {
+        id: 'memory-review',
+        label: 'Review in Memory',
+        targetKind: 'findings-candidate',
+        noticeKind: 'memory-proposal',
+      },
+    ])
     const empty = manifest({ frames: [PANE] })
     expect(empty.success && empty.data.contributions.frames[0]?.destinations).toEqual([])
   })
 
   it('rejects duplicate ids and more than eight destinations', () => {
     const destination = (id: string) => ({ id, label: id, targetKind: 'findings-candidate' })
-    expect(messages(manifest({ frames: [pane([destination('review'), destination('review')])] })))
-      .toContain("duplicate destination id 'review'")
-    expect(manifest({ frames: [pane(Array.from({ length: 9 }, (_, index) => destination(`d-${index}`)))] }).success)
-      .toBe(false)
+    expect(messages(manifest({ frames: [pane([destination('review'), destination('review')])] }))).toContain(
+      "duplicate destination id 'review'",
+    )
+    expect(
+      manifest({ frames: [pane(Array.from({ length: 9 }, (_, index) => destination(`d-${index}`)))] }).success,
+    ).toBe(false)
   })
 })
 
@@ -351,8 +594,11 @@ describe('pane layouts', () => {
   // cross-field check here: a plugin may not name a route outside its own namespace, a layout has the
   // regions it has, and a surface that parses and can never do anything is refused rather than shipped.
   const doc = (document: Record<string, unknown>) => ({ kind: 'document', ...document })
-  const layout = (document: Record<string, unknown>) =>
-    ({ ...PANE, layout: 'single', regions: { body: doc(document) } })
+  const layout = (document: Record<string, unknown>) => ({
+    ...PANE,
+    layout: 'single',
+    regions: { body: doc(document) },
+  })
   // The document region by name, since that is the only kind these cases assert on: a `frame` region
   // is a bare string and a `remote` one carries an entry rather than a route.
   const region = (result: ReturnType<typeof manifest>, name: string) => {
@@ -374,9 +620,12 @@ describe('pane layouts', () => {
   })
 
   it('confines both routes to the plugin, so the host cannot be made to read core on its behalf', () => {
-    expect(messages(manifest({ frames: [layout({ read: '/v1/core/tasks' })] }))).toContain('route must be inside /v1/p/board/')
-    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' })] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v1/core/tasks' })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
   })
 
   it('takes only a published language id', () => {
@@ -384,9 +633,21 @@ describe('pane layouts', () => {
   })
 
   it('refuses a layout on a surface with no rectangle to arrange', () => {
-    expect(messages(manifest({
-      frames: [{ target: 'importer', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v1/p/board/doc' }) } }],
-    }))).toContain('layout is only valid on a pane, a reference panel or a settings page')
+    expect(
+      messages(
+        manifest({
+          frames: [
+            {
+              target: 'importer',
+              id: 'board',
+              label: 'Board',
+              layout: 'single',
+              regions: { body: doc({ read: '/v1/p/board/doc' }) },
+            },
+          ],
+        }),
+      ),
+    ).toContain('layout is only valid on a pane, a reference panel or a settings page')
   })
 
   // A reference panel and a settings page have one region and host-drawn chrome around it, so `single`
@@ -394,39 +655,83 @@ describe('pane layouts', () => {
   // tree rather than an iframe.
   it("lets a panel and a settings page name 'single', and nothing wider", () => {
     for (const target of ['refPanel', 'settings'] as const) {
-      expect(manifest({
-        frames: [{ target, id: 'board', label: 'Board', layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } }],
-      }).success).toBe(true)
-      expect(messages(manifest({
-        frames: [{ target, id: 'board', label: 'Board', layout: 'list-detail', regions: { list: 'frame', detail: 'frame' } }],
-      })).join(' ')).toContain("only layout is 'single'")
+      expect(
+        manifest({
+          frames: [
+            {
+              target,
+              id: 'board',
+              label: 'Board',
+              layout: 'single',
+              regions: { body: { kind: 'remote', entry: 'pane' } },
+            },
+          ],
+        }).success,
+      ).toBe(true)
+      expect(
+        messages(
+          manifest({
+            frames: [
+              {
+                target,
+                id: 'board',
+                label: 'Board',
+                layout: 'list-detail',
+                regions: { list: 'frame', detail: 'frame' },
+              },
+            ],
+          }),
+        ).join(' '),
+      ).toContain("only layout is 'single'")
     }
   })
 
   // A remote region names a key of the object the bundle passed to `mountTree`, not a route: there is
   // nothing to confine, and a name with no renderer behind it draws the labelled placeholder.
   it('accepts a remote region and asks it for no route', () => {
-    const parsed = manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } }] })
+    const parsed = manifest({
+      frames: [{ ...PANE, layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } }],
+    })
     expect(parsed.success).toBe(true)
-    expect(parsed.success && parsed.data.contributions.frames[0].regions?.body).toEqual({ kind: 'remote', entry: 'pane' })
+    expect(parsed.success && parsed.data.contributions.frames[0].regions?.body).toEqual({
+      kind: 'remote',
+      entry: 'pane',
+    })
   })
 
   it('allows only a list-detail pane to declare the host-owned collapse control', () => {
-    expect(manifest({
-      frames: [{ ...PANE, collapsible: true, layout: 'list-detail', regions: { list: 'frame', detail: 'frame' } }],
-    }).success).toBe(true)
-    expect(messages(manifest({ frames: [{ ...PANE, collapsible: true }] })))
-      .toContain('collapsible is only valid on a list-detail pane')
+    expect(
+      manifest({
+        frames: [{ ...PANE, collapsible: true, layout: 'list-detail', regions: { list: 'frame', detail: 'frame' } }],
+      }).success,
+    ).toBe(true)
+    expect(messages(manifest({ frames: [{ ...PANE, collapsible: true }] }))).toContain(
+      'collapsible is only valid on a list-detail pane',
+    )
   })
 
   it('allows only a task pane to opt into archived-task previews', () => {
     const parsed = manifest({ frames: [{ ...PANE, readsArchived: true }] })
     expect(parsed.success && parsed.data.contributions.frames[0].readsArchived).toBe(true)
-    expect(messages(manifest({
-      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' }, readsArchived: true }],
-    }))).toContain('readsArchived is only valid on a task pane')
-    expect(messages(manifest({ frames: [{ ...PANE, scope: 'project', readsArchived: true }] })))
-      .toContain('readsArchived is only valid on a task pane')
+    expect(
+      messages(
+        manifest({
+          frames: [
+            {
+              target: 'settings',
+              id: 'board',
+              label: 'Board',
+              layout: 'single',
+              regions: { body: 'frame' },
+              readsArchived: true,
+            },
+          ],
+        }),
+      ),
+    ).toContain('readsArchived is only valid on a task pane')
+    expect(messages(manifest({ frames: [{ ...PANE, scope: 'project', readsArchived: true }] }))).toContain(
+      'readsArchived is only valid on a task pane',
+    )
   })
 
   it('takes status-mark consent from a source or a task pane, and from no other surface', () => {
@@ -441,61 +746,101 @@ describe('pane layouts', () => {
       { ...PANE, scope: 'project' },
       { target: 'overlay', id: 'picker', label: 'Picker' },
     ]) {
-      expect(messages(manifest({ frames: [{ ...frame, statusAnnotations: true }] }))).toContain('statusAnnotations is only valid on a task pane')
+      expect(messages(manifest({ frames: [{ ...frame, statusAnnotations: true }] }))).toContain(
+        'statusAnnotations is only valid on a task pane',
+      )
     }
   })
 
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
-    expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v1/p/board/doc' }) } }] }).success).toBe(false)
-    expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))
-      .toContain("layout 'single' has no sidebar region")
-    expect(messages(manifest({ frames: [{ ...PANE, layout: 'list-detail', regions: { list: 'frame' } }] })))
-      .toContain("layout 'list-detail' needs a detail region")
+    expect(
+      manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v1/p/board/doc' }) } }] })
+        .success,
+    ).toBe(false)
+    expect(
+      messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })),
+    ).toContain("layout 'single' has no sidebar region")
+    expect(messages(manifest({ frames: [{ ...PANE, layout: 'list-detail', regions: { list: 'frame' } }] }))).toContain(
+      "layout 'list-detail' needs a detail region",
+    )
     const { layout: _dropped, ...noLayout } = PANE
-    expect(messages(manifest({ frames: [{ ...noLayout, regions: { body: 'frame' } }] })))
-      .toContain('regions need a layout to name them')
+    expect(messages(manifest({ frames: [{ ...noLayout, regions: { body: 'frame' } }] }))).toContain(
+      'regions need a layout to name them',
+    )
   })
 
   it('refuses key claims on a pane with no frame region, which draws nothing to claim them', () => {
-    expect(messages(manifest({ frames: [{ ...layout({ read: '/v1/p/board/doc' }), claimsKeys: ['meta+j'] }] })))
-      .toContain('this pane draws no frame, so there is nothing here to claim keys')
+    expect(
+      messages(manifest({ frames: [{ ...layout({ read: '/v1/p/board/doc' }), claimsKeys: ['meta+j'] }] })),
+    ).toContain('this pane draws no frame, so there is nothing here to claim keys')
   })
 
-  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them. The
-  // layout that arrived with its consumer, the database pane, which is what shipping the region
-  // addressing on day one was for.
-  const composed = (document: Record<string, unknown>) =>
-    ({ ...PANE, layout: 'document-over-frame', regions: { document: doc(document), frame: 'frame' } })
+  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them, as
+  // the database pane uses.
+  const composed = (document: Record<string, unknown>) => ({
+    ...PANE,
+    layout: 'document-over-frame',
+    regions: { document: doc(document), frame: 'frame' },
+  })
 
   it('accepts a composed pane, and allows the key claims a host-drawn one refuses', () => {
-    const result = manifest({ frames: [{ ...composed({ read: '/v1/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }] })
+    const result = manifest({
+      frames: [{ ...composed({ read: '/v1/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }],
+    })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.frames[0]?.layout).toBe('document-over-frame')
   })
 
   it('confines the completions route like any other, and defaults its trigger characters', () => {
-    const ok = manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete' } })] })
+    const ok = manifest({
+      frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete' } })],
+    })
     expect(ok.success).toBe(true)
     expect(region(ok, 'body')?.completions?.triggerCharacters).toEqual([])
-    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/other/complete' } })] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(
+      messages(
+        manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/other/complete' } })] }),
+      ),
+    ).toContain('route must be inside /v1/p/board/')
   })
 
-  it('confines a region\'s hover and diagnostics routes, and leaves completions as they were', () => {
-    const ok = manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete' },
-      hover: { route: '/v1/p/board/hover' }, diagnostics: { route: '/v1/p/board/check' } })] })
+  it("confines a region's hover and diagnostics routes, and leaves completions as they were", () => {
+    const ok = manifest({
+      frames: [
+        layout({
+          read: '/v1/p/board/doc',
+          completions: { route: '/v1/p/board/complete' },
+          hover: { route: '/v1/p/board/hover' },
+          diagnostics: { route: '/v1/p/board/check' },
+        }),
+      ],
+    })
     expect(ok.success).toBe(true)
-    expect(region(ok, 'body')).toMatchObject({ hover: { route: '/v1/p/board/hover' }, diagnostics: { route: '/v1/p/board/check' },
-      completions: { route: '/v1/p/board/complete', triggerCharacters: [] } })
-    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/p/board/../other/check' } })] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(region(ok, 'body')).toMatchObject({
+      hover: { route: '/v1/p/board/hover' },
+      diagnostics: { route: '/v1/p/board/check' },
+      completions: { route: '/v1/p/board/complete', triggerCharacters: [] },
+    })
+    expect(
+      messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })] })),
+    ).toContain('route must be inside /v1/p/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [layout({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/p/board/../other/check' } })],
+        }),
+      ),
+    ).toContain('route must be inside /v1/p/board/')
   })
 })
 
 describe('document services', () => {
-  const service = (extra: Record<string, unknown>) => ({ id: 'json-check', label: 'JSON check', languageId: 'json', ...extra })
+  const service = (extra: Record<string, unknown>) => ({
+    id: 'json-check',
+    label: 'JSON check',
+    languageId: 'json',
+    ...extra,
+  })
 
   it('accepts a file-language provider with its own routes', () => {
     const result = manifest({ documentServices: [service({ diagnostics: { route: '/v1/p/board/check' } })] })
@@ -504,15 +849,26 @@ describe('document services', () => {
     ])
   })
 
-  it('refuses another plugin\'s route, an unknown language, no service, and a duplicate id', () => {
-    expect(messages(manifest({ documentServices: [service({ hover: { route: '/v1/p/other/hover' } })] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(manifest({ documentServices: [service({ languageId: 'cobol', hover: { route: '/v1/p/board/hover' } })] }).success).toBe(false)
-    expect(messages(manifest({ documentServices: [service({})] })))
-      .toContain('a document service needs hover, diagnostics, or both')
-    expect(messages(manifest({ documentServices: [service({ hover: { route: '/v1/p/board/hover' } }),
-      service({ languageId: 'yaml', hover: { route: '/v1/p/board/hover' } })] })))
-      .toContain("duplicate contribution id 'json-check'")
+  it("refuses another plugin's route, an unknown language, no service, and a duplicate id", () => {
+    expect(messages(manifest({ documentServices: [service({ hover: { route: '/v1/p/other/hover' } })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(
+      manifest({ documentServices: [service({ languageId: 'cobol', hover: { route: '/v1/p/board/hover' } })] }).success,
+    ).toBe(false)
+    expect(messages(manifest({ documentServices: [service({})] }))).toContain(
+      'a document service needs hover, diagnostics, or both',
+    )
+    expect(
+      messages(
+        manifest({
+          documentServices: [
+            service({ hover: { route: '/v1/p/board/hover' } }),
+            service({ languageId: 'yaml', hover: { route: '/v1/p/board/hover' } }),
+          ],
+        }),
+      ),
+    ).toContain("duplicate contribution id 'json-check'")
   })
 })
 
@@ -531,14 +887,19 @@ describe('surface actions', () => {
       frame: 'frame',
     },
   }
-  const execute = (surface: string) => ({ id: 'execute', kind: 'action', title: 'Run', action: { verb: 'surfaceAction', surface } })
+  const execute = (surface: string) => ({
+    id: 'execute',
+    kind: 'action',
+    title: 'Run',
+    action: { verb: 'surfaceAction', surface },
+  })
 
   it('accepts a command aimed at a composed pane this manifest declares', () => {
     expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
   })
 
-  // A document beside the region is NOT required, although the verb was born in a pane that has one.
-  // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
+  // A document beside the region is NOT required. The palette is another way in, and from there "do
+  // this in the thing I am looking at" is a sentence
   // about any pane the plugin draws — http's `list-detail` request panel as much as database's
   // editor-over-panel (docs/http-client/client.md § From the command palette).
   it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
@@ -551,34 +912,56 @@ describe('surface actions', () => {
     expect(manifest({ frames: [trees], commands: [execute('board')] }).success).toBe(true)
   })
 
-  it('refuses a pane with nothing of the plugin\'s own to receive it', () => {
+  it("refuses a pane with nothing of the plugin's own to receive it", () => {
     // Every region host-drawn: the pane runs none of this plugin's code, so a command aimed at it would
     // parse and then post into nothing.
     const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v1/p/board/doc' } } }
-    expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane drawing a region of its own")
+    expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] }))).toContain(
+      "surfaceAction names 'board', which this manifest does not declare as a pane drawing a region of its own",
+    )
   })
 
-  it('refuses another plugin\'s surface, which is to say any it did not declare', () => {
-    expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] })))
-      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane drawing a region of its own")
+  it("refuses another plugin's surface, which is to say any it did not declare", () => {
+    expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] }))).toContain(
+      "surfaceAction names 'someone-elses', which this manifest does not declare as a pane drawing a region of its own",
+    )
   })
 })
 
 describe('migration entrypoint confinement', () => {
   it('accepts a relative migrations directory and rejects escapes', () => {
-    expect(pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', migrations: './migrations',
-    }).success).toBe(true)
-    expect(pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', migrations: '../other/migrations',
-    }).success).toBe(false)
+    expect(
+      pluginManifestSchema.safeParse({
+        id: 'board',
+        name: 'Board',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: '1',
+        migrations: './migrations',
+      }).success,
+    ).toBe(true)
+    expect(
+      pluginManifestSchema.safeParse({
+        id: 'board',
+        name: 'Board',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: '1',
+        migrations: '../other/migrations',
+      }).success,
+    ).toBe(false)
   })
 })
 
 describe('rail visibility', () => {
   const SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v1/p/board/items', showInRailByDefault: false }
-  const SETTINGS = { target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }
+  const SETTINGS = {
+    target: 'settings',
+    id: 'board-settings',
+    label: 'Board',
+    layout: 'single',
+    regions: { body: 'frame' },
+  }
 
   it('accepts a hidden-by-default source and a settings page that carries its switch', () => {
     const result = manifest({ sources: [SOURCE], frames: [{ ...SETTINGS, railSourceVisibility: ['board'] }] })
@@ -594,8 +977,9 @@ describe('rail visibility', () => {
   })
 
   it('refuses the field anywhere but a settings page', () => {
-    expect(messages(manifest({ sources: [SOURCE], frames: [{ ...PANE, railSourceVisibility: ['board'] }] })))
-      .toContain('railSourceVisibility is only valid on a settings surface')
+    expect(messages(manifest({ sources: [SOURCE], frames: [{ ...PANE, railSourceVisibility: ['board'] }] }))).toContain(
+      'railSourceVisibility is only valid on a settings surface',
+    )
   })
 })
 
@@ -604,8 +988,9 @@ describe('chrome descriptors', () => {
     const source = { id: 'board', label: 'Board', order: 60, tree: { list: 'boardList', detail: 'boardDetail' } }
     expect(webviewManifest({ sources: [source] }).success).toBe(true)
     expect(messages(manifest({ sources: [source] }))).toContain('a remote-tree source requires a client bundle')
-    expect(messages(webviewManifest({ sources: [{ ...source, items: '/v1/p/board/items' }] })))
-      .toContain('a source needs either an items route or a remote tree')
+    expect(messages(webviewManifest({ sources: [{ ...source, items: '/v1/p/board/items' }] }))).toContain(
+      'a source needs either an items route or a remote tree',
+    )
     expect(messages(webviewManifest({ sources: [{ ...source, tree: { list: 'boardList' } }] }))).not.toEqual([])
   })
 
@@ -613,7 +998,14 @@ describe('chrome descriptors', () => {
     const result = manifest({
       sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
       slots: [{ id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge' }],
-      commands: [{ id: 'board.new', kind: 'action', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v1/p/board/new' } }],
+      commands: [
+        {
+          id: 'board.new',
+          kind: 'action',
+          title: 'Board: new card',
+          action: { verb: 'runNodeAction', path: '/v1/p/board/new' },
+        },
+      ],
       attention: [{ id: 'board-stuck', items: '/v1/p/board/attention' }],
       nodeStats: [{ id: 'board-count', label: ['card stuck', 'cards stuck'], data: '/v1/p/board/stat' }],
     })
@@ -639,62 +1031,94 @@ describe('chrome descriptors', () => {
   })
 
   it('confines every route to the plugin’s own namespace', () => {
-    expect(messages(manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v1/core/tasks' }] })))
-      .toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v1/core/tasks' }] }))).toEqual([
+      'route must be inside /v1/p/board/',
+    ])
     // Another plugin's namespace is the interesting case: it looks legal and is the whole point of the
     // check.
-    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/github/attention' }] })))
-      .toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/github/attention' }] }))).toEqual([
+      'route must be inside /v1/p/board/',
+    ])
     // A prefix match is not a namespace match.
-    expect(messages(manifest({ nodeStats: [{ id: 'n', label: ['x', 'y'], data: '/v1/p/board-other/stat' }] })))
-      .toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/board/../other/items' }] })))
-      .toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(manifest({ nodeStats: [{ id: 'n', label: ['x', 'y'], data: '/v1/p/board-other/stat' }] }))).toEqual(
+      ['route must be inside /v1/p/board/'],
+    )
+    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/board/../other/items' }] }))).toEqual([
+      'route must be inside /v1/p/board/',
+    ])
     // `runNodeAction` carries a route too, and it is checked wherever an action can appear.
-    expect(messages(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } }] })))
-      .toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        manifest({
+          commands: [
+            { id: 'p', kind: 'action', title: 'P', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } },
+          ],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('rejects an openPane naming a pane the manifest does not declare', () => {
-    const bad = manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'diff' } }] })
+    const bad = manifest({
+      sources: [
+        { id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'diff' } },
+      ],
+    })
     expect(messages(bad)).toEqual([`openPane names 'diff', which this manifest does not declare as a task-scoped pane`])
 
     const good = manifest({
       frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'board' } }],
+      sources: [
+        { id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'board' } },
+      ],
     })
     expect(good.success).toBe(true)
   })
 
   it('rejects a settings surface being used as an openPane target', () => {
     const bad = manifest({
-      frames: [{ target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }],
+      frames: [
+        { target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } },
+      ],
       commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openPane', pane: 'board-settings' } }],
     })
     expect(bad.success).toBe(false)
   })
 
   it('rejects a non-https openUrl', () => {
-    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'https://example.com/x' } }] }).success).toBe(true)
-    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'http://example.com/x' } }] }).success).toBe(false)
+    expect(
+      manifest({
+        commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'https://example.com/x' } }],
+      }).success,
+    ).toBe(true)
+    expect(
+      manifest({
+        commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'http://example.com/x' } }],
+      }).success,
+    ).toBe(false)
   })
 
   it('rejects an unknown slot and an unknown verb', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'statusbar', data: '/v1/p/board/badge' }] }).success).toBe(false)
     // `invoke` is a v1 non-verb, since it needs a frame lifecycle the shell does not have. Failing here is
     // the point: an author is told, rather than shipping a palette row that silently does nothing.
-    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] }).success).toBe(false)
+    expect(
+      manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] })
+        .success,
+    ).toBe(false)
   })
 
   it('accepts the host-owned createTask verb without embedding executable steps', () => {
     const result = manifest({
-      sources: [{
-        id: 'board',
-        label: 'Board',
-        order: 60,
-        items: '/v1/p/board/rail-items',
-        onSelect: { verb: 'createTask' },
-      }],
+      sources: [
+        {
+          id: 'board',
+          label: 'Board',
+          order: 60,
+          items: '/v1/p/board/rail-items',
+          onSelect: { verb: 'createTask' },
+        },
+      ],
     })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.sources[0]?.onSelect).toEqual({ verb: 'createTask' })
@@ -707,63 +1131,95 @@ describe('chrome descriptors', () => {
 
   it('carries an agent-context pair and confines both of its routes', () => {
     const good = manifest({
-      agentContexts: [{
-        id: 'saved-requests',
-        label: 'Saved HTTP requests',
-        description: 'Request shapes with credential-bearing fields redacted.',
-        options: '/v1/p/board/context-options',
-        capture: '/v1/p/board/context-capture',
-      }],
+      agentContexts: [
+        {
+          id: 'saved-requests',
+          label: 'Saved HTTP requests',
+          description: 'Request shapes with credential-bearing fields redacted.',
+          options: '/v1/p/board/context-options',
+          capture: '/v1/p/board/context-capture',
+        },
+      ],
     })
     expect(good.success).toBe(true)
     expect(good.success && good.data.contributions.agentContexts[0]?.capture).toBe('/v1/p/board/context-capture')
 
     // A core route is the obvious escape; another plugin's namespace is the one that looks legal.
-    expect(messages(manifest({
-      agentContexts: [{ id: 'c', label: 'C', options: '/v1/core/tasks', capture: '/v1/p/board/capture' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(manifest({
-      agentContexts: [{ id: 'c', label: 'C', options: '/v1/p/board/options', capture: '/v1/p/http/context-capture' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        manifest({
+          agentContexts: [{ id: 'c', label: 'C', options: '/v1/core/tasks', capture: '/v1/p/board/capture' }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        manifest({
+          agentContexts: [
+            { id: 'c', label: 'C', options: '/v1/p/board/options', capture: '/v1/p/http/context-capture' },
+          ],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('rejects an agent-context id already taken by another contribution kind', () => {
-    expect(messages(manifest({
-      frames: [PANE],
-      agentContexts: [{ id: 'board', label: 'Board context', options: '/v1/p/board/options', capture: '/v1/p/board/capture' }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          agentContexts: [
+            { id: 'board', label: 'Board context', options: '/v1/p/board/options', capture: '/v1/p/board/capture' },
+          ],
+        }),
+      ),
+    ).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('carries a source’s reserved panel region, and refuses one that also navigates', () => {
-    const source = (over: Record<string, unknown>) => manifest({
-      frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', ...over }],
-    })
+    const source = (over: Record<string, unknown>) =>
+      manifest({
+        frames: [PANE],
+        sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', ...over }],
+      })
 
     const parsed = source({ panels: { fieldRole: 'status', views: ['list', 'board'], max: 6 } })
-    expect(parsed.success && parsed.data.contributions.sources[0]!.panels)
-      .toEqual({ fieldRole: 'status', views: ['list', 'board'], max: 6 })
+    expect(parsed.success && parsed.data.contributions.sources[0]!.panels).toEqual({
+      fieldRole: 'status',
+      views: ['list', 'board'],
+      max: 6,
+    })
 
     // A source panel has one rectangle beside its rail list, and the detail half of a master/detail browse
     // already claims it. Declaring both would parse and then draw one of them.
-    expect(messages(manifest({
-      frames: [PROJECT_PANE],
-      routes: [PROJECT_ROUTE],
-      sources: [{ ...PROJECT_SOURCE, panels: {} }],
-    }))).toContain('a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          routes: [PROJECT_ROUTE],
+          sources: [{ ...PROJECT_SOURCE, panels: {} }],
+        }),
+      ),
+    ).toContain(
+      'a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list',
+    )
 
     // An `openPane` source is unaffected: it opens a pane in a task and leaves this rectangle alone.
     expect(source({ panels: {}, onSelect: { verb: 'openPane', pane: 'board' } }).success).toBe(true)
   })
 
   it('carries a source empty state, bounds its message and narrows its action', () => {
-    const source = (emptyState: unknown) => manifest({
-      frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', emptyState }],
-    })
+    const source = (emptyState: unknown) =>
+      manifest({
+        frames: [PANE],
+        sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', emptyState }],
+      })
 
     expect(source({ message: 'No linked projects yet.' }).success).toBe(true)
-    expect(source({ message: 'Nothing to show.', action: { verb: 'openPane', pane: 'board' }, actionLabel: 'Open board' }).success).toBe(true)
+    expect(
+      source({ message: 'Nothing to show.', action: { verb: 'openPane', pane: 'board' }, actionLabel: 'Open board' })
+        .success,
+    ).toBe(true)
 
     // The two verbs an empty rail cannot carry, and the reason is the rail being empty: `createTask`
     // promotes a selected row and `navigate` substitutes a routed project into a surface path, and a state
@@ -771,12 +1227,14 @@ describe('chrome descriptors', () => {
     expect(source({ message: 'x', action: { verb: 'createTask' } }).success).toBe(false)
     expect(source({ message: 'x', action: { verb: 'navigate', surface: 'board' } }).success).toBe(false)
     // The same route confinement every action gets, and the same url policy.
-    expect(messages(source({ message: 'x', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } })))
-      .toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(source({ message: 'x', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } }))).toEqual([
+      'route must be inside /v1/p/board/',
+    ])
     expect(source({ message: 'x', action: { verb: 'openUrl', url: 'http://example.com' } }).success).toBe(false)
     // An action naming a pane this manifest never declared, which would render a button opening nothing.
-    expect(messages(source({ message: 'x', action: { verb: 'openPane', pane: 'ghost' } })))
-      .toEqual([`openPane names 'ghost', which this manifest does not declare as a task-scoped pane`])
+    expect(messages(source({ message: 'x', action: { verb: 'openPane', pane: 'ghost' } }))).toEqual([
+      `openPane names 'ghost', which this manifest does not declare as a task-scoped pane`,
+    ])
 
     // Bounded, because it renders in the rail: a source cannot put an essay where a list goes.
     expect(source({ message: '' }).success).toBe(false)
@@ -793,12 +1251,20 @@ describe('chrome descriptors', () => {
     // The escape that matters here is naming another plugin's resolver: the host POSTs identifiers to
     // whatever this says and stamps the answer with the declaring plugin's provider, so an unconfined
     // route is how a plugin would publish someone else's items under its own name.
-    expect(messages(manifest({
-      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/p/linear/issues' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(manifest({
-      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/core/integrations' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        manifest({
+          refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/p/linear/issues' }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        manifest({
+          refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/core/integrations' }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('caps ref resolvers at four and refuses an id another contribution kind already took', () => {
@@ -806,15 +1272,23 @@ describe('chrome descriptors', () => {
     expect(manifest({ refResolvers: five }).success).toBe(false)
     expect(manifest({ refResolvers: five.slice(0, 4) }).success).toBe(true)
 
-    expect(messages(manifest({
-      frames: [PANE],
-      refResolvers: [{ id: 'board', kind: 'board.card', resolve: '/v1/p/board/refs' }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          refResolvers: [{ id: 'board', kind: 'board.card', resolve: '/v1/p/board/refs' }],
+        }),
+      ),
+    ).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('refuses the removed collection format with a migration path', () => {
     const result = parsePluginManifest({
-      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
       contributions: { collections: [{ id: 'old', items: '/v1/p/board/old' }] },
     })
     expect(result.ok).toBe(false)
@@ -823,46 +1297,86 @@ describe('chrome descriptors', () => {
 
   it('carries a schedule, confines its run route and insists there is a node half to serve it', () => {
     const good = nodeManifest({
-      schedules: [{ id: 'refresh', name: 'Refresh the mirror', run: '/v1/p/board/schedules/refresh', cadence: { every: 600 }, timeout: 120 }],
+      schedules: [
+        {
+          id: 'refresh',
+          name: 'Refresh the mirror',
+          run: '/v1/p/board/schedules/refresh',
+          cadence: { every: 600 },
+          timeout: 120,
+        },
+      ],
     })
     expect(good.success && good.data.contributions.schedules[0]?.cadence).toEqual({ every: 600 })
 
     // The whole grammar, reused rather than re-declared: a schedule says when in the same three forms
     // core's own do.
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { daily: '03:30' } }] }).success).toBe(true)
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }] }).success).toBe(true)
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { cron: '* * * * *' } }] }).success).toBe(false)
+    expect(
+      nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { daily: '03:30' } }] }).success,
+    ).toBe(true)
+    expect(
+      nodeManifest({
+        schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }],
+      }).success,
+    ).toBe(true)
+    expect(
+      nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { cron: '* * * * *' } }] })
+        .success,
+    ).toBe(false)
 
     // Confinement is what stops a schedule being a way to make the node POST to core's routes, or to
     // another plugin's, unattended and on a timer.
-    expect(messages(nodeManifest({
-      schedules: [{ id: 's', name: 'S', run: '/v1/p/linear/sync', cadence: { every: 600 } }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(nodeManifest({
-      schedules: [{ id: 's', name: 'S', run: '/v1/core/tasks', cadence: { every: 600 } }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          schedules: [{ id: 's', name: 'S', run: '/v1/p/linear/sync', cadence: { every: 600 } }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          schedules: [{ id: 's', name: 'S', run: '/v1/core/tasks', cadence: { every: 600 } }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
 
     // Only a node half serves that namespace, so a client-only package declaring one would fire forever
     // against a 404.
-    expect(messages(manifest({
-      schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
-    }))).toEqual(['a schedule runs a node route; declare `node` in the manifest'])
+    expect(
+      messages(
+        manifest({
+          schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
+        }),
+      ),
+    ).toEqual(['a schedule runs a node route; declare `node` in the manifest'])
   })
 
   it('caps schedules at four and refuses an id another contribution kind already took', () => {
-    const five = Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }))
+    const five = Array.from({ length: 5 }, (_, i) => ({
+      id: `s${i}`,
+      name: 'S',
+      run: '/v1/p/board/s',
+      cadence: { every: 600 },
+    }))
     expect(nodeManifest({ schedules: five }).success).toBe(false)
     expect(nodeManifest({ schedules: five.slice(0, 4) }).success).toBe(true)
 
-    expect(messages(nodeManifest({
-      frames: [PANE],
-      schedules: [{ id: 'board', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(
+      messages(
+        nodeManifest({
+          frames: [PANE],
+          schedules: [{ id: 'board', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
+        }),
+      ),
+    ).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('carries a task check, confines both its routes and insists there is a node half to serve them', () => {
     const good = nodeManifest({
-      taskChecks: [{ id: 'containers', check: '/v1/p/board/archive/check', apply: '/v1/p/board/archive/apply', timeout: 3 }],
+      taskChecks: [
+        { id: 'containers', check: '/v1/p/board/archive/check', apply: '/v1/p/board/archive/apply', timeout: 3 },
+      ],
     })
     expect(good.success && good.data.contributions.taskChecks[0]?.apply).toBe('/v1/p/board/archive/apply')
 
@@ -871,17 +1385,29 @@ describe('chrome descriptors', () => {
 
     // Both halves are confined, and neither may be another plugin's or core's: a check is a route the host
     // calls, so an unconfined one would be a way to make the node read anything on archive.
-    expect(messages(nodeManifest({
-      taskChecks: [{ id: 'c', check: '/v1/p/linear/c' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
-    expect(messages(nodeManifest({
-      taskChecks: [{ id: 'c', check: '/v1/p/board/c', apply: '/v1/core/tasks' }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          taskChecks: [{ id: 'c', check: '/v1/p/linear/c' }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          taskChecks: [{ id: 'c', check: '/v1/p/board/c', apply: '/v1/core/tasks' }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
 
     // Same rule a schedule gets, for the same reason: only a node half serves that namespace.
-    expect(messages(manifest({
-      taskChecks: [{ id: 'c', check: '/v1/p/board/c' }],
-    }))).toEqual(['a task check calls a node route; declare `node` in the manifest'])
+    expect(
+      messages(
+        manifest({
+          taskChecks: [{ id: 'c', check: '/v1/p/board/c' }],
+        }),
+      ),
+    ).toEqual(['a task check calls a node route; declare `node` in the manifest'])
   })
 
   it('caps task checks at four and refuses an id another contribution kind already took', () => {
@@ -889,24 +1415,30 @@ describe('chrome descriptors', () => {
     expect(nodeManifest({ taskChecks: five }).success).toBe(false)
     expect(nodeManifest({ taskChecks: five.slice(0, 4) }).success).toBe(true)
 
-    expect(messages(nodeManifest({
-      frames: [PANE],
-      taskChecks: [{ id: 'board', check: '/v1/p/board/c' }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(
+      messages(
+        nodeManifest({
+          frames: [PANE],
+          taskChecks: [{ id: 'board', check: '/v1/p/board/c' }],
+        }),
+      ),
+    ).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('accepts a data-only harness and insists a spawn names exactly one thing to run', () => {
     // The whole opencode plugin from docs/plugin-authoring/harnesses.md § Harnesses, minus the icon: no node half,
     // no client half, no build step. If this stops parsing, that document is wrong.
     const opencode = manifest({
-      harnesses: [{
-        id: 'opencode',
-        label: 'OpenCode',
-        spawn: { command: 'opencode', args: ['acp'] },
-        envPassthrough: ['OPENCODE_*'],
-        quirks: { manualCompaction: true },
-        terminal: { command: 'opencode' },
-      }],
+      harnesses: [
+        {
+          id: 'opencode',
+          label: 'OpenCode',
+          spawn: { command: 'opencode', args: ['acp'] },
+          envPassthrough: ['OPENCODE_*'],
+          quirks: { manualCompaction: true },
+          terminal: { command: 'opencode' },
+        },
+      ],
     })
     expect(opencode.success).toBe(true)
     expect(opencode.success && opencode.data.contributions.harnesses[0]).toMatchObject({
@@ -916,47 +1448,70 @@ describe('chrome descriptors', () => {
     })
 
     // Neither, or both, describes nothing acorn can start.
-    expect(messages(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { args: ['acp'] } }] })))
-      .toEqual(['a harness must declare exactly one of command or entry'])
-    expect(messages(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', entry: './dist/adapter.js' } }],
-    }))).toEqual(['a harness must declare exactly one of command or entry'])
+    expect(messages(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { args: ['acp'] } }] }))).toEqual([
+      'a harness must declare exactly one of command or entry',
+    ])
+    expect(
+      messages(
+        manifest({
+          harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', entry: './dist/adapter.js' } }],
+        }),
+      ),
+    ).toEqual(['a harness must declare exactly one of command or entry'])
   })
 
   it('confines an adapter entry to the package and ties `requires` to it', () => {
-    expect(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { entry: './dist/adapter.js', requires: { command: 'h', env: 'H_BIN' } } }],
-    }).success).toBe(true)
+    expect(
+      manifest({
+        harnesses: [
+          { id: 'h', label: 'H', spawn: { entry: './dist/adapter.js', requires: { command: 'h', env: 'H_BIN' } } },
+        ],
+      }).success,
+    ).toBe(true)
 
     // The same confinement every code entrypoint gets: a harness entry is a path acorn will run.
-    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { entry: '../../../etc/passwd' } }] }).success).toBe(false)
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { entry: '../../../etc/passwd' } }] }).success).toBe(
+      false,
+    )
     expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { entry: '/usr/bin/node' } }] }).success).toBe(false)
 
     // `requires` says which CLI an adapter drives, so it means nothing beside a bare command.
-    expect(messages(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', requires: { command: 'x', env: 'X_BIN' } } }],
-    }))).toEqual(['requires names the CLI an adapter drives, so it is only valid with entry'])
+    expect(
+      messages(
+        manifest({
+          harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', requires: { command: 'x', env: 'X_BIN' } } }],
+        }),
+      ),
+    ).toEqual(['requires names the CLI an adapter drives, so it is only valid with entry'])
   })
 
   it('refuses an env passthrough that would copy the whole node environment', () => {
-    expect(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H_TOKEN_DIR', 'H_*'] }],
-    }).success).toBe(true)
+    expect(
+      manifest({
+        harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H_TOKEN_DIR', 'H_*'] }],
+      }).success,
+    ).toBe(true)
     // A bare `*` is the one glob that defeats the allowlist outright, refused here as well as in brokerEnv.
-    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['*'] }] }).success).toBe(false)
-    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H-DASH'] }] }).success).toBe(false)
+    expect(
+      manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['*'] }] }).success,
+    ).toBe(false)
+    expect(
+      manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H-DASH'] }] }).success,
+    ).toBe(false)
   })
 
   // A harness may chat, answer one prompt, or both, and the two blocks are independent. What stays
   // fixed is that it runs one binary, because "is this installed" is one lookup on PATH.
   it('accepts a one-shot harness with no interactive mode, and holds it to one command', () => {
     const deepseek = manifest({
-      harnesses: [{
-        id: 'deepseek',
-        label: 'DeepSeek',
-        spawn: { command: 'dsh', args: ['--profile', 'acp'] },
-        oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
-      }],
+      harnesses: [
+        {
+          id: 'deepseek',
+          label: 'DeepSeek',
+          spawn: { command: 'dsh', args: ['--profile', 'acp'] },
+          oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+        },
+      ],
     })
     expect(deepseek.success).toBe(true)
     expect(deepseek.success && deepseek.data.contributions.harnesses[0]).toMatchObject({
@@ -965,46 +1520,77 @@ describe('chrome descriptors', () => {
     expect(deepseek.success && deepseek.data.contributions.harnesses[0].terminal).toBeUndefined()
 
     // Borrowing the interactive command is the common case, and needs no command of its own.
-    expect(manifest({
-      harnesses: [{
-        id: 'h',
-        label: 'H',
-        spawn: { command: 'opencode', args: ['acp'] },
-        terminal: { command: 'opencode' },
-        oneShot: { args: ['run'], output: 'text' },
-      }],
-    }).success).toBe(true)
+    expect(
+      manifest({
+        harnesses: [
+          {
+            id: 'h',
+            label: 'H',
+            spawn: { command: 'opencode', args: ['acp'] },
+            terminal: { command: 'opencode' },
+            oneShot: { args: ['run'], output: 'text' },
+          },
+        ],
+      }).success,
+    ).toBe(true)
 
     // Nothing to run at all.
-    expect(messages(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, oneShot: { args: ['run'], output: 'text' } }],
-    }))).toEqual(['a one-shot turn needs a command, either its own or the one terminal declares'])
+    expect(
+      messages(
+        manifest({
+          harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, oneShot: { args: ['run'], output: 'text' } }],
+        }),
+      ),
+    ).toEqual(['a one-shot turn needs a command, either its own or the one terminal declares'])
 
     // Two binaries, which would give the availability check two answers.
-    expect(messages(manifest({
-      harnesses: [{
-        id: 'h',
-        label: 'H',
-        spawn: { command: 'h' },
-        terminal: { command: 'h' },
-        oneShot: { command: 'h-gen', args: ['run'], output: 'text' },
-      }],
-    }))).toEqual(['a harness runs one command; oneShot borrows the one terminal declares'])
+    expect(
+      messages(
+        manifest({
+          harnesses: [
+            {
+              id: 'h',
+              label: 'H',
+              spawn: { command: 'h' },
+              terminal: { command: 'h' },
+              oneShot: { command: 'h-gen', args: ['run'], output: 'text' },
+            },
+          ],
+        }),
+      ),
+    ).toEqual(['a harness runs one command; oneShot borrows the one terminal declares'])
   })
 
   it('confines harness probe routes and insists there is a node half to serve them', () => {
-    expect(nodeManifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/board/h/usage', auth: '/v1/p/board/h/auth' } }],
-    }).success).toBe(true)
+    expect(
+      nodeManifest({
+        harnesses: [
+          {
+            id: 'h',
+            label: 'H',
+            spawn: { command: 'h' },
+            probes: { usage: '/v1/p/board/h/usage', auth: '/v1/p/board/h/auth' },
+          },
+        ],
+      }).success,
+    ).toBe(true)
 
-    expect(messages(nodeManifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/linear/usage' } }],
-    }))).toEqual(['route must be inside /v1/p/board/'])
+    expect(
+      messages(
+        nodeManifest({
+          harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/linear/usage' } }],
+        }),
+      ),
+    ).toEqual(['route must be inside /v1/p/board/'])
 
     // Verbatim the schedule and task-check rule: only a node half serves that namespace.
-    expect(messages(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/board/h/usage' } }],
-    }))).toEqual(['a harness probe calls a node route; declare `node` in the manifest'])
+    expect(
+      messages(
+        manifest({
+          harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/board/h/usage' } }],
+        }),
+      ),
+    ).toEqual(['a harness probe calls a node route; declare `node` in the manifest'])
 
     // And a harness with no probes needs no node half at all, which is the whole point of the tier.
     expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' } }] }).success).toBe(true)
@@ -1015,68 +1601,131 @@ describe('chrome descriptors', () => {
     expect(manifest({ harnesses: five }).success).toBe(false)
     expect(manifest({ harnesses: five.slice(0, 4) }).success).toBe(true)
 
-    expect(messages(manifest({
-      frames: [PANE],
-      harnesses: [{ id: 'board', label: 'H', spawn: { command: 'h' } }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          harnesses: [{ id: 'board', label: 'H', spawn: { command: 'h' } }],
+        }),
+      ),
+    ).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
-    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 30 }] }).success).toBe(true)
-    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 5 }] }).success).toBe(false)
+    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 30 }] }).success).toBe(
+      true,
+    )
+    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 5 }] }).success).toBe(
+      false,
+    )
   })
 
   it('validates declarative content links against their declared pane and capture', () => {
     const good = manifest({
       frames: [PANE],
-      contentLinks: [{
-        id: 'board.card',
-        match: 'https://*.board.example/cards/{key}',
-        openPane: 'board',
-        item: 'key',
-      }],
+      contentLinks: [
+        {
+          id: 'board.card',
+          match: 'https://*.board.example/cards/{key}',
+          openPane: 'board',
+          item: 'key',
+        },
+      ],
     })
     expect(good.success).toBe(true)
 
-    expect(messages(manifest({
-      contentLinks: [{
-        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'missing', item: 'key',
-      }],
-    }))).toContain(`content link names 'missing', which this manifest does not declare as a task-scoped pane`)
+    expect(
+      messages(
+        manifest({
+          contentLinks: [
+            {
+              id: 'board.card',
+              match: 'https://board.example/cards/{key}',
+              openPane: 'missing',
+              item: 'key',
+            },
+          ],
+        }),
+      ),
+    ).toContain(`content link names 'missing', which this manifest does not declare as a task-scoped pane`)
 
-    expect(messages(manifest({
-      frames: [PANE],
-      contentLinks: [{
-        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'id',
-      }],
-    }))).toContain(`content link item 'id' is not captured by its match pattern`)
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          contentLinks: [
+            {
+              id: 'board.card',
+              match: 'https://board.example/cards/{key}',
+              openPane: 'board',
+              item: 'id',
+            },
+          ],
+        }),
+      ),
+    ).toContain(`content link item 'id' is not captured by its match pattern`)
   })
 
   it('accepts a content link whose only destination is this plugin reference panel', () => {
     // `openPane` is optional because a plugin can have items worth glancing at and no task pane at all.
     // The panel is addressed by provider, and a refPanel's provider is already the plugin id, so declaring
     // one is the whole declaration.
-    expect(manifest({
-      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board', layout: 'single', regions: { body: 'frame' } }],
-      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
-    }).success).toBe(true)
+    expect(
+      manifest({
+        frames: [
+          {
+            target: 'refPanel',
+            id: 'board-ref',
+            label: 'Card',
+            providerId: 'board',
+            layout: 'single',
+            regions: { body: 'frame' },
+          },
+        ],
+        contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+      }).success,
+    ).toBe(true)
   })
 
   it('rejects a content link with no destination at all', () => {
     // The rule the project-scoped pane checks already state, in the other direction: a contribution that
     // parses and can never do anything is worse than a parse error, because it looks installed.
-    expect(messages(manifest({
-      frames: [PANE],
-      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
-    }))).toContain(`content link 'board.card' has nowhere to open: declare openPane, or a refPanel surface for this plugin's items`)
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+        }),
+      ),
+    ).toContain(
+      `content link 'board.card' has nowhere to open: declare openPane, or a refPanel surface for this plugin's items`,
+    )
   })
 })
 
 // A project-scoped pane plus the route that addresses it and the source that mounts it. Written out once
 // because every case below is a mutation of exactly one of the three.
-const PROJECT_PANE = { target: 'pane', id: 'board-card', label: 'Card', scope: 'project', layout: 'single', regions: { body: 'frame' } }
-const PROJECT_ROUTE = { id: 'board.card-route', path: '/p/:projectId/x/board/cards/:key', surface: 'board-card', item: 'key' }
-const PROJECT_SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v1/p/board/rail-items', onSelect: { verb: 'navigate', surface: 'board-card' } }
+const PROJECT_PANE = {
+  target: 'pane',
+  id: 'board-card',
+  label: 'Card',
+  scope: 'project',
+  layout: 'single',
+  regions: { body: 'frame' },
+}
+const PROJECT_ROUTE = {
+  id: 'board.card-route',
+  path: '/p/:projectId/x/board/cards/:key',
+  surface: 'board-card',
+  item: 'key',
+}
+const PROJECT_SOURCE = {
+  id: 'board',
+  label: 'Board',
+  order: 60,
+  items: '/v1/p/board/rail-items',
+  onSelect: { verb: 'navigate', surface: 'board-card' },
+}
 
 describe('project-scoped surfaces and their routes', () => {
   it('carries a project-scoped pane addressed by a host-prefixed route', () => {
@@ -1090,118 +1739,233 @@ describe('project-scoped surfaces and their routes', () => {
   it('confines a route to the prefix the host mints from the plugin id', () => {
     // Core's own project URL is the whole hazard: a manifest that could claim it would take over project
     // navigation for the entire shell.
-    const core = manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/cards/:key' }] })
+    const core = manifest({
+      frames: [PROJECT_PANE],
+      sources: [PROJECT_SOURCE],
+      routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/cards/:key' }],
+    })
     expect(messages(core)).toContain('route must be inside /p/:projectId/x/board/')
     // Another plugin's prefix looks legal, which is why it is checked rather than assumed.
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/github/cards/:key' }] })))
-      .toContain('route must be inside /p/:projectId/x/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/github/cards/:key' }],
+        }),
+      ),
+    ).toContain('route must be inside /p/:projectId/x/board/')
     // A prefix match is not a namespace match, and dot segments are normalised before the check so an
     // apparently owned path cannot escape afterwards.
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board-other/cards/:key' }] })))
-      .toContain('route must be inside /p/:projectId/x/board/')
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board/../../settings' }] })))
-      .toContain('route must be inside /p/:projectId/x/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board-other/cards/:key' }],
+        }),
+      ),
+    ).toContain('route must be inside /p/:projectId/x/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board/../../settings' }],
+        }),
+      ),
+    ).toContain('route must be inside /p/:projectId/x/board/')
     // Not a path at all, and a path leaving the origin both report the same confinement failure.
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: 'cards/:key' }] })))
-      .toContain('route must be inside /p/:projectId/x/board/')
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '//evil.example/p/:projectId/x/board/cards/:key' }] })))
-      .toContain('route must be inside /p/:projectId/x/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, path: 'cards/:key' }],
+        }),
+      ),
+    ).toContain('route must be inside /p/:projectId/x/board/')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, path: '//evil.example/p/:projectId/x/board/cards/:key' }],
+        }),
+      ),
+    ).toContain('route must be inside /p/:projectId/x/board/')
   })
 
   it('rejects a route naming a surface this manifest does not declare as project-scoped', () => {
-    expect(messages(manifest({ routes: [PROJECT_ROUTE] })))
-      .toContain(`route names 'board-card', which this manifest does not declare as a project-scoped pane`)
+    expect(messages(manifest({ routes: [PROJECT_ROUTE] }))).toContain(
+      `route names 'board-card', which this manifest does not declare as a project-scoped pane`,
+    )
     // A task pane is not addressable this way either: its selection lives in the task's layout, and the
     // surface it would mount into does not exist outside one.
-    expect(messages(manifest({
-      frames: [PANE],
-      routes: [{ ...PROJECT_ROUTE, surface: 'board' }],
-    }))).toContain(`route names 'board', which this manifest does not declare as a project-scoped pane`)
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          routes: [{ ...PROJECT_ROUTE, surface: 'board' }],
+        }),
+      ),
+    ).toContain(`route names 'board', which this manifest does not declare as a project-scoped pane`)
   })
 
   it('requires the addressed item to be a parameter of the path, and never projectId', () => {
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'identifier' }] })))
-      .toContain(`route item 'identifier' must be a :param of its path other than projectId`)
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, item: 'identifier' }],
+        }),
+      ),
+    ).toContain(`route item 'identifier' must be a :param of its path other than projectId`)
     // `projectId` is a parameter of every such path, and it is the host's, bound before a plugin sees it.
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'projectId' }] })))
-      .toContain(`route item 'projectId' must be a :param of its path other than projectId`)
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, item: 'projectId' }],
+        }),
+      ),
+    ).toContain(`route item 'projectId' must be a :param of its path other than projectId`)
   })
 
   it('refuses a project-scoped surface with no address and no mount site', () => {
-    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE] })))
-      .toContain(`project-scoped pane 'board-card' needs a routes entry; it has no other address`)
-    expect(messages(manifest({ frames: [PROJECT_PANE], routes: [PROJECT_ROUTE] })))
-      .toContain(`project-scoped pane 'board-card' needs a source whose onSelect navigates to it; it has nowhere else to mount`)
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE] }))).toContain(
+      `project-scoped pane 'board-card' needs a routes entry; it has no other address`,
+    )
+    expect(messages(manifest({ frames: [PROJECT_PANE], routes: [PROJECT_ROUTE] }))).toContain(
+      `project-scoped pane 'board-card' needs a source whose onSelect navigates to it; it has nowhere else to mount`,
+    )
   })
 
   it('keeps openPane and navigate on disjoint sets of surfaces', () => {
-    // The refusal the whole change is about: `openPane` on a project-scoped surface would toast "open a
+    // The refusal that matters most: `openPane` on a project-scoped surface would toast "open a
     // task first" forever, so the manifest says no instead of the runtime saying nothing useful.
-    expect(messages(manifest({
-      frames: [PROJECT_PANE],
-      routes: [PROJECT_ROUTE],
-      sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'openPane', pane: 'board-card' } }],
-    }))).toContain(`openPane names 'board-card', which this manifest does not declare as a task-scoped pane`)
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          routes: [PROJECT_ROUTE],
+          sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'openPane', pane: 'board-card' } }],
+        }),
+      ),
+    ).toContain(`openPane names 'board-card', which this manifest does not declare as a task-scoped pane`)
     // And the other way: navigating to a task pane has no URL to go to.
-    expect(messages(manifest({
-      frames: [PANE],
-      sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'navigate', surface: 'board' } }],
-    }))).toContain(`navigate names 'board', which this manifest does not declare as a project-scoped pane`)
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'navigate', surface: 'board' } }],
+        }),
+      ),
+    ).toContain(`navigate names 'board', which this manifest does not declare as a project-scoped pane`)
   })
 
   it('refuses navigate from a command, which has no project and no navigator', () => {
-    expect(manifest({
-      frames: [PROJECT_PANE],
-      routes: [PROJECT_ROUTE],
-      sources: [PROJECT_SOURCE],
-      commands: [{ id: 'board.open', kind: 'action', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
-    }).success).toBe(false)
+    expect(
+      manifest({
+        frames: [PROJECT_PANE],
+        routes: [PROJECT_ROUTE],
+        sources: [PROJECT_SOURCE],
+        commands: [
+          {
+            id: 'board.open',
+            kind: 'action',
+            title: 'Board: open card',
+            action: { verb: 'navigate', surface: 'board-card' },
+          },
+        ],
+      }).success,
+    ).toBe(false)
   })
 
   // The one click site inside a command that can carry `navigate`: a search result. It has a picked
   // row and, at project scope, the project the palette session captured, which is exactly the pair the
-  // verb was missing everywhere else (docs/plugins/commands.md § Command kinds).
+  // verb needs (docs/plugins/commands.md § Command kinds).
   it('lets a search result navigate, and counts it as a mount site for the surface', () => {
     const find = {
-      id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',
-      route: '/v1/p/board/search', onSelect: { verb: 'navigate', surface: 'board-card' },
+      id: 'find',
+      title: 'Board: find a card',
+      kind: 'search',
+      scope: 'project',
+      route: '/v1/p/board/search',
+      onSelect: { verb: 'navigate', surface: 'board-card' },
     }
     // `nodeManifest`, because a search calls a node route and only a node half serves one.
-    expect(nodeManifest({
-      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE], commands: [find],
-    }).success).toBe(true)
+    expect(
+      nodeManifest({
+        frames: [PROJECT_PANE],
+        routes: [PROJECT_ROUTE],
+        sources: [PROJECT_SOURCE],
+        commands: [find],
+      }).success,
+    ).toBe(true)
     // And on its own: a project-scoped surface reached only from the palette is addressed and
     // mountable, so the "nowhere to mount" refusal must not fire on it.
-    expect(nodeManifest({
-      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], commands: [find],
-    }).success).toBe(true)
+    expect(
+      nodeManifest({
+        frames: [PROJECT_PANE],
+        routes: [PROJECT_ROUTE],
+        commands: [find],
+      }).success,
+    ).toBe(true)
     // The surface still has to be one this manifest declared as project-scoped.
-    expect(messages(nodeManifest({
-      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE],
-      commands: [{ ...find, onSelect: { verb: 'navigate', surface: 'nope' } }],
-    }))).toContain(`navigate names 'nope', which this manifest does not declare as a project-scoped pane`)
+    expect(
+      messages(
+        nodeManifest({
+          frames: [PROJECT_PANE],
+          routes: [PROJECT_ROUTE],
+          sources: [PROJECT_SOURCE],
+          commands: [{ ...find, onSelect: { verb: 'navigate', surface: 'nope' } }],
+        }),
+      ),
+    ).toContain(`navigate names 'nope', which this manifest does not declare as a project-scoped pane`)
   })
 
   it('refuses navigate and createTask from a slot badge, whose click carries no row and no project', () => {
-    const slot = (onClick: unknown) => manifest({
-      frames: [PROJECT_PANE],
-      routes: [PROJECT_ROUTE],
-      sources: [PROJECT_SOURCE],
-      slots: [{ id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge', onClick }],
-    }).success
+    const slot = (onClick: unknown) =>
+      manifest({
+        frames: [PROJECT_PANE],
+        routes: [PROJECT_ROUTE],
+        sources: [PROJECT_SOURCE],
+        slots: [{ id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge', onClick }],
+      }).success
     expect(slot({ verb: 'navigate', surface: 'board-card' })).toBe(false)
     expect(slot({ verb: 'createTask' })).toBe(false)
     expect(slot({ verb: 'runNodeAction', path: '/v1/p/board/refresh' })).toBe(true)
   })
 
   it('allows only a pane to be project-scoped, and folds routes into the duplicate-id sweep', () => {
-    expect(messages(manifest({ frames: [{ target: 'settings', id: 'board-settings', label: 'Board', scope: 'project', layout: 'single', regions: { body: 'frame' } }] })))
-      .toContain('only a pane surface can be project-scoped')
-    expect(messages(manifest({
-      frames: [PROJECT_PANE],
-      sources: [PROJECT_SOURCE],
-      routes: [{ ...PROJECT_ROUTE, id: 'board' }],
-    }))).toContain(`duplicate contribution id 'board'`)
+    expect(
+      messages(
+        manifest({
+          frames: [
+            {
+              target: 'settings',
+              id: 'board-settings',
+              label: 'Board',
+              scope: 'project',
+              layout: 'single',
+              regions: { body: 'frame' },
+            },
+          ],
+        }),
+      ),
+    ).toContain('only a pane surface can be project-scoped')
+    expect(
+      messages(
+        manifest({
+          frames: [PROJECT_PANE],
+          sources: [PROJECT_SOURCE],
+          routes: [{ ...PROJECT_ROUTE, id: 'board' }],
+        }),
+      ),
+    ).toContain(`duplicate contribution id 'board'`)
   })
 })
 
@@ -1219,7 +1983,13 @@ describe('plugin commands and keybindings', () => {
       commands: [
         command,
         { id: 'open', kind: 'action', title: 'Open board', action: { verb: 'openPane', pane: 'board' } },
-        { id: 'docs', kind: 'action', title: 'Open docs', palette: false, action: { verb: 'openUrl', url: 'https://example.com/docs' } },
+        {
+          id: 'docs',
+          kind: 'action',
+          title: 'Open docs',
+          palette: false,
+          action: { verb: 'openUrl', url: 'https://example.com/docs' },
+        },
       ],
     })
     expect(result.success).toBe(true)
@@ -1228,12 +1998,21 @@ describe('plugin commands and keybindings', () => {
   })
 
   it('names the removed palette collection and rejects command action escapes', () => {
-    const old = parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions: {
-      palette: [{ id: 'old', title: 'Old', action: { verb: 'runNodeAction', path: '/v1/p/board/old' } }],
-    } })
+    const old = parsePluginManifest({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      contributions: {
+        palette: [{ id: 'old', title: 'Old', action: { verb: 'runNodeAction', path: '/v1/p/board/old' } }],
+      },
+    })
     expect(old.ok).toBe(false)
     expect(!old.ok && old.reason).toContain('removed contributions.palette')
-    expect(manifest({ commands: [{ ...command, action: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] }).success).toBe(false)
+    expect(
+      manifest({ commands: [{ ...command, action: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] }).success,
+    ).toBe(false)
     expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
   })
 
@@ -1241,26 +2020,45 @@ describe('plugin commands and keybindings', () => {
   // is that every kind is held to the same confinement as every other route.
   const group = { id: 'cards', title: 'Cards', category: 'navigation', kind: 'group' }
   const find = {
-    id: 'find', title: 'Find a card', kind: 'search', route: '/v1/p/board/search',
+    id: 'find',
+    title: 'Find a card',
+    kind: 'search',
+    route: '/v1/p/board/search',
     onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   }
   const ask = {
-    id: 'ask', title: 'New card', kind: 'input', route: '/v1/p/board/new-card',
+    id: 'ask',
+    title: 'New card',
+    kind: 'input',
+    route: '/v1/p/board/new-card',
     onSuccess: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   }
   const theme = {
-    id: 'theme', title: 'Board theme', kind: 'setting',
-    readRoute: '/v1/p/board/theme', writeRoute: '/v1/p/board/theme',
-    options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+    id: 'theme',
+    title: 'Board theme',
+    kind: 'setting',
+    readRoute: '/v1/p/board/theme',
+    writeRoute: '/v1/p/board/theme',
+    options: [
+      { value: 'light', label: 'Light' },
+      { value: 'dark', label: 'Dark' },
+    ],
   }
 
   it('requires an explicit command kind', () => {
     const result = manifest({ commands: [{ id: 'old', title: 'Old', action: { verb: 'openTask' } }] })
     expect(result.success).toBe(false)
     expect(paths(result)).toContain('contributions.commands.0.kind')
-    const parsed = parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions: {
-      commands: [{ id: 'old', title: 'Old', action: { verb: 'openTask' } }],
-    } })
+    const parsed = parsePluginManifest({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      contributions: {
+        commands: [{ id: 'old', title: 'Old', action: { verb: 'openTask' } }],
+      },
+    })
     expect(!parsed.ok && parsed.reason).toContain('contributions.commands[0].kind is required')
   })
 
@@ -1274,7 +2072,10 @@ describe('plugin commands and keybindings', () => {
     })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.commands[1]).toMatchObject({
-      kind: 'search', scope: 'node', minQueryLength: 3, debounceMs: 400,
+      kind: 'search',
+      scope: 'node',
+      minQueryLength: 3,
+      debounceMs: 400,
     })
   })
 
@@ -1287,87 +2088,150 @@ describe('plugin commands and keybindings', () => {
   })
 
   it('confines both new routes and both new verbs to the plugin’s own namespace', () => {
-    expect(messages(nodeManifest({ commands: [{ ...find, route: '/v1/p/other/search' }] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(nodeManifest({ commands: [{ ...ask, route: '/v1/tasks' }] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(nodeManifest({ commands: [{ ...find, onSelect: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...find, route: '/v1/p/other/search' }] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(messages(nodeManifest({ commands: [{ ...ask, route: '/v1/tasks' }] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(
+      messages(nodeManifest({ commands: [{ ...find, onSelect: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] })),
+    ).toContain('route must be inside /v1/p/board/')
   })
 
   it('refuses a search, an input or a setting from a package with no node half to answer it', () => {
-    expect(messages(manifest({ commands: [find] })))
-      .toContain('a search command calls a node route; declare `node` in the manifest')
-    expect(messages(manifest({ commands: [ask] })))
-      .toContain('an input command calls a node route; declare `node` in the manifest')
-    expect(messages(manifest({ commands: [theme] })))
-      .toContain('a setting command calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ commands: [find] }))).toContain(
+      'a search command calls a node route; declare `node` in the manifest',
+    )
+    expect(messages(manifest({ commands: [ask] }))).toContain(
+      'an input command calls a node route; declare `node` in the manifest',
+    )
+    expect(messages(manifest({ commands: [theme] }))).toContain(
+      'a setting command calls a node route; declare `node` in the manifest',
+    )
   })
 
   it('accepts a setting with two of its own routes and a bounded list of choices', () => {
     const result = nodeManifest({ commands: [group, { ...theme, parentId: 'cards', scope: 'project' }] })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.commands[1]).toMatchObject({
-      kind: 'setting', scope: 'project', readRoute: '/v1/p/board/theme',
+      kind: 'setting',
+      scope: 'project',
+      readRoute: '/v1/p/board/theme',
     })
   })
 
   it('confines both of a setting’s routes to the plugin’s own namespace', () => {
     // The message is the shared one; what the path in the issue names is which of the two routes.
-    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] })))
-      .toContain('contributions.commands.0.readRoute')
-    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v1/p/other/theme' }] })))
-      .toContain('contributions.commands.0.writeRoute')
+    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] }))).toContain(
+      'contributions.commands.0.readRoute',
+    )
+    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v1/p/other/theme' }] }))).toContain(
+      'contributions.commands.0.writeRoute',
+    )
   })
 
   it('refuses a setting that is not a choice: too few options, too many, or two spelled the same', () => {
-    expect(nodeManifest({ commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }] }] }).success).toBe(false)
-    expect(nodeManifest({
-      commands: [{ ...theme, options: Array.from({ length: 33 }, (_, at) => ({ value: `v${at}`, label: `V${at}` })) }],
-    }).success).toBe(false)
-    expect(messages(nodeManifest({
-      commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }, { value: 'light', label: 'Also light' }] }],
-    }))).toContain("setting 'theme' declares 'light' twice")
+    expect(nodeManifest({ commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }] }] }).success).toBe(
+      false,
+    )
+    expect(
+      nodeManifest({
+        commands: [
+          { ...theme, options: Array.from({ length: 33 }, (_, at) => ({ value: `v${at}`, label: `V${at}` })) },
+        ],
+      }).success,
+    ).toBe(false)
+    expect(
+      messages(
+        nodeManifest({
+          commands: [
+            {
+              ...theme,
+              options: [
+                { value: 'light', label: 'Light' },
+                { value: 'light', label: 'Also light' },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toContain("setting 'theme' declares 'light' twice")
   })
 
   it('holds the parent graph together across the whole array', () => {
-    expect(messages(nodeManifest({ commands: [{ ...find, parentId: 'gone' }] })))
-      .toContain("command 'find' names an undeclared parent 'gone'")
-    expect(messages(nodeManifest({ commands: [command, { ...find, parentId: 'search' }] })))
-      .toContain("command 'find' names 'search', which is not a group")
-    expect(messages(nodeManifest({
-      commands: [{ ...group, parentId: 'other' }, { id: 'other', title: 'Other', kind: 'group', parentId: 'cards' }],
-    }))).toContain("command 'cards' is inside a parent cycle")
+    expect(messages(nodeManifest({ commands: [{ ...find, parentId: 'gone' }] }))).toContain(
+      "command 'find' names an undeclared parent 'gone'",
+    )
+    expect(messages(nodeManifest({ commands: [command, { ...find, parentId: 'search' }] }))).toContain(
+      "command 'find' names 'search', which is not a group",
+    )
+    expect(
+      messages(
+        nodeManifest({
+          commands: [
+            { ...group, parentId: 'other' },
+            { id: 'other', title: 'Other', kind: 'group', parentId: 'cards' },
+          ],
+        }),
+      ),
+    ).toContain("command 'cards' is inside a parent cycle")
   })
 
   it.each(['meta+shift+f', 'ctrl+alt+enter'])('accepts canonical modified chord %s', (defaultChord) => {
-    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success).toBe(true)
+    expect(
+      manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success,
+    ).toBe(true)
   })
 
-  it.each(['Meta+Shift+F', 'shift+meta+f', 'f', 'shift+f', 'hyper+f', 'meta+f g'])('rejects unusable chord %s', (defaultChord) => {
-    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success).toBe(false)
-  })
+  it.each(['Meta+Shift+F', 'shift+meta+f', 'f', 'shift+f', 'hyper+f', 'meta+f g'])(
+    'rejects unusable chord %s',
+    (defaultChord) => {
+      expect(
+        manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success,
+      ).toBe(false)
+    },
+  )
 
   it('requires commands and surface scopes to point inside the same manifest', () => {
-    expect(messages(manifest({ commands: [command], keybindings: [{ command: 'missing', defaultChord: 'meta+f', when: 'task' }] })))
-      .toContain("keybinding names undeclared command 'missing'")
-    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface' }] }).success).toBe(false)
-    expect(manifest({ frames: [PANE], commands: [command], keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface', surface: 'board' }] }).success).toBe(true)
-    expect(messages(manifest({
-      commands: [command],
-      keybindings: [
-        { command: 'search', defaultChord: 'meta+f', when: 'global' },
-        { command: 'search', defaultChord: 'meta+g', when: 'global' },
-      ],
-    }))).toContain("command 'search' has more than one keybinding")
+    expect(
+      messages(
+        manifest({ commands: [command], keybindings: [{ command: 'missing', defaultChord: 'meta+f', when: 'task' }] }),
+      ),
+    ).toContain("keybinding names undeclared command 'missing'")
+    expect(
+      manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface' }] })
+        .success,
+    ).toBe(false)
+    expect(
+      manifest({
+        frames: [PANE],
+        commands: [command],
+        keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface', surface: 'board' }],
+      }).success,
+    ).toBe(true)
+    expect(
+      messages(
+        manifest({
+          commands: [command],
+          keybindings: [
+            { command: 'search', defaultChord: 'meta+f', when: 'global' },
+            { command: 'search', defaultChord: 'meta+g', when: 'global' },
+          ],
+        }),
+      ),
+    ).toContain("command 'search' has more than one keybinding")
   })
 
   it('allows declared frame claims except for shell escape hatches', () => {
     expect(manifest({ frames: [{ ...PANE, claimsKeys: ['meta+f', 'meta+shift+f'] }] }).success).toBe(true)
     for (const chord of ['meta+k', 'meta+,', 'meta+1', 'meta+9', 'escape']) {
-      expect(messages(manifest({ frames: [{ ...PANE, claimsKeys: [chord] }] }))).toContain(`${chord} is reserved by acorn and cannot be claimed`)
+      expect(messages(manifest({ frames: [{ ...PANE, claimsKeys: [chord] }] }))).toContain(
+        `${chord} is reserved by acorn and cannot be claimed`,
+      )
     }
   })
 })
@@ -1377,7 +2241,12 @@ describe('themes', () => {
   // client re-checks all of it before generating CSS, because a roster row is bytes a node sent, but this
   // is where an author finds out, so each rule is pinned at the door it is enforced at.
   const palette = Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456']))
-  const theme = (over: Record<string, unknown> = {}) => ({ id: 'nightfall', label: 'Nightfall', tokens: palette, ...over })
+  const theme = (over: Record<string, unknown> = {}) => ({
+    id: 'nightfall',
+    label: 'Nightfall',
+    tokens: palette,
+    ...over,
+  })
 
   it('accepts a complete palette and defaults the dark flag', () => {
     expect(manifest({ themes: [theme({ dark: true })] }).success).toBe(true)
@@ -1401,13 +2270,27 @@ describe('themes', () => {
   })
 
   it('refuses a value that is not a colour, including one that could escape the block', () => {
-    for (const value of ['red', 'inherit', 'var(--bg)', 'url(https://evil.example/x)', '#fff; } :root { --bg: red', '#fff\n}']) {
+    for (const value of [
+      'red',
+      'inherit',
+      'var(--bg)',
+      'url(https://evil.example/x)',
+      '#fff; } :root { --bg: red',
+      '#fff\n}',
+    ]) {
       expect(manifest({ themes: [theme({ tokens: { ...palette, '--bg': value } })] }).success, value).toBe(false)
     }
   })
 
   it('accepts hex and flat colour functions', () => {
-    for (const value of ['#fff', '#ffffff', '#ffffffcc', 'rgba(0, 0, 0, 0.42)', 'oklch(0.7 0.15 250)', 'hsl(210 100% 50%)']) {
+    for (const value of [
+      '#fff',
+      '#ffffff',
+      '#ffffffcc',
+      'rgba(0, 0, 0, 0.42)',
+      'oklch(0.7 0.15 250)',
+      'hsl(210 100% 50%)',
+    ]) {
       expect(manifest({ themes: [theme({ tokens: { ...palette, '--bg': value } })] }).success, value).toBe(true)
     }
   })
@@ -1427,7 +2310,9 @@ describe('styles', () => {
   const style = (tokens: Record<string, string>) => ({ id: 'dense', label: 'Dense', tokens })
 
   it('accepts a partial pack and rejects unsafe or out-of-family values', () => {
-    expect(manifest({ styles: [style({ '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' })] }).success).toBe(true)
+    expect(
+      manifest({ styles: [style({ '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' })] }).success,
+    ).toBe(true)
     for (const [token, value] of [
       ['--row-h', 'url(https://example.com/x)'],
       ['--space-1', 'var(--shadow-1)'],
@@ -1442,8 +2327,12 @@ describe('styles', () => {
 })
 
 describe('slots', () => {
-  const slot = (over: Record<string, unknown> = {}) =>
-    ({ id: 'board-badge', slot: 'footer', data: '/v1/p/board/badge', ...over })
+  const slot = (over: Record<string, unknown> = {}) => ({
+    id: 'board-badge',
+    slot: 'footer',
+    data: '/v1/p/board/badge',
+    ...over,
+  })
 
   it('accepts the two host slots that have a host to draw them', () => {
     expect(manifest({ slots: [slot()] }).success).toBe(true)
@@ -1460,10 +2349,12 @@ describe('slots', () => {
   })
 
   it('confines a slot’s data route and its click verb to the plugin’s own namespace', () => {
-    expect(messages(manifest({ slots: [slot({ data: '/v1/core/tasks' })] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(manifest({ slots: [slot({ onClick: { verb: 'runNodeAction', path: '/v1/p/other/go' } })] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ slots: [slot({ data: '/v1/core/tasks' })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(
+      messages(manifest({ slots: [slot({ onClick: { verb: 'runNodeAction', path: '/v1/p/other/go' } })] })),
+    ).toContain('route must be inside /v1/p/board/')
   })
 })
 
@@ -1492,13 +2383,17 @@ describe('context menus', () => {
   })
 
   it('refuses a `when` naming a fact the location does not have', () => {
-    expect(manifest({ contextMenus: [menu({ when: { origin: 'github', pinned: true, projectId: 'p1' } })] }).success).toBe(true)
-    expect(messages(manifest({ contextMenus: [menu({ when: { branch: 'main' } })] })))
-      .toContain("'task.row' has no fact named 'branch'")
+    expect(
+      manifest({ contextMenus: [menu({ when: { origin: 'github', pinned: true, projectId: 'p1' } })] }).success,
+    ).toBe(true)
+    expect(messages(manifest({ contextMenus: [menu({ when: { branch: 'main' } })] }))).toContain(
+      "'task.row' has no fact named 'branch'",
+    )
     // The identity fields are on the target and still not facts: a menu row keyed to one task id is not an
     // extension point.
-    expect(messages(manifest({ contextMenus: [menu({ when: { id: 't1' } })] })))
-      .toContain("'task.row' has no fact named 'id'")
+    expect(messages(manifest({ contextMenus: [menu({ when: { id: 't1' } })] }))).toContain(
+      "'task.row' has no fact named 'id'",
+    )
   })
 
   it('takes the context-free verb set only, and confines its route', () => {
@@ -1508,65 +2403,128 @@ describe('context menus', () => {
     expect(manifest({ contextMenus: [menu({ action: { verb: 'createTask' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'navigate', surface: 'board' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'teleport' } })] }).success).toBe(false)
-    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'runNodeAction', path: '/v1/core/tasks' } })] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'openPane', pane: 'ghost' } })] })))
-      .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
+    expect(
+      messages(manifest({ contextMenus: [menu({ action: { verb: 'runNodeAction', path: '/v1/core/tasks' } })] })),
+    ).toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'openPane', pane: 'ghost' } })] }))).toContain(
+      "openPane names 'ghost', which this manifest does not declare as a task-scoped pane",
+    )
   })
 
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
-    expect(manifest({ contextMenus: Array.from({ length: 32 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(true)
-    expect(manifest({ contextMenus: Array.from({ length: 33 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(false)
+    expect(manifest({ contextMenus: Array.from({ length: 32 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(
+      true,
+    )
+    expect(manifest({ contextMenus: Array.from({ length: 33 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(
+      false,
+    )
     expect(messages(manifest({ contextMenus: [menu(), menu()] }))).toContain("duplicate contribution id 'open-card'")
   })
 
   it('allows rail actions only for a declared source or task pane of this plugin', () => {
     const source = { id: 'feed', label: 'Feed', order: 1, items: '/v1/p/board/items' }
     const contributions = { sources: [source], frames: [PANE] }
-    expect(manifest({ ...contributions, contextMenus: [menu({ location: 'rail.source', surface: 'feed' }), menu({ id: 'pane-action', location: 'rail.pane', surface: 'board' })] }).success).toBe(true)
-    for (const [location, surface] of [['rail.source', 'other-feed'], ['rail.pane', 'other-pane'], ['rail.source', undefined]]) {
-      expect(messages(manifest({ ...contributions, contextMenus: [menu({ location, surface })] })))
-        .toContain(`${location} requires a surface declared by this plugin`)
+    expect(
+      manifest({
+        ...contributions,
+        contextMenus: [
+          menu({ location: 'rail.source', surface: 'feed' }),
+          menu({ id: 'pane-action', location: 'rail.pane', surface: 'board' }),
+        ],
+      }).success,
+    ).toBe(true)
+    for (const [location, surface] of [
+      ['rail.source', 'other-feed'],
+      ['rail.pane', 'other-pane'],
+      ['rail.source', undefined],
+    ]) {
+      expect(messages(manifest({ ...contributions, contextMenus: [menu({ location, surface })] }))).toContain(
+        `${location} requires a surface declared by this plugin`,
+      )
     }
-    expect(messages(manifest({ ...contributions, contextMenus: [menu({ surface: 'feed' })] })))
-      .toContain('task.row does not accept a surface')
+    expect(messages(manifest({ ...contributions, contextMenus: [menu({ surface: 'feed' })] }))).toContain(
+      'task.row does not accept a surface',
+    )
   })
 
   it('takes file and document actions from any plugin, matched on file facts only', () => {
-    const inspect = menu({ id: 'inspect-file', location: 'file.row', label: 'Inspect JSON', when: { extension: 'json', directory: false },
-      action: { verb: 'runNodeAction', path: '/v1/p/board/inspect' } })
-    expect(manifest({ contextMenus: [inspect, { ...inspect, id: 'inspect-tab', location: 'document.tab', when: { readOnly: false, projectId: 'p1' } }] }).success).toBe(true)
+    const inspect = menu({
+      id: 'inspect-file',
+      location: 'file.row',
+      label: 'Inspect JSON',
+      when: { extension: 'json', directory: false },
+      action: { verb: 'runNodeAction', path: '/v1/p/board/inspect' },
+    })
+    expect(
+      manifest({
+        contextMenus: [
+          inspect,
+          { ...inspect, id: 'inspect-tab', location: 'document.tab', when: { readOnly: false, projectId: 'p1' } },
+        ],
+      }).success,
+    ).toBe(true)
     // A file belongs to the plugin that draws it, so there is no owned surface to name.
-    expect(messages(manifest({ contextMenus: [{ ...inspect, surface: 'files' }] }))).toContain('file.row does not accept a surface')
+    expect(messages(manifest({ contextMenus: [{ ...inspect, surface: 'files' }] }))).toContain(
+      'file.row does not accept a surface',
+    )
     // The path and revision are what the action receives, not something to match on.
-    expect(messages(manifest({ contextMenus: [{ ...inspect, when: { path: 'package.json' } }] })))
-      .toContain("'file.row' has no fact named 'path'")
-    expect(messages(manifest({ contextMenus: [{ ...inspect, location: 'document.tab', when: { revision: 'abc' } }] })))
-      .toContain("'document.tab' has no fact named 'revision'")
+    expect(messages(manifest({ contextMenus: [{ ...inspect, when: { path: 'package.json' } }] }))).toContain(
+      "'file.row' has no fact named 'path'",
+    )
+    expect(
+      messages(manifest({ contextMenus: [{ ...inspect, location: 'document.tab', when: { revision: 'abc' } }] })),
+    ).toContain("'document.tab' has no fact named 'revision'")
     // The route is still confined to the declaring plugin's own namespace.
-    expect(messages(manifest({ contextMenus: [{ ...inspect, action: { verb: 'runNodeAction', path: '/v1/p/editor/tasks' } }] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(
+      messages(
+        manifest({ contextMenus: [{ ...inspect, action: { verb: 'runNodeAction', path: '/v1/p/editor/tasks' } }] }),
+      ),
+    ).toContain('route must be inside /v1/p/board/')
   })
 
   it('takes message and turn actions from any plugin, matched on role and status only', () => {
-    const note = menu({ id: 'file-note', location: 'agent.message', label: 'File as note', when: { role: 'assistant', status: 'completed' },
-      action: { verb: 'runNodeAction', path: '/v1/p/board/note' } })
-    expect(manifest({ contextMenus: [note, { ...note, id: 'turn-note', location: 'agent.turn', when: { status: 'failed', projectId: 'p1' } }] }).success).toBe(true)
-    expect(messages(manifest({ contextMenus: [{ ...note, surface: 'agent' }] }))).toContain('agent.message does not accept a surface')
+    const note = menu({
+      id: 'file-note',
+      location: 'agent.message',
+      label: 'File as note',
+      when: { role: 'assistant', status: 'completed' },
+      action: { verb: 'runNodeAction', path: '/v1/p/board/note' },
+    })
+    expect(
+      manifest({
+        contextMenus: [
+          note,
+          { ...note, id: 'turn-note', location: 'agent.turn', when: { status: 'failed', projectId: 'p1' } },
+        ],
+      }).success,
+    ).toBe(true)
+    expect(messages(manifest({ contextMenus: [{ ...note, surface: 'agent' }] }))).toContain(
+      'agent.message does not accept a surface',
+    )
     // The text and ids are what the action receives, not something to match on.
-    expect(messages(manifest({ contextMenus: [{ ...note, when: { text: 'hello' } }] })))
-      .toContain("'agent.message' has no fact named 'text'")
-    expect(messages(manifest({ contextMenus: [{ ...note, location: 'agent.turn', when: { role: 'user' } }] })))
-      .toContain("'agent.turn' has no fact named 'role'")
+    expect(messages(manifest({ contextMenus: [{ ...note, when: { text: 'hello' } }] }))).toContain(
+      "'agent.message' has no fact named 'text'",
+    )
+    expect(
+      messages(manifest({ contextMenus: [{ ...note, location: 'agent.turn', when: { role: 'user' } }] })),
+    ).toContain("'agent.turn' has no fact named 'role'")
   })
 
   it('takes selection actions from any plugin, matched on the kind of content only', () => {
-    const explain = menu({ id: 'explain', location: 'content.selection', label: 'Explain selection',
-      when: { contentKind: 'code', languageId: 'typescript', readOnly: false }, action: { verb: 'runNodeAction', path: '/v1/p/board/explain' } })
+    const explain = menu({
+      id: 'explain',
+      location: 'content.selection',
+      label: 'Explain selection',
+      when: { contentKind: 'code', languageId: 'typescript', readOnly: false },
+      action: { verb: 'runNodeAction', path: '/v1/p/board/explain' },
+    })
     expect(manifest({ contextMenus: [explain] }).success).toBe(true)
-    expect(messages(manifest({ contextMenus: [{ ...explain, surface: 'editor' }] }))).toContain('content.selection does not accept a surface')
-    expect(messages(manifest({ contextMenus: [{ ...explain, when: { text: 'TODO' } }] })))
-      .toContain("'content.selection' has no fact named 'text'")
+    expect(messages(manifest({ contextMenus: [{ ...explain, surface: 'editor' }] }))).toContain(
+      'content.selection does not accept a surface',
+    )
+    expect(messages(manifest({ contextMenus: [{ ...explain, when: { text: 'TODO' } }] }))).toContain(
+      "'content.selection' has no fact named 'text'",
+    )
   })
 })
 
@@ -1578,22 +2536,32 @@ describe('context menus', () => {
 // from the wrong one, since the author of the guest sees nothing but an empty strip.
 
 describe('extension points', () => {
-  const point = (over: Record<string, unknown> = {}) =>
-    ({ id: 'card-links', label: 'Linked items', location: 'pane.footer', surface: 'board', ...over })
+  const point = (over: Record<string, unknown> = {}) => ({
+    id: 'card-links',
+    label: 'Linked items',
+    location: 'pane.footer',
+    surface: 'board',
+    ...over,
+  })
 
   it('accepts a point hung off a pane this manifest declares', () => {
     expect(manifest({ frames: [PANE], extensionPoints: [point()] }).success).toBe(true)
   })
 
   it('refuses a point on a surface this manifest does not declare', () => {
-    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ surface: 'ghost' })] })))
-      .toContain("extension point names 'ghost', which this manifest does not declare as a pane surface")
+    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ surface: 'ghost' })] }))).toContain(
+      "extension point names 'ghost', which this manifest does not declare as a pane surface",
+    )
     // A settings page, importer, overlay, refPanel or webview is chrome the host already draws around a
     // frame; there is nowhere in one to reserve a strip.
-    expect(manifest({
-      frames: [{ target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }],
-      extensionPoints: [point({ surface: 'board-settings' })],
-    }).success).toBe(false)
+    expect(
+      manifest({
+        frames: [
+          { target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } },
+        ],
+        extensionPoints: [point({ surface: 'board-settings' })],
+      }).success,
+    ).toBe(false)
   })
 
   it('refuses a location this acorn has no host for', () => {
@@ -1601,10 +2569,14 @@ describe('extension points', () => {
   })
 
   it('refuses two points at the same place on the same surface', () => {
-    expect(messages(manifest({
-      frames: [PANE],
-      extensionPoints: [point(), point({ id: 'other' })],
-    }))).toContain("'board' already has an extension point at 'pane.footer'")
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          extensionPoints: [point(), point({ id: 'other' })],
+        }),
+      ),
+    ).toContain("'board' already has an extension point at 'pane.footer'")
   })
 
   // ── The aside: a region the user fills (docs/dashboards/placements.md § Placements) ────────────────────
@@ -1625,28 +2597,40 @@ describe('extension points', () => {
   })
 
   it('refuses panels on a footer, whose contributors are other plugins', () => {
-    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ panels: {} })] })))
-      .toContain("panels is only valid on a 'pane.aside' extension point")
+    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ panels: {} })] }))).toContain(
+      "panels is only valid on a 'pane.aside' extension point",
+    )
   })
 
   it('refuses a region that names sources and a field role at once', () => {
-    expect(messages(manifest({
-      frames: [PANE],
-      extensionPoints: [point({ location: 'pane.aside', panels: { sources: ['a:b'], fieldRole: 'status' } })],
-    }))).toContain('a panel region names sources or a fieldRole, never both')
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          extensionPoints: [point({ location: 'pane.aside', panels: { sources: ['a:b'], fieldRole: 'status' } })],
+        }),
+      ),
+    ).toContain('a panel region names sources or a fieldRole, never both')
   })
 
   it('refuses a view kind this build has no renderer for', () => {
-    expect(manifest({
-      frames: [PANE],
-      extensionPoints: [point({ location: 'pane.aside', panels: { views: ['sankey'] } })],
-    }).success).toBe(false)
+    expect(
+      manifest({
+        frames: [PANE],
+        extensionPoints: [point({ location: 'pane.aside', panels: { views: ['sankey'] } })],
+      }).success,
+    ).toBe(false)
   })
 })
 
 describe('extensions', () => {
-  const extension = (over: Record<string, unknown> = {}) =>
-    ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v1/p/board/issues', ...over })
+  const extension = (over: Record<string, unknown> = {}) => ({
+    id: 'board-issues',
+    point: 'tracker:card-links',
+    label: 'Issues',
+    items: '/v1/p/board/issues',
+    ...over,
+  })
 
   it('accepts a contribution naming another plugin’s point, and defaults its order', () => {
     const parsed = nodeManifest({ extensions: [extension()] })
@@ -1654,23 +2638,34 @@ describe('extensions', () => {
   })
 
   it('requires a node bundle for items and route carriers', () => {
-    expect(messages(manifest({ extensions: [extension()] })))
-      .toContain('an items extension calls a node route; declare `node` in the manifest')
-    expect(messages(manifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] })))
-      .toContain('a route extension calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ extensions: [extension()] }))).toContain(
+      'an items extension calls a node route; declare `node` in the manifest',
+    )
+    expect(
+      messages(
+        manifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] }),
+      ),
+    ).toContain('a route extension calls a node route; declare `node` in the manifest')
 
     expect(nodeManifest({ extensions: [extension()] }).success).toBe(true)
-    expect(nodeManifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] }).success).toBe(true)
+    expect(
+      nodeManifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] })
+        .success,
+    ).toBe(true)
   })
 
   it('keeps remote and frame carriers independent of the node bundle', () => {
-    expect(webviewManifest({
-      extensions: [extension({ items: undefined, remote: 'card' })],
-    }).success).toBe(true)
-    expect(webviewManifest({
-      frames: [{ target: 'inline', id: 'preview', label: 'Preview' }],
-      extensions: [extension({ items: undefined, frame: 'preview' })],
-    }).success).toBe(true)
+    expect(
+      webviewManifest({
+        extensions: [extension({ items: undefined, remote: 'card' })],
+      }).success,
+    ).toBe(true)
+    expect(
+      webviewManifest({
+        frames: [{ target: 'inline', id: 'preview', label: 'Preview' }],
+        extensions: [extension({ items: undefined, frame: 'preview' })],
+      }).success,
+    ).toBe(true)
   })
 
   it('refuses a point reference that is not one', () => {
@@ -1684,30 +2679,41 @@ describe('extensions', () => {
   it('confines the items route to this plugin’s own namespace', () => {
     // This is "reading another plugin's routes", refused at the earliest possible moment. The point
     // owner's namespace is exactly the one a hostile contribution would name.
-    expect(messages(manifest({ extensions: [extension({ items: '/v1/p/tracker/cards' })] })))
-      .toContain('route must be inside /v1/p/board/')
-    expect(messages(manifest({ extensions: [extension({ items: '/v1/core/tasks' })] })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ extensions: [extension({ items: '/v1/p/tracker/cards' })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
+    expect(messages(manifest({ extensions: [extension({ items: '/v1/core/tasks' })] }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
   })
 
   it('takes the context-free verb set only, checked against this manifest’s own surfaces', () => {
     // The click site is inside another plugin's pane: there is no rail row to promote and no project of
     // this plugin's to navigate within.
     expect(manifest({ extensions: [extension({ onSelect: { verb: 'createTask' } })] }).success).toBe(false)
-    expect(messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })))
-      .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
-    expect(nodeManifest({
-      frames: [PANE],
-      extensions: [extension({ onSelect: { verb: 'openPane', pane: 'board' } })],
-    }).success).toBe(true)
+    expect(
+      messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })),
+    ).toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
+    expect(
+      nodeManifest({
+        frames: [PANE],
+        extensions: [extension({ onSelect: { verb: 'openPane', pane: 'board' } })],
+      }).success,
+    ).toBe(true)
   })
 
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
-    // Sixteen since the one key grew from rows to five kinds: a plugin that opens a pane, a slot in it,
+    // Sixteen, because the one key covers five kinds: a plugin that opens a pane, a slot in it,
     // a hook before it acts and an annotation on its rows is describing one integration, not four.
-    expect(nodeManifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
-    expect(nodeManifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
-    expect(messages(nodeManifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
+    expect(
+      nodeManifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success,
+    ).toBe(true)
+    expect(
+      nodeManifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success,
+    ).toBe(false)
+    expect(messages(nodeManifest({ extensions: [extension(), extension()] }))).toContain(
+      "duplicate contribution id 'board-issues'",
+    )
   })
 })
 
@@ -1719,15 +2725,19 @@ describe('the five kinds', () => {
     manifest({ frames: [PANE], extensionPoints: [{ id: 'p', label: 'P', ...over }] })
 
   it('reads a manifest with no kind as rows, so everything written before this parses unchanged', () => {
-    const parsed = manifest({ frames: [PANE], extensionPoints: [{ id: 'p', label: 'P', location: 'pane.footer', surface: 'board' }] })
+    const parsed = manifest({
+      frames: [PANE],
+      extensionPoints: [{ id: 'p', label: 'P', location: 'pane.footer', surface: 'board' }],
+    })
     expect(parsed.success && parsed.data.contributions.extensionPoints[0]!.kind).toBe('rows')
   })
 
   it('makes an annotation say what its items are keyed by, and refuses a location on one', () => {
     expect(kindPoint({ kind: 'annotation', key: { file: 'string', line: 'number' } }).success).toBe(true)
     expect(messages(kindPoint({ kind: 'annotation' }))).toContain("a 'annotation' extension point declares key")
-    expect(messages(kindPoint({ kind: 'annotation', key: { file: 'string' }, location: 'pane.footer', surface: 'board' })))
-      .toContain("location is not read on a 'annotation' extension point")
+    expect(
+      messages(kindPoint({ kind: 'annotation', key: { file: 'string' }, location: 'pane.footer', surface: 'board' })),
+    ).toContain("location is not read on a 'annotation' extension point")
   })
 
   it('makes a remote point say how it arbitrates, and gives it no location to draw at', () => {
@@ -1736,19 +2746,27 @@ describe('the five kinds', () => {
   })
 
   it('makes a rectangle take an inline location and nothing else', () => {
-    expect(kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.inline-beside', surface: 'board' }).success).toBe(true)
+    expect(
+      kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.inline-beside', surface: 'board' }).success,
+    ).toBe(true)
     // The location is what the host reads to decide which host draws the point at all, so a rows point
     // and a rectangle point may not take each other's names.
-    expect(messages(kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.footer', surface: 'board' })))
-      .toContain("'pane.footer' is not a location a 'rectangle' extension point can take")
-    expect(messages(kindPoint({ kind: 'rows', location: 'pane.inline-below', surface: 'board' })))
-      .toContain("'pane.inline-below' is not a location a 'rows' extension point can take")
+    expect(
+      messages(kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.footer', surface: 'board' })),
+    ).toContain("'pane.footer' is not a location a 'rectangle' extension point can take")
+    expect(messages(kindPoint({ kind: 'rows', location: 'pane.inline-below', surface: 'board' }))).toContain(
+      "'pane.inline-below' is not a location a 'rows' extension point can take",
+    )
   })
 
   it('makes a hook declare its payload and what is allowed at it', () => {
     expect(kindPoint({ kind: 'hook', payload: { branch: 'string' }, allows: ['veto'] }).success).toBe(true)
-    expect(messages(kindPoint({ kind: 'hook', allows: ['veto'] }))).toContain("a 'hook' extension point declares payload")
-    expect(messages(kindPoint({ kind: 'hook', payload: { branch: 'string' } }))).toContain("a 'hook' extension point declares allows")
+    expect(messages(kindPoint({ kind: 'hook', allows: ['veto'] }))).toContain(
+      "a 'hook' extension point declares payload",
+    )
+    expect(messages(kindPoint({ kind: 'hook', payload: { branch: 'string' } }))).toContain(
+      "a 'hook' extension point declares allows",
+    )
     // A payload type this build has no vocabulary for. The tree's prop vocabulary and nothing else.
     expect(kindPoint({ kind: 'hook', payload: { branch: 'blob' }, allows: ['veto'] }).success).toBe(false)
   })
@@ -1758,107 +2776,189 @@ describe('the five kinds', () => {
       nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ items: '/v1/p/board/rows' }).success).toBe(true)
     expect(messages(extension({}))).toContain('an extension names exactly one of items, remote, frame or route')
-    expect(messages(extension({ items: '/v1/p/board/rows', route: '/v1/p/board/hook', mode: 'veto' })))
-      .toContain('an extension names exactly one of items, remote, frame or route, not items and route')
+    expect(messages(extension({ items: '/v1/p/board/rows', route: '/v1/p/board/hook', mode: 'veto' }))).toContain(
+      'an extension names exactly one of items, remote, frame or route, not items and route',
+    )
   })
 
   it('declares a disclosed node point with no carrier, because the node files it through ctx', () => {
     const extension = (over: Record<string, unknown>) =>
-      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'agents:session-messenger', label: 'E', ...over }] })
+      nodeManifest({
+        frames: [PANE],
+        extensions: [{ id: 'e', point: 'agents:session-messenger', label: 'E', ...over }],
+      })
     expect(extension({}).success).toBe(true)
-    expect(messages(extension({ items: '/v1/p/board/rows' })))
-      .toContain("'agents:session-messenger' is filled from the node through ctx.extensionPoints.handle, so it names no items")
+    expect(messages(extension({ items: '/v1/p/board/rows' }))).toContain(
+      "'agents:session-messenger' is filled from the node through ctx.extensionPoints.handle, so it names no items",
+    )
   })
 
   it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
     const extension = (over: Record<string, unknown>) =>
       nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ route: '/v1/p/board/scan', mode: 'veto' }).success).toBe(true)
-    expect(messages(extension({ route: '/v1/p/board/scan' })))
-      .toContain('a hook handler says what it asks to do: observe, transform or veto')
-    expect(messages(extension({ items: '/v1/p/board/rows', mode: 'veto' })))
-      .toContain('mode is only valid on a hook handler, which names a route')
+    expect(messages(extension({ route: '/v1/p/board/scan' }))).toContain(
+      'a hook handler says what it asks to do: observe, transform or veto',
+    )
+    expect(messages(extension({ items: '/v1/p/board/rows', mode: 'veto' }))).toContain(
+      'mode is only valid on a hook handler, which names a route',
+    )
     // Confined to this plugin's own namespace, for the reason every other declared route is.
-    expect(messages(extension({ route: '/v1/p/other/scan', mode: 'veto' })))
-      .toContain('route must be inside /v1/p/board/')
+    expect(messages(extension({ route: '/v1/p/other/scan', mode: 'veto' }))).toContain(
+      'route must be inside /v1/p/board/',
+    )
   })
 
   it('makes an inline frame and the extension that places it name each other', () => {
     const withBundle = (contributions: Record<string, unknown>) =>
       pluginManifestSchema.safeParse({
-        id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
+        id: 'board',
+        name: 'Board',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: '1',
+        client: './dist/client.js',
+        contributions,
       })
-    expect(withBundle({
-      frames: [PANE, { target: 'inline', id: 'preview', label: 'Markdown preview' }],
-      extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'preview', matches: ['*.md'] }],
-    }).success).toBe(true)
+    expect(
+      withBundle({
+        frames: [PANE, { target: 'inline', id: 'preview', label: 'Markdown preview' }],
+        extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'preview', matches: ['*.md'] }],
+      }).success,
+    ).toBe(true)
     // A rectangle nothing places is a box with nowhere to be drawn.
-    expect(messages(withBundle({ frames: [PANE, { target: 'inline', id: 'preview', label: 'P' }] })))
-      .toContain("inline frame 'preview' needs an extension placing it in another plugin's rectangle point")
-    expect(messages(withBundle({
-      frames: [PANE],
-      extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'ghost' }],
-    }))).toContain("extension names frame 'ghost', which this manifest does not declare with target 'inline'")
+    expect(messages(withBundle({ frames: [PANE, { target: 'inline', id: 'preview', label: 'P' }] }))).toContain(
+      "inline frame 'preview' needs an extension placing it in another plugin's rectangle point",
+    )
+    expect(
+      messages(
+        withBundle({
+          frames: [PANE],
+          extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'ghost' }],
+        }),
+      ),
+    ).toContain("extension names frame 'ghost', which this manifest does not declare with target 'inline'")
   })
 
   it('makes a remote contribution declare the bundle it draws from', () => {
-    expect(messages(manifest({
-      frames: [PANE],
-      extensions: [{ id: 'card', point: 'agents:tool-card', label: 'Card', remote: 'toolCard', matches: ['bash'] }],
-    }))).toContain('a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest')
+    expect(
+      messages(
+        manifest({
+          frames: [PANE],
+          extensions: [{ id: 'card', point: 'agents:tool-card', label: 'Card', remote: 'toolCard', matches: ['bash'] }],
+        }),
+      ),
+    ).toContain('a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest')
   })
 })
 
 describe('detail region mounts', () => {
-  const REF_PANEL = { target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board', layout: 'single', regions: { body: 'frame' } }
-  const project = { frames: [{ ...PANE, id: 'board-tasks' }, PROJECT_PANE, REF_PANEL], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE] }
-  const summary = (mounts: unknown, over: Record<string, unknown> = {}) =>
-    ({ id: 'summary', label: 'Summary', kind: 'remote', mode: 'stack', max: 2, mounts, ...over })
+  const REF_PANEL = {
+    target: 'refPanel',
+    id: 'board-ref',
+    label: 'Card',
+    providerId: 'board',
+    layout: 'single',
+    regions: { body: 'frame' },
+  }
+  const project = {
+    frames: [{ ...PANE, id: 'board-tasks' }, PROJECT_PANE, REF_PANEL],
+    routes: [PROJECT_ROUTE],
+    sources: [PROJECT_SOURCE],
+  }
+  const summary = (mounts: unknown, over: Record<string, unknown> = {}) => ({
+    id: 'summary',
+    label: 'Summary',
+    kind: 'remote',
+    mode: 'stack',
+    max: 2,
+    mounts,
+    ...over,
+  })
 
   it('mounts a remote point above a project pane and a reference panel of its own', () => {
-    const parsed = manifest({ ...project, extensionPoints: [summary([
-      { surface: 'board-card', region: 'header' },
-      { surface: 'board-ref', region: 'header' },
-    ])] })
+    const parsed = manifest({
+      ...project,
+      extensionPoints: [
+        summary([
+          { surface: 'board-card', region: 'header' },
+          { surface: 'board-ref', region: 'header' },
+        ]),
+      ],
+    })
     expect(messages(parsed)).toEqual([])
     expect(parsed.success && parsed.data.contributions.extensionPoints[0]!.mounts).toHaveLength(2)
   })
 
   it('refuses a surface this manifest does not declare, which is how another plugin\u2019s view is refused', () => {
-    expect(messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'linear-issue', region: 'header' }])] })))
-      .toContain("mounts names 'linear-issue', which this manifest does not declare as a pane or reference panel")
+    expect(
+      messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'linear-issue', region: 'header' }])] })),
+    ).toContain("mounts names 'linear-issue', which this manifest does not declare as a pane or reference panel")
   })
 
   it('refuses a task pane until it has a selection contract', () => {
-    expect(messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'board-tasks', region: 'footer' }])] })))
-      .toContain("'board-tasks' is a task pane; detail regions mount on project panes and reference panels")
+    expect(
+      messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'board-tasks', region: 'footer' }])] })),
+    ).toContain("'board-tasks' is a task pane; detail regions mount on project panes and reference panels")
   })
 
   it('refuses two points in one region of one surface', () => {
     const mounts = [{ surface: 'board-card', region: 'header' }]
-    expect(messages(manifest({ ...project, extensionPoints: [summary(mounts), summary(mounts, { id: 'other' })] })))
-      .toContain("'board-card' already has an extension point mounted at 'header'")
+    expect(
+      messages(manifest({ ...project, extensionPoints: [summary(mounts), summary(mounts, { id: 'other' })] })),
+    ).toContain("'board-card' already has an extension point mounted at 'header'")
     // The other region of the same surface is a separate placement.
-    expect(manifest({ ...project, extensionPoints: [summary(mounts), summary([{ surface: 'board-card', region: 'footer' }], { id: 'other' })] }).success)
-      .toBe(true)
+    expect(
+      manifest({
+        ...project,
+        extensionPoints: [summary(mounts), summary([{ surface: 'board-card', region: 'footer' }], { id: 'other' })],
+      }).success,
+    ).toBe(true)
   })
 
   it('refuses mounts on any kind but remote, an unknown region, and more than eight', () => {
-    expect(messages(manifest({ ...project, extensionPoints: [{ id: 'rows', label: 'Rows', location: 'pane.footer', surface: 'board-tasks', mounts: [{ surface: 'board-card', region: 'header' }] }] })))
-      .toContain("mounts is not read on a 'rows' extension point")
-    expect(manifest({ ...project, extensionPoints: [summary([{ surface: 'board-card', region: 'aside' }])] }).success).toBe(false)
+    expect(
+      messages(
+        manifest({
+          ...project,
+          extensionPoints: [
+            {
+              id: 'rows',
+              label: 'Rows',
+              location: 'pane.footer',
+              surface: 'board-tasks',
+              mounts: [{ surface: 'board-card', region: 'header' }],
+            },
+          ],
+        }),
+      ),
+    ).toContain("mounts is not read on a 'rows' extension point")
+    expect(
+      manifest({ ...project, extensionPoints: [summary([{ surface: 'board-card', region: 'aside' }])] }).success,
+    ).toBe(false)
     const nine = Array.from({ length: 9 }, () => ({ surface: 'board-card', region: 'header' }))
     expect(manifest({ ...project, extensionPoints: [summary(nine)] }).success).toBe(false)
   })
 })
 
 describe('the exclusive slot', () => {
-  const coreSlot = (over: Record<string, unknown> = {}) =>
-    ({ target: 'coreSlot', id: 'board-rail', label: 'Board task list', coreSlot: 'rail.taskList', ...over })
+  const coreSlot = (over: Record<string, unknown> = {}) => ({
+    target: 'coreSlot',
+    id: 'board-rail',
+    label: 'Board task list',
+    coreSlot: 'rail.taskList',
+    ...over,
+  })
 
   const withBundle = (contributions: Record<string, unknown>) =>
     pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      client: './dist/client.js',
+      contributions,
     })
 
   it('accepts a replacement for a designated core surface', () => {
@@ -1867,45 +2967,68 @@ describe('the exclusive slot', () => {
 
   it('refuses a core surface this acorn has not designated', () => {
     expect(withBundle({ frames: [coreSlot({ coreSlot: 'sidebar.future' })] }).success).toBe(false)
-    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] })))
-      .toContain('a coreSlot surface must name which core surface it replaces')
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] }))).toContain(
+      'a coreSlot surface must name which core surface it replaces',
+    )
   })
 
   it('requires a remote tree for a pane switcher replacement', () => {
-    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: 'pane.switcher' })] })))
-      .toContain('pane.switcher needs a single remote-tree body')
-    expect(messages(withBundle({ frames: [coreSlot({
-      coreSlot: 'pane.switcher', layout: 'single', regions: { body: { kind: 'remote', entry: 'switcher' } },
-    })] }))).toEqual([])
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: 'pane.switcher' })] }))).toContain(
+      'pane.switcher needs a single remote-tree body',
+    )
+    expect(
+      messages(
+        withBundle({
+          frames: [
+            coreSlot({
+              coreSlot: 'pane.switcher',
+              layout: 'single',
+              regions: { body: { kind: 'remote', entry: 'switcher' } },
+            }),
+          ],
+        }),
+      ),
+    ).toEqual([])
   })
 
   it('needs a client bundle, because the host mounts one here', () => {
     // Without one there is nothing to draw in core's place, and the trust queue holds bundles, so a
     // bundle-less package offering to replace a core surface would never reach the prompt disclosing it.
-    expect(messages(manifest({ frames: [coreSlot()] })))
-      .toContain('a coreSlot surface needs a client bundle; declare `client` in the manifest')
+    expect(messages(manifest({ frames: [coreSlot()] }))).toContain(
+      'a coreSlot surface needs a client bundle; declare `client` in the manifest',
+    )
   })
 
   it('refuses `coreSlot` on anything that is not a coreSlot surface', () => {
-    expect(messages(manifest({ frames: [{ ...PANE, coreSlot: 'rail.taskList' }] })))
-      .toContain('coreSlot is only valid on a coreSlot surface')
+    expect(messages(manifest({ frames: [{ ...PANE, coreSlot: 'rail.taskList' }] }))).toContain(
+      'coreSlot is only valid on a coreSlot surface',
+    )
   })
 
   it('is not a pane, so no verb can name it', () => {
     // `openPane` opens into a task's layout and a core surface belongs to no task. A verb that could name
     // one would be an offer that can only fail.
-    expect(withBundle({
-      frames: [coreSlot()],
-      commands: [{ id: 'go', title: 'Go', action: { verb: 'openPane', pane: 'board-rail' } }],
-    }).success).toBe(false)
+    expect(
+      withBundle({
+        frames: [coreSlot()],
+        commands: [{ id: 'go', title: 'Go', action: { verb: 'openPane', pane: 'board-rail' } }],
+      }).success,
+    ).toBe(false)
   })
 })
 
 describe('forward compatibility: unknown is retained and reported', () => {
-  // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn still loads on this
-  // one; what changed is that it no longer does so in silence.
+  // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn
+  // still loads on this one, and it does not do so in silence.
   const parse = (extra: Record<string, unknown>) =>
-    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3', ...extra })
+    parsePluginManifest({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '4',
+      ...extra,
+    })
 
   it('names an unknown top-level key, contribution kind and node facet', () => {
     const result = parse({
@@ -1925,7 +3048,7 @@ describe('forward compatibility: unknown is retained and reported', () => {
   it('still loads it, which is the half that must not change', () => {
     const result = parse({ widgets: [], permissions: { node: { core: ['git'] } } })
     // The known facet survives, the unknown key is gone from the parsed shape, and the manifest is
-    // usable. Refusing it here is what `apiVersion` used to do and what this rule exists to prevent.
+    // usable. Refusing it here is what this rule exists to prevent.
     expect(result.ok && result.manifest.permissions.node.core).toEqual(['git'])
     expect(result.ok && 'widgets' in result.manifest).toBe(false)
   })
@@ -1934,11 +3057,27 @@ describe('forward compatibility: unknown is retained and reported', () => {
     // `plugins` is a group only core fills, and `galaxy` is no scope at all. Either one refused would
     // drop the whole plugin over where one page is filed.
     const settings = (extra: Record<string, unknown>) => ({
-      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+      target: 'settings',
+      id: 'board-settings',
+      label: 'Board',
+      layout: 'single',
+      regions: { body: 'frame' },
+      ...extra,
     })
-    const result = parse({ contributions: { frames: [settings({ category: 'plugins', settingsScope: 'galaxy' }), settings({ id: 'board-more', category: 'agents' })] } })
-    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.category, frame.settingsScope]))
-      .toEqual([['board-settings', undefined, undefined], ['board-more', 'agents', undefined]])
+    const result = parse({
+      contributions: {
+        frames: [
+          settings({ category: 'plugins', settingsScope: 'galaxy' }),
+          settings({ id: 'board-more', category: 'agents' }),
+        ],
+      },
+    })
+    expect(
+      result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.category, frame.settingsScope]),
+    ).toEqual([
+      ['board-settings', undefined, undefined],
+      ['board-more', 'agents', undefined],
+    ])
     expect(result.ok && [...result.unknown].sort()).toEqual([
       'contributions.frames.board-settings.category: plugins',
       'contributions.frames.board-settings.settingsScope: galaxy',
@@ -1947,16 +3086,37 @@ describe('forward compatibility: unknown is retained and reported', () => {
 
   it('keeps a settings page whose search lists are past the limit, without those lists, and says so', () => {
     const settings = (extra: Record<string, unknown>) => ({
-      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+      target: 'settings',
+      id: 'board-settings',
+      label: 'Board',
+      layout: 'single',
+      regions: { body: 'frame' },
+      ...extra,
     })
     const words = Array.from({ length: 17 }, (_, index) => `word${index}`)
-    const result = parse({ contributions: { frames: [
-      settings({ keywords: words, sections: [{ id: 'bad id', label: 'Nope' }] }),
-      settings({ id: 'board-more', keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] }),
-      // Two sections with one id: a link could reach only one of them.
-      settings({ id: 'board-twice', sections: [{ id: 'columns', label: 'Columns' }, { id: 'columns', label: 'Lanes' }] }),
-    ] } })
-    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.keywords, frame.sections])).toEqual([
+    const result = parse({
+      contributions: {
+        frames: [
+          settings({ keywords: words, sections: [{ id: 'bad id', label: 'Nope' }] }),
+          settings({
+            id: 'board-more',
+            keywords: ['cards'],
+            sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }],
+          }),
+          // Two sections with one id: a link could reach only one of them.
+          settings({
+            id: 'board-twice',
+            sections: [
+              { id: 'columns', label: 'Columns' },
+              { id: 'columns', label: 'Lanes' },
+            ],
+          }),
+        ],
+      },
+    })
+    expect(
+      result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.keywords, frame.sections]),
+    ).toEqual([
       ['board-settings', undefined, undefined],
       ['board-more', ['cards'], [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }]],
       ['board-twice', undefined, undefined],
@@ -1970,15 +3130,26 @@ describe('forward compatibility: unknown is retained and reported', () => {
 
   it('keeps a settings page whose rail switch names a source the plugin does not own, and says which', () => {
     const settings = (extra: Record<string, unknown>) => ({
-      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+      target: 'settings',
+      id: 'board-settings',
+      label: 'Board',
+      layout: 'single',
+      regions: { body: 'frame' },
+      ...extra,
     })
     const board = { id: 'board', label: 'Board', order: 50, items: '/v1/p/board/items' }
-    const result = parse({ contributions: {
-      sources: [board],
-      frames: [settings({ railSourceVisibility: ['board', 'home', 'github'] })],
-    } })
+    const result = parse({
+      contributions: {
+        sources: [board],
+        frames: [settings({ railSourceVisibility: ['board', 'home', 'github'] })],
+      },
+    })
     // The page and its own source's switch survive. The core source and another plugin's are named.
-    expect(result.ok && result.manifest.contributions.frames[0]?.railSourceVisibility).toEqual(['board', 'home', 'github'])
+    expect(result.ok && result.manifest.contributions.frames[0]?.railSourceVisibility).toEqual([
+      'board',
+      'home',
+      'github',
+    ])
     expect(result.ok && [...result.unknown].sort()).toEqual([
       "contributions.frames.board-settings.railSourceVisibility: 'github' is not one of this plugin's sources",
       "contributions.frames.board-settings.railSourceVisibility: 'home' is not one of this plugin's sources",
@@ -1994,7 +3165,14 @@ describe('forward compatibility: unknown is retained and reported', () => {
 // so neither can live on the field.
 describe('declared dependencies', () => {
   const requires = (plugins: unknown[]) =>
-    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', requires: { plugins } })
+    pluginManifestSchema.safeParse({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      requires: { plugins },
+    })
 
   it('refuses a package that requires itself', () => {
     const result = requires([{ id: 'board' }])
@@ -2003,7 +3181,10 @@ describe('declared dependencies', () => {
   })
 
   it('refuses the same dependency twice, since the two ranges could disagree', () => {
-    const result = requires([{ id: 'agents', version: '1' }, { id: 'agents', version: '2' }])
+    const result = requires([
+      { id: 'agents', version: '1' },
+      { id: 'agents', version: '2' },
+    ])
     expect(result.success).toBe(false)
     expect(!result.success && result.error.issues[0].message).toContain('required twice')
   })
@@ -2019,35 +3200,61 @@ describe('declared dependencies', () => {
 
 it('reports cross-field errors in author-facing order with their descriptor paths', () => {
   const result = parsePluginManifest({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3',
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: 'acorn-1',
+    apiVersion: '4',
     requires: { plugins: [{ id: 'board' }] },
     contributions: {
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }],
+      frames: [
+        { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] },
+      ],
       commands: [{ id: 'open', kind: 'action', title: 'Open', action: { verb: 'openPane', pane: 'missing' } }],
     },
   })
   expect(result).toEqual({
     ok: false,
-    reason: 'acorn-plugin.json does not match the manifest schema — requires.plugins[0].id: a plugin cannot require itself; contributions.frames[0]: a webview surface needs a client bundle; declare `client` in the manifest; contributions.commands[0].action.pane: openPane names \'missing\', which this manifest does not declare as a task-scoped pane',
+    reason:
+      "acorn-plugin.json does not match the manifest schema — requires.plugins[0].id: a plugin cannot require itself; contributions.frames[0]: a webview surface needs a client bundle; declare `client` in the manifest; contributions.commands[0].action.pane: openPane names 'missing', which this manifest does not declare as a task-scoped pane",
   })
 })
 
 describe('derived data sources', () => {
-  const source = (extra: Record<string, unknown>) => nodeManifest({ dataSources: [{ sourceId: 'readiness', name: 'Readiness',
-    singular: 'Issue', plural: 'Issues', identityScope: 'Linear issue', handler: '/v1/p/board/readiness', ...extra }] })
+  const source = (extra: Record<string, unknown>) =>
+    nodeManifest({
+      dataSources: [
+        {
+          sourceId: 'readiness',
+          name: 'Readiness',
+          singular: 'Issue',
+          plural: 'Issues',
+          identityScope: 'Linear issue',
+          handler: '/v1/p/board/readiness',
+          ...extra,
+        },
+      ],
+    })
 
   it('accepts declared inputs and refuses them beside a provider', () => {
-    const inputs = { issues: { source: 'linear:issues', label: 'Issues' }, pulls: { source: 'github:pull-requests', label: 'Pull requests', optional: true } }
+    const inputs = {
+      issues: { source: 'linear:issues', label: 'Issues' },
+      pulls: { source: 'github:pull-requests', label: 'Pull requests', optional: true },
+    }
     expect(source({ inputs }).success).toBe(true)
     const both = source({ inputs, providerId: 'linear' })
     expect(both.success).toBe(false)
-    expect(both.error?.issues.map(issue => issue.message)).toContain("A source with inputs can't also own a provider.")
+    expect(both.error?.issues.map((issue) => issue.message)).toContain(
+      "A source with inputs can't also own a provider.",
+    )
   })
 
   it('refuses a bad input name, a source without a plugin, and a ninth input', () => {
     expect(source({ inputs: { Issues: { source: 'linear:issues', label: 'Issues' } } }).success).toBe(false)
     expect(source({ inputs: { issues: { source: 'issues', label: 'Issues' } } }).success).toBe(false)
-    const nine = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`input${i}`, { source: 'linear:issues', label: 'Issues' }]))
+    const nine = Object.fromEntries(
+      Array.from({ length: 9 }, (_, i) => [`input${i}`, { source: 'linear:issues', label: 'Issues' }]),
+    )
     expect(source({ inputs: nine }).success).toBe(false)
   })
 })

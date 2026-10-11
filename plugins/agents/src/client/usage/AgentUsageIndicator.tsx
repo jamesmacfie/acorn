@@ -8,12 +8,11 @@ import { agentUsageStore } from './usageStore'
 // How much of each harness's plan is gone, in the pane header, with the full readout behind it.
 //
 // A Popover, not a hover tooltip: the panel it holds has a refresh button and several lines of
-// numbers in it, so it has to be reachable from the keyboard and stay open while it is read. The
-// hover-only version of this was a rectangle the kit had no name for.
+// numbers in it, so it has to be reachable from the keyboard and stay open while it is read.
 export default function AgentUsageIndicator() {
-  // The button is the always-mounted reader, so it starts the load itself. The panel below also calls
-  // init(), and that is fine: the store counts consumers. When the panel was the only caller the
-  // button sat on "reading usage…" forever, because a Popover does not render its content until it opens.
+  // The button is the always-mounted reader, so it starts the load itself. A Popover does not render
+  // its content until it opens, so with the panel as the only caller the button would sit on "reading
+  // usage…" forever. The panel calls init() too, which is fine: the store counts consumers.
   onMount(() => onCleanup(agentUsageStore.init()))
 
   const entries = () => usageSummaryEntries(agentUsageStore.snapshot())
@@ -34,13 +33,15 @@ export default function AgentUsageIndicator() {
           <Show when={entries().length} fallback={<Text emphasis="muted">reading usage…</Text>}>
             {/* The pairs sit a step further apart than the dot sits from its own label, which is
                 what keeps "Claude Code 48%" and "Codex —" reading as two readings rather than one
-                run of words. Gap `none` on the inner one had the dot touching the C. */}
+                run of words. Gap `none` on the inner one puts the dot against the first letter. */}
             <Inline gap="stack">
               <For each={entries()}>
                 {(entry) => (
                   <Inline>
                     <StatusDot tone={usageTone(entry.health)} size="sm" />
-                    <Text emphasis="muted">{entry.label} {entry.value}</Text>
+                    <Text emphasis="muted">
+                      {entry.label} {entry.value}
+                    </Text>
                   </Inline>
                 )}
               </For>

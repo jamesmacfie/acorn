@@ -12,15 +12,18 @@ export function renderSessionConversation(snapshot: AgentSessionSnapshot): { tex
   const lines = events.flatMap((record) => {
     if (record.event.type === 'user_message') return [`User:\n${record.event.text}`]
     if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-    if (record.event.type === 'file_change') return [`File change: ${record.event.path ?? record.event.summary ?? 'unspecified'}`]
-    if (record.event.type === 'plan') return [`Plan:\n${record.event.entries.map((entry) => `- [${entry.status}] ${entry.text}`).join('\n')}`]
+    if (record.event.type === 'file_change')
+      return [`File change: ${record.event.path ?? record.event.summary ?? 'unspecified'}`]
+    if (record.event.type === 'plan')
+      return [`Plan:\n${record.event.entries.map((entry) => `- [${entry.status}] ${entry.text}`).join('\n')}`]
     return []
   })
   const rendered = lines.join('\n\n')
   const truncated = snapshot.events.length > MAX_EVENTS || rendered.length > MAX_CHARACTERS
   return {
-    text: `${truncated ? '[Earlier conversation events were omitted.]\n\n' : ''}${rendered.slice(-MAX_CHARACTERS)
-      || '(The source session has no displayable conversation events.)'}`,
+    text: `${truncated ? '[Earlier conversation events were omitted.]\n\n' : ''}${
+      rendered.slice(-MAX_CHARACTERS) || '(The source session has no displayable conversation events.)'
+    }`,
     truncated,
   }
 }

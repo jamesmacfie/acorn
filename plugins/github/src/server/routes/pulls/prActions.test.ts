@@ -5,7 +5,14 @@ import type { AppEnv, Principal } from '@acorn/plugin-api/node'
 import { prActions } from './prActions'
 // Everything this route test needs from the host, through the one seam a third-party author would use:
 // the auth gate, a migrated core database, this plugin's own database, and the `c.env` bindings.
-import { makeTestDb, makeTestPluginDb, testEnv, testGate, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import {
+  makeTestDb,
+  makeTestPluginDb,
+  testEnv,
+  testGate,
+  type TestDb,
+  type TestPluginDb,
+} from '@acorn/plugin-api/testkit'
 import { pullRequests, repos } from '../../../node/schema'
 import { gh, ghGraphQL } from '../../githubApi'
 import type { GithubEmit } from '../../events'
@@ -40,7 +47,9 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
     emit = vi.fn<GithubEmit>()
-    await plugin.db.insert(repos).values({ userId: 'james', id: 1, owner: 'acme', name: 'widget', fetchedAt: Date.now() })
+    await plugin.db
+      .insert(repos)
+      .values({ userId: 'james', id: 1, owner: 'acme', name: 'widget', fetchedAt: Date.now() })
     await plugin.db.insert(pullRequests).values({
       userId: 'james',
       repoId: 1,
@@ -72,10 +81,15 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
   })
 
   // Core folds the project facet it hands the client (`runn-fast`), the mirror keeps GitHub's own
-  // spelling (`Runn-Fast`), so a case-sensitive match reported every such repo as unmirrored.
+  // spelling (`Runn-Fast`), so a case-sensitive match would report every such repo as unmirrored.
   it('resolves a mirrored repo whose owner differs only in case', async () => {
-    await plugin.db.insert(repos).values({ userId: 'james', id: 2, owner: 'Acme-Corp', name: 'Widget', fetchedAt: Date.now() })
-    const res = await req(PRINCIPAL, 'POST', '/api/repos/acme-corp/widget/pulls/1/viewed', { path: 'src/a.ts', viewed: true })
+    await plugin.db
+      .insert(repos)
+      .values({ userId: 'james', id: 2, owner: 'Acme-Corp', name: 'Widget', fetchedAt: Date.now() })
+    const res = await req(PRINCIPAL, 'POST', '/api/repos/acme-corp/widget/pulls/1/viewed', {
+      path: 'src/a.ts',
+      viewed: true,
+    })
     expect(res.status).toBe(200)
   })
 
@@ -92,25 +106,33 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
   })
 
   it('viewed toggle is app-state only → typed success, no GitHub call', async () => {
-    const res = await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/viewed', { path: 'src/a.ts', viewed: true })
+    const res = await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/viewed', {
+      path: 'src/a.ts',
+      viewed: true,
+    })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ path: 'src/a.ts', viewed: true })
     expect(emit).toHaveBeenCalledWith('pr-synced', {
-      repoOwner: 'acme', repoName: 'widget', pullNumber: 1, headSha: 'abc123',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      pullNumber: 1,
+      headSha: 'abc123',
     })
   })
 
   it('announces every successful PR mirror write or invalidation and suppresses repeat no-ops', async () => {
-    const json = (body: unknown = {}) => new Response(JSON.stringify(body), {
-      headers: { 'content-type': 'application/json' },
-    })
-    vi.mocked(gh).mockImplementation(async (_token, path) => {
-      if (path.endsWith('/issues/1/comments')) return json({
-        node_id: 'comment-1',
-        user: { login: 'octocat' },
-        body_html: '<p>Hello</p>',
-        created_at: '2026-09-11T00:00:00Z',
+    const json = (body: unknown = {}) =>
+      new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
       })
+    vi.mocked(gh).mockImplementation(async (_token, path) => {
+      if (path.endsWith('/issues/1/comments'))
+        return json({
+          node_id: 'comment-1',
+          user: { login: 'octocat' },
+          body_html: '<p>Hello</p>',
+          created_at: '2026-09-11T00:00:00Z',
+        })
       if (path.includes('/labels')) return json([{ name: 'ready', color: '00ff00' }])
       if (path.includes('/requested_reviewers')) return json({ requested_reviewers: [{ login: 'reviewer' }] })
       return json()
@@ -118,7 +140,10 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     vi.mocked(ghGraphQL).mockResolvedValue(json({ data: {} }))
 
     const expected = {
-      repoOwner: 'acme', repoName: 'widget', pullNumber: 1, headSha: 'abc123',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      pullNumber: 1,
+      headSha: 'abc123',
     }
     const succeedsWithEvent = async (method: string, path: string, body?: unknown) => {
       emit.mockClear()
@@ -137,7 +162,10 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/labels', { name: 'ready' })
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/viewed', { path: 'src/a.ts', viewed: true })
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/review-comments', {
-      body: 'Please rename this', path: 'src/a.ts', line: 3, side: 'RIGHT',
+      body: 'Please rename this',
+      path: 'src/a.ts',
+      line: 3,
+      side: 'RIGHT',
     })
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/review-comments/42/replies', { body: 'Done' })
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/threads/thread-1/resolve', { resolved: true })
@@ -145,9 +173,14 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     await succeedsWithEvent('POST', '/api/repos/acme/widget/pulls/1/requested-reviewers', { login: 'reviewer' })
 
     emit.mockClear()
-    expect((await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/viewed', {
-      path: 'src/a.ts', viewed: true,
-    })).status).toBe(200)
+    expect(
+      (
+        await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/viewed', {
+          path: 'src/a.ts',
+          viewed: true,
+        })
+      ).status,
+    ).toBe(200)
     expect(emit).not.toHaveBeenCalled()
 
     emit.mockClear()
@@ -155,9 +188,13 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     expect(emit).not.toHaveBeenCalled()
 
     emit.mockClear()
-    expect((await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/requested-reviewers', {
-      login: 'reviewer',
-    })).status).toBe(200)
+    expect(
+      (
+        await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/requested-reviewers', {
+          login: 'reviewer',
+        })
+      ).status,
+    ).toBe(200)
     expect(emit).not.toHaveBeenCalled()
   })
 

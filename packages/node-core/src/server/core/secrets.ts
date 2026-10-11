@@ -34,7 +34,7 @@ export function redact(text: string, secrets: readonly string[]): string {
 // against `Object.freeze(new Error(...))`. When a field cannot be rewritten, a redacted plain Error
 // replaces it: losing the class is bad, leaking the credential is worse.
 //
-// `seen` breaks a circular cause chain, which otherwise recursed until RangeError.
+// `seen` breaks a circular cause chain, which would otherwise recurse until RangeError.
 function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = new Set()): unknown {
   if (!(error instanceof Error)) {
     return typeof error === 'string' ? redact(error, secrets) : error
@@ -83,7 +83,11 @@ export class SecretService {
 
   // For callers that have to tell "not connected" from "failed". githubToken() relies on this to
   // converge never-connected and revoked onto one user-visible outcome.
-  async useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null> {
+  async useOptional<T>(
+    ref: string | null | undefined,
+    purpose: string,
+    fn: (plaintext: string) => T | Promise<T>,
+  ): Promise<T | null> {
     try {
       return await this.use(ref, purpose, fn)
     } catch (error) {

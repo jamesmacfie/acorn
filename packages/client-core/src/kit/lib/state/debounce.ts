@@ -6,9 +6,26 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   const run = ((...args: A) => {
     pending = args
     clearTimeout(timer)
-    timer = setTimeout(() => { timer = undefined; const a = pending; pending = undefined; if (a) fn(...a) }, ms)
+    timer = setTimeout(() => {
+      timer = undefined
+      const a = pending
+      pending = undefined
+      if (a) fn(...a)
+    }, ms)
   }) as Debounced<A>
-  run.flush = () => { if (timer) { clearTimeout(timer); timer = undefined; const a = pending; pending = undefined; if (a) fn(...a) } }
-  run.cancel = () => { clearTimeout(timer); timer = undefined; pending = undefined }
+  run.flush = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = undefined
+      const a = pending
+      pending = undefined
+      if (a) fn(...a)
+    }
+  }
+  run.cancel = () => {
+    clearTimeout(timer)
+    timer = undefined
+    pending = undefined
+  }
   return run
 }

@@ -27,11 +27,7 @@ import {
 } from './policy'
 import { foldReadableEvents, type AgentReadResult } from './readProjection'
 import { DelegationReports, delegatedTurn, turnResultSchema } from './reports'
-import {
-  AgentDelegationStore,
-  DelegationLimitError,
-  type AgentSpawn,
-} from './store'
+import { AgentDelegationStore, DelegationLimitError, type AgentSpawn } from './store'
 import { WorktreeProvisioning, type WorktreeTaskService } from './worktreeProvisioning'
 import { spawnConfigOptions, spawnProfileId } from './spawnConfiguration'
 
@@ -83,30 +79,36 @@ export type AgentCancelResult = {
 const operationKey = (context: ToolContext, tool: 'agent_prompt' | 'agent_cancel'): string =>
   `${context.taskId}:${context.sessionId}:${tool}:${context.callId}`
 
-const waitConditionMet = (snapshot: AgentSessionSnapshot, until: AgentWaitInput['until'], afterSeq: number): boolean => {
+const waitConditionMet = (
+  snapshot: AgentSessionSnapshot,
+  until: AgentWaitInput['until'],
+  afterSeq: number,
+): boolean => {
   if (snapshot.wait?.until === until && snapshot.wait.afterSeq === afterSeq) return snapshot.wait.matched
   if (until === 'ready') return snapshot.session.runtimeState === 'ready'
   if (until === 'attention') return !['none', 'unread'].includes(snapshot.session.attention)
   if (until === 'stopped') return ['stopped', 'failed', 'archived'].includes(snapshot.session.runtimeState)
-  return snapshot.events.some((record) =>
-    record.seq > afterSeq && (record.event.type === 'turn_completed' || record.event.type === 'error'))
+  return snapshot.events.some(
+    (record) => record.seq > afterSeq && (record.event.type === 'turn_completed' || record.event.type === 'error'),
+  )
 }
 
-const ownerOf = (caller: Caller) => caller.managedSession
-  ? { sessionId: caller.managedSession.id, title: caller.title }
-  : { sessionId: null, title: caller.title }
+const ownerOf = (caller: Caller) =>
+  caller.managedSession
+    ? { sessionId: caller.managedSession.id, title: caller.title }
+    : { sessionId: null, title: caller.title }
 
 const spawnResult = (spawn: AgentSpawn): AgentSpawnResult => ({
-    spawnId: spawn.id,
-    taskId: spawn.childTaskId,
-    sessionId: spawn.childSessionId,
-    turnId: spawn.childTurnId,
-    depth: spawn.depth,
-    provisioningState: spawn.provisioningState,
-    // A newly created session's ledger begins at zero. Keep this replay-stable even when provider
-    // startup has appended metadata by the time an idempotent retry arrives.
-    cursor: 0,
-    ...(spawn.error ? { error: spawn.error } : {}),
+  spawnId: spawn.id,
+  taskId: spawn.childTaskId,
+  sessionId: spawn.childSessionId,
+  turnId: spawn.childTurnId,
+  depth: spawn.depth,
+  provisioningState: spawn.provisioningState,
+  // A newly created session's ledger begins at zero. Keep this replay-stable even when provider
+  // startup has appended metadata by the time an idempotent retry arrives.
+  cursor: 0,
+  ...(spawn.error ? { error: spawn.error } : {}),
 })
 
 /** Plugin-owned orchestration over the managed runtime and its database. */
@@ -145,9 +147,7 @@ export class AgentDelegationService {
     const visibility = await this.store.visibilityForSessions(page.sessions)
     if (!visibility.length) return { ...page, delegations: [] }
     const sessions = new Map(page.sessions.map((session) => [session.id, session]))
-    const terminals = visibility.some((item) => !item.managedParentSessionId)
-      ? await this.terminalSessions()
-      : []
+    const terminals = visibility.some((item) => !item.managedParentSessionId) ? await this.terminalSessions() : []
     const delegations: AgentSessionDelegation[] = []
     for (const item of visibility) {
       const child = sessions.get(item.sessionId)
@@ -161,8 +161,9 @@ export class AgentDelegationService {
         })
         continue
       }
-      const terminal = terminals.find((candidate) =>
-        candidate.id === item.ownerSessionId && candidate.taskId === item.ownerTaskId)
+      const terminal = terminals.find(
+        (candidate) => candidate.id === item.ownerSessionId && candidate.taskId === item.ownerTaskId,
+      )
       delegations.push({
         sessionId: item.sessionId,
         depth: item.depth,
@@ -312,14 +313,16 @@ export class AgentDelegationService {
     const custom = await this.customAgentFor(input)
     const defaults = await this.runtime.spawnedAgentDefaults()
     const profileId = spawnProfileId(defaults, caller.profileId, input.profileId, custom)
-    const provider = await this.runtime.usableProvider((candidate) => candidate.profileId === profileId)
+    const provider = await this.runtime.providers.usable((candidate) => candidate.profileId === profileId)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
     if (!provider.installed || provider.authenticated === false) {
       throw new ToolError('bad_request', provider.diagnostics[0] ?? `Profile '${profileId}' is unavailable.`)
     }
     // A custom agent narrows like any other ceiling, between the caller's and the one asked for here.
     const toolCeiling = delegatedToolCeiling(
-      custom?.maxToolRisk ? delegatedToolCeiling(context.toolCeiling, { maxRisk: custom.maxToolRisk }) : context.toolCeiling,
+      custom?.maxToolRisk
+        ? delegatedToolCeiling(context.toolCeiling, { maxRisk: custom.maxToolRisk })
+        : context.toolCeiling,
       input.toolCeiling,
     )
     // Resolve before reserving the worktree so retries keep the same model and effort snapshot.
@@ -327,32 +330,33 @@ export class AgentDelegationService {
     if (Object.keys(configOptions).length) input = { ...input, configOptions }
     let reserved: ReturnType<AgentDelegationStore['reserveShared']>
     try {
-      reserved = input.isolation === 'worktree'
-        ? this.store.reserveWorktree({
-            ownerTaskId: caller.taskId,
-            ownerSessionId: caller.sessionId,
-            idempotencyKey,
-            provisioning: {
-              title: input.title,
-              prompt: input.prompt,
-              branch: input.title,
-              ...(input.baseBranch !== undefined ? { baseBranch: input.baseBranch } : {}),
-              providerId: provider.id,
-              profileId: provider.profileId,
-              parentSessionId: caller.managedSession?.id ?? null,
-              parentTurnId: caller.parentTurnId,
-              toolCeiling,
-              ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
-              ...(input.checks ? { checks: input.checks } : {}),
-              ...(input.configOptions ? { configOptions: input.configOptions } : {}),
-              ...(custom ? { customAgentId: custom.id } : {}),
-            },
-          })
-        : this.store.reserveShared({
-            ownerTaskId: caller.taskId,
-            ownerSessionId: caller.sessionId,
-            idempotencyKey,
-          })
+      reserved =
+        input.isolation === 'worktree'
+          ? this.store.reserveWorktree({
+              ownerTaskId: caller.taskId,
+              ownerSessionId: caller.sessionId,
+              idempotencyKey,
+              provisioning: {
+                title: input.title,
+                prompt: input.prompt,
+                branch: input.title,
+                ...(input.baseBranch !== undefined ? { baseBranch: input.baseBranch } : {}),
+                providerId: provider.id,
+                profileId: provider.profileId,
+                parentSessionId: caller.managedSession?.id ?? null,
+                parentTurnId: caller.parentTurnId,
+                toolCeiling,
+                ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+                ...(input.checks ? { checks: input.checks } : {}),
+                ...(input.configOptions ? { configOptions: input.configOptions } : {}),
+                ...(custom ? { customAgentId: custom.id } : {}),
+              },
+            })
+          : this.store.reserveShared({
+              ownerTaskId: caller.taskId,
+              ownerSessionId: caller.sessionId,
+              idempotencyKey,
+            })
     } catch (error) {
       if (error instanceof DelegationLimitError) throw new ToolError('bad_request', error.message)
       throw error
@@ -371,22 +375,25 @@ export class AgentDelegationService {
     let childSessionId: string | undefined
     let childTurnId: string | undefined
     try {
-      const session = await this.runtime.acceptSession({
-        taskId: caller.taskId,
-        providerId: provider.id,
-        profileId: provider.profileId,
-        title: input.title,
-        kind: 'delegated',
-        parentSessionId: caller.managedSession?.id,
-        parentTurnId: caller.parentTurnId ?? undefined,
-        ...(custom ? { customAgentId: custom.id } : {}),
-        config: {
-          delegationSpawnId: reserved.spawn.id,
-          toolCeiling,
-          ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
-          ...(input.configOptions ? { requestedConfigOptions: input.configOptions } : {}),
+      const session = await this.runtime.acceptSession(
+        {
+          taskId: caller.taskId,
+          providerId: provider.id,
+          profileId: provider.profileId,
+          title: input.title,
+          kind: 'delegated',
+          parentSessionId: caller.managedSession?.id,
+          parentTurnId: caller.parentTurnId ?? undefined,
+          ...(custom ? { customAgentId: custom.id } : {}),
+          config: {
+            delegationSpawnId: reserved.spawn.id,
+            toolCeiling,
+            ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+            ...(input.configOptions ? { requestedConfigOptions: input.configOptions } : {}),
+          },
         },
-      }, `delegation:${reserved.spawn.id}:session`)
+        `delegation:${reserved.spawn.id}:session`,
+      )
       childSessionId = session.id
       const turn = await this.runtime.enqueueTurn(session.id, {
         ...delegatedTurn(ownerOf(caller), input.prompt, input.resultSchema, {
@@ -479,11 +486,7 @@ export class AgentDelegationService {
     return operation
   }
 
-  private async cancelOnce(
-    input: AgentCancelInput,
-    session: AgentSession,
-    key: string,
-  ): Promise<AgentCancelResult> {
+  private async cancelOnce(input: AgentCancelInput, session: AgentSession, key: string): Promise<AgentCancelResult> {
     const target = input.turnId
       ? await this.runtime.store.turn(input.turnId)
       : await this.runtime.store.activeTurn(session.id)
@@ -498,7 +501,7 @@ export class AgentDelegationService {
     // A plugin's note belongs to the delegated turn it follows, so cancelling it stops that whole turn's
     // operation: its other notes, its review, and its report.
     const followUpOf = target.effectivePolicy.followUpOf
-    const origin = typeof followUpOf === 'string' ? await this.runtime.store.turn(followUpOf) ?? target : target
+    const origin = typeof followUpOf === 'string' ? ((await this.runtime.store.turn(followUpOf)) ?? target) : target
     await this.reports.cancelFollowUps(origin)
     const resultingSession = await this.runtime.store.requireSession(session.id)
     const result: AgentCancelResult = {
@@ -541,8 +544,9 @@ export class AgentDelegationService {
         title: managed.title,
       }
     }
-    const terminal = (await this.terminalSessions()).find((candidate) =>
-      candidate.id === context.sessionId && candidate.taskId === context.taskId)
+    const terminal = (await this.terminalSessions()).find(
+      (candidate) => candidate.id === context.sessionId && candidate.taskId === context.taskId,
+    )
     if (!terminal) throw new ToolError('not_found', 'Session not found.')
     return {
       taskId: context.taskId,

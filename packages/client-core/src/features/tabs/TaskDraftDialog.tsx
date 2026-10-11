@@ -12,17 +12,33 @@ import type { Task } from '../../infra/queries'
 import { BranchOptions } from './BranchOptions'
 import { createTaskDraftStore, type TaskDraft } from './taskDraftStore'
 
-export function TaskDraftDialog(props: { draft: TaskDraft; tasks: () => Task[] | undefined; onClose: () => void; onCreated?: (task: Task) => Promise<void> }) {
+export function TaskDraftDialog(props: {
+  draft: TaskDraft
+  tasks: () => Task[] | undefined
+  onClose: () => void
+  onCreated?: (task: Task) => Promise<void>
+}) {
   const navigate = useNavigate()
   const model = createTaskDraftStore(props.draft, props.tasks, props.onClose, navigate, props.onCreated)
   let titleInput: HTMLInputElement | undefined
   const isNew = props.draft.mode === 'new'
   const fallbackIcon = taskOriginAppearance(props.draft.mode === 'new' ? 'local' : props.draft.task.origin).glyph
-  const projectOptions = props.draft.mode === 'new' ? props.draft.projects.map((project) => ({ value: project.id, label: project.name })) : []
+  const projectOptions =
+    props.draft.mode === 'new'
+      ? props.draft.projects.map((project) => ({ value: project.id, label: project.name }))
+      : []
 
   return (
     <Modal title={isNew ? 'New task' : 'Rename task'} autoFocus={() => titleInput} onDismiss={props.onClose}>
-      <Show when={isNew && model.selectedProject()?.vcs === 'git' && props.draft.mode === 'new' && !props.draft.baseCommit && !props.draft.worktreePath}>
+      <Show
+        when={
+          isNew &&
+          model.selectedProject()?.vcs === 'git' &&
+          props.draft.mode === 'new' &&
+          !props.draft.baseCommit &&
+          !props.draft.worktreePath
+        }
+      >
         <Tabs
           tabs={[
             { id: 'new', label: 'New worktree' },
@@ -36,12 +52,27 @@ export function TaskDraftDialog(props: { draft: TaskDraft; tasks: () => Task[] |
         />
       </Show>
       <Modal.Body>
-        <Show when={model.error()}><Alert>{model.error()}</Alert></Show>
-        <Show when={model.createdTask()}>{(task) => <Alert>Task {task().title} was created. Retry the workflow on this task or open it.</Alert>}</Show>
-        <Show when={model.baseCommit()}>{(commit) => <Text tone="muted" wrap>Starting at commit {commit()}</Text>}</Show>
+        <Show when={model.error()}>
+          <Alert>{model.error()}</Alert>
+        </Show>
+        <Show when={model.createdTask()}>
+          {(task) => <Alert>Task {task().title} was created. Retry the workflow on this task or open it.</Alert>}
+        </Show>
+        <Show when={model.baseCommit()}>
+          {(commit) => (
+            <Text tone="muted" wrap>
+              Starting at commit {commit()}
+            </Text>
+          )}
+        </Show>
         <Show when={isNew}>
           <Field label="Project">
-            <Select value={model.projectId()} onChange={model.setProjectId} options={projectOptions} disabled={props.draft.mode === 'new' && !!(props.draft.baseCommit || props.draft.worktreePath)} />
+            <Select
+              value={model.projectId()}
+              onChange={model.setProjectId}
+              options={projectOptions}
+              disabled={props.draft.mode === 'new' && !!(props.draft.baseCommit || props.draft.worktreePath)}
+            />
           </Field>
         </Show>
         <Field label="Title">
@@ -49,39 +80,99 @@ export function TaskDraftDialog(props: { draft: TaskDraft; tasks: () => Task[] |
             <FieldProvider value={NO_FIELD}>
               <IconPicker ariaLabel="Task icon" value={model.icon()} fallback={fallbackIcon} onSelect={model.setIcon} />
             </FieldProvider>
-            <Input ref={(element) => (titleInput = element)} value={model.text()} onInput={model.setText} onSubmit={() => void model.submit()} />
+            <Input
+              ref={(element) => (titleInput = element)}
+              value={model.text()}
+              onInput={model.setText}
+              onSubmit={() => void model.submit()}
+            />
           </Inline>
         </Field>
         <Show when={isNew && model.selectedProject()?.vcs === 'git'}>
-          <div id={`new-task-panel-${model.source()}`} role="tabpanel" aria-labelledby={`new-task-tab-${model.source()}`} style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}>
+          <div
+            id={`new-task-panel-${model.source()}`}
+            role="tabpanel"
+            aria-labelledby={`new-task-tab-${model.source()}`}
+            style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}
+          >
             <Show when={model.source() === 'new'}>
-              <Show when={!model.baseCommit()} fallback={<Field label="Branch"><Input value={model.branchTouched() ? model.branchText() : model.checkedAvailability()?.branch ?? model.effectiveBranch()} onInput={model.setBranch} /></Field>}><BranchOptions
-                branch={model.branchTouched() ? model.branchText() : model.checkedAvailability()?.branch ?? model.effectiveBranch()}
-                error={model.branchError()}
-                checking={model.availability.loading}
-                base={model.baseBranch() ?? ''}
-                branches={model.branches()}
-                onBranch={model.setBranch}
-                onBase={model.setBaseBranch}
-                onSubmit={() => void model.submit()}
-              /></Show>
+              <Show
+                when={!model.baseCommit()}
+                fallback={
+                  <Field label="Branch">
+                    <Input
+                      value={
+                        model.branchTouched()
+                          ? model.branchText()
+                          : (model.checkedAvailability()?.branch ?? model.effectiveBranch())
+                      }
+                      onInput={model.setBranch}
+                    />
+                  </Field>
+                }
+              >
+                <BranchOptions
+                  branch={
+                    model.branchTouched()
+                      ? model.branchText()
+                      : (model.checkedAvailability()?.branch ?? model.effectiveBranch())
+                  }
+                  error={model.branchError()}
+                  checking={model.availability.loading}
+                  base={model.baseBranch() ?? ''}
+                  branches={model.branches()}
+                  onBranch={model.setBranch}
+                  onBase={model.setBaseBranch}
+                  onSubmit={() => void model.submit()}
+                />
+              </Show>
               <Checkbox size="sm" label="Skip setup script" checked={model.skipSetup()} onChange={model.setSkipSetup} />
             </Show>
             <Show when={model.source() === 'folder'}>
-              <Text tone="muted" wrap>No new branch. The task uses whatever is checked out in the project folder.</Text>
+              <Text tone="muted" wrap>
+                No new branch. The task uses whatever is checked out in the project folder.
+              </Text>
             </Show>
             <Show when={model.source() === 'worktree'}>
-              <Field label="Worktree" hint={model.worktrees.loading ? 'Asking git for worktrees.' : model.worktrees() === null ? 'Could not list the worktrees for this project.' : model.worktrees()?.length ? 'The task uses this folder and its branch. Setup does not run.' : 'Every worktree git lists for this project is already a task.'}>
-                <Select value={model.chosenWorktree()?.path ?? ''} onChange={model.setPickedWorktree} disabled={!model.worktrees()?.length} options={(model.worktrees() ?? []).map((worktree) => ({ value: worktree.path, label: worktree.branch, description: worktree.path }))} />
+              <Field
+                label="Worktree"
+                hint={
+                  model.worktrees.loading
+                    ? 'Asking git for worktrees.'
+                    : model.worktrees() === null
+                      ? 'Could not list the worktrees for this project.'
+                      : model.worktrees()?.length
+                        ? 'The task uses this folder and its branch. Setup does not run.'
+                        : 'Every worktree git lists for this project is already a task.'
+                }
+              >
+                <Select
+                  value={model.chosenWorktree()?.path ?? ''}
+                  onChange={model.setPickedWorktree}
+                  disabled={!model.worktrees()?.length}
+                  options={(model.worktrees() ?? []).map((worktree) => ({
+                    value: worktree.path,
+                    label: worktree.branch,
+                    description: worktree.path,
+                  }))}
+                />
               </Field>
             </Show>
           </div>
         </Show>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
-        <Show when={model.createdTask()}><Button variant="ghost" onPress={model.openCreatedTask}>Open task</Button></Show>
-        <Button variant="solid" disabled={!model.canSubmit()} onPress={() => void model.submit()}>{model.createdTask() ? 'Retry workflow' : isNew ? 'Create task' : 'Rename'}</Button>
+        <Button variant="ghost" onPress={props.onClose}>
+          Cancel
+        </Button>
+        <Show when={model.createdTask()}>
+          <Button variant="ghost" onPress={model.openCreatedTask}>
+            Open task
+          </Button>
+        </Show>
+        <Button variant="solid" disabled={!model.canSubmit()} onPress={() => void model.submit()}>
+          {model.createdTask() ? 'Retry workflow' : isNew ? 'Create task' : 'Rename'}
+        </Button>
       </Modal.Actions>
     </Modal>
   )

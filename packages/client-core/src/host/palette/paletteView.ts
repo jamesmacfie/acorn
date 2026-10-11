@@ -14,7 +14,7 @@ import { createOverlayFocus, type PaletteView } from './overlay'
 // Everything in here is DOM: which element had focus before the palette opened, which overlay is the
 // open one, and how a `keydown` becomes a session operation. Nothing in here decides what a row is,
 // what order the rows come in, or what pressing Enter on one does — that is the session, and the
-// terminal binds the same operations to its own keys (apps/tui/src/chrome/Palette.tsx).
+// terminal binds the same operations to its own keys.
 //
 // It is not `createOverlayPalette`. That hook holds the query and the cursor in two signals of its
 // own, which is right for a file finder and wrong here: a palette that pushes a group has to restore
@@ -29,16 +29,18 @@ export type CommandPaletteView = {
 /**
  * Wire a session to the chord that opens it and the surface that draws it.
  *
- * `id` becomes `overlay.<id>.toggle` for both the command and the keybinding, which is what
- * `createOverlayPalette` produced before and therefore what a reader's saved override is keyed on
+ * `id` becomes `overlay.<id>.toggle` for both the command and the keybinding, the same id
+ * `createOverlayPalette` mints, and so what a reader's saved override is keyed on
  * (docs/command-palette-and-shortcuts/shortcuts.md § Plugin shortcuts, on binding ids as persistence keys).
  * Changing it would silently unbind everybody's ⌘K.
  */
-export function createCommandPaletteView(options: CommandSessionOptions & {
-  id: string
-  title: string
-  toggleChord: string
-}): CommandPaletteView {
+export function createCommandPaletteView(
+  options: CommandSessionOptions & {
+    id: string
+    title: string
+    toggleChord: string
+  },
+): CommandPaletteView {
   // Declared before the session and reading it lazily: `createOverlayFocus` wants the close it should
   // call when another overlay takes over, and the session wants the focus hooks. One of the two has to
   // be named before it exists, and a closure is the honest way to do it.
@@ -76,7 +78,11 @@ export function createCommandPaletteView(options: CommandSessionOptions & {
     // renderer keymap. The native menu catches Cmd/Ctrl+K and reaches the same toggle as the
     // registered command used by the renderer shortcut.
     const offNative = desktopExtras()?.onCommandPalette(toggle)
-    onCleanup(() => { offNative?.(); binding.dispose(); command.dispose() })
+    onCleanup(() => {
+      offNative?.()
+      binding.dispose()
+      command.dispose()
+    })
   })
 
   const view: PaletteView = {

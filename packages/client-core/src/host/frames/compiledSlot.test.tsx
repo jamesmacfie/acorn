@@ -7,12 +7,11 @@ import type { Disposable } from '../../kit/lib/state/registry'
 // The direct render path into a slot: a compiled plugin's component, mounted where a loaded plugin's
 // worker tree would go (docs/plugins/cooperative-extension-points.md § Cooperative extension points, "two render paths").
 //
-// The shape under test is context and memory, which is the pair phase 6 of the layout programme moved
-// onto this seam: context opens `context:section` and draws its own rows as the default children;
-// memory contributes a component that matches the `memory` section only. What has to be true is
-// everything a person would notice — memory's form appears under its own section and nowhere else,
-// context's own rows stay put beside it because the point stacks, and disabling memory leaves context
-// drawing exactly what it drew before anybody contributed.
+// The shape under test is context and memory, the pair that meets on this seam: context opens `context:section` and
+// draws its own rows as the default children; memory contributes a component that matches the `memory` section only.
+// What has to be true is everything a person would notice — memory's form appears under its own section and nowhere
+// else, context's own rows stay put beside it because the point stacks, and disabling memory leaves context drawing
+// exactly what it drew before anybody contributed.
 
 vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
@@ -23,26 +22,30 @@ vi.mock('../tree/RemoteTree', () => ({ RemoteTree: () => <span>worker-tree</span
 const registered: Disposable[] = []
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: 'context:section',
-    ownerId: 'context',
-    label: 'Context section',
-    kind: 'remote',
-    mode: 'stack',
-    max: 2,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: 'context:section',
+      ownerId: 'context',
+      label: 'Context section',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+    }),
+  )
 
 const memory = () =>
-  registered.push(extensionRegistry.register({
-    id: 'memory.section',
-    pluginId: 'memory',
-    point: 'context:section',
-    label: 'Memory proposals',
-    order: 10,
-    carrier: 'component',
-    matches: ['memory'],
-    component: (props: { section: string }) => <span>memory-form:{props.section}</span>,
-  }))
+  registered.push(
+    extensionRegistry.register({
+      id: 'memory.section',
+      pluginId: 'memory',
+      point: 'context:section',
+      label: 'Memory proposals',
+      order: 10,
+      carrier: 'component',
+      matches: ['memory'],
+      component: (props: { section: string }) => <span>memory-form:{props.section}</span>,
+    }),
+  )
 
 const draw = (element: () => import('solid-js').JSX.Element) => {
   const host = document.createElement('div')

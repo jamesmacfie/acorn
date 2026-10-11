@@ -32,36 +32,68 @@ type HostProps = {
  */
 export default function DashboardPanelHost(props: HostProps) {
   // Keyed, so each session starts at the launcher rather than at the last session's choice.
-  return <Show when={props.session} keyed>{session => <PanelSession {...props} session={session} />}</Show>
+  return (
+    <Show when={props.session} keyed>
+      {(session) => <PanelSession {...props} session={session} />}
+    </Show>
+  )
 }
 
 function PanelSession(props: HostProps & { session: DashboardEditorSession }) {
-  const [launched, setLaunched] = createSignal<LaunchResult | undefined>(props.session.dashboardId ? { kind: 'draft', dashboardId: props.session.dashboardId } : undefined)
-  const dashboardId = () => { const launch = launched(); return launch?.kind === 'draft' ? launch.dashboardId : undefined }
-  const start = () => { const launch = launched(); return launch?.kind === 'draft' ? undefined : launch }
+  const [launched, setLaunched] = createSignal<LaunchResult | undefined>(
+    props.session.dashboardId ? { kind: 'draft', dashboardId: props.session.dashboardId } : undefined,
+  )
+  const dashboardId = () => {
+    const launch = launched()
+    return launch?.kind === 'draft' ? launch.dashboardId : undefined
+  }
+  const start = () => {
+    const launch = launched()
+    return launch?.kind === 'draft' ? undefined : launch
+  }
   return (
-    <Show when={launched()} fallback={<PanelLauncher workspaceId={props.scope.workspaceId ?? ''} {...(props.region ? { region: props.region } : {})}
-      onLaunch={setLaunched} onDismiss={props.onClose} />}><Portal><PanelStudio
-      scope={props.scope}
-      {...(dashboardId() ? { dashboardId: dashboardId() } : {})}
-      {...(start() ? { start: start() } : {})}
-      withAi={props.session.withAi}
-      {...(props.region ? { region: props.region } : {})}
-      {...(dashboardId() && layoutAt(props.scope).rects[dashboardId()!] ? { placed: layoutAt(props.scope).rects[dashboardId()!] } : {})}
-      returnLabel={props.returnLabel}
-      onClose={props.onClose}
-      onDeleted={id => { if (panelDefinition(id)) removePanel(id) }}
-      onPublished={(id, title, destination, view, sources, fieldRoles) => {
-        const existing = panelDefinition(id)
-        savePanel({
-          id, title, shaping: {}, view,
-          publication: { dashboardId: id, sources, fieldRoles },
-        })
-        // A later publication updates the stable definition without disturbing any placement or
-        // layout. Only the first publication chooses an initial rectangle.
-        if (!existing) placePanelAt(destination, id, sizePresets(view.kind).m)
-      }}
-    /></Portal></Show>
+    <Show
+      when={launched()}
+      fallback={
+        <PanelLauncher
+          workspaceId={props.scope.workspaceId ?? ''}
+          {...(props.region ? { region: props.region } : {})}
+          onLaunch={setLaunched}
+          onDismiss={props.onClose}
+        />
+      }
+    >
+      <Portal>
+        <PanelStudio
+          scope={props.scope}
+          {...(dashboardId() ? { dashboardId: dashboardId() } : {})}
+          {...(start() ? { start: start() } : {})}
+          withAi={props.session.withAi}
+          {...(props.region ? { region: props.region } : {})}
+          {...(dashboardId() && layoutAt(props.scope).rects[dashboardId()!]
+            ? { placed: layoutAt(props.scope).rects[dashboardId()!] }
+            : {})}
+          returnLabel={props.returnLabel}
+          onClose={props.onClose}
+          onDeleted={(id) => {
+            if (panelDefinition(id)) removePanel(id)
+          }}
+          onPublished={(id, title, destination, view, sources, fieldRoles) => {
+            const existing = panelDefinition(id)
+            savePanel({
+              id,
+              title,
+              shaping: {},
+              view,
+              publication: { dashboardId: id, sources, fieldRoles },
+            })
+            // A later publication updates the stable definition without disturbing any placement or
+            // layout. Only the first publication chooses an initial rectangle.
+            if (!existing) placePanelAt(destination, id, sizePresets(view.kind).m)
+          }}
+        />
+      </Portal>
+    </Show>
   )
 }
 

@@ -2,17 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/solid-query'
 import { segmentContentKey } from '@acorn/diff-document/document'
 import type { CodeRow, DiffRow } from '../../kit/diff/diffModel'
-import { createSegmentCache, dropSegmentCache, enrichmentWeight, plainWeight, residentKey, segmentCacheFor } from './segmentCache'
+import {
+  createSegmentCache,
+  dropSegmentCache,
+  enrichmentWeight,
+  plainWeight,
+  residentKey,
+  segmentCacheFor,
+} from './segmentCache'
 
-// The node's weighted segment cache on its own (./segmentCache.ts): what it keeps, what it lets go,
-// and in which order. The pane wiring is covered in DiffPane.test.tsx.
+// The node's weighted segment cache on its own: what it keeps, what it lets go, and in which order. The pane
+// wiring is covered in DiffPane.test.tsx.
 
-const code = (raw: string): CodeRow => ({ kind: 'insert', path: 'a.ts', oldNo: null, newNo: 1, raw, toks: [{ content: raw, light: '', dark: '' }] })
+const code = (raw: string): CodeRow => ({
+  kind: 'insert',
+  path: 'a.ts',
+  oldNo: null,
+  newNo: 1,
+  raw,
+  toks: [{ content: raw, light: '', dark: '' }],
+})
 const rows = (count: number, raw = 'x'): DiffRow[] => Array.from({ length: count }, () => code(raw))
 const coloured = (plain: readonly DiffRow[]): DiffRow[] =>
-  plain.map((row) => (row.kind === 'insert' ? { ...row, toks: [{ content: row.raw, light: '#111111', dark: '#eeeeee' }] } : row))
-const put = (cache: ReturnType<typeof createSegmentCache>, key: string, plain: DiffRow[], path = 'a.ts', patchKey = 'p') =>
-  cache.insert([{ key, path, patchKey, plain }])
+  plain.map((row) =>
+    row.kind === 'insert' ? { ...row, toks: [{ content: row.raw, light: '#111111', dark: '#eeeeee' }] } : row,
+  )
+const put = (
+  cache: ReturnType<typeof createSegmentCache>,
+  key: string,
+  plain: DiffRow[],
+  path = 'a.ts',
+  patchKey = 'p',
+) => cache.insert([{ key, path, patchKey, plain }])
 const keys = (cache: ReturnType<typeof createSegmentCache>) => ['a', 'b', 'c', 'd', 'e'].filter((key) => cache.has(key))
 
 describe('the weight estimator', () => {
@@ -22,7 +43,9 @@ describe('the weight estimator', () => {
     expect(plainWeight(rows(2, 'abcdefgh'))).toBe(plainWeight(plain) + 2 * 4 * 2)
     expect(plainWeight(rows(3, 'abcd'))).toBeGreaterThan(plainWeight(plain))
     // Colour weighs its tokens, their colours and word spans; a plain row has none of it.
-    const withWords = coloured(plain).map((row) => (row.kind === 'insert' ? { ...row, words: [{ content: 'ab', kind: 'add' as const }] } : row))
+    const withWords = coloured(plain).map((row) =>
+      row.kind === 'insert' ? { ...row, words: [{ content: 'ab', kind: 'add' as const }] } : row,
+    )
     expect(enrichmentWeight(withWords)).toBeGreaterThan(enrichmentWeight(coloured(plain)))
     expect(enrichmentWeight(coloured(plain))).toBeGreaterThan(0)
   })
@@ -149,8 +172,12 @@ describe('the segment cache', () => {
     expect(content).toContain('v')
     expect(residentKey(content, 'a.ts', 'head')).toBe(residentKey(segmentContentKey('sha256:aa', 0), 'a.ts', 'head'))
     // The same head blob with another patch, or another segment of it, is another entry.
-    expect(residentKey(segmentContentKey('sha256:bb', 0), 'a.ts', 'head')).not.toBe(residentKey(content, 'a.ts', 'head'))
-    expect(residentKey(segmentContentKey('sha256:aa', 1), 'a.ts', 'head')).not.toBe(residentKey(content, 'a.ts', 'head'))
+    expect(residentKey(segmentContentKey('sha256:bb', 0), 'a.ts', 'head')).not.toBe(
+      residentKey(content, 'a.ts', 'head'),
+    )
+    expect(residentKey(segmentContentKey('sha256:aa', 1), 'a.ts', 'head')).not.toBe(
+      residentKey(content, 'a.ts', 'head'),
+    )
     // The same patch under another name or read through another sha is too.
     expect(residentKey(content, 'b.ts', 'head')).not.toBe(residentKey(content, 'a.ts', 'head'))
     expect(residentKey(content, 'a.ts', 'other')).not.toBe(residentKey(content, 'a.ts', 'head'))

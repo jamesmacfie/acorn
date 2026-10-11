@@ -1,8 +1,8 @@
 # Host-owned webviews
 
 This page covers the child webviews the shell owns: the browser preview and loaded-plugin webview
-pages, their history and lifetime, how the preview finds its URL, and the dormant preview tunnel. Read
-it before you change preview behavior or a webview policy. It's part of [desktop shell](../shell.md).
+pages, their history and lifetime, and how the preview finds its URL. Read it before you change
+preview behavior or a webview policy. It's part of [desktop shell](../shell.md).
 
 ## Host-owned webviews
 
@@ -52,13 +52,13 @@ browser actions.
 
 The bridge registers its state listener before calling `ensure`. Each successful reconciliation
 replays the URL, loading state, and history cursor to the mounted toolbar. Operations are ordered per
-native key. Eviction advances the key's generation at once, drops queued work, and retires the old
-view before any replacement. Retired callbacks read a denied policy and stop reporting.
+native key. Eviction aborts the key's owner signal at once, which drops queued work, and retires the
+old view before any replacement. Retired callbacks read a denied policy and stop reporting.
 
 Pane cleanup removes observers and hides only its task's view. Overlay changes don't call `ensure`. A
 pending configuration read or an absent URL hides without evicting. A resolution error or native
 refusal offers **Retry preview**. A Node switch retires the whole preview family, including records
-from before a renderer reload, and a family generation rejects stale commands. Task archive, owner
+from before a renderer reload, and the family's owner signal rejects stale commands. Task archive, owner
 removal, window close, and shutdown release resources. Loaded plugin pages are evicted on unmount and
 on policy replacement.
 
@@ -109,26 +109,3 @@ script, so stopping the dev server doesn't close an open preview.
 `plugins/preview/src/client/configuredStore.ts` holds the answer and reads again on a URL change, a
 project change, an unseen task, a Node switch, and a reconnect. A Node that answers 404 gets the pane on
 every task.
-
-## The preview tunnel
-
-The tunnel in `@acorn/custody/supervision/previewTunnel.ts` stays in custody, but the pane doesn't
-open it while remote preview is off. A tunnel alone isn't a browser network boundary, because a
-loaded page can make more requests straight from your computer.
-
-The listener binds `127.0.0.1` explicitly. Opening a key already in flight returns the same promise,
-and admission reserves a slot at once, so pending and live listeners together count toward the limit of
-16. Closing a task or Node retires pending binds too, and callbacks keep their entry identity so they
-can't touch a replacement. Disposal refuses further opens.
-
-Each listener has a 32-byte base64url secret. wry can't add a request header, so the helper reports
-each port and secret to Rust on stdout, and the shell seeds an `acorn_tunnel` cookie into the pane
-before its first navigation. The renderer never sees the secret. `authorize()` accepts the
-`x-acorn-tunnel` header or the cookie, compares with `timingSafeEqual` on a length-checked pair, and
-destroys the socket on a mismatch before dialing the Node. It scans the request head as `latin1`,
-because a UTF-8 decoder could make two byte strings compare equal.
-
-A connection that never completes a request head is refused after two seconds, with at most 8 KB
-buffered. An idle listener with no connection for 60 seconds is closed, as a backstop for a crashed
-renderer. Both sides pause their socket until the other accepts the last chunk, so backpressure goes
-through the kernel.

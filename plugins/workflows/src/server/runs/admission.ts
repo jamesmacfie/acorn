@@ -84,7 +84,7 @@ export class WorkflowStartService {
         inputs,
         provenance,
         allowDatabaseDefinitions,
-        queryRevision: this.deps.queryRevision ? id => this.deps.queryRevision!(id, scope) : undefined,
+        queryRevision: this.deps.queryRevision ? (id) => this.deps.queryRevision!(id, scope) : undefined,
       })
       if (graph.requiresRepoTrust) await this.deps.authorizeRepoConfig(taskId)
       await this.deps.validateDestination?.(graph, scope)
@@ -113,9 +113,12 @@ export class WorkflowStartService {
         return { error: 'needs-trust' }
       }
       return {
-        error: error instanceof WorkflowValidationError
-          ? error.message
-          : error instanceof Error ? error.message : 'Failed to start workflow.',
+        error:
+          error instanceof WorkflowValidationError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : 'Failed to start workflow.',
       }
     }
   }
@@ -130,9 +133,14 @@ export class WorkflowStartService {
     const fingerprint = launchId ? workflowContentFingerprint({ taskId, definitionId, inputs: inputs ?? {} }) : null
     const callerKey = launchId ? `device:${launchId}` : null
     if (callerKey) {
-      const [existing] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.invocationKey, callerKey))
-      if (existing) return existing.taskId === taskId && existing.payloadFingerprint === fingerprint
-        ? { runId: existing.id } : { error: 'This workflow launch ID was used with different task, definition, or inputs.' }
+      const [existing] = await this.db
+        .select()
+        .from(schema.workflowRuns)
+        .where(eq(schema.workflowRuns.invocationKey, callerKey))
+      if (existing)
+        return existing.taskId === taskId && existing.payloadFingerprint === fingerprint
+          ? { runId: existing.id }
+          : { error: 'This workflow launch ID was used with different task, definition, or inputs.' }
     }
     const scope = await this.deps.taskScope(taskId)
     if (!scope) return { error: 'That task no longer exists.' }
@@ -143,8 +151,16 @@ export class WorkflowStartService {
         scope,
         this.runner.validationCatalog(),
       )
-      return this.startDefinition(taskId, resolved.definition, inputs, resolved.provenance, allowDatabaseDefinitions,
-        launchId ? { intendedRunId: launchId, callerKey: callerKey!, payloadFingerprint: fingerprint!, trigger: 'manual' } : undefined)
+      return this.startDefinition(
+        taskId,
+        resolved.definition,
+        inputs,
+        resolved.provenance,
+        allowDatabaseDefinitions,
+        launchId
+          ? { intendedRunId: launchId, callerKey: callerKey!, payloadFingerprint: fingerprint!, trigger: 'manual' }
+          : undefined,
+      )
     } catch (error) {
       return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to resolve workflow.' }
     }
@@ -207,16 +223,17 @@ export class WorkflowStartService {
       scope,
       this.runner.validationCatalog(),
     )
-    const definition = purpose === 'review' && resolved.definition.inputs
-      ? { ...resolved.definition, inputs: resolved.definition.inputs.map((input) => ({ ...input, required: false })) }
-      : resolved.definition
+    const definition =
+      purpose === 'review' && resolved.definition.inputs
+        ? { ...resolved.definition, inputs: resolved.definition.inputs.map((input) => ({ ...input, required: false })) }
+        : resolved.definition
     const graph = await resolveWorkflowGraph(this.db, definition, {
       scope,
       catalog: this.runner.validationCatalog(),
       inputs,
       provenance: resolved.provenance,
       allowDatabaseDefinitions: true,
-      queryRevision: this.deps.queryRevision ? id => this.deps.queryRevision!(id, scope) : undefined,
+      queryRevision: this.deps.queryRevision ? (id) => this.deps.queryRevision!(id, scope) : undefined,
     })
     if (graph.requiresRepoTrust && purpose === 'start') {
       if ('taskId' in target) await this.deps.authorizeRepoConfig(target.taskId)

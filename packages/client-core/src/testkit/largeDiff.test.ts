@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { fileDocument } from '@acorn/diff-document/document'
-import { buildDiffRows, buildRenderableRows, diffRowsFromPlain, maxLineCols, plainTokenize, toBands } from '../kit/diff/diffModel'
+import {
+  buildDiffRows,
+  buildRenderableRows,
+  diffRowsFromPlain,
+  maxLineCols,
+  plainTokenize,
+  toBands,
+} from '../kit/diff/diffModel'
 import { LARGE_SURFACE_PROFILES, largeDiffFiles, largeDiffSummary } from './largeDiff'
 
-// The fixture every large-surface measurement is taken against. Later phases compare numbers across
+// The fixture every large-surface measurement is taken against. Measurements are compared across
 // commits, so the files a seed produces must not drift silently: the small profile's digest is pinned,
 // and a deliberate change to the generator updates it here.
 
@@ -33,7 +40,9 @@ describe('the large-diff fixture', () => {
     for (const file of largeDiffFiles('small', 1)) {
       const rows = buildRenderableRows([{ file, diff: buildDiffRows(file, plainTokenize) }], file.threads)
       expect(rows.filter((row) => row.kind === 'thread')).toHaveLength(file.threads.length)
-      const code = rows.flatMap((row) => (row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete' ? [row] : []))
+      const code = rows.flatMap((row) =>
+        row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete' ? [row] : [],
+      )
       for (const note of file.notes) {
         const hit = code.some((row) => (note.side === 'additions' ? row.newNo : row.oldNo) === note.line)
         expect(hit, `${note.path}:${note.side}:${note.line}`).toBe(true)
@@ -58,7 +67,8 @@ describe('the large-diff fixture', () => {
     expect(threads.some((thread) => thread.resolved) && threads.some((thread) => !thread.resolved)).toBe(true)
     expect(threads.some((thread) => thread.comments.length > 1)).toBe(true)
     const bodies = threads.flatMap((thread) => thread.comments.map((comment) => comment.body ?? ''))
-    for (const marker of ['![', '<details>', '```suggestion']) expect(bodies.some((body) => body.includes(marker))).toBe(true)
+    for (const marker of ['![', '<details>', '```suggestion'])
+      expect(bodies.some((body) => body.includes(marker))).toBe(true)
     expect(new Set(threads.map((thread) => thread.threadId)).size).toBe(threads.length)
   })
 
@@ -86,7 +96,10 @@ describe('the large-diff fixture as a segmented document', () => {
     for (const file of largeDiffFiles('scale', 1)) {
       const doc = fileDocument(file.path, file.patch)
       const whole = buildDiffRows(file, plainTokenize)
-      expect(doc.descriptors.reduce((sum, segment) => sum + segment.rows, 0), file.path).toBe(whole.length)
+      expect(
+        doc.descriptors.reduce((sum, segment) => sum + segment.rows, 0),
+        file.path,
+      ).toBe(whole.length)
       expect(Math.max(0, ...doc.descriptors.map((segment) => segment.columns))).toBe(maxLineCols(whole))
       doc.segments.forEach((plain, ordinal) => {
         const rows = diffRowsFromPlain(file.path, file.sha, plain)

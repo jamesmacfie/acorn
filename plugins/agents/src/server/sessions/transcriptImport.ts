@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export type ImportedTranscriptTurn = {
+type ImportedTranscriptTurn = {
   user: string
   assistant: string[]
 }
@@ -23,11 +23,7 @@ const textParts = (value: unknown): string[] => {
   })
 }
 
-const pushMessage = (
-  turns: ImportedTranscriptTurn[],
-  role: string,
-  parts: string[],
-): void => {
+const pushMessage = (turns: ImportedTranscriptTurn[], role: string, parts: string[]): void => {
   if (!parts.length) return
   if (role === 'user') {
     turns.push({ user: parts.join('\n\n'), assistant: [] })
@@ -52,23 +48,22 @@ function parseJsonLines(content: string): ImportedTranscript {
     }
     if (!value || typeof value !== 'object') continue
     const record = value as Record<string, unknown>
-    const payload = record.payload && typeof record.payload === 'object'
-      ? record.payload as Record<string, unknown>
-      : record
-    const message = record.message && typeof record.message === 'object'
-      ? record.message as Record<string, unknown>
-      : payload
-    const sessionRef = record.sessionId ?? record.session_id
-      ?? (record.type === 'session_meta' ? payload.id : undefined)
+    const payload =
+      record.payload && typeof record.payload === 'object' ? (record.payload as Record<string, unknown>) : record
+    const message =
+      record.message && typeof record.message === 'object' ? (record.message as Record<string, unknown>) : payload
+    const sessionRef =
+      record.sessionId ?? record.session_id ?? (record.type === 'session_meta' ? payload.id : undefined)
     if (typeof sessionRef === 'string' && sessionRef) providerSessionRef = sessionRef
     const payloadType = typeof payload.type === 'string' ? payload.type : ''
-    const role = typeof message.role === 'string'
-      ? message.role
-      : payloadType === 'user_message'
-        ? 'user'
-        : payloadType === 'assistant_message'
-          ? 'assistant'
-          : ''
+    const role =
+      typeof message.role === 'string'
+        ? message.role
+        : payloadType === 'user_message'
+          ? 'user'
+          : payloadType === 'assistant_message'
+            ? 'assistant'
+            : ''
     if (!role) continue
     pushMessage(turns, role, textParts(message.content ?? message.text))
   }
@@ -80,14 +75,18 @@ const AcornExportSchema = z.object({
     title: z.string().optional(),
     providerSessionRef: z.string().nullable().optional(),
   }),
-  turns: z.array(z.object({
-    id: z.string(),
-    input: z.array(z.object({ type: z.string() }).passthrough()),
-  })),
-  events: z.array(z.object({
-    turnId: z.string().nullable(),
-    event: z.object({ type: z.string() }).passthrough(),
-  })),
+  turns: z.array(
+    z.object({
+      id: z.string(),
+      input: z.array(z.object({ type: z.string() }).passthrough()),
+    }),
+  ),
+  events: z.array(
+    z.object({
+      turnId: z.string().nullable(),
+      event: z.object({ type: z.string() }).passthrough(),
+    }),
+  ),
 })
 
 function parseAcornExport(value: unknown): ImportedTranscript | null {
@@ -106,8 +105,9 @@ function parseAcornExport(value: unknown): ImportedTranscript | null {
     title: parsed.data.session.title,
     providerSessionRef: parsed.data.session.providerSessionRef ?? undefined,
     turns: parsed.data.turns.flatMap((turn) => {
-      const user = turn.input.flatMap((part) =>
-        part.type === 'text' && typeof part.text === 'string' ? [part.text] : []).join('\n\n')
+      const user = turn.input
+        .flatMap((part) => (part.type === 'text' && typeof part.text === 'string' ? [part.text] : []))
+        .join('\n\n')
       return user.trim() ? [{ user, assistant: eventsByTurn.get(turn.id) ?? [] }] : []
     }),
   }

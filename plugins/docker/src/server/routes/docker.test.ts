@@ -31,16 +31,34 @@ const authed = () => as({ kind: 'device', userId: 'james' })
 const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
 
 const summary = {
-  id: 'abc123', name: 'web-1', image: 'nginx', state: 'running', status: 'Up', createdAt: null,
-  ports: [], composeProject: null, composeService: null, composeWorkingDir: null, labels: {},
+  id: 'abc123',
+  name: 'web-1',
+  image: 'nginx',
+  state: 'running',
+  status: 'Up',
+  createdAt: null,
+  ports: [],
+  composeProject: null,
+  composeService: null,
+  composeWorkingDir: null,
+  labels: {},
 }
 
 const fake = (over: Partial<DockerBridge> = {}): DockerBridge => ({
   info: async () => ({ available: true, version: '29.4.0', context: 'orbstack' }),
   containers: async () => [summary],
   inspectContainer: async () => ({
-    ...summary, command: 'nginx', startedAt: null, finishedAt: null, exitCode: null,
-    restartCount: 0, health: null, env: [], mounts: [], networks: [], imageId: 'sha256:x',
+    ...summary,
+    command: 'nginx',
+    startedAt: null,
+    finishedAt: null,
+    exitCode: null,
+    restartCount: 0,
+    health: null,
+    env: [],
+    mounts: [],
+    networks: [],
+    imageId: 'sha256:x',
   }),
   containerAction: async () => ({ ok: true }),
   removeContainer: async () => ({ ok: true }),
@@ -55,7 +73,11 @@ const fake = (over: Partial<DockerBridge> = {}): DockerBridge => ({
   taskSummary: async () => [{ taskId: 't1', running: 2, total: 3, projects: ['runn_x'] }],
   taskContainers: async () => [summary],
   taskTeardown: async () => ({ ok: true }),
-  projectMatcher: async () => ({ repo: {}, home: {}, effective: { composeProject: null, matchLabels: [], matchName: true } }),
+  projectMatcher: async () => ({
+    repo: {},
+    home: {},
+    effective: { composeProject: null, matchLabels: [], matchName: true },
+  }),
   ...over,
 })
 
@@ -65,16 +87,22 @@ describe('docker routes', () => {
   it('serves info and containers', async () => {
     setDockerBridge(fake())
     const app = authed()
-    expect(await (await app.fetch(req('/api/docker/info'), {} as Env)).json()).toEqual({ available: true, version: '29.4.0', context: 'orbstack' })
+    expect(await (await app.fetch(req('/api/docker/info'), {} as Env)).json()).toEqual({
+      available: true,
+      version: '29.4.0',
+      context: 'orbstack',
+    })
     expect(await (await app.fetch(req('/api/docker/containers'), {} as Env)).json()).toEqual([summary])
   })
 
   it('forwards actions with validated refs and bodies', async () => {
     let got: unknown = null
-    setDockerBridge(fake({
-      containerAction: async (ref, action) => ((got = { ref, action }), { ok: true }),
-      removeContainer: async (ref, force) => ((got = { ref, force }), { ok: true }),
-    }))
+    setDockerBridge(
+      fake({
+        containerAction: async (ref, action) => ((got = { ref, action }), { ok: true }),
+        removeContainer: async (ref, force) => ((got = { ref, force }), { ok: true }),
+      }),
+    )
     const app = authed()
     await app.fetch(req('/api/docker/containers/web-1/action', 'POST', { action: 'stop' }), {} as Env)
     expect(got).toEqual({ ref: 'web-1', action: 'stop' })
@@ -86,9 +114,16 @@ describe('docker routes', () => {
     setDockerBridge(fake())
     const app = authed()
     expect((await app.fetch(req('/api/docker/containers/--rm/inspect'), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/docker/containers/-f/action', 'POST', { action: 'stop' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/docker/containers/web-1/action', 'POST', { action: 'explode' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/docker/compose/action', 'POST', { project: '--evil', action: 'down' }), {} as Env)).status).toBe(400)
+    expect(
+      (await app.fetch(req('/api/docker/containers/-f/action', 'POST', { action: 'stop' }), {} as Env)).status,
+    ).toBe(400)
+    expect(
+      (await app.fetch(req('/api/docker/containers/web-1/action', 'POST', { action: 'explode' }), {} as Env)).status,
+    ).toBe(400)
+    expect(
+      (await app.fetch(req('/api/docker/compose/action', 'POST', { project: '--evil', action: 'down' }), {} as Env))
+        .status,
+    ).toBe(400)
     expect((await app.fetch(req('/api/docker/prune', 'POST', { kind: 'everything' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/docker/images/--all/remove', 'POST', {}), {} as Env)).status).toBe(400)
   })
@@ -96,29 +131,38 @@ describe('docker routes', () => {
   it('forwards compose actions and prune', async () => {
     let compose: unknown = null
     let pruned: string | null = null
-    setDockerBridge(fake({
-      composeAction: async (project, action) => ((compose = { project, action }), { ok: true }),
-      prune: async (kind) => ((pruned = kind), { reclaimed: '2GB' }),
-    }))
+    setDockerBridge(
+      fake({
+        composeAction: async (project, action) => ((compose = { project, action }), { ok: true }),
+        prune: async (kind) => ((pruned = kind), { reclaimed: '2GB' }),
+      }),
+    )
     const app = authed()
     await app.fetch(req('/api/docker/compose/action', 'POST', { project: 'runn_x', action: 'down' }), {} as Env)
     expect(compose).toEqual({ project: 'runn_x', action: 'down' })
-    expect(await (await app.fetch(req('/api/docker/prune', 'POST', { kind: 'images' }), {} as Env)).json()).toEqual({ reclaimed: '2GB' })
+    expect(await (await app.fetch(req('/api/docker/prune', 'POST', { kind: 'images' }), {} as Env)).json()).toEqual({
+      reclaimed: '2GB',
+    })
     expect(pruned).toBe('images')
   })
 
-  it('serves task summaries and forwards teardown', async () => {
-    let torn: string | null = null
-    setDockerBridge(fake({ taskTeardown: async (id) => ((torn = id), { ok: true }) }))
+  it('serves task summaries and containers', async () => {
+    setDockerBridge(fake())
     const app = authed()
-    expect(await (await app.fetch(req('/api/docker/task-summary'), {} as Env)).json()).toEqual([{ taskId: 't1', running: 2, total: 3, projects: ['runn_x'] }])
+    expect(await (await app.fetch(req('/api/docker/task-summary'), {} as Env)).json()).toEqual([
+      { taskId: 't1', running: 2, total: 3, projects: ['runn_x'] },
+    ])
     expect(await (await app.fetch(req('/api/docker/tasks/t1/containers'), {} as Env)).json()).toEqual([summary])
-    await app.fetch(req('/api/docker/tasks/t1/teardown', 'POST'), {} as Env)
-    expect(torn).toBe('t1')
   })
 
   it('passes BridgeError statuses through', async () => {
-    setDockerBridge(fake({ inspectContainer: async () => { throw new BridgeError(404, 'docker_not_found') } }))
+    setDockerBridge(
+      fake({
+        inspectContainer: async () => {
+          throw new BridgeError(404, 'docker_not_found')
+        },
+      }),
+    )
     expect((await authed().fetch(req('/api/docker/containers/gone/inspect'), {} as Env)).status).toBe(404)
   })
 
@@ -161,10 +205,12 @@ describe('the docker daemon surface is device-only', () => {
     const touched: string[] = []
     // Every method records rather than answers, so "403" cannot be a bridge error in disguise.
     const spy = new Proxy(fake(), {
-      get: (target, key: string) => (...args: unknown[]) => {
-        touched.push(key)
-        return (target as unknown as Record<string, (...a: unknown[]) => unknown>)[key](...args)
-      },
+      get:
+        (target, key: string) =>
+        (...args: unknown[]) => {
+          touched.push(key)
+          return (target as unknown as Record<string, (...a: unknown[]) => unknown>)[key](...args)
+        },
     })
     setDockerBridge(spy)
     const app = asTask1()
@@ -178,13 +224,10 @@ describe('the docker daemon surface is device-only', () => {
     expect(touched).toEqual([])
   })
 
-  it('leaves the task-addressed pair reachable, since core mount already confines them', async () => {
-    let torn: string | null = null
-    setDockerBridge(fake({ taskTeardown: async (id) => ((torn = id), { ok: true }) }))
+  it('leaves the task-addressed containers route reachable, since core mount already confines it', async () => {
+    setDockerBridge(fake())
     const app = asTask1()
     expect((await app.fetch(req('/api/docker/tasks/t1/containers'), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/docker/tasks/t1/teardown', 'POST'), {} as Env)).status).toBe(200)
-    expect(torn).toBe('t1')
   })
 
   it('still serves the whole daemon surface to a device', async () => {

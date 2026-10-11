@@ -13,7 +13,15 @@ export function browserAgentTools(pool: BrowserPool): AgentToolContribution[] {
     description: string,
     input: z.ZodType,
     handler: AgentToolContribution['handler'],
-  ): AgentToolContribution => ({ name, description, input, scope: 'task', risk: 'execute', exposeToRenderer: true, handler })
+  ): AgentToolContribution => ({
+    name,
+    description,
+    input,
+    scope: 'task',
+    risk: 'execute',
+    exposeToRenderer: true,
+    handler,
+  })
 
   return [
     tool(

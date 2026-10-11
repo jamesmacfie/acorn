@@ -12,7 +12,8 @@ export const agentMcpServerRoute = (name: string) => `${agentMcpServersRoute}/${
 export const agentMcpServerTestRoute = (name: string) => `${agentMcpServerRoute(name)}/test`
 export const agentMcpPackagePlanRoute = `${agentMcpServersRoute}/package-plan`
 export const agentMcpPackageActivateRoute = (name: string) => `${agentMcpServerRoute(name)}/package-activate`
-export const agentMcpPackageTestRoute = (planId: string) => `${agentMcpPackagePlanRoute}/${encodeURIComponent(planId)}/test`
+export const agentMcpPackageTestRoute = (planId: string) =>
+  `${agentMcpPackagePlanRoute}/${encodeURIComponent(planId)}/test`
 export const agentMcpServerConsentRoute = (name: string) => `${agentMcpServerRoute(name)}/consent`
 export const agentMcpReviewsRoute = `${agentMcpServersRoute}/reviews`
 export const agentMcpReviewRoute = (name: string) => `${agentMcpServerRoute(name)}/review`
@@ -35,10 +36,6 @@ const MAX_PAIRS = 64
 const MAX_TEXT = 4_096
 
 export type AgentMcpTransport = 'stdio' | 'http'
-
-/** An environment variable or header as the form sends it. A secret with no `value` keeps the stored
- *  one, so an edit never has to see a secret to leave it alone. */
-export type AgentMcpPairInput = { name: string; value?: string; secret: boolean }
 
 /** An environment variable or header as the node returns it. A secret's value is always `null`. */
 export type AgentMcpPair = { name: string; value: string | null; secret: boolean }
@@ -116,45 +113,61 @@ export type AgentMcpPendingReview = {
 
 const pairInput = z.object({
   name: z.string().regex(PAIR_NAME, 'Names use letters, digits, _ and -, and start with a letter or _.'),
-  value: z.string().max(MAX_TEXT).refine((value) => !/[\r\n\0]/.test(value), 'Values cannot contain line breaks.').optional(),
+  value: z
+    .string()
+    .max(MAX_TEXT)
+    .refine((value) => !/[\r\n\0]/.test(value), 'Values cannot contain line breaks.')
+    .optional(),
   secret: z.boolean(),
 })
 
-export const agentMcpServerInputSchema = z.object({
-  transport: z.enum(['stdio', 'http']),
-  command: z.string().trim().max(MAX_TEXT).optional(),
-  args: z.array(z.string().max(MAX_TEXT)).max(MAX_ARGS).optional(),
-  url: z.string().trim().max(MAX_TEXT).optional(),
-  values: z.array(pairInput).max(MAX_PAIRS).optional(),
-  enabled: z.boolean(),
-  reviewTools: z.boolean().optional(),
-}).superRefine((input, ctx) => {
-  if (input.transport === 'stdio' && !input.command) {
-    ctx.addIssue({ code: 'custom', path: ['command'], message: 'A stdio server needs a command.' })
-  }
-  if (input.transport === 'http') {
-    let url: URL | null = null
-    try { url = input.url ? new URL(input.url) : null } catch { url = null }
-    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
-      ctx.addIssue({ code: 'custom', path: ['url'], message: 'An HTTP server needs an http:// or https:// URL.' })
+export const agentMcpServerInputSchema = z
+  .object({
+    transport: z.enum(['stdio', 'http']),
+    command: z.string().trim().max(MAX_TEXT).optional(),
+    args: z.array(z.string().max(MAX_TEXT)).max(MAX_ARGS).optional(),
+    url: z.string().trim().max(MAX_TEXT).optional(),
+    values: z.array(pairInput).max(MAX_PAIRS).optional(),
+    enabled: z.boolean(),
+    reviewTools: z.boolean().optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.transport === 'stdio' && !input.command) {
+      ctx.addIssue({ code: 'custom', path: ['command'], message: 'A stdio server needs a command.' })
     }
-  }
-  const seen = new Set<string>()
-  for (const pair of input.values ?? []) {
-    const key = input.transport === 'http' ? pair.name.toLowerCase() : pair.name
-    if (seen.has(key)) ctx.addIssue({ code: 'custom', path: ['values'], message: `${pair.name} is listed twice.` })
-    seen.add(key)
-    if (!pair.secret && pair.value === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['values'], message: `${pair.name} needs a value.` })
+    if (input.transport === 'http') {
+      let url: URL | null = null
+      try {
+        url = input.url ? new URL(input.url) : null
+      } catch {
+        url = null
+      }
+      if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+        ctx.addIssue({ code: 'custom', path: ['url'], message: 'An HTTP server needs an http:// or https:// URL.' })
+      }
     }
-  }
-})
+    const seen = new Set<string>()
+    for (const pair of input.values ?? []) {
+      const key = input.transport === 'http' ? pair.name.toLowerCase() : pair.name
+      if (seen.has(key)) ctx.addIssue({ code: 'custom', path: ['values'], message: `${pair.name} is listed twice.` })
+      seen.add(key)
+      if (!pair.secret && pair.value === undefined) {
+        ctx.addIssue({ code: 'custom', path: ['values'], message: `${pair.name} needs a value.` })
+      }
+    }
+  })
 
 export const agentMcpPackagePlanInputSchema = z.object({
   coordinate: z.string().min(1).max(256),
   targetName: z.string().regex(MCP_SERVER_NAME),
-  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
-  exceptions: z.array(z.object({ coordinate: z.string().min(1).max(256), reason: z.string().min(1).max(500) })).max(8).optional(),
+  expectedRevision: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  exceptions: z
+    .array(z.object({ coordinate: z.string().min(1).max(256), reason: z.string().min(1).max(500) }))
+    .max(8)
+    .optional(),
 })
 export const agentMcpPackageActivateInputSchema = z.object({
   planId: z.string().uuid(),

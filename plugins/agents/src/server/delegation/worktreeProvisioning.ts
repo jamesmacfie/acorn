@@ -5,7 +5,11 @@ import { delegatedTurn } from './reports'
 import type { AgentDelegationStore, AgentSpawn, AgentSpawnProvisioning } from './store'
 
 export type WorktreeTaskService = {
-  createChild(parentTaskId: string, seed: { title: string; branch: string; baseBranch?: string }, intendedChildId?: string): Promise<string>
+  createChild(
+    parentTaskId: string,
+    seed: { title: string; branch: string; baseBranch?: string },
+    intendedChildId?: string,
+  ): Promise<string>
 }
 
 /** Recoverable provisioning across core's task database and the Agents plugin database. */
@@ -34,7 +38,11 @@ export class WorktreeProvisioning {
 
     const taskId = await this.tasks.createChild(
       spawn.ownerTaskId,
-      { title: plan.title, branch: plan.branch, ...(plan.baseBranch !== undefined ? { baseBranch: plan.baseBranch } : {}) },
+      {
+        title: plan.title,
+        branch: plan.branch,
+        ...(plan.baseBranch !== undefined ? { baseBranch: plan.baseBranch } : {}),
+      },
       spawn.childTaskId,
     )
     if (taskId !== spawn.childTaskId) throw new Error('Core returned a different child task during replay.')
@@ -50,7 +58,9 @@ export class WorktreeProvisioning {
     if (!turn) {
       const root = await this.core?.tasks.root(taskId)
       if (this.core && !root) throw new Error('Child worktree is unavailable when recording the spawn base commit.')
-      const baseCommit = root ? await this.core?.git.gitText(['rev-parse', '--verify', 'HEAD^{commit}'], { cwd: root, maxOutputBytes: 100 }) : undefined
+      const baseCommit = root
+        ? await this.core?.git.gitText(['rev-parse', '--verify', 'HEAD^{commit}'], { cwd: root, maxOutputBytes: 100 })
+        : undefined
       const parent = plan.parentSessionId ? await this.runtime.store.getSession(plan.parentSessionId) : null
       turn = await this.runtime.enqueueTurn(session.id, {
         ...delegatedTurn(

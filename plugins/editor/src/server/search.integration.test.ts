@@ -8,7 +8,9 @@ import { searchInFiles } from './search'
 import { listFilteredPaths } from './searchProcess'
 
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'editor-search-'))
@@ -24,7 +26,9 @@ async function fixture() {
 it('uses bundled ripgrep to scope results and apply excludes after includes', async () => {
   const { core } = await fixture()
   const result = await searchInFiles(core, 'task', 'needle', {
-    folder: 'src', include: ['*.tsx'], exclude: ['**/generated/**'],
+    folder: 'src',
+    include: ['*.tsx'],
+    exclude: ['**/generated/**'],
   })
   expect(result.files.map((file) => file.path)).toEqual(['src/good.tsx'])
   expect(result.files[0].hits[0]).toMatchObject({ line: 1, col: 4, endCol: 10 })
@@ -38,14 +42,24 @@ it('confines scopes, reports missing folders, and treats option-like queries as 
   const outside = await mkdtemp(join(tmpdir(), 'editor-search-outside-'))
   roots.push(outside)
   await symlink(outside, join(root, 'escape'))
-  await expect(searchInFiles(core, 'task', 'needle', { folder: 'escape' })).rejects.toMatchObject({ code: 'invalid_scope' })
-  await expect(searchInFiles(core, 'task', 'needle', { folder: 'missing' })).rejects.toMatchObject({ code: 'invalid_scope' })
-  await expect(searchInFiles(core, 'task', 'needle', { folder: '../outside' })).rejects.toMatchObject({ code: 'invalid_scope' })
+  await expect(searchInFiles(core, 'task', 'needle', { folder: 'escape' })).rejects.toMatchObject({
+    code: 'invalid_scope',
+  })
+  await expect(searchInFiles(core, 'task', 'needle', { folder: 'missing' })).rejects.toMatchObject({
+    code: 'invalid_scope',
+  })
+  await expect(searchInFiles(core, 'task', 'needle', { folder: '../outside' })).rejects.toMatchObject({
+    code: 'invalid_scope',
+  })
   await writeFile(join(root, 'src', '-dash.tsx'), '--files\n')
   const result = await searchInFiles(core, 'task', '--files', { folder: 'src', include: ['*.tsx'] })
   expect(result.files.map((file) => file.path)).toEqual(['src/-dash.tsx'])
-  await expect(searchInFiles(core, 'task', 'needle', { include: ['['] })).rejects.toMatchObject({ code: 'invalid_filter' })
-  await expect(listFilteredPaths(root, '.', ['*.tsx'], [], AbortSignal.abort())).rejects.toMatchObject({ code: 'cancelled' })
+  await expect(searchInFiles(core, 'task', 'needle', { include: ['['] })).rejects.toMatchObject({
+    code: 'invalid_filter',
+  })
+  await expect(listFilteredPaths(root, '.', ['*.tsx'], [], AbortSignal.abort())).rejects.toMatchObject({
+    code: 'cancelled',
+  })
 })
 
 it('keeps hidden and ignored files out of default search, including in a Unicode option-like folder', async () => {
@@ -62,8 +76,11 @@ it('keeps hidden and ignored files out of default search, including in a Unicode
 
 it('validates regex through bundled ripgrep when the include matches no files', async () => {
   const { core } = await fixture()
-  await expect(searchInFiles(core, 'task', '[', { regex: true, include: ['*.never'] }))
-    .rejects.toMatchObject({ code: 'invalid_query' })
-  expect(await searchInFiles(core, 'task', 'needle', { regex: true, include: ['*.never'] }))
-    .toEqual({ files: [], truncated: false })
+  await expect(searchInFiles(core, 'task', '[', { regex: true, include: ['*.never'] })).rejects.toMatchObject({
+    code: 'invalid_query',
+  })
+  expect(await searchInFiles(core, 'task', 'needle', { regex: true, include: ['*.never'] })).toEqual({
+    files: [],
+    truncated: false,
+  })
 })

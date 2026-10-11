@@ -1,6 +1,15 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
-export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user' | 'project'
+export type MemoryType =
+  | 'convention'
+  | 'architecture'
+  | 'decision'
+  | 'fix'
+  | 'reference'
+  | 'feedback'
+  | 'task'
+  | 'user'
+  | 'project'
 export type MemoryScope = 'project' | 'private'
 
 export type MemoryLibraryEntry = {

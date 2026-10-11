@@ -90,7 +90,11 @@ describe('RefPanelHost', () => {
 
   it('renders nothing when the provider becomes ineligible while the ref is open', () => {
     let live = true
-    panel('linear', () => <span data-mark="linear" />, () => live)
+    panel(
+      'linear',
+      () => <span data-mark="linear" />,
+      () => live,
+    )
 
     mount()
     openRefPanel({ providerId: 'linear', displayId: 'ENG-42' })

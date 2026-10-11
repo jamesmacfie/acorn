@@ -1,7 +1,11 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { utf8Exceeds } from '@acorn/protocol/extensionPoints.ts'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
-import { MAX_STEP_BODY_JSON_BYTES, MAX_STEP_BODY_TAIL_LINES, type WorkflowStepBodyProps } from '../../contract/stepBody.ts'
+import {
+  MAX_STEP_BODY_JSON_BYTES,
+  MAX_STEP_BODY_TAIL_LINES,
+  type WorkflowStepBodyProps,
+} from '../../contract/stepBody.ts'
 
 // What a `workflows:step-body` provider is handed for the selected step (../../contract/stepBody.ts).
 // One function, so the bounds live in one place and a test can hold them.

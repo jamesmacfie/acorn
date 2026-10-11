@@ -4,12 +4,19 @@ import { clearComposerDraft, clearComposerDrafts, composerDraftState } from './c
 import { readComposerPayload } from './composerDraftStorage'
 
 // Migration must survive a quota failure without multiplying Node-owned attachment ids.
-afterEach(() => { vi.restoreAllMocks(); clearComposerDrafts(); localStorage.clear(); setActiveNode(null) })
+afterEach(() => {
+  vi.restoreAllMocks()
+  clearComposerDrafts()
+  localStorage.clear()
+  setActiveNode(null)
+})
 
 it('claims legacy payload once and preserves its source when storage rejects the migration', () => {
   localStorage.setItem('acorn.agent-draft.legacy-failure', 'unsent')
   localStorage.setItem('acorn.agent-attachments.legacy-failure', '["attachment-A"]')
-  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
+  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new Error('quota')
+  })
   const a = composerDraftState('legacy-failure', 'A')
   expect(a.text()).toBe('unsent')
   expect(a.attachmentIds()).toEqual(['attachment-A'])

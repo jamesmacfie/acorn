@@ -19,13 +19,18 @@ const GitPaneFooter = lazy(() => import('./TaskGitPane').then((module) => ({ def
 const GitPaneDetail = lazy(() => import('./TaskGitPane').then((module) => ({ default: module.GitPaneDetail })))
 
 export const gitPaneContribution: PaneLayoutContribution<GitTaskPaneModel> = {
-  id: GIT_PANE, label: 'Git', glyph: 'git-branch', description: 'Uncommitted changes, history, stashes and worktrees', order: 20,
-  defaultChord: 'meta+shift+g', requires: { plugin: 'git' },
+  id: GIT_PANE,
+  label: 'Git',
+  glyph: 'git-branch',
+  description: 'Uncommitted changes, history, stashes and worktrees',
+  order: 20,
+  defaultChord: 'meta+shift+g',
+  requires: { plugin: 'git' },
   when: gitAvailable,
   layout: 'list-detail',
-  // Held once per task by the host (client-core registries/paneModels.ts). The Changes model is built
+  // Held once per task by the host (`paneModel` in client-core). The Changes model is built
   // with the pane, so its selection and commit draft survive a tab switch. Each tab only reads Git
-  // while it is the one on screen (./paneModel.ts).
+  // while it is the one on screen (`createGitPaneModel`).
   model: (task, pane) => {
     const git = createGitPaneModel(task, pane.shown)
     return { ...git, changes: createChangesModel(task, { shown: () => pane.shown() && git.section() === 'changes' }) }

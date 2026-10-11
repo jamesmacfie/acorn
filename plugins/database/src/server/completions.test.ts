@@ -6,12 +6,27 @@ import { completeSql, resolveQualifier, textBeforeCursor } from './completions'
 // an injected catalog, because a live Postgres is not a unit test.
 
 const TABLES: DbCatalogTable[] = [
-  { schema: 'public', name: 'orders', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'total', dataType: 'numeric' }] },
-  { schema: 'public', name: 'users', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'email', dataType: 'text' }] },
+  {
+    schema: 'public',
+    name: 'orders',
+    columns: [
+      { name: 'id', dataType: 'uuid' },
+      { name: 'total', dataType: 'numeric' },
+    ],
+  },
+  {
+    schema: 'public',
+    name: 'users',
+    columns: [
+      { name: 'id', dataType: 'uuid' },
+      { name: 'email', dataType: 'text' },
+    ],
+  },
   { schema: 'billing', name: 'invoices', columns: [{ name: 'number', dataType: 'text' }] },
 ]
 
-const labels = (text: string, column: number, line = 1) => completeSql(text, { line, column }, TABLES).map((item) => item.label)
+const labels = (text: string, column: number, line = 1) =>
+  completeSql(text, { line, column }, TABLES).map((item) => item.label)
 
 describe('textBeforeCursor', () => {
   it('takes the current line up to the cursor, and clamps a position past the end', () => {
@@ -43,7 +58,7 @@ describe('completeSql', () => {
     expect(labels('INSERT INTO ', 13)).toEqual(['orders', 'users', 'billing.invoices'])
   })
 
-  it('offers exactly that table\'s columns after an alias, and nothing else', () => {
+  it("offers exactly that table's columns after an alias, and nothing else", () => {
     const items = completeSql('SELECT o. FROM orders o', { line: 1, column: 10 }, TABLES)
     expect(items.map((i) => i.label)).toEqual(['id', 'total'])
     expect(items.every((i) => i.kind === 'field')).toBe(true)

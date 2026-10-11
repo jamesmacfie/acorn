@@ -1,6 +1,6 @@
 // Which editor the pane's file view mounts. One device preference (`editor_mode`), read from the
 // prefs query and written through savePref — the device-prefs pattern, where localStorage is written
-// before the query cache (packages/client-core/src/features/settings/savePref.ts).
+// before the query cache.
 //
 // Graphical is the default and stays it: terminal mode is for a person who already lives in vim.
 import type { QueryClient } from '@tanstack/solid-query'
@@ -29,7 +29,9 @@ export const saveEditorShowIgnored = (qc: QueryClient, enabled: boolean): Promis
 
 export const readEditorIndentation = (prefs: Record<string, string> | undefined): Indentation => {
   const match = /^(spaces|tabs):(2|4|8)$/.exec(prefs?.[PrefKeys.editorIndentation] ?? '')
-  return match ? { mode: match[1] as Indentation['mode'], width: Number(match[2]) as Indentation['width'] } : { mode: 'spaces', width: 2 }
+  return match
+    ? { mode: match[1] as Indentation['mode'], width: Number(match[2]) as Indentation['width'] }
+    : { mode: 'spaces', width: 2 }
 }
 
 export const saveEditorIndentation = (qc: QueryClient, value: Indentation): Promise<boolean> =>

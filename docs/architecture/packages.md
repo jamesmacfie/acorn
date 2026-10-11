@@ -130,7 +130,7 @@ folder is named `main`, `service`, or `wiring`. Every workspace package carries 
   banner, or a plugin frame's own console. Tests are exempt, because they spy on `console` to check
   the logger. [Telemetry](../telemetry.md) § Logging covers the logger.
 - **The custody stack stays shell-free.** `@acorn/custody` is the broker, fleet, device tokens, plugin
-  cache and trust store, tunnels, and supervised Node service. It names no shell binding, and its
+  cache and trust store, and supervised Node service. It names no shell binding, and its
   encryption is injected. The desktop runs it in a helper process, and the terminal client runs it in
   process. [Shell](../shell.md) covers the helper.
 - **The client stays portable.** Only `packages/client-core/src/infra/platform/` reads `window.acorn`.

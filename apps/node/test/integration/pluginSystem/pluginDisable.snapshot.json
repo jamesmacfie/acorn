@@ -30,7 +30,6 @@
       "github/data/actions",
       "github/data/branches",
       "github/data/pulls",
-      "github/pins",
       "github/repos",
       "github/tasks",
       "memory",
@@ -135,11 +134,11 @@
       "memory.library",
       "notes.seedTask",
       "notes.store",
-      "preview.rules",
       "preview.urls",
       "terminal.route",
       "terminal.runRoute",
       "terminal.runTargets",
+      "terminal.runtime",
       "terminal.sendToAgent",
       "terminal.sessions",
       "terminal.taskCreatedHook",
@@ -207,7 +206,6 @@
         "github/data/actions",
         "github/data/branches",
         "github/data/pulls",
-        "github/pins",
         "github/repos",
         "github/tasks"
       ],
@@ -265,7 +263,6 @@
         "preview"
       ],
       "capabilities": [
-        "preview.rules",
         "preview.urls"
       ]
     },

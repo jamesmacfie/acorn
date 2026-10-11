@@ -31,7 +31,13 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
       {(pluginId) => (
         <>
           <div class="markdown-fence-toggle">
-            <Button size="xs" variant="ghost" pressed={viewer.preview()} tip={`Drawn by ${pluginId()}`} onPress={viewer.toggle}>
+            <Button
+              size="xs"
+              variant="ghost"
+              pressed={viewer.preview()}
+              tip={`Drawn by ${pluginId()}`}
+              onPress={viewer.toggle}
+            >
               Preview
             </Button>
           </div>
@@ -45,7 +51,9 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
                 {...(props.scope.projectId ? { projectId: props.scope.projectId } : {})}
                 // A contributor that goes away hides this whole view first; a tree that failed leaves the
                 // slot drawing its empty default, so the fence falls back to its source.
-                occupied={(occupied) => { if (!occupied && viewer.pluginId()) viewer.failed() }}
+                occupied={(occupied) => {
+                  if (!occupied && viewer.pluginId()) viewer.failed()
+                }}
               />
             </div>
           </Show>

@@ -7,9 +7,8 @@ describe('defaultBranchForTask', () => {
   })
 
   it('de-duplicates the final prefixed name', () => {
-    expect(defaultBranchForTask('Fix Login', 'james/', [
-      'james/fix-login',
-      'james/fix-login-2',
-    ])).toBe('james/fix-login-3')
+    expect(defaultBranchForTask('Fix Login', 'james/', ['james/fix-login', 'james/fix-login-2'])).toBe(
+      'james/fix-login-3',
+    )
   })
 })

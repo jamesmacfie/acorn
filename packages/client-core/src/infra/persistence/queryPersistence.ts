@@ -9,7 +9,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const PERSISTED_SNAPSHOT_MAX_AGE_MS = 7 * DAY_MS
 
 // How long one entry is carried from snapshot to snapshot without being refetched. It matches the
-// QueryClient's `gcTime` (infra/node/fleet.ts), so an entry nobody has looked at for a day leaves
+// QueryClient's `gcTime` (see `clientFor`), so an entry nobody has looked at for a day leaves
 // memory and the snapshot together. A restored week-old entry is drawn once and then dropped at the
 // next write unless its screen refetched it.
 export const PERSISTED_QUERY_MAX_AGE_MS = DAY_MS
@@ -31,7 +31,7 @@ export const shouldPersistQueryKey = (key: QueryKey): boolean => {
 // A query that sets `meta: { persist: false }` stays in memory only. Search answers do: restoring one
 // after a relaunch would show an old provider answer as though it had just arrived.
 export const shouldPersistQuery = (query: Query): boolean =>
-  defaultShouldDehydrateQuery(query)
-  && query.meta?.persist !== false
-  && shouldPersistQueryKey(query.queryKey)
-  && query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS
+  defaultShouldDehydrateQuery(query) &&
+  query.meta?.persist !== false &&
+  shouldPersistQueryKey(query.queryKey) &&
+  query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS

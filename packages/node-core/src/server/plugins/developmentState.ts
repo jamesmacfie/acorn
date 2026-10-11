@@ -8,7 +8,8 @@ export const DEVELOPMENT_FILE = 'development-plugins.json'
 
 /** Which plugins are in development mode. Read from the file per call, as input grants are, so the
  *  source runtime sees a change at once. */
-export const developmentPlugins = (dataDir: string): readonly string[] => pluginListStore(dataDir, DEVELOPMENT_FILE).get()
+export const developmentPlugins = (dataDir: string): readonly string[] =>
+  pluginListStore(dataDir, DEVELOPMENT_FILE).get()
 
 // The log lines are in memory and per process. Nothing is written to disk, and a plugin out of
 // development mode keeps no lines.

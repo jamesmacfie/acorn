@@ -17,24 +17,46 @@ vi.mock('./sessions/wsChannel', () => ({
 const { managedAgentStore } = await import('./sessions/managedStore')
 const { agentRailMarkerContribution } = await import('./railMarkerContribution')
 
-const row = (id: string, taskId: string, over: Partial<AgentSession> = {}): AgentSession => ({
-  id, taskId, title: id, providerId: 'claude', config: {}, createdAt: 1, updatedAt: 1, lastEventSeq: 0, lastReadSeq: 0,
-  attention: 'none', controller: 'acorn', runtimeState: 'ready', subagents: [], queuedTurns: 0, kind: 'interactive',
-  ...over,
-} as unknown as AgentSession)
+const row = (id: string, taskId: string, over: Partial<AgentSession> = {}): AgentSession =>
+  ({
+    id,
+    taskId,
+    title: id,
+    providerId: 'claude',
+    config: {},
+    createdAt: 1,
+    updatedAt: 1,
+    lastEventSeq: 0,
+    lastReadSeq: 0,
+    attention: 'none',
+    controller: 'acorn',
+    runtimeState: 'ready',
+    subagents: [],
+    queuedTurns: 0,
+    kind: 'interactive',
+    ...over,
+  }) as unknown as AgentSession
 
-const event = (sessionId: string, seq: number): AgentEventRecord => ({
-  id: `${sessionId}-e${seq}`, sessionId, turnId: 'turn', seq, schemaVersion: 1, searchText: null, createdAt: 5_000 + seq,
-  event: { type: 'assistant_message', text: 'more' },
-} as unknown as AgentEventRecord)
+const event = (sessionId: string, seq: number): AgentEventRecord =>
+  ({
+    id: `${sessionId}-e${seq}`,
+    sessionId,
+    turnId: 'turn',
+    seq,
+    schemaVersion: 1,
+    searchText: null,
+    createdAt: 5_000 + seq,
+    event: { type: 'assistant_message', text: 'more' },
+  }) as unknown as AgentEventRecord
 
 describe('the agent rail marker while a session streams', () => {
   // One case, because the store is a module singleton and the rows below outlive it.
   it('runs no row per event, and keeps the session’s live sequence off the roster', () => {
     managedAgentStore.activate()
     const TASKS = 30
-    managedAgentStore.upsertSessions(Array.from({ length: 100 }, (_, index) =>
-      row(`s${index}`, `t${index % TASKS}`, { updatedAt: 1_000 - index })))
+    managedAgentStore.upsertSessions(
+      Array.from({ length: 100 }, (_, index) => row(`s${index}`, `t${index % TASKS}`, { updatedAt: 1_000 - index })),
+    )
     managedAgentStore.upsertSession(row('s99', 't9', { updatedAt: 1_000, runtimeState: 'working' }))
     const runs = new Map<string, number>()
     const markers = new Map<string, readonly { id: string }[]>()
@@ -51,12 +73,12 @@ describe('the agent rail marker while a session streams', () => {
     runs.clear()
     const roster = managedAgentStore.sessions()
 
-    // What the node sends per streamed event now: the event, and no row unless the event changed it
-    // (server/sessions/runtimeEngine.ts § record). s0 is in t0.
+    // What the node sends per streamed event: the event, and no row unless the event changed it
+    // (the runtime engine's `record`). s0 is in t0.
     for (let seq = 1; seq <= 25; seq++) deliver({ channel: 'agent:event', event: event('s0', seq) })
 
     // No row runs at all: an event frame leaves the roster alone, and the live sequence the pane
-    // marks read up to is its own per-session signal (sessions/managedStore.ts § eventSeqs).
+    // marks read up to is its own per-session signal (`eventSeqs` in the managed store).
     expect([...runs.keys()]).toEqual([])
     // Nor anything that reads the whole roster, such as Agent Center.
     expect(managedAgentStore.sessions()).toBe(roster)
@@ -66,7 +88,10 @@ describe('the agent rail marker while a session streams', () => {
 
     // And a row that did change still lands, on its task's rows alone.
     runs.clear()
-    deliver({ channel: 'agent:session', session: row('s1', 't1', { updatedAt: 6_000, lastEventSeq: 3, attention: 'permission' }) })
+    deliver({
+      channel: 'agent:session',
+      session: row('s1', 't1', { updatedAt: 6_000, lastEventSeq: 3, attention: 'permission' }),
+    })
     expect([...runs.keys()]).toEqual(['t1'])
     expect(markers.get('t1')?.map((marker) => marker.id)).toEqual(['attention'])
   })
@@ -75,7 +100,8 @@ describe('the agent rail marker while a session streams', () => {
 describe('the Workflows pane button', () => {
   it('spins only for a working workflow agent, so the Agent button can spin while it stays still', () => {
     managedAgentStore.activate()
-    const workflowsButton = (taskId: string) => agentRailMarkerContribution.markers({ kind: 'pane', id: 'workflows', taskId })
+    const workflowsButton = (taskId: string) =>
+      agentRailMarkerContribution.markers({ kind: 'pane', id: 'workflows', taskId })
     const agentButton = (taskId: string) => agentRailMarkerContribution.markers({ kind: 'pane', id: 'agents', taskId })
 
     managedAgentStore.upsertSession(row('chat', 'wf-a', { runtimeState: 'working' }))

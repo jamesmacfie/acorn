@@ -39,9 +39,7 @@ export function planWorkspaceViewTransition(input: WorkspaceViewTransitionInput)
   if (input.explicitProjectPath && workspaceOwnsPath(input.workspace, input.explicitProjectPath)) {
     return { kind: 'keep-project' }
   }
-  const activeTask = input.activeTaskId
-    ? input.tasks.find((task) => task.id === input.activeTaskId)
-    : undefined
+  const activeTask = input.activeTaskId ? input.tasks.find((task) => task.id === input.activeTaskId) : undefined
 
   if (!input.selectedSource && activeTask && ownsProject(input.workspace, activeTask.projectId)) {
     return { kind: 'keep-task', task: activeTask }

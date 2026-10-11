@@ -19,7 +19,9 @@ const PAGE = `data:text/html,${encodeURIComponent(`
 const serve = async (): Promise<{ url: string; close: () => Promise<void> }> => {
   const { createServer } = await import('node:http')
   const html = decodeURIComponent(PAGE.slice('data:text/html,'.length))
-  const server = createServer((_request, response) => response.writeHead(200, { 'content-type': 'text/html' }).end(html))
+  const server = createServer((_request, response) =>
+    response.writeHead(200, { 'content-type': 'text/html' }).end(html),
+  )
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as { port: number }
   return { url: `http://127.0.0.1:${port}/`, close: () => new Promise((done) => server.close(() => done())) }
@@ -59,9 +61,9 @@ describe.skipIf(!process.env.ACORN_BROWSER_SMOKE)('the agent browser, end to end
 
       // The page logs what it read out of the input, so this pins that the fill landed as a value the
       // page's own script could see, rather than as a DOM attribute.
-      await expect.poll(async () => (await pool.console('task-1')).lines.join('\n'), { timeout: 5_000 }).toContain(
-        'clicked:someone@example.test',
-      )
+      await expect
+        .poll(async () => (await pool.console('task-1')).lines.join('\n'), { timeout: 5_000 })
+        .toContain('clicked:someone@example.test')
 
       const shot = await pool.screenshot('task-1')
       expect(shot).toMatchObject({ captureId: 'capture-0', url: '/v1/p/browser/captures/capture-0' })

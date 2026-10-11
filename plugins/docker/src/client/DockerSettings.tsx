@@ -15,7 +15,11 @@ const infoText = (info: DockerInfo): string =>
     : `Docker isn't available: ${info.detail}`
 
 const SWITCHES: Array<{ key: keyof DockerPrefs; label: string; description?: string }> = [
-  { key: 'confirmDestructive', label: 'Ask twice before destructive actions', description: 'Applies to remove, prune, and compose down.' },
+  {
+    key: 'confirmDestructive',
+    label: 'Ask twice before destructive actions',
+    description: 'Applies to remove, prune, and compose down.',
+  },
   { key: 'showStopped', label: 'Show stopped containers in the Docker list' },
 ]
 
@@ -39,7 +43,13 @@ export default function DockerSettings() {
             until the daemon answers, and a failed one would take the page down with it. */}
         <SettingRow
           label="Docker engine"
-          description={info.state === 'ready' ? infoText(info()) : info.state === 'errored' ? "Couldn't get Docker's status." : 'Checking Docker…'}
+          description={
+            info.state === 'ready'
+              ? infoText(info())
+              : info.state === 'errored'
+                ? "Couldn't get Docker's status."
+                : 'Checking Docker…'
+          }
         />
       </SettingsSection>
 
@@ -50,9 +60,11 @@ export default function DockerSettings() {
             description={item.description}
             error={saves[item.key].error()}
             // Both defaults are constants in ./dockerPrefs.ts, which is what a record with nothing stored reads.
-            onReset={current()[item.key] === defaultDockerPrefs[item.key]
-              ? undefined
-              : () => write(item.key, defaultDockerPrefs[item.key])}
+            onReset={
+              current()[item.key] === defaultDockerPrefs[item.key]
+                ? undefined
+                : () => write(item.key, defaultDockerPrefs[item.key])
+            }
           >
             <Checkbox
               switch
@@ -69,7 +81,10 @@ export default function DockerSettings() {
         label="Task linking"
         help="acorn lists a task's containers, and cleans them up, from the Compose stack started in its worktree. Project rules only suggest a stack in the task summary. To start and stop a stack from the task, add it as a run target."
       >
-        <SettingRow label="Project rules" description="Set in each project's .acorn/config.toml. The project's Docker tab shows them." />
+        <SettingRow
+          label="Project rules"
+          description="Set in each project's .acorn/config.toml. The project's Docker tab shows them."
+        />
       </SettingsSection>
     </>
   )

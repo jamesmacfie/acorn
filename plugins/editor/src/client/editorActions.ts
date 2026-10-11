@@ -2,7 +2,18 @@ import type { EditorView } from '@codemirror/view'
 import { openReplacePanel } from '@acorn/plugin-api/ui/editor'
 import type * as Engine from './editorEngine'
 
-export type EditorAction = 'find' | 'replace' | 'comment' | 'duplicate' | 'move-up' | 'move-down' | 'select-next' | 'undo' | 'redo' | 'indent' | 'outdent'
+export type EditorAction =
+  | 'find'
+  | 'replace'
+  | 'comment'
+  | 'duplicate'
+  | 'move-up'
+  | 'move-down'
+  | 'select-next'
+  | 'undo'
+  | 'redo'
+  | 'indent'
+  | 'outdent'
 
 export const EDITOR_ACTIONS: readonly { id: EditorAction; title: string }[] = [
   { id: 'find', title: 'Find in file' },

@@ -17,11 +17,15 @@ import { and, eq } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { projectCount, storedWorkspacesMode } from '../workspacesMode'
+import { projectCount, storedWorkspacesMode } from '../projects/workspacesMode'
 import { broadcastWorkspacesModeChanged } from '../notify'
 
 export class PreferenceWriteError extends Error {
-  constructor(readonly status: 400 | 409, readonly code: 'bad_request' | 'workspaces_fixed', message: string) {
+  constructor(
+    readonly status: 400 | 409,
+    readonly code: 'bad_request' | 'workspaces_fixed',
+    message: string,
+  ) {
     super(message)
   }
 }
@@ -36,15 +40,21 @@ export function writePreference(db: AppDatabase, userId: string, key: string, va
       }
       const stored = storedWorkspacesMode(tx, userId)
       if (stored !== null && stored !== value && !(stored === 'off' && value === 'on')) {
-        throw new PreferenceWriteError(409, 'workspaces_fixed', "Grouped workspaces can't be switched back to separate projects.")
+        throw new PreferenceWriteError(
+          409,
+          'workspaces_fixed',
+          "Grouped workspaces can't be switched back to separate projects.",
+        )
       }
       if (stored === null && projectCount(tx) > 0 && value !== 'on') {
         throw new PreferenceWriteError(409, 'workspaces_fixed', 'Existing projects use grouped workspaces.')
       }
       if (stored !== value) changedMode = value
     }
-    tx.insert(schema.prefs).values({ userId, key, value })
-      .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } }).run()
+    tx.insert(schema.prefs)
+      .values({ userId, key, value })
+      .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } })
+      .run()
     return changedMode
   })
   // Both the route and the plugin service write here. Publish only after the transaction commits.

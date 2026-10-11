@@ -13,18 +13,41 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
 }))
 const { default: SecurityDiagnosticsPanel } = await import('./SecurityDiagnosticsPanel')
 
-const choices: SecurityScopeChoices = { projects: [{ id: 'project-1', name: 'Project one' }, { id: 'project-2', name: 'Project two' }] }
+const choices: SecurityScopeChoices = {
+  projects: [
+    { id: 'project-1', name: 'Project one' },
+    { id: 'project-2', name: 'Project two' },
+  ],
+}
 const report = (nodeId: string, projectId: string | null = null): SecurityDiagnostics => ({
-  nodeId, projectId, checkedAt: Date.now(), expiresAt: Date.now() + 300_000,
-  findings: [{ id: 'instructions.checks', owner: 'agents', nodeId, projectId, checkedAt: Date.now(),
-    state: 'observed', severity: 'info', source: 'fixture', summary: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
-    description: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
-    limits: 'Limited evidence.', repair: 'Review settings.' }],
+  nodeId,
+  projectId,
+  checkedAt: Date.now(),
+  expiresAt: Date.now() + 300_000,
+  findings: [
+    {
+      id: 'instructions.checks',
+      owner: 'agents',
+      nodeId,
+      projectId,
+      checkedAt: Date.now(),
+      state: 'observed',
+      severity: 'info',
+      source: 'fixture',
+      summary: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
+      description: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
+      limits: 'Limited evidence.',
+      repair: 'Review settings.',
+    },
+  ],
 })
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
-const checkButton = (host: HTMLElement) => [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Check this node')!
+const checkButton = (host: HTMLElement) =>
+  [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Check this node')!
 
-afterEach(() => { mock.requests = [] })
+afterEach(() => {
+  mock.requests = []
+})
 
 it('cancels a Node request and ignores a late response from the previous Node', async () => {
   const host = document.createElement('div')
@@ -50,7 +73,8 @@ it('cancels a Node request and ignores a late response from the previous Node', 
   mock.requests.shift()!.resolve(report('node-2'))
   await settle()
   expect(host.textContent).toContain('Evidence for node-2')
-  dispose(); host.remove()
+  dispose()
+  host.remove()
 })
 
 it('clears project evidence when the project changes and refuses a late reply', async () => {
@@ -59,14 +83,19 @@ it('clears project evidence when the project changes and refuses a late reply', 
   const dispose = render(() => <SecurityDiagnosticsPanel nodeId="node-1" />, host)
   mock.requests.shift()!.resolve(choices)
   await settle()
-  const project = [...host.querySelectorAll('select')].find((select) => select.getAttribute('aria-label') === 'Project') ?? host.querySelector('select')!
-  project.value = 'project-1'; project.dispatchEvent(new Event('change', { bubbles: true }))
+  const project =
+    [...host.querySelectorAll('select')].find((select) => select.getAttribute('aria-label') === 'Project') ??
+    host.querySelector('select')!
+  project.value = 'project-1'
+  project.dispatchEvent(new Event('change', { bubbles: true }))
   checkButton(host).click()
   const old = mock.requests.shift()!
-  project.value = 'project-2'; project.dispatchEvent(new Event('change', { bubbles: true }))
+  project.value = 'project-2'
+  project.dispatchEvent(new Event('change', { bubbles: true }))
   expect(old.signal?.aborted).toBe(true)
   old.resolve(report('node-1', 'project-1'))
   await settle()
   expect(host.textContent).not.toContain('Evidence for node-1/project-1')
-  dispose(); host.remove()
+  dispose()
+  host.remove()
 })

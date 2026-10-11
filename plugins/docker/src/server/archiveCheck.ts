@@ -8,7 +8,9 @@ import type { DockerBridge } from '../server/routes/docker'
 /** No containers, no row. Archiving a task docker knows nothing about costs one `docker ps`. */
 export async function dockerArchiveConcern(bridge: DockerBridge, task: TaskRef): Promise<TaskConcern | null> {
   const matched = await bridge.taskContainers(task.id)
-  const running = matched.filter((container) => container.state === 'running' || container.state === 'paused' || container.state === 'restarting')
+  const running = matched.filter(
+    (container) => container.state === 'running' || container.state === 'paused' || container.state === 'restarting',
+  )
   if (!running.length) return null
   return {
     id: 'containers',

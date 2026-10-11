@@ -5,12 +5,17 @@ import { logStorageFootprint } from '@acorn/node-core/server/storage'
 import type { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
-import { loadedPluginBinding, loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/server/plugins'
+import {
+  loadedPluginBinding,
+  loadExternalPlugins,
+  type InstalledPlugin,
+  type PluginLoadFailure,
+} from '@acorn/node-core/server/plugins'
 import { adoptRenamedPluginDb, reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
-import { reconcileTmux } from '@acorn/plugin-terminal/node/index.ts'
+import { TERMINAL_RUNTIME } from '@acorn/plugin-terminal/contract/runtime.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 import { nodePlugins, type NodePluginDeps } from './plugins'
@@ -23,7 +28,6 @@ const reconcileLog = createLogger('node:reconcile')
 // app supervises it rather than owning a second implementation. This lives in apps/node to keep the
 // dependency direction right: the graph names plugins, and node-core stays independent of them
 // (docs/architecture/packages.md § Package boundaries).
-export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
 export type NodeComposition = {
   plugins: NodePlugin[]
@@ -37,20 +41,22 @@ export type NodeComposition = {
   // "Failures are contained, and every failure names itself"). Both roots hand this to the
   // PLUGIN_STATE bridge, which is how it reaches the roster row and the attention inbox.
   failures: readonly PluginLoadFailure[]
-  drainOrder: typeof NODE_DRAIN_ORDER
 }
 
-// Async because loading a plugin from disk is an `await import()`. Both composition roots already
-// awaited initPlugins around this call, so the graph assembles at the same point it always did.
+// Async because loading a plugin from disk is an `await import()`. bootNode awaits it before
+// initPlugins (./boot.ts).
 //
 // A fresh install's empty directory gets exactly the static list. Anything extra arrived through the
 // installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
-  // The changes plugin became part of git on 2026-10-11. Its review notes move with it, before any
-  // plugin opens a database.
-  if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git')) pluginLog.info('moved the changes plugin database to git')
+  // An older data root can hold a `changes` database. The git plugin owns those review notes, so they
+  // move to git's database before any plugin opens one. Mixed-version path until 2027-01-09.
+  if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git'))
+    pluginLog.info('moved the changes plugin database to git')
   const builtins = nodePlugins(dataDir, deps)
-  const { loaded, installed, failures } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
+  const { loaded, installed, failures } = await loadExternalPlugins(dataDir, {
+    builtins: builtins.map((plugin) => plugin.name),
+  })
   // A loaded plugin may replace a built-in of the same id, which is how the loader gets dogfooded
   // (scripts/build-plugin.mjs). Only one of them lands in the graph: the ids are route namespaces and
   // database filenames, and initPlugins rejects a duplicate name outright.
@@ -60,14 +66,11 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
     loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
     installed,
     failures,
-    drainOrder: NODE_DRAIN_ORDER,
   }
 }
 
-// The compiled-in list only, not derived from assembleNodeGraph: it is the parity fixture the
-// standalone/supervised comparison uses (docs/testing/layers.md § Composition roots), and it must
-// describe what the build contains, not what happens to be installed in whichever data root the
-// process was pointed at.
+// The compiled-in list only, not derived from assembleNodeGraph: the plugin reloader needs what the
+// build contains, not what happens to be installed in whichever data root the process was pointed at.
 export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)
 
 export type BundledReconcileOptions = {
@@ -90,12 +93,16 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
     const bundled = reconcileBundledPlugins(dataDir, bundledRoot)
     preserved.push(...bundled.preserved)
     if (bundled.installed.length || bundled.updated.length) {
-      pluginLog.info(`bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
+      pluginLog.info(
+        `bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`,
+      )
     }
     // Tombstoned outside the package directory so a later app update cannot restore it
     // (docs/plugins/loaded-plugins.md § Loaded plugins).
     if (bundled.removed.length) {
-      pluginLog.info(`bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
+      pluginLog.info(
+        `bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`,
+      )
     }
     for (const failure of bundled.failures) {
       pluginLog.error(`bundled ${failure.id} was not reconciled: ${failure.reason}`)
@@ -111,7 +118,9 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
   if (development) {
     // Development only (docs/plugins/loaded-plugins.md § Loaded plugins): for a user this row is correct and
     // permanent, an owner install must never be replaced by a bundled copy.
-    pluginLog.info(`an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
+    pluginLog.info(
+      `an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`,
+    )
   }
 }
 
@@ -122,8 +131,7 @@ export type ReconcileOptions = {
   mark?(step: string): void
 }
 
-// The post-listener sequence shared by both hosts (docs/node-distribution.md § Runtime).
-// Host-specific work stays at the call site: MCP registration, state transitions, the ready signal.
+// The post-listener sequence bootNode runs (docs/node-distribution.md § Runtime).
 export async function reconcileNode({ db, dataDir, capabilities, mark = () => {} }: ReconcileOptions): Promise<void> {
   const githubMirror = capabilities.get(GITHUB_MIRROR)
   void logStorageFootprint(
@@ -133,7 +141,7 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
   ).catch((error) => storageLog.warn(`footprint failed: ${describeError(error).message}`))
 
   try {
-    await reconcileTmux()
+    await capabilities.get(TERMINAL_RUNTIME)?.reconcile()
     mark('reconcile.tmux')
   } catch (error) {
     reconcileLog.warn(`tmux reconcile failed: ${describeError(error).message}`)
@@ -158,6 +166,7 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
   }
 }
 
+// The bounded drain, in order (docs/node-distribution.md § Operations).
 export type NodeDrainResources = {
   listener: () => Promise<unknown>
   reconciliation: () => Promise<unknown>

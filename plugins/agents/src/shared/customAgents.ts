@@ -1,5 +1,6 @@
 // A custom agent: a saved start for a managed session. A harness, the provider options to start it on,
-// text for its system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents).
+// text for its system prompt, and a ceiling on acorn's own tools
+// (docs/managed-agents/custom-agents.md § Custom agents).
 //
 // The options are the same `optionId -> value` table a session default is, because model, reasoning
 // and permission mode are all options a provider advertises about itself. Nothing here names one.
@@ -23,9 +24,12 @@ export const customAgentInputSchema = z.object({
   description: z.string().trim().max(500).optional(),
   providerId: id,
   profileId: id,
-  options: z.record(id, z.string().max(500)).refine((value) => Object.keys(value).length <= 20, {
-    message: 'A custom agent cannot set more than 20 options.',
-  }).default({}),
+  options: z
+    .record(id, z.string().max(500))
+    .refine((value) => Object.keys(value).length <= 20, {
+      message: 'A custom agent cannot set more than 20 options.',
+    })
+    .default({}),
   instructions: z.string().max(MAX_CUSTOM_AGENT_INSTRUCTIONS).optional(),
   // The highest risk of acorn tool the session may call. Absent means no ceiling beyond the owner's own
   // tool preferences. It only ever narrows (docs/agent-tools.md).
@@ -97,5 +101,5 @@ export function sessionCustomAgent(config: Record<string, unknown>): CustomAgent
 
 /** An agent by id, or by its name ignoring case, which is how another agent asks for one. */
 export const findCustomAgent = (agents: readonly CustomAgent[], ref: string): CustomAgent | undefined =>
-  agents.find((agent) => agent.id === ref)
-  ?? agents.find((agent) => agent.name.toLowerCase() === ref.trim().toLowerCase())
+  agents.find((agent) => agent.id === ref) ??
+  agents.find((agent) => agent.name.toLowerCase() === ref.trim().toLowerCase())

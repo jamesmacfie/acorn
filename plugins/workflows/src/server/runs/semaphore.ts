@@ -31,7 +31,7 @@ export class Semaphore {
         resolve()
       }
       const abort = () => {
-        const index = this.#queue.findIndex(entry => entry.ready === ready)
+        const index = this.#queue.findIndex((entry) => entry.ready === ready)
         if (index >= 0) this.#queue.splice(index, 1)
         reject(new DOMException('Aborted', 'AbortError'))
       }
@@ -54,7 +54,10 @@ export class Semaphore {
     // Skip a saturated root without reserving a Node slot for its waiting work.
     for (let index = 0; index < this.#queue.length && this.#active < this.limit;) {
       const entry = this.#queue[index]!
-      if (!this.available(entry.key, entry.limit)) { index += 1; continue }
+      if (!this.available(entry.key, entry.limit)) {
+        index += 1
+        continue
+      }
       this.#queue.splice(index, 1)
       entry.ready()
     }

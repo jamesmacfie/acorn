@@ -6,26 +6,21 @@ import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications'
 import { renderFixture } from '../harness'
 import { focusedRegion } from './regions'
-import {
-  COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP, TYPING,
-} from './tiers'
+import { COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP, TYPING } from './tiers'
 
 // The tier table, as the two things that can actually be checked.
 //
 // The property worth having is "no two layers at one tier bind the same key with the same target mode
-// and target", and it cannot be written: `@opentui/keymap` 0.5.9 exposes `registerLayer`, which hands
-// back a disposer, and `getActiveKeys`, which answers for the layers active against the current
-// focus. There is no public way to enumerate the layers that are registered, so a test cannot walk
-// them and compare. Reaching into the engine's own state to do it anyway would be a test of the
-// engine's internals that breaks on its next release, and the thing under test here is this app.
+// and target", and it cannot be written: `@opentui/keymap` 0.5.9 has no public way to enumerate the
+// registered layers, and reaching into the engine's own state would test its internals rather than
+// this app.
 //
 // So the property is two checks, and between them they cover the two ways the table goes wrong:
 //
-//   a grep      a number spelled outside ./tiers.ts, which is how a tenth tier appears without
+//   a grep      a number spelled outside ./tiers.ts, which is how a new tier appears without
 //               anybody deciding on one
-//   a press     the one collision that existed, which was two Escapes at the region tier. It is a
-//               rendered test rather than a grep because what was wrong was the order the two layers
-//               happened to register in, and only a press can see an order
+//   a press     two Escapes at the region tier. A rendered test rather than a grep, because the
+//               fault is the order two layers register in, and only a press can see an order
 //
 // Do not go looking for the enumeration API. If a release adds one, this file is where the two checks
 // collapse back into one (docs/tui/keys.md § The five key groups).
@@ -33,9 +28,9 @@ import {
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const filesIn = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (
-    entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]
-  )).filter((file) => /\.tsx?$/.test(file))
+  readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]))
+    .filter((file) => /\.tsx?$/.test(file))
 
 /** A priority as an object field: `{ priority: 40 }`, which is how a layer and an intercept take one. */
 const AS_A_FIELD = /priority:\s*\d/
@@ -44,17 +39,16 @@ const AS_A_FIELD = /priority:\s*\d/
  * A priority as `bindKeys`'s third argument, which follows the bindings array or the `.map()` that
  * built it: `], 45, { mode: 'focus' })` or `})), 30)`.
  *
- * Held to the eleven values the table names plus 35, which the deleted swallow layer used, so an
- * ordinary number in an ordinary call — `slice(at, 2)`, `Math.max(a[i], 0)` — is not a false alarm.
- * A relapse spells one of these, because a relapse is somebody re-adding a tier.
+ * Held to the eleven values the table names plus 35, a retired tier, so an ordinary number in an
+ * ordinary call — `slice(at, 2)`, `Math.max(a[i], 0)` — is not a false alarm. A relapse spells one of
+ * these, because a relapse is somebody re-adding a tier.
  */
 const AS_AN_ARGUMENT = /[\])],\s*(?:0|5|30|35|36|40|41|42|45|60|61|200)\s*(?:\)|,\s*\{)/
 
 describe('the tiers are named in one place', () => {
   it('spells a keymap priority in tiers.ts and nowhere else', () => {
     // The same shape as the greps in ../invariants.test.ts, and for the same reason: what this forbids
-    // is a second place to put a decision. Ten numbers across eight files is ten decisions nobody
-    // reviewed, and two of them collided.
+    // is a second place to put a decision.
     const spelled = filesIn(ROOT)
       .filter((file) => !/\.test\.tsx?$/.test(file))
       .filter((file) => file !== join(ROOT, 'keys', 'tiers.ts'))
@@ -90,11 +84,9 @@ describe('the tiers are named in one place', () => {
 
 describe('one Escape at the region tier', () => {
   it('clears what is on screen first, then climbs', async () => {
-    // The collision the table found. There were two layers at the region tier binding Escape — the
-    // shell's notification dismiss and the region chain's `moveBack` — and which one answered came
-    // down to which had registered first, which is the reconciler's business and not a rule anybody
-    // wrote down. Now there is one handler and the order is a line of code
-    // (./install.ts § clearNotifications).
+    // Notification dismiss and the region chain's `moveBack` both answer Escape at the region tier.
+    // As two layers they would answer in registration order; as one handler the order is a line of
+    // code (./install.ts § clearNotifications).
     const screen = await renderFixture({ width: 100, height: 28, pane: 'notes' })
     try {
       await screen.until('Scratchpad')
@@ -114,7 +106,7 @@ describe('one Escape at the region tier', () => {
       expect(cleared).not.toContain('Saved.')
       expect(focusedRegion()).toEqual(inside)
 
-      // Second Escape has nothing to clear, so it climbs, which is the other layer's old job.
+      // Second Escape has nothing to clear, so it climbs.
       await screen.press('ESCAPE')
       expect(focusedRegion()?.regionId).toBe('panes')
     } finally {

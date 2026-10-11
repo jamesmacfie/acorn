@@ -3,15 +3,12 @@ import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { WorkflowDef } from '../shared/workflowContracts'
 
 // workflows.runner: the lifecycle methods the composition root and Node-owned schedulers need after
-// plugin initialization.
+// plugin initialization, reached through this declared surface rather than an import of the runner.
 //
 // Reconciliation cannot run inside init. It sweeps every 'running' step back to 'pending' and re-ticks
 // its run, so it has to run after the listener binds, because a resumed step calls the node's own
 // loopback context route. It also has to run before the composition root resolves `reconciled`, which
 // `start`, `gate`, and `cancel` await so a run cannot start into the sweep.
-//
-// Lives in contract/ for the same reason as agents.runtime: the composition root reaches it through a
-// declared surface rather than a deep import of server/runs/runner.ts.
 type WorkflowInternalStartBase = {
   taskId: string
   inputs?: Record<string, DataValue>
@@ -21,10 +18,7 @@ type WorkflowInternalStartBase = {
   trigger: string
 }
 
-export type WorkflowInternalStart = WorkflowInternalStartBase & (
-  | { workflow: WorkflowDef }
-  | { workflowId: string }
-)
+export type WorkflowInternalStart = WorkflowInternalStartBase & ({ workflow: WorkflowDef } | { workflowId: string })
 
 export type WorkflowsRunnerHandle = {
   reconcile(): Promise<void>

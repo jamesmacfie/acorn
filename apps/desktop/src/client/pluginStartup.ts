@@ -16,21 +16,26 @@ export function createPluginStartup(options: PluginStartupOptions) {
   let start: Promise<readonly ClientPlugin[]> | undefined
   let failed = false
   let release: () => void = () => {}
-  const started = new Promise<void>((resolve) => { release = resolve })
+  const started = new Promise<void>((resolve) => {
+    release = resolve
+  })
   let applied: string | null = null
   const pending = new Map<string, Promise<void>>()
 
   const initialize = (): Promise<readonly ClientPlugin[]> => {
     if (!start) {
-      start = options.load().then((plugins) => {
-        options.register(plugins, options.disabled())
-        options.onReady()
-        return plugins
-      }).catch((error: unknown) => {
-        failed = true
-        options.onFailed(error)
-        throw error
-      })
+      start = options
+        .load()
+        .then((plugins) => {
+          options.register(plugins, options.disabled())
+          options.onReady()
+          return plugins
+        })
+        .catch((error: unknown) => {
+          failed = true
+          options.onFailed(error)
+          throw error
+        })
       release()
     }
     return start
@@ -61,7 +66,9 @@ export function createPluginStartup(options: PluginStartupOptions) {
       options.register(plugins, disabled ?? options.disabled())
       applied = disabled !== null ? nodeId : null
     }
-    const result = pass().finally(() => { pending.delete(nodeId) })
+    const result = pass().finally(() => {
+      pending.delete(nodeId)
+    })
     pending.set(nodeId, result)
     return result
   }

@@ -96,8 +96,9 @@ export default function ProvidedNodes() {
   // A provider's own name, or its plugin's when no node listed the provider: its id is
   // `<pluginId>:<providerId>`.
   const providerName = (id: string): string =>
-    provided().rows.flatMap((answer) => answer.data.providers).find((provider) => provider.id === id)?.label
-      ?? pluginLabel(id.split(':')[0]!)
+    provided()
+      .rows.flatMap((answer) => answer.data.providers)
+      .find((provider) => provider.id === id)?.label ?? pluginLabel(id.split(':')[0]!)
 
   return (
     <Show when={hasNodeProviders(provided())}>
@@ -109,7 +110,11 @@ export default function ProvidedNodes() {
         {/* A provider that could not answer is a line, never a failed page: the rest of the list is
             still true (docs/architecture/fleet.md § Client state and fleet behavior). */}
         <For each={providerFailures(provided())}>
-          {(failure) => <Alert tone="warn" variant="banner">{providerName(failure.providerId)} couldn't list its machines: {failure.reason}</Alert>}
+          {(failure) => (
+            <Alert tone="warn" variant="banner">
+              {providerName(failure.providerId)} couldn't list its machines: {failure.reason}
+            </Alert>
+          )}
         </For>
 
         <For each={rows()}>
@@ -118,12 +123,22 @@ export default function ProvidedNodes() {
               <Inline gap="row" wrap>
                 <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>
                 <Badge size="xs">From {row.providerLabel}</Badge>
-                <Show when={row.adoptedAs}><Badge size="xs">In this fleet</Badge></Show>
+                <Show when={row.adoptedAs}>
+                  <Badge size="xs">In this fleet</Badge>
+                </Show>
                 {/* Adoption needs a host that holds device tokens. In a plain browser served by a
                     node there is none, so the row shows without the button rather than offering one
                     that cannot work. */}
                 <Show when={!row.adoptedAs && row.state === 'ready' && canPairNodes()}>
-                  <Button size="sm" disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
+                  <Button
+                    size="sm"
+                    disabled={busy()}
+                    onPress={() =>
+                      void run(async () => {
+                        await adoptProvidedNode(row)
+                      })
+                    }
+                  >
                     Add to this computer
                   </Button>
                 </Show>
@@ -176,7 +191,12 @@ export default function ProvidedNodes() {
               <Show
                 when={creating() === target().id}
                 fallback={
-                  <Button onPress={() => { setCreating(target().id); setNewLabel('') }}>
+                  <Button
+                    onPress={() => {
+                      setCreating(target().id)
+                      setNewLabel('')
+                    }}
+                  >
                     <Icon name="plus" /> New node on {target().label}
                   </Button>
                 }
@@ -185,28 +205,35 @@ export default function ProvidedNodes() {
                     action and Cancel under the last one. */}
                 <Card>
                   <Stack gap="row">
-                  <Field label="Name for the new node">
-                    <Input
-                      label="Name for the new node"
-                      value={newLabel()}
-                      ref={(el) => queueMicrotask(() => el.focus())}
-                      onInput={(value) => setNewLabel(value)}
-                    />
-                  </Field>
-                  <Inline gap="row">
-                    <Button
-                      variant="solid"
-                      tone="accent"
-                      disabled={busy() || !newLabel().trim()}
-                      onPress={() => void run(async () => {
-                        await createProvidedNode({ providerId: target().id, sourceNodeId: target().sourceNodeId }, newLabel().trim())
-                        setCreating(null)
-                      })}
-                    >
-                      {busy() ? 'Creating…' : 'Create'}
-                    </Button>
-                    <Button variant="ghost" onPress={() => setCreating(null)}>Cancel</Button>
-                  </Inline>
+                    <Field label="Name for the new node">
+                      <Input
+                        label="Name for the new node"
+                        value={newLabel()}
+                        ref={(el) => queueMicrotask(() => el.focus())}
+                        onInput={(value) => setNewLabel(value)}
+                      />
+                    </Field>
+                    <Inline gap="row">
+                      <Button
+                        variant="solid"
+                        tone="accent"
+                        disabled={busy() || !newLabel().trim()}
+                        onPress={() =>
+                          void run(async () => {
+                            await createProvidedNode(
+                              { providerId: target().id, sourceNodeId: target().sourceNodeId },
+                              newLabel().trim(),
+                            )
+                            setCreating(null)
+                          })
+                        }
+                      >
+                        {busy() ? 'Creating…' : 'Create'}
+                      </Button>
+                      <Button variant="ghost" onPress={() => setCreating(null)}>
+                        Cancel
+                      </Button>
+                    </Inline>
                   </Stack>
                 </Card>
               </Show>
@@ -214,7 +241,9 @@ export default function ProvidedNodes() {
           }}
         </For>
 
-        <Show when={error()}><Alert>{error()}</Alert></Show>
+        <Show when={error()}>
+          <Alert>{error()}</Alert>
+        </Show>
       </SettingsSection>
     </Show>
   )

@@ -30,7 +30,10 @@ it('preserves unborn, untracked, staged, and unstaged ranges for literal filenam
   setup('add', '.')
   writeFileSync(join(root, path), 'changed\nsecond\nunstaged\n')
   writeFileSync(join(root, 'file0.txt'), 'untracked\n')
-  expect(await provider.read('task', path, { root })).toEqual([{ from: 1, to: 1 }, { from: 3, to: 3 }])
+  expect(await provider.read('task', path, { root })).toEqual([
+    { from: 1, to: 1 },
+    { from: 3, to: 3 },
+  ])
   expect(await provider.read('task', 'file0.txt')).toEqual([{ from: 1, to: 1 }])
   await expect(provider.read('task', path, { root: '/different-root' })).rejects.toThrow('worktree changed')
 })

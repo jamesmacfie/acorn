@@ -28,33 +28,83 @@ export type WorktreeInventory = {
   observedAt: number
 }
 
-export type CleanupRequest = { observation: string }
 export type CleanupResult = { ok: boolean; error?: string; inventory: WorktreeInventory }
 
 export const inventoryRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/worktrees`
-export const cleanupRoute = (projectId: string, observation: string) => `${inventoryRoute(projectId)}/${encodeURIComponent(observation)}/remove`
+export const cleanupRoute = (projectId: string, observation: string) =>
+  `${inventoryRoute(projectId)}/${encodeURIComponent(observation)}/remove`
 
 export type Commit = {
-  id: string; parents: string[]; author: { name: string; email: string; at: number };
-  committer: { name: string; email: string; at: number }; subject: string; message: string; refs: string[]
+  id: string
+  parents: string[]
+  author: { name: string; email: string; at: number }
+  committer: { name: string; email: string; at: number }
+  subject: string
+  message: string
+  refs: string[]
 }
 export type HistoryFilter = { ref: string | null; field: 'message' | 'author' | 'hash'; query: string }
-export type HistoryPage = { commits: Commit[]; refs: string[]; nextCursor: string | null; observation: string; searched: number; limit: number; omitted: string | null }
-export type RevisionFile = { path: string; oldPath: string | null; status: string; oldMode: string; newMode: string; oldId: string; newId: string; binary: boolean; omission: string | null }
-export type RevisionDetail = { commit: Commit; base: string | null; files: RevisionFile[]; topology: import('@acorn/diff-document/document').DiffDocumentTopology; omitted: string | null }
+export type HistoryPage = {
+  commits: Commit[]
+  refs: string[]
+  nextCursor: string | null
+  observation: string
+  searched: number
+  limit: number
+  omitted: string | null
+}
+export type RevisionFile = {
+  path: string
+  oldPath: string | null
+  status: string
+  oldMode: string
+  newMode: string
+  oldId: string
+  newId: string
+  binary: boolean
+  omission: string | null
+}
+export type RevisionDetail = {
+  commit: Commit
+  base: string | null
+  files: RevisionFile[]
+  topology: import('@acorn/diff-document/document').DiffDocumentTopology
+  omitted: string | null
+}
 export const historyRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/history`
-export const revisionRoute = (projectId: string, id: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(id)}`
+export const revisionRoute = (projectId: string, id: string) =>
+  `/v1/p/git/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(id)}`
 
 export type Stash = {
-  id: string; objectId: string; selector: string; fingerprint: string; message: string; originBranch: string | null;
-  createdAt: number; base: string; untrackedParent: string | null; untrackedFiles: string[]
+  id: string
+  objectId: string
+  selector: string
+  fingerprint: string
+  message: string
+  originBranch: string | null
+  createdAt: number
+  base: string
+  untrackedParent: string | null
+  untrackedFiles: string[]
 }
 export type StashRoster = { projectId: string; repository: string; stashes: Stash[]; fingerprint: string }
 export type StashSelection = Pick<Stash, 'objectId' | 'selector' | 'fingerprint'>
-export type StashCreate = { taskId: string; expectedPath: string; message: string; includeUntracked: boolean; keepIndex: boolean }
+export type StashCreate = {
+  taskId: string
+  expectedPath: string
+  message: string
+  includeUntracked: boolean
+  keepIndex: boolean
+}
 export type StashApply = { taskId: string; expectedPath: string; selection: StashSelection; restoreIndex: boolean }
 export type StashDrop = { selection: StashSelection; confirm: true }
-export type StashResult = { ok: boolean; error: string | null; conflicts: string[] | null; roster: StashRoster | null; changed: boolean }
+export type StashResult = {
+  ok: boolean
+  error: string | null
+  conflicts: string[] | null
+  roster: StashRoster | null
+  changed: boolean
+}
 export const stashesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/stashes`
 
 export type ExplainKind = 'commit' | 'stash'
@@ -63,7 +113,15 @@ export type ExplainResult = { text: string; backendId: string; modelId: string; 
 export const explainRoute = (projectId: string, kind: ExplainKind, id: string) =>
   `/v1/p/git/projects/${encodeURIComponent(projectId)}/explanations/${kind}/${encodeURIComponent(id)}`
 
-export type GitRef = { name: string; kind: 'local' | 'remote' | 'tag'; objectId: string; commitId: string | null; upstream: string | null; checkedOut: boolean; reservedBy: WorktreeOwner[] }
+export type GitRef = {
+  name: string
+  kind: 'local' | 'remote' | 'tag'
+  objectId: string
+  commitId: string | null
+  upstream: string | null
+  checkedOut: boolean
+  reservedBy: WorktreeOwner[]
+}
 export type RefRoster = { repository: string; refs: GitRef[] }
 export type RefChange =
   | { action: 'create-branch'; name: string; startId: string }
@@ -73,27 +131,60 @@ export type RefChange =
   | { action: 'create-tag'; name: string; startId: string; message: string | null }
   | { action: 'delete-tag'; name: string; expectedId: string }
 /** An unavailable post-state carries the last observation from this repository, not a cache update. */
-export type RefChangeResult = { ok: boolean; reason: string | null; roster: RefRoster; postState: 'fresh' | 'unavailable'; command: { code: number | null; error: string | null } | null }
+export type RefChangeResult = {
+  ok: boolean
+  reason: string | null
+  roster: RefRoster
+  postState: 'fresh' | 'unavailable'
+  command: { code: number | null; error: string | null } | null
+}
 export const refsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/refs`
 
 export type GitRemote = { name: string; fetchUrl: string; pushUrl: string; fetchUrlCount: number; pushUrlCount: number }
-export type RemoteRoster = { repository: string; remotes: GitRemote[]; lastFetch: Record<string, { successAt: number | null; failureAt: number | null; error: string | null }> }
+export type RemoteRoster = {
+  repository: string
+  remotes: GitRemote[]
+  lastFetch: Record<string, { successAt: number | null; failureAt: number | null; error: string | null }>
+}
 export type RemoteChange =
   | { action: 'add'; name: string; url: string }
   | { action: 'remove'; name: string; expectedUrl: string }
   | { action: 'set-url'; name: string; expectedUrl: string; url: string }
   | { action: 'fetch'; name: string; expectedUrl: string }
-export type RemoteChangeResult = { ok: boolean; reason: string | null; roster: RemoteRoster; postState: 'fresh' | 'unavailable'; command: { code: number | null; error: string | null } | null }
+export type RemoteChangeResult = {
+  ok: boolean
+  reason: string | null
+  roster: RemoteRoster
+  postState: 'fresh' | 'unavailable'
+  command: { code: number | null; error: string | null } | null
+}
 export const remotesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/remotes`
 
 export type ComparisonMode = 'direct' | 'merge-base'
 export type Comparison = { source: string; destination: string; base: string; mode: ComparisonMode }
 export const comparisonRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/comparison`
 
-export type IdentityValue = { value: string | null; scope: string | null; origin: string | null; local: string | null; global: string | null }
-export type GitSettings = { repository: string; name: IdentityValue; email: IdentityValue; pullPolicy: 'ff-only' | 'rebase'; autoFetch: boolean }
+export type IdentityValue = {
+  value: string | null
+  scope: string | null
+  origin: string | null
+  local: string | null
+  global: string | null
+}
+export type GitSettings = {
+  repository: string
+  name: IdentityValue
+  email: IdentityValue
+  pullPolicy: 'ff-only' | 'rebase'
+  autoFetch: boolean
+}
 export type IdentityWrite = { scope: 'local' | 'global'; name: string; email: string }
-export type IdentityWriteResult = { name: { ok: boolean; error: string | null }; email: { ok: boolean; error: string | null }; settings: GitSettings; readbackError: string | null }
+export type IdentityWriteResult = {
+  name: { ok: boolean; error: string | null }
+  email: { ok: boolean; error: string | null }
+  settings: GitSettings
+  readbackError: string | null
+}
 export const gitSettingsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/settings`
 
 export type OperationKind = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
@@ -101,8 +192,13 @@ export type OperationKind = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
 export type OperationConflict = { path: string; stages: number[] }
 /** `operation` null with conflicts is an unresolved index with nothing to continue, such as a conflicted stash apply. */
 export type OperationState = {
-  taskId: string; checkout: string; branch: string | null; head: string | null
-  operation: OperationKind | null; source: string | null; conflicts: OperationConflict[]
+  taskId: string
+  checkout: string
+  branch: string | null
+  head: string | null
+  operation: OperationKind | null
+  source: string | null
+  conflicts: OperationConflict[]
   /** Owner activity that would refuse a checkout write now. Advisory: the write checks again. */
   busy: string[]
 }
@@ -114,19 +210,40 @@ export type OperationResult = { ok: boolean; error: string | null; state: Operat
 export const operationRoute = (taskId: string) => `/v1/p/git/tasks/${encodeURIComponent(taskId)}/operation`
 
 /** One index stage of a conflicted path. `present: false` means that side deleted the file. */
-export type ConflictSide = { stage: 1 | 2 | 3; label: string; present: boolean; objectId: string | null; mode: string | null; text: string | null }
+export type ConflictSide = {
+  stage: 1 | 2 | 3
+  label: string
+  present: boolean
+  objectId: string | null
+  mode: string | null
+  text: string | null
+}
 /** The working file Git left. `present: false` means the checkout has no file at the path. */
 export type ConflictResult = { present: boolean; revision: string | null; text: string | null }
 export type ConflictDetail = {
-  path: string; operation: OperationKind | null; sides: ConflictSide[]; result: ConflictResult
+  path: string
+  operation: OperationKind | null
+  sides: ConflictSide[]
+  result: ConflictResult
   /** Covers the path's index stages and the working file. A save carries it back unchanged. */
   fingerprint: string
   /** Why Acorn can't edit this conflict as text, with what to do instead. Null when it can. */
   unsupported: string | null
 }
 export type ConflictResolution = { kind: 'text'; text: string } | { kind: 'delete' }
-export type ConflictResolve = { expectedPath: string; path: string; fingerprint: string; resolution: ConflictResolution }
+export type ConflictResolve = {
+  expectedPath: string
+  path: string
+  fingerprint: string
+  resolution: ConflictResolution
+}
 /** `saved` means the working file changed. A saved but unstaged result has `ok: false` and can be retried. */
-export type ConflictResolveResult = { ok: boolean; saved: boolean; error: string | null; revision: string | null; state: OperationState | null }
+export type ConflictResolveResult = {
+  ok: boolean
+  saved: boolean
+  error: string | null
+  revision: string | null
+  state: OperationState | null
+}
 export const conflictRoute = (taskId: string, path?: string) =>
   `/v1/p/git/tasks/${encodeURIComponent(taskId)}/conflict${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`

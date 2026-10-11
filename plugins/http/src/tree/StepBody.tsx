@@ -1,5 +1,16 @@
 import { createMemo, Show } from 'solid-js'
-import { Badge, CodeBlock, CopyButton, EmptyState, Facts, Fold, Stack, Text, Toolbar, ToolbarSpacer } from '@acorn/plugin-api/ui/tree'
+import {
+  Badge,
+  CodeBlock,
+  CopyButton,
+  EmptyState,
+  Facts,
+  Fold,
+  Stack,
+  Text,
+  Toolbar,
+  ToolbarSpacer,
+} from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { WorkflowStepBodyProps } from '@acorn/plugin-workflows/contract/stepBody.ts'
 import { formatBody, statusTone } from './ResponseView'
@@ -20,8 +31,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /** The stored response, or `null` for anything else. The run pane's JSON is checked here, not trusted. */
 export function readStepResponse(output: unknown): StepResponse | null {
   if (!isRecord(output) || typeof output.status !== 'number') return null
-  const headers = Object.entries(isRecord(output.headers) ? output.headers : {})
-    .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  const headers = Object.entries(isRecord(output.headers) ? output.headers : {}).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  )
   return { status: output.status, headers, body: typeof output.body === 'string' ? output.body : '' }
 }
 
@@ -35,23 +47,37 @@ export function HttpStepBodyApp(props: WorkflowStepBodyProps & { bridge: AcornBr
   })
 
   return (
-    <Show when={response()} fallback={<Text tone="muted">{props.status === 'running' ? 'Sending…' : 'No response.'}</Text>}>
+    <Show
+      when={response()}
+      fallback={<Text tone="muted">{props.status === 'running' ? 'Sending…' : 'No response.'}</Text>}
+    >
       {(current) => (
         <Stack gap="row">
           <Toolbar variant="bar" size="sm" ariaLabel="Response status">
             <Badge tone={statusTone(current().status)} shape="pill">{`${current().status}`}</Badge>
             <ToolbarSpacer />
             <Show when={body()}>
-              <CopyButton always text={body()} onCopy={(text: string) => void props.bridge.ui.copy(text)} title="Copy body" />
+              <CopyButton
+                always
+                text={body()}
+                onCopy={(text: string) => void props.bridge.ui.copy(text)}
+                title="Copy body"
+              />
             </Show>
           </Toolbar>
           <Show when={current().headers.length}>
             <Fold label="Headers" count={current().headers.length}>
-              <Facts size="sm" grouping="rows" items={current().headers.map(([name, value]) => ({ label: name, value, mono: true }))} />
+              <Facts
+                size="sm"
+                grouping="rows"
+                items={current().headers.map(([name, value]) => ({ label: name, value, mono: true }))}
+              />
             </Fold>
           </Show>
           <Show when={body()} fallback={<EmptyState size="sm">The response has no body.</EmptyState>}>
-            <CodeBlock size="sm" wrap maxHeight="block">{body()}</CodeBlock>
+            <CodeBlock size="sm" wrap maxHeight="block">
+              {body()}
+            </CodeBlock>
           </Show>
         </Stack>
       )}

@@ -73,6 +73,13 @@ no reactive state in it at all.
 Not yet everywhere: `*Slice`, `*State`, and `*ViewState` still appear in agents, context, editor,
 and notes. Each folds into `*Store`.
 
+**A stale async result is dropped by a named guard, not a counter.** `latestOnly(load, commit)` wraps
+one load and one commit, and only the newest call commits. `latestSignal()` serves a flow with
+several awaits: `next()` aborts the previous flow's `AbortSignal` and returns a fresh one, the flow
+checks `signal.aborted` after each await, and `abort()` cancels on a reset or an unmount. Both live
+in `kit/lib/state/` and on `@acorn/plugin-api/client`. A counter stays only when it carries data,
+such as a revision sent to the Node, and it's named for what it holds.
+
 **A client HTTP wrapper is `<plugin>Client.ts` in `client/`.** If another package needs the wrapper it
 moves to `contract/` and keeps the name.
 
@@ -151,7 +158,8 @@ Two more tests check the docs. `tools/arch/docPaths.test.ts` checks that every r
 backticks and every relative link between docs resolves, and that a retired directory name appears
 only on a line that marks it gone. `tools/arch/docCitations.test.ts` checks that every
 `docs/<page>.md § Heading` in a source comment names a doc and a heading that exist.
-[Architecture rules](./testing/architecture-rules.md#doc-checks) covers both.
+`tools/arch/commentPaths.test.ts` checks that every other file path in a source comment exists.
+[Architecture rules](./testing/architecture-rules.md#doc-checks) covers all three.
 
 The other rules are review rules on purpose. A naming convention is a prompt for the reader. A test
 that matched filenames against a pattern would need an exception for every deliberate case: the two

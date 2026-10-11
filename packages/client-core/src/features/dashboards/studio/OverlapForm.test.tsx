@@ -3,7 +3,10 @@ import { formPlan, mountStageForm } from '../../../testkit/stageForms'
 import OverlapForm from './OverlapForm'
 
 let form: ReturnType<typeof mountStageForm<'overlap'>> | undefined
-afterEach(() => { form?.dispose(); form = undefined })
+afterEach(() => {
+  form?.dispose()
+  form = undefined
+})
 
 describe('OverlapForm', () => {
   it('writes starts, ends, a partition, and a pair limit', () => {

@@ -15,29 +15,105 @@ const { clientEvents } = await import('../../../host/registries/commands/clientE
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../../../host/plugins/distribution')
 const { activeCacheId } = await import('../../../infra/node/activeNode')
 
-const tasks: PanelPlan['sources'][number] = { id: 'tasks', label: 'Tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
-  name: 'Tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
-  query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
-} } }
+const tasks: PanelPlan['sources'][number] = {
+  id: 'tasks',
+  label: 'Tasks',
+  role: 'primary',
+  reference: {
+    kind: 'inline',
+    bindings: {},
+    content: {
+      name: 'Tasks',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+      sourceParameters: {},
+      query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
+    },
+  },
+}
 // A plan with a source but an empty title, which the schema refuses.
-const invalid: PanelPlan = { version: 2, title: '', time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' }, columns: [], stages: [], view: { kind: 'list' }, sources: [tasks] }
+const invalid: PanelPlan = {
+  version: 2,
+  title: '',
+  time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+  columns: [],
+  stages: [],
+  view: { kind: 'list' },
+  sources: [tasks],
+}
 const filtered: PanelPlan = {
-  ...invalid, title: 'Open tasks',
+  ...invalid,
+  title: 'Open tasks',
   columns: [{ id: 'title', label: 'Title', type: 'text', bind: { tasks: { field: '/title' } } }],
-  stages: [{ op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/title' } }, operator: 'eq', right: { address: { from: 'literal', value: 'x' } } } }],
+  stages: [
+    {
+      op: 'filter',
+      where: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/title' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'x' } },
+      },
+    },
+  ],
 }
 // A derived source whose one input reads GitHub, with no binding yet.
-const readiness: PanelPlan = { ...filtered, title: 'Release readiness', stages: [], columns: [{ id: 'title', label: 'Title', type: 'text', bind: { ready: { field: '/title' } } }],
-  sources: [{ id: 'ready', label: 'Release readiness', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
-    name: 'Release readiness', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
-    query: { source: { pluginId: 'northwind', sourceId: 'readiness' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
-  } } }] }
+const readiness: PanelPlan = {
+  ...filtered,
+  title: 'Release readiness',
+  stages: [],
+  columns: [{ id: 'title', label: 'Title', type: 'text', bind: { ready: { field: '/title' } } }],
+  sources: [
+    {
+      id: 'ready',
+      label: 'Release readiness',
+      role: 'primary',
+      reference: {
+        kind: 'inline',
+        bindings: {},
+        content: {
+          name: 'Release readiness',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          sourceParameters: {},
+          query: {
+            source: { pluginId: 'northwind', sourceId: 'readiness' },
+            scope: { workspaceId: 'w', parameters: {} },
+            sort: [],
+          },
+        },
+      },
+    },
+  ],
+}
 const derivedCatalog = [
-  { pluginId: 'github', sourceId: 'pull-requests', name: 'Pull requests', singular: 'Pull request', plural: 'Pull requests', identityScope: 'pull', providerId: 'github' },
-  { pluginId: 'northwind', sourceId: 'readiness', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue',
-    inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } } },
+  {
+    pluginId: 'github',
+    sourceId: 'pull-requests',
+    name: 'Pull requests',
+    singular: 'Pull request',
+    plural: 'Pull requests',
+    identityScope: 'pull',
+    providerId: 'github',
+  },
+  {
+    pluginId: 'northwind',
+    sourceId: 'readiness',
+    name: 'Release readiness',
+    singular: 'Issue',
+    plural: 'Issues',
+    identityScope: 'issue',
+    inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } },
+  },
 ]
-const draft = (content: PanelPlan): DashboardDraft => ({ id: 'd1', workspaceId: 'w', content, draftRevision: 1, basePublishedRevision: null, publishedRevision: null, updatedAt: Date.now() } as DashboardDraft)
+const draft = (content: PanelPlan): DashboardDraft =>
+  ({
+    id: 'd1',
+    workspaceId: 'w',
+    content,
+    draftRevision: 1,
+    basePublishedRevision: null,
+    publishedRevision: null,
+    updatedAt: Date.now(),
+  }) as DashboardDraft
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
@@ -48,14 +124,33 @@ let catalog: unknown[]
 let runProblems: unknown[]
 let runSources: unknown[]
 const onClose = vi.fn()
-const settle = async (times = 3) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
-const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
-const row = (text: string) => [...document.querySelectorAll<HTMLElement>('.ui-row')].find(entry => entry.textContent?.includes(text))
+const settle = async (times = 3) => {
+  for (let index = 0; index < times; index += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+}
+const button = (text: string) =>
+  [...document.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === text) as
+    | HTMLButtonElement
+    | undefined
+const row = (text: string) =>
+  [...document.querySelectorAll<HTMLElement>('.ui-row')].find((entry) => entry.textContent?.includes(text))
 const mount = (dashboardId?: string, start?: Parameters<typeof PanelStudio>[0]['start'], withAi?: boolean) => {
-  dispose = render(() => <QueryClientProvider client={client}>
-    <PanelStudio scope={{ surface: 'home', workspaceId: 'w' } as never} dashboardId={dashboardId} start={start} withAi={withAi} returnLabel="Home"
-      onPublished={() => {}} onDeleted={() => {}} onClose={onClose} />
-  </QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <PanelStudio
+          scope={{ surface: 'home', workspaceId: 'w' } as never}
+          dashboardId={dashboardId}
+          start={start}
+          withAi={withAi}
+          returnLabel="Home"
+          onPublished={() => {}}
+          onDeleted={() => {}}
+          onClose={onClose}
+        />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 beforeEach(() => {
@@ -67,18 +162,30 @@ beforeEach(() => {
   onClose.mockReset()
   requests.mockReset()
   requests.mockImplementation(async (path, options) => {
-    const body = options?.body ? JSON.parse(options.body) as { operation?: string } : undefined
+    const body = options?.body ? (JSON.parse(options.body) as { operation?: string }) : undefined
     if (path.endsWith('/dashboards/list')) return [draft({ ...invalid, title: 'Old idea' })]
     if (path.endsWith('/dashboards/get')) return draft(opened)
     // A copy, as from the wire: the query cache wraps what it's given, which would mark the fixtures.
-    if (path.endsWith('/dashboards/run')) return {
-      plan: structuredClone(opened), rows: [], groups: [],
-      diagnostics: { problems: runProblems, sources: runSources, stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
-    }
+    if (path.endsWith('/dashboards/run'))
+      return {
+        plan: structuredClone(opened),
+        rows: [],
+        groups: [],
+        diagnostics: {
+          problems: runProblems,
+          sources: runSources,
+          stages: [],
+          evaluationTime: 0,
+          plugins: [],
+          accounts: [],
+          complete: true,
+        },
+      }
     if (path.endsWith('/data-sources/list')) return { sources: catalog, discoveries: [] }
     if (path.endsWith('/queries/list')) return []
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
-    if (path.endsWith('/models/backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
+    if (path.endsWith('/models/backends'))
+      return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
     if (path.endsWith('/core/prefs')) return {}
     if (path.endsWith('/authoring/turn')) return turnReply()
     if (body?.operation === 'describe') return new Promise(() => {})
@@ -132,7 +239,9 @@ describe('PanelStudio', () => {
     await settle()
     expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('Look')
     // Each view by name, with what it's for.
-    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Each row as a title with a few details under it.')
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain(
+      'Each row as a title with a few details under it.',
+    )
   })
 
   it('marks a step that has a problem', async () => {
@@ -147,8 +256,14 @@ describe('PanelStudio', () => {
   it("marks a derived source's input for its missing account, offers to connect one, and blocks publishing", async () => {
     opened = readiness
     catalog = derivedCatalog
-    runProblems = [{ path: '/sources/0/reference/content/query/scope/inputs/pulls', message: 'Release readiness: input-required: input pulls', severity: 'error',
-      failure: { code: 'input-required', source: 'northwind:readiness', input: 'pulls' } }]
+    runProblems = [
+      {
+        path: '/sources/0/reference/content/query/scope/inputs/pulls',
+        message: 'Release readiness: input-required: input pulls',
+        severity: 'error',
+        failure: { code: 'input-required', source: 'northwind:readiness', input: 'pulls' },
+      },
+    ]
     const settingsTabs: string[] = []
     const stop = clientEvents.on('presentation:open-settings', ({ tab }) => settingsTabs.push(tab))
     mount('d1')
@@ -170,22 +285,48 @@ describe('PanelStudio', () => {
 
     button('Publish…')!.click()
     await settle()
-    expect([...document.querySelectorAll('[role="dialog"]')].at(-1)!.textContent).toContain('Fix these before publishing')
+    expect([...document.querySelectorAll('[role="dialog"]')].at(-1)!.textContent).toContain(
+      'Fix these before publishing',
+    )
     expect(button('Publish')!.disabled).toBe(true)
   })
 
   it('shows a source in development: what it read, the records it dropped, and a warning before publishing', async () => {
     const bound = structuredClone(readiness)
     const reference = bound.sources[0]!.reference
-    if (reference.kind === 'inline') reference.content.query.scope.inputs = { pulls: { connectionId: 'c1', parameters: {} } }
+    if (reference.kind === 'inline')
+      reference.content.query.scope.inputs = { pulls: { connectionId: 'c1', parameters: {} } }
     opened = bound
     catalog = derivedCatalog
     runProblems = []
-    runSources = [{ id: 'ready', label: 'Release readiness', completeness: { kind: 'incomplete', cause: 'invalid-records', count: 3 },
-      inputs: { pulls: { records: 42, completeness: { kind: 'complete' } } },
-      development: { inputMs: { pulls: 120 }, pluginMs: 30, dropped: [{ recordId: 'ENG-1', pointer: '/status', message: '"needs-qa" isn\'t a declared choice' }] } }]
-    _seedPluginDistribution([[activeCacheId(), [{ name: 'northwind', required: false, disabled: false, running: true, state: 'active',
-      development: { on: true, reloadedAt: Date.now() } }]]])
+    runSources = [
+      {
+        id: 'ready',
+        label: 'Release readiness',
+        completeness: { kind: 'incomplete', cause: 'invalid-records', count: 3 },
+        inputs: { pulls: { records: 42, completeness: { kind: 'complete' } } },
+        development: {
+          inputMs: { pulls: 120 },
+          pluginMs: 30,
+          dropped: [{ recordId: 'ENG-1', pointer: '/status', message: '"needs-qa" isn\'t a declared choice' }],
+        },
+      },
+    ]
+    _seedPluginDistribution([
+      [
+        activeCacheId(),
+        [
+          {
+            name: 'northwind',
+            required: false,
+            disabled: false,
+            running: true,
+            state: 'active',
+            development: { on: true, reloadedAt: Date.now() },
+          },
+        ],
+      ],
+    ])
     const settingsTabs: string[] = []
     const stop = clientEvents.on('presentation:open-settings', ({ tab }) => settingsTabs.push(tab))
     mount('d1')
@@ -214,7 +355,9 @@ describe('PanelStudio', () => {
     button('Publish…')!.click()
     await settle()
     const review = [...document.querySelectorAll('[role="dialog"]')].at(-1)!
-    expect(review.textContent).toContain('This panel reads a source in development. Others will see it change as you edit the plugin.')
+    expect(review.textContent).toContain(
+      'This panel reads a source in development. Others will see it change as you edit the plugin.',
+    )
     expect(review.textContent).not.toContain('Fix these before publishing')
   })
 
@@ -223,7 +366,9 @@ describe('PanelStudio', () => {
     await settle()
     button('Add')!.click()
     await settle()
-    const filter = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent === 'Keep matching rows')!
+    const filter = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+      (item) => item.textContent === 'Keep matching rows',
+    )!
     expect(filter.disabled).toBe(true)
     expect(filter.dataset.tip).toBe('Add a column first.')
   })
@@ -242,16 +387,35 @@ describe('PanelStudio', () => {
   it('closes on Escape', async () => {
     mount('d1')
     await settle()
-    document.querySelector<HTMLElement>('.dash-studio')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    document
+      .querySelector<HTMLElement>('.dash-studio')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('reviews a proposal on the outline, with the inspector read-only and Publish off', async () => {
     opened = filtered
-    const added: PanelPlan['stages'][number] = { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/title' } }, operator: 'eq', right: { address: { from: 'literal', value: 'y' } } } }
+    const added: PanelPlan['stages'][number] = {
+      op: 'filter',
+      where: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/title' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'y' } },
+      },
+    }
     turnReply = async () => ({
-      state: 'proposal', base: filtered, baseRevision: 1, candidate: { ...filtered, stages: [...filtered.stages, added] }, summary: 'Adds a filter.',
-      diff: [], problems: [], context: [{ role: 'user', content: 'Add a filter' }], usage: { requests: 1, inputTokens: 1, outputTokens: 1 }, providerId: 'p', modelId: 'm',
+      state: 'proposal',
+      base: filtered,
+      baseRevision: 1,
+      candidate: { ...filtered, stages: [...filtered.stages, added] },
+      summary: 'Adds a filter.',
+      diff: [],
+      problems: [],
+      context: [{ role: 'user', content: 'Add a filter' }],
+      usage: { requests: 1, inputTokens: 1, outputTokens: 1 },
+      providerId: 'p',
+      modelId: 'm',
     })
     mount('d1')
     await settle(6)
@@ -271,7 +435,9 @@ describe('PanelStudio', () => {
     expect(row('Keep where Title is "y"')?.textContent).toContain('Added')
     expect(button('Publish…')!.disabled).toBe(true)
     expect(document.querySelector<HTMLElement>('.dash-studio-forms')!.inert).toBe(true)
-    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Apply or discard the proposal to keep editing.')
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain(
+      'Apply or discard the proposal to keep editing.',
+    )
     expect(document.body.textContent).toContain('Proposal: 1 step added')
 
     button('Discard')!.click()

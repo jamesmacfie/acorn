@@ -49,9 +49,9 @@ const asMillis = (value: unknown): number | null => {
 }
 const asString = (value: unknown): string | null => (value == null ? null : cleanString(String(value)))
 
-export const rollbarItemUrl = (itemId: string): string | null =>
+const rollbarItemUrl = (itemId: string): string | null =>
   itemId ? `https://rollbar.com/item/${encodeURIComponent(itemId)}/` : null
-export const rollbarOccurrenceUrl = (uuid: string | null): string | null =>
+const rollbarOccurrenceUrl = (uuid: string | null): string | null =>
   uuid ? `https://rollbar.com/occurrence/uuid/?uuid=${encodeURIComponent(uuid)}` : null
 
 // One frame → { filename, line, column, method, code, inProject }. Rollbar supplies the offending
@@ -182,7 +182,11 @@ export function occurrenceSummary(detail: RollbarOccurrenceDetail): RollbarOccur
   }
 }
 
-export function normalizeSummary(integrationId: string, integrationLabel: string, raw: RollbarApiItem): RollbarItemSummary {
+export function normalizeSummary(
+  integrationId: string,
+  integrationLabel: string,
+  raw: RollbarApiItem,
+): RollbarItemSummary {
   return {
     integrationId,
     integrationLabel,
@@ -197,15 +201,11 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
     firstOccurrenceAt: asMillis(raw.first_occurrence_timestamp),
     lastOccurrenceAt: asMillis(raw.last_occurrence_timestamp),
     ...(cleanString(raw.framework) ? { framework: cleanString(raw.framework)! } : {}),
-    ...(asMillis(raw.last_activated_timestamp) != null ? { lastActivatedAt: asMillis(raw.last_activated_timestamp) } : {}),
     ...(asNumber(raw.unique_occurrences) != null ? { uniqueOccurrences: asNumber(raw.unique_occurrences)! } : {}),
   }
 }
 
-export function normalizeItemMetadata(
-  summary: RollbarItemSummary,
-  item: RollbarApiItem,
-): RollbarItemMetadata {
+export function normalizeItemMetadata(summary: RollbarItemSummary, item: RollbarApiItem): RollbarItemMetadata {
   return {
     ...summary,
     resolvedInVersion: asString(item.resolved_in_version),

@@ -19,13 +19,16 @@ export type LibraryRequest = {
 export function memoryLibrary(store: MemoryStoreAccess, core: KnowledgeCoreServices) {
   return async (action: string, projectId: string | undefined, request: LibraryRequest) => {
     try {
-      if (projectId && !await core.projects.byId(projectId)) throw new ToolError('not_found', 'No such project.')
+      if (projectId && !(await core.projects.byId(projectId))) throw new ToolError('not_found', 'No such project.')
       const address = request.address
-      if (address && address.scope === 'project' && address.projectId !== projectId) throw new ToolError('bad_request', 'Memory address must match the selected project.')
-      if (address) address.projectId = address.scope === 'private' ? null : projectId ?? null
+      if (address && address.scope === 'project' && address.projectId !== projectId)
+        throw new ToolError('bad_request', 'Memory address must match the selected project.')
+      if (address) address.projectId = address.scope === 'private' ? null : (projectId ?? null)
       switch (action) {
-        case 'get': return address ? await store.get(address) : null
-        case 'history': return address ? await store.history(address) : []
+        case 'get':
+          return address ? await store.get(address) : null
+        case 'history':
+          return address ? await store.history(address) : []
         case 'edit': {
           if (!address || !request.input || !request.scope) throw new ToolError('bad_request', 'Missing edit fields.')
           // A private memory still needs the selected project when moving into project scope.
@@ -39,7 +42,8 @@ export function memoryLibrary(store: MemoryStoreAccess, core: KnowledgeCoreServi
           if (!address || !request.version) throw new ToolError('bad_request', 'Missing history version.')
           return await store.restore(address, request.version, request.hash)
         }
-        case 'changes': return await store.feed(projectId ?? null, request.scope)
+        case 'changes':
+          return await store.feed(projectId ?? null, request.scope)
         case 'preview': {
           const { memoryPreview } = await import('./standingContext')
           return await memoryPreview(store, core, projectId ?? null, request.scope)
@@ -62,14 +66,21 @@ export function memoryLibrary(store: MemoryStoreAccess, core: KnowledgeCoreServi
           return await memoryImportPreview(core, store, projectId, request.sourceId)
         }
         case 'import': {
-          if (!projectId || !request.sourceId || !request.files) throw new ToolError('bad_request', 'Preview an import source first.')
+          if (!projectId || !request.sourceId || !request.files)
+            throw new ToolError('bad_request', 'Preview an import source first.')
           const { importMemory } = await import('./memoryImport')
           return await importMemory(core, store, projectId, request.sourceId, request.files)
         }
-        default: throw new ToolError('not_found', 'No such memory operation.')
+        default:
+          throw new ToolError('not_found', 'No such memory operation.')
       }
     } catch (error) {
-      if (error instanceof ToolError) throw new BridgeError(error.kind === 'conflict' ? 409 : error.kind === 'not_found' ? 404 : 400, error.kind, error.message)
+      if (error instanceof ToolError)
+        throw new BridgeError(
+          error.kind === 'conflict' ? 409 : error.kind === 'not_found' ? 404 : 400,
+          error.kind,
+          error.message,
+        )
       throw error
     }
   }

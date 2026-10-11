@@ -13,14 +13,30 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 describe('note frontmatter round-trip (docs/notes-and-memory.md)', () => {
   it('serialize → parse preserves meta + body', () => {
-    const meta = { title: 'repro steps', author: 'agent' as const, kind: 'finding' as const, originSessionId: 's-1', originTaskId: null, included: true, createdAt: 123 }
+    const meta = {
+      title: 'repro steps',
+      author: 'agent' as const,
+      kind: 'finding' as const,
+      originSessionId: 's-1',
+      originTaskId: null,
+      included: true,
+      createdAt: 123,
+    }
     const { meta: parsed, body } = parseNote(serializeNote(meta, '# repro\nsteps here\n'), 'repro-steps')
     expect(parsed).toEqual(meta)
     expect(body).toBe('# repro\nsteps here\n')
   })
   it('included defaults to true when absent, round-trips false, and carries originTaskId', () => {
     expect(parseNote('body only', 's').meta.included).toBe(true) // legacy note → included
-    const meta = { title: 't', author: 'user' as const, kind: 'scratch' as const, originSessionId: null, originTaskId: 'task-9', included: false, createdAt: 1 }
+    const meta = {
+      title: 't',
+      author: 'user' as const,
+      kind: 'scratch' as const,
+      originSessionId: null,
+      originTaskId: 'task-9',
+      included: false,
+      createdAt: 1,
+    }
     const { meta: parsed } = parseNote(serializeNote(meta, 'x'), 's')
     expect(parsed.included).toBe(false)
     expect(parsed.originTaskId).toBe('task-9')
@@ -93,7 +109,10 @@ describe('NotesStore over a temp dir', () => {
   })
 
   it('append creates a missing note with the writer identity (agent findings)', async () => {
-    await store.append({ scope: 'task', taskId: 'task-1' }, 'findings', 'learned a thing', { author: 'agent', originSessionId: 'sess-1' })
+    await store.append({ scope: 'task', taskId: 'task-1' }, 'findings', 'learned a thing', {
+      author: 'agent',
+      originSessionId: 'sess-1',
+    })
     const note = await store.read({ scope: 'task', taskId: 'task-1' }, 'findings')
     expect(note.author).toBe('agent')
     expect(note.kind).toBe('finding')
@@ -105,9 +124,17 @@ describe('NotesStore over a temp dir', () => {
   it('tool writes stamp their writer while human edits preserve existing provenance', async () => {
     await store.create(workspace, 'shared', { author: 'user', body: 'old' })
     await store.write(workspace, 'shared', 'agent edit', { author: 'agent', originSessionId: 's1', originTaskId: 't1' })
-    expect(await store.read(workspace, 'shared')).toMatchObject({ author: 'agent', originSessionId: 's1', originTaskId: 't1' })
+    expect(await store.read(workspace, 'shared')).toMatchObject({
+      author: 'agent',
+      originSessionId: 's1',
+      originTaskId: 't1',
+    })
     await store.write(workspace, 'shared', 'human edit')
-    expect(await store.read(workspace, 'shared')).toMatchObject({ author: 'agent', originSessionId: 's1', originTaskId: 't1' })
+    expect(await store.read(workspace, 'shared')).toMatchObject({
+      author: 'agent',
+      originSessionId: 's1',
+      originTaskId: 't1',
+    })
   })
 
   it('atomicity: a failed write leaves no partial file behind', async () => {
@@ -121,13 +148,17 @@ describe('NotesStore over a temp dir', () => {
 
   it('rejects traversal slugs and workspace ids at the boundary', async () => {
     await expect(store.read(workspace, '../evil')).rejects.toThrow('Invalid note slug')
-    await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow('Invalid note location id')
+    await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow(
+      'Invalid note location id',
+    )
   })
 })
 
-describe('removing deleted tasks\' notes', () => {
+describe("removing deleted tasks' notes", () => {
   let root: string
-  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'acorn-notes-delete-')) })
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'acorn-notes-delete-'))
+  })
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
   it('removes the task folders and keeps notes promoted to the workspace', async () => {
@@ -139,7 +170,9 @@ describe('removing deleted tasks\' notes', () => {
     expect(await removeTaskFolders(root, ['gone', 'never-had-notes', '../escape'])).toBe(1)
 
     expect(readdirSync(join(root, 'task'))).toEqual(['kept'])
-    expect((await store.list({ scope: 'workspace', workspaceId: 'ws' })).map((note) => note.originTaskId)).toEqual(['gone'])
+    expect((await store.list({ scope: 'workspace', workspaceId: 'ws' })).map((note) => note.originTaskId)).toEqual([
+      'gone',
+    ])
     expect(await removeTaskFolders(root, ['gone'])).toBe(0)
   })
 })

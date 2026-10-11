@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { CRASH_WINDOW_MS, MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
 
 // This is the logic where a mistake reaches a user as either "the app won't stop restarting" or "the
-// app gave up too early". Neither is visible to tsc, and before the extraction neither could be
-// exercised without booting the app and crashing a real service five times.
+// app gave up too early". Neither is visible to tsc, and inline in the composition root neither could
+// be exercised without booting the app and crashing a real service five times.
 describe('crash budget', () => {
   it('backs off further with each crash, then gives up on the sixth in the window', () => {
     const times: number[] = []

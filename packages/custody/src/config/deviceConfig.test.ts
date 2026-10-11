@@ -10,7 +10,9 @@ const fixture = () => {
   directories.push(directory)
   return new DeviceConfigStore(directory)
 }
-afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+})
 
 describe('device config file', () => {
   it('preserves unknown keys during a Settings write', () => {

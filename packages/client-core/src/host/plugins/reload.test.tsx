@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { NodeConnectionState, NodeRecord } from '@acorn/protocol/broker.ts'
 
 // The first plugin pass is owned by the watcher and fired by a node becoming reachable, because every
-// host can start before the node it just spawned is up: fired at boot it asked nobody, found no roster, and
-// left a session with no loaded plugins in it.
+// host can start before the node it just spawned is up: fired at boot it asks nobody, finds no roster, and
+// leaves a session with no loaded plugins in it.
 //
 // A `.tsx` so it runs in the jsdom project, which is the only one with Solid's browser build; under the
 // server build an effect never re-runs and this suite would pass on a world with no reactivity in it.
@@ -21,7 +21,9 @@ let pluginChange: ((nodeId: string) => void) | undefined
 vi.mock('../../infra/node/wsClient', () => ({
   wsOnFleetPluginsChanged: (callback: (nodeId: string) => void) => {
     pluginChange = callback
-    return () => { pluginChange = undefined }
+    return () => {
+      pluginChange = undefined
+    }
   },
 }))
 const forgetPluginNode = vi.fn()
@@ -34,7 +36,10 @@ vi.mock('./distribution', () => ({
   onPluginDistributionCommit: () => () => {},
   syncPluginDistribution: vi.fn(async () => {}),
 }))
-vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn(async () => {}), syncPluginContributionsInBackground: vi.fn() }))
+vi.mock('./syncContributions', () => ({
+  syncPluginContributions: vi.fn(async () => {}),
+  syncPluginContributionsInBackground: vi.fn(),
+}))
 
 const { watchPluginChanges, reconcileDevicePluginChange, preparePluginContributionsForNode } = await import('./reload')
 const { syncPluginDistribution } = await import('./distribution')
@@ -51,7 +56,7 @@ describe('the first pass', () => {
     expect(passes()).toBe(1)
     expect(syncPluginDistribution).toHaveBeenLastCalledWith({ deviceOnly: true })
 
-    // Membership lands before the connection does, which is the boot order this used to fire in.
+    // Membership lands before the connection does, so membership alone must not fire a pass.
     setNodes([node('a')])
     expect(passes()).toBe(1)
     setStates({ a: 'online' })
@@ -83,7 +88,12 @@ it('reconciles device changes without requesting node rosters', async () => {
 
 it('waits for the selected node roster before registering loaded contributions', async () => {
   let finish!: () => void
-  vi.mocked(syncPluginDistribution).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+  vi.mocked(syncPluginDistribution).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
   vi.mocked(syncPluginContributions).mockClear()
   const ready = preparePluginContributionsForNode('linked-node')
   expect(syncPluginDistribution).toHaveBeenLastCalledWith({ nodeIds: ['linked-node'] })
@@ -95,9 +105,16 @@ it('waits for the selected node roster before registering loaded contributions',
 
 it('resolves only once the contribution hosts have loaded and registered', async () => {
   let loaded!: () => void
-  vi.mocked(syncPluginContributions).mockImplementationOnce(() => new Promise<void>((resolve) => { loaded = resolve }))
+  vi.mocked(syncPluginContributions).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        loaded = resolve
+      }),
+  )
   let settled = false
-  const ready = preparePluginContributionsForNode('linked-node').then(() => { settled = true })
+  const ready = preparePluginContributionsForNode('linked-node').then(() => {
+    settled = true
+  })
   await vi.waitFor(() => expect(loaded).toBeTypeOf('function'))
   expect(settled).toBe(false)
   loaded()

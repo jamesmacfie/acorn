@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
@@ -7,21 +7,17 @@ import { taskById } from '../../features/tasks/taskLookup'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
 import type { CommandExecutionContext } from '../registries/commands/commands'
-import { registerNavigationCommands } from './navigationCommands'
+import { registerNavigationCommands } from '../registries/commands/navigationCommands'
+import { createRouterNavigation } from './routerNavigation'
 import { registerHiddenSourceOpeners } from './sourceOpeners'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
 import { focusedCollectionTarget } from '../../kit/keys/collection'
 
-// ⌘K, as a renderer over the shared session.
-//
-// This component used to be the palette: it fetched every `paletteRows` source, composed them with
-// the registry's actions and the task and workspace lists, filtered them, kept a row-to-source map
-// and invoked the pick. All of that is `host/registries/commands/sessionStore.ts` now, and the terminal
-// runs on the same object (apps/tui/src/chrome/Palette.tsx). What is left here is what only this host
-// can answer: which identity a session captures, which nodes a fleet search may ask, and the dialog
-// it draws the rows in.
+// ⌘K, as a renderer over the shared palette session (`createCommandSession`), which the terminal's
+// palette runs on too. This file holds what only this host can answer: which identity a session
+// captures, which nodes a fleet search may ask, and the dialog it draws the rows in.
 
 export default function CommandPalette() {
   const params = useParams()
@@ -30,7 +26,7 @@ export default function CommandPalette() {
 
   const context = (): CommandExecutionContext => {
     // The rail's own test for "a task is on screen". `activeTaskId` stays set when you leave a task
-    // for a source, and the palette then aimed task commands at a task you could not see, and hid that
+    // for a source, so reading it alone aims task commands at a task you can't see and hides that
     // task from Go to task.
     const taskId = selectedSource() ? null : activeTaskId()
     // A task route carries no project parameter. Commands still run in the task's project, matching
@@ -39,10 +35,13 @@ export default function CommandPalette() {
     return {
       host: 'desktop',
       nodeId: activeNodeId() ?? null,
-      workspaceId: workspaceForProject(
-        fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace),
-        projectId,
-      )?.id ?? null,
+      workspaceId:
+        workspaceForProject(
+          fleetWorkspaces()
+            .entries.filter((entry) => entry.nodeId === activeNodeId())
+            .map((entry) => entry.workspace),
+          projectId,
+        )?.id ?? null,
       projectId: projectId ?? null,
       taskId: taskId ?? null,
       paneId: null,
@@ -70,9 +69,13 @@ export default function CommandPalette() {
     fleet: () => (nodes().length > 1 ? nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })) : []),
   })
 
-  // The four navigation searches, which need the session's own open flag: the task fan-out runs only
-  // while somebody is looking at the palette.
-  registerNavigationCommands({ open: session.open, fleetWorkspaces })
+  // The Go to commands, which need the session's own open flag: the task fan-out runs only while
+  // somebody is looking at the palette.
+  const navigation = createRouterNavigation({ open: session.open, fleetWorkspaces })
+  onMount(() => {
+    const commands = registerNavigationCommands(navigation)
+    onCleanup(() => commands.dispose())
+  })
   // A way back to every plugin source the rail is not drawing.
   registerHiddenSourceOpeners(() => context().workspaceId)
 
@@ -94,8 +97,12 @@ export default function CommandPalette() {
       items={session.rows()}
       ariaLabel="Command palette"
       // A search or an input frame asks for its own thing; the root and a group are still this list.
-      placeholder={session.placeholder()
-        || (session.kind() === 'group' && session.frame()?.title ? `Filter ${session.frame()!.title}…` : 'Search commands and settings…')}
+      placeholder={
+        session.placeholder() ||
+        (session.kind() === 'group' && session.frame()?.title
+          ? `Filter ${session.frame()!.title}…`
+          : 'Search commands and settings…')
+      }
       emptyText="No matches."
       breadcrumb={session.breadcrumb()}
       // Segment i names frame i + 1 (the root has no title). A segment for the frame on screen is text.
@@ -103,7 +110,11 @@ export default function CommandPalette() {
       busy={session.busy()}
       announce={announce()}
       onComposing={session.setComposing}
-      status={<Show when={session.status()}><Alert>{session.status()}</Alert></Show>}
+      status={
+        <Show when={session.status()}>
+          <Alert>{session.status()}</Alert>
+        </Show>
+      }
       onPick={(row) => session.activateRow(row.id)}
       rowClassList={(row) => ({ 'palette-error': row.action.effect === 'none' })}
       row={(row) => (

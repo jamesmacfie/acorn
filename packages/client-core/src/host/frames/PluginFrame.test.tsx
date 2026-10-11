@@ -132,11 +132,13 @@ describe('PluginFrame', () => {
 
   it('releases the port, appearance watcher, event listeners, and webview subscription on unmount', () => {
     const unwebview = vi.fn()
-    const { transferred, dispose } = mount({ webview: {
-      navigate: async () => true,
-      command: async () => true,
-      subscribe: () => unwebview,
-    } })
+    const { transferred, dispose } = mount({
+      webview: {
+        navigate: async () => true,
+        command: async () => true,
+        subscribe: () => unwebview,
+      },
+    })
     const close = vi.spyOn(MessagePort.prototype, 'close')
     dispose()
     expect(close).toHaveBeenCalledTimes(2)

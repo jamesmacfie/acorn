@@ -39,8 +39,8 @@ it('draws the request tabs as cloneable tree data', async () => {
   const nodes = nodesIn(batches.flat())
   const strip = nodes.find((node) => node.type === 'Tabs')
   expect(strip?.props).not.toHaveProperty('actions')
-  // A tab whose count is `undefined` used to take the whole list with it, and `Tabs` then threw on
-  // `props.tabs.map`, which unmounted both regions of the panel.
+  // A tab whose count is `undefined` must not take the whole list with it: `Tabs` would throw on
+  // `props.tabs.map` and unmount both regions of the panel.
   expect(strip?.props.tabs).toHaveLength(5)
   expect(nodes.some((node) => node.type === 'Select')).toBe(true)
 

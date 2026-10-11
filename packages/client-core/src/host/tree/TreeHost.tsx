@@ -15,12 +15,10 @@ import type { FenceScope } from '../markdownFences/fenceViewers'
 //
 // This component is the only thing standing between a stranger's code and the shell's DOM. What it is
 // not is the rules: the store, the pre-flight check and the mutation apply are ./treeState.ts, which
-// the terminal host draws from too (docs/tui.md). One set of rules,
-// two shells.
+// the terminal host draws from too (docs/tui.md). One set of rules, two shells.
 //
 // Focus, selection, scroll memory and ARIA are not implemented here and never will be. The nodes this
-// mounts are the kit's own components, so they arrive with everything phase 2 gave them. That is the
-// whole reason the remote root came after focus rather than before it.
+// mounts are the kit's own components, so they arrive with all of that already.
 
 /** What a mounted tree talks to its sandbox through. One per slot; the worker host supplies it. */
 export type TreeTransport = {
@@ -79,13 +77,19 @@ export function TreeHost(props: TreeHostProps) {
     return (
       <Show when={stored()} keyed={false}>
         <Show when={type() !== TEXT_NODE} fallback={<>{String(stored()!.props.value ?? '')}</>}>
-          <Show when={type() === CHROME_SLOT_NODE} fallback={
-            <Show when={isKitNode(type())}>
-              <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
-                <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
-              </Dynamic>
-            </Show>
-          }>
+          <Show
+            when={type() === CHROME_SLOT_NODE}
+            fallback={
+              <Show when={isKitNode(type())}>
+                <Dynamic
+                  component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])}
+                  {...resolved()}
+                >
+                  <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
+                </Dynamic>
+              </Show>
+            }
+          >
             <NestedChromeSlot slotRef={resolved().slotRef as SlotRef} />
           </Show>
         </Show>
@@ -98,13 +102,24 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. A failed optional contribution stays out of the owner's
           UI rather than replacing it with an error. */}
-      <ErrorBoundary fallback={(error) => { reportFailure(String(error)); return null }}>
+      <ErrorBoundary
+        fallback={(error) => {
+          reportFailure(String(error))
+          return null
+        }}
+      >
         {/* One boundary per root, not per node and not one for the whole slot. A heavy node is a
             loader (./kitEntry.ts), and a pending `lazy()` renders as an empty string — invisible on
             the DOM, refused by a cell host, so `fallback={null}` is the shape the pane registry
             already settled on (../registries/panes/panes.ts). Per root rather than per tree so a
             root waiting on a diff viewer does not blank the roots beside it. */}
-        <For each={state.roots()}>{(id) => <Suspense fallback={null}><NodeView id={id} /></Suspense>}</For>
+        <For each={state.roots()}>
+          {(id) => (
+            <Suspense fallback={null}>
+              <NodeView id={id} />
+            </Suspense>
+          )}
+        </For>
       </ErrorBoundary>
     </Show>
   )

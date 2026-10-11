@@ -3,18 +3,23 @@ import { dashboardsSlice } from '../../features/dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
 import { defaultLayout, normalizeLayout, type TaskLayout } from '../../features/tasks/taskLayout'
 import { hydrateTaskLayout, hydrateWorkspaceView, taskLayouts, workspaceViews } from '../../features/tasks/tasks'
-import { currentWorkspaceId, hydrateWorkspaceHistory, MAX_RECENT_WORKSPACES, workspaceHistory, type WorkspaceHistory } from '../../features/workspaces/lastWorkspace'
+import {
+  currentWorkspaceId,
+  hydrateWorkspaceHistory,
+  MAX_RECENT_WORKSPACES,
+  workspaceHistory,
+  type WorkspaceHistory,
+} from '../../features/workspaces/lastWorkspace'
 import type { WorkspaceView } from '../../features/workspaces/workspaceViewTransition'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
 
-// Core-owned persisted state only: the task layout (core owns panes), notices (core owns the
-// notification centre) and the dashboard model (core owns panels). Feature-owned slices live next
-// to the store they bind, the dashboards one does, and is re-exported here rather than redeclared
-// so the composition root keeps registering one list. See
-// plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts;
-// each plugin registers its own through `ctx.persistedStateSlices` in its client/index.ts. The
-// composition root registers only these and the direct preference slices (app/client/activate.ts).
+// Core-owned persisted state only: the task layout (core owns panes), the workspace view, notices
+// (core owns the notification centre) and the dashboard model (core owns panels). Feature-owned
+// slices live next to the store they bind, as the dashboards ones do, and are listed here rather than
+// redeclared so the composition root keeps registering one list. Each plugin registers its own
+// through `ctx.persistedStateSlices`. The composition root registers only these and the direct
+// preference slices (apps/desktop/src/client/activate.ts).
 
 const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
   id: 'core.task-layouts',
@@ -43,7 +48,9 @@ const parseWorkspaceView = (raw: unknown): WorkspaceView => {
   if (value && typeof value === 'object') {
     const candidate = value as { source?: unknown; path?: unknown; taskId?: unknown }
     if (typeof candidate.source === 'string') {
-      return typeof candidate.path === 'string' ? { source: candidate.source, path: candidate.path } : { source: candidate.source }
+      return typeof candidate.path === 'string'
+        ? { source: candidate.source, path: candidate.path }
+        : { source: candidate.source }
     }
     if (typeof candidate.taskId === 'string') return { taskId: candidate.taskId }
   }
@@ -107,7 +114,7 @@ export const workspaceHistorySlice: PersistedStateSlice<WorkspaceHistory> = {
 // above is: the terminal has no `localStorage`.
 export const lastWorkspaceSlice = (hydrate: (workspaceId: string) => void): PersistedStateSlice<string> => {
   // Written back until a workspace is open. The pass can write before the client has settled on one,
-  // and a boot that fails in that gap flushes its pending writes as it is torn down, which used to
+  // and a boot that fails in that gap flushes its pending writes as it is torn down, which would
   // save an empty value over the right one.
   let saved = ''
   return {
@@ -121,10 +128,13 @@ export const lastWorkspaceSlice = (hydrate: (workspaceId: string) => void): Pers
     empty: () => '',
     unknownIds: 'drop',
     maxBytes: 512,
-    binding: appStateBinding(() => currentWorkspaceId() ?? saved, (value) => {
-      saved = value
-      hydrate(value)
-    }),
+    binding: appStateBinding(
+      () => currentWorkspaceId() ?? saved,
+      (value) => {
+        saved = value
+        hydrate(value)
+      },
+    ),
   }
 }
 
@@ -134,12 +144,14 @@ const parseNotices = (raw: unknown): Notice[] => {
   return value.filter((notice): notice is Notice => {
     if (!notice || typeof notice !== 'object') return false
     const candidate = notice as Partial<Notice>
-    return typeof candidate.id === 'string'
-      && typeof candidate.taskId === 'string'
-      && typeof candidate.kind === 'string'
-      && typeof candidate.title === 'string'
-      && typeof candidate.at === 'number'
-      && typeof candidate.read === 'boolean'
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.taskId === 'string' &&
+      typeof candidate.kind === 'string' &&
+      typeof candidate.title === 'string' &&
+      typeof candidate.at === 'number' &&
+      typeof candidate.read === 'boolean'
+    )
   })
 }
 

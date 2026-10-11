@@ -1,8 +1,23 @@
 import type { RailData, RailProps, TopbarData, TopbarProps } from '@acorn/protocol/chrome.ts'
 import type { OwnerActions } from '../tree/hostRequests'
 
-export const RAIL_ACTIONS = ['selectSource', 'openWorkspace', 'toggleCollapsed', 'reorderSources', 'createTask', 'openContextMenu'] as const
-export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'navigate', 'clearCache', 'addProject'] as const
+export const RAIL_ACTIONS = [
+  'selectSource',
+  'openWorkspace',
+  'toggleCollapsed',
+  'reorderSources',
+  'createTask',
+  'openContextMenu',
+] as const
+export const TOPBAR_ACTIONS = [
+  'pickWorkspace',
+  'pickProject',
+  'pickNode',
+  'openSettings',
+  'navigate',
+  'clearCache',
+  'addProject',
+] as const
 
 const known = (id: unknown, list: readonly { id: string }[]): string => {
   if (typeof id !== 'string' || !list.some((item) => item.id === id)) throw new Error('That choice is unavailable')
@@ -11,9 +26,16 @@ const known = (id: unknown, list: readonly { id: string }[]): string => {
 
 const point = (value: unknown): { x: number; y: number } => {
   const at = value as { x?: unknown; y?: unknown } | null
-  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y) ||
-    (at.x as number) < 0 || (at.y as number) < 0 ||
-    (at.x as number) > 100_000 || (at.y as number) > 100_000) throw new Error('Menu point is unavailable')
+  if (
+    !at ||
+    !Number.isFinite(at.x) ||
+    !Number.isFinite(at.y) ||
+    (at.x as number) < 0 ||
+    (at.y as number) < 0 ||
+    (at.x as number) > 100_000 ||
+    (at.y as number) > 100_000
+  )
+    throw new Error('Menu point is unavailable')
   return { x: at.x as number, y: at.y as number }
 }
 
@@ -32,9 +54,13 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
         value.openContextMenu(known(request.id, sources), point(request.at))
       },
       reorderSources: (ids) => {
-        if (!Array.isArray(ids) || ids.length !== sources.length ||
-          ids.some((id) => typeof id !== 'string') || new Set(ids).size !== sources.length ||
-          ids.some((id) => !sources.some((source) => source.id === id))) {
+        if (
+          !Array.isArray(ids) ||
+          ids.length !== sources.length ||
+          ids.some((id) => typeof id !== 'string') ||
+          new Set(ids).size !== sources.length ||
+          ids.some((id) => !sources.some((source) => source.id === id))
+        ) {
           throw new Error('Source order must contain each available source once')
         }
         value.reorderSources(ids)
@@ -44,17 +70,45 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
 }
 
 export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: OwnerActions } {
-  const { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
-    breadcrumb, node, nodes, account, canAddProject, slots } = value
+  const {
+    workspacesMode,
+    workspace,
+    workspaces,
+    workspacePickerVisible,
+    project,
+    projects,
+    projectPickerVisible,
+    projectPickerDisabled,
+    breadcrumb,
+    node,
+    nodes,
+    account,
+    canAddProject,
+    slots,
+  } = value
   return {
-    data: { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
-      breadcrumb, node, nodes, account, canAddProject, slots },
+    data: {
+      workspacesMode,
+      workspace,
+      workspaces,
+      workspacePickerVisible,
+      project,
+      projects,
+      projectPickerVisible,
+      projectPickerDisabled,
+      breadcrumb,
+      node,
+      nodes,
+      account,
+      canAddProject,
+      slots,
+    },
     actions: {
       pickWorkspace: (selection) => {
         const selected = selection as { id?: unknown; nodeId?: unknown } | null
-      if (!selected || typeof selected.nodeId !== 'string') throw new Error('Selection is unavailable')
+        if (!selected || typeof selected.nodeId !== 'string') throw new Error('Selection is unavailable')
         const entry = workspaces.find((item) => item.id === selected.id && item.nodeId === selected.nodeId)
-      if (!entry) throw new Error('Selection is unavailable')
+        if (!entry) throw new Error('Selection is unavailable')
         value.pickWorkspace(entry.id, entry.nodeId)
       },
       pickProject: (id) => value.pickProject(known(id, projects)),

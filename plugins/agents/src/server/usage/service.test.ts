@@ -21,7 +21,17 @@ const provider = (id: AgentUsageProviderId, percent = 80): AgentProviderUsage =>
   health: 'healthy',
   plan: null,
   account: null,
-  quotas: [{ id: 'session', label: 'Session', percentRemaining: percent, resetsAt: null, resetText: null, windowSeconds: null, health: 'healthy' }],
+  quotas: [
+    {
+      id: 'session',
+      label: 'Session',
+      percentRemaining: percent,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: null,
+      health: 'healthy',
+    },
+  ],
   cost: null,
   daily: null,
   capturedAt: 1,
@@ -86,7 +96,10 @@ describe('agent usage service', () => {
       probeDir: await probeDir(),
       ttlMs: 100,
       now: () => clock,
-      collectors: collectorsFor(async () => provider('claude', ++calls), async () => provider('codex')),
+      collectors: collectorsFor(
+        async () => provider('claude', ++calls),
+        async () => provider('codex'),
+      ),
     })
     const first = service.read({ userId: 'james' })
     const joined = service.read({ userId: 'james', force: true })
@@ -163,7 +176,11 @@ describe('agent usage service', () => {
       ),
     })
     const snapshot = await service.read({ userId: 'james' })
-    expect(snapshot.providers[0]).toMatchObject({ provider: 'claude', availability: 'missing', error: { code: 'cli_missing' } })
+    expect(snapshot.providers[0]).toMatchObject({
+      provider: 'claude',
+      availability: 'missing',
+      error: { code: 'cli_missing' },
+    })
     expect(snapshot.providers[1].availability).toBe('available')
   })
 
@@ -176,13 +193,18 @@ describe('agent usage service', () => {
         ...emptyAgentPricingPreferences(),
         claude: {
           overrides: [],
-          customModels: [{
-            model: 'claude-new',
-            price: { input: customInput, output: 2, cacheWrite: 1, cacheRead: 0.1 },
-          }],
+          customModels: [
+            {
+              model: 'claude-new',
+              price: { input: customInput, output: 2, cacheWrite: 1, cacheRead: 0.1 },
+            },
+          ],
         },
       }),
-      collectors: collectorsFor(async () => provider('claude', ++calls), async () => provider('codex')),
+      collectors: collectorsFor(
+        async () => provider('claude', ++calls),
+        async () => provider('codex'),
+      ),
     })
 
     await service.read({ userId: 'james' })
@@ -210,8 +232,24 @@ describe('agent usage service', () => {
             ...provider('codex', 0),
             health: 'depleted',
             quotas: [
-              { id: 'session', label: 'Session', percentRemaining: 0, resetsAt: 2_000, resetText: null, windowSeconds: 300, health: 'depleted' },
-              { id: 'weekly', label: 'Weekly', percentRemaining: 0, resetsAt: 3_000, resetText: null, windowSeconds: 600, health: 'depleted' },
+              {
+                id: 'session',
+                label: 'Session',
+                percentRemaining: 0,
+                resetsAt: 2_000,
+                resetText: null,
+                windowSeconds: 300,
+                health: 'depleted',
+              },
+              {
+                id: 'weekly',
+                label: 'Weekly',
+                percentRemaining: 0,
+                resetsAt: 3_000,
+                resetText: null,
+                windowSeconds: 600,
+                health: 'depleted',
+              },
             ],
           }
         },
@@ -230,7 +268,17 @@ describe('agent usage service', () => {
         async () => ({
           ...provider('codex', 0),
           health: 'depleted',
-          quotas: [{ id: 'session', label: 'Session', percentRemaining: 0, resetsAt: null, resetText: 'later', windowSeconds: null, health: 'depleted' }],
+          quotas: [
+            {
+              id: 'session',
+              label: 'Session',
+              percentRemaining: 0,
+              resetsAt: null,
+              resetText: 'later',
+              windowSeconds: null,
+              health: 'depleted',
+            },
+          ],
         }),
       ),
     })

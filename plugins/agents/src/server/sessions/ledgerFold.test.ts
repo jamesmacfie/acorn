@@ -1,12 +1,17 @@
 // The ledger fold against a real migrated database: a tool call or file change keeps its opening row
-// and one row with its latest state, and every reader still draws the card it drew when each update
-// had a row of its own. The reference in each test is what the old ledger held: every record exactly
-// as recordEvent returned it, which is also what the socket carries.
+// and one row with its latest state, and every reader draws the card it would from a row per update.
+// The reference in each test is that unfolded ledger: every record exactly as recordEvent returned it,
+// which is also what the socket carries.
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { asc, eq, sql } from 'drizzle-orm'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
-import type { AgentEventRecord, AgentNormalizedEvent, AgentProviderDescriptor, AgentToolCall } from '../../contract/wire.ts'
+import type {
+  AgentEventRecord,
+  AgentNormalizedEvent,
+  AgentProviderDescriptor,
+  AgentToolCall,
+} from '../../contract/wire.ts'
 import { agentEventSearchText } from '../../contract/wire.ts'
 import * as schema from '../../node/schema'
 import { buildConversationItems } from '../../client/sessions/conversationItems'
@@ -54,13 +59,18 @@ describe('ledger fold', () => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     db = ctx.storage.open()
     store = new AgentStore(db, ctx.core)
-    sessionId = (await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)).id
+    sessionId = (
+      await store.createSession(
+        {
+          taskId: randomUUID(),
+          providerId: 'fake',
+          profileId: 'fake',
+          kind: 'interactive',
+          config: {},
+        },
+        PROVIDER,
+      )
+    ).id
     frames = []
   })
 
@@ -71,8 +81,13 @@ describe('ledger fold', () => {
   const record = async (turnId: string | null, event: AgentNormalizedEvent, into: AgentStore = store) => {
     frames.push(await into.recordEvent(sessionId, turnId, event))
   }
-  const stored = () => db.select().from(schema.agentEvents)
-    .where(eq(schema.agentEvents.sessionId, sessionId)).orderBy(asc(schema.agentEvents.seq)).all()
+  const stored = () =>
+    db
+      .select()
+      .from(schema.agentEvents)
+      .where(eq(schema.agentEvents.sessionId, sessionId))
+      .orderBy(asc(schema.agentEvents.seq))
+      .all()
   const drawn = (events: AgentEventRecord[]) => buildConversationItems(events)
   const ledger = async () => (await store.exportSnapshot(sessionId)).events
 
@@ -141,8 +156,12 @@ describe('ledger fold', () => {
   it('keeps the search index in step and still finds the call', async () => {
     const turn = randomUUID()
     for (const event of COMMAND) await record(turn, event)
-    const fts = db.all<{ eventId: string }>(sql`SELECT event_id AS eventId FROM agent_events_fts WHERE session_id = ${sessionId}`)
-    const indexed = stored().filter((row) => row.searchText !== null).map((row) => row.id)
+    const fts = db.all<{ eventId: string }>(
+      sql`SELECT event_id AS eventId FROM agent_events_fts WHERE session_id = ${sessionId}`,
+    )
+    const indexed = stored()
+      .filter((row) => row.searchText !== null)
+      .map((row) => row.id)
     expect(fts.map((row) => row.eventId)).toEqual(indexed)
     expect(indexed).toHaveLength(1)
     expect((await store.searchSessions('second line')).map((session) => session.id)).toEqual([sessionId])
@@ -163,11 +182,17 @@ describe('ledger fold', () => {
 
   it('folds every row of a call stored before the fold existed', async () => {
     const turn = randomUUID()
-    // The old ledger: one row per update, each with its own search text.
+    // An unfolded ledger: one row per update, each with its own search text.
     for (const [index, event] of COMMAND.slice(0, 3).entries()) {
       const row = {
-        id: randomUUID(), sessionId, turnId: turn, seq: index + 1, schemaVersion: 1,
-        eventJson: JSON.stringify(event), searchText: agentEventSearchText(event), createdAt: index,
+        id: randomUUID(),
+        sessionId,
+        turnId: turn,
+        seq: index + 1,
+        schemaVersion: 1,
+        eventJson: JSON.stringify(event),
+        searchText: agentEventSearchText(event),
+        createdAt: index,
       }
       db.insert(schema.agentEvents).values(row).run()
       frames.push({ ...row, event, searchText: row.searchText })
@@ -194,8 +219,13 @@ describe('ledger fold', () => {
 
   it('keeps the opener and latest report of a file change, and leaves one without a change id alone', async () => {
     const turn = randomUUID()
-    const change = (patch: string, changeId?: string): AgentNormalizedEvent =>
-      ({ type: 'file_change', path: 'src/a.ts', patch, summary: 'Updated a file.', ...(changeId ? { changeId } : {}) })
+    const change = (patch: string, changeId?: string): AgentNormalizedEvent => ({
+      type: 'file_change',
+      path: 'src/a.ts',
+      patch,
+      summary: 'Updated a file.',
+      ...(changeId ? { changeId } : {}),
+    })
     await record(turn, change('@@ -1 +1 @@\n-a\n+b', 'edit-1'))
     await record(turn, change('@@ -1 +1 @@\n-a\n+c', 'edit-1'))
     await record(turn, change('@@ -1 +1 @@\n-a\n+d', 'edit-1'))

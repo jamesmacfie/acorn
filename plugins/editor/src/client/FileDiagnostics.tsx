@@ -1,7 +1,12 @@
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import {
-  LANGUAGE_REQUEST_TOO_LARGE, languageRequestTooLarge, positionAt, requestDiagnostics,
-  type CheckedDiagnostic, type DocumentServiceRoute,
+  LANGUAGE_REQUEST_TOO_LARGE,
+  languageRequestTooLarge,
+  latestSignal,
+  positionAt,
+  requestDiagnostics,
+  type CheckedDiagnostic,
+  type DocumentServiceRoute,
 } from '@acorn/plugin-api/client'
 import { Button, Row, Text } from '@acorn/plugin-api/ui'
 
@@ -17,22 +22,22 @@ export default function FileDiagnostics(props: {
   read: () => Promise<string>
 }) {
   const [answer, setAnswer] = createSignal<Answer>()
+  // Sent with each request, for the language service. The newest check aborts the ones before it.
   let revision = 0
-  let reading: AbortController | undefined
-  onCleanup(() => reading?.abort())
+  const checking = latestSignal()
+  onCleanup(() => checking.abort())
 
   const check = async (route: DocumentServiceRoute): Promise<void> => {
-    reading?.abort()
-    const current = reading = new AbortController()
+    const signal = checking.next()
     const sent = ++revision
     const text = await props.read().catch(() => undefined)
-    if (current.signal.aborted) return
+    if (signal.aborted) return
     if (text === undefined || languageRequestTooLarge(text)) {
       setAnswer(text === undefined ? 'Could not read this file.' : LANGUAGE_REQUEST_TOO_LARGE)
       return
     }
-    const items = await requestDiagnostics(route.route, props.nodeId, { text, revision: sent }, current.signal)
-    if (current.signal.aborted || sent !== revision) return
+    const items = await requestDiagnostics(route.route, props.nodeId, { text, revision: sent }, signal)
+    if (signal.aborted) return
     setAnswer(items ? { label: route.label, text, items } : { label: route.label, failed: true })
   }
 
@@ -50,13 +55,28 @@ export default function FileDiagnostics(props: {
           </Row>
           <Show when={answer()} keyed>
             {(value) => {
-              if (typeof value === 'string') return <Text emphasis="muted" wrap>{value}</Text>
+              if (typeof value === 'string')
+                return (
+                  <Text emphasis="muted" wrap>
+                    {value}
+                  </Text>
+                )
               if ('failed' in value) return <Text emphasis="muted" wrap>{`${value.label} did not answer.`}</Text>
               return (
-                <Show when={value.items.length} fallback={<Text emphasis="muted" wrap>{`No problems, from ${value.label}.`}</Text>}>
+                <Show
+                  when={value.items.length}
+                  fallback={<Text emphasis="muted" wrap>{`No problems, from ${value.label}.`}</Text>}
+                >
                   <Text emphasis="muted" wrap>{`From ${value.label}:`}</Text>
                   <For each={value.items}>
-                    {(item) => <Text tone={item.severity === 'error' ? 'danger' : item.severity === 'warning' ? 'warn' : undefined} wrap>{line(value.text, item)}</Text>}
+                    {(item) => (
+                      <Text
+                        tone={item.severity === 'error' ? 'danger' : item.severity === 'warning' ? 'warn' : undefined}
+                        wrap
+                      >
+                        {line(value.text, item)}
+                      </Text>
+                    )}
                   </For>
                 </Show>
               )

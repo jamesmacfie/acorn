@@ -25,10 +25,9 @@
 //
 // ## Why Vite and not esbuild
 //
-// The phase doc said esbuild; there is none in this workspace, and apps/node already bundles itself
-// with Vite using exactly the settings a plugin bundle needs (ESM out, node builtins external,
-// workspace packages inlined). Adding a second bundler to run the same job would be a dependency
-// bought for nothing.
+// There is no esbuild in this workspace, and apps/node already bundles itself with Vite using exactly
+// the settings a plugin bundle needs (ESM out, node builtins external, workspace packages inlined).
+// Adding a second bundler to run the same job would be a dependency bought for nothing.
 //
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
@@ -51,11 +50,9 @@ const CONFIG_FILE = 'acorn-plugin.config.mjs'
 // compiles to a call into the module named below, which builds acorn's own node names instead of DOM
 // (docs/plugins/client-half.md § Loaded plugins: the client half).
 //
-// This used to be a `framework` key each plugin named, with a map from it to a transform. Phase 9 of
-// the layout programme removed it: the remote adapter is the only target, so the key had one legal
-// value. A bundle drawing a rectangle instead writes no JSX and is unaffected — the transform has
-// nothing to rewrite — and a tree built through the SDK's own node functions rather than JSX is in the
-// same position.
+// There is no per-plugin choice of transform: the remote adapter is the only target. A bundle drawing
+// a rectangle instead writes no JSX and is unaffected — the transform has nothing to rewrite — and a
+// tree built through the SDK's own node functions rather than JSX is in the same position.
 const treeTransform = (moduleName = '@acorn/plugin-api/ui/tree') =>
   solid({ solid: { generate: 'universal', moduleName } })
 
@@ -117,9 +114,8 @@ const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins
 if (pluginPackage.dependencies?.['acorn-plugin-sdk']?.startsWith('workspace:')) {
   runPnpm(['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
 }
-// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/transport/api.ts,
-// because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
-// but one const, which is why pluginApiVersion.ts exists.
+// Imported, not scraped. A .mjs script cannot import a built package, but it can import a .ts file with
+// nothing in it but one const, which is why the protocol keeps the API version in a file of its own.
 //
 // That import relies on Node's own type stripping, so it has a version floor. The root package.json
 // pins it, but `engines` is a warning rather than a wall by default — and the failure without this
@@ -271,9 +267,9 @@ writeFileSync(
 
 // Mark a package built STRAIGHT INTO the data root as a dev build, so boot reconciliation treats it as
 // app-owned and a newer bundled version replaces it. Without this it is indistinguishable from an
-// owner-installed package — a directory with bytes nobody has on record — so it was marked `user` and
-// then protected from every subsequent app build, which has already cost an hour once and presented as a
-// feature that silently did not exist.
+// owner-installed package — a directory with bytes nobody has on record — so it would be marked `user`
+// and then protected from every subsequent app build, which presents as a feature that silently does
+// not exist.
 //
 // Deliberately NOT written under `--package-root`: that output is the distribution path, and a marker
 // travelling into application resources would tell every user's node that its bundled plugins are
@@ -302,7 +298,7 @@ try {
     } else {
       // A package built straight into the data root is not an owner install, and any such row is a
       // leftover: without clearing it, a developer who was already trapped stays trapped no matter how
-      // many times they rebuild, which is the exact failure this is fixing.
+      // many times they rebuild.
       delete state.plugins[id]
       writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
       console.log(`[build-plugin] cleared the stale "user" ownership row for ${id}`)

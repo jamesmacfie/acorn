@@ -2,9 +2,8 @@
 //
 // A layout's regions are separate components the host mounts side by side, so anything two of them
 // share has to outlive both of them: collapsing a library unmounts the list, and the note being
-// edited must not go with it. Four compiled panes each grew the same module-level `createRoot` map to
-// solve that — notes, changes, agents and context — which is the admission rule's own test for a
-// seam ("two or more plugins need it"). This is that map, once.
+// edited must not go with it. Several panes need that (notes, changes, agents and context), so the
+// module-level `createRoot` map lives here once rather than in each of them.
 //
 // `createRoot` rather than a plain object because a model owns resources and effects, and their owner
 // has to be one the host's mounting and unmounting cannot take away. No detached owner is passed, and
@@ -65,12 +64,21 @@ function releaseModel(paneId: string, entry: Held): void {
 }
 
 /** Build in a detached root that inherits provider context and retires with its captured shell. */
-export function paneModel<M>(paneId: string, taskId: string, build: () => M, owner = 'core', scope = paneModelScope()): M {
+export function paneModel<M>(
+  paneId: string,
+  taskId: string,
+  build: () => M,
+  owner = 'core',
+  scope = paneModelScope(),
+): M {
   const entry = held.get(paneId)
   if (entry && entry.taskId === taskId && entry.scope === scope && !scope.retired) return entry.model as M
   if (entry) releaseModel(paneId, entry)
   if (scope.retired) throw new Error('Cannot build a pane model in a retired Node shell.')
-  const span = startSpan(owner, { name: 'pane.model', attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId } })
+  const span = startSpan(owner, {
+    name: 'pane.model',
+    attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId },
+  })
   let disposeRoot: (() => void) | undefined
   try {
     const next = createRoot((dispose) => {
@@ -89,7 +97,8 @@ export function paneModel<M>(paneId: string, taskId: string, build: () => M, own
 }
 
 const [drawn, setDrawn] = createSignal<ReadonlyMap<string, number>>(new Map())
-const drawnKey = (scope: PaneModelScope, paneId: string, taskId: string): string => `${scope.id}\u0000${paneId}\u0000${taskId}`
+const drawnKey = (scope: PaneModelScope, paneId: string, taskId: string): string =>
+  `${scope.id}\u0000${paneId}\u0000${taskId}`
 
 function countDrawn(key: string, by: number): void {
   setDrawn((current) => {

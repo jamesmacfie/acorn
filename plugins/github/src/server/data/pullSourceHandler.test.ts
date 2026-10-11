@@ -1,66 +1,183 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginRequestContext } from '@acorn/plugin-api/node'
-import { dataSourceDescriptionSchema, dataSourcePageSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import {
+  dataSourceDescriptionSchema,
+  dataSourcePageSchema,
+  type DataSourceRequest,
+} from '@acorn/protocol/dataSources.ts'
 import { readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { createPullSourceHandler } from './pullSourceHandler'
 import { gh, ghGraphQL } from '../githubApi'
 
-vi.mock('../githubApi', async original => ({ ...await original<typeof import('../githubApi')>(), ghGraphQL: vi.fn(), gh: vi.fn() }))
-const node = (id: string, overrides = {}) => ({ id, number: 1, title: 'A change', url: 'https://github.com/org/repo/pull/1',
-  state: 'OPEN', isDraft: false, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' },
-  headRepository: { nameWithOwner: 'Alice/Fork' }, headRefName: 'feature',
-  createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z', closedAt: null, mergedAt: null,
-  mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null,
+vi.mock('../githubApi', async (original) => ({
+  ...(await original<typeof import('../githubApi')>()),
+  ghGraphQL: vi.fn(),
+  gh: vi.fn(),
+}))
+const node = (id: string, overrides = {}) => ({
+  id,
+  number: 1,
+  title: 'A change',
+  url: 'https://github.com/org/repo/pull/1',
+  state: 'OPEN',
+  isDraft: false,
+  author: { login: 'alice' },
+  repository: { nameWithOwner: 'org/repo' },
+  headRepository: { nameWithOwner: 'Alice/Fork' },
+  headRefName: 'feature',
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-02T00:00:00Z',
+  closedAt: null,
+  mergedAt: null,
+  mergeable: 'UNKNOWN',
+  mergeStateStatus: 'UNSTABLE',
+  autoMergeRequest: null,
   reviewDecision: 'REVIEW_REQUIRED',
   labels: { nodes: [{ name: 'bug' }], pageInfo: { hasNextPage: false, endCursor: null } },
-  reviewRequests: { nodes: [{ requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }], pageInfo: { hasNextPage: false, endCursor: null } },
-  latestCommit: { nodes: [{ commit: { committedDate: '2026-09-02T00:00:00Z', statusCheckRollup: { state: 'FAILURE', contexts: {
-    checkRunCountsByState: [{ state: 'FAILURE', count: 1 }, { state: 'SUCCESS', count: 0 }], statusContextCountsByState: [],
-  } } } }] }, latestComment: { nodes: [] }, latestReview: { nodes: [] },
-  reviewRequestEvents: { pageInfo: { hasPreviousPage: false }, nodes: [{ createdAt: '2026-09-02T12:00:00Z',
-    requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }] }, ...overrides })
+  reviewRequests: {
+    nodes: [{ requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }],
+    pageInfo: { hasNextPage: false, endCursor: null },
+  },
+  latestCommit: {
+    nodes: [
+      {
+        commit: {
+          committedDate: '2026-09-02T00:00:00Z',
+          statusCheckRollup: {
+            state: 'FAILURE',
+            contexts: {
+              checkRunCountsByState: [
+                { state: 'FAILURE', count: 1 },
+                { state: 'SUCCESS', count: 0 },
+              ],
+              statusContextCountsByState: [],
+            },
+          },
+        },
+      },
+    ],
+  },
+  latestComment: { nodes: [] },
+  latestReview: { nodes: [] },
+  reviewRequestEvents: {
+    pageInfo: { hasPreviousPage: false },
+    nodes: [
+      {
+        createdAt: '2026-09-02T12:00:00Z',
+        requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' },
+      },
+    ],
+  },
+  ...overrides,
+})
 const upstream = (nodes: ReturnType<typeof node>[], next: string | null = null, count = nodes.length) =>
-  Response.json({ data: { search: { nodes, issueCount: count, pageInfo: { hasNextPage: next !== null, endCursor: next } } } })
+  Response.json({
+    data: { search: { nodes, issueCount: count, pageInfo: { hasNextPage: next !== null, endCursor: next } } },
+  })
 const scope = { connectionId: 'selected', parameters: { repositories: ['org/repo'] } }
 const source = { pluginId: 'github', sourceId: 'pull-requests' }
-const query = (): Extract<DataSourceRequest, { operation: 'query' }> => ({ operation: 'query',
-  query: { source, scope, sort: [{ pointer: '/updatedAt', direction: 'desc' }] }, mode: 'execution', evaluationTime: 100, pageSize: 1 })
+const query = (): Extract<DataSourceRequest, { operation: 'query' }> => ({
+  operation: 'query',
+  query: { source, scope, sort: [{ pointer: '/updatedAt', direction: 'desc' }] },
+  mode: 'execution',
+  evaluationTime: 100,
+  pageSize: 1,
+})
 const filter = (pointer: string, value: string | number | boolean, operator: 'eq' | 'gte' = 'eq'): DataPredicate => ({
-  kind: 'comparison', left: { address: { from: 'item', pointer } }, operator, right: { address: { from: 'literal', value } },
+  kind: 'comparison',
+  left: { address: { from: 'item', pointer } },
+  operator,
+  right: { address: { from: 'literal', value } },
 })
 const context: PluginRequestContext = {
-  userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {
-    connections: async () => [{ id: 'selected', status: 'connected' } as Awaited<ReturnType<PluginRequestContext['providers']['connections']>>[number]], resource: vi.fn(), items: vi.fn(),
+  userId: 'owner',
+  principal: { kind: 'device', userId: 'owner' },
+  providers: {
+    connections: async () => [
+      { id: 'selected', status: 'connected' } as Awaited<
+        ReturnType<PluginRequestContext['providers']['connections']>
+      >[number],
+    ],
+    resource: vi.fn(),
+    items: vi.fn(),
     withConnections: async (_provider, visit) => {
       const value = await visit({ id: 'selected', status: 'connected' } as Parameters<typeof visit>[0], 'secret')
       return value === undefined ? [] : [value]
     },
   },
 }
-const call = (handler: ReturnType<typeof createPullSourceHandler>, input: DataSourceRequest, ctx = context) => handler(
-  new Request('http://acorn.test/', { method: 'POST', body: JSON.stringify(input) }), ctx)
+const call = (handler: ReturnType<typeof createPullSourceHandler>, input: DataSourceRequest, ctx = context) =>
+  handler(new Request('http://acorn.test/', { method: 'POST', body: JSON.stringify(input) }), ctx)
 
-afterEach(() => { vi.clearAllMocks(); vi.useRealTimers() })
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.useRealTimers()
+})
 
 describe('GitHub typed pull source', () => {
   it('checks the live pull before a confined state write', async () => {
     const handler = createPullSourceHandler()
     const ref = { ...source, connectionId: 'selected', recordId: 'pull-node', scope }
-    const details = () => handler(new Request('http://acorn.test/data/pulls', { method: 'POST', body: JSON.stringify({
-      operation: 'details', ref, scope, projection: ['/state'],
-    }) }), context)
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { node: { state: 'OPEN', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } } }))
-    expect(await (await details()).json()).toMatchObject({ kind: 'found', data: { state: 'open' }, writableFields: ['/state'] })
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { node: { state: 'MERGED', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } } }))
-    expect(await (await details()).json()).toMatchObject({ kind: 'found', data: { state: 'merged' }, writableFields: [] })
-    const write = (expected: string) => handler(new Request('http://acorn.test/data/pulls/write', { method: 'POST', body: JSON.stringify({
-      ref, field: '/state', expected, target: 'closed', idempotencyKey: '11111111-2222-4333-8444-555555555555',
-    }) }), context)
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { node: { state: 'CLOSED', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } } }))
+    const details = () =>
+      handler(
+        new Request('http://acorn.test/data/pulls', {
+          method: 'POST',
+          body: JSON.stringify({
+            operation: 'details',
+            ref,
+            scope,
+            projection: ['/state'],
+          }),
+        }),
+        context,
+      )
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({
+        data: { node: { state: 'OPEN', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } },
+      }),
+    )
+    expect(await (await details()).json()).toMatchObject({
+      kind: 'found',
+      data: { state: 'open' },
+      writableFields: ['/state'],
+    })
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({
+        data: { node: { state: 'MERGED', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } },
+      }),
+    )
+    expect(await (await details()).json()).toMatchObject({
+      kind: 'found',
+      data: { state: 'merged' },
+      writableFields: [],
+    })
+    const write = (expected: string) =>
+      handler(
+        new Request('http://acorn.test/data/pulls/write', {
+          method: 'POST',
+          body: JSON.stringify({
+            ref,
+            field: '/state',
+            expected,
+            target: 'closed',
+            idempotencyKey: '11111111-2222-4333-8444-555555555555',
+          }),
+        }),
+        context,
+      )
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({
+        data: { node: { state: 'CLOSED', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } },
+      }),
+    )
     expect(await (await write('open')).json()).toEqual({ outcome: 'stale' })
     expect(gh).not.toHaveBeenCalled()
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { node: { state: 'OPEN', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } } }))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({
+        data: { node: { state: 'OPEN', number: 4, repository: { name: 'repo', owner: { login: 'org' } } } },
+      }),
+    )
     vi.mocked(gh).mockResolvedValueOnce(Response.json({ state: 'closed' }))
     expect(await (await write('open')).json()).toEqual({ outcome: 'done' })
     expect(vi.mocked(gh).mock.calls[0]?.[1]).toBe('/repos/org/repo/pulls/4')
@@ -69,24 +186,38 @@ describe('GitHub typed pull source', () => {
     const res = await call(createPullSourceHandler(), { operation: 'describe', source, scope })
     const description = dataSourceDescriptionSchema.parse(await res.json())
     expect(description.operations).toMatchObject({ details: true, incremental: false })
-    expect(description.writable).toEqual([{ field: '/state', path: '/v1/p/github/data/pulls/write', risk: 'write', values: ['open', 'closed'] }])
-    expect(description.fields.find(field => field.pointer === '/state')?.choices).toMatchObject({ kind: 'static' })
-    expect(['/githubProvider', '/githubConnectionId', '/headRepository', '/headBranch'].every(pointer =>
-      description.fields.some(field => field.pointer === pointer))).toBe(true)
+    expect(description.writable).toEqual([
+      { field: '/state', path: '/v1/p/github/data/pulls/write', risk: 'write', values: ['open', 'closed'] },
+    ])
+    expect(description.fields.find((field) => field.pointer === '/state')?.choices).toMatchObject({ kind: 'static' })
+    expect(
+      ['/githubProvider', '/githubConnectionId', '/headRepository', '/headBranch'].every((pointer) =>
+        description.fields.some((field) => field.pointer === pointer),
+      ),
+    ).toBe(true)
     expect(ghGraphQL).not.toHaveBeenCalled()
   })
 
   it('uses the head repository and selected account for branch lookup, including forks and deleted heads', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([
-      node('fork', { headRepository: { nameWithOwner: 'Alice/Fork' }, headRefName: 'feature' }),
-      node('base', { headRepository: { nameWithOwner: 'ORG/Repo' }, headRefName: 'feature' }),
-      node('deleted', { headRepository: null, headRefName: 'feature' }),
-    ]))
-    const input = query(); input.pageSize = 25
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('fork', { headRepository: { nameWithOwner: 'Alice/Fork' }, headRefName: 'feature' }),
+        node('base', { headRepository: { nameWithOwner: 'ORG/Repo' }, headRefName: 'feature' }),
+        node('deleted', { headRepository: null, headRefName: 'feature' }),
+      ]),
+    )
+    const input = query()
+    input.pageSize = 25
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
-    expect(page.records.map(record => ({ id: record.recordId, provider: readDataPointer(record.data, '/githubProvider'),
-      account: readDataPointer(record.data, '/githubConnectionId'), repository: readDataPointer(record.data, '/headRepository'),
-      branch: readDataPointer(record.data, '/headBranch') }))).toEqual([
+    expect(
+      page.records.map((record) => ({
+        id: record.recordId,
+        provider: readDataPointer(record.data, '/githubProvider'),
+        account: readDataPointer(record.data, '/githubConnectionId'),
+        repository: readDataPointer(record.data, '/headRepository'),
+        branch: readDataPointer(record.data, '/headBranch'),
+      })),
+    ).toEqual([
       { id: 'base', provider: 'github', account: 'selected', repository: 'org/repo', branch: 'feature' },
       { id: 'deleted', provider: 'github', account: 'selected', repository: null, branch: 'feature' },
       { id: 'fork', provider: 'github', account: 'selected', repository: 'alice/fork', branch: 'feature' },
@@ -94,9 +225,13 @@ describe('GitHub typed pull source', () => {
   })
 
   it('does not count a label-only update as pull-request activity', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('label-edit', {
-      updatedAt: '2026-10-01T00:00:00Z',
-    })]))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('label-edit', {
+          updatedAt: '2026-10-01T00:00:00Z',
+        }),
+      ]),
+    )
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
     expect(page.records[0]?.data).toMatchObject({
       updatedAt: Date.parse('2026-10-01T00:00:00Z'),
@@ -105,41 +240,58 @@ describe('GitHub typed pull source', () => {
   })
 
   it('selects open drafts and failing checks by arbitrary author, excluding closed and merged PRs', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([
-      node('closed', { state: 'CLOSED' }), node('merged', { state: 'MERGED' }), node('other', { author: { login: 'bob' } }),
-      node('open', { isDraft: true }),
-    ]))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('closed', { state: 'CLOSED' }),
+        node('merged', { state: 'MERGED' }),
+        node('other', { author: { login: 'bob' } }),
+        node('open', { isDraft: true }),
+      ]),
+    )
     const input = query()
     input.query.predicate = { kind: 'all', predicates: [filter('/state', 'open'), filter('/author', 'alice')] }
     const response = await call(createPullSourceHandler(), input)
     const page = dataSourcePageSchema.parse(await response.json())
     expect(page.completeness).toEqual({ kind: 'complete' })
     expect(page.records).toHaveLength(1)
-    expect(page.records[0]).toMatchObject({ recordId: 'open', data: { state: 'open', draft: true, mergeStateStatus: 'UNSTABLE', author: 'alice' }, action: { verb: 'openUrl' } })
+    expect(page.records[0]).toMatchObject({
+      recordId: 'open',
+      data: { state: 'open', draft: true, mergeStateStatus: 'UNSTABLE', author: 'alice' },
+      action: { verb: 'openUrl' },
+    })
     expect(page.records[0]?.writableFields).toEqual(['/state'])
-    expect(page.records[0]?.data).toMatchObject({ githubProvider: 'github', githubConnectionId: 'selected',
-      headRepository: 'alice/fork', headBranch: 'feature', checkStatuses: ['FAILURE'],
-      reviewRequests: [{ kind: 'team', name: 'reviewers', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
+    expect(page.records[0]?.data).toMatchObject({
+      githubProvider: 'github',
+      githubConnectionId: 'selected',
+      headRepository: 'alice/fork',
+      headBranch: 'feature',
+      checkStatuses: ['FAILURE'],
+      reviewRequests: [{ kind: 'team', name: 'reviewers', requestedAt: Date.parse('2026-09-02T12:00:00Z') }],
+    })
     expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo is:open author:alice' })
   })
 
   it('exhausts upstream pages, orders ties by stable ID, and continues without more provider reads', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('z')], 'next', 3))
+    vi.mocked(ghGraphQL)
+      .mockResolvedValueOnce(upstream([node('z')], 'next', 3))
       .mockResolvedValueOnce(upstream([node('a'), node('b')], null, 3))
     const handler = createPullSourceHandler()
     const first = dataSourcePageSchema.parse(await (await call(handler, query())).json())
     expect(first.records[0]?.recordId).toBe('a')
     expect(first.completeness.kind).toBe('more')
     if (first.completeness.kind !== 'more') throw new Error('missing cursor')
-    const second = dataSourcePageSchema.parse(await (await call(handler, { ...query(), cursor: first.completeness.cursor, pageSize: 2 })).json())
-    expect(second.records.map(row => row.recordId)).toEqual(['b', 'z'])
+    const second = dataSourcePageSchema.parse(
+      await (await call(handler, { ...query(), cursor: first.completeness.cursor, pageSize: 2 })).json(),
+    )
+    expect(second.records.map((row) => row.recordId)).toEqual(['b', 'z'])
     expect(second.completeness.kind).toBe('complete')
     expect(ghGraphQL).toHaveBeenCalledTimes(2)
   })
 
   it('does not accept a sorted take through an upstream ceiling', async () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('one')], null, 251))
-    const input = query(); input.query.take = 1
+    const input = query()
+    input.query.take = 1
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
     expect(page).toMatchObject({ records: [], completeness: { kind: 'incomplete', cause: 'upstream-cap' } })
   })
@@ -147,43 +299,62 @@ describe('GitHub typed pull source', () => {
   it('returns exactly the stable first N and bounded completeness across pages', async () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('z'), node('b'), node('a')]))
     const handler = createPullSourceHandler()
-    const input = query(); input.query.take = 2
+    const input = query()
+    input.query.take = 2
     const first = dataSourcePageSchema.parse(await (await call(handler, input)).json())
-    expect(first.records.map(row => row.recordId)).toEqual(['a'])
+    expect(first.records.map((row) => row.recordId)).toEqual(['a'])
     if (first.completeness.kind !== 'more') throw new Error('missing cursor')
-    const last = dataSourcePageSchema.parse(await (await call(handler, { ...input, cursor: first.completeness.cursor })).json())
-    expect(last.records.map(row => row.recordId)).toEqual(['b'])
+    const last = dataSourcePageSchema.parse(
+      await (await call(handler, { ...input, cursor: first.completeness.cursor })).json(),
+    )
+    expect(last.records.map((row) => row.recordId)).toEqual(['b'])
     expect(last.completeness).toEqual({ kind: 'bounded' })
   })
 
   it('compares millisecond date boundaries exactly after conservative provider filtering', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('old'), node('new', { updatedAt: '2026-09-02T00:00:01Z' })]))
-    const input = query(); input.query.predicate = filter('/updatedAt', Date.parse('2026-09-02T00:00:00.500Z'), 'gte')
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([node('old'), node('new', { updatedAt: '2026-09-02T00:00:01Z' })]),
+    )
+    const input = query()
+    input.query.predicate = filter('/updatedAt', Date.parse('2026-09-02T00:00:00.500Z'), 'gte')
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
-    expect(page.records.map(row => row.recordId)).toEqual(['new'])
+    expect(page.records.map((row) => row.recordId)).toEqual(['new'])
   })
 
   it('uses GitHub viewer review search for negative as well as positive matches', async () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('not-requested')]))
-    const input = query(); input.query.predicate = filter('/reviewRequestedFromViewer', false)
+    const input = query()
+    input.query.predicate = filter('/reviewRequestedFromViewer', false)
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
     expect(page.records[0]?.data).toMatchObject({ reviewRequestedFromViewer: false })
-    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo -review-requested:@me', first: 25 })
+    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({
+      q: 'is:pr repo:org/repo -review-requested:@me',
+      first: 25,
+    })
   })
 
-  it.each(['org/repo is:closed', '', 'org'])('rejects invalid repository %j before a network call', async repository => {
-    const input = query(); input.query.scope = { ...scope, parameters: { repositories: [repository] } }
-    expect((await call(createPullSourceHandler(), input)).ok).toBe(false)
-    expect(ghGraphQL).not.toHaveBeenCalled()
-  })
+  it.each(['org/repo is:closed', '', 'org'])(
+    'rejects invalid repository %j before a network call',
+    async (repository) => {
+      const input = query()
+      input.query.scope = { ...scope, parameters: { repositories: [repository] } }
+      expect((await call(createPullSourceHandler(), input)).ok).toBe(false)
+      expect(ghGraphQL).not.toHaveBeenCalled()
+    },
+  )
 
   it('rejects qualifier injection, unsupported groups, and unknown sort fields', async () => {
     const handler = createPullSourceHandler()
-    for (const predicate of [filter('/author', 'alice is:closed'), { kind: 'any', predicates: [filter('/draft', true)] } as DataPredicate]) {
-      const input = query(); input.query.predicate = predicate
+    for (const predicate of [
+      filter('/author', 'alice is:closed'),
+      { kind: 'any', predicates: [filter('/draft', true)] } as DataPredicate,
+    ]) {
+      const input = query()
+      input.query.predicate = predicate
       expect((await call(handler, input)).ok).toBe(false)
     }
-    const input = query(); input.query.sort = [{ pointer: '/title', direction: 'asc' }]
+    const input = query()
+    input.query.sort = [{ pointer: '/title', direction: 'asc' }]
     expect((await call(handler, input)).ok).toBe(false)
     expect(ghGraphQL).not.toHaveBeenCalled()
   })
@@ -192,7 +363,7 @@ describe('GitHub typed pull source', () => {
     () => Response.json({ errors: [{ message: 'secret provider body' }] }),
     () => new Response('secret', { status: 429, headers: { 'retry-after': '60' } }),
     () => Response.json({ data: null }),
-  ])('fails closed on provider errors without leaking bodies', async response => {
+  ])('fails closed on provider errors without leaking bodies', async (response) => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(response())
     const res = await call(createPullSourceHandler(), query())
     expect(res.ok).toBe(false)
@@ -200,7 +371,8 @@ describe('GitHub typed pull source', () => {
   })
 
   it('rejects duplicate IDs and repeated provider cursors', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a')], 'loop', 3))
+    vi.mocked(ghGraphQL)
+      .mockResolvedValueOnce(upstream([node('a')], 'loop', 3))
       .mockResolvedValueOnce(upstream([node('b')], 'loop', 3))
     expect((await call(createPullSourceHandler(), query())).ok).toBe(false)
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a'), node('a')]))
@@ -208,11 +380,32 @@ describe('GitHub typed pull source', () => {
   })
 
   it('reads every check state of a commit with more checks than one GitHub page holds', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a', { latestCommit: { nodes: [{ commit: { committedDate: '2026-09-02T00:00:00Z',
-      statusCheckRollup: { state: 'PENDING', contexts: {
-        checkRunCountsByState: [{ state: 'SUCCESS', count: 120 }, { state: 'QUEUED', count: 2 }, { state: 'COMPLETED', count: 1 }],
-        statusContextCountsByState: [{ state: 'ERROR', count: 1 }],
-      } } } }] } })]))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('a', {
+          latestCommit: {
+            nodes: [
+              {
+                commit: {
+                  committedDate: '2026-09-02T00:00:00Z',
+                  statusCheckRollup: {
+                    state: 'PENDING',
+                    contexts: {
+                      checkRunCountsByState: [
+                        { state: 'SUCCESS', count: 120 },
+                        { state: 'QUEUED', count: 2 },
+                        { state: 'COMPLETED', count: 1 },
+                      ],
+                      statusContextCountsByState: [{ state: 'ERROR', count: 1 }],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ]),
+    )
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
     const states = readDataPointer(page.records[0]!.data, '/checkStatuses') as string[]
     expect(page.completeness.kind).toBe('complete')
@@ -222,20 +415,37 @@ describe('GitHub typed pull source', () => {
 
   it('reads a pull request whose review was requested from a bot', async () => {
     const bot = { __typename: 'Bot', login: 'copilot-pull-request-reviewer' }
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a', {
-      reviewRequests: { nodes: [{ requestedReviewer: bot }], pageInfo: { hasNextPage: false, endCursor: null } },
-      reviewRequestEvents: { pageInfo: { hasPreviousPage: false }, nodes: [{ createdAt: '2026-09-02T12:00:00Z', requestedReviewer: bot }] },
-    })]))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('a', {
+          reviewRequests: { nodes: [{ requestedReviewer: bot }], pageInfo: { hasNextPage: false, endCursor: null } },
+          reviewRequestEvents: {
+            pageInfo: { hasPreviousPage: false },
+            nodes: [{ createdAt: '2026-09-02T12:00:00Z', requestedReviewer: bot }],
+          },
+        }),
+      ]),
+    )
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
-    expect(page.records[0]?.data).toMatchObject({ requestedReviewers: [], requestedTeams: [],
-      reviewRequests: [{ kind: 'bot', name: 'copilot-pull-request-reviewer', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
+    expect(page.records[0]?.data).toMatchObject({
+      requestedReviewers: [],
+      requestedTeams: [],
+      reviewRequests: [
+        { kind: 'bot', name: 'copilot-pull-request-reviewer', requestedAt: Date.parse('2026-09-02T12:00:00Z') },
+      ],
+    })
   })
 
   it("says why a read failed in the pull list's words, and never passes GitHub's own text on", async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ errors: [{ message: 'Resource protected by organization SAML enforcement. secret detail' }] }))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({ errors: [{ message: 'Resource protected by organization SAML enforcement. secret detail' }] }),
+    )
     const blocked = await call(createPullSourceHandler(), query())
     expect(blocked.status).toBe(502)
-    expect(await blocked.json()).toEqual({ error: 'github_source_failed', reason: "Authorise acorn's GitHub sign-in for your organisation's single sign-on, then try again." })
+    expect(await blocked.json()).toEqual({
+      error: 'github_source_failed',
+      reason: "Authorise acorn's GitHub sign-in for your organisation's single sign-on, then try again.",
+    })
     vi.mocked(ghGraphQL).mockResolvedValueOnce(new Response('', { status: 429, headers: { 'retry-after': '30' } }))
     expect((await call(createPullSourceHandler(), query())).status).toBe(429)
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a'), node('a')]))
@@ -249,10 +459,19 @@ describe('GitHub typed pull source', () => {
     const page = dataSourcePageSchema.parse(await (await call(handler, query())).json())
     if (page.completeness.kind !== 'more') throw new Error('missing cursor')
     const input = { ...query(), cursor: page.completeness.cursor }
-    expect((await call(handler, input, { ...context, principal: { kind: 'internal', scope: 'task', userId: 'owner', taskId: 'task' } })).status).toBe(403)
+    expect(
+      (
+        await call(handler, input, {
+          ...context,
+          principal: { kind: 'internal', scope: 'task', userId: 'owner', taskId: 'task' },
+        })
+      ).status,
+    ).toBe(403)
     expect((await call(handler, { ...input, evaluationTime: 101 })).ok).toBe(false)
     expect((await call(handler, input, { ...context, userId: 'other' })).ok).toBe(false)
-    expect((await call(handler, { ...input, query: { ...input.query, scope: { ...scope, connectionId: 'other' } } })).ok).toBe(false)
+    expect(
+      (await call(handler, { ...input, query: { ...input.query, scope: { ...scope, connectionId: 'other' } } })).ok,
+    ).toBe(false)
     vi.advanceTimersByTime(60_001)
     expect((await call(handler, input)).ok).toBe(false)
     expect(ghGraphQL).toHaveBeenCalledTimes(1)
@@ -260,22 +479,73 @@ describe('GitHub typed pull source', () => {
 
   it('uses only the explicit connection and keeps repository option pagination', async () => {
     const handler = createPullSourceHandler()
-    expect((await call(handler, { ...query(), query: { ...query().query, scope: { ...scope, connectionId: 'other' } } })).ok).toBe(false)
+    expect(
+      (await call(handler, { ...query(), query: { ...query().query, scope: { ...scope, connectionId: 'other' } } })).ok,
+    ).toBe(false)
     expect(ghGraphQL).not.toHaveBeenCalled()
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
-      nodes: [{ nameWithOwner: 'org/repo' }], pageInfo: { hasNextPage: true, endCursor: 'repo-next' },
-    } } } }))
-    const res = await call(handler, { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: '', pageSize: 25 })
-    expect(await res.json()).toEqual({ options: [{ id: 'org/repo', label: 'org/repo' }], exhausted: false, nextCursor: 'repo-next' })
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      Response.json({
+        data: {
+          viewer: {
+            repositories: {
+              nodes: [{ nameWithOwner: 'org/repo' }],
+              pageInfo: { hasNextPage: true, endCursor: 'repo-next' },
+            },
+          },
+        },
+      }),
+    )
+    const res = await call(handler, {
+      operation: 'options',
+      source,
+      scope,
+      target: 'parameter',
+      pointer: '/repositories',
+      search: '',
+      pageSize: 25,
+    })
+    expect(await res.json()).toEqual({
+      options: [{ id: 'org/repo', label: 'org/repo' }],
+      exhausted: false,
+      nextCursor: 'repo-next',
+    })
   })
 
   it("lists each repository by its folded name, which is how a workspace's projects name it", async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
-      nodes: [{ nameWithOwner: 'acme/api' }, { nameWithOwner: 'acme/web' }], pageInfo: { hasNextPage: true, endCursor: 'page-2' },
-    } } } })).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
-      nodes: [{ nameWithOwner: 'Runn-Fast/runn' }], pageInfo: { hasNextPage: false, endCursor: null },
-    } } } }))
-    const res = await call(createPullSourceHandler(), { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: 'runn-fast/runn', pageSize: 25 })
+    vi.mocked(ghGraphQL)
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            viewer: {
+              repositories: {
+                nodes: [{ nameWithOwner: 'acme/api' }, { nameWithOwner: 'acme/web' }],
+                pageInfo: { hasNextPage: true, endCursor: 'page-2' },
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            viewer: {
+              repositories: {
+                nodes: [{ nameWithOwner: 'Runn-Fast/runn' }],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+      )
+    const res = await call(createPullSourceHandler(), {
+      operation: 'options',
+      source,
+      scope,
+      target: 'parameter',
+      pointer: '/repositories',
+      search: 'runn-fast/runn',
+      pageSize: 25,
+    })
     expect(await res.json()).toEqual({ options: [{ id: 'runn-fast/runn', label: 'Runn-Fast/runn' }], exhausted: true })
     expect(vi.mocked(ghGraphQL).mock.calls[1]?.[2]).toMatchObject({ first: 25, after: 'page-2' })
   })

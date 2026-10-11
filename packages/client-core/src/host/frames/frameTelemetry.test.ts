@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import { _resetClientTelemetry, flushTelemetry, setTelemetryEnabled, startClientTelemetry, startInteraction } from '../../infra/telemetry/emitter'
+import {
+  _resetClientTelemetry,
+  flushTelemetry,
+  setTelemetryEnabled,
+  startClientTelemetry,
+  startInteraction,
+} from '../../infra/telemetry/emitter'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
 // The frame's telemetry verb, driven over a real MessageChannel through the real broker, for the
@@ -21,7 +27,13 @@ const BINDING: FrameBinding = {
 
 const services = (): FrameServices => ({
   fetch: vi.fn(async () => ({ ok: true, status: 200, body: null })),
-  fetchBytes: vi.fn(async () => ({ ok: true as const, status: 200, bytes: new Uint8Array(), type: '', filename: null })),
+  fetchBytes: vi.fn(async () => ({
+    ok: true as const,
+    status: 200,
+    bytes: new Uint8Array(),
+    type: '',
+    filename: null,
+  })),
   subscribe: vi.fn(() => vi.fn()),
   stateGet: vi.fn(() => undefined),
   stateSet: vi.fn(async () => {}),
@@ -88,7 +100,10 @@ describe('a frame emitting telemetry', () => {
   it('files an event under the binding, whatever the message says', async () => {
     // The whole security property in one assertion: the frame names a plugin and the host ignores
     // it, because the owner comes from the binding the host made.
-    channel.port2.postMessage({ kind: 'telemetry', record: { type: 'event', name: 'cache-miss', attrs: { owner: 'github', resource: 'issues' } } })
+    channel.port2.postMessage({
+      kind: 'telemetry',
+      record: { type: 'event', name: 'cache-miss', attrs: { owner: 'github', resource: 'issues' } },
+    })
     const records = await collected()
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({ kind: 'event', name: 'cache-miss' })
@@ -98,7 +113,10 @@ describe('a frame emitting telemetry', () => {
   it('takes a count, a gauge and an error', async () => {
     channel.port2.postMessage({ kind: 'telemetry', record: { type: 'count', name: 'items-synced', value: 12 } })
     channel.port2.postMessage({ kind: 'telemetry', record: { type: 'gauge', name: 'queue-depth', value: 3 } })
-    channel.port2.postMessage({ kind: 'telemetry', record: { type: 'error', name: 'UpstreamError', message: 'rate limited' } })
+    channel.port2.postMessage({
+      kind: 'telemetry',
+      record: { type: 'error', name: 'UpstreamError', message: 'rate limited' },
+    })
     const records = await collected()
     expect(records.map((record) => record.kind)).toEqual(['metric', 'metric', 'error'])
     expect(records.every((record) => record.attrs.owner === 'board')).toBe(true)
@@ -106,18 +124,30 @@ describe('a frame emitting telemetry', () => {
 
   it('hangs a span under the open interaction and mints the ids itself', async () => {
     const interaction = startInteraction('core', { name: 'command' })
-    channel.port2.postMessage({ kind: 'telemetry', record: { type: 'span', name: 'draw-chart', durationMs: 40, status: 'error' } })
+    channel.port2.postMessage({
+      kind: 'telemetry',
+      record: { type: 'span', name: 'draw-chart', durationMs: 40, status: 'error' },
+    })
     await new Promise((resolve) => setTimeout(resolve, 5))
     interaction.end()
     const records = await collected()
     const span = records.find((record) => record.kind === 'span' && record.name === 'draw-chart')
-    expect(span).toMatchObject({ kind: 'span', durationMs: 40, status: 'error', traceId: interaction.traceId, parentSpanId: interaction.spanId })
+    expect(span).toMatchObject({
+      kind: 'span',
+      durationMs: 40,
+      status: 'error',
+      traceId: interaction.traceId,
+      parentSpanId: interaction.spanId,
+    })
     // A frame cannot name a trace, so the id is one the host minted and not one the frame sent.
     expect(span?.kind === 'span' && span.spanId).not.toBe(interaction.spanId)
   })
 
   it('writes a log line under the plugin id', async () => {
-    channel.port2.postMessage({ kind: 'telemetry', record: { type: 'log', level: 'warn', message: 'upstream is slow' } })
+    channel.port2.postMessage({
+      kind: 'telemetry',
+      record: { type: 'log', level: 'warn', message: 'upstream is slow' },
+    })
     const records = await collected()
     expect(records[0]).toMatchObject({ kind: 'log', level: 'warn', logger: 'board', body: 'upstream is slow' })
   })
@@ -127,7 +157,13 @@ describe('a frame emitting telemetry', () => {
     // could do with the answer.
     const answers: unknown[] = []
     channel.port2.onmessage = (event: MessageEvent) => void answers.push(event.data)
-    for (const record of [null, { type: 'nope', name: 'x' }, { type: 'event' }, { type: 'count', name: 'x', value: Number.NaN }, { type: 'log', level: 'shout', message: 'x' }]) {
+    for (const record of [
+      null,
+      { type: 'nope', name: 'x' },
+      { type: 'event' },
+      { type: 'count', name: 'x', value: Number.NaN },
+      { type: 'log', level: 'shout', message: 'x' },
+    ]) {
       channel.port2.postMessage({ kind: 'telemetry', record })
     }
     const records = await collected()
@@ -138,7 +174,11 @@ describe('a frame emitting telemetry', () => {
   it('keeps only the scalars out of an attribute map', async () => {
     channel.port2.postMessage({
       kind: 'telemetry',
-      record: { type: 'event', name: 'sync', attrs: { rows: 4, ok: true, note: 'fine', body: { secret: 1 }, list: [1, 2] } },
+      record: {
+        type: 'event',
+        name: 'sync',
+        attrs: { rows: 4, ok: true, note: 'fine', body: { secret: 1 }, list: [1, 2] },
+      },
     })
     const records = await collected()
     expect(records[0].attrs).toMatchObject({ rows: 4, ok: true, note: 'fine' })
@@ -152,7 +192,8 @@ describe('a frame emitting telemetry', () => {
     for (let index = 0; index < 1100; index += 1) {
       channel.port2.postMessage({ kind: 'telemetry', record: { type: 'count', name: 'tick', value: 1 } })
     }
-    for (let tick = 0; tick < 400 && misbehaved.length === 0; tick += 1) await new Promise((resolve) => setTimeout(resolve, 1))
+    for (let tick = 0; tick < 400 && misbehaved.length === 0; tick += 1)
+      await new Promise((resolve) => setTimeout(resolve, 1))
     expect(misbehaved[0]).toContain('bridge messages')
   })
 })

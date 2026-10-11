@@ -28,13 +28,16 @@ export const editorPlugin = (): NodePlugin => {
         timeoutMs: 2_000,
       })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, lazyEditorBridge(
-          ctx.core,
-          ctx.events.worktreeStatus,
-          ctx.hooks,
-          () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
-          () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
-        )),
+        ctx.capabilities.provide(
+          EDITOR,
+          lazyEditorBridge(
+            ctx.core,
+            ctx.events.worktreeStatus,
+            ctx.hooks,
+            () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
+            () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
+          ),
+        ),
         ctx.capabilities.provide(SEARCH, lazySearchBridge(ctx.core)),
         // Read-only bytes for a plugin that draws a file in the editor (../contract/files.ts). Loaded on
         // first use, like the route bridge above.

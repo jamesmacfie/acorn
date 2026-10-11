@@ -3,14 +3,13 @@ import type { AppEnv } from './middleware/auth'
 import { respondError } from './respond'
 import { capabilityId, type CapabilityId } from './pluginHost/capabilities'
 
-// Route handlers resolve their provider from the per-runtime registry carried by c.env. Keeping this
-// helper in the historical bridge module makes the migration mechanical for existing route families;
-// the module contains no mutable slot, setter, or process-global implementation.
+// Route handlers resolve their provider from the per-runtime registry carried by c.env. The module
+// holds no mutable slot, setter, or process-global implementation.
 export const routeCapability = <T>(id: string): CapabilityId<T> => capabilityId<T>(id)
 
-// Route tests historically installed fakes through module setters. Keep that test ergonomics without
-// reintroducing a production bridge: the map is consulted only when a test omits RuntimeBindings, and
-// every production request resolves from its per-runtime registry.
+// Route tests install fakes here without reintroducing a production bridge: the map is consulted only
+// when a test omits RuntimeBindings, and every production request resolves from its per-runtime
+// registry.
 const routeTestOverrides = new Map<string, unknown>()
 export const setRouteTestCapability = <T>(id: CapabilityId<T>, impl: T | null): void => {
   if (impl === null) routeTestOverrides.delete(id)
@@ -19,8 +18,6 @@ export const setRouteTestCapability = <T>(id: CapabilityId<T>, impl: T | null): 
 
 export const routeCapabilityFor = <T>(c: Context<AppEnv>, id: CapabilityId<T>): T | undefined =>
   (c.env?.CAPABILITIES?.get(id) ?? routeTestOverrides.get(id)) as T | undefined
-
-export const routeTestCapabilityFor = <T>(id: CapabilityId<T>): T | undefined => routeTestOverrides.get(id) as T | undefined
 
 // Thrown by a bridge to classify a failure as something other than a 500. `code` is the stable
 // machine code (docs/api-reference/transport.md § Errors); `detail` carries human prose. Anything else a
@@ -39,7 +36,11 @@ export class BridgeError extends Error {
 // The one route body for a bridge-backed handler: resolve the slot, run the call, JSON the result.
 // A missing bridge → 503; a BridgeError → its declared status; any other throw bubbles to the app
 // backstop as 500 'internal'.
-export async function viaBridge<B>(c: Context<AppEnv>, id: CapabilityId<B>, fn: (b: B) => Promise<unknown>): Promise<Response> {
+export async function viaBridge<B>(
+  c: Context<AppEnv>,
+  id: CapabilityId<B>,
+  fn: (b: B) => Promise<unknown>,
+): Promise<Response> {
   const impl = routeCapabilityFor(c, id)
   if (!impl) return respondError(c, 503, 'bridge-unavailable')
   try {

@@ -13,7 +13,11 @@ import type { SourceFailure } from '@acorn/dashboards-core/plan.ts'
 // Settings: Review and Turn it on open the plugin's page, and Reconnect opens the account's.
 
 const FIX_LABELS: Record<SourceFix, string> = {
-  'choose-account': 'Choose an account', review: 'Review', reconnect: 'Reconnect…', 'turn-on': 'Turn it on', retry: 'Try again',
+  'choose-account': 'Choose an account',
+  review: 'Review',
+  reconnect: 'Reconnect…',
+  'turn-on': 'Turn it on',
+  retry: 'Try again',
 }
 
 /** Settings' navigate, for a surface outside the settings layer: opens the layer on `target`. A layer
@@ -25,7 +29,8 @@ const openSettingsAt: SettingsNavigate = (target, opened) => {
 }
 
 /** A plugin's page in Settings, for About this source and the plugin fixes, or its Logs tab. */
-export const openPluginSettings = (pluginId: string, tab?: 'logs'): void => openPluginPage(openSettingsAt, pluginId, 'node', tab)
+export const openPluginSettings = (pluginId: string, tab?: 'logs'): void =>
+  openPluginPage(openSettingsAt, pluginId, 'node', tab)
 
 export default function SourceFailureAlert(props: {
   failure: SourceFailure
@@ -48,11 +53,23 @@ export default function SourceFailureAlert(props: {
   // A fix with nowhere to go here, such as Try again without a retry, isn't drawn.
   const fix = () => {
     const wanted = text().fix
-    return wanted === 'choose-account' && !props.onChooseAccount || wanted === 'retry' && !props.onRetry ? undefined : wanted
+    return (wanted === 'choose-account' && !props.onChooseAccount) || (wanted === 'retry' && !props.onRetry)
+      ? undefined
+      : wanted
   }
   return (
-    <Alert tone={props.severity === 'error' ? 'warn' : 'muted'}
-      actions={<Show when={fix()}>{wanted => <Button size="sm" onPress={() => run(wanted())}>{FIX_LABELS[wanted()]}</Button>}</Show>}>
+    <Alert
+      tone={props.severity === 'error' ? 'warn' : 'muted'}
+      actions={
+        <Show when={fix()}>
+          {(wanted) => (
+            <Button size="sm" onPress={() => run(wanted())}>
+              {FIX_LABELS[wanted()]}
+            </Button>
+          )}
+        </Show>
+      }
+    >
       {text().message}
     </Alert>
   )

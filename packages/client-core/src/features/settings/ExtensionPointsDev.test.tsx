@@ -1,7 +1,11 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ExtensionPointsDev from './ExtensionPointsDev'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../../host/registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { recordTreeFailure } from '../../host/tree/treeFailures'
 import { documentServiceRegistry } from '../../host/registries/panes/documentServices'
@@ -26,26 +30,30 @@ let dispose: () => void
 const registered: Disposable[] = []
 
 const point = (id: string, kind: 'rows' | 'remote', mode?: 'stack' | 'replace') =>
-  registered.push(extensionPointRegistry.register({
-    id,
-    ownerId: id.split(':')[0]!,
-    label: 'Ports',
-    kind,
-    max: 4,
-    ...(kind === 'rows' ? { location: 'pane.footer' as const, surface: 'board' } : {}),
-    ...(mode ? { mode } : {}),
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id,
+      ownerId: id.split(':')[0]!,
+      label: 'Ports',
+      kind,
+      max: 4,
+      ...(kind === 'rows' ? { location: 'pane.footer' as const, surface: 'board' } : {}),
+      ...(mode ? { mode } : {}),
+    }),
+  )
 
 const contribution = (pluginId: string, pointId: string, carrier: ExtensionContribution['carrier']) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:x`,
-    pluginId,
-    point: pointId,
-    label: `${pluginId} rows`,
-    order: 500,
-    carrier,
-    ...(carrier === 'items' ? { fetch: async () => [] } : { entry: 'draw', hash: 'abc' }),
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:x`,
+      pluginId,
+      point: pointId,
+      label: `${pluginId} rows`,
+      order: 500,
+      carrier,
+      ...(carrier === 'items' ? { fetch: async () => [] } : { entry: 'draw', hash: 'abc' }),
+    } as ExtensionContribution),
+  )
 
 beforeEach(() => {
   host = document.createElement('div')
@@ -111,9 +119,17 @@ describe('ExtensionPointsDev', () => {
   })
 
   it('lists who answers a language, and offers a pick only on a tie', () => {
-    const provide = (pluginId: string) => registered.push(documentServiceRegistry.register({
-      id: `${pluginId}:json`, pluginId, label: `${pluginId} check`, languageId: 'json', diagnostics: `/v1/p/${pluginId}/check`, available: () => true,
-    }))
+    const provide = (pluginId: string) =>
+      registered.push(
+        documentServiceRegistry.register({
+          id: `${pluginId}:json`,
+          pluginId,
+          label: `${pluginId} check`,
+          languageId: 'json',
+          diagnostics: `/v1/p/${pluginId}/check`,
+          available: () => true,
+        }),
+      )
     provide('lint')
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
@@ -129,13 +145,30 @@ describe('ExtensionPointsDev', () => {
   // What an author can't see from the owner's screen: how many fit, what the owner will do when asked,
   // which keys a contributor answers to, and why a tree that should be there drew nothing.
   it('shows a point’s cap and actions, and each contributor’s keys and last failure', () => {
-    registered.push(extensionPointRegistry.register({
-      id: 'preview:toolbar', ownerId: 'preview', label: 'Toolbar', kind: 'remote', mode: 'stack', max: 4, actions: ['reload'],
-    }))
-    registered.push(extensionRegistry.register({
-      id: 'plugin:docs:toolbar', pluginId: 'docs', point: 'preview:toolbar', label: 'Docs button', order: 500,
-      carrier: 'remote', entry: 'draw', hash: 'abc', matches: ['*.md', '*.markdown'],
-    }))
+    registered.push(
+      extensionPointRegistry.register({
+        id: 'preview:toolbar',
+        ownerId: 'preview',
+        label: 'Toolbar',
+        kind: 'remote',
+        mode: 'stack',
+        max: 4,
+        actions: ['reload'],
+      }),
+    )
+    registered.push(
+      extensionRegistry.register({
+        id: 'plugin:docs:toolbar',
+        pluginId: 'docs',
+        point: 'preview:toolbar',
+        label: 'Docs button',
+        order: 500,
+        carrier: 'remote',
+        entry: 'draw',
+        hash: 'abc',
+        matches: ['*.md', '*.markdown'],
+      }),
+    )
     recordTreeFailure('plugin:docs:toolbar', 'worker stopped answering')
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
@@ -146,10 +179,20 @@ describe('ExtensionPointsDev', () => {
   })
 
   it('says where the host draws a point an owner mounted in a detail region', () => {
-    registered.push(extensionPointRegistry.register({
-      id: 'linear:issue-summary', ownerId: 'linear', label: 'Issue summary', kind: 'remote', mode: 'stack', max: 2,
-      mounts: [{ surface: 'linear-issue', region: 'header' }, { surface: 'linear-ref', region: 'header' }],
-    }))
+    registered.push(
+      extensionPointRegistry.register({
+        id: 'linear:issue-summary',
+        ownerId: 'linear',
+        label: 'Issue summary',
+        kind: 'remote',
+        mode: 'stack',
+        max: 2,
+        mounts: [
+          { surface: 'linear-issue', region: 'header' },
+          { surface: 'linear-ref', region: 'header' },
+        ],
+      }),
+    )
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
     expect(text()).toContain('Drawn at the header of linear-issue, the header of linear-ref.')

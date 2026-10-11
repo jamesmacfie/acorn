@@ -8,7 +8,9 @@ describe('wrapBracketedPaste', () => {
     expect(wrapBracketedPaste('a\r\nb\r\n')).toBe(`${PASTE_BEGIN}a\r\nb${PASTE_END}`)
   })
   it('strips embedded paste markers (a payload cannot end the paste early)', () => {
-    expect(wrapBracketedPaste(`evil${PASTE_END}rm -rf\nmore${PASTE_BEGIN}x`)).toBe(`${PASTE_BEGIN}evilrm -rf\nmorex${PASTE_END}`)
+    expect(wrapBracketedPaste(`evil${PASTE_END}rm -rf\nmore${PASTE_BEGIN}x`)).toBe(
+      `${PASTE_BEGIN}evilrm -rf\nmorex${PASTE_END}`,
+    )
   })
 })
 
@@ -77,7 +79,13 @@ describe('live PTY delivery (cat)', () => {
   it('a multi-line send lands as ONE wrapped block in the ring', async () => {
     const { spawn } = await import('node-pty')
     // raw -echo: cat's stdout is then exactly the bytes we wrote, once, no tty-echo interleaving.
-    const pty = spawn('/bin/sh', ['-c', 'stty raw -echo; cat'], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: { PATH: process.env.PATH ?? '', TERM: 'xterm-256color' } })
+    const pty = spawn('/bin/sh', ['-c', 'stty raw -echo; cat'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH ?? '', TERM: 'xterm-256color' },
+    })
     let ring = ''
     pty.onData((d) => {
       ring += d
@@ -103,29 +111,39 @@ it('cancels real submit timers on clear and releases completed timer ownership',
   try {
     const session = fakeSession(false)
     const sender = new AgentSender(() => session)
-    sender.send('a', 'one', 'now'); sender.send('a', 'two', 'now')
+    sender.send('a', 'one', 'now')
+    sender.send('a', 'two', 'now')
     expect(vi.getTimerCount()).toBe(2)
     sender.clear('a')
     expect(vi.getTimerCount()).toBe(0)
     vi.advanceTimersByTime(200)
-    expect(session.writes.filter(s => s === '\r')).toHaveLength(0)
+    expect(session.writes.filter((s) => s === '\r')).toHaveLength(0)
     sender.send('a', 'three', 'now')
     vi.advanceTimersByTime(150)
     expect(session.writes.at(-1)).toBe('\r')
     expect((sender as unknown as { submits: Map<string, unknown> }).submits.size).toBe(0)
-  } finally { vi.useRealTimers() }
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('fences old callbacks even when a scheduler cannot cancel them or a session ID is reused', () => {
   const callbacks: (() => void)[] = []
   let session = fakeSession(false)
   const original = session
-  const sender = new AgentSender(() => session, 150, callback => { callbacks.push(callback) })
+  const sender = new AgentSender(
+    () => session,
+    150,
+    (callback) => {
+      callbacks.push(callback)
+    },
+  )
   sender.send('a', 'one', 'now')
   session = fakeSession(false)
   callbacks.shift()!()
-  expect(original.writes.filter(s => s === '\r')).toHaveLength(0)
-  sender.send('a', 'two', 'now'); sender.clear('a')
+  expect(original.writes.filter((s) => s === '\r')).toHaveLength(0)
+  sender.send('a', 'two', 'now')
+  sender.clear('a')
   callbacks.shift()!()
-  expect(session.writes.filter(s => s === '\r')).toHaveLength(0)
+  expect(session.writes.filter((s) => s === '\r')).toHaveLength(0)
 })

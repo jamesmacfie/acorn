@@ -17,9 +17,13 @@ export async function memoryImportSources(core: ImportCore, projectId: string): 
   const checkout = await realpath(project.path)
   let root = checkout
   try {
-    const common = (await core.git.gitText(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: checkout })).trim()
+    const common = (
+      await core.git.gitText(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: checkout })
+    ).trim()
     if (common) root = dirname(resolve(checkout, common))
-  } catch { /* A non-git checkout can still have repository memory. */ }
+  } catch {
+    /* A non-git checkout can still have repository memory. */
+  }
   const config = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
   const slug = process.env.CLAUDE_CODE_PROJECT_DIR_NAME || root.replace(/[^a-zA-Z0-9]/g, '-')
   const candidates = [
@@ -34,7 +38,12 @@ export async function memoryImportSources(core: ImportCore, projectId: string): 
   return sources
 }
 
-export async function memoryImportPreview(core: ImportCore, store: MemoryStoreAccess, projectId: string, sourceId: string): Promise<MemoryImportFile[]> {
+export async function memoryImportPreview(
+  core: ImportCore,
+  store: MemoryStoreAccess,
+  projectId: string,
+  sourceId: string,
+): Promise<MemoryImportFile[]> {
   const source = (await memoryImportSources(core, projectId)).find((source) => source.id === sourceId)
   if (!source) throw new ToolError('not_found', 'No such import source.')
   const files: MemoryImportFile[] = []
@@ -46,7 +55,17 @@ export async function memoryImportPreview(core: ImportCore, store: MemoryStoreAc
     const info = await lstat(path)
     if (!info.isFile() || info.isSymbolicLink()) continue
     if (info.size > 64 * 1024) {
-      files.push({ file, name, description: '', type: 'reference', body: '', sourceHash: '', destinationHash: null, collision: false, error: 'File exceeds 64 KiB.' })
+      files.push({
+        file,
+        name,
+        description: '',
+        type: 'reference',
+        body: '',
+        sourceHash: '',
+        destinationHash: null,
+        collision: false,
+        error: 'File exceeds 64 KiB.',
+      })
       continue
     }
     const text = await readFile(path, 'utf8')
@@ -56,14 +75,30 @@ export async function memoryImportPreview(core: ImportCore, store: MemoryStoreAc
     const input = { name, description: parsed.description, type: parsed.type as MemoryWrite['type'], body: parsed.body }
     const current = await store.get({ scope: 'project', projectId, name })
     let error: string | undefined
-    try { validateMemoryWrite(input) } catch (e) { error = e instanceof Error ? e.message : 'Invalid memory.' }
-    files.push({ file, ...input, sourceHash: memoryHash(text), destinationHash: current?.hash ?? null, collision: !!current, ...(error ? { error } : {}) })
+    try {
+      validateMemoryWrite(input)
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Invalid memory.'
+    }
+    files.push({
+      file,
+      ...input,
+      sourceHash: memoryHash(text),
+      destinationHash: current?.hash ?? null,
+      collision: !!current,
+      ...(error ? { error } : {}),
+    })
   }
   return files
 }
 
-export async function importMemory(core: ImportCore, store: MemoryStoreAccess, projectId: string, sourceId: string,
-  selected: { name: string; sourceHash: string; destinationHash: string | null; overwrite: boolean }[]): Promise<MemoryImportResult> {
+export async function importMemory(
+  core: ImportCore,
+  store: MemoryStoreAccess,
+  projectId: string,
+  sourceId: string,
+  selected: { name: string; sourceHash: string; destinationHash: string | null; overwrite: boolean }[],
+): Promise<MemoryImportResult> {
   const preview = await memoryImportPreview(core, store, projectId, sourceId)
   const result: MemoryImportResult = { imported: [], skipped: [], errors: [] }
   for (const choice of selected) {
@@ -72,15 +107,27 @@ export async function importMemory(core: ImportCore, store: MemoryStoreAccess, p
       result.errors.push({ name: choice.name, error: 'Source or destination changed. Preview again.' })
       continue
     }
-    if (file.collision && !choice.overwrite) { result.skipped.push(file.name); continue }
+    if (file.collision && !choice.overwrite) {
+      result.skipped.push(file.name)
+      continue
+    }
     try {
       if (file.error) throw new Error(file.error)
-      await store.write({ scope: 'project', projectId, name: file.name }, {
-        name: file.name, description: file.description, type: file.type as MemoryWrite['type'], body: file.body,
-        ...(file.destinationHash ? { hash: file.destinationHash } : {}),
-      }, { by: 'import' })
+      await store.write(
+        { scope: 'project', projectId, name: file.name },
+        {
+          name: file.name,
+          description: file.description,
+          type: file.type as MemoryWrite['type'],
+          body: file.body,
+          ...(file.destinationHash ? { hash: file.destinationHash } : {}),
+        },
+        { by: 'import' },
+      )
       result.imported.push(file.name)
-    } catch (e) { result.errors.push({ name: file.name, error: e instanceof Error ? e.message : 'Import failed.' }) }
+    } catch (e) {
+      result.errors.push({ name: file.name, error: e instanceof Error ? e.message : 'Import failed.' })
+    }
   }
   return result
 }

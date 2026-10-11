@@ -12,7 +12,8 @@ import { activeEditorUnder } from './editorPtyOwners'
 import { editorWorktreeChanged } from './worktreeInvalidation'
 import { exclusiveRename, exclusiveRenameAvailability } from './exclusiveRename'
 
-const validName = (name: string): boolean => !!name && name !== '.' && name !== '..' && !/[\\/\0]/.test(name) && name.toLowerCase() !== '.git'
+const validName = (name: string): boolean =>
+  !!name && name !== '.' && name !== '..' && !/[\\/\0]/.test(name) && name.toLowerCase() !== '.git'
 export const gitMetadata = (path: string): boolean => path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git')
 export const entryIdentity = (info: { dev: number; ino: number; birthtimeMs: number; ctimeMs: number }): string =>
   `${info.dev}:${info.ino}:${info.birthtimeMs}:${info.ctimeMs}`
@@ -20,12 +21,17 @@ export const stableEntryId = (info: { dev: number; ino: number; birthtimeMs: num
   `${info.dev}:${info.ino}:${info.birthtimeMs}`
 export const entryKind = (info: { isSymbolicLink(): boolean; isDirectory(): boolean }): FileEntryKind =>
   info.isSymbolicLink() ? 'link' : info.isDirectory() ? 'folder' : 'file'
-const failure = (reason: string, partial = false): FileActionResult => ({ ok: false, reason, ...(partial ? { partial } : {}) })
-const reason = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+const failure = (reason: string, partial = false): FileActionResult => ({
+  ok: false,
+  reason,
+  ...(partial ? { partial } : {}),
+})
+const reason = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
 
 async function rootFor(core: EditorCoreServices, taskId: string, expected?: string): Promise<string> {
   const root = await core.tasks.root(taskId)
-  if (!root || (expected !== undefined && root !== expected)) throw new Error('The task checkout changed. Refresh the tree.')
+  if (!root || (expected !== undefined && root !== expected))
+    throw new Error('The task checkout changed. Refresh the tree.')
   return root
 }
 
@@ -37,7 +43,8 @@ function entryPath(core: EditorCoreServices, root: string, path: string, allowRo
     throw new Error('The worktree root cannot be changed.')
   }
   if (gitMetadata(path)) throw new Error('Git metadata cannot be changed.')
-  if (path.split(/[\/]/).some((part) => !part || part === '.' || part === '..')) throw new Error('Use a normalized worktree path.')
+  if (path.split(/[\/]/).some((part) => !part || part === '.' || part === '..'))
+    throw new Error('Use a normalized worktree path.')
   const name = basename(path)
   if (!validName(name)) throw new Error('Invalid file name.')
   const parent = dirname(path) === '.' ? '' : dirname(path)
@@ -49,29 +56,54 @@ function entryPath(core: EditorCoreServices, root: string, path: string, allowRo
   return abs
 }
 
-async function checkTarget(core: EditorCoreServices, target: FileTarget, root: string, allowRoot = false): Promise<string> {
+async function checkTarget(
+  core: EditorCoreServices,
+  target: FileTarget,
+  root: string,
+  allowRoot = false,
+): Promise<string> {
   const abs = entryPath(core, root, target.path, allowRoot)
   const info = await lstat(abs)
-  if (stableEntryId(info) !== target.entryId || entryIdentity(info) !== target.identity || entryKind(info) !== target.kind) throw new Error('The tree entry changed. Refresh and try again.')
+  if (
+    stableEntryId(info) !== target.entryId ||
+    entryIdentity(info) !== target.identity ||
+    entryKind(info) !== target.kind
+  )
+    throw new Error('The tree entry changed. Refresh and try again.')
   return abs
 }
 
 async function absent(path: string): Promise<boolean> {
-  try { await lstat(path); return false }
-  catch (cause) { if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return true; throw cause }
+  try {
+    await lstat(path)
+    return false
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw cause
+  }
 }
 
 export function createFileActions(core: EditorCoreServices, changed: EditorChanged) {
   const announce = (root: string, taskId: string): Promise<void> => editorWorktreeChanged(core, root, taskId, changed)
   const trashAvailability = async (taskId: string): Promise<TrashAvailability> => {
     if (platform() === 'darwin') {
-      try { await lstat('/usr/bin/trash'); return { available: true } }
-      catch { return { available: false, reason: 'The Node host has no system trash command.' } }
+      try {
+        await lstat('/usr/bin/trash')
+        return { available: true }
+      } catch {
+        return { available: false, reason: 'The Node host has no system trash command.' }
+      }
     }
     if (platform() === 'linux') {
       const root = await core.tasks.root(taskId)
       if (!root) return { available: false, reason: 'This task has no checkout.' }
-      const result = await core.proc.runProcess({ file: 'gio', args: ['version'], cwd: root, timeoutMs: 3_000, maxOutputBytes: 1_024 })
+      const result = await core.proc.runProcess({
+        file: 'gio',
+        args: ['version'],
+        cwd: root,
+        timeoutMs: 3_000,
+        maxOutputBytes: 1_024,
+      })
       return result.code === 0
         ? { available: true }
         : { available: false, reason: 'Install GIO on the Node host to move files to trash.' }
@@ -91,13 +123,19 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
         const info = await lstat(abs)
         return { root, path, kind: entryKind(info), identity: entryIdentity(info), entryId: stableEntryId(info) }
       } catch (cause) {
-        if ((cause as NodeJS.ErrnoException).code === 'ENOENT') throw new BridgeError(404, 'not_found', 'Tree entry not found.')
+        if ((cause as NodeJS.ErrnoException).code === 'ENOENT')
+          throw new BridgeError(404, 'not_found', 'Tree entry not found.')
         throw new BridgeError(403, 'path_outside', reason(cause))
       }
     },
     trashAvailability,
     renameAvailability: exclusiveRenameAvailability,
-    create: async (taskId: string, parent: FileTarget, name: string, kind: 'file' | 'folder'): Promise<FileActionResult> => {
+    create: async (
+      taskId: string,
+      parent: FileTarget,
+      name: string,
+      kind: 'file' | 'folder',
+    ): Promise<FileActionResult> => {
       if (!validName(name)) return failure('Enter one valid file name.')
       try {
         const root = await rootFor(core, taskId, parent.root)
@@ -108,12 +146,20 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
           const path = parent.path ? `${parent.path}/${name}` : name
           const abs = entryPath(core, root, path)
           if (kind === 'folder') await mkdir(abs)
-          else { const handle = await open(abs, 'wx'); await handle.close() }
-          try { await announce(root, taskId) }
-          catch (cause) { return failure(`Entry created at ${path}, but refresh failed: ${reason(cause)}`, true) }
+          else {
+            const handle = await open(abs, 'wx')
+            await handle.close()
+          }
+          try {
+            await announce(root, taskId)
+          } catch (cause) {
+            return failure(`Entry created at ${path}, but refresh failed: ${reason(cause)}`, true)
+          }
           return { ok: true, path }
         })
-      } catch (cause) { return failure(reason(cause)) }
+      } catch (cause) {
+        return failure(reason(cause))
+      }
     },
     rename: async (taskId: string, source: FileTarget, name: string): Promise<FileActionResult> => {
       if (!validName(name)) return failure('Enter one valid file name.')
@@ -124,8 +170,11 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
         return await withFileWriteLock(await canonicalCheckoutKey(root), async () => {
           await rootFor(core, taskId, source.root)
           const from = await checkTarget(core, source, root)
-          if (await activeEditorUnder(root, source.path)) return failure('Close $EDITOR on this entry or a descendant before renaming it.')
-          const path = source.path.includes('/') ? `${source.path.slice(0, source.path.lastIndexOf('/'))}/${name}` : name
+          if (await activeEditorUnder(root, source.path))
+            return failure('Close $EDITOR on this entry or a descendant before renaming it.')
+          const path = source.path.includes('/')
+            ? `${source.path.slice(0, source.path.lastIndexOf('/'))}/${name}`
+            : name
           const to = entryPath(core, root, path)
           if (from === to) return { ok: true, path }
           // On case-insensitive filesystems, a case-only destination names the source itself.
@@ -136,25 +185,37 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
           })
           const sourceInfo = await lstat(from)
           const exactDestination = (await readdir(dirname(from))).includes(name)
-          const sameEntry = !!destination && !exactDestination
-            && destination.dev === sourceInfo.dev && destination.ino === sourceInfo.ino
-            && name.toLowerCase() === basename(from).toLowerCase()
-          if (!sameEntry && !await absent(to)) return failure('A file or folder already has that name.')
+          const sameEntry =
+            !!destination &&
+            !exactDestination &&
+            destination.dev === sourceInfo.dev &&
+            destination.ino === sourceInfo.ino &&
+            name.toLowerCase() === basename(from).toLowerCase()
+          if (!sameEntry && !(await absent(to))) return failure('A file or folder already has that name.')
           if (sameEntry) {
             const intermediate = join(dirname(from), `.acorn-rename-${randomUUID()}`)
             await exclusiveRename(core.proc, from, intermediate)
-            try { await exclusiveRename(core.proc, intermediate, to) }
-            catch (cause) {
-              try { await exclusiveRename(core.proc, intermediate, from) }
-              catch { return failure(`Rename failed and the entry may remain at ${intermediate}. ${reason(cause)}`, true) }
+            try {
+              await exclusiveRename(core.proc, intermediate, to)
+            } catch (cause) {
+              try {
+                await exclusiveRename(core.proc, intermediate, from)
+              } catch {
+                return failure(`Rename failed and the entry may remain at ${intermediate}. ${reason(cause)}`, true)
+              }
               throw cause
             }
           } else await exclusiveRename(core.proc, from, to)
-          try { await announce(root, taskId) }
-          catch (cause) { return failure(`Entry renamed to ${path}, but refresh failed: ${reason(cause)}`, true) }
+          try {
+            await announce(root, taskId)
+          } catch (cause) {
+            return failure(`Entry renamed to ${path}, but refresh failed: ${reason(cause)}`, true)
+          }
           return { ok: true, path }
         })
-      } catch (cause) { return failure(reason(cause)) }
+      } catch (cause) {
+        return failure(reason(cause))
+      }
     },
     trash: async (taskId: string, source: FileTarget): Promise<FileActionResult> => {
       try {
@@ -164,19 +225,26 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
         return await withFileWriteLock(await canonicalCheckoutKey(root), async () => {
           await rootFor(core, taskId, source.root)
           const abs = await checkTarget(core, source, root)
-          if (await activeEditorUnder(root, source.path)) return failure('Close $EDITOR on this entry or a descendant before moving it to trash.')
-          try { await moveToTrash(root, abs) }
-          catch (cause) {
+          if (await activeEditorUnder(root, source.path))
+            return failure('Close $EDITOR on this entry or a descendant before moving it to trash.')
+          try {
+            await moveToTrash(root, abs)
+          } catch (cause) {
             const stillHere = await absent(abs)
             if (stillHere) await announce(root, taskId)
             return failure(`The Node could not confirm the trash operation: ${reason(cause)}`, stillHere)
           }
-          if (!await absent(abs)) return failure('The trash command returned but the entry is still present.')
-          try { await announce(root, taskId) }
-          catch (cause) { return failure(`Entry moved to trash, but refresh failed: ${reason(cause)}`, true) }
+          if (!(await absent(abs))) return failure('The trash command returned but the entry is still present.')
+          try {
+            await announce(root, taskId)
+          } catch (cause) {
+            return failure(`Entry moved to trash, but refresh failed: ${reason(cause)}`, true)
+          }
           return { ok: true, path: source.path }
         })
-      } catch (cause) { return failure(reason(cause)) }
+      } catch (cause) {
+        return failure(reason(cause))
+      }
     },
   }
 }

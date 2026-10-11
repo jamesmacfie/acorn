@@ -68,5 +68,8 @@ export function startRuntimePressure(options: {
     at = nextAt
   }, INTERVAL_MS)
   timer.unref?.()
-  return () => { clearInterval(timer); delay.disable() }
+  return () => {
+    clearInterval(timer)
+    delay.disable()
+  }
 }

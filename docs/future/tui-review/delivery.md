@@ -36,8 +36,9 @@ Prioritize these unclosed paths:
 5. Workflow edit, publish, run, gate, retry, and schedule configuration.
 6. Offline/revoked Nodes, loaded-plugin trust and updates, and recovery of a reused session.
 
-Editor implementation and local evidence are in [Editor acceptance](../editor/README.md).
-Reuse its contract and completion records. Finish any terminal-specific journey that the feature
+Editor implementation and local evidence are in the
+[Editor completion records](../../testing/editor-delivery-2026-10-08.md). Reuse the
+[Editor contract](../../editor.md) and those records. Finish any terminal-specific journey that the feature
 inventory needs; do not rebuild its completed menus, navigation, or scoped search.
 
 ## Fix presentation failures

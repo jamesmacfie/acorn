@@ -20,5 +20,4 @@ export const STYLES = (): [string, string][] => styleContributions().map((style)
 export const DEFAULT_STYLE = 'terminal'
 
 /** Keep the stored choice while its plugin is unavailable; registration restores it reactively. */
-export const resolveStyle = (id: string | undefined): string =>
-  id && styleRegistry.get(id) ? id : DEFAULT_STYLE
+export const resolveStyle = (id: string | undefined): string => (id && styleRegistry.get(id) ? id : DEFAULT_STYLE)

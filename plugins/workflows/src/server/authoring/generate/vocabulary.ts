@@ -13,7 +13,10 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
     lines.push('', 'A `gate-policy` step asks a policy for a verdict and fails the run when it says no. Its `policy`')
     lines.push(`is one of: ${policies.map((policy) => `\`${policy.id}\``).join(', ')}.`)
     if (!compact) {
-      lines.push('', `{ "id": "checks", "name": "Checks", "kind": "gate-policy", "after": ["open-a-pull-request"], "policy": "${policies[0]!.id}" }`)
+      lines.push(
+        '',
+        `{ "id": "checks", "name": "Checks", "kind": "gate-policy", "after": ["open-a-pull-request"], "policy": "${policies[0]!.id}" }`,
+      )
     }
   }
 
@@ -28,20 +31,26 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
   lines.push('')
   // The default first and the structured ones next, so a node with more profiles than fit keeps the
   // ones a definition might actually have to name.
-  const ranked = [...profiles].sort((a, b) =>
-    Number(b.id === DEFAULT_PROFILE_ID) - Number(a.id === DEFAULT_PROFILE_ID) || Number(b.structured) - Number(a.structured) || a.id.localeCompare(b.id))
+  const ranked = [...profiles].sort(
+    (a, b) =>
+      Number(b.id === DEFAULT_PROFILE_ID) - Number(a.id === DEFAULT_PROFILE_ID) ||
+      Number(b.structured) - Number(a.structured) ||
+      a.id.localeCompare(b.id),
+  )
   const shown = ranked.slice(0, GENERATE_MAX_PROFILES)
   const rest = ranked.length - shown.length
   if (compact) {
     lines.push(`${shown.map((profile) => `\`${profile.id}\``).join(', ')}${rest > 0 ? `, and ${rest} more` : ''}.`)
   } else {
-    lines.push(...shown.map((profile) => {
-      const notes = [
-        ...(profile.id === DEFAULT_PROFILE_ID ? ['The default'] : []),
-        ...(profile.structured ? ['Has a structured mode'] : []),
-      ]
-      return `- \`${profile.id}\`, ${profile.label}.${notes.map((note) => ` ${note}.`).join('')}`
-    }))
+    lines.push(
+      ...shown.map((profile) => {
+        const notes = [
+          ...(profile.id === DEFAULT_PROFILE_ID ? ['The default'] : []),
+          ...(profile.structured ? ['Has a structured mode'] : []),
+        ]
+        return `- \`${profile.id}\`, ${profile.label}.${notes.map((note) => ` ${note}.`).join('')}`
+      }),
+    )
     if (rest > 0) lines.push(`- and ${rest} more.`)
   }
 
@@ -58,7 +67,9 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
     lines.push('needs no `profileId`.')
   } else {
     lines.push('A `decide` step needs a profile with a structured mode and the default has none, so give every')
-    lines.push(`\`decide\` step a \`profileId\` of one of: ${structured.map((profile) => `\`${profile.id}\``).join(', ')}.`)
+    lines.push(
+      `\`decide\` step a \`profileId\` of one of: ${structured.map((profile) => `\`${profile.id}\``).join(', ')}.`,
+    )
   }
   return lines.join('\n')
 }

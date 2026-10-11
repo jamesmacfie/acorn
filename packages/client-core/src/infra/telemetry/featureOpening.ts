@@ -20,7 +20,7 @@ import { startSpan, type SpanHandle } from './emitter'
 export type UsableState = 'content' | 'empty' | 'offline' | 'error'
 
 /** How a record ended. `usable` covers all four `UsableState`s. */
-export type OpeningOutcome = 'usable' | 'timeout' | 'cancelled'
+type OpeningOutcome = 'usable' | 'timeout' | 'cancelled'
 
 export type FeatureKind = 'pane' | 'source' | 'settings'
 
@@ -46,7 +46,12 @@ const pending = new Map<string, Pending>()
 const opened = new Set<string>()
 const settledListeners = new Set<(featureId: string, outcome: OpeningOutcome, proxy: boolean) => void>()
 
-function settle(featureId: string, record: Pending, outcome: OpeningOutcome, attrs: Record<string, string | boolean>): void {
+function settle(
+  featureId: string,
+  record: Pending,
+  outcome: OpeningOutcome,
+  attrs: Record<string, string | boolean>,
+): void {
   if (pending.get(featureId) !== record) return
   pending.delete(featureId)
   clearTimeout(record.timer)
@@ -61,7 +66,11 @@ function settle(featureId: string, record: Pending, outcome: OpeningOutcome, att
  * Start timing a feature the host is mounting. Returns the close the host calls on unmount, which
  * cancels the record if the feature never reported.
  */
-export function openFeature(featureId: string, owner: string, options: { kind: FeatureKind; reportsUsable: boolean }): () => void {
+export function openFeature(
+  featureId: string,
+  owner: string,
+  options: { kind: FeatureKind; reportsUsable: boolean },
+): () => void {
   const previous = pending.get(featureId)
   if (previous) settle(featureId, previous, 'cancelled', {})
   if (pending.size >= MAX_PENDING_OPENINGS) {
@@ -83,7 +92,11 @@ export function openFeature(featureId: string, owner: string, options: { kind: F
 }
 
 /** The feature's own report that it can be used now. Ignored when nothing is pending for it. */
-export function featureUsable(featureId: string, state: UsableState = 'content', facts: { cached?: boolean } = {}): void {
+export function featureUsable(
+  featureId: string,
+  state: UsableState = 'content',
+  facts: { cached?: boolean } = {},
+): void {
   const record = pending.get(featureId)
   if (!record) return
   settle(featureId, record, 'usable', { state, ...(facts.cached === undefined ? {} : { cached: facts.cached }) })

@@ -25,7 +25,8 @@ export function newSessionChoices(
 
 export const choiceLabel = (choice: NewSessionChoice): string => choice.agent?.name ?? choice.provider.label
 
-export const choiceGlyph = (choice: NewSessionChoice): string | undefined => choice.agent?.glyph ?? choice.provider.glyph
+export const choiceGlyph = (choice: NewSessionChoice): string | undefined =>
+  choice.agent?.glyph ?? choice.provider.glyph
 
 /** What the row says under its name. For an agent, the harness and the values it sets, which is what
  *  tells two agents on one harness apart. */

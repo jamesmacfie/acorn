@@ -52,7 +52,13 @@ function generate(keyPath: string, certPath: string): void {
     cert.setSubject(subject)
     cert.setIssuer(subject)
     cert.setExtensions([
-      { name: 'subjectAltName', altNames: [{ type: 7, ip: '127.0.0.1' }, { type: 2, value: 'localhost' }] },
+      {
+        name: 'subjectAltName',
+        altNames: [
+          { type: 7, ip: '127.0.0.1' },
+          { type: 2, value: 'localhost' },
+        ],
+      },
       { name: 'basicConstraints', critical: true, cA: true },
       { name: 'keyUsage', critical: true, digitalSignature: true, keyEncipherment: true, keyCertSign: true },
     ])

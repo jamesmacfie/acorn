@@ -8,8 +8,14 @@ vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => state.active
 
 const { pluginLabel } = await import('./pluginLabel')
 
-const row = (name: string, label?: string): NodePluginRow =>
-  ({ name, ...(label === undefined ? {} : { label }), required: false, disabled: false, running: true, state: 'active' })
+const row = (name: string, label?: string): NodePluginRow => ({
+  name,
+  ...(label === undefined ? {} : { label }),
+  required: false,
+  disabled: false,
+  running: true,
+  state: 'active',
+})
 
 const serve = (byNode: Record<string, NodePluginRow[]>, device: NodePluginRow[] = []): void => {
   state.snapshot = {

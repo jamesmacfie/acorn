@@ -1,7 +1,6 @@
-import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // What "run this workflow" is, before anything draws it.
 //
-// A module of its own rather than a signal inside ./StartDialog.tsx, because the palette asks for the
+// A module of its own rather than a signal inside the dialog, because the palette asks for the
 // dialog and a palette command is a `.ts` file with a node-environment test: one Solid component on
 // the path makes that module unloadable there (docs/plugin-authoring/testing.md § Testing).
 import { createSignal } from 'solid-js'
@@ -14,8 +13,6 @@ export type StartRequest = {
   defId: string
   name: string
   inputs?: readonly WorkflowInput[]
-  /** Values the caller already knows — the item a run was started from, in phase 5. */
-  prefill?: Readonly<Record<string, DataValue>>
   /** The task to run on. Absent means the dialog asks. */
   taskId?: string
   projectId?: string
@@ -37,11 +34,10 @@ export const closeWorkflowStart = (): void => {
  *
  * Exported because the palette's "Run a workflow" row needs the same answer before it starts, and it
  * cannot call `requestWorkflowStart` for the other half: a command's refusal belongs in the palette
- * frame rather than in a toast, so that row throws (../commands.ts). One rule, two readers.
+ * frame rather than in a toast, so that row throws. One rule, two readers.
  */
-export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
-  !next.taskId
-  || (next.inputs ?? []).some((input) => input.required && input.default === undefined && next.prefill?.[input.name] === undefined)
+export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'taskId'>): boolean =>
+  !next.taskId || (next.inputs ?? []).some((input) => input.required && input.default === undefined)
 
 /**
  * Ask for the dialog.
@@ -57,8 +53,7 @@ export async function requestWorkflowStart(next: StartRequest): Promise<void> {
     setRequest(next)
     return
   }
-  const values = { ...(next.prefill ?? {}) }
-  const answer = await startWorkflow(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
+  const answer = await startWorkflow(taskId, { defId: next.defId })
   if (answer.error) toast(answer.error, { tone: 'danger' })
   else if (answer.runId) next.onStarted?.(answer.runId, taskId)
 }

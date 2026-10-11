@@ -1,8 +1,17 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
-import { pendingTerminalTrust, resolvePendingTrust, terminalAnswersSkills } from '@acorn/client-core/host/plugins/distribution.ts'
-import { recordNodeDecision, recordTrustDecision, TIER_LABEL, trustTiers } from '@acorn/client-core/host/trust/trustModel.ts'
+import {
+  pendingTerminalTrust,
+  resolvePendingTrust,
+  terminalAnswersSkills,
+} from '@acorn/client-core/host/plugins/distribution.ts'
+import {
+  recordNodeDecision,
+  recordTrustDecision,
+  TIER_LABEL,
+  trustTiers,
+} from '@acorn/client-core/host/trust/trustModel.ts'
 import { Modal, ModalBody, SectionHeader } from '../kit/grouping'
 import { Alert, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
@@ -15,9 +24,10 @@ import { Line } from '../kit/cells'
 // `recordTrustDecision`. What is here is the arrangement: a `Modal` where the pane would go, drawn
 // with the kit.
 //
-// The tier split is a security claim and the three lists may never be merged (docs/security/plugin-storage-and-supply-chain.md §
-// Design rules, rule 6): `Enforced` is a fence the bridge holds, `Declared` is a disclosure the
-// plugin can ignore entirely, and a strong claim must not lend credibility to a weaker one beside it.
+// The tier split is a security claim and the three lists may never be merged
+// (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the
+// bridge holds, `Declared` is a disclosure the plugin can ignore entirely, and a strong claim must not
+// lend credibility to a weaker one beside it.
 //
 // Escape is "not now" and records nothing, exactly as on the desktop: a rejection is remembered, so a
 // stray keypress must not permanently disable a plugin with no surface anywhere to undo it.
@@ -54,8 +64,10 @@ export function TrustPrompt() {
     setError('')
     const decision = key === 'accepted' ? 'accepted' : 'rejected'
     void (terminalAnswersSkills(current.row) ? recordNodeDecision(current, decision) : Promise.resolve())
-      .then(() => current.hash ? recordTrustDecision(current, decision) : undefined)
-      .catch((problem: unknown) => setError(problem instanceof Error ? problem.message : 'Could not record the decision.'))
+      .then(() => (current.hash ? recordTrustDecision(current, decision) : undefined))
+      .catch((problem: unknown) =>
+        setError(problem instanceof Error ? problem.message : 'Could not record the decision.'),
+      )
       .finally(() => setSaving(false))
   }
 
@@ -65,31 +77,43 @@ export function TrustPrompt() {
         <Modal onDismiss={dismiss} role="alertdialog" title={`Run ${current().row.name}?`} size="wide">
           <ModalBody>
             <Line role="muted">
-              {`${current().row.installed?.version ?? '?'} ${current().source?.kind === 'device'
-                ? `installed on this device from ${current().sourceLabel ?? 'a package'}${current().sourceLabel?.startsWith('path:') ? ' (folder bytes are not pinned)' : ''}`
-                : `from ${nodeLabel(current().nodeId)}`}${current().previous?.hash === current().hash
-                ? current().previous?.declaration
-                  ? ', same client code with a changed declaration; review its grants again'
-                  : ', review the declaration for this previously approved client code again'
-                : current().previous ? `, an update from ${current().previous!.version}` : ''}`}
+              {`${current().row.installed?.version ?? '?'} ${
+                current().source?.kind === 'device'
+                  ? `installed on this device from ${current().sourceLabel ?? 'a package'}${current().sourceLabel?.startsWith('path:') ? ' (folder bytes are not pinned)' : ''}`
+                  : `from ${nodeLabel(current().nodeId)}`
+              }${
+                current().previous?.hash === current().hash
+                  ? current().previous?.declaration
+                    ? ', same client code with a changed declaration; review its grants again'
+                    : ', review the declaration for this previously approved client code again'
+                  : current().previous
+                    ? `, an update from ${current().previous!.version}`
+                    : ''
+              }`}
             </Line>
             <Show when={added().length}>
               <SectionHeader level="group">What this version asks for that the last one did not</SectionHeader>
-              <For each={added()}>{(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}</For>
+              <For each={added()}>
+                {(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}
+              </For>
             </Show>
             {/* One block per tier, never one list. */}
             <For each={kept()}>
               {(tier) => (
                 <>
                   <SectionHeader level="group">{TIER_LABEL[tier.key]}</SectionHeader>
-                  <For each={tier.lines}>{(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}</For>
+                  <For each={tier.lines}>
+                    {(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}
+                  </For>
                 </>
               )}
             </For>
             <Show when={current().row.inputs?.inputs.some((input) => !input.approved)}>
               <Line role="muted">It also reads your data through other sources. Approve that in the desktop app.</Line>
             </Show>
-            <Show when={error()}><Alert>{error()}</Alert></Show>
+            <Show when={error()}>
+              <Alert>{error()}</Alert>
+            </Show>
             <box flexDirection="column">
               <Rows id="plugins.trust" ariaLabel="Run this plugin?" items={[...CHOICES]} onActivate={decide}>
                 {(row, item) => <Row item={item}>{row.label}</Row>}

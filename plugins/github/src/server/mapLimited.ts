@@ -4,7 +4,11 @@
 //
 // The first throw rejects the whole map and stops new items starting. Calls already in flight finish
 // on their own; nothing waits for them.
-export async function mapLimited<T, R>(items: readonly T[], limit: number, run: (item: T, index: number) => Promise<R>): Promise<R[]> {
+export async function mapLimited<T, R>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
   const out = new Array<R>(items.length)
   let next = 0
   let failed = false

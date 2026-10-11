@@ -12,5 +12,8 @@ export function registerAddressHostWhenReady(
   void preparePluginContributionsForNode(host.nodeId).then(() => {
     if (!disposed) unregister = registerAddressHost(host)
   }, onFailure)
-  return () => { disposed = true; unregister() }
+  return () => {
+    disposed = true
+    unregister()
+  }
 }

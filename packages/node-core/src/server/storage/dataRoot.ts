@@ -1,5 +1,17 @@
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeSync } from 'node:fs'
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
@@ -139,8 +151,8 @@ function readIdentity(path: string): NodeIdentity | null {
 const identityPathOf = (dir: string): string => join(dir, IDENTITY_FILE)
 
 // Read-modify-write against the file, not against a field captured in memory. Two owners write
-// node.json now — this process's DataRoot, and the attachment functions below, which a route calls
-// long after the root was opened — so a writer that serialised its own cached copy would silently
+// node.json, this process's DataRoot and the attachment functions below, which a route calls long
+// after the root was opened, so a writer that serialised its own cached copy would silently
 // drop whatever the other one had recorded.
 function updateIdentity(path: string, patch: Partial<NodeIdentity>): NodeIdentity {
   const current = readIdentity(path)
@@ -188,12 +200,18 @@ export function openDataRoot(dir: string): DataRoot {
 
   // An old root without node.json must not acquire a fresh baseline marker over existing state. The
   // desktop helper seals this Node's keys before its first start, so that file isn't state.
-  if (existsSync(dir) && !existsSync(join(dir, IDENTITY_FILE)) && readdirSync(dir).some((name) => name !== LOCK_FILE && name !== SEALED_NODE_KEYS_FILE)) {
+  if (
+    existsSync(dir) &&
+    !existsSync(join(dir, IDENTITY_FILE)) &&
+    readdirSync(dir).some((name) => name !== LOCK_FILE && name !== SEALED_NODE_KEYS_FILE)
+  ) {
     throw new Error(`${dir} contains unmarked state. Reset it before opening the acorn-1 baseline.`)
   }
   const identityPath = join(dir, IDENTITY_FILE)
   if (existsSync(identityPath) && !readIdentity(identityPath)) {
-    throw new Error(`${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`)
+    throw new Error(
+      `${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`,
+    )
   }
 
   mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -205,7 +223,9 @@ export function openDataRoot(dir: string): DataRoot {
     const existed = existsSync(identityPath)
     const existing = existed ? readIdentity(identityPath) : null
     if (existed && !existing) {
-      throw new Error(`${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`)
+      throw new Error(
+        `${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`,
+      )
     }
     // No `protocolVersion` field (docs/data-layer/data-root.md § `node.json`, docs/api-reference/transport.md § Versioning).
     let identity: NodeIdentity = existing ?? { baseline: ACORN_BASELINE, nodeId: randomUUID(), createdAt: Date.now() }

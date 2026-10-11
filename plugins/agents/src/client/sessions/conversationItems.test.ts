@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
 import {
-  buildConversationItems, createConversationProjection, findSubagentItem, isChatItem, visibleConversationItems,
+  buildConversationItems,
+  createConversationProjection,
+  findSubagentItem,
+  isChatItem,
+  visibleConversationItems,
 } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
@@ -70,7 +74,7 @@ describe('conversation projection', () => {
       event(2, { type: 'assistant_message', text: ' world', messageId: 'a', append: true }),
       event(3, { type: 'assistant_message', text: 'separate', messageId: 'b', append: true }),
     ])
-    expect(items.map((item) => item.event.type === 'assistant_message' ? item.event.text : '')).toEqual([
+    expect(items.map((item) => (item.event.type === 'assistant_message' ? item.event.text : ''))).toEqual([
       'hello world',
       'separate',
     ])
@@ -130,8 +134,7 @@ describe('conversation projection', () => {
       { used: 94_358, size: 1_000_000 },
       { used: 180_004, size: 1_000_000 },
     ])
-    expect(visibleConversationItems(items).map((item) => item.event.type))
-      .toEqual(['turn_completed', 'turn_completed'])
+    expect(visibleConversationItems(items).map((item) => item.event.type)).toEqual(['turn_completed', 'turn_completed'])
   })
 
   it('picks up a usage update that lands after the turn already closed', () => {
@@ -142,8 +145,10 @@ describe('conversation projection', () => {
       // belongs to, which sits above the closing card, so the second pass reads the final figure.
       event(3, { type: 'usage', usage: { contextUsed: 96_100 } }, null),
     ])
-    expect(items.find((item) => item.event.type === 'turn_completed')?.context)
-      .toEqual({ used: 96_100, size: 1_000_000 })
+    expect(items.find((item) => item.event.type === 'turn_completed')?.context).toEqual({
+      used: 96_100,
+      size: 1_000_000,
+    })
   })
 
   it('leaves a turn that reported no context without a figure', () => {
@@ -156,30 +161,42 @@ describe('conversation projection', () => {
       event(1, { type: 'usage', usage: { contextUsed: 10 } }, 'turn-1'),
       event(2, { type: 'usage', usage: { contextUsed: 20 } }, 'turn-2'),
     ])
-    expect(items.map((item) => item.event.type === 'usage' ? item.event.usage.contextUsed : null)).toEqual([10, 20])
+    expect(items.map((item) => (item.event.type === 'usage' ? item.event.usage.contextUsed : null))).toEqual([10, 20])
   })
 
   it('folds full plan snapshots within a turn and keeps another turn separate', () => {
     const items = buildConversationItems([
-      event(1, {
-        type: 'plan',
-        entries: [
-          { id: 'plan-0', text: 'Inspect the boundary', status: 'in_progress' },
-          { id: 'plan-1', text: 'Make the change', status: 'pending' },
-        ],
-      }, 'turn-1'),
+      event(
+        1,
+        {
+          type: 'plan',
+          entries: [
+            { id: 'plan-0', text: 'Inspect the boundary', status: 'in_progress' },
+            { id: 'plan-1', text: 'Make the change', status: 'pending' },
+          ],
+        },
+        'turn-1',
+      ),
       event(2, { type: 'assistant_message', text: 'The boundary is clear.', messageId: 'a' }, 'turn-1'),
-      event(3, {
-        type: 'plan',
-        entries: [
-          { id: 'plan-0', text: 'Inspect the boundary', status: 'completed' },
-          { id: 'plan-1', text: 'Make the change', status: 'in_progress' },
-        ],
-      }, 'turn-1'),
-      event(4, {
-        type: 'plan',
-        entries: [{ id: 'plan-0', text: 'Review the result', status: 'in_progress' }],
-      }, 'turn-2'),
+      event(
+        3,
+        {
+          type: 'plan',
+          entries: [
+            { id: 'plan-0', text: 'Inspect the boundary', status: 'completed' },
+            { id: 'plan-1', text: 'Make the change', status: 'in_progress' },
+          ],
+        },
+        'turn-1',
+      ),
+      event(
+        4,
+        {
+          type: 'plan',
+          entries: [{ id: 'plan-0', text: 'Review the result', status: 'in_progress' }],
+        },
+        'turn-2',
+      ),
     ])
 
     expect(items.map((item) => item.event.type)).toEqual(['plan', 'assistant_message', 'plan'])
@@ -204,29 +221,40 @@ describe('conversation projection', () => {
     ])
     expect(items.map((item) => item.event.type)).toEqual(['assistant_message', 'subagent', 'tool'])
     const [, card] = items
-    expect(card.event.type === 'subagent' && card.event.subagent)
-      .toMatchObject({ id: 'sub-1', title: 'Read alpha', status: 'completed', model: 'opus' })
-    expect(card.children?.map((child) => child.event.type === 'tool' ? child.event.tool.id : null))
-      .toEqual(['sub-1', 'grep-1'])
+    expect(card.event.type === 'subagent' && card.event.subagent).toMatchObject({
+      id: 'sub-1',
+      title: 'Read alpha',
+      status: 'completed',
+      model: 'opus',
+    })
+    expect(card.children?.map((child) => (child.event.type === 'tool' ? child.event.tool.id : null))).toEqual([
+      'sub-1',
+      'grep-1',
+    ])
     expect(card.lastSeq).toBe(6)
   })
 
   it('folds an untagged mid-call update into the subagent that opened the call', () => {
     // Claude's adapter tags a subagent's `tool_call` and its final `tool_call_update` with the owning
-    // agent and leaves the one in between untagged. This used to be looked up per stream, so that
-    // middle update could not find its card and opened a second one at the top level, titled with the
-    // raw tool id because a mid-call update carries no title either. Seven of them in a two-subagent
-    // capture.
+    // agent and leaves the one in between untagged. Looked up per stream, that middle update would miss
+    // its card and open a second one at the top level, titled with the raw tool id.
     const items = buildConversationItems([
       event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
-      event(2, { type: 'tool', tool: { id: 'read-1', title: 'Read alpha.txt', status: 'pending', subagentId: 'sub-1' } }),
+      event(2, {
+        type: 'tool',
+        tool: { id: 'read-1', title: 'Read alpha.txt', status: 'pending', subagentId: 'sub-1' },
+      }),
       event(3, { type: 'tool', tool: { id: 'read-1', title: '', output: 'alpha' } }),
       event(4, { type: 'tool', tool: { id: 'read-1', title: '', status: 'completed', subagentId: 'sub-1' } }),
     ])
     expect(items.map((item) => item.event.type)).toEqual(['subagent'])
     expect(items[0].children).toHaveLength(1)
-    expect(items[0].children?.[0].event.type === 'tool' && items[0].children?.[0].event.tool)
-      .toMatchObject({ id: 'read-1', title: 'Read alpha.txt', status: 'completed', output: 'alpha' })
+    expect(items[0].children?.[0].event.type === 'tool' && items[0].children?.[0].event.tool).toMatchObject({
+      id: 'read-1',
+      title: 'Read alpha.txt',
+      status: 'completed',
+      output: 'alpha',
+    })
   })
 
   it('keeps a tool card in the stream that opened it, whichever way the attribution drifts', () => {
@@ -239,8 +267,10 @@ describe('conversation projection', () => {
       event(3, { type: 'tool', tool: { id: 'bash-1', title: '', status: 'completed', subagentId: 'sub-1' } }),
     ])
     expect(items.map((item) => item.event.type)).toEqual(['tool', 'subagent'])
-    expect(items[0].event.type === 'tool' && items[0].event.tool)
-      .toMatchObject({ title: 'Parent bash', status: 'completed' })
+    expect(items[0].event.type === 'tool' && items[0].event.tool).toMatchObject({
+      title: 'Parent bash',
+      status: 'completed',
+    })
     expect(items[1].children).toHaveLength(0)
   })
 
@@ -257,8 +287,8 @@ describe('conversation projection', () => {
   })
 
   it('puts a subagent\u2019s file change in the subagent\u2019s run', () => {
-    // A subagent's run has to show what it changed, not only which tool it ran. The diff used to render
-    // in the parent's stream while the Edit call that produced it sat inside the subagent's card.
+    // A subagent's run has to show what it changed, not only which tool it ran, so the diff must not
+    // land in the parent's stream while the Edit call that produced it sits inside the subagent's card.
     const items = buildConversationItems([
       event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
       event(2, { type: 'tool', tool: { id: 'edit-1', title: 'Edit src/a.ts', subagentId: 'sub-1' } }),
@@ -275,10 +305,20 @@ describe('conversation projection', () => {
     // patch updates and re-sends the whole turn's diff each time it grows.
     const items = buildConversationItems([
       event(1, { type: 'file_change', path: 'a.ts', patch: '@@ -1 +1 @@\n-a\n+b', changeId: 'toolu_1', snippet: true }),
-      event(2, { type: 'file_change', patch: 'diff --git a/a.ts b/a.ts', changeId: 'turn:t1', summary: 'All changes this turn' }),
+      event(2, {
+        type: 'file_change',
+        patch: 'diff --git a/a.ts b/a.ts',
+        changeId: 'turn:t1',
+        summary: 'All changes this turn',
+      }),
       event(3, { type: 'file_change', path: 'b.ts', patch: '@@ -1 +1 @@\n-c\n+d', changeId: 'toolu_1' }),
       event(4, { type: 'file_change', path: 'a.ts', patch: '@@ -9 +9 @@\n-a\n+b', changeId: 'toolu_1' }),
-      event(5, { type: 'file_change', patch: 'diff --git a/b.ts b/b.ts', changeId: 'turn:t1', summary: 'All changes this turn' }),
+      event(5, {
+        type: 'file_change',
+        patch: 'diff --git a/b.ts b/b.ts',
+        changeId: 'turn:t1',
+        summary: 'All changes this turn',
+      }),
       // Stored before change ids existed: each one is its own row, as it always was.
       event(6, { type: 'file_change', summary: 'Codex updated files.' }),
       event(7, { type: 'file_change', summary: 'Codex updated files.' }),
@@ -314,13 +354,14 @@ describe('conversation projection', () => {
 describe('a subagent\u2019s run on its own', () => {
   // What the main window renders when a sub-row is selected: the card's children as the top level, so a
   // long child run is read at full width instead of inside a box in its parent's stream.
-  const built = () => buildConversationItems([
-    event(1, { type: 'assistant_message', text: 'delegating', messageId: 'a' }),
-    event(2, { type: 'subagent', subagent: { id: 'sub-1', title: 'Read alpha', status: 'running' } }),
-    event(3, { type: 'tool', tool: { id: 'sub-1', title: 'Read alpha', input: 'go', subagentId: 'sub-1' } }),
-    event(4, { type: 'assistant_message', text: 'Teal', messageId: 'c', subagentId: 'sub-1' }),
-    event(5, { type: 'session_state', state: 'ready' }),
-  ])
+  const built = () =>
+    buildConversationItems([
+      event(1, { type: 'assistant_message', text: 'delegating', messageId: 'a' }),
+      event(2, { type: 'subagent', subagent: { id: 'sub-1', title: 'Read alpha', status: 'running' } }),
+      event(3, { type: 'tool', tool: { id: 'sub-1', title: 'Read alpha', input: 'go', subagentId: 'sub-1' } }),
+      event(4, { type: 'assistant_message', text: 'Teal', messageId: 'c', subagentId: 'sub-1' }),
+      event(5, { type: 'session_state', state: 'ready' }),
+    ])
 
   it('finds the card a selection names', () => {
     const card = findSubagentItem(built(), 'sub-1')
@@ -337,11 +378,12 @@ describe('a subagent\u2019s run on its own', () => {
   it('hides the same events at both levels', () => {
     // One shared predicate. Two lists disagreeing would show a session_state row inside a subagent card
     // and not outside it.
-    expect(visibleConversationItems(built()).map((item) => item.event.type))
-      .toEqual(['assistant_message', 'subagent'])
+    expect(visibleConversationItems(built()).map((item) => item.event.type)).toEqual(['assistant_message', 'subagent'])
     const card = findSubagentItem(built(), 'sub-1')
-    expect(visibleConversationItems(card?.children ?? []).map((item) => item.event.type))
-      .toEqual(['tool', 'assistant_message'])
+    expect(visibleConversationItems(card?.children ?? []).map((item) => item.event.type)).toEqual([
+      'tool',
+      'assistant_message',
+    ])
   })
 })
 
@@ -351,12 +393,15 @@ describe('what a request leaves in the thread', () => {
     event(2, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
     event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
   ]
-  const rows = (status: AgentRequest['status']) => (requestId: string): AgentRequest | undefined =>
-    requestId === 'allow-1' ? ({ providerRequestId: 'allow-1', status } as AgentRequest) : undefined
+  const rows =
+    (status: AgentRequest['status']) =>
+    (requestId: string): AgentRequest | undefined =>
+      requestId === 'allow-1' ? ({ providerRequestId: 'allow-1', status } as AgentRequest) : undefined
 
   const drawn = (status: AgentRequest['status']) =>
-    visibleConversationItems(buildConversationItems(asked), rows(status))
-      .map((item) => item.event.type === 'request' ? item.event.requestId : item.event.type)
+    visibleConversationItems(buildConversationItems(asked), rows(status)).map((item) =>
+      item.event.type === 'request' ? item.event.requestId : item.event.type,
+    )
 
   it('draws a permission while it is blocking, because that is where you answer it', () => {
     expect(drawn('pending')).toEqual(['ask-1', 'allow-1'])
@@ -369,8 +414,11 @@ describe('what a request leaves in the thread', () => {
   it('keeps a question either way, answered or not', () => {
     expect(drawn('resolved')).toContain('ask-1')
     // No rows at all: a subagent's own stream, which never holds a request.
-    expect(visibleConversationItems(buildConversationItems(asked))
-      .some((item) => item.event.type === 'request' && item.event.requestId === 'ask-1')).toBe(true)
+    expect(
+      visibleConversationItems(buildConversationItems(asked)).some(
+        (item) => item.event.type === 'request' && item.event.requestId === 'ask-1',
+      ),
+    ).toBe(true)
   })
 
   it('draws no card for the answer itself, which belongs to the question it answered', () => {
@@ -378,11 +426,13 @@ describe('what a request leaves in the thread', () => {
   })
 
   it('seats the question where it was asked, so the thread reads in order', () => {
-    const ordered = visibleConversationItems(buildConversationItems([
-      event(1, { type: 'assistant_message', text: 'Before' }),
-      event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
-      event(3, { type: 'assistant_message', text: 'After' }),
-    ]))
+    const ordered = visibleConversationItems(
+      buildConversationItems([
+        event(1, { type: 'assistant_message', text: 'Before' }),
+        event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+        event(3, { type: 'assistant_message', text: 'After' }),
+      ]),
+    )
     expect(ordered.map((item) => item.event.type)).toEqual(['assistant_message', 'request', 'assistant_message'])
   })
 })
@@ -394,29 +444,44 @@ describe('what "show chats only" keeps', () => {
       .map((item) => item.event.type)
 
   it('keeps the question the agent asked and the answer on it', () => {
-    expect(chats([
-      event(1, { type: 'assistant_message', text: 'Two ways to do this.' }),
-      event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
-      event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
-      event(4, { type: 'assistant_message', text: 'Doing the first one.' }),
-    ])).toEqual(['assistant_message', 'request', 'assistant_message'])
+    expect(
+      chats([
+        event(1, { type: 'assistant_message', text: 'Two ways to do this.' }),
+        event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+        event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
+        event(4, { type: 'assistant_message', text: 'Doing the first one.' }),
+      ]),
+    ).toEqual(['assistant_message', 'request', 'assistant_message'])
   })
 
   it('still drops the tool calls and the notes', () => {
-    expect(chats([
-      event(1, { type: 'user_message', text: 'Go' }),
-      event(2, { type: 'reasoning', text: 'thinking' }),
-      event(3, { type: 'tool', tool: { id: 'bash-1', title: 'Bash' } }),
-      event(4, { type: 'turn_completed', stopReason: 'end_turn' }),
-    ])).toEqual(['user_message'])
+    expect(
+      chats([
+        event(1, { type: 'user_message', text: 'Go' }),
+        event(2, { type: 'reasoning', text: 'thinking' }),
+        event(3, { type: 'tool', tool: { id: 'bash-1', title: 'Bash' } }),
+        event(4, { type: 'turn_completed', stopReason: 'end_turn' }),
+      ]),
+    ).toEqual(['user_message'])
   })
 
   // `belongsInThread` has already let it go, so chat-only inherits that rather than deciding again.
   it('does not bring back a permission that was already answered', () => {
-    const rows = () => ({ providerRequestId: 'allow-1', status: 'resolved' } as AgentRequest)
-    expect(chats([
-      event(1, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
-    ], rows)).toEqual([])
+    const rows = () => ({ providerRequestId: 'allow-1', status: 'resolved' }) as AgentRequest
+    expect(
+      chats(
+        [
+          event(1, {
+            type: 'request',
+            requestId: 'allow-1',
+            kind: 'permission',
+            title: 'Allow the tests?',
+            options: [],
+          }),
+        ],
+        rows,
+      ),
+    ).toEqual([])
   })
 })
 
@@ -430,37 +495,75 @@ describe('folding a tool call’s web activity', () => {
   }
 
   it('adds the sources a completion reports to the action the start reported', () => {
-    expect(webCard([
-      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
-      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', web: { results: [{ url: 'https://example.com' }] } } }),
-    ])).toEqual({ action: { type: 'search', queries: ['acp'] }, results: [{ url: 'https://example.com' }] })
+    expect(
+      webCard([
+        event(1, {
+          type: 'tool',
+          tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } },
+        }),
+        event(2, {
+          type: 'tool',
+          tool: { id: 'w', title: '', status: 'completed', web: { results: [{ url: 'https://example.com' }] } },
+        }),
+      ]),
+    ).toEqual({ action: { type: 'search', queries: ['acp'] }, results: [{ url: 'https://example.com' }] })
   })
 
   it('keeps the action when a later update repeats nothing of it', () => {
-    expect(webCard([
-      event(1, { type: 'tool', tool: { id: 'w', title: 'Fetch page', web: { action: { type: 'fetch_page', url: 'https://example.com' } } } }),
-      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', output: 'the page' } }),
-    ])).toEqual({ action: { type: 'fetch_page', url: 'https://example.com' } })
+    expect(
+      webCard([
+        event(1, {
+          type: 'tool',
+          tool: { id: 'w', title: 'Fetch page', web: { action: { type: 'fetch_page', url: 'https://example.com' } } },
+        }),
+        event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', output: 'the page' } }),
+      ]),
+    ).toEqual({ action: { type: 'fetch_page', url: 'https://example.com' } })
   })
 
   it('is unchanged when a completion repeats the action it already had', () => {
-    expect(webCard([
-      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
-      event(2, { type: 'tool', tool: { id: 'w', title: 'Search web', status: 'completed', web: { action: { type: 'search', queries: ['acp'] } } } }),
-    ])).toEqual({ action: { type: 'search', queries: ['acp'] } })
+    expect(
+      webCard([
+        event(1, {
+          type: 'tool',
+          tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } },
+        }),
+        event(2, {
+          type: 'tool',
+          tool: {
+            id: 'w',
+            title: 'Search web',
+            status: 'completed',
+            web: { action: { type: 'search', queries: ['acp'] } },
+          },
+        }),
+      ]),
+    ).toEqual({ action: { type: 'search', queries: ['acp'] } })
   })
 
   it('lets a provider say it found nothing, and tells that apart from saying nothing', () => {
-    expect(webCard([
-      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { results: [{ url: 'https://example.com' }] } } }),
-      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [] } } }),
-    ])?.results).toEqual([])
+    expect(
+      webCard([
+        event(1, {
+          type: 'tool',
+          tool: { id: 'w', title: 'Search web', web: { results: [{ url: 'https://example.com' }] } },
+        }),
+        event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [] } } }),
+      ])?.results,
+    ).toEqual([])
   })
 
   it('keeps everything else on the card when only sources arrive', () => {
     const [item] = buildConversationItems([
-      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', kind: 'search', status: 'running', input: '{}', subagentId: 'child-1' } }),
-      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [{ url: 'https://example.com' }] } }, ...{} }),
+      event(1, {
+        type: 'tool',
+        tool: { id: 'w', title: 'Search web', kind: 'search', status: 'running', input: '{}', subagentId: 'child-1' },
+      }),
+      event(2, {
+        type: 'tool',
+        tool: { id: 'w', title: '', web: { results: [{ url: 'https://example.com' }] } },
+        ...{},
+      }),
     ])
     expect(item.event.type === 'tool' && item.event.tool).toMatchObject({
       title: 'Search web',
@@ -484,7 +587,12 @@ describe('a transcript the node folded', () => {
     event(6, { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed', output: 'a\nb\nc\n' } }),
   ]
   const cards = (events: AgentEventRecord[]) =>
-    buildConversationItems(events).map(({ key, firstSeq, lastSeq, event: value }) => ({ key, firstSeq, lastSeq, value }))
+    buildConversationItems(events).map(({ key, firstSeq, lastSeq, event: value }) => ({
+      key,
+      firstSeq,
+      lastSeq,
+      value,
+    }))
 
   it('draws what the raw rows draw, whether a call ends inside a page or runs across two', () => {
     expect(cards(foldToolEvents(raw))).toEqual(cards(raw))
@@ -501,7 +609,7 @@ describe('a transcript the node folded', () => {
 
 describe('the projection a streaming transcript keeps', () => {
   // What a card sees when one more event arrives: the object it already has, unless that event is its.
-  // The array is the store's, which grows in place (managedStore.ts § appendEvent).
+  // The array is the store's, which grows in place (`appendEvent`).
   const before = () => [
     event(1, { type: 'user_message', text: 'go' }, 'turn-1'),
     event(2, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } }, 'turn-1'),
@@ -551,12 +659,15 @@ describe('the projection a streaming transcript keeps', () => {
 
   it('takes the store merging a usage update into the line in place', () => {
     const { events, project, held } = open()
-    // What managedStore.ts § foldUsage does: same id, same seq, a new running total.
+    // What the store's `foldUsage` does: same id, same seq, a new running total.
     events[3] = { ...events[3], event: { type: 'usage', usage: { contextUsed: 1_200 } } }
     const items = project(events)
     expect(items).toEqual(buildConversationItems(events))
     expect(items.find((item) => item.event.type === 'turn_completed')?.context).toEqual({ used: 1_200 })
-    expect(items.filter((item, at) => item !== held[at]).map((item) => item.event.type)).toEqual(['usage', 'turn_completed'])
+    expect(items.filter((item, at) => item !== held[at]).map((item) => item.event.type)).toEqual([
+      'usage',
+      'turn_completed',
+    ])
   })
 
   it('rebuilds when a row lands behind the tail, and draws what a rebuild draws', () => {
@@ -565,7 +676,11 @@ describe('the projection a streaming transcript keeps', () => {
     project(events)
     // A late frame for the same call. The card keeps its key and its seqs and gains output, so no
     // earlier object may be handed back for it.
-    events.splice(5, 0, event(7, { type: 'tool', tool: { id: 'cmd', title: '', output: 'a', outputAppend: true } }, 'turn-1'))
+    events.splice(
+      5,
+      0,
+      event(7, { type: 'tool', tool: { id: 'cmd', title: '', output: 'a', outputAppend: true } }, 'turn-1'),
+    )
     const items = project(events)
     expect(items).toEqual(buildConversationItems(events))
     expect(items.find((item) => item.event.type === 'tool')?.event).toMatchObject({ tool: { output: 'ab' } })

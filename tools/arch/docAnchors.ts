@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Shared by the two doc checkers: `docPaths.test.ts` reads the docs, `docCitations.test.ts` reads the
-// source comments that cite them. Both have to agree on what a heading's id is.
+// Shared by the path checkers: `docPaths.test.ts` reads the docs, and `docCitations.test.ts` and
+// `commentPaths.test.ts` read source comments. They have to agree on what a heading's id is and on
+// which words mark a path as gone.
 
 export const ROOT = (() => {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -14,6 +15,10 @@ export const ROOT = (() => {
     dir = parent
   }
 })()
+
+// A line holding one of these marks the path it names as deleted or not yet added, so the path checks
+// skip it. They're the phrasings the docs already used when the doc path check landed.
+export const GONE = ['delete', 'replaced', 'moved to', 'git history', 'git log', '(new']
 
 // GitHub-style heading ids: markup is removed, punctuation is dropped, and spaces become hyphens.
 export const slug = (text: string): string =>
@@ -27,8 +32,8 @@ export const slug = (text: string): string =>
     .replace(/\s/g, '-')
 
 // Every id a link can land on in a doc. A repeated heading receives a numeric suffix. Explicit
-// `<a id="…">` anchors are included because the landing pages use them to preserve old section links
-// after moving long references into subfolders.
+// `<a id="…">` anchors are included because a split page may keep one for a link it can't update
+// (docs/writing-docs.md § Split a long page).
 export const anchors = (file: string): Set<string> => {
   const found = new Set<string>()
   const duplicates = new Map<string, number>()

@@ -24,7 +24,12 @@ export default defineConfig({
     emptyOutDir: true,
     reportCompressedSize: false,
     lib: {
-      entry: { sdk: 'src/index.ts', remote: 'src/remote/solid.ts', data: 'src/data/index.ts', testing: 'src/testing/index.ts' },
+      entry: {
+        sdk: 'src/index.ts',
+        remote: 'src/remote/solid.ts',
+        data: 'src/data/index.ts',
+        testing: 'src/testing/index.ts',
+      },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`,
     },

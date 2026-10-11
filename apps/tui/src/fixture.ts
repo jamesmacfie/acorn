@@ -1,6 +1,11 @@
 import type { Task } from '@acorn/protocol/api.ts'
 import type { NoteSummary } from '@acorn/protocol/notes.ts'
-import { documentTopology, fileDocument, type DiffDocumentTopology, type DiffSegmentPayload } from '@acorn/diff-document/document'
+import {
+  documentTopology,
+  fileDocument,
+  type DiffDocumentTopology,
+  type DiffSegmentPayload,
+} from '@acorn/diff-document/document'
 
 // One task and three notes, as the node would answer them. Shared by the smoke test and the capture
 // script (`pnpm --filter @acorn/tui capture`), which is how this package gets a screenshot on a machine
@@ -28,18 +33,50 @@ export const TASK: Task = {
   sort: 0,
 }
 
-export const TASK_NOTES: NoteSummary[] = [
-  { slug: 'scratchpad', title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 },
-  { slug: 'repro-steps', title: 'Repro steps', author: 'user', kind: 'finding', included: true, originTaskId: null, updatedAt: 0 },
-  { slug: 'what-the-agent-found', title: 'What the agent found', author: 'agent', kind: 'finding', included: false, originTaskId: null, updatedAt: 0 },
+const TASK_NOTES: NoteSummary[] = [
+  {
+    slug: 'scratchpad',
+    title: 'Scratchpad',
+    author: 'user',
+    kind: 'scratch',
+    included: true,
+    originTaskId: null,
+    updatedAt: 0,
+  },
+  {
+    slug: 'repro-steps',
+    title: 'Repro steps',
+    author: 'user',
+    kind: 'finding',
+    included: true,
+    originTaskId: null,
+    updatedAt: 0,
+  },
+  {
+    slug: 'what-the-agent-found',
+    title: 'What the agent found',
+    author: 'agent',
+    kind: 'finding',
+    included: false,
+    originTaskId: null,
+    updatedAt: 0,
+  },
 ]
 
-export const WORKSPACE_NOTES: NoteSummary[] = [
-  { slug: 'conventions', title: 'Conventions', author: 'user', kind: 'finding', included: true, originTaskId: null, updatedAt: 0 },
+const WORKSPACE_NOTES: NoteSummary[] = [
+  {
+    slug: 'conventions',
+    title: 'Conventions',
+    author: 'user',
+    kind: 'finding',
+    included: true,
+    originTaskId: null,
+    updatedAt: 0,
+  },
 ]
 
-const BODY = '# Repro steps\n\n1. Sign in as a new account.\n2. Change the password.\n3. Sign in again — the old one still works.\n'
-
+const BODY =
+  '# Repro steps\n\n1. Sign in as a new account.\n2. Change the password.\n3. Sign in again — the old one still works.\n'
 
 // ── Per-pane fixtures ──────────────────────────────────────────────────────────────────────────────
 // Kept beside the transport rather than in each test, so every pane's snapshot is of the same node.
@@ -98,54 +135,80 @@ const SECOND_PROJECT = {
 
 export const SECOND_TASK: Task = { ...TASK, id: 'task-2', title: 'second task', projectId: SECOND_PROJECT.id }
 
-const AGENT_PROVIDERS = [{
-  id: 'claude',
-  profileId: 'claude',
-  label: 'Claude Code',
-  driverKind: 'acp' as const,
-  driverVersion: '1',
-  installed: true,
-  authenticated: true,
-  statusAuthority: 'driver',
-  capabilities: [],
-  configOptions: [],
-  commands: [],
-  skills: [],
-  diagnostics: [],
-}]
+const AGENT_PROVIDERS = [
+  {
+    id: 'claude',
+    profileId: 'claude',
+    label: 'Claude Code',
+    driverKind: 'acp' as const,
+    driverVersion: '1',
+    installed: true,
+    authenticated: true,
+    statusAuthority: 'driver',
+    capabilities: [],
+    configOptions: [],
+    commands: [],
+    skills: [],
+    diagnostics: [],
+  },
+]
 
-const AGENT_SESSIONS = [{
-  id: 'session-1',
-  taskId: TASK.id,
-  providerId: 'claude',
-  profileId: 'claude',
-  kind: 'managed',
-  driverKind: 'acp',
-  driverVersion: '1',
-  providerSessionRef: null,
-  controller: 'acorn',
-  runtimeState: 'idle',
-  attention: 'none',
-  statusAuthority: 'driver',
-  title: 'Find why the old password still works',
-  model: 'claude-opus-5',
-  config: {},
-  parentSessionId: null,
-  parentTurnId: null,
-  subagents: [], queuedTurns: 0,
-  lastEventSeq: 2,
-  lastReadSeq: 2,
-  archivedAt: null,
-  createdAt: 0,
-  updatedAt: 0,
-}]
+const AGENT_SESSIONS = [
+  {
+    id: 'session-1',
+    taskId: TASK.id,
+    providerId: 'claude',
+    profileId: 'claude',
+    kind: 'managed',
+    driverKind: 'acp',
+    driverVersion: '1',
+    providerSessionRef: null,
+    controller: 'acorn',
+    runtimeState: 'idle',
+    attention: 'none',
+    statusAuthority: 'driver',
+    title: 'Find why the old password still works',
+    model: 'claude-opus-5',
+    config: {},
+    parentSessionId: null,
+    parentTurnId: null,
+    subagents: [],
+    queuedTurns: 0,
+    lastEventSeq: 2,
+    lastReadSeq: 2,
+    archivedAt: null,
+    createdAt: 0,
+    updatedAt: 0,
+  },
+]
 
-const agentSessions = () => process.env.ACORN_FIXTURE_CODEX_PLAN
-  ? [{ ...AGENT_SESSIONS[0]!, kind: 'interactive', driverKind: 'codex-app-server',
-      providerId: 'codex', profileId: 'codex', runtimeState: 'ready',
-      config: { configOptions: [{ id: 'mode', label: 'Mode', category: 'mode', currentValue: 'plan',
-        values: [{ value: 'plan', label: 'Plan' }, { value: 'default', label: 'Default' }] }] } }]
-  : AGENT_SESSIONS
+const agentSessions = () =>
+  process.env.ACORN_FIXTURE_CODEX_PLAN
+    ? [
+        {
+          ...AGENT_SESSIONS[0]!,
+          kind: 'interactive',
+          driverKind: 'codex-app-server',
+          providerId: 'codex',
+          profileId: 'codex',
+          runtimeState: 'ready',
+          config: {
+            configOptions: [
+              {
+                id: 'mode',
+                label: 'Mode',
+                category: 'mode',
+                currentValue: 'plan',
+                values: [
+                  { value: 'plan', label: 'Plan' },
+                  { value: 'default', label: 'Default' },
+                ],
+              },
+            ],
+          },
+        },
+      ]
+    : AGENT_SESSIONS
 
 // One turn, a prompt, an answer, a tool card and an approval still waiting: the four things the sweep
 // has to see on the agents transcript (docs/tui.md).
@@ -178,102 +241,185 @@ const event = (seq: number, value: unknown) => ({
 })
 
 // A transcript longer than any pane is tall, so a case can ask whether the viewport stayed on the
-// newest turn and kept the composer under it (../kit/scrolling.tsx § followViewport). Behind a flag
+// newest turn and kept the composer under it (`stickToBottom` on the kit's `Viewport`). Behind a flag
 // because every other agents case reads a screen it can hold in its head, and thirty turns of filler
 // would make each of those assert against a scroll position instead of against a pane.
 // A function rather than a constant: a test sets the flag inside its own body, which is long after
 // this module was evaluated (./workspaceFocus.test.tsx does the same with its own flag).
-const agentFiller = () => (process.env.ACORN_FIXTURE_LONG_TRANSCRIPT
-  ? Array.from({ length: 30 }, (_, index) =>
-    event(100 + index, { type: 'assistant_message', text: `Filler turn ${index + 1}.` }))
-  : [])
+const agentFiller = () =>
+  process.env.ACORN_FIXTURE_LONG_TRANSCRIPT
+    ? Array.from({ length: 30 }, (_, index) =>
+        event(100 + index, { type: 'assistant_message', text: `Filler turn ${index + 1}.` }),
+      )
+    : []
 
 // A web call: the one tool card whose body is not a block of text, so the terminal has its own thing
 // to prove about it (./agentsWeb.test.tsx). Behind a flag for the same reason the filler above is —
 // the pane sweep reads a screen it can hold in its head, and one more card pushes the first turn off
 // the top of it, which would make that case about a scroll position instead of about a pane.
-const agentWebActivity = () => (process.env.ACORN_FIXTURE_WEB_ACTIVITY
-  ? [event(3, {
-    type: 'tool' as const,
-    tool: {
-      id: 'tool-2',
-      title: 'Search web',
-      kind: 'search',
-      status: 'completed' as const,
-      web: {
-        action: { type: 'search' as const, queries: ['bcrypt compare timing'] },
-        results: [{ url: 'https://docs.example/bcrypt', title: 'Comparing hashes', domain: 'docs.example' }],
-      },
-    },
-  })]
-  : [])
+const agentWebActivity = () =>
+  process.env.ACORN_FIXTURE_WEB_ACTIVITY
+    ? [
+        event(3, {
+          type: 'tool' as const,
+          tool: {
+            id: 'tool-2',
+            title: 'Search web',
+            kind: 'search',
+            status: 'completed' as const,
+            web: {
+              action: { type: 'search' as const, queries: ['bcrypt compare timing'] },
+              results: [{ url: 'https://docs.example/bcrypt', title: 'Comparing hashes', domain: 'docs.example' }],
+            },
+          },
+        }),
+      ]
+    : []
 
 // A command still running after its turn (docs/managed-agents/background-commands.md), with more output
 // than the card shows folded. Behind a flag for the same reason as the web call above.
-const agentBackgroundCommand = () => (process.env.ACORN_FIXTURE_BACKGROUND_COMMAND
-  ? [event(3, {
-    type: 'tool' as const,
-    tool: {
-      id: 'tool-3',
-      title: 'pnpm test',
-      kind: 'execute',
-      status: 'running' as const,
-      background: true,
-      output: Array.from({ length: 20 }, (_, index) => `test ${index + 1} passed`).join('\n'),
-    },
-  })]
-  : [])
+const agentBackgroundCommand = () =>
+  process.env.ACORN_FIXTURE_BACKGROUND_COMMAND
+    ? [
+        event(3, {
+          type: 'tool' as const,
+          tool: {
+            id: 'tool-3',
+            title: 'pnpm test',
+            kind: 'execute',
+            status: 'running' as const,
+            background: true,
+            output: Array.from({ length: 20 }, (_, index) => `test ${index + 1} passed`).join('\n'),
+          },
+        }),
+      ]
+    : []
 
-const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
-  session: agentSessions()[0],
-  turns: [{ ...AGENT_TURN, source: 'interactive', status: 'completed',
-    effectivePolicy: { mode: 'plan' }, providerTurnRef: 'codex-turn-1', stopReason: 'completed' }],
-  events: [
-    event(1, { type: 'request', requestId: 'question-1', kind: 'question', title: 'Shall I plan it?' }),
-    event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Write src/login.ts', status: 'completed' } }),
-    event(3, { type: 'plan', entries: [{ id: 'step-1', text: 'Inspect code', status: 'completed' }] }),
-    event(4, { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1',
-      text: '1. Update the API\n2. Test the UI' }),
-    // Refused by a policy plugin before anyone saw it (docs/managed-agents/permission-policy.md).
-    event(5, { type: 'request', requestId: 'blocked-1', kind: 'permission', title: 'Allow command?',
-      blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' } }),
-    event(6, { type: 'turn_completed', stopReason: 'completed' }),
-  ],
-  requests: [{ id: 'question-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'question-1',
-    kind: 'question', status: 'resolved', title: 'Shall I plan it?', detail: null, payload: {},
-    resolution: { answers: { go: 'Yes, plan it' } }, expiresAt: null, createdAt: 0, resolvedAt: 0 }, {
-    id: 'blocked-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'blocked-1',
-    kind: 'permission', status: 'resolved', title: 'Allow command?', detail: null, payload: { options: [] },
-    resolution: { blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' } },
-    expiresAt: null, createdAt: 0, resolvedAt: 0 }],
-}) : ({
-  session: agentSessions()[0],
-  turns: [AGENT_TURN],
-  events: [
-    ...agentFiller(),
-    event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
-    event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Read src/login.ts', status: 'completed', output: 'export async function signIn(' } }),
-    ...agentWebActivity(),
-    ...agentBackgroundCommand(),
-    event(4, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
-    event(5, { type: 'request', requestId: 'request-1', kind: 'permission', title: 'Write src/login.ts', detail: 'Replace the password check', options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] }),
-  ],
-  requests: [{
-    id: 'request-1',
-    sessionId: 'session-1',
-    turnId: 'turn-1',
-    providerRequestId: 'request-1',
-    kind: 'permission',
-    status: 'pending',
-    title: 'Write src/login.ts',
-    detail: 'Replace the password check',
-    payload: { options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] },
-    resolution: null,
-    expiresAt: null,
-    createdAt: 0,
-    resolvedAt: null,
-  }],
-})
+const agentSnapshot = () =>
+  process.env.ACORN_FIXTURE_CODEX_PLAN
+    ? {
+        session: agentSessions()[0],
+        turns: [
+          {
+            ...AGENT_TURN,
+            source: 'interactive',
+            status: 'completed',
+            effectivePolicy: { mode: 'plan' },
+            providerTurnRef: 'codex-turn-1',
+            stopReason: 'completed',
+          },
+        ],
+        events: [
+          event(1, { type: 'request', requestId: 'question-1', kind: 'question', title: 'Shall I plan it?' }),
+          event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Write src/login.ts', status: 'completed' } }),
+          event(3, { type: 'plan', entries: [{ id: 'step-1', text: 'Inspect code', status: 'completed' }] }),
+          event(4, {
+            type: 'plan_proposal',
+            itemId: 'plan-1',
+            providerTurnId: 'codex-turn-1',
+            text: '1. Update the API\n2. Test the UI',
+          }),
+          // Refused by a policy plugin before anyone saw it (docs/managed-agents/permission-policy.md).
+          event(5, {
+            type: 'request',
+            requestId: 'blocked-1',
+            kind: 'permission',
+            title: 'Allow command?',
+            blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' },
+          }),
+          event(6, { type: 'turn_completed', stopReason: 'completed' }),
+        ],
+        requests: [
+          {
+            id: 'question-1',
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            providerRequestId: 'question-1',
+            kind: 'question',
+            status: 'resolved',
+            title: 'Shall I plan it?',
+            detail: null,
+            payload: {},
+            resolution: { answers: { go: 'Yes, plan it' } },
+            expiresAt: null,
+            createdAt: 0,
+            resolvedAt: 0,
+          },
+          {
+            id: 'blocked-1',
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            providerRequestId: 'blocked-1',
+            kind: 'permission',
+            status: 'resolved',
+            title: 'Allow command?',
+            detail: null,
+            payload: { options: [] },
+            resolution: {
+              blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' },
+            },
+            expiresAt: null,
+            createdAt: 0,
+            resolvedAt: 0,
+          },
+        ],
+      }
+    : {
+        session: agentSessions()[0],
+        turns: [AGENT_TURN],
+        events: [
+          ...agentFiller(),
+          event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
+          event(2, {
+            type: 'tool',
+            tool: {
+              id: 'tool-1',
+              title: 'Read src/login.ts',
+              status: 'completed',
+              output: 'export async function signIn(',
+            },
+          }),
+          ...agentWebActivity(),
+          ...agentBackgroundCommand(),
+          event(4, {
+            type: 'assistant_message',
+            text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
+          }),
+          event(5, {
+            type: 'request',
+            requestId: 'request-1',
+            kind: 'permission',
+            title: 'Write src/login.ts',
+            detail: 'Replace the password check',
+            options: [
+              { id: 'allow', label: 'Allow' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          }),
+        ],
+        requests: [
+          {
+            id: 'request-1',
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            providerRequestId: 'request-1',
+            kind: 'permission',
+            status: 'pending',
+            title: 'Write src/login.ts',
+            detail: 'Replace the password check',
+            payload: {
+              options: [
+                { id: 'allow', label: 'Allow' },
+                { id: 'deny', label: 'Deny' },
+              ],
+            },
+            resolution: null,
+            expiresAt: null,
+            createdAt: 0,
+            resolvedAt: null,
+          },
+        ],
+      }
 
 // One `LocalStatus`, the way the route answers it: the branch facts travel with the file list, so the
 // pane's header, groups and footer all read one record (docs/diff-rendering/changes-pane.md § One status read).
@@ -303,24 +449,34 @@ const PATCH = [
 ].join('\n')
 
 const TASK_CONTEXT = {
-  task: { id: TASK.id, title: TASK.title, projectId: TASK.projectId, branch: TASK.branch, worktreePath: TASK.worktreePath, pullNumber: TASK.pullNumber },
-  sections: [{
-    id: 'notes',
-    label: 'Notes',
-    defaultIncluded: true,
-    budget: {},
-    items: [{ id: 'repro-steps', kind: 'note', label: 'Repro steps' }],
-    compact: '1 note',
-    omitted: 0,
-  }, {
-    id: 'changes',
-    label: 'Working tree',
-    defaultIncluded: true,
-    budget: {},
-    items: [{ id: 'src/login.ts', kind: 'file', label: 'src/login.ts', details: ['+12 -3'] }],
-    compact: '3 files',
-    omitted: 0,
-  }],
+  task: {
+    id: TASK.id,
+    title: TASK.title,
+    projectId: TASK.projectId,
+    branch: TASK.branch,
+    worktreePath: TASK.worktreePath,
+    pullNumber: TASK.pullNumber,
+  },
+  sections: [
+    {
+      id: 'notes',
+      label: 'Notes',
+      defaultIncluded: true,
+      budget: {},
+      items: [{ id: 'repro-steps', kind: 'note', label: 'Repro steps' }],
+      compact: '1 note',
+      omitted: 0,
+    },
+    {
+      id: 'changes',
+      label: 'Working tree',
+      defaultIncluded: true,
+      budget: {},
+      items: [{ id: 'src/login.ts', kind: 'file', label: 'src/login.ts', details: ['+12 -3'] }],
+      compact: '3 files',
+      omitted: 0,
+    },
+  ],
   issues: [],
   notes: [],
   memory: [],
@@ -334,7 +490,14 @@ const PULL_REF = { owner: 'runn-fast', repo: 'acorn', number: 42 }
 const pulls = () => {
   const count = Number(process.env.ACORN_FIXTURE_PULLS ?? 1)
   return count > 1
-    ? [PULL, ...Array.from({ length: count - 1 }, (_unused, at) => ({ ...PULL, number: 100 + at, title: `Older pull ${100 + at}` }))]
+    ? [
+        PULL,
+        ...Array.from({ length: count - 1 }, (_unused, at) => ({
+          ...PULL,
+          number: 100 + at,
+          title: `Older pull ${100 + at}`,
+        })),
+      ]
     : [PULL]
 }
 
@@ -358,29 +521,44 @@ const PULL_DETAIL = {
   reviews: [],
   requestedReviewers: [],
   comments: [],
-  commits: [{ sha: 'abc123', message: 'Invalidate the old password on reset', author: 'James Macfie', authorLogin: 'jamesmacfie', committedAt: 0 }],
-  checks: [{ name: 'lint', status: 'success', url: null, runId: 1 }, { name: 'test', status: 'success', url: null, runId: 2 }],
+  commits: [
+    {
+      sha: 'abc123',
+      message: 'Invalidate the old password on reset',
+      author: 'James Macfie',
+      authorLogin: 'jamesmacfie',
+      committedAt: 0,
+    },
+  ],
+  checks: [
+    { name: 'lint', status: 'success', url: null, runId: 1 },
+    { name: 'test', status: 'success', url: null, runId: 2 },
+  ],
   threads: [],
 }
 
 /** A patch as long as a test asks for, in place of the short one below.
  *
- *  A diff longer than the panel it draws in is its own case, and it is the case the terminal diff
- *  shipped broken: a column of rows that does not fit is shrunk rather than scrolled, so four hundred
- *  lines were drawn into thirty rows on top of each other (./diffLong.test.tsx). The lines are long
- *  as well as many, because the other half of the same bug is horizontal. */
+ *  A diff longer than the panel it draws in is its own case: a column of rows that does not fit is
+ *  shrunk rather than scrolled, so the rows draw on top of each other (./diffLong.test.tsx). The lines
+ *  are long as well as many, because the other half of the same trap is horizontal. */
 const longPatch = (): string | null => {
   const lines = Number(process.env.ACORN_FIXTURE_PATCH_LINES ?? 0)
   if (!lines) return null
   const mark = (at: number) => (at % 3 === 0 ? '+' : at % 3 === 1 ? '-' : ' ')
-  return [`@@ -1,${lines} +1,${lines} @@`, ...Array.from({ length: lines }, (_unused, at) =>
-    `${mark(at)}  const somethingRatherLongIndeed${at} = await loadAccountByEmailAddress(email.toLowerCase().trim(), ${at})`)].join('\n')
+  return [
+    `@@ -1,${lines} +1,${lines} @@`,
+    ...Array.from(
+      { length: lines },
+      (_unused, at) =>
+        `${mark(at)}  const somethingRatherLongIndeed${at} = await loadAccountByEmailAddress(email.toLowerCase().trim(), ${at})`,
+    ),
+  ].join('\n')
 }
 
 /** A real patch body on one of the two changed files, so the diff column has something to draw.
- *
- *  Both files answered `patch: null` before, which is the legitimate shape for a binary or an
- *  over-large file — and it meant every test that opened a pull was asserting on "no changes". */
+ *  `patch: null` is the legitimate shape for a binary or an over-large file, but with no patch at all
+ *  every test that opens a pull would be asserting on "no changes". */
 const LOGIN_PATCH = [
   '@@ -1,4 +1,5 @@',
   ' export async function signIn(email: string, password: string) {',
@@ -397,31 +575,86 @@ const pullFiles = () => {
 }
 
 const PULL_FILES = [
-  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, position: 0, patchState: 'available', patchKey: 'sha256:login', patch: LOGIN_PATCH },
-  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, position: 1, patchState: 'unavailable', patchKey: null, patch: null },
+  {
+    path: 'src/login.ts',
+    status: 'modified',
+    additions: 12,
+    deletions: 3,
+    sha: 'a',
+    viewed: false,
+    position: 0,
+    patchState: 'available',
+    patchKey: 'sha256:login',
+    patch: LOGIN_PATCH,
+  },
+  {
+    path: 'src/session.ts',
+    status: 'modified',
+    additions: 4,
+    deletions: 0,
+    sha: 'b',
+    viewed: false,
+    position: 1,
+    patchState: 'unavailable',
+    patchKey: null,
+    patch: null,
+  },
 ]
 
-type FixtureFile = { path: string; status: string | null; additions: number | null; deletions: number | null; sha: string | null; patch: string | null }
+type FixtureFile = {
+  path: string
+  status: string | null
+  additions: number | null
+  deletions: number | null
+  sha: string | null
+  patch: string | null
+}
 
 /** Files as a diff document, cut the way a provider's node cuts one, and every segment of it. The stub
  *  transport sees no request body, so a segments request is answered with all of them and the viewer
  *  keeps the ones it asked for. Exported for the kit's own DiffPane case. */
-export function fixtureDocument(files: readonly FixtureFile[]): { topology: DiffDocumentTopology; segments: DiffSegmentPayload[] } {
+export function fixtureDocument(files: readonly FixtureFile[]): {
+  topology: DiffDocumentTopology
+  segments: DiffSegmentPayload[]
+} {
   const segments: DiffSegmentPayload[] = []
-  const topology = documentTopology(files.map((file, index) => {
-    const doc = fileDocument(file.path, file.patch)
-    const patchKey = file.patch ? `fixture:${index}:${file.patch.length}` : null
-    doc.segments.forEach((rows, ordinal) => segments.push({ path: file.path, patchKey: patchKey!, ordinal, rows }))
-    return { path: file.path, status: file.status, additions: file.additions, deletions: file.deletions, sha: file.sha, viewed: false, patchKey, segments: doc.descriptors }
-  }))
+  const topology = documentTopology(
+    files.map((file, index) => {
+      const doc = fileDocument(file.path, file.patch)
+      const patchKey = file.patch ? `fixture:${index}:${file.patch.length}` : null
+      doc.segments.forEach((rows, ordinal) => segments.push({ path: file.path, patchKey: patchKey!, ordinal, rows }))
+      return {
+        path: file.path,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+        sha: file.sha,
+        viewed: false,
+        patchKey,
+        segments: doc.descriptors,
+      }
+    }),
+  )
   return { topology, segments }
 }
 
 /** The working tree's one patch, as the Changes node answers a document: per file, the digest and the
  *  cut, and only for the files it has a patch for. */
 const localDocument = () => {
-  const { topology, segments } = fixtureDocument([{ path: 'src/login.ts', status: 'modified', additions: 2, deletions: 1, sha: 'unstaged', patch: PATCH.slice(PATCH.indexOf('@@')) }])
-  return { files: topology.files.map(({ path, patchKey, segments: cut }) => ({ path, patchKey, segments: cut })), segments }
+  const { topology, segments } = fixtureDocument([
+    {
+      path: 'src/login.ts',
+      status: 'modified',
+      additions: 2,
+      deletions: 1,
+      sha: 'unstaged',
+      patch: PATCH.slice(PATCH.indexOf('@@')),
+    },
+  ])
+  return {
+    files: topology.files.map(({ path, patchKey, segments: cut }) => ({ path, patchKey, segments: cut })),
+    segments,
+  }
 }
 
 const EDITOR_ENTRIES = [
@@ -430,7 +663,8 @@ const EDITOR_ENTRIES = [
   { name: 'README.md', dir: false },
 ]
 
-const FILE_TEXT = 'export async function signIn(email: string, password: string) {\n  const account = await load(email)\n  return check(account.passwordHash, password)\n}\n'
+const FILE_TEXT =
+  'export async function signIn(email: string, password: string) {\n  const account = await load(email)\n  return check(account.passwordHash, password)\n}\n'
 
 // Every request the fixture was asked for, in order, so a test can assert that a control acted rather
 // than only that it drew. A control's whole job is to make one of these; the answer it gets back is
@@ -442,159 +676,207 @@ const recorded: { path: string; method: string }[] = []
 export const recordedRequests = (): readonly { path: string; method: string }[] => recorded
 
 /** Test seam: the list is module state, so a suite must not inherit the previous test's traffic. */
-export const _resetRequests = (): void => { recorded.length = 0 }
+export const _resetRequests = (): void => {
+  recorded.length = 0
+}
 
 /** A transport that answers the routes the panes ask for and 404s the rest, so a route the pane
  *  starts asking for shows up as an empty region rather than as a silent pass. */
 export function stubTransport(): {
-  fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }>
+  fetch: (
+    nodeId: string,
+    request: { path: string; method?: string },
+  ) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }>
   pending: () => number
   idle: (signal: AbortSignal) => Promise<void>
 } {
   let pending = 0
   const waiters = new Set<() => void>()
   // Connected, with the one capability the pull list asks for. `providers` stays empty beside it, which
-// is what switches off the "does this workspace link a project of its?" gate — that gate only applies
-// to a provider that enumerates projects, and nothing here says GitHub does.
-const GITHUB_INTEGRATION = {
-  id: 'github',
-  providerId: 'github' as const,
-  label: 'GitHub',
-  status: 'connected' as const,
-  authKind: 'token' as const,
-  account: null,
-  scopes: [],
-  capabilities: {},
-  createdAt: 0,
-  updatedAt: 0,
-}
+  // is what switches off the "does this workspace link a project of its?" gate — that gate only applies
+  // to a provider that enumerates projects, and nothing here says GitHub does.
+  const GITHUB_INTEGRATION = {
+    id: 'github',
+    providerId: 'github' as const,
+    label: 'GitHub',
+    status: 'connected' as const,
+    authKind: 'token' as const,
+    account: null,
+    scopes: [],
+    capabilities: {},
+    createdAt: 0,
+    updatedAt: 0,
+  }
 
-const json = (value: unknown) => ({
+  const json = (value: unknown) => ({
     status: 200,
     headers: { 'content-type': 'application/json' },
     body: new TextEncoder().encode(JSON.stringify(value)),
   })
   return {
     pending: () => pending,
-    idle: (signal) => pending === 0 ? Promise.resolve() : new Promise((resolve, reject) => {
-      const settled = () => {
-        signal.removeEventListener('abort', aborted)
-        waiters.delete(settled)
-        resolve()
-      }
-      const aborted = () => {
-        waiters.delete(settled)
-        reject(signal.reason)
-      }
-      waiters.add(settled)
-      signal.addEventListener('abort', aborted, { once: true })
-      if (signal.aborted) aborted()
-    }),
+    idle: (signal) =>
+      pending === 0
+        ? Promise.resolve()
+        : new Promise((resolve, reject) => {
+            const settled = () => {
+              signal.removeEventListener('abort', aborted)
+              waiters.delete(settled)
+              resolve()
+            }
+            const aborted = () => {
+              waiters.delete(settled)
+              reject(signal.reason)
+            }
+            waiters.add(settled)
+            signal.addEventListener('abort', aborted, { once: true })
+            if (signal.aborted) aborted()
+          }),
     fetch: async (_nodeId, request) => {
       pending += 1
       try {
-      // A transport that answers in a microtask can never hold a `Suspense` open past the tick that
-      // destroys its subtree, so the failure the real app lives with — content removed, destroyed,
-      // then handed back dead — was unreachable from a
-      // test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
-      const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
-      if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
-      const path = request.path
-      recorded.push({ path, method: request.method ?? 'GET' })
-      // The shell asks for these on mount. Answering them keeps a suite's output free of query
-      // errors that say nothing about what is under test.
-      //
-      // One integration, and it is GitHub, because the rail gates a browse source on the integration
-      // behind it being connected (features/tabs/railSources.ts) — with none, the Menu holds only the
-      // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
-      // were always answered here; this is the row that lets a reader reach them.
-      if (path === '/v1/core/prefs') return json({})
-      // Compiled client contributions now require the node's running roster. The fixture mirrors
-      // the built-in services its pane routes below represent; there are no loaded client bundles.
-      if (path === '/v1/core/plugins') return json({
-        restartRequired: false,
-        requests: [],
-        plugins: ['agents', 'browser', 'docker', 'editor', 'git', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
-          .map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
-      })
-      if (path === '/v1/core/integrations') return json({
-        integrations: [GITHUB_INTEGRATION],
-        providers: process.env.ACORN_FIXTURE_LINK_SCOPES ? [{ id: 'github', supportsProjects: true }] : [],
-      })
-      if (path === '/v1/core/workspaces') return json([
-        { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },
-        ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE
-          ? [{ id: 'ws-2', name: 'second', projects: [{ id: SECOND_PROJECT.id, name: SECOND_PROJECT.name }] }]
-          : []),
-      ])
-      if (path === '/v1/core/workspaces/ws-1/external-projects') return json({
-        projects: process.env.ACORN_FIXTURE_LINK_SCOPES && !process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
-          ? [{ integrationId: 'github', externalId: 'runn-fast/acorn' }] : [],
-      })
-      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({
-        projects: process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
-          ? [{ integrationId: 'github', externalId: 'runn-fast/second' }] : [],
-      })
-      if (path === '/v1/core/tasks') return json([TASK, ...(process.env.ACORN_FIXTURE_LINK_SCOPES ? [SECOND_TASK] : [])])
-      // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
-      // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a
-      // word, so a filter can be shown to keep some rows and drop others.
-      if (path === '/v1/p/probe/items') return json({ items: [
-        { id: 'reset', title: 'Invalidate the old password on reset' },
-        { id: 'rotate', title: 'Rotate the signing key' },
-        { id: 'copy', title: 'Password reset copy' },
-      ] })
-      if (path === '/v1/p/probe/task-items') return json({ items: [
-        { id: 'first', title: 'First incident', task: { title: 'First incident' } },
-        { id: 'second', title: 'Second incident', task: { title: 'Second incident' } },
-      ] })
-      if (path === '/v1/core/projects') return json({
-        projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
-      })
-      if (path === `/v1/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
-      if (path === '/v1/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
-      if (path === '/v1/p/notes/workspaces/global/notes') return json([])
-      if (path.endsWith('/repro-steps')) return json({ slug: 'repro-steps', title: 'Repro steps', body: BODY, included: true })
-      if (path.endsWith('/scratchpad')) return json({ slug: 'scratchpad', title: 'Scratchpad', body: 'Whatever is in hand.\n', included: true })
-      // ── One answer per pane in the roster ─────────────────────────────────────────────────────
-      // Enough for each pane to draw its own shape rather than an error, because the sweep is about
-      // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
-      // `Alert` reads the same however unreadable the real thing is.
-      if (path === '/v1/p/agents/providers') return json(AGENT_PROVIDERS)
-      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: agentSessions(), delegations: [], nextCursor: null })
-      // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
-      // reads as a session id, and the caller would get a snapshot object where it expects an array
-      // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
-      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(agentSessions())
-      if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
-      if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
-      if (path === `/v1/p/git/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
-      if (path === `/v1/p/git/tasks/${TASK.id}/review-notes`) return json([])
-      if (path === `/v1/p/git/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
-      if (path === `/v1/p/git/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
-      if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
-      if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
-      if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
-      if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/list`)) return json(EDITOR_ENTRIES)
-      if (path === `/v1/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
-      if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
-      if (path === `/v1/p/github/tasks/${TASK.id}/pulls`) return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
-      // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
-      // rather than "Not found" on all but the first.
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
-      // Every GET on the files route answers with the list and whether it is all of them, and the diff
-      // route with the same files as a document (plugins/github/src/shared/api.ts § PullDiffResponse).
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json({ files: pullFiles(), completeness: { kind: 'complete' } })
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/diff$/.test(path)) return json({ document: fixtureDocument(pullFiles()).topology, completeness: { kind: 'complete' } })
-      if (path === '/v1/p/github/repos/runn-fast/acorn/diff/segments') return json(fixtureDocument(pullFiles()).segments)
-      if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
-      if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
-      if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])
-      // `ACORN_FIXTURE_LOG=1` prints what went unanswered. A pane that starts asking for a new route
-      // otherwise shows up as an empty region, and finding out which route it wanted is the difference
-      // between a minute and an afternoon.
-      if (process.env.ACORN_FIXTURE_LOG) process.stderr.write(`MISS ${request.method ?? 'GET'} ${path}\n`)
-      return { status: 404, headers: {}, body: new Uint8Array() }
+        // A transport that answers in a microtask can never hold a `Suspense` open past the next tick,
+        // so without a delay the shape the real app lives with (content removed, then handed back)
+        // can't be reached from a test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
+        const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
+        const path = request.path
+        recorded.push({ path, method: request.method ?? 'GET' })
+        // The shell asks for these on mount. Answering them keeps a suite's output free of query
+        // errors that say nothing about what is under test.
+        //
+        // One integration, and it is GitHub, because the rail gates a browse source on the integration
+        // behind it being connected (features/tabs/railSources.ts) — with none, the Menu holds only the
+        // sources that need no provider and the Browse panel has nothing to draw.
+        if (path === '/v1/core/prefs') return json({})
+        // Compiled client contributions require the node's running roster. The fixture mirrors
+        // the built-in services its pane routes below represent; there are no loaded client bundles.
+        if (path === '/v1/core/plugins')
+          return json({
+            restartRequired: false,
+            requests: [],
+            plugins: [
+              'agents',
+              'browser',
+              'docker',
+              'editor',
+              'git',
+              'github',
+              'memory',
+              'notes',
+              'preview',
+              'terminal',
+              'workflows',
+            ].map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
+          })
+        if (path === '/v1/core/integrations')
+          return json({
+            integrations: [GITHUB_INTEGRATION],
+            providers: process.env.ACORN_FIXTURE_LINK_SCOPES ? [{ id: 'github', supportsProjects: true }] : [],
+          })
+        if (path === '/v1/core/workspaces')
+          return json([
+            {
+              id: 'ws-1',
+              name: 'acorn',
+              projects: [
+                { id: 'project-1', name: 'acorn' },
+                { id: 'project-2', name: 'sibling' },
+              ],
+            },
+            ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE
+              ? [{ id: 'ws-2', name: 'second', projects: [{ id: SECOND_PROJECT.id, name: SECOND_PROJECT.name }] }]
+              : []),
+          ])
+        if (path === '/v1/core/workspaces/ws-1/external-projects')
+          return json({
+            projects:
+              process.env.ACORN_FIXTURE_LINK_SCOPES && !process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+                ? [{ integrationId: 'github', externalId: 'runn-fast/acorn' }]
+                : [],
+          })
+        if (path === '/v1/core/workspaces/ws-2/external-projects')
+          return json({
+            projects: process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+              ? [{ integrationId: 'github', externalId: 'runn-fast/second' }]
+              : [],
+          })
+        if (path === '/v1/core/tasks')
+          return json([TASK, ...(process.env.ACORN_FIXTURE_LINK_SCOPES ? [SECOND_TASK] : [])])
+        // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
+        // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a
+        // word, so a filter can be shown to keep some rows and drop others.
+        if (path === '/v1/p/probe/items')
+          return json({
+            items: [
+              { id: 'reset', title: 'Invalidate the old password on reset' },
+              { id: 'rotate', title: 'Rotate the signing key' },
+              { id: 'copy', title: 'Password reset copy' },
+            ],
+          })
+        if (path === '/v1/p/probe/task-items')
+          return json({
+            items: [
+              { id: 'first', title: 'First incident', task: { title: 'First incident' } },
+              { id: 'second', title: 'Second incident', task: { title: 'Second incident' } },
+            ],
+          })
+        if (path === '/v1/core/projects')
+          return json({
+            projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
+          })
+        if (path === `/v1/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
+        if (path === '/v1/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
+        if (path === '/v1/p/notes/workspaces/global/notes') return json([])
+        if (path.endsWith('/repro-steps'))
+          return json({ slug: 'repro-steps', title: 'Repro steps', body: BODY, included: true })
+        if (path.endsWith('/scratchpad'))
+          return json({ slug: 'scratchpad', title: 'Scratchpad', body: 'Whatever is in hand.\n', included: true })
+        // ── One answer per pane in the roster ─────────────────────────────────────────────────────
+        // Enough for each pane to draw its own shape rather than an error, because the sweep is about
+        // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
+        // `Alert` reads the same however unreadable the real thing is.
+        if (path === '/v1/p/agents/providers') return json(AGENT_PROVIDERS)
+        if (path.startsWith('/v1/p/agents/sessions?'))
+          return json({ sessions: agentSessions(), delegations: [], nextCursor: null })
+        // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
+        // reads as a session id, and the caller would get a snapshot object where it expects an array
+        // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
+        if (path.startsWith('/v1/p/agents/sessions/search?')) return json(agentSessions())
+        if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
+        if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events'))
+          return json({ events: [], nextCursor: null })
+        if (path === `/v1/p/git/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
+        if (path === `/v1/p/git/tasks/${TASK.id}/review-notes`) return json([])
+        if (path === `/v1/p/git/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
+        if (path === `/v1/p/git/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
+        if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
+        if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
+        if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
+        if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/list`)) return json(EDITOR_ENTRIES)
+        if (path === `/v1/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
+        if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
+        if (path === `/v1/p/github/tasks/${TASK.id}/pulls`)
+          return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
+        // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
+        // rather than "Not found" on all but the first.
+        if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
+        // Every GET on the files route answers with the list and whether it is all of them, and the diff
+        // route with the same files as a document (plugins/github/src/shared/api.ts § PullDiffResponse).
+        if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path))
+          return json({ files: pullFiles(), completeness: { kind: 'complete' } })
+        if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/diff$/.test(path))
+          return json({ document: fixtureDocument(pullFiles()).topology, completeness: { kind: 'complete' } })
+        if (path === '/v1/p/github/repos/runn-fast/acorn/diff/segments')
+          return json(fixtureDocument(pullFiles()).segments)
+        if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
+        if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
+        if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])
+        // `ACORN_FIXTURE_LOG=1` prints what went unanswered. A pane that starts asking for a new route
+        // otherwise shows up as an empty region, and finding out which route it wanted is the difference
+        // between a minute and an afternoon.
+        if (process.env.ACORN_FIXTURE_LOG) process.stderr.write(`MISS ${request.method ?? 'GET'} ${path}\n`)
+        return { status: 404, headers: {}, body: new Uint8Array() }
       } finally {
         pending -= 1
         if (pending === 0) {

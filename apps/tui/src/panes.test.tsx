@@ -31,8 +31,7 @@ const drewCleanly = (frame: string, paneId: string): void => {
  * `until` is the first thing the case is going to look for, and the frame is taken again until it is
  * on screen. A pane's own data is a route and a store rather than a prop, and the first render in a
  * fresh worker also pays for compiling everything the pane pulls in — so the settle the harness does
- * comes back before the pane has filled, and every one of these asserted on an empty screen once
- * (docs/tui.md).
+ * can come back before the pane has filled (docs/tui.md).
  *
  * Bounded, and the frame comes back either way: a pane that never fills is itself a finding, and this
  * reports it as a missing line on a screen somebody can read rather than as a timeout.
@@ -41,7 +40,11 @@ const screenFor = async (
   pane: string,
   options: { until: string; width?: number; height?: number },
 ): Promise<string> => {
-  const screen = await renderFixture({ pane, ...(options.width ? { width: options.width } : {}), ...(options.height ? { height: options.height } : {}) })
+  const screen = await renderFixture({
+    pane,
+    ...(options.width ? { width: options.width } : {}),
+    ...(options.height ? { height: options.height } : {}),
+  })
   let frame = await screen.frame()
   for (let tries = 0; tries < 20 && !frame.includes(options.until); tries += 1) {
     // A real wait, not just another flush: what is outstanding is a route and, on a cold worker, the
@@ -64,13 +67,13 @@ describe('every pane at 80 by 24', () => {
     // mark in the leading cell, before the title, even though the subtitle can be clipped at 80.
     expect(frame).toMatch(/◌\s+Find why the old password still works/)
     // `Row variant="stacked"` puts the subtitle on its own line here, as it does on the DOM. Drawing
-    // both on one line ran the title into the model name with nothing between them.
+    // both on one line runs the title into the model name with nothing between them.
     //
     // The state is off the end of it at this size and that is the pane behaving. The left column takes
     // about a third of the shell, so at 80 the pane is 54 cells and a stacked row splits what is left
     // with its own trailing actions — which leaves the subtitle 30. Written down rather than fixed,
     // the same way the PR pane's folded navigator is: the row still says which session and which
-    // model, which is what the reader came for (../chrome/Rail.tsx § railCells).
+    // model, which is what the reader came for (./chrome/Rail.tsx § railCells).
     expect(frame).toContain('claude · claude-opus-5')
   }, 60_000)
 
@@ -87,10 +90,10 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('Description')
   }, 60_000)
 
-  it('git: the Changes tab\'s tracked group, its counts, and the commit line at the foot', async () => {
+  it("git: the Changes tab's tracked group, its counts, and the commit line at the foot", async () => {
     const frame = await screenFor('git', { until: 'Tracked' })
     // Groups by what a file is, not by which staging area it is in: staging is the checkbox on the
-    // row now, and the fixture's three files are two tracked edits and one new file.
+    // row, and the fixture's three files are two tracked edits and one new file.
     expect(frame).toContain('Tracked')
     expect(frame).toContain('login.ts')
     const trackedLine = frame.split('\n').find((line) => line.includes('Tracked'))!
@@ -101,9 +104,8 @@ describe('every pane at 80 by 24', () => {
     // the checkbox stay legible and the deletions fall off the end, which is what
     // docs/ui-design/every-node.md § Every node at 80 by 24 says a row's `meta` gives up first.
     expect(frame).toContain('+12')
-    // The editor is always there, where the one-line field used to appear only once something was
-    // staged, and the button says which commit it is about to make: the fixture has one file in the
-    // index, so it is the index that gets committed.
+    // The editor is always there, and the button says which commit it is about to make: the fixture
+    // has one file in the index, so it is the index that gets committed.
     expect(frame).toContain('Commit message')
     expect(frame).toContain('[Commit]')
     expect(frame).toContain('[Commit options]')
@@ -143,21 +145,17 @@ describe('every pane at 80 by 24', () => {
   }, 60_000)
 
   // Driving one, rather than reading it: open a session and read what the agent said. At 120 the pane
-  // draws both its columns, which is the size this asks about — the transcript, a tool card, the
-  // approval and the composer are the four things the plugin table promises the terminal
-  // (01-why.md). At 80 the same four are behind the layout's group switch, which the layout suite owns.
+  // draws both its columns, which is the size this asks about: the transcript, a tool card, the
+  // approval and the composer. At 80 the same four are behind the layout's group switch, which the
+  // layout suite owns.
   it('agents: a session opens on a transcript, a tool card, an approval and a composer', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     // Tab to the session list, wherever the cycle starts, then open the row the caret is on.
     //
-    // Two things this loop learned. The bound is the whole cycle and then some, because the shell puts
-    // three regions down the left before the pane strip and a fixed four presses stopped short — the
-    // `RETURN` then landed on the Menu and opened a browse source, which drew a blank pane and failed
-    // naming the wrong thing (../chrome/Rail.tsx).
-    //
-    // And what it waits for is the row's own title. `Find why…` is the *subtitle* of the first row, on
-    // the line below the caret's, so a loop looking for it never matched and fell through to whichever
-    // region it ended on. It passed anyway, on the region the fall-through happened to leave it in.
+    // The bound is the whole cycle and then some, because the shell puts three regions down the left
+    // before the pane strip; too few presses leave `RETURN` on the Menu, which opens a browse source
+    // (./chrome/Rail.tsx). And it waits for the row's own title: `Find why…` is the *subtitle* of the
+    // first row, on the line below the caret's, so a loop looking for it never matches.
     let found = false
     for (let step = 0; step < 10 && !found; step += 1) {
       const caret = (await screen.frame()).split('\n').find((line) => line.includes('\u203a')) ?? ''
@@ -173,7 +171,7 @@ describe('every pane at 80 by 24', () => {
     fitsIn(frame, 120)
     // The agent's answer, asserted to where the turn wraps: the left column takes about a third of the
     // shell, so the detail column is 52 cells here and a message longer than that runs onto a second
-    // line, which is the transcript working rather than failing (../chrome/Rail.tsx § railCells).
+    // line, which is the transcript working rather than failing (./chrome/Rail.tsx § railCells).
     //
     // The reader's own opening words are not on this screen, and that is the pane behaving. A session
     // with no saved reading mark opens at the foot, so the newest turn is what you land on and the

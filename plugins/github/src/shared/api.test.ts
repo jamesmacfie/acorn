@@ -8,7 +8,6 @@ import {
   pullDiffRoute,
   diffSegmentsRoute,
   diffSearchRoute,
-  pinsKey,
   pullKey,
   pullPrefixKey,
   pullRoute,
@@ -41,9 +40,12 @@ describe('github wire contract', () => {
     expect(pullDiffRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/diff')
     expect(diffSegmentsRoute('octo', 'repo')).toBe('/v1/p/github/repos/octo/repo/diff/segments')
     expect(diffSearchRoute('octo', 'repo')).toBe('/v1/p/github/repos/octo/repo/diff/search')
-    expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies'))
-      .toBe('/v1/p/github/repos/octo/repo/pulls/12/review-comments/99/replies')
-    expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/v1/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
+    expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies')).toBe(
+      '/v1/p/github/repos/octo/repo/pulls/12/review-comments/99/replies',
+    )
+    expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe(
+      '/v1/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve',
+    )
     expect(rerunFailedRoute('octo', 'repo', 123)).toBe('/v1/p/github/repos/octo/repo/actions/123/rerun')
   })
 
@@ -56,7 +58,6 @@ describe('github wire contract', () => {
     expect(repoLabelsKey('octo', 'repo')).toEqual(['labels', 'octo', 'repo'])
     expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary', 'v2'])
     expect(pullDiffKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'diff'])
-    expect(pinsKey).toEqual(['pins'])
   })
 
   // The same net protocol keeps over its own builders, scoped to this plugin: enumerated from the
@@ -68,7 +69,9 @@ describe('github wire contract', () => {
       .filter(([name]) => name.endsWith('Route'))
       .map(([name, value]): [string, unknown] => [
         name,
-        typeof value === 'function' ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy)) : value,
+        typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy))
+          : value,
       ])
     expect(paths.length).toBeGreaterThan(20) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {

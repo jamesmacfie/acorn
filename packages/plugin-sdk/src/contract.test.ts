@@ -3,7 +3,7 @@ import * as sdk from './index.ts'
 import type * as Published from './public.ts'
 import type { AcornBridge, PluginFrameContext } from './index.ts'
 
-// The drift lock for the hand-written published declaration. See docs/plugins/package-shape.md
+// The drift lock for the hand-written published declaration. See docs/plugins/publishing.md
 // § What is published, and what acorn promises about it. The published name snapshot cannot detect a
 // type changing beneath an unchanged name; these assertions compare the declaration with the host.
 //
@@ -19,7 +19,10 @@ type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]
 // also names the offender when it does break.
 const _bridge: Mutual<AcornBridge, Published.AcornBridge> = [true, true]
 const _context: Mutual<PluginFrameContext, Published.PluginFrameContext> = [true, true]
-const _error: Mutual<InstanceType<typeof sdk.AcornBridgeError>, InstanceType<typeof Published.AcornBridgeError>> = [true, true]
+const _error: Mutual<InstanceType<typeof sdk.AcornBridgeError>, InstanceType<typeof Published.AcornBridgeError>> = [
+  true,
+  true,
+]
 const _connect: Mutual<typeof sdk.connect, typeof Published.connect> = [true, true]
 const _mount: Mutual<typeof sdk.mountFrame, typeof Published.mountFrame> = [true, true]
 const _link: Mutual<typeof sdk.openLinkOnClick, typeof Published.openLinkOnClick> = [true, true]

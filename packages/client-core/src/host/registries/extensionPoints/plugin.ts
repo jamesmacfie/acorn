@@ -11,11 +11,22 @@ import { isRailMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { refPanelRegistry, type RefPanelContribution } from '../panes/refPanels'
 import { clientScheduleRegistry, type ClientScheduleContribution } from '../shell/schedules'
 import { contentLinkRegistry, type ContentLinkContribution } from '../panes/contentLinks'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution, type ExtensionPointContribution } from './extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+  type ExtensionPointContribution,
+} from './extensionPoints'
 import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
-import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../../../infra/node/clientCapabilities'
+import {
+  clientCapability,
+  clientCapabilityIds,
+  provideClientCapability,
+  requireClientCapability,
+  type ClientCapabilityId,
+} from '../../../infra/node/clientCapabilities'
 import type { Disposable, Registry } from '../../../kit/lib/state/registry'
 import { pluginSettingsPlacementProblem, settingsRegistry, type SettingsContribution } from '../shell/settings'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
@@ -30,27 +41,27 @@ import { registerSessionSource, type SessionSource } from '../sessions/sessionSo
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
 // (docs/plugins/activation.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
-export type ClientContributionPoint<T> = {
+type ClientContributionPoint<T> = {
   register(entry: T): void
 }
 
 /** What a compiled plugin declares when it opens a point. The two fields the host owns are missing:
  *  `id` here is the bare point id, and `ownerId` is stamped from the plugin doing the registering. */
-export type CompiledExtensionPoint =
-  Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
+type CompiledExtensionPoint = Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
 
 /** What a compiled plugin declares when it fills somebody else's point. `pluginId` and `carrier` are
  *  the host's; `component` is the only carrier a plugin in this process can bring. */
-export type CompiledExtension =
-  Omit<ExtensionContribution, 'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'>
-  & { component: NonNullable<ExtensionContribution['component']> }
+type CompiledExtension = Omit<
+  ExtensionContribution,
+  'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'
+> & { component: NonNullable<ExtensionContribution['component']> }
 
 // What a plugin loaded from disk would be handed, if one were ever handed this object. It is not: a
 // loaded plugin's client half is a manifest plus a tree or a frame, and the descriptor pass turns those
 // into the same contributions from outside. The split is here anyway, because
 // docs/contribution-kinds.md names a tier per kind and the test that reads this file should see the same
 // partition the table does.
-export type ClientPluginContext = {
+type ClientPluginContext = {
   readonly name: string
   panes: ClientContributionPoint<PaneRegistration>
   // Generic per call. A source's promotion is typed on the item it promotes, and the registry holds a
@@ -63,7 +74,7 @@ export type ClientPluginContext = {
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
-  // or just a task id (registries/slots.ts).
+  // or just a task id (./slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
   // A place in this plugin's own tree that another plugin may fill (docs/plugins/cooperative-extension-points.md § Cooperative
   // extension points). The compiled half of the manifest's `extensionPoints`; the host mints
@@ -71,46 +82,45 @@ export type ClientPluginContext = {
   extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
   // What this plugin brings to somebody else's point. The compiled half of the manifest's
   // `extensions`, and the only carrier available here is a component: a loaded plugin ships bytes for a
-  // worker, and a compiled one is already in this process (registries/extensionPoints.ts).
+  // worker, and a compiled one is already in this process (./extensionPoints.ts).
   extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
   agentContexts: ClientContributionPoint<AgentContextContribution>
   // One number on a Fleet home node card (docs/frontend/registries.md § Registries and plugins;
-  // registries/nodeStats.ts).
+  // rail/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
   // Rows for the attention inbox: states on a node that need the owner, fetched per node
-  // (docs/frontend/shell-state.md § Shell state; registries/attention.ts).
+  // (docs/frontend/shell-state.md § Shell state; rail/attention.ts).
   attentionSources: ClientContributionPoint<AttentionSourceContribution>
   // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design/icons.md §
   // Icons).
   brandMarks: ClientContributionPoint<BrandMark>
-  // A recogniser that turns an external URL into an in-app destination (registries/contentLinks.ts).
+  // A recogniser that turns an external URL into an in-app destination (panes/contentLinks.ts).
   contentLinks: ClientContributionPoint<ContentLinkContribution>
   // The escape hatch, and the line it sits on: a registry the HOST owns gets a named member above; a
   // registry another PLUGIN published has no member to give it, and goes through here. Same ownership
   // check and same recorded disposable either way, so the only difference is who declared the
-  // registry. Both of core's own targets got names on 2026-08-27; before that the line was drawn
-  // nowhere and every contribution count that read this file was two short.
+  // registry.
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
 }
 
 // What a plugin compiled into this bundle is handed: everything above, plus the five kinds
 // docs/contribution-kinds.md marks compiled-only on the client. An intersection rather than a second
 // literal, for the same reason as the node's CompiledNodePluginContext.
-export type CompiledClientPluginContext = ClientPluginContext & {
+type CompiledClientPluginContext = ClientPluginContext & {
   // Live, node-scoped summaries for host navigation and send pickers. The compiled owner keeps its
   // complete records and the registration is disposed with its other contributions.
   sessionSources: { register(source: SessionSource): void }
   // The same word the node uses for the same idea, and deliberately not the same shape
-  // (registries/schedules.ts).
+  // (shell/schedules.ts).
   schedules: ClientContributionPoint<ClientScheduleContribution>
   integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
   // Status markers drawn on a rail control by the host, published from the state that owns them
-  // (registries/railMarkers.ts). Data only; a marker has no click verb.
+  // (rail/railMarkerFeed.ts). Data only; a marker has no click verb.
   railMarkers: ClientContributionPoint<RailMarkerContribution>
   persistedStateSlices: ClientContributionPoint<PersistedStateSlice<unknown>>
   // Plugin-to-plugin functions, the same four methods as the node's `ctx.capabilities`
-  // (../clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
+  // (infra/node/clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
   // hit "already provided".
   //
   // Not the platform gate. That is `requires` on a contribution, answered by hostCapabilities.ts.
@@ -119,7 +129,7 @@ export type CompiledClientPluginContext = ClientPluginContext & {
 
 // The client half of the node's `Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>`. Same
 // four verbs, so an author who learned one half does not get the other backwards.
-export type ClientCapabilities = {
+type ClientCapabilities = {
   provide<T>(id: ClientCapabilityId<T>, impl: T): void
   get<T>(id: ClientCapabilityId<T>): T | undefined
   // For a capability whose provider cannot be disabled. Throws rather than returning undefined, so a
@@ -159,19 +169,20 @@ const contributed = new Map<string, Disposable[]>()
 
 // The inputs of the last pass and what it returned. The shell calls the host once at boot with nothing
 // disabled and again when the node answers, and that answer is almost always "nothing disabled" as
-// well. Re-running for it took every contribution back, notified every registry twice and ran every
-// `activate` a second time, which primed the agent roster twice per launch.
-let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null = null
+// well. Re-running for it would take every contribution back, notify every registry twice and run every
+// `activate` a second time, priming the agent roster twice per launch.
+let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null =
+  null
 
 // The same plugin objects in the same order, with the same ones switched off. Nothing else is an input
 // to a pass. Which node a contribution talks to and whether it draws are both read when they are
 // asked, not at `init`, and a plugin whose side effects follow the active node keys them on it itself
 // (the agent roster prime, the terminal session list). Loaded plugins arrive through their own pass.
 const samePass = (plugins: readonly ClientPlugin[], skipped: readonly string[]): boolean =>
-  lastPass !== null
-  && lastPass.plugins.length === plugins.length
-  && lastPass.plugins.every((plugin, index) => plugin === plugins[index])
-  && lastPass.skipped.join('\n') === skipped.join('\n')
+  lastPass !== null &&
+  lastPass.plugins.length === plugins.length &&
+  lastPass.plugins.every((plugin, index) => plugin === plugins[index]) &&
+  lastPass.skipped.join('\n') === skipped.join('\n')
 
 // A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
 // because `pr`, `changes` and `terminal.drawer` are persisted layout keys and chord targets, so
@@ -186,8 +197,10 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
   // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
   // contributed an entry and the seams that build a telemetry record can name it
-  // (kit/lib/state/registry.ts § the owner side-map).
-  const own = <T extends { id: string }>(registry: { register: (entry: T, owner?: string) => Disposable }): ClientContributionPoint<T> => ({
+  // (the owner side-map in kit/lib/state/registry.ts).
+  const own = <T extends { id: string }>(registry: {
+    register: (entry: T, owner?: string) => Disposable
+  }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)
       if (provider !== undefined && provider !== name) {
@@ -200,7 +213,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   const contentLinks: ClientContributionPoint<ContentLinkContribution> = {
     register: (entry) => {
       const provider = declaredProvider(entry)
-      if (provider !== undefined && provider !== name) throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
+      if (provider !== undefined && provider !== name)
+        throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
       const id = entry.id.startsWith(`${name}.`) ? entry.id : `${name}.${entry.id}`
       record(contentLinkRegistry.register({ ...entry, id, ...(entry.target ? { providerId: name } : {}) }, name))
     },
@@ -222,15 +236,20 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // nothing to look at until they are stamped. The id is the host's to mint.
   // Neither goes through `own`. Both arrive without the field the host stamps, and the point's id is
   // qualified here rather than declared, which is the same rule the manifest path follows
-  // (plugins/chrome/extensionPoints.ts).
+  // (chrome/chromeExtensionPoints.ts).
   const ownExtensionPoint: ClientContributionPoint<CompiledExtensionPoint> = {
     register: (entry) => {
-      record(extensionPointRegistry.register({
-        ...entry,
-        id: qualifiedExtensionPointId(name, entry.id),
-        ownerId: name,
-        max: entry.max ?? 1,
-      }, name))
+      record(
+        extensionPointRegistry.register(
+          {
+            ...entry,
+            id: qualifiedExtensionPointId(name, entry.id),
+            ownerId: name,
+            max: entry.max ?? 1,
+          },
+          name,
+        ),
+      )
     },
   }
   // `own`, plus the placement check. Core fills three of the nine settings groups itself, and a page
@@ -258,14 +277,21 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
     commands: ownCommand,
     keybindings,
-    contextMenus: { register: (entry) => {
-      if (isRailMenuLocation(entry.location) && !entry.surface) throw new Error(`Plugin '${name}' must name a rail menu surface`)
-      if (isRailMenuLocation(entry.location) &&
-        (entry.location === 'rail.source' ? sourceRegistry.ownerOf(entry.surface!) : paneRegistry.ownerOf(entry.surface!)) !== name) {
-        throw new Error(`Plugin '${name}' cannot add a menu to '${entry.surface}'`)
-      }
-      record(contextMenuRegistry.register(entry, name))
-    } },
+    contextMenus: {
+      register: (entry) => {
+        if (isRailMenuLocation(entry.location) && !entry.surface)
+          throw new Error(`Plugin '${name}' must name a rail menu surface`)
+        if (
+          isRailMenuLocation(entry.location) &&
+          (entry.location === 'rail.source'
+            ? sourceRegistry.ownerOf(entry.surface!)
+            : paneRegistry.ownerOf(entry.surface!)) !== name
+        ) {
+          throw new Error(`Plugin '${name}' cannot add a menu to '${entry.surface}'`)
+        }
+        record(contextMenuRegistry.register(entry, name))
+      },
+    },
     integrationFlows: ownIntegrationFlow,
     projectImporters: own(projectImporterRegistry),
     settingsPages: ownSettingsPage,
@@ -299,13 +325,18 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
 // source is not refused for the order the author wrote them in.
 function railSwitchProblem(pluginId: string): string | undefined {
   return untrack(() => {
-    const own = sourceRegistry.entries().map((source) => source.id).filter((id) => sourceRegistry.ownerOf(id) === pluginId)
+    const own = sourceRegistry
+      .entries()
+      .map((source) => source.id)
+      .filter((id) => sourceRegistry.ownerOf(id) === pluginId)
     for (const page of settingsRegistry.entries()) {
       const ids = page.railSourceVisibility
       if (!ids || settingsRegistry.ownerOf(page.id) !== pluginId) continue
-      if (ids.length > RAIL_SOURCE_VISIBILITY_MAX) return `settings page '${page.id}' with more than ${RAIL_SOURCE_VISIBILITY_MAX} railSourceVisibility ids`
+      if (ids.length > RAIL_SOURCE_VISIBILITY_MAX)
+        return `settings page '${page.id}' with more than ${RAIL_SOURCE_VISIBILITY_MAX} railSourceVisibility ids`
       const foreign = foreignRailSources(ids, own)[0]
-      if (foreign) return `settings page '${page.id}' with a railSourceVisibility id '${foreign}' that is not one of its sources`
+      if (foreign)
+        return `settings page '${page.id}' with a railSourceVisibility id '${foreign}' that is not one of its sources`
     }
     return undefined
   })
@@ -322,7 +353,13 @@ export function initClientPlugins(
   }
   const disabled = new Set(options.disabled ?? [])
   const isSkipped = (plugin: ClientPlugin): boolean => disabled.has(plugin.name) && !plugin.required
-  if (samePass(plugins, plugins.filter(isSkipped).map((plugin) => plugin.name))) return lastPass!.result
+  if (
+    samePass(
+      plugins,
+      plugins.filter(isSkipped).map((plugin) => plugin.name),
+    )
+  )
+    return lastPass!.result
   // Forgotten until this pass finishes, so one that throws part-way is never mistaken for done.
   lastPass = null
   const enabled: string[] = []
@@ -334,8 +371,8 @@ export function initClientPlugins(
 
   // One update for the whole roster. A second apply takes each plugin's contributions back and
   // registers them again, and without the batch an effect could run in between and find a source,
-  // pane or command missing. The shell's "is the selected source still on offer" check did exactly
-  // that, and reset every relaunch on a plugin source to Home.
+  // pane or command missing. The shell's "is the selected source still on offer" check is one such
+  // effect, and it would reset every relaunch on a plugin source to Home.
   batch(() => {
     for (const plugin of plugins) {
       // Take back whatever this plugin registered on a previous activation, before it registers again.

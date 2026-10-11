@@ -1,6 +1,6 @@
-// Shared host grammar and URL policy for host-owned plugin webviews. The manifest parser, renderer
-// broker and Electron redirect guard all call this independently; changing the grant in one layer
-// therefore cannot silently widen another.
+// Shared host grammar and URL policy for host-owned plugin webviews. The manifest parser and the
+// renderer broker both call this, so changing the grant in one layer cannot silently widen the other.
+// The shell's navigation guard is a Rust twin (`is_allowed_webview_url`) and must change with it.
 export const WEBVIEW_HOST_MAX_LENGTH = 253
 export const WEBVIEW_HOST_MAX_COUNT = 32
 
@@ -8,7 +8,7 @@ const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i
 const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1'])
 
-const unbracket = (host: string): string => host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+const unbracket = (host: string): string => (host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host)
 
 export function normalizeWebviewHost(pattern: string): string {
   if (!pattern.length || pattern.length > WEBVIEW_HOST_MAX_LENGTH) {
@@ -24,7 +24,8 @@ export function normalizeWebviewHost(pattern: string): string {
     return host
   }
   if (IPV4.test(host)) {
-    if (wildcard || host.split('.').some((part) => Number(part) > 255)) throw new Error('webview host has an invalid IPv4 address')
+    if (wildcard || host.split('.').some((part) => Number(part) > 255))
+      throw new Error('webview host has an invalid IPv4 address')
     return host
   }
   if (!host.includes('.') || host.split('.').some((label) => !HOST_LABEL.test(label))) {
@@ -33,7 +34,7 @@ export function normalizeWebviewHost(pattern: string): string {
   return wildcard ? `*.${host}` : host
 }
 
-export const isLoopbackWebviewHost = (hostname: string): boolean => LOOPBACK.has(unbracket(hostname.toLowerCase()))
+const isLoopbackWebviewHost = (hostname: string): boolean => LOOPBACK.has(unbracket(hostname.toLowerCase()))
 
 export function webviewHostMatches(hostname: string, pattern: string): boolean {
   let normalized: string

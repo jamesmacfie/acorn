@@ -1,4 +1,15 @@
-import { createComponent, createMemo, createRenderEffect, lazy, onCleanup, onMount, Suspense, type Accessor, type Component, type JSX } from 'solid-js'
+import {
+  createComponent,
+  createMemo,
+  createRenderEffect,
+  lazy,
+  onCleanup,
+  onMount,
+  Suspense,
+  type Accessor,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
@@ -133,11 +144,10 @@ export type PaneModelContext = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
 export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 
-// There is no `keepAlive` here either, and there was: the field promised the host would keep a pane's
-// DOM across a task switch, exactly one pane set it, and nothing ever read it. What keeps a pane cheap
-// to leave and come back to is ./paneModels.ts within a task and the query cache across tasks, warmed
-// by `prefetch` above. A hidden element tree per task is the memory shape this codebase already
-// declined for the agent transcript (docs/managed-agents/transcript.md), so it is not coming back as a pane field.
+// There is no `keepAlive` here. What keeps a pane cheap to leave and come back to is ./paneModels.ts
+// within a task and the query cache across tasks, warmed by `prefetch` above. A hidden element tree per
+// task is the memory shape this codebase declined for the agent transcript
+// (docs/managed-agents/transcript.md).
 //
 // There is no per-pane `freshness` hook here (docs/panes/contributions.md § Contributions has the reason).
 //
@@ -183,11 +193,12 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   // with its own components and this registry is the one place that decided otherwise
   // (../../layouts/table.ts).
   //
-  // Behind `lazy` for the reason plugins/frames/register.ts states: this module is imported by
-  // bare-Node test suites, and the repo's vitest configs have no Solid transform, so a static import
-  // of a `.tsx` file would make it unimportable there. The `??` short-circuits, so a host that
+  // Behind `lazy` because this module is imported by bare-Node test suites with no Solid transform,
+  // where a static import of a `.tsx` file would make it unimportable. The `??` short-circuits, so a host that
   // supplied a table never reaches for the DOM one at all.
-  const Draw = lazy(async () => ({ default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout] }))
+  const Draw = lazy(async () => ({
+    default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout],
+  }))
   return {
     ...entry,
     // A region that is not a `lazy()` has nothing to load. A failed load is the region boundary's to
@@ -202,26 +213,33 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       const regions: Record<string, Region> = {}
       // A getter, so the model is looked up when a region renders rather than when the pane is built,
       // and a pane that switches task hands its regions the new task's model without remounting them.
-      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => {
-        const taskId = props.task.id
-        return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId, scope)) })
-      }, owner ?? 'core', scope) : undefined)
+      const model = () =>
+        entry.model
+          ? paneModel(
+              entry.id,
+              props.task.id,
+              () => {
+                const taskId = props.task.id
+                return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId, scope)) })
+              },
+              owner ?? 'core',
+              scope,
+            )
+          : undefined
       // For as long as this pane draws this task, which is what the model's `shown` reads.
       createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
-        // renders as an empty string, which drew the region's rectangle empty until the module
-        // landed. The boundary draws the host's labelled placeholder instead. One boundary per region
-        // rather than one per pane, so a slow region does not blank the ones beside it. It used to be
-        // here for a harder reason, a cell host that refused a bare string outright; that rule went
-        // with the terminal rewrite (apps/tui/src/tree/renderer.ts).
+        // renders as an empty string, which would draw the region's rectangle empty until the module
+        // lands. The boundary draws the host's labelled placeholder instead. One boundary per region
+        // rather than one per pane, so a slow region does not blank the ones beside it.
         //
         // The boundary covers the module arriving and nothing after it. Everything under a region
         // shares it, and `@tanstack/solid-query` suspends whatever boundary is above it whenever
-        // `.data` is read on an empty cache, so a query that starts once the region is already on
-        // screen used to take the region back out of the document for the length of its fetch. The
-        // solid-js patch is what stops that: a boundary that has drawn never swaps back to its
-        // fallback, and patches/README.md holds the reasoning.
+        // `.data` is read on an empty cache, so without the solid-js patch a query that starts once the
+        // region is on screen would take the region back out of the document for the length of its
+        // fetch. With it, a boundary that has drawn never swaps back to its fallback; patches/README.md
+        // holds the reasoning.
         regions[name] = () => {
           // Opened here, where the host asks for the region, and ended when the region's content
           // mounts. A region that suspends is the case worth measuring: everything between those two
@@ -231,15 +249,21 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             attrs: { seam: 'pane.region', 'pane.id': entry.id, 'pane.region': name },
           })
           return createComponent(Suspense, {
-            get fallback() { return loadingPlaceholder(entry.label) },
+            get fallback() {
+              return loadingPlaceholder(entry.label)
+            },
             get children() {
               return createComponent(MeasuredRegion, {
                 paneId: entry.id,
                 span,
                 get children() {
                   return createComponent(Region, {
-                    get task() { return props.task },
-                    get model() { return model() },
+                    get task() {
+                      return props.task
+                    },
+                    get model() {
+                      return model()
+                    },
                   })
                 },
               })
@@ -249,18 +273,29 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       }
       // The layout is a `lazy` too, and a pending one renders as an empty string for the same
       // reason a region does, so it gets the same boundary and placeholder.
-      return createComponent(Suspense, { get fallback() { return loadingPlaceholder(entry.label) }, get children() { return createComponent(Draw, {
-        stateKey: entry.id,
-        label: entry.label,
-        regions,
-        ...(entry.tabs ? { tabs: entry.tabs } : {}),
-        // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
-        // pane. Collapsing a library must not remount the note being edited.
-        get hidden() { return entry.hidden?.(props.task) },
-      collapsible: entry.collapsible === true,
-      collapseContent: entry.collapseContent ?? 'rows',
-      get scrollScope() { return props.task.id },
-      }) } })
+      return createComponent(Suspense, {
+        get fallback() {
+          return loadingPlaceholder(entry.label)
+        },
+        get children() {
+          return createComponent(Draw, {
+            stateKey: entry.id,
+            label: entry.label,
+            regions,
+            ...(entry.tabs ? { tabs: entry.tabs } : {}),
+            // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
+            // pane. Collapsing a library must not remount the note being edited.
+            get hidden() {
+              return entry.hidden?.(props.task)
+            },
+            collapsible: entry.collapsible === true,
+            collapseContent: entry.collapseContent ?? 'rows',
+            get scrollScope() {
+              return props.task.id
+            },
+          })
+        },
+      })
     },
   }
 }
@@ -278,25 +313,23 @@ export const paneContributions = (): readonly PaneContribution[] =>
   [...paneRegistry.entries()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
 export const paneContribution = (id: PaneId): PaneContribution | undefined => paneRegistry.get(id)
-export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id)
-export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
-  hasHostCapability(pane.requires)
-  && (!task || task.status !== 'archived' || pane.readsArchived === true)
-  && (!task || !pane.when || pane.when(task))
+  hasHostCapability(pane.requires) &&
+  (!task || task.status !== 'archived' || pane.readsArchived === true) &&
+  (!task || !pane.when || pane.when(task))
 
 /** A hover shorter than this is the pointer crossing the rail, not a reader looking at a row. */
 export const PANE_PREFETCH_HOVER_MS = 150
 
 /** Every available pane's `prefetch` for one task, run once. Failures are the pane's to swallow. */
-export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
+const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
   for (const pane of paneContributions()) {
     if (!pane.prefetch || !paneAvailable(pane, task)) continue
     try {
       pane.prefetch(task, queryClient)
     } catch (error) {
       // A pane that throws on the way to warming a cache must not take the rail's pointer handler
-      // with it. Nothing is missing afterwards; the pane fetches on mount as it always did.
+      // with it. Nothing is missing afterwards; the pane fetches on mount.
       log.error(`'${pane.id}' failed to prefetch`, error, { 'pane.id': pane.id })
     }
   }
@@ -307,7 +340,11 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
  * rail past twenty rows fetches nothing. It also starts loading the code of `shown`, the panes the task
  * opens with, so a first opening doesn't wait on its chunks. Only those: the rest load when opened.
  */
-export const schedulePanePrefetch = (task: Task, queryClient: QueryClient, shown: readonly PaneId[] = []): { cancel: () => void } => {
+export const schedulePanePrefetch = (
+  task: Task,
+  queryClient: QueryClient,
+  shown: readonly PaneId[] = [],
+): { cancel: () => void } => {
   const timer = setTimeout(() => {
     prefetchPanes(task, queryClient)
     for (const id of shown) {

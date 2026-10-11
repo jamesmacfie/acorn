@@ -72,10 +72,10 @@ const ESCAPE_PAIR_MS = 400
 //
 // Every mounted rectangle's own answer, rather than a count of the ones that are entered. Two of them
 // can be mounted at once, a task with a terminal pane beside a docker exec, and each answers about its
-// own box, so the footer asks whether any of them says yes. A count could disagree with the screen and
-// did: the second rectangle leaving decremented a number the first one still held, and a rectangle
-// hidden without being unmounted never decremented at all, so the footer went on telling a reader to
-// press Escape at a box nobody could see. Nothing derived from the box itself can drift that way.
+// own box, so the footer asks whether any of them says yes. A count can disagree with the screen: the
+// second rectangle leaving decrements a number the first one still holds, and a rectangle hidden
+// without being unmounted never decrements at all, so the footer tells a reader to press Escape at a
+// box nobody can see. Nothing derived from the box itself can drift that way.
 //
 // A signal over the list rather than a plain array, so the footer re-reads when a rectangle mounts as
 // well as when one is entered. Module state rather than a prop threaded up through the shell: the
@@ -100,14 +100,16 @@ const SCROLLBACK = 1000
  *  Node's ESM loader cannot see, which is the shape
  *  `plugins/agents/src/server/usage/processRunner.ts` already uses for it. Lazily, and that half is
  *  load-bearing: this module is in `App`'s eager graph, so a static import would put a whole terminal
- *  emulator into the startup of the build that draws its terminals with OpenTUI's instead
- *  (../scripts/check-startup-graph.mjs, docs/frontend/startup-budget.md § Startup budget). */
+ *  emulator into startup
+ *  (apps/tui/scripts/check-startup-graph.mjs, docs/frontend/startup-budget.md § Startup budget). */
 let loaded: typeof HeadlessTerminal | undefined
 
 const emulatorClass = (): typeof HeadlessTerminal => {
-  loaded ??= (createRequire(import.meta.url)('@xterm/headless') as {
-    Terminal: typeof HeadlessTerminal
-  }).Terminal
+  loaded ??= (
+    createRequire(import.meta.url)('@xterm/headless') as {
+      Terminal: typeof HeadlessTerminal
+    }
+  ).Terminal
   return loaded
 }
 
@@ -141,9 +143,9 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     for (const listener of dataListeners) listener(bytes)
   }
   // A keystroke, encoded the way a PTY expects it, and handed to whoever is filling the rectangle.
-  // Through an encoder rather than the emulator's own key handling: OpenTUI's only takes keys when
-  // the renderer has focused it, headless xterm has no keyboard at all, and here the box holds the
-  // focus either way so that Enter and Escape belong to the rectangle rather than to what is in it.
+  // Through an encoder rather than the emulator's own key handling: headless xterm has no keyboard at
+  // all, and here the box holds the focus so that Enter and Escape belong to the rectangle rather than
+  // to what is in it.
   const send = (key: KeyEvent) => {
     const bytes = inside?.encode(key)
     if (bytes?.length) emit(bytes)
@@ -155,7 +157,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   // eating keys, because `visible` is per node and `onScreen` walks the parents
   // (../keys/regions.ts § onScreen).
   //
-  // Both terms are reactive now and both have to be, because this answer is drawn: the title and the
+  // Both terms are reactive and both have to be, because this answer is drawn: the title and the
   // border tone are this box's own, so a render that short-circuited before either signal would not
   // re-run when the keys arrived, and the rectangle would take them without saying so.
   const entered = (): boolean => armed() && !!box && focusedRenderable() === box && onScreen(box)
@@ -169,12 +171,10 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     // come back to it (../keys/regions.ts § The one owner).
     focusRenderable(box)
   }
-  // The keys leaving the box disarms it, and there are two ways for that to happen: something else
-  // takes them, or the box goes off screen behind an overlay or a switched-away tab. Neither used to
-  // be one thing to watch — the first raised the renderer's `blurred` event and the second raised
-  // nothing at all — and one store's signal is both of them now. Hiding a subtree asks for a landing
-  // pass, the pass moves the keys off the node that went off screen, and that write is this effect's
-  // turn to run (../keys/regions.ts § The landing rule).
+  // The keys leaving the box disarms it, and there are two ways for that to happen: something else takes
+  // them, or the box goes off screen behind an overlay or a switched-away tab. The store's focus signal
+  // covers both. Hiding a subtree asks for a landing pass, the pass moves the keys off the node that went off
+  // screen, and that write is this effect's turn to run (../keys/regions.ts § The landing rule).
   createEffect(() => {
     if (armed() && !entered()) setArmed(false)
   })
@@ -189,8 +189,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   }
 
   /** The handle a caller filling the rectangle is given: the emulator's own write and size, and this
-   *  component's two listener lists. The same four members whichever emulator mounted, which is what
-   *  keeps `./pty.ts` one piece of code (§ CellTerminal). */
+   *  component's two listener lists (§ CellTerminal). */
   const hand = (write: CellTerminal['write'], size: CellTerminal['size']): void => {
     props.mount?.({
       write,
@@ -239,7 +238,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     })
     onCleanup(() => term.dispose())
     node.props.terminal = term
-    // The emulator answering a query the program inside sent it, exactly as above. It is the only
+    // The emulator answering a query the program inside sent it. It is the only
     // thing this event carries here, because nothing calls `term.input`: a rectangle decides which
     // keys are its before the emulator sees one.
     const replies = term.onData((text) => emit(new TextEncoder().encode(text)))
@@ -286,25 +285,39 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     // its, `Ctrl+C` included, and no app layer may fire. An intercept rather than a layer, because a
     // layer answers the keys it can name and a rectangle answers all of them
     // (docs/tui/traps.md § The Rectangle contract, ../keys/tiers.ts).
-    onCleanup(engine.intercept('key', (ctx) => {
-      const key = ctx.event
-      if (!entered()) {
-        // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
-        // second Escape just after leaving goes back in and sends the Escape through, which is how a
-        // reader reaches vim's normal mode from in here.
-        if (!focusWithin(box)) return
-        if (key.name === 'return') { enter(); ctx.consume(); return }
-        if (key.name === 'escape' && Date.now() - leftAt < ESCAPE_PAIR_MS) {
-          enter()
+    onCleanup(
+      engine.intercept(
+        'key',
+        (ctx) => {
+          const key = ctx.event
+          if (!entered()) {
+            // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
+            // second Escape just after leaving goes back in and sends the Escape through, which is how a
+            // reader reaches vim's normal mode from in here.
+            if (!focusWithin(box)) return
+            if (key.name === 'return') {
+              enter()
+              ctx.consume()
+              return
+            }
+            if (key.name === 'escape' && Date.now() - leftAt < ESCAPE_PAIR_MS) {
+              enter()
+              send(key)
+              ctx.consume()
+            }
+            return
+          }
+          if (key.name === 'escape') {
+            leave()
+            ctx.consume()
+            return
+          }
           send(key)
           ctx.consume()
-        }
-        return
-      }
-      if (key.name === 'escape') { leave(); ctx.consume(); return }
-      send(key)
-      ctx.consume()
-    }, { priority: RECTANGLE }))
+        },
+        { priority: RECTANGLE },
+      ),
+    )
   }
 
   /** A paste while the rectangle is entered belongs to the program inside it, bracketed where that
@@ -351,14 +364,16 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
 
 /** An `editor` rectangle: the text of the file, read-only, with the handoff to `$EDITOR` beside it.
  *
- *  A box and a line. The read-only view and the search inside it are not built, and the handoff
- *  needed nothing built: the editor pane's terminal mode runs the reader's own editor in a PTY on the
- *  node, so in cells it simply draws (docs/tui/rectangles.md § Rectangles).
- *  Drawn rather than absent because a pane that names one is telling the truth about what is there. */
+ *  A box and a line. The handoff needs nothing of its own: the editor pane's terminal mode runs the
+ *  reader's own editor in a PTY on the node, so in cells it simply draws
+ *  (docs/tui/rectangles.md § Rectangles). Drawn rather than absent because a pane that names one is
+ *  telling the truth about what is there. */
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {
   return (
     <box flexDirection="column" flexGrow={1} {...boxBorder('surface')} title={props.label}>
-      <Show when={props.children} fallback={<Line role="muted">the file opens here</Line>}>{props.children}</Show>
+      <Show when={props.children} fallback={<Line role="muted">the file opens here</Line>}>
+        {props.children}
+      </Show>
     </box>
   )
 }

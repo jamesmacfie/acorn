@@ -1,6 +1,15 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, type AppEnv, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import {
+  BridgeError,
+  type AppEnv,
+  requireDevice,
+  respondError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/plugin-api/node'
 import type { EditorLineMarkerSet, EditorLineMarkerSnapshot } from '../../contract/lineMarkers'
 import { imageTypeForPath } from '../../contract/imagePreview'
 import type { EditorFileStatusSnapshot } from '../../contract/fileStatus'
@@ -10,9 +19,17 @@ import type { EditorFileStatusSnapshot } from '../../contract/fileStatus'
 // (docs/security/process-and-paths.md § Process, path, and configuration controls), so a traversal or symlink escape is
 // a 403 and an unmapped repo is a 404. See server/routes/editor.test.ts.
 
-import type { EditorEntry, EditorReadResult, EditorWriteResult, FileActionResult, FileTarget, IgnoreEntries, TrashAvailability } from '../../contract/api'
+import type {
+  EditorEntry,
+  EditorReadResult,
+  EditorWriteResult,
+  FileActionResult,
+  FileTarget,
+  IgnoreEntries,
+  TrashAvailability,
+} from '../../contract/api'
 export type { EditorEntry } from '../../contract/api'
-export type { EditorWriteResult } from '../../contract/api'
+
 export type EditorBridge = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
@@ -37,8 +54,21 @@ export const EDITOR = routeCapability<EditorBridge>('editor.route')
 export const setEditorBridge = (bridge: EditorBridge | null): void => setRouteTestCapability(EDITOR, bridge)
 
 // Write touches the filesystem, so the body is validated (the privileged-boundary contract).
-const writeBody = z.object({ path: z.string().min(1), content: z.string(), expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).nullable() })
-const targetBody = z.object({ path: z.string(), kind: z.enum(['file', 'folder', 'link']), identity: z.string().min(1), entryId: z.string().min(1), root: z.string().min(1) })
+const writeBody = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  expectedRevision: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+})
+const targetBody = z.object({
+  path: z.string(),
+  kind: z.enum(['file', 'folder', 'link']),
+  identity: z.string().min(1),
+  entryId: z.string().min(1),
+  root: z.string().min(1),
+})
 const createBody = z.object({ parent: targetBody, name: z.string(), kind: z.enum(['file', 'folder']) })
 const renameBody = z.object({ source: targetBody, name: z.string() })
 const trashBody = z.object({ source: targetBody })
@@ -75,7 +105,8 @@ export const editor = new Hono<AppEnv>()
         'cache-control': 'private, no-store',
       })
     } catch (error) {
-      if (error instanceof BridgeError) return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
+      if (error instanceof BridgeError)
+        return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
       throw error
     }
   })
@@ -84,22 +115,34 @@ export const editor = new Hono<AppEnv>()
     if (!path) return respondError(c, 400, 'bad_request')
     const revision = c.req.query('revision')
     if (revision !== undefined && !/^[a-f0-9]{64}$/.test(revision)) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, EDITOR, async (b) => revision === undefined
-      ? b.lineMarkers(c.req.param('id'), path)
-      : b.markerSnapshot?.(c.req.param('id'), path, revision) ?? { revision: null, markers: [] })
+    // A request without a revision comes from a client that predates marker snapshots, and gets the
+    // plain array it expects. Mixed-version path until 2026-12-31.
+    return viaBridge(c, EDITOR, async (b) =>
+      revision === undefined
+        ? b.lineMarkers(c.req.param('id'), path)
+        : (b.markerSnapshot?.(c.req.param('id'), path, revision) ?? { revision: null, markers: [] }),
+    )
   })
   .put('/:id/editor/file', async (c) => {
     const parsed = writeBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, EDITOR, (b) => b.write(c.req.param('id'), parsed.data.path, parsed.data.content, parsed.data.expectedRevision))
+    return viaBridge(c, EDITOR, (b) =>
+      b.write(c.req.param('id'), parsed.data.path, parsed.data.content, parsed.data.expectedRevision),
+    )
   })
-  .get('/:id/editor/entry', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.entry(c.req.param('id'), c.req.query('path') ?? '')))
-  .get('/:id/editor/trash-availability', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.trashAvailability(c.req.param('id'))))
+  .get('/:id/editor/entry', requireDevice, (c) =>
+    viaBridge(c, EDITOR, (b) => b.entry(c.req.param('id'), c.req.query('path') ?? '')),
+  )
+  .get('/:id/editor/trash-availability', requireDevice, (c) =>
+    viaBridge(c, EDITOR, (b) => b.trashAvailability(c.req.param('id'))),
+  )
   .get('/:id/editor/rename-availability', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.renameAvailability()))
   .post('/:id/editor/create', requireDevice, async (c) => {
     const parsed = createBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, EDITOR, (b) => b.create(c.req.param('id'), parsed.data.parent, parsed.data.name, parsed.data.kind))
+    return viaBridge(c, EDITOR, (b) =>
+      b.create(c.req.param('id'), parsed.data.parent, parsed.data.name, parsed.data.kind),
+    )
   })
   .post('/:id/editor/rename', requireDevice, async (c) => {
     const parsed = renameBody.safeParse(await c.req.json().catch(() => null))

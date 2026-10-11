@@ -24,8 +24,8 @@ const log = createLogger('fleet')
 // globals under a browser's name.
 //
 // The broker runs in this process, which the desktop's does not (docs/security.md § Trust
-// boundaries). That is the trade 06-isolation.md records: the token lives in this module and reaches
-// no kit component, a module boundary where the desktop has a process boundary. Everything below
+// boundaries). That is the trade: the token lives in this module and reaches no kit component, a
+// module boundary where the desktop has a process boundary. Everything below
 // hands out a `NodeRecord`, which `toNodeRecord` strips of the certificate and the device row, and no
 // token crosses into anything the renderer can read.
 
@@ -44,11 +44,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   const statuses = new Map<string, NodeStatus>()
 
   const broker = new NodeBroker({
-    frame: (nodeId, frame) => { for (const handler of frameHandlers) handler(nodeId, frame) },
+    frame: (nodeId, frame) => {
+      for (const handler of frameHandlers) handler(nodeId, frame)
+    },
     // Terminal output, as the one binary frame (@acorn/protocol/ws.ts § The one binary frame). The
     // desktop tags the node id around this because it has a process boundary to cross; here the
     // broker is in this process, so the frame the node sent is handed over as it stands.
-    bytes: (nodeId, frame) => { for (const handler of byteHandlers) handler(nodeId, frame) },
+    bytes: (nodeId, frame) => {
+      for (const handler of byteHandlers) handler(nodeId, frame)
+    },
     status: (status) => {
       statuses.set(status.nodeId, status)
       for (const handler of statusHandlers) handler(status)
@@ -68,9 +72,13 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   // Without a broker record, selecting a saved node fails as "Unknown node".
   for (const node of fleet.list()) connect(node.nodeId)
   // Connect the local node again when this run's child announces its current endpoint.
-  if (opened.starting) void opened.starting.then((handshake) => connect(handshake.nodeId), () => {})
+  if (opened.starting)
+    void opened.starting.then(
+      (handshake) => connect(handshake.nodeId),
+      () => {},
+    )
 
-  const subscribe = <T,>(list: T[], handler: T): (() => void) => {
+  const subscribe = <T>(list: T[], handler: T): (() => void) => {
     list.push(handler)
     return () => {
       const at = list.indexOf(handler)
@@ -88,7 +96,8 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     platform: process.platform,
     nodeFetch: (nodeId: string, request: Parameters<NodeBroker['fetch']>[1]) => broker.fetch(nodeId, request),
     nodeAbort: (requestId: string) => broker.abort(requestId),
-    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1], options?: Parameters<NodeBroker['send']>[2]) => broker.send(nodeId, frame, options),
+    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1], options?: Parameters<NodeBroker['send']>[2]) =>
+      broker.send(nodeId, frame, options),
     nodeInterest: (_nodeId: string | null) => {},
     onNodeTransportError: (_cb: unknown) => () => {},
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
@@ -117,7 +126,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
       pending = null
       const node = fleet.remember(
-        { nodeId: result.nodeId, label: request.label, endpoint: probe.endpoint, fingerprint: probe.fingerprint, certPem: probe.certPem, deviceId: result.device.id, local: false },
+        {
+          nodeId: result.nodeId,
+          label: request.label,
+          endpoint: probe.endpoint,
+          fingerprint: probe.fingerprint,
+          certPem: probe.certPem,
+          deviceId: result.device.id,
+          local: false,
+        },
         result.deviceToken,
       )
       connect(node.nodeId)
@@ -137,8 +154,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
         // The last request that will ever authenticate, and it closes our own socket. A failure must
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await broker
-          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v1/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
-          .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}`, error, { 'node.id': nodeId }))
+          .fetch(nodeId, {
+            requestId: `forget-${nodeId}`,
+            path: `/v1/core/devices/${node.deviceId}`,
+            method: 'DELETE',
+            headers: {},
+          })
+          .catch((error: unknown) =>
+            log.warn(`could not revoke this device on ${nodeId}`, error, { 'node.id': nodeId }),
+          )
       }
       broker.remove(nodeId)
       fleet.forget(nodeId)
@@ -146,12 +170,13 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     },
     nodeReconnect: (nodeId: string) => connect(nodeId),
     nodeRestartLocal: async (): Promise<void> => {
-      if (!supervised) throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
+      if (!supervised)
+        throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
       await stop()
       // A restarted node binds a fresh port and may mint a fresh token, so the fleet row is rewritten
-      // from the new handshake rather than reused. What is not here is the desktop's `onNodeReplaced`
-      // push: nothing in this build is holding a view of the old endpoint to invalidate. Phase 4 draws
-      // the chrome that would need telling.
+      // from the new handshake rather than reused. Unlike the desktop, nothing here sends an
+      // `onNodeReplaced` push.
+      //
       // Awaited here, unlike the start at boot: nothing is waiting on a frame, and the caller asked
       // for a node it can use. The restarted child's stderr is piped and dropped rather than held —
       // the hold in `main.tsx` belongs to the child this process spawned at boot.
@@ -185,6 +210,10 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       onActivate: () => () => {},
       setBadge: setTerminalBadge,
     },
+
+    // Visible for as long as this process runs, because the screen is up until `quit` takes it down
+    // and exits. Client schedules pause while a host is hidden; a terminal has no `document` to ask.
+    visibility: { hidden: () => false, onChange: () => () => {} },
 
     // Custody of third-party plugin bundles: a content-addressed file cache and an acknowledgement
     // file under the TUI's config directory, hashed here rather than by a helper because there is no

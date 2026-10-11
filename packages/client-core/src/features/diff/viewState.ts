@@ -15,8 +15,8 @@ export type DiffViewScope = {
 
 /**
  * Where the reader was, by identity: an item of the document and a point in its code rows, or a
- * dynamic block and an offset into it (./diffLayout.ts). Not a pixel offset, which a thread measured
- * above the reader or a narrower pane would make wrong. Valid for the projection and the file set it
+ * dynamic block and an offset into it. Not a pixel offset, which a thread measured above the reader
+ * or a narrower pane would make wrong. Valid for the projection and the file set it
  * was taken in; a place whose item has gone lands on that file's header.
  */
 export type DiffScrollState = {
@@ -70,16 +70,15 @@ export const rememberDiffFileFilter = (scope: DiffViewScope, fileFilter: string)
   viewStates.set(key, { ...viewStates.get(key), fileFilter })
 }
 
-export const diffFileFilter = (scope: DiffViewScope): string =>
-  viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
+export const diffFileFilter = (scope: DiffViewScope): string => viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
 
 export function evictDiffViewStates(taskId: string): void {
   const prefix = `task:${taskId}:`
   for (const key of viewStates.keys()) if (key.startsWith(prefix)) viewStates.delete(key)
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in a central evictor list, so this signal and the thing that clears it
+// are one edit apart (`onScopeEvicted`).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictDiffViewStates(e.taskId)
 })

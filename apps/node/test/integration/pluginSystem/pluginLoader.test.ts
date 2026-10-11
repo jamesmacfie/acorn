@@ -15,7 +15,7 @@ import { integrationProviderRegistry } from '@acorn/node-core/server/integration
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginState } from '@acorn/node-core/server/pluginHost'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { assembleNodeGraph } from '../../../src/composition/composition'
 import { buildPluginStateBridge } from '../../../src/composition/pluginState'
@@ -31,15 +31,30 @@ const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 async function seedRailScope(db: AppDatabase): Promise<void> {
   const now = 1
   await db.insert(schema.integrations).values({
-    id: 'rollbar-production', userId: 'dogfood-user', provider: 'rollbar', label: 'Production',
-    encryptedCredentials: 'sealed', authKind: 'api-key', createdAt: now, updatedAt: now,
+    id: 'rollbar-production',
+    userId: 'dogfood-user',
+    provider: 'rollbar',
+    label: 'Production',
+    encryptedCredentials: 'sealed',
+    authKind: 'api-key',
+    createdAt: now,
+    updatedAt: now,
   })
-  await db.insert(schema.workspaces).values({ id: 'dogfood-workspace', name: 'Dogfood', createdAt: now, updatedAt: now })
+  await db
+    .insert(schema.workspaces)
+    .values({ id: 'dogfood-workspace', name: 'Dogfood', createdAt: now, updatedAt: now })
   await db.insert(schema.projects).values({
-    id: 'dogfood-project', name: 'widget', workspaceId: 'dogfood-workspace', createdAt: now, updatedAt: now,
+    id: 'dogfood-project',
+    name: 'widget',
+    workspaceId: 'dogfood-workspace',
+    createdAt: now,
+    updatedAt: now,
   })
   await db.insert(schema.workspaceExternalProjects).values({
-    workspaceId: 'dogfood-workspace', integrationId: 'rollbar-production', externalId: 'project-1', createdAt: now,
+    workspaceId: 'dogfood-workspace',
+    integrationId: 'rollbar-production',
+    externalId: 'project-1',
+    createdAt: now,
   })
 }
 
@@ -77,18 +92,31 @@ describe('loading rollbar from disk', () => {
       expect(installed[0]?.client).toMatchObject({ hash: expect.stringMatching(/^[0-9a-f]{64}$/) })
       expect(installed[0]?.client?.bytes).toBeGreaterThan(1_000)
       expect(installed[0]?.manifest.contributions).toMatchObject({
-        frames: [{ target: 'pane', id: 'rollbar' }, { target: 'pane', id: 'rollbar-item', scope: 'project' }],
+        frames: [
+          { target: 'pane', id: 'rollbar' },
+          { target: 'pane', id: 'rollbar-item', scope: 'project' },
+        ],
         sources: [{ id: 'rollbar-items', items: '/v1/p/rollbar/rail-items' }],
       })
 
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({
+          secrets: new SecretService('0'.repeat(64)),
+          db: core.db,
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
+        }),
         dataDir: dataRoot,
-        loaded: new Map([['rollbar', {
-          permissions: loaded[0].manifest.permissions.node,
-          storage: loaded[0].storage,
-        }]]),
+        loaded: new Map([
+          [
+            'rollbar',
+            {
+              permissions: loaded[0].manifest.permissions.node,
+              storage: loaded[0].storage,
+            },
+          ],
+        ]),
       })
       expect(plugins.failed).toEqual([])
       expect(plugins.enabled).toEqual(['rollbar'])
@@ -104,9 +132,13 @@ describe('loading rollbar from disk', () => {
         principal: { kind: 'device', userId: 'dogfood-user', deviceId: 'dogfood-device' },
         providers: {
           connections: async () => [],
-          resource: async () => { throw new Error('an empty connection list must not read a resource') },
+          resource: async () => {
+            throw new Error('an empty connection list must not read a resource')
+          },
           withConnections: async () => [],
-          items: () => { throw new Error('rollbar reads no item store directly') },
+          items: () => {
+            throw new Error('rollbar reads no item store directly')
+          },
         },
       })
       expect(response.status).toBe(403)
@@ -121,42 +153,59 @@ describe('loading rollbar from disk', () => {
         principal: { kind: 'device', userId: 'dogfood-user', deviceId: 'dogfood-device' },
         providers: {
           connections: async () => [{ id: 'rollbar-production', label: 'Production' } as never],
-          resource: async () => ({
-            ok: true,
-            value: {
-              capped: false,
-              items: [{
-                integrationId: 'rollbar-production', integrationLabel: 'Production', identifier: '142', itemId: '999',
-                url: 'https://rollbar.com/item/999/', title: 'Checkout failed', level: 'error', environment: 'production',
-                status: 'active', totalOccurrences: 12, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-              }],
-            },
-          }) as never,
+          resource: async () =>
+            ({
+              ok: true,
+              value: {
+                capped: false,
+                items: [
+                  {
+                    integrationId: 'rollbar-production',
+                    integrationLabel: 'Production',
+                    identifier: '142',
+                    itemId: '999',
+                    url: 'https://rollbar.com/item/999/',
+                    title: 'Checkout failed',
+                    level: 'error',
+                    environment: 'production',
+                    status: 'active',
+                    totalOccurrences: 12,
+                    firstOccurrenceAt: 1,
+                    lastOccurrenceAt: 2,
+                  },
+                ],
+              },
+            }) as never,
           withConnections: async () => [],
-          items: () => { throw new Error('rollbar reads no item store directly') },
+          items: () => {
+            throw new Error('rollbar reads no item store directly')
+          },
         },
       })
       expect(rail.status).toBe(200)
       expect(await rail.json()).toEqual({
-        items: [{
-          id: 'rollbar-production:142',
-          title: 'Checkout failed',
-          fields: ['12'],
-          short: '#142',
-          icon: 'circle-x',
-          severity: 'danger',
-          task: {
-            origin: 'rollbar',
+        items: [
+          {
+            id: 'rollbar-production:142',
             title: 'Checkout failed',
-            // The seed text a workflow started from this row reads
-            // (docs/workflows/starting-runs.md § Starting a run).
-            body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',
-            link: {
-              connectionId: 'rollbar-production', identifier: '142',
-              ref: { displayId: '142', externalId: '999', url: 'https://rollbar.com/item/999/' },
+            fields: ['12'],
+            short: '#142',
+            icon: 'circle-x',
+            severity: 'danger',
+            task: {
+              origin: 'rollbar',
+              title: 'Checkout failed',
+              // The seed text a workflow started from this row reads
+              // (docs/workflows/starting-runs.md § Starting a run).
+              body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',
+              link: {
+                connectionId: 'rollbar-production',
+                identifier: '142',
+                ref: { displayId: '142', externalId: '999', url: 'https://rollbar.com/item/999/' },
+              },
             },
           },
-        }],
+        ],
       })
     } finally {
       vi.unstubAllEnvs()
@@ -191,7 +240,10 @@ describe('loading rollbar from disk', () => {
       const target = pluginDir(broken, 'rollbar')
       mkdirSync(dirname(target), { recursive: true })
       cpSync(source, target, { recursive: true })
-      const manifest = JSON.parse(readFileSync(join(target, 'acorn-plugin.json'), 'utf8')) as { node: string; version: string }
+      const manifest = JSON.parse(readFileSync(join(target, 'acorn-plugin.json'), 'utf8')) as {
+        node: string
+        version: string
+      }
       // What an author's own typo looks like from here.
       writeFileSync(join(target, manifest.node), 'export default {\n')
 
@@ -207,19 +259,21 @@ describe('loading rollbar from disk', () => {
       })
 
       // And the whole point: what the owner is told. The route is parse, call, respond over this
-      // (docs/plugins/loaded-plugins.md § Loaded plugins covers why a load failure used to read as a permanently
-      // stuck Restart banner).
-      const state = pluginState(await buildPluginStateBridge({
-        dataDir: broken,
-        db: core.db,
-        roster: () => [],
-        booted: () => [],
-        loadFailures: () => failures,
-        disabled: () => [],
-        setDisabled: () => {},
-        // Nothing in this case reloads; the bridge only needs a host to hand the reloader.
-        reloadHost: { reload: () => Promise.reject(new Error('not wired in this test')) },
-      }))
+      // (docs/plugins/loaded-plugins.md § Loaded plugins covers why a load failure must not read as a
+      // permanently stuck Restart banner).
+      const state = pluginState(
+        await buildPluginStateBridge({
+          dataDir: broken,
+          db: core.db,
+          roster: () => [],
+          booted: () => [],
+          loadFailures: () => failures,
+          disabled: () => [],
+          setDisabled: () => {},
+          // Nothing in this case reloads; the bridge only needs a host to hand the reloader.
+          reloadHost: { reload: () => Promise.reject(new Error('not wired in this test')) },
+        }),
+      )
       const row = state.plugins.find((entry) => entry.name === 'rollbar')
       expect(row).toMatchObject({ state: 'failed', stage: 'load' })
       expect(row?.reason).toContain('could not import')
@@ -232,8 +286,8 @@ describe('loading rollbar from disk', () => {
   })
 
   it('lets a newer bundled package replace what build:plugin wrote, without touching a user install', () => {
-    // The script marked what it wrote (`.acorn-dev-build`), the whole fix: docs/plugins/loaded-plugins.md § Loaded
-    // plugins covers what happened before it existed.
+    // The script marked what it wrote (`.acorn-dev-build`): docs/plugins/loaded-plugins.md § Loaded
+    // plugins covers why that marker matters.
     const built = pluginDir(dataRoot, 'rollbar')
     expect(existsSync(join(built, DEV_BUILD_MARKER))).toBe(true)
 
@@ -254,14 +308,22 @@ describe('loading rollbar from disk', () => {
       } finally {
         warn.mockRestore()
       }
-      expect(readBundledPluginState(dataRoot, 'rollbar')).toMatchObject({ status: 'installed', version: `${manifest.version}-bundled` })
+      expect(readBundledPluginState(dataRoot, 'rollbar')).toMatchObject({
+        status: 'installed',
+        version: `${manifest.version}-bundled`,
+      })
 
       // The protection that must not move: docs/plugins/loaded-plugins.md § Loaded plugins covers why an owner
       // install wins outright.
       markPluginUserManaged(dataRoot, 'rollbar')
-      writeFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), JSON.stringify({ ...manifest, version: '9.9.9' }))
+      writeFileSync(
+        join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'),
+        JSON.stringify({ ...manifest, version: '9.9.9' }),
+      )
       expect(reconcileBundledPlugins(dataRoot, resources)).toMatchObject({ preserved: ['rollbar'], updated: [] })
-      expect(JSON.parse(readFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), 'utf8')).version).toBe('9.9.9')
+      expect(JSON.parse(readFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), 'utf8')).version).toBe(
+        '9.9.9',
+      )
     } finally {
       rmSync(resources, { recursive: true, force: true })
     }

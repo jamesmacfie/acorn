@@ -2,7 +2,20 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show, type Accessor } from 'solid-js'
 import { pluginLabel, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, EmptyState, Field, Icon, Inline, Input, Select, SettingRow, SettingsSection, Stack, Text, Textarea,
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Icon,
+  Inline,
+  Input,
+  Select,
+  SettingRow,
+  SettingsSection,
+  Stack,
+  Text,
+  Textarea,
 } from '@acorn/plugin-api/ui'
 import { confirmAction, IconPicker } from '@acorn/plugin-api/ui/host'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
@@ -12,15 +25,15 @@ import ProviderGlyph from '../sessions/ProviderGlyph'
 import { advertisedOptionsByProvider } from './agentConfigOptions'
 import { customAgentsOptions, deleteCustomAgent, saveCustomAgent } from './customAgentsClient'
 
-// Settings -> Agents -> Custom agents: saved starts for a managed session (docs/managed-agents/custom-agents.md §
-// Custom agents). A list, then one agent's editor in the same pane, which the settings header names
-// and offers the way back from (useSettingsDetail). The editor is a form with Save and Cancel rather
-// than saving on each change, unlike the rest of Settings, because an agent is a record that needs a
-// name and a harness before it can exist at all. Delete sits in the editor's danger zone. The
-// sections match the ones `../index.ts` declares.
+// Settings -> Agents -> Custom agents: saved starts for a managed session
+// (docs/managed-agents/custom-agents.md § Custom agents). A list, then one agent's editor in the same
+// pane, which the settings header names and offers the way back from (useSettingsDetail). The editor is
+// a form with Save and Cancel rather than saving on each change, unlike the rest of Settings, because an
+// agent is a record that needs a name and a harness before it can exist at all. The sections match the
+// ones the plugin's registration declares.
 
 // The harnesses whose system prompt acorn can add to. Every other one gets the instructions as context
-// at the start of the session instead (server/drivers/acpDriver.ts).
+// at the start of the session instead (the ACP session's context block).
 const SYSTEM_PROMPT_HARNESSES: ReadonlySet<string> = new Set(['claude', 'codex'])
 
 const TOOL_ACCESS = [
@@ -59,11 +72,14 @@ export default function CustomAgentsSettings() {
   }
   const inputOf = ({ id: _id, source: _source, ...input }: CustomAgent): CustomAgentInput => input
 
-  const summary = (agent: CustomAgent): string => [
-    providerFor(agent.providerId)?.label ?? agent.providerId,
-    ...Object.values(agent.options),
-    ...(agent.maxToolRisk ? [TOOL_ACCESS.find((access) => access.value === agent.maxToolRisk)?.label ?? agent.maxToolRisk] : []),
-  ].join(' · ')
+  const summary = (agent: CustomAgent): string =>
+    [
+      providerFor(agent.providerId)?.label ?? agent.providerId,
+      ...Object.values(agent.options),
+      ...(agent.maxToolRisk
+        ? [TOOL_ACCESS.find((access) => access.value === agent.maxToolRisk)?.label ?? agent.maxToolRisk]
+        : []),
+    ].join(' · ')
 
   // A plugin's agents are read-only, so they sit apart under their own heading and offer Duplicate.
   const own = () => (agents.data ?? []).filter((agent) => agent.source.kind === 'user')
@@ -77,7 +93,9 @@ export default function CustomAgentsSettings() {
           {(pluginId) => <Badge size="xs">From {pluginLabel(pluginId())}</Badge>}
         </Show>
         <Show when={agent.source.kind === 'user'}>
-          <Button size="sm" variant="ghost" onPress={() => open(agent.id, inputOf(agent))}>Edit</Button>
+          <Button size="sm" variant="ghost" onPress={() => open(agent.id, inputOf(agent))}>
+            Edit
+          </Button>
         </Show>
         <Button size="sm" variant="ghost" onPress={() => open(null, { ...inputOf(agent), name: `${agent.name} copy` })}>
           Duplicate
@@ -105,7 +123,18 @@ export default function CustomAgentsSettings() {
                 </Button>
               }
             >
-              <For each={own()} fallback={<Show when={agents.isSuccess}><EmptyState align="start" size="sm">No custom agents.</EmptyState></Show>}>{row}</For>
+              <For
+                each={own()}
+                fallback={
+                  <Show when={agents.isSuccess}>
+                    <EmptyState align="start" size="sm">
+                      No custom agents.
+                    </EmptyState>
+                  </Show>
+                }
+              >
+                {row}
+              </For>
             </SettingsSection>
             <Show when={fromPlugins().length}>
               <SettingsSection
@@ -175,7 +204,9 @@ function AgentEditor(props: {
       goes: 'Your unsaved changes to this agent.',
       stays: props.editing().id ? 'The agent as it was last saved.' : undefined,
       danger: true,
-    }).then((discard) => { if (discard) props.onClose() })
+    }).then((discard) => {
+      if (discard) props.onClose()
+    })
   }
 
   const save = async () => {
@@ -219,7 +250,11 @@ function AgentEditor(props: {
   return (
     <>
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={back}>‹ Custom agents</Button></Inline>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={back}>
+            ‹ Custom agents
+          </Button>
+        </Inline>
       </Show>
       <SettingsSection id="agent" label="Agent">
         <Stack gap="stack">
@@ -232,8 +267,15 @@ function AgentEditor(props: {
               onInput={(name) => update({ name })}
             />
           </Field>
-          <Field label="Description" hint="Shown under the name in New. Leave it empty to show the harness and its settings.">
-            <Input value={draft().description ?? ''} maxLength={500} onInput={(description) => update({ description: description || undefined })} />
+          <Field
+            label="Description"
+            hint="Shown under the name in New. Leave it empty to show the harness and its settings."
+          >
+            <Input
+              value={draft().description ?? ''}
+              maxLength={500}
+              onInput={(description) => update({ description: description || undefined })}
+            />
           </Field>
           <Field label="Icon" hint="Choose an icon, or reset to use the harness's icon.">
             <IconPicker
@@ -257,8 +299,8 @@ function AgentEditor(props: {
             when={props.advertised[draft().providerId]?.length}
             fallback={
               <Text emphasis="muted" wrap>
-                Open a {provider()?.label ?? 'session on this harness'} session once. The model, effort,
-                and mode it offers appear here after that.
+                Open a {provider()?.label ?? 'session on this harness'} session once. The model, effort, and mode it
+                offers appear here after that.
               </Text>
             }
           >
@@ -270,7 +312,11 @@ function AgentEditor(props: {
                     value={draft().options[option.id] ?? ''}
                     options={[
                       { value: '', label: 'Your usual default' },
-                      ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
+                      ...option.values.map((value) => ({
+                        value: value.value,
+                        label: value.label,
+                        title: value.description,
+                      })),
                     ]}
                     onChange={(value) => chooseOption(option.id, value)}
                   />
@@ -278,7 +324,10 @@ function AgentEditor(props: {
               )}
             </For>
           </Show>
-          <Field label="acorn tools" hint="The most this agent can do with acorn's tools. Tools and permissions still applies.">
+          <Field
+            label="acorn tools"
+            hint="The most this agent can do with acorn's tools. Tools and permissions still applies."
+          >
             <Select
               label="acorn tools"
               value={draft().maxToolRisk ?? ''}
@@ -288,9 +337,11 @@ function AgentEditor(props: {
           </Field>
           <Field
             label="Instructions"
-            hint={SYSTEM_PROMPT_HARNESSES.has(draft().providerId)
-              ? `Added to ${provider()?.label ?? 'the agent'}'s system prompt for every session started from this agent.`
-              : "This harness can't take extra instructions, so acorn adds them before your first message. The agent can lose them when it shortens a long conversation."}
+            hint={
+              SYSTEM_PROMPT_HARNESSES.has(draft().providerId)
+                ? `Added to ${provider()?.label ?? 'the agent'}'s system prompt for every session started from this agent.`
+                : "This harness can't take extra instructions, so acorn adds them before your first message. The agent can lose them when it shortens a long conversation."
+            }
           >
             <Textarea
               value={draft().instructions ?? ''}
@@ -302,15 +353,21 @@ function AgentEditor(props: {
           </Field>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
           <Inline gap="row">
-            <Button tone="accent" variant="solid" busy={saving()} onPress={() => void save()}>Save</Button>
-            <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+            <Button tone="accent" variant="solid" busy={saving()} onPress={() => void save()}>
+              Save
+            </Button>
+            <Button variant="ghost" onPress={props.onClose}>
+              Cancel
+            </Button>
           </Inline>
         </Stack>
       </SettingsSection>
       <Show when={props.editing().id}>
         <SettingsSection id="danger" label="Danger zone" tone="danger">
           <SettingRow label="Delete agent" description="Sessions already started from it keep running.">
-            <Button tone="danger" busy={deleting()} onPress={() => void remove()}>Delete agent</Button>
+            <Button tone="danger" busy={deleting()} onPress={() => void remove()}>
+              Delete agent
+            </Button>
           </SettingRow>
         </SettingsSection>
       </Show>

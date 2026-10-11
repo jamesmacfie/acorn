@@ -62,8 +62,8 @@ export type HookHandlerRegistration = {
 }
 
 // Module singletons, like the route, source and extension-point registries beside them, with the
-// same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (./host.ts § clearRegistrations).
+// same lifecycle answer: each registration hands back its own undo, and the plugin host runs it on
+// teardown (./host.ts § clearRegistrations).
 const points = new Map<string, HookPointRegistration>()
 const handlers = new Map<string, HookHandlerRegistration>()
 
@@ -71,8 +71,7 @@ const handlers = new Map<string, HookHandlerRegistration>()
  * Core's own points, declared here because core has no manifest to declare them in
  * (@acorn/protocol/extensionPoints.ts § CORE_HOOK_POINTS).
  *
- * `core:worktree-created` is the generalisation of the old single-slot `WORKTREE_CREATED` capability:
- * one plugin used to be able to run setup after a worktree appeared, and now any number can, in the
+ * `core:worktree-created` lets any number of plugins run setup after a worktree appears, in the
  * owner's order, with a timeout each and a roster row when one fails. It allows `observe` and
  * `transform` and not `veto`: the worktree exists by the time this runs, so there is nothing left to
  * refuse, and a handler that wants to change what happens next changes the payload.
@@ -126,7 +125,7 @@ const CORE_POINTS: readonly HookPointRegistration[] = [
   },
   {
     // The gate in front of every agent tool call, wherever the call came from: an MCP client, a managed
-    // harness, or the renderer's own typed projection all land on one route (../routes/agentTools.ts).
+    // harness, or the renderer's own typed projection all land on one route (`agentTools`).
     // Core's rather than the agents plugin's, because core owns the tool registry and the route; the
     // plugin owns sessions.
     //
@@ -166,7 +165,12 @@ for (const point of CORE_POINTS) points.set(point.id, point)
 
 /** What each handler's last run did, for the developer view and the roster row. Kept out of the
  *  registrations so a re-register does not wipe the record of why the previous one failed. */
-export type HookRunRecord = { at: number; ms: number; outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed' | 'asked'; detail?: string }
+export type HookRunRecord = {
+  at: number
+  ms: number
+  outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed' | 'asked'
+  detail?: string
+}
 
 const lastRun = new Map<string, HookRunRecord>()
 
@@ -175,7 +179,11 @@ const lastRun = new Map<string, HookRunRecord>()
 export function registerHookPoint(registration: HookPointRegistration): Disposable {
   if (points.has(registration.id)) throw new Error(`Hook point already declared: ${registration.id}`)
   points.set(registration.id, registration)
-  return { dispose: () => { if (points.get(registration.id) === registration) points.delete(registration.id) } }
+  return {
+    dispose: () => {
+      if (points.get(registration.id) === registration) points.delete(registration.id)
+    },
+  }
 }
 
 /** Register one handler on somebody else's point (or your own). Registering before the point is
@@ -183,7 +191,11 @@ export function registerHookPoint(registration: HookPointRegistration): Disposab
 export function registerHookHandler(registration: HookHandlerRegistration): Disposable {
   if (handlers.has(registration.id)) throw new Error(`Duplicate hook handler '${registration.id}'.`)
   handlers.set(registration.id, registration)
-  return { dispose: () => { if (handlers.get(registration.id) === registration) handlers.delete(registration.id) } }
+  return {
+    dispose: () => {
+      if (handlers.get(registration.id) === registration) handlers.delete(registration.id)
+    },
+  }
 }
 
 /** Drop everything this plugin declared and everything it registered. Both halves, because a plugin
@@ -232,11 +244,16 @@ export const hookHandlers = (): (HookHandlerRegistration & { matched: boolean; l
 type HookRun = { started: number; traceId: string; spanId: string }
 const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, spanId: traceId ? newSpanId() : '' })
 
-// The developer view's record of one handler, and its span. Both from the same three facts, because
-// `note` was already a span in all but name: a start, an end and a closed outcome set. The owner is
+// The developer view's record of one handler, and its span. Both come from the same three facts: a
+// start, an end, and a closed outcome set. The owner is
 // the handler's plugin, stamped from the registration and never read off the handler's answer, the
 // same rule the verdict's `by` follows.
-const note = (handler: HookHandlerRegistration, run: HookRun, outcome: HookRunRecord['outcome'], detail?: string): void => {
+const note = (
+  handler: HookHandlerRegistration,
+  run: HookRun,
+  outcome: HookRunRecord['outcome'],
+  detail?: string,
+): void => {
   const at = Date.now()
   lastRun.set(handler.id, { at, ms: at - run.started, outcome, ...(detail ? { detail } : {}) })
   if (!telemetryEnabled()) return
@@ -281,7 +298,8 @@ async function callOne(
     // The handler runs inside its own span, so whatever it spawns or queries is filed under its
     // plugin and lands in the chain's trace (../telemetry/context.ts).
     const answer = runWithTelemetry({ traceId: run.traceId, spanId: run.spanId, owner: handler.pluginId }, () =>
-      handler.call(payload, controller.signal))
+      handler.call(payload, controller.signal),
+    )
     return await Promise.race([answer, deadline])
   } catch (error) {
     log.warn(`${handler.id} on '${handler.point}' failed: ${describeError(error).message}`)
@@ -299,7 +317,7 @@ async function callOne(
  * stalled — resolves to a verdict, because every caller is a code path that was about to do something
  * and "the interceptor is broken" must not be the thing that stops it.
  *
- * The chain rules, all of them, are these thirty lines:
+ * The chain rules, all of them:
  *
  *   - Handlers never see each other. Each is called with the payload as it stands when its turn comes.
  *   - Observers run alongside and cannot affect anything, so their answers are dropped unread.
@@ -366,11 +384,14 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
       continue
     }
     if (handler.mode === 'ask') {
-      const question = answer === 'timeout' ? null : answer as { ask?: unknown; reason?: unknown } | null
+      const question = answer === 'timeout' ? null : (answer as { ask?: unknown; reason?: unknown } | null)
       if (question?.ask === true) {
         note(handler, run, 'asked', displayText(question.reason))
         // `by` is stamped from the registration, the same rule a veto's follows.
-        asks.push({ reason: displayText(question.reason) ?? `${handler.pluginId} wants you to decide`, by: handler.pluginId })
+        asks.push({
+          reason: displayText(question.reason) ?? `${handler.pluginId} wants you to decide`,
+          by: handler.pluginId,
+        })
       } else {
         note(handler, run, answer === 'timeout' ? 'timeout' : 'ok')
       }

@@ -17,9 +17,9 @@ const log = createLogger('fleet')
 const FLEET_FILE = `${ACORN_BASELINE}-fleet.json`
 
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
-export const fleetNodeSchema = nodeRecordSchema.extend({
+const fleetNodeSchema = nodeRecordSchema.extend({
   // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but
-  // main performs the TLS, so the renderer has no use for it.
+  // the helper performs the TLS, so the renderer has no use for it.
   certPem: z.string().optional(),
   // This device's row in the node's `devices` table, so "Revoke" can name it. Absent for the local
   // node, which is adopted from the service start handoff rather than paired.
@@ -114,7 +114,11 @@ export class FleetStore {
     this.#nodes = nodes
     const path = join(this.userDataDir, FLEET_FILE)
     mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
-    writeFileSync(path, `${JSON.stringify({ version: 1, nodes } satisfies z.input<typeof fleetFileSchema>, null, 2)}\n`, { mode: 0o600 })
+    writeFileSync(
+      path,
+      `${JSON.stringify({ version: 1, nodes } satisfies z.input<typeof fleetFileSchema>, null, 2)}\n`,
+      { mode: 0o600 },
+    )
     chmodSync(path, 0o600)
   }
 }

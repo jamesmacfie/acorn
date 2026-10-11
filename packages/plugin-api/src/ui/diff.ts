@@ -6,35 +6,13 @@
 // The row components are on ./ui, by the same rule that governs ./client: anything from a .tsx module
 // goes there, so a plugin's node-environment test can still load this model.
 
-export {
-  buildDiffRows,
-  buildDiffRowsAsync,
-  buildRenderableRows,
-  expandGap,
-  expandGapAsync,
-  gapId,
-  highlighterTokenize,
-  isCodeRow,
-  maxLineCols,
-  plainTokenize,
-  rowIdentityKeys,
-  toBands,
-} from '@acorn/client-core/kit/diff'
-export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff'
+export type { CodeRow } from '@acorn/client-core/kit/diff'
 
-// The tokenizer the async builders take. On this entrypoint rather than ./client because it's part of
-// the diff toolkit's contract, since `buildDiffRowsAsync(file, tokenizeDocument)` is the whole intended
-// call, and because a plugin has no other reason to reach the highlighter directly.
-export { tokenizeDocument } from '@acorn/client-core/infra/highlight'
-export type { TokenizeDocument } from '@acorn/client-core/infra/highlight'
-
-export type { FindHighlight } from '@acorn/client-core/kit/diff'
 export { synth } from '@acorn/client-core/kit/diff'
-export { createSplitScrollSync } from '@acorn/client-core/kit/diff'
 
 // The port DiffPane (on ./ui, since it is a component) is driven through. A plugin that owns a diff
 // fills this in from its own queries and mutations; nothing else about the shell is configurable.
-export type { CommentSide, DiffLineAnchor, DiffSource } from '@acorn/client-core/features/diff'
+export type { DiffLineAnchor, DiffSource } from '@acorn/client-core/features/diff'
 // The document the port carries: a topology, segments of plain rows, and search pages. A provider
 // builds these on its node (./node); a client source only ever moves them, except for assembling a
 // topology from descriptors its node sent (docs/diff-rendering/document.md § The document).
@@ -43,8 +21,12 @@ export { documentTopology } from '@acorn/diff-document/document'
 // graph, and the barrel would bring the diff view state and segment loaders along with it.
 export { loadDiffLineContext } from '@acorn/client-core/features/diff/lineContext.ts'
 export type {
-  DiffDocumentFile, DiffDocumentTopology, DiffSearchMatch, DiffSearchPage, DiffSearchRequest, DiffSegmentDescriptor,
-  DiffSegmentPayload, DiffSegmentRequest, PlainDiffRow,
+  DiffDocumentFile,
+  DiffDocumentTopology,
+  DiffSearchPage,
+  DiffSearchRequest,
+  DiffSegmentPayload,
+  DiffSegmentRequest,
 } from '@acorn/diff-document/document'
 // Session-only scroll and collapse memory, keyed by scope. `diffScopeKey` is here so a caller keying
 // its own session state by the same scope stays in step rather than writing a second spelling.
@@ -52,5 +34,4 @@ export { diffScopeKey } from '@acorn/client-core/features/diff'
 // A few lines around one anchor, read from the segment that holds it through the viewer's own loader
 // and node cache: the quoted code on a review thread's card, without parsing any patch.
 export { createDiffSnippets } from '@acorn/client-core/features/diff'
-export type { DiffSnippet, DiffSnippetAnchor, DiffSnippetLine, DiffSnippets } from '@acorn/client-core/features/diff'
-export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/features/diff'
+export type { DiffSnippetAnchor, DiffSnippetLine, DiffSnippets } from '@acorn/client-core/features/diff'

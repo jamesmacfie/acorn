@@ -4,7 +4,7 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 // The device's memory of which node this window talks to, and what it buys: a cache partition on the
 // first tick.
 //
-// The window opens before the node does now (docs/frontend/data-and-startup.md § Startup readiness), so
+// The window opens before the node does (docs/frontend/data-and-startup.md § Startup readiness), so
 // `activeNodeId()` has to answer before the fleet does. If it does not, the shell mounts on
 // the `origin` partition, the fleet answers, and the whole first paint is thrown away and remounted on
 // the real one.
@@ -17,7 +17,9 @@ vi.mock('idb-keyval', () => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () =
 const store = new Map<string, string>([['acorn.last-node', 'node-remembered']])
 let interests: (string | null)[] = []
 ;(globalThis as { localStorage?: unknown }).localStorage = {
-  get length() { return store.size },
+  get length() {
+    return store.size
+  },
   key: (index: number) => [...store.keys()][index] ?? null,
   getItem: (key: string) => store.get(key) ?? null,
   setItem: (key: string, value: string) => void store.set(key, value),
@@ -25,7 +27,16 @@ let interests: (string | null)[] = []
   clear: () => store.clear(),
 }
 
-const { activeCacheId, activeNodeId, activeNodeStarting, nodeGateHolds, nodeReadiness, nodeReady, selectActiveNode, setActiveNode } = await import('./activeNode')
+const {
+  activeCacheId,
+  activeNodeId,
+  activeNodeStarting,
+  nodeGateHolds,
+  nodeReadiness,
+  nodeReady,
+  selectActiveNode,
+  setActiveNode,
+} = await import('./activeNode')
 const { _resetFleet, cacheKeyFor, clientFor, ORIGIN_NODE_ID, refreshFleet } = await import('./fleet')
 
 const record = (nodeId: string, local = true): NodeRecord => ({
@@ -90,8 +101,10 @@ describe('the remembered node', () => {
 describe('authoritative event interest', () => {
   it('declares equivalent selection and a cached switch without a fetch', () => {
     stubBridge([record('node-a'), record('node-b')])
-    setActiveNode('node-a'); interests = []
-    setActiveNode('node-a'); setActiveNode('node-b')
+    setActiveNode('node-a')
+    interests = []
+    setActiveNode('node-a')
+    setActiveNode('node-b')
     expect(interests).toEqual(['node-a', 'node-b'])
   })
 })

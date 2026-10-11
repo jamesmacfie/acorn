@@ -1,16 +1,18 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { WorkflowChildRunSummary } from '../shared/api'
 
-export type WorkflowRunStatus = 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled'
+export type WorkflowRunStatus =
+  | 'running'
+  | 'gated'
+  | 'cancelling'
+  | 'done'
+  | 'completed-with-failures'
+  | 'failed'
+  | 'safety-rail'
+  | 'cancelled'
 export type WorkflowGateStatus = 'waiting-gate' | 'done' | 'failed' | 'cancelled'
 
-export type WorkflowRunChangedEvent = {
-  taskId: string
-  runId: string
-  status: WorkflowRunStatus
-}
-
-export type WorkflowGateChangedEvent = {
+type WorkflowGateChangedEvent = {
   taskId: string
   runId: string
   stepId: string
@@ -22,7 +24,7 @@ export type WorkflowChildChangedEvent = WorkflowChildRunSummary & {
   ownerTaskId: string
 }
 
-export type WorkflowGateRecord = WorkflowGateChangedEvent & { name: string }
+type WorkflowGateRecord = WorkflowGateChangedEvent & { name: string }
 
 /** Rebuild a task's approval inbox after reconnecting or missing a gate event. */
 export type WorkflowGatesCapability = {

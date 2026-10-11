@@ -1,9 +1,9 @@
 // "Saved database queries" in the agent composer, as the two routes the manifest's `agentContexts`
 // descriptor names.
 //
-// This used to be a client contribution over rows the client already held. What travels here is SQL a
-// person wrote down and a note they wrote beside it. No credential enters this file: the connection URL
-// is resolved per connect in main/database.ts and never persisted, so there's nothing to redact.
+// What travels here is SQL a person wrote down and a note they wrote beside it. No credential enters
+// this file: the connection URL is resolved per connect by core's data service and never persisted, so
+// there's nothing to redact.
 //
 // What the host doesn't let this file decide: `source` (bound from the plugin id), the capture time,
 // and the byte measurement the 512 KiB composer ceiling is checked against.
@@ -27,8 +27,7 @@ export const savedQueryOption = (query: DbSavedQuery): AgentContextOption => ({
 
 export const savedQuerySnapshot = (query: DbSavedQuery): PluginAgentContextSnapshotBody => ({
   // Stable rather than time-stamped: the composer replaces a snapshot by contextId, so re-capturing the
-  // same query updates it instead of attaching it twice. The compiled contribution this replaces put
-  // `Date.now()` here, so every capture stacked up in a draft. The host prefixes the plugin id.
+  // same query updates it instead of attaching it twice. The host prefixes the plugin id.
   contextId: query.id,
   label: `Database · ${query.name}`,
   content: [

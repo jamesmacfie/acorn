@@ -76,10 +76,12 @@ describe('agent pricing preferences', () => {
     const result = validateAgentPricingPreferences({
       version: 1,
       claude: {
-        overrides: [{
-          catalogId: 'missing',
-          price: { input: -1, output: 1, cacheWrite: 1, cacheRead: 1 },
-        }],
+        overrides: [
+          {
+            catalogId: 'missing',
+            price: { input: -1, output: 1, cacheWrite: 1, cacheRead: 1 },
+          },
+        ],
         customModels: [
           { model: 'same', price: { input: 1, output: 1, cacheWrite: 1, cacheRead: 1 } },
           { model: 'SAME', price: { input: 1, output: 1, cacheWrite: 1, cacheRead: 1 } },
@@ -100,16 +102,20 @@ describe('agent pricing preferences', () => {
   })
 
   it('normalizes old Claude-only version-1 settings without losing overrides', () => {
-    const parsed = parseAgentPricingPreferences(JSON.stringify({
-      version: 1,
-      claude: {
-        overrides: [{
-          catalogId: 'opus-5',
-          price: { input: 6, output: 30, cacheWrite: 7.5, cacheRead: 0.6 },
-        }],
-        customModels: [],
-      },
-    }))
+    const parsed = parseAgentPricingPreferences(
+      JSON.stringify({
+        version: 1,
+        claude: {
+          overrides: [
+            {
+              catalogId: 'opus-5',
+              price: { input: 6, output: 30, cacheWrite: 7.5, cacheRead: 0.6 },
+            },
+          ],
+          customModels: [],
+        },
+      }),
+    )
     expect(parsed.claude.overrides).toHaveLength(1)
     expect(parsed.codex).toEqual({ overrides: [], customModels: [] })
   })

@@ -24,7 +24,8 @@ export default function QueuedAgentTurns(props: {
 }) {
   const words = createWorkspaceWords()
   const queued = createMemo(() =>
-    props.turns.filter((turn) => turn.status === 'queued').sort((a, b) => a.ordinal - b.ordinal))
+    props.turns.filter((turn) => turn.status === 'queued').sort((a, b) => a.ordinal - b.ordinal),
+  )
   const scheduled = createMemo(() => queued().find((turn) => turn.notBefore != null && turn.notBefore > Date.now()))
   const [editing, setEditing] = createSignal<string | null>(null)
   const [text, setText] = createSignal('')
@@ -54,9 +55,11 @@ export default function QueuedAgentTurns(props: {
     const next = text().trim()
     if (!next) return
     const withoutText = turn.input.filter((part) => part.type !== 'text')
-    const saved = await run(`${turn.id}:save`, () => managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, {
-      input: [{ type: 'text', text: next }, ...withoutText],
-    }))
+    const saved = await run(`${turn.id}:save`, () =>
+      managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, {
+        input: [{ type: 'text', text: next }, ...withoutText],
+      }),
+    )
     if (saved) setEditing(null)
   }
 
@@ -72,14 +75,14 @@ export default function QueuedAgentTurns(props: {
                   {scheduled()
                     ? `Usage limit reached. Continues automatically at ${new Date(scheduled()!.notBefore!).toLocaleString()}.`
                     : props.runtimeState === 'working' || props.runtimeState === 'waiting'
-                    ? 'Sends when the current turn finishes.'
-                    : 'Sends when the provider is ready.'}
+                      ? 'Sends when the current turn finishes.'
+                      : 'Sends when the provider is ready.'}
                 </Text>
               }
             >
               <Text emphasis="muted" wrap>
-                Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per
-                provider and {limits.data?.workspace ?? 3} per {words().singular}.
+                Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per provider and{' '}
+                {limits.data?.workspace ?? 3} per {words().singular}.
               </Text>
               <Button
                 variant="bare"
@@ -99,7 +102,8 @@ export default function QueuedAgentTurns(props: {
                     fallback={
                       <Show when={promptText(turn) || !attachments(turn).length}>
                         <Text wrap>
-                          {promptText(turn) || `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}
+                          {promptText(turn) ||
+                            `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}
                         </Text>
                       </Show>
                     }
@@ -152,8 +156,11 @@ export default function QueuedAgentTurns(props: {
                       label="Move queued turn up"
                       busy={pending() === `${turn.id}:up`}
                       disabled={index() === 0 || pending() != null}
-                      onPress={() => void run(`${turn.id}:up`, () =>
-                        managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }))}
+                      onPress={() =>
+                        void run(`${turn.id}:up`, () =>
+                          managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }),
+                        )
+                      }
                     />
                     <IconButton
                       icon="arrow-down"
@@ -161,8 +168,11 @@ export default function QueuedAgentTurns(props: {
                       label="Move queued turn down"
                       busy={pending() === `${turn.id}:down`}
                       disabled={index() === queued().length - 1 || pending() != null}
-                      onPress={() => void run(`${turn.id}:down`, () =>
-                        managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }))}
+                      onPress={() =>
+                        void run(`${turn.id}:down`, () =>
+                          managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }),
+                        )
+                      }
                     />
                     <IconButton
                       tone="danger"
@@ -171,8 +181,9 @@ export default function QueuedAgentTurns(props: {
                       label="Remove queued prompt"
                       busy={pending() === `${turn.id}:remove`}
                       disabled={pending() != null}
-                      onPress={() => void run(`${turn.id}:remove`, () =>
-                        managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))}
+                      onPress={() =>
+                        void run(`${turn.id}:remove`, () => managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))
+                      }
                     />
                   </Inline>
                 </Stack>

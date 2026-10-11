@@ -7,7 +7,17 @@ import { PROJECT_COLOR_OPTIONS } from './ProjectColorInput'
 import { Text } from '../../kit/components/content/Text'
 import { formatPath } from '../../kit/lib/rendering/formatPath'
 import { IconButton } from '../../kit/components/inputs/IconButton'
-import { Badge, Button, Checkbox, Input, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Input,
+  Select,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '../../kit/components/primitives'
 import { Toolbar } from '../../kit/components/layout/Toolbar'
 import './projects.css'
 import { createProjectOrder } from './createProjectOrder'
@@ -50,135 +60,206 @@ export function ProjectTable(props: {
   // A project deleted or moved off this table drops out of the selection with it.
   createEffect(() => {
     const present = new Set(all().map((project) => project.id))
-    setSelected((current) => ([...current].every((id) => present.has(id)) ? current : new Set([...current].filter((id) => present.has(id)))))
+    setSelected((current) =>
+      [...current].every((id) => present.has(id)) ? current : new Set([...current].filter((id) => present.has(id))),
+    )
   })
   const isSelected = (id: string) => selected().has(id)
-  const toggle = (ids: readonly string[], on: boolean) => setSelected((current) => {
-    const next = new Set(current)
-    for (const id of ids) {
-      if (on) next.add(id)
-      else next.delete(id)
-    }
-    return next
-  })
+  const toggle = (ids: readonly string[], on: boolean) =>
+    setSelected((current) => {
+      const next = new Set(current)
+      for (const id of ids) {
+        if (on) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
   const chosen = () => all().filter((project) => isSelected(project.id))
 
   return (
     <>
       {/* The wrapper gives the rows their floor in projects.css. */}
       <div class="ws-project-table" ref={table} aria-busy={order.busy()}>
-      <Table size="sm">
-        <TableRow head>
-          <TableHead><span class="sr-only">Reorder</span></TableHead>
-          <TableHead>
-            <Checkbox
-              ariaLabel="Select every project"
-              checked={all().length > 0 && chosen().length === all().length}
-              indeterminate={chosen().length > 0 && chosen().length < all().length}
-              disabled={!all().length}
-              onChange={(on) => toggle(all().map((project) => project.id), on)}
-            />
-          </TableHead>
-          <TableHead>Project</TableHead>
-          <TableHead priority="low">Folder</TableHead>
-          <TableHead priority="low">Detected</TableHead>
-          <TableHead align="end">Tasks</TableHead>
-          <TableHead><span class="sr-only">Open</span></TableHead>
-        </TableRow>
-        <Index each={props.groups}>
-          {(group) => (
-            <>
-              <Show when={props.groupHeads}>
-                <TableRow>
-                  <TableCell />
-                  <TableCell>
-                    <Show when={group().projects.length}>
-                      <Checkbox
-                        ariaLabel={`Select every project in ${group().label}`}
-                        checked={group().projects.every((project) => isSelected(project.id))}
-                        indeterminate={group().projects.some((project) => isSelected(project.id)) && !group().projects.every((project) => isSelected(project.id))}
-                        onChange={(on) => toggle(group().projects.map((project) => project.id), on)}
-                      />
-                    </Show>
-                  </TableCell>
-                  {/* The count is the group's, so it sits after its name in the header-count style
+        <Table size="sm">
+          <TableRow head>
+            <TableHead>
+              <span class="sr-only">Reorder</span>
+            </TableHead>
+            <TableHead>
+              <Checkbox
+                ariaLabel="Select every project"
+                checked={all().length > 0 && chosen().length === all().length}
+                indeterminate={chosen().length > 0 && chosen().length < all().length}
+                disabled={!all().length}
+                onChange={(on) =>
+                  toggle(
+                    all().map((project) => project.id),
+                    on,
+                  )
+                }
+              />
+            </TableHead>
+            <TableHead>Project</TableHead>
+            <TableHead priority="low">Folder</TableHead>
+            <TableHead priority="low">Detected</TableHead>
+            <TableHead align="end">Tasks</TableHead>
+            <TableHead>
+              <span class="sr-only">Open</span>
+            </TableHead>
+          </TableRow>
+          <Index each={props.groups}>
+            {(group) => (
+              <>
+                <Show when={props.groupHeads}>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell>
+                      <Show when={group().projects.length}>
+                        <Checkbox
+                          ariaLabel={`Select every project in ${group().label}`}
+                          checked={group().projects.every((project) => isSelected(project.id))}
+                          indeterminate={
+                            group().projects.some((project) => isSelected(project.id)) &&
+                            !group().projects.every((project) => isSelected(project.id))
+                          }
+                          onChange={(on) =>
+                            toggle(
+                              group().projects.map((project) => project.id),
+                              on,
+                            )
+                          }
+                        />
+                      </Show>
+                    </TableCell>
+                    {/* The count is the group's, so it sits after its name in the header-count style
                       rather than under the Folder heading. */}
-                  <TableCell header>
-                    <span class="ws-group-name">
-                      <Show when={group().workspaceId && props.openWorkspace} fallback={<Text emphasis="strong">{group().label}</Text>}>
-                        <Button variant="bare" size="sm" title={`Open ${group().label}`} onPress={() => props.openWorkspace?.(group().workspaceId!)}>
-                          <Text emphasis="strong">{group().label}</Text>
-                        </Button>
-                      </Show>
-                      <span class="ws-group-count">{group().projects.length || 'no'} project{group().projects.length === 1 ? '' : 's'}</span>
-                    </span>
-                  </TableCell>
-                  <TableCell />
-                  <TableCell />
-                  <TableCell />
-                  <TableCell />
-                </TableRow>
-              </Show>
-              {/* Index, not For: a refetch after every write hands back new objects, and For would
-                  rebuild the rows under the pointer and drop the focus on the row's checkbox. */}
-              <Index each={order.projectsFor(group())}>
-                {(project, index) => (
-                  // The whole row opens the project. The row leaves a press on its checkbox, its folder
-                  // button, or its chevron to that control (Table.tsx § inCellControl).
-                  <TableRow onPress={() => props.openProject(project().id)}>
-                    <TableCell>
-                      <Show when={group().workspaceId}>
-                        <ProjectOrderHandle project={project()} order={order} first={index === 0} last={index === group().projects.length - 1} />
-                      </Show>
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox ariaLabel={`Select ${project().name}`} checked={isSelected(project().id)} onChange={(on) => toggle([project().id], on)} />
-                    </TableCell>
                     <TableCell header>
-                      <span class="ws-project-name">
-                        <span class="ws-project-dot" style={{ background: resolveProjectColor(project().color) ?? 'transparent' }} data-empty={project().color ? undefined : ''} aria-hidden="true" />
-                        <span>{project().name}</span>
-                        <Show when={project().hidden}><Badge size="xs">Hidden</Badge></Show>
+                      <span class="ws-group-name">
+                        <Show
+                          when={group().workspaceId && props.openWorkspace}
+                          fallback={<Text emphasis="strong">{group().label}</Text>}
+                        >
+                          <Button
+                            variant="bare"
+                            size="sm"
+                            title={`Open ${group().label}`}
+                            onPress={() => props.openWorkspace?.(group().workspaceId!)}
+                          >
+                            <Text emphasis="strong">{group().label}</Text>
+                          </Button>
+                        </Show>
+                        <span class="ws-group-count">
+                          {group().projects.length || 'no'} project{group().projects.length === 1 ? '' : 's'}
+                        </span>
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <Show
-                        when={project().path}
-                        fallback={
-                          <span class="ws-row-nopath">
-                            No folder on disk
-                            <Show when={props.mapFolder && canPickFolder()}>
-                              {' '}<Button variant="bare" size="sm" onPress={() => props.mapFolder?.(project().id)}>Add folder</Button>
-                            </Show>
-                          </span>
-                        }
-                      >
-                        {/* The last two folders tell projects apart. The tip holds the whole path. */}
-                        {(path) => <span class="ws-row-path" data-tip={path()}>{formatPath(path())}</span>}
-                      </Show>
-                    </TableCell>
-                    <TableCell>
-                      {/* Words, not marks: a git mark read as "-o-", and its meaning lived only in a tip. */}
-                      <span class="ws-row-facets">
-                        <Show when={project().path && project().vcs !== 'git'}><Badge size="xs">Folder</Badge></Show>
-                        <Show when={project().vcs === 'git'}><Badge size="xs">Git</Badge></Show>
-                        <Show when={project().github}><Badge size="xs">GitHub</Badge></Show>
-                      </span>
-                    </TableCell>
-                    <TableCell align="end">{props.taskCount(project().id)}</TableCell>
-                    <TableCell align="end">
-                      <IconButton icon="chevron-right" label={`Open ${project().name}`} onPress={() => props.openProject(project().id)} />
-                    </TableCell>
+                    <TableCell />
+                    <TableCell />
+                    <TableCell />
+                    <TableCell />
                   </TableRow>
-                )}
-              </Index>
-            </>
-          )}
-        </Index>
-      </Table>
+                </Show>
+                {/* Index, not For: a refetch after every write hands back new objects, and For would
+                  rebuild the rows under the pointer and drop the focus on the row's checkbox. */}
+                <Index each={order.projectsFor(group())}>
+                  {(project, index) => (
+                    // The whole row opens the project. The row leaves a press on its checkbox, its folder
+                    // button, or its chevron to that control (`Table`'s `inCellControl`).
+                    <TableRow onPress={() => props.openProject(project().id)}>
+                      <TableCell>
+                        <Show when={group().workspaceId}>
+                          <ProjectOrderHandle
+                            project={project()}
+                            order={order}
+                            first={index === 0}
+                            last={index === group().projects.length - 1}
+                          />
+                        </Show>
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox
+                          ariaLabel={`Select ${project().name}`}
+                          checked={isSelected(project().id)}
+                          onChange={(on) => toggle([project().id], on)}
+                        />
+                      </TableCell>
+                      <TableCell header>
+                        <span class="ws-project-name">
+                          <span
+                            class="ws-project-dot"
+                            style={{ background: resolveProjectColor(project().color) ?? 'transparent' }}
+                            data-empty={project().color ? undefined : ''}
+                            aria-hidden="true"
+                          />
+                          <span>{project().name}</span>
+                          <Show when={project().hidden}>
+                            <Badge size="xs">Hidden</Badge>
+                          </Show>
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Show
+                          when={project().path}
+                          fallback={
+                            <span class="ws-row-nopath">
+                              No folder on disk
+                              <Show when={props.mapFolder && canPickFolder()}>
+                                {' '}
+                                <Button variant="bare" size="sm" onPress={() => props.mapFolder?.(project().id)}>
+                                  Add folder
+                                </Button>
+                              </Show>
+                            </span>
+                          }
+                        >
+                          {/* The last two folders tell projects apart. The tip holds the whole path. */}
+                          {(path) => (
+                            <span class="ws-row-path" data-tip={path()}>
+                              {formatPath(path())}
+                            </span>
+                          )}
+                        </Show>
+                      </TableCell>
+                      <TableCell>
+                        {/* Words, not marks: a git mark read as "-o-", and its meaning lived only in a tip. */}
+                        <span class="ws-row-facets">
+                          <Show when={project().path && project().vcs !== 'git'}>
+                            <Badge size="xs">Folder</Badge>
+                          </Show>
+                          <Show when={project().vcs === 'git'}>
+                            <Badge size="xs">Git</Badge>
+                          </Show>
+                          <Show when={project().github}>
+                            <Badge size="xs">GitHub</Badge>
+                          </Show>
+                        </span>
+                      </TableCell>
+                      <TableCell align="end">{props.taskCount(project().id)}</TableCell>
+                      <TableCell align="end">
+                        <IconButton
+                          icon="chevron-right"
+                          label={`Open ${project().name}`}
+                          onPress={() => props.openProject(project().id)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Index>
+              </>
+            )}
+          </Index>
+        </Table>
       </div>
-      <Show when={order.error()}>{(error) => <Text tone="danger" wrap>{error()}</Text>}</Show>
-      <span class="sr-only" role="status">{order.announcement()}</span>
+      <Show when={order.error()}>
+        {(error) => (
+          <Text tone="danger" wrap>
+            {error()}
+          </Text>
+        )}
+      </Show>
+      <span class="sr-only" role="status">
+        {order.announcement()}
+      </span>
 
       <Show when={chosen().length}>
         <BulkBar
@@ -187,12 +268,21 @@ export function ProjectTable(props: {
           allowMove={props.allowMove !== false}
           refresh={props.refresh}
           report={setResult}
-          onClear={() => { setSelected(new Set<string>()); setResult(undefined) }}
+          onClear={() => {
+            setSelected(new Set<string>())
+            setResult(undefined)
+          }}
         />
       </Show>
       {/* Outside the bar, which goes when its projects leave the selection: a move off a workspace's page
           takes every moved row with it, and the result still has to be read. */}
-      <Show when={result()}>{(done) => <Text tone={done().tone} wrap>{done().text}</Text>}</Show>
+      <Show when={result()}>
+        {(done) => (
+          <Text tone={done().tone} wrap>
+            {done().text}
+          </Text>
+        )}
+      </Show>
     </>
   )
 }
@@ -232,9 +322,11 @@ function BulkBar(props: {
     await props.refresh().catch(() => undefined)
     setBusy(false)
     const saved = targets.length - failures.length
-    setResult(failures.length
-      ? { tone: 'danger', text: `${done(`${saved} of ${noun(targets.length)}`)}. ${failures.join('. ')}.` }
-      : { tone: 'ok', text: `${done(noun(saved))}.` })
+    setResult(
+      failures.length
+        ? { tone: 'danger', text: `${done(`${saved} of ${noun(targets.length)}`)}. ${failures.join('. ')}.` }
+        : { tone: 'ok', text: `${done(noun(saved))}.` },
+    )
   }
 
   const moveTo = (workspaceId: string) => {
@@ -243,7 +335,10 @@ function BulkBar(props: {
       return
     }
     const name = props.workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? 'that workspace'
-    void each((what) => `Moved ${what} to ${name}`, (project) => patchProject(project.id, { workspaceId }))
+    void each(
+      (what) => `Moved ${what} to ${name}`,
+      (project) => patchProject(project.id, { workspaceId }),
+    )
   }
   const moveToNew = async (event: Event) => {
     event.preventDefault()
@@ -253,7 +348,10 @@ function BulkBar(props: {
     try {
       const workspace = await createWorkspace(name)
       setNaming(null)
-      await each((what) => `Moved ${what} to ${name}`, (project) => patchProject(project.id, { workspaceId: workspace.id }))
+      await each(
+        (what) => `Moved ${what} to ${name}`,
+        (project) => patchProject(project.id, { workspaceId: workspace.id }),
+      )
     } catch (cause) {
       setBusy(false)
       setResult({ tone: 'danger', text: cause instanceof Error ? cause.message : 'Could not create that workspace.' })
@@ -264,24 +362,41 @@ function BulkBar(props: {
     <div class="ws-bulk" role="region" aria-label="Selected projects">
       <Toolbar variant="bar" ariaLabel="Change the selected projects">
         <Text emphasis="strong">{count()} selected</Text>
-        <Show
-          when={props.allowMove && naming() !== null}
-          fallback={null}
-        >
+        <Show when={props.allowMove && naming() !== null} fallback={null}>
           <form class="ws-add-form" onSubmit={(event) => void moveToNew(event)}>
-            <Input label="New workspace name" placeholder="Workspace name" value={naming() ?? ''}
+            <Input
+              label="New workspace name"
+              placeholder="Workspace name"
+              value={naming() ?? ''}
               ref={(input) => queueMicrotask(() => input.focus())}
-              onInput={setNaming} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNaming(null) } }} />
-            <Button submit disabled={busy() || !naming()?.trim()}>Create and move</Button>
-            <Button variant="ghost" onPress={() => setNaming(null)}>Cancel</Button>
+              onInput={setNaming}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setNaming(null)
+                }
+              }}
+            />
+            <Button submit disabled={busy() || !naming()?.trim()}>
+              Create and move
+            </Button>
+            <Button variant="ghost" onPress={() => setNaming(null)}>
+              Cancel
+            </Button>
           </form>
         </Show>
         <Show when={props.allowMove && naming() === null}>
           <Select
-            size="sm" width="auto" label="Move to workspace" value="" disabled={busy()}
-            options={[{ value: '', label: 'Move to workspace…', disabled: true },
+            size="sm"
+            width="auto"
+            label="Move to workspace"
+            value=""
+            disabled={busy()}
+            options={[
+              { value: '', label: 'Move to workspace…', disabled: true },
               ...props.workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name })),
-              { value: NEW_WORKSPACE, label: 'New workspace…' }]}
+              { value: NEW_WORKSPACE, label: 'New workspace…' },
+            ]}
             onChange={moveTo}
           />
         </Show>
@@ -292,7 +407,10 @@ function BulkBar(props: {
             onPress={() => {
               // Read once: the lists refetch before the result is worded, and by then every row has flipped.
               const show = allHidden()
-              void each((what) => `${show ? 'Showed' : 'Hid'} ${what}`, (project) => patchProject(project.id, { hidden: !show }))
+              void each(
+                (what) => `${show ? 'Showed' : 'Hid'} ${what}`,
+                (project) => patchProject(project.id, { hidden: !show }),
+              )
             }}
           >
             {allHidden() ? 'Show' : 'Hide'}
@@ -308,11 +426,18 @@ function BulkBar(props: {
               ...PROJECT_COLOR_OPTIONS,
               { value: 'none', label: 'No colour' },
             ]}
-            onChange={(value) => void each((what) => `Recoloured ${what}`, (project) => patchProject(project.id, { color: value === 'none' ? null : value }))}
+            onChange={(value) =>
+              void each(
+                (what) => `Recoloured ${what}`,
+                (project) => patchProject(project.id, { color: value === 'none' ? null : value }),
+              )
+            }
           />
         </Show>
         <Toolbar.Spacer />
-        <Button size="sm" variant="bare" onPress={props.onClear}>Clear</Button>
+        <Button size="sm" variant="bare" onPress={props.onClear}>
+          Clear
+        </Button>
       </Toolbar>
     </div>
   )

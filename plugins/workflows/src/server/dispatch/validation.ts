@@ -49,12 +49,15 @@ export function bindingProblems(
   const parsed = dataBindingSchema.safeParse(binding)
   if (!parsed.success) return [`${label} is not a valid typed binding`]
   const address = parsed.data.address
-  if (address.from === 'input' && !declaredInputs.has(address.name)) return [`${label} references undeclared input '${address.name}'`]
+  if (address.from === 'input' && !declaredInputs.has(address.name))
+    return [`${label} references undeclared input '${address.name}'`]
   if (address.from === 'item' && !allowItem) return [`${label} can use an item only in a workflow-map step`]
   if (address.from === 'step') {
     if (!indexes.has(address.stepId)) return [`${label} references unknown step '${address.stepId}'`]
-    if (!precedes(address.stepId, stepName)) return [`${label} references '${address.stepId}', which is not one of its predecessors`]
-    if (!structured(address.stepId)) return [`${label} references '${address.stepId}', which does not declare structured output`]
+    if (!precedes(address.stepId, stepName))
+      return [`${label} references '${address.stepId}', which is not one of its predecessors`]
+    if (!structured(address.stepId))
+      return [`${label} references '${address.stepId}', which does not declare structured output`]
   }
   return []
 }
@@ -69,14 +72,25 @@ function childWorkflowProblems(
   structured: (step: string) => boolean,
 ): string[] {
   if (!child) return [`${label} needs child_workflow`]
-  const errors = unexpectedFields(child, ['ref', 'inputs']).map((field) => `${label} child_workflow has unsupported field '${field}'`)
+  const errors = unexpectedFields(child, ['ref', 'inputs']).map(
+    (field) => `${label} child_workflow has unsupported field '${field}'`,
+  )
   const ref = child.ref
   if (!ref || typeof ref !== 'object') errors.push(`${label} child_workflow.ref must be a reference table`)
   else if (ref.source === 'database' || ref.source === 'user') {
-    errors.push(...unexpectedFields(ref, ['source', 'id']).map((field) => `${label} child_workflow.ref has unsupported field '${field}'`))
-    if (typeof ref.id !== 'string' || !ref.id.trim()) errors.push(`${label} child_workflow.ref.id must be a nonempty string`)
+    errors.push(
+      ...unexpectedFields(ref, ['source', 'id']).map(
+        (field) => `${label} child_workflow.ref has unsupported field '${field}'`,
+      ),
+    )
+    if (typeof ref.id !== 'string' || !ref.id.trim())
+      errors.push(`${label} child_workflow.ref.id must be a nonempty string`)
   } else if (ref.source === 'repo') {
-    errors.push(...unexpectedFields(ref, ['source', 'path']).map((field) => `${label} child_workflow.ref has unsupported field '${field}'`))
+    errors.push(
+      ...unexpectedFields(ref, ['source', 'path']).map(
+        (field) => `${label} child_workflow.ref has unsupported field '${field}'`,
+      ),
+    )
     if (typeof ref.path !== 'string' || !REPO_WORKFLOW_PATH_RE.test(ref.path)) {
       errors.push(`${label} child_workflow.ref.path must name a file under .acorn/workflows`)
     }
@@ -84,7 +98,18 @@ function childWorkflowProblems(
 
   for (const [name, binding] of Object.entries(child.inputs ?? {})) {
     if (!INPUT_NAME_RE.test(name)) errors.push(`${label} child_workflow.inputs has invalid name '${name}'`)
-    errors.push(...bindingProblems(`${label} child_workflow.inputs.${name}`, binding, declaredInputs, indexes, precedes, structured, stepIdentity(step), step.kind === 'workflow-map'))
+    errors.push(
+      ...bindingProblems(
+        `${label} child_workflow.inputs.${name}`,
+        binding,
+        declaredInputs,
+        indexes,
+        precedes,
+        structured,
+        stepIdentity(step),
+        step.kind === 'workflow-map',
+      ),
+    )
   }
   return errors
 }
@@ -111,34 +136,58 @@ export function workflowDispatchProblems(args: {
     return errors
   }
 
-  const errors = step.agent ? [] : childWorkflowProblems(label, step, step.childWorkflow, declaredInputs, indexes, precedes, structured)
+  const errors = step.agent
+    ? []
+    : childWorkflowProblems(label, step, step.childWorkflow, declaredInputs, indexes, precedes, structured)
   if (step.agent && step.childWorkflow) errors.push(`${label} must choose either agent or childWorkflow`)
   if (step.agent && kind !== 'workflow-map') errors.push(`${label} can run an agent directly only in For each`)
   if (step.agent) {
-    if (typeof step.agent !== 'object' || Array.isArray(step.agent)) return [...errors, `${label} agent must be a configuration object`]
+    if (typeof step.agent !== 'object' || Array.isArray(step.agent))
+      return [...errors, `${label} agent must be a configuration object`]
     const agent = step.agent
-    errors.push(...unexpectedFields(agent, ['prompt', 'goal', 'profileId', 'model', 'configOptions', 'schema', 'onFailure']).map(field => `${label} agent has unsupported field '${field}'`))
+    errors.push(
+      ...unexpectedFields(agent, ['prompt', 'goal', 'profileId', 'model', 'configOptions', 'schema', 'onFailure']).map(
+        (field) => `${label} agent has unsupported field '${field}'`,
+      ),
+    )
     if (typeof agent.prompt !== 'string' || !agent.prompt.trim()) errors.push(`${label} agent needs a prompt`)
-    if (agent.onFailure !== undefined && !['continue', 'stop'].includes(agent.onFailure)) errors.push(`${label} agent onFailure must be continue or stop`)
-    if (agent.model !== undefined && typeof agent.model !== 'string') errors.push(`${label} agent model must be a string`)
+    if (agent.onFailure !== undefined && !['continue', 'stop'].includes(agent.onFailure))
+      errors.push(`${label} agent onFailure must be continue or stop`)
+    if (agent.model !== undefined && typeof agent.model !== 'string')
+      errors.push(`${label} agent model must be a string`)
     if (agent.model && agent.configOptions?.model) errors.push(`${label} agent sets both model and configOptions.model`)
-    if (agent.configOptions !== undefined && (!agent.configOptions || typeof agent.configOptions !== 'object'
-      || Array.isArray(agent.configOptions) || Object.values(agent.configOptions).some(value => typeof value !== 'string'))) {
+    if (
+      agent.configOptions !== undefined &&
+      (!agent.configOptions ||
+        typeof agent.configOptions !== 'object' ||
+        Array.isArray(agent.configOptions) ||
+        Object.values(agent.configOptions).some((value) => typeof value !== 'string'))
+    ) {
       errors.push(`${label} agent configOptions must map option IDs to strings`)
     }
     if (agent.schema !== undefined) {
-      try { parseDataSchema(agent.schema) } catch (error) { errors.push(`${label} agent schema: ${error instanceof Error ? error.message : 'Invalid result schema'}`) }
+      try {
+        parseDataSchema(agent.schema)
+      } catch (error) {
+        errors.push(`${label} agent schema: ${error instanceof Error ? error.message : 'Invalid result schema'}`)
+      }
     }
-    if (/\$\{/.test(agent.prompt ?? '')) errors.push(`${label} agent prompt receives the current item automatically; template references are not supported`)
-    if (typeof agent.goal === 'string' && /\$\{/.test(agent.goal)) errors.push(`${label} agent goal is plain text; template references are not supported`)
+    if (/\$\{/.test(agent.prompt ?? ''))
+      errors.push(
+        `${label} agent prompt receives the current item automatically; template references are not supported`,
+      )
+    if (typeof agent.goal === 'string' && /\$\{/.test(agent.goal))
+      errors.push(`${label} agent goal is plain text; template references are not supported`)
   }
   if (step.childWorkflow && targets) {
     const ref = step.childWorkflow.ref
-    const target = ref && targets.find((entry) => {
-      if (entry.ref.source !== ref.source) return false
-      if (entry.ref.source === 'repo' && ref.source === 'repo') return entry.ref.path === ref.path
-      return entry.ref.source !== 'repo' && ref.source !== 'repo' && entry.ref.id === ref.id
-    })
+    const target =
+      ref &&
+      targets.find((entry) => {
+        if (entry.ref.source !== ref.source) return false
+        if (entry.ref.source === 'repo' && ref.source === 'repo') return entry.ref.path === ref.path
+        return entry.ref.source !== 'repo' && ref.source !== 'repo' && entry.ref.id === ref.id
+      })
     if (!target) errors.push(`${label} child workflow is not available to this project`)
     else {
       const bindings = step.childWorkflow.inputs ?? {}
@@ -156,32 +205,55 @@ export function workflowDispatchProblems(args: {
 
   if (kind === 'workflow-map') {
     if (step.repeat) {
-      try { processingFields(step.repeat) } catch (error) { errors.push(`${label}: ${error instanceof Error ? error.message : 'Invalid repeat policy'}`) }
+      try {
+        processingFields(step.repeat)
+      } catch (error) {
+        errors.push(`${label}: ${error instanceof Error ? error.message : 'Invalid repeat policy'}`)
+      }
     }
     if (!step.items) errors.push(`${label} needs items`)
-    else if (typeof step.items !== 'object' || Array.isArray(step.items)
-      || typeof step.items.step !== 'string' || typeof step.items.pointer !== 'string') {
-      errors.push(`${label} items must be {"step":"structured-predecessor-id","pointer":"/array"}, using the predecessor's stable ID. Put step and pointer directly in items, without an address wrapper.`)
-    }
-    else {
-      errors.push(...unexpectedFields(step.items, ['step', 'pointer']).map((field) => `${label} items has unsupported field '${field}'`))
+    else if (
+      typeof step.items !== 'object' ||
+      Array.isArray(step.items) ||
+      typeof step.items.step !== 'string' ||
+      typeof step.items.pointer !== 'string'
+    ) {
+      errors.push(
+        `${label} items must be {"step":"structured-predecessor-id","pointer":"/array"}, using the predecessor's stable ID. Put step and pointer directly in items, without an address wrapper.`,
+      )
+    } else {
+      errors.push(
+        ...unexpectedFields(step.items, ['step', 'pointer']).map(
+          (field) => `${label} items has unsupported field '${field}'`,
+        ),
+      )
       if (!indexes.has(step.items.step)) errors.push(`${label} items references unknown step '${step.items.step}'`)
       else if (!precedes(step.items.step, stepIdentity(step))) {
         errors.push(`${label} items references '${step.items.step}', which is not one of its predecessors`)
       } else if (!structured(step.items.step)) {
         errors.push(`${label} items references '${step.items.step}', which does not declare structured output`)
       }
-      if (parseWorkflowJsonPointer(step.items.pointer) === null) errors.push(`${label} items.pointer is not a safe JSON Pointer`)
+      if (parseWorkflowJsonPointer(step.items.pointer) === null)
+        errors.push(`${label} items.pointer is not a safe JSON Pointer`)
     }
-    if (step.itemKey !== undefined && (typeof step.itemKey !== 'string' || parseWorkflowJsonPointer(step.itemKey) === null)) {
+    if (
+      step.itemKey !== undefined &&
+      (typeof step.itemKey !== 'string' || parseWorkflowJsonPointer(step.itemKey) === null)
+    ) {
       errors.push(`${label} item_key is not a safe JSON Pointer`)
     }
-    if (step.title && (typeof step.title.template !== 'string' || !step.title.template.trim())) errors.push(`${label} needs a title template`)
+    if (step.title && (typeof step.title.template !== 'string' || !step.title.template.trim()))
+      errors.push(`${label} needs a title template`)
     else if (step.title) {
-      errors.push(...unexpectedFields(step.title, ['template', 'bindings']).map((field) => `${label} title has unsupported field '${field}'`))
+      errors.push(
+        ...unexpectedFields(step.title, ['template', 'bindings']).map(
+          (field) => `${label} title has unsupported field '${field}'`,
+        ),
+      )
       const names = new Set(Object.keys(step.title.bindings ?? {}))
       for (const token of step.title.template.match(BOUND_TEMPLATE_TOKEN_RE) ?? []) {
-        if (!/^\$\{[A-Za-z][A-Za-z0-9_]*\}$/.test(token)) errors.push(`${label} title has invalid binding expression '${token}'`)
+        if (!/^\$\{[A-Za-z][A-Za-z0-9_]*\}$/.test(token))
+          errors.push(`${label} title has invalid binding expression '${token}'`)
       }
       if (step.title.template.replace(BOUND_TEMPLATE_TOKEN_RE, '').includes('${')) {
         errors.push(`${label} title has an unterminated binding expression`)
@@ -191,7 +263,18 @@ export function workflowDispatchProblems(args: {
       }
       for (const [name, binding] of Object.entries(step.title.bindings ?? {})) {
         if (!INPUT_NAME_RE.test(name)) errors.push(`${label} title.bindings has invalid name '${name}'`)
-        errors.push(...bindingProblems(`${label} title.bindings.${name}`, binding, declaredInputs, indexes, precedes, structured, stepIdentity(step), true))
+        errors.push(
+          ...bindingProblems(
+            `${label} title.bindings.${name}`,
+            binding,
+            declaredInputs,
+            indexes,
+            precedes,
+            structured,
+            stepIdentity(step),
+            true,
+          ),
+        )
       }
     }
   } else {

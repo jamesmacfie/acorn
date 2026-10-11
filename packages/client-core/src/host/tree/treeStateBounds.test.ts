@@ -17,15 +17,44 @@ function host() {
   const detach = vi.fn()
   const transport: TreeTransport = {
     send: () => {},
-    onBatch: (listener) => { receive = listener; return detach },
-    onFailed: (listener) => { fail = listener; return detach },
+    onBatch: (listener) => {
+      receive = listener
+      return detach
+    },
+    onFailed: (listener) => {
+      fail = listener
+      return detach
+    },
   }
   const refused = vi.fn()
-  const state = createTreeState({ pluginId: 'bounds', transport, onRefused: refused,
-    scheduler: { schedule: (callback) => { callbacks.push(callback); return callbacks.length }, cancel } })
-  return { state, receive: (ops: readonly TreeMutation[]) => receive(ops), fail: (message: string) => fail(message), callbacks, cancel, detach, refused }
+  const state = createTreeState({
+    pluginId: 'bounds',
+    transport,
+    onRefused: refused,
+    scheduler: {
+      schedule: (callback) => {
+        callbacks.push(callback)
+        return callbacks.length
+      },
+      cancel,
+    },
+  })
+  return {
+    state,
+    receive: (ops: readonly TreeMutation[]) => receive(ops),
+    fail: (message: string) => fail(message),
+    callbacks,
+    cancel,
+    detach,
+    refused,
+  }
 }
-const insert = (node: TreeNode, parent: string | null = null): TreeMutation => ({ op: 'insert', node, parent, index: 0 })
+const insert = (node: TreeNode, parent: string | null = null): TreeMutation => ({
+  op: 'insert',
+  node,
+  parent,
+  index: 0,
+})
 
 // Depth uses the same shared state in desktop and terminal hosts.
 describe('whole projected tree depth', () => {
@@ -43,7 +72,10 @@ describe('whole projected tree depth', () => {
     const h = host()
     h.state._apply([insert(chain(63)), insert(chain(2, 's'))])
     const before = JSON.stringify({ roots: h.state.roots(), nodes: h.state.nodes })
-    h.state._apply([{ op: 'text', id: 'p1', value: 'prefix' }, { op: 'move', id: 's1', parent: 'p63', index: 0 }])
+    h.state._apply([
+      { op: 'text', id: 'p1', value: 'prefix' },
+      { op: 'move', id: 's1', parent: 'p63', index: 0 },
+    ])
     expect(h.refused).toHaveBeenCalledOnce()
     expect(h.refused).toHaveBeenCalledWith(expect.stringContaining('tree deeper than 64'))
     expect(JSON.stringify({ roots: h.state.roots(), nodes: h.state.nodes })).toBe(before)
@@ -76,7 +108,10 @@ describe('whole projected tree depth', () => {
   it('refuses an intermediate cycle even if a later removal would hide it', () => {
     const h = host()
     h.state._apply([insert(chain(3))])
-    h.state._apply([{ op: 'move', id: 'p1', parent: 'p3', index: 0 }, { op: 'remove', id: 'p1' }])
+    h.state._apply([
+      { op: 'move', id: 'p1', parent: 'p3', index: 0 },
+      { op: 'remove', id: 'p1' },
+    ])
     expect(h.refused).toHaveBeenCalledWith(expect.stringContaining('inside itself'))
     expect(Object.keys(h.state.nodes)).toHaveLength(3)
     h.state.dispose()
@@ -86,7 +121,12 @@ describe('whole projected tree depth', () => {
     const h = host()
     const count = TREE_LIMITS.batchOps
     h.state._apply(Array.from({ length: count }, (_, i) => insert(leaf(`n${i}`))))
-    const moves: TreeMutation[] = Array.from({ length: count - 1 }, (_, i) => ({ op: 'move', id: `n${i}`, parent: `n${i + 1}`, index: 0 }))
+    const moves: TreeMutation[] = Array.from({ length: count - 1 }, (_, i) => ({
+      op: 'move',
+      id: `n${i}`,
+      parent: `n${i + 1}`,
+      index: 0,
+    }))
     h.state._apply([...moves, { op: 'remove', id: `n${count - 1}` }])
     expect(h.refused).not.toHaveBeenCalled()
     expect(h.state.roots()).toEqual([])

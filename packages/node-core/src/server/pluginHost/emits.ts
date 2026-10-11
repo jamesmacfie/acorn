@@ -17,11 +17,10 @@ const producers = new Map<string, { emits: readonly PluginEmit[] }>()
 export function declareEmits(pluginId: string, emits: readonly PluginEmit[]): () => void {
   const declaration = { emits }
   producers.set(pluginId, declaration)
-  return () => { if (producers.get(pluginId) === declaration) producers.delete(pluginId) }
+  return () => {
+    if (producers.get(pluginId) === declaration) producers.delete(pluginId)
+  }
 }
-
-/** The declared verbs of a producer, or undefined when no such plugin is running. */
-export const declaredEmits = (pluginId: string): readonly PluginEmit[] | undefined => producers.get(pluginId)?.emits
 
 /** Throw when `channel` names a running producer that did not declare the verb. Silent for an absent
  *  producer, and for the subscriber's own channel. */
@@ -30,9 +29,11 @@ export function assertSubscribableVerb(channel: string, subscriber: string): voi
   if (!parsed || parsed.pluginId === subscriber) return
   const declared = producers.get(parsed.pluginId)?.emits
   if (declared && !declared.some((emit) => emit.verb === parsed.verb)) {
-    throw new Error(`plugin '${parsed.pluginId}' does not declare '${parsed.verb}' in its emits, so '${subscriber}' cannot subscribe to it`)
+    throw new Error(
+      `plugin '${parsed.pluginId}' does not declare '${parsed.verb}' in its emits, so '${subscriber}' cannot subscribe to it`,
+    )
   }
 }
 
 // Test seam.
-export const _resetEmits = (): void => producers.clear()
+const _resetEmits = (): void => producers.clear()

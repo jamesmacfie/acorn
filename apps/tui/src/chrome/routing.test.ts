@@ -6,9 +6,9 @@ import { routedProjectId } from './routing'
 //
 // `routedProjectId` is what every project-scoped surface reads and what the shell's "keep the path on
 // a project this workspace has" effect compares against. Answering `null` where the path plainly
-// carries a project is how that effect came to navigate away from the project a reader had just
-// chosen, on every row they moved to: a plugin surface whose pattern nothing here registered matched
-// no route, so `params` was empty, so the shell decided nothing was routed.
+// carries a project would make that effect navigate away from the project a reader just chose, on
+// every row they move to: a plugin surface whose pattern nothing here registered matches no route, so
+// `params` is empty and the shell decides nothing is routed.
 describe('the project the shell is on', () => {
   afterEach(() => _resetRouter())
 

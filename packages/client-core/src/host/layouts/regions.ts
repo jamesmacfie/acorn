@@ -1,12 +1,10 @@
 import type { JSX } from 'solid-js'
-import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 
-// What every layout is handed. See docs/panes/layout.md § Layout model for the two layers of layout and
-// docs/panes/layout.md § Layout model for each layout's regions and its narrow and terminal projections.
+// What every layout is handed (docs/panes/layout.md § Layout model).
 //
-// One props type for all seven layouts rather than seven, because the render path in
-// registries/panes.ts and, from phase 3, the remote root both build these props without knowing which
-// layout they are building for. A layout reads the fields it has regions for and ignores the rest.
+// One props type for all seven layouts, because the pane registry's render path and the remote root
+// both build these props without knowing which layout they are building for. A layout reads the
+// fields it has regions for and ignores the rest.
 
 /**
  * A region's contents, as a thunk.
@@ -27,7 +25,7 @@ export type LayoutProps = {
   hidden?: readonly string[]
   /** `list-detail` only. Offer the control that collapses the list column to a rail. Opt in, because
    *  the pane has to give each of its rows a `collapsed` slot for the rail to be readable
-   *  (registries/panes/panes.ts § collapsible). */
+   *  (`collapsible` on the pane contribution). */
   collapsible?: boolean
   /** `list-detail` only. An empty collapse keeps only the header-height expand control instead of
    *  asking the list region to provide one-mark row variants. */
@@ -56,5 +54,3 @@ export type LayoutProps = {
 }
 
 export type Layout = (props: LayoutProps) => JSX.Element
-
-export type { PaneLayoutName }

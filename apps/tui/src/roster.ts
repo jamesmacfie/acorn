@@ -13,18 +13,17 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same thirteen the desktop
-// registers, and nine panes reach the strip (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin
-// is not on this list and never will be: it arrives from a node as a bundle, and
-// `watchPluginChanges` in main.tsx is what finds it, once a node is reachable.
+// because that is where a pane comes from on the desktop too. It is the same twelve the desktop
+// registers (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin is not on this
+// list: it arrives from a node as a bundle, and the client runtime's `watchPluginChanges` finds it
+// once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// The original twelve imports were the terminal client's eager module graph. `App.tsx` held them so their
-// `init` could register at module scope, and `main.tsx` awaits `App` before it creates a renderer — so
-// every pane, every source and every query module in twelve plugins was evaluated before a cell was
-// drawn. That was 224 KB of the 1.03 MB the shell loaded to draw a rail
-// (measured 2026-09-03).
+// These imports pull in every pane, source and query module in twelve plugins. `main.tsx` awaits
+// `App` before it creates a renderer, so holding them in `App.tsx` would evaluate all of that before
+// a cell is drawn. ../scripts/check-startup-graph.mjs fails the build if the roster reaches the
+// startup graph.
 //
 // Registering after the frame is safe because every contribution registry is a Solid signal
 // (client-core kit/lib/state/registry.ts): the shell draws its chrome, this lands, and the rail, the pane

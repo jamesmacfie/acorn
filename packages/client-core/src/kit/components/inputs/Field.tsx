@@ -5,8 +5,8 @@ import { createFieldSlot, FieldProvider, NO_FIELD } from './controlAttrs'
 /** Label + control + optional hint/error.
  *
  *  The caption alone is the `<label>`, pointed at the control by id, and the hint, the error, and the
- *  help describe the control by id. A label wrapped round all of them made the hint and any error
- *  part of the control's name ("Port The port the server listens on"). The control claims the id
+ *  help describe the control by id. A label wrapped round all of them would make the hint and any
+ *  error part of the control's name ("Port The port the server listens on"). The control claims the id
  *  itself (./controlAttrs.ts), so a caller never writes one.
  *
  *  `group` covers what a `<label>` cannot: several controls under one caption, each with a label of
@@ -34,11 +34,17 @@ export function Field(props: {
     <Show when={props.label}>
       <Show
         when={props.help}
-        fallback={<label class="ui-field-label" id={labelId} for={slot.target()}>{props.label}</label>}
+        fallback={
+          <label class="ui-field-label" id={labelId} for={slot.target()}>
+            {props.label}
+          </label>
+        }
       >
         {(help) => (
           <span class="ui-titled">
-            <label class="ui-field-label" id={labelId} for={slot.target()}>{props.label}</label>
+            <label class="ui-field-label" id={labelId} for={slot.target()}>
+              {props.label}
+            </label>
             <HelpMark text={help()} titleId={labelId} textId={helpId} />
           </span>
         )}
@@ -47,22 +53,35 @@ export function Field(props: {
   )
   const tail = (
     <>
-      <Show when={props.hint}><span class="ui-field-hint" id={hintId}>{props.hint}</span></Show>
-      <Show when={props.error}><span class="ui-field-error" id={errorId} role="alert">{props.error}</span></Show>
+      <Show when={props.hint}>
+        <span class="ui-field-hint" id={hintId}>
+          {props.hint}
+        </span>
+      </Show>
+      <Show when={props.error}>
+        <span class="ui-field-error" id={errorId} role="alert">
+          {props.error}
+        </span>
+      </Show>
     </>
   )
   return (
     <Show
       when={props.group}
-      fallback={(
+      fallback={
         <div class="ui-field" data-layout={props.layout ?? 'stack'}>
           {caption}
           <FieldProvider value={slot.claim}>{props.children}</FieldProvider>
           {tail}
         </div>
-      )}
+      }
     >
-      <div class="ui-field" data-layout={props.layout ?? 'stack'} role="group" aria-labelledby={props.label ? labelId : undefined}>
+      <div
+        class="ui-field"
+        data-layout={props.layout ?? 'stack'}
+        role="group"
+        aria-labelledby={props.label ? labelId : undefined}
+      >
         {caption}
         <FieldProvider value={NO_FIELD}>{props.children}</FieldProvider>
         {tail}

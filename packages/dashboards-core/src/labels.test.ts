@@ -2,16 +2,51 @@ import { describe, expect, it } from 'vitest'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { DATA_OPERATORS } from '@acorn/protocol/dataBindings.ts'
 import {
-  AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, DURATION_UNIT_LABELS, EMPTY_SORT_LABELS, EXPRESSION_LABELS,
-  GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS, MEASURE_LABELS, OPERATOR_LABELS, PRECISION_LABELS, PRESENTATION_LABELS, PREVIOUS_CHANGE_LABELS, RELATIVE_OFFSET_LABELS, REQUIREMENT_STATUS_LABELS,
-  OPERATION_HELP, SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNMATCHED_LABELS, VIEW_HELP, VIEW_LABELS, WEEK_START_LABELS,
-  calendarLabel, offsetLabel, operatorLabel, planPartLabel,
+  AGGREGATE_LABELS,
+  ARITHMETIC_LABELS,
+  BUCKET_LABELS,
+  CHART_SHAPE_LABELS,
+  COLUMN_TYPE_LABELS,
+  COMPARE_LABELS,
+  DURATION_UNIT_LABELS,
+  EMPTY_SORT_LABELS,
+  EXPRESSION_LABELS,
+  GOOD_DIRECTION_LABELS,
+  GROUP_ORDER_LABELS,
+  MEASURE_LABELS,
+  OPERATOR_LABELS,
+  PRECISION_LABELS,
+  PRESENTATION_LABELS,
+  PREVIOUS_CHANGE_LABELS,
+  REQUIREMENT_STATUS_LABELS,
+  OPERATION_HELP,
+  SORT_DIRECTION_LABELS,
+  SOURCE_ROLE_LABELS,
+  TIME_MODE_LABELS,
+  TONE_LABELS,
+  TREND_LABELS,
+  UNMATCHED_LABELS,
+  VIEW_HELP,
+  VIEW_LABELS,
+  WEEK_START_LABELS,
+  calendarLabel,
+  offsetLabel,
+  operatorLabel,
+  planPartLabel,
 } from './labels'
 
 // Read straight from the zod schemas, so a value added there fails here until it has a label. The
 // walk uses zod's own `def.type` rather than importing zod, which this package doesn't depend on.
-type Any = { def: { type: string }; unwrap(): Any; shape: Record<string, Any>; element: Any; options: unknown[]; values: Set<unknown> }
-const unwrap = (schema: Any): Any => ['optional', 'default', 'lazy'].includes(schema.def.type) ? unwrap(schema.unwrap()) : schema
+type Any = {
+  def: { type: string }
+  unwrap(): Any
+  shape: Record<string, Any>
+  element: Any
+  options: unknown[]
+  values: Set<unknown>
+}
+const unwrap = (schema: Any): Any =>
+  ['optional', 'default', 'lazy'].includes(schema.def.type) ? unwrap(schema.unwrap()) : schema
 const field = (schema: Any, key: string): Any => unwrap(unwrap(schema).shape[key]!)
 const element = (schema: Any): Any => unwrap(unwrap(schema).element)
 const values = (schema: Any): string[] => {
@@ -21,7 +56,8 @@ const values = (schema: Any): string[] => {
   throw new Error(`Not an enum: ${inner.def.type}`)
 }
 const variants = (schema: Any): Any[] => unwrap(schema).options as Any[]
-const variant = (schema: Any, key: string, value: string): Any => variants(schema).find(option => values(field(option, key)).includes(value))!
+const variant = (schema: Any, key: string, value: string): Any =>
+  variants(schema).find((option) => values(field(option, key)).includes(value))!
 
 const plan = panelPlanSchema as unknown as Any
 const column = element(field(plan, 'columns'))
@@ -40,14 +76,14 @@ describe('panel labels', () => {
     ['requirement status', values(field(element(field(plan, 'requirements')), 'status')), REQUIREMENT_STATUS_LABELS],
     ['time mode', values(field(field(plan, 'time'), 'mode')), TIME_MODE_LABELS],
     ['week start', values(field(field(plan, 'time'), 'weekStart')), WEEK_START_LABELS],
-    ['expression', variants(expression).flatMap(option => values(field(option, 'kind'))), EXPRESSION_LABELS],
+    ['expression', variants(expression).flatMap((option) => values(field(option, 'kind'))), EXPRESSION_LABELS],
     ['arithmetic', values(field(variant(expression, 'kind', 'arithmetic'), 'operator')), ARITHMETIC_LABELS],
     ['duration unit', values(field(variant(expression, 'kind', 'duration'), 'unit')), DURATION_UNIT_LABELS],
     ['measure', values(field(element(field(summarize, 'measures')), 'kind')), MEASURE_LABELS],
     ['group bucket', values(field(element(field(plan, 'group')), 'bucket')), BUCKET_LABELS],
     ['view', values(field(view, 'kind')), VIEW_LABELS],
     ['view help', values(field(view, 'kind')), VIEW_HELP],
-    ['operation help', variants(stages).flatMap(option => values(field(option, 'op'))), OPERATION_HELP],
+    ['operation help', variants(stages).flatMap((option) => values(field(option, 'op'))), OPERATION_HELP],
     ['aggregate', values(field(view, 'aggregate')), AGGREGATE_LABELS],
     ['chart shape', values(field(view, 'shape')), CHART_SHAPE_LABELS],
     ['presentation', values(field(field(field(plan, 'actions'), 'press'), 'prefer')), PRESENTATION_LABELS],
@@ -75,7 +111,6 @@ describe('panel labels', () => {
     expect(offsetLabel('+P1W')).toBe('1 week from now')
     expect(calendarLabel('startOfMonth')).toBe('the start of this month')
     expect(calendarLabel('startOfWeek', '-P2W')).toBe('the start of the week 2 weeks ago')
-    for (const [offset, label] of Object.entries(RELATIVE_OFFSET_LABELS)) expect(offsetLabel(offset)).toBe(label)
   })
 
   it('names the part a problem path points at', () => {

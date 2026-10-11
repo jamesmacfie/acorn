@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import type { UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 
 const NotificationBell = lazy(() => import('@acorn/client-core/features/notifications/NotificationBell.tsx'))
 const CommandPalette = lazy(() => import('@acorn/client-core/host/palette/CommandPalette.tsx'))
@@ -17,7 +17,9 @@ export const shellSlotContributions: UiSlotContribution[] = [
   // own, and this one is the answer to a notification they just clicked.
   { id: 'security.plugin-approval', slot: 'overlay', order: 4, component: () => <PluginApprovalDialog /> },
   {
-    id: 'notifications.bell', slot: 'topbar.right', order: 10,
+    id: 'notifications.bell',
+    slot: 'topbar.right',
+    order: 10,
     component: (props) => <NotificationBell onSelectTask={props.context.selectTask} />,
   },
   { id: 'palette.commands', slot: 'overlay', order: 10, component: () => <CommandPalette /> },

@@ -4,7 +4,8 @@ Date: October 8, 2026. Status: dated delivery evidence, preserved from the compl
 
 These notes record what each phase implemented and checked. They are not instructions to rebuild
 the editor. Later phase notes can supersede earlier limits or measurements.
-[Final acceptance](../future/editor/README.md) owns the remaining review and release checks.
+The [phase six followup](./editor-phase06-follow-up-2026-10-08.md) lists the release checks that
+could not run.
 
 ## Phase 01: protect documents from external changes
 

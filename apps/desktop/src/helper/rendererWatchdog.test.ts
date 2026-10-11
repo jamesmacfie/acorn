@@ -7,17 +7,36 @@ function fixture() {
   let enabled = true
   const report = vi.fn()
   const watch = createRendererWatchdog({ now: () => time, enabled: () => enabled, report })
-  return { watch, report, setEnabled: (on: boolean) => { enabled = on },
-    advance: (ms: number) => { time += ms; watch.tick() } }
+  return {
+    watch,
+    report,
+    setEnabled: (on: boolean) => {
+      enabled = on
+    },
+    advance: (ms: number) => {
+      time += ms
+      watch.tick()
+    },
+  }
 }
 describe('renderer watchdog', () => {
   it('reports a permanent renderer stall from the independent helper, once, then recovery', () => {
     const f = fixture()
     f.watch.receive({ active: true, activity })
     for (let i = 0; i < 8; i++) f.advance(1000)
-    expect(f.report).toHaveBeenCalledExactlyOnceWith('ui.hang.suspected', { durationMs: 5000, ...activity, contextAgeMs: 5000, operationActive: true })
+    expect(f.report).toHaveBeenCalledExactlyOnceWith('ui.hang.suspected', {
+      durationMs: 5000,
+      ...activity,
+      contextAgeMs: 5000,
+      operationActive: true,
+    })
     f.watch.receive({ active: true, activity: null })
-    expect(f.report).toHaveBeenLastCalledWith('ui.hang.recovered', { durationMs: 8000, ...activity, contextAgeMs: 8000, operationActive: true })
+    expect(f.report).toHaveBeenLastCalledWith('ui.hang.recovered', {
+      durationMs: 8000,
+      ...activity,
+      contextAgeMs: 8000,
+      operationActive: true,
+    })
   })
   it('retains the last interaction after it completes, marked as historical context', () => {
     const f = fixture()
@@ -25,7 +44,12 @@ describe('renderer watchdog', () => {
     f.advance(1000)
     f.watch.receive({ active: true, activity: null })
     for (let i = 0; i < 5; i++) f.advance(1000)
-    expect(f.report).toHaveBeenCalledWith('ui.hang.suspected', { durationMs: 5000, ...activity, contextAgeMs: 6000, operationActive: false })
+    expect(f.report).toHaveBeenCalledWith('ui.hang.suspected', {
+      durationMs: 5000,
+      ...activity,
+      contextAgeMs: 6000,
+      operationActive: false,
+    })
   })
   it('does not confuse sleep or helper starvation with a renderer hang', () => {
     const f = fixture()

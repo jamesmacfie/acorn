@@ -3,7 +3,7 @@ import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
 import type { FilterBarProps, SectionProps } from '@acorn/client-core/kit/components/layout'
-import { isCompact, slotColor } from '../../appearance'
+import { slotColor } from '../../appearance'
 import { Line, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
 import { stop } from '../../keys/stops'
@@ -13,19 +13,20 @@ export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Elemen
   // it has a height to work against. Still `flexShrink={0}`, by the rule above: what does not fit
   // is clipped by the region, never squeezed into the line above.
   return (
-    <box
-      flexDirection="column"
-      flexShrink={0}
-      flexGrow={props.grow ? 1 : 0}
-      gap={spaceLines(props.gap ?? 'stack')}
-    >
+    <box flexDirection="column" flexShrink={0} flexGrow={props.grow ? 1 : 0} gap={spaceLines(props.gap ?? 'stack')}>
       {props.children}
     </box>
   )
 }
 
 // `even` is ignored: a row of cells already gives each child the width it needs.
-export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; even?: boolean; children: JSX.Element }) {
+export function Inline(props: {
+  gap?: Space
+  wrap?: boolean
+  spread?: boolean
+  even?: boolean
+  children: JSX.Element
+}) {
   return (
     <box
       flexDirection="row"
@@ -43,10 +44,16 @@ export function Section(props: SectionProps) {
     <box flexDirection="column" flexShrink={0} marginTop={spaceLines('section')}>
       <box flexDirection="row" gap={1}>
         <Line role="eyebrow">{props.label}</Line>
-        <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
+        <Show when={props.count !== undefined}>
+          <Line role="muted">{String(props.count)}</Line>
+        </Show>
         {slot(props.actions)}
       </box>
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
       {props.children}
     </box>
   )
@@ -71,7 +78,7 @@ export function Fold(props: {
   children: JSX.Element
 }) {
   const [local, setLocal] = createSignal(props.defaultOpen ?? false)
-  const open = () => (props.onOpenChange ? props.open ?? false : local())
+  const open = () => (props.onOpenChange ? (props.open ?? false) : local())
   const toggle = () => {
     const next = !open()
     setLocal(next)
@@ -93,12 +100,16 @@ export function Fold(props: {
         <Line {...litControl({ focused: control.focused() })}>{open() ? '▾' : '▸'}</Line>
         {slot(props.leading)}
         <Line {...litControl({ focused: control.focused(), strong: true })}>{props.label}</Line>
-        <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
+        <Show when={props.count !== undefined}>
+          <Line role="muted">{String(props.count)}</Line>
+        </Show>
         {slot(props.meta)}
         {slot(props.actions)}
       </box>
       <Show when={open()}>
-        <box flexDirection="column" paddingLeft={props.contentIndent === 'none' ? 0 : 2}>{props.children}</box>
+        <box flexDirection="column" paddingLeft={props.contentIndent === 'none' ? 0 : 2}>
+          {props.children}
+        </box>
       </Show>
     </box>
   )
@@ -126,7 +137,7 @@ export function Card(props: {
   // Focus colours the frame and takes precedence over the card's tone. In compact density a toned
   // card keeps only its left edge, so the speaker cue still spans the whole message.
   const lit = () => control.focused()
-  const accent = () => lit() ? 'accent' : props.stripe
+  const accent = () => (lit() ? 'accent' : props.stripe)
   return (
     <box
       flexDirection="column"
@@ -134,16 +145,16 @@ export function Card(props: {
       minWidth={0}
       width={props.fit ? undefined : '100%'}
       alignSelf={props.fit ? 'flex-start' : undefined}
-      marginTop={isCompact() ? 0 : 1}
-      marginBottom={isCompact() ? 0 : 1}
-      ref={(element: Renderable) => { if (props.onPress) control.ref(element) }}
-      {...(isCompact()
-        ? { border: accent() ? ['left'] as const : false, borderStyle: 'single' as const }
-        : boxBorder('surface', lit() ? { tone: 'accent' } : {}))}
+      marginTop={1}
+      marginBottom={1}
+      ref={(element: Renderable) => {
+        if (props.onPress) control.ref(element)
+      }}
+      {...boxBorder('surface', lit() ? { tone: 'accent' } : {})}
       borderLeftAccent={accent() ? { glyph: borderCell('stripe').glyph, color: slotColor(accent()!) } : undefined}
       title={props.title}
-      paddingLeft={isCompact() ? 0 : 1}
-      paddingRight={isCompact() ? 0 : 1}
+      paddingLeft={1}
+      paddingRight={1}
     >
       {props.children}
     </box>
@@ -157,29 +168,58 @@ export function Card(props: {
  *  fit onto the next line before it shrinks anything, so an overfull bar costs a line instead of its
  *  words, and a bar that fits is laid out exactly as it was.
  *
- *  The gap is the column gap alone. Yoga's `gap` sets both axes, so a wrapped bar gained a blank row
- *  between its lines.
+ *  The gap is the column gap alone. Yoga's `gap` sets both axes, so a wrapped bar would gain a blank
+ *  row between its lines.
  *
  *  Nothing here wraps `props.children`. A context provider around them would put them inside a memo
- *  of Solid's own, and re-running a toolbar's children as a unit used to break the changes pane: a
- *  callback-form `<Show>` in that bar had its accessor read again after its condition went false,
- *  which stock Solid refuses as `Stale read from <Show>`. Our copy holds the last value instead
- *  (patches/README.md), but the bar still has no reason to re-run its children. An open panel widens
- *  itself instead (§ `Menu`). */
-type ToolbarProps = { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }
-  | { variant: 'status'; size?: 'sm' | 'md'; ariaLabel?: string; primary: JSX.Element; secondary?: JSX.Element; essential: JSX.Element; actions?: JSX.Element; children?: never }
+ *  of Solid's own and re-run the bar's children as a unit, and a callback-form `<Show>` among them
+ *  then has its accessor read again after its condition went false, which stock Solid refuses as
+ *  `Stale read from <Show>`. Our copy holds the last value instead (patches/README.md), but the bar
+ *  still has no reason to re-run its children. An open panel widens itself instead (§ `Menu`). */
+type ToolbarProps =
+  | { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }
+  | {
+      variant: 'status'
+      size?: 'sm' | 'md'
+      ariaLabel?: string
+      primary: JSX.Element
+      secondary?: JSX.Element
+      essential: JSX.Element
+      actions?: JSX.Element
+      children?: never
+    }
 
 export function Toolbar(props: ToolbarProps) {
-  return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
-    {props.variant === 'status' ? <>{props.primary}{props.essential}{props.actions}{props.secondary}</> : props.children}
-  </box>
+  return (
+    <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
+      {props.variant === 'status' ? (
+        <>
+          {props.primary}
+          {props.essential}
+          {props.actions}
+          {props.secondary}
+        </>
+      ) : (
+        props.children
+      )}
+    </box>
+  )
 }
 
 export function FilterBar(props: FilterBarProps) {
-  return <box flexDirection="row" flexWrap="wrap" flexShrink={0} minWidth={0}
-    paddingLeft={spaceCells('inline')} paddingRight={spaceCells('inline')} columnGap={spaceCells('inline')}>
-    {props.children}
-  </box>
+  return (
+    <box
+      flexDirection="row"
+      flexWrap="wrap"
+      flexShrink={0}
+      minWidth={0}
+      paddingLeft={spaceCells('inline')}
+      paddingRight={spaceCells('inline')}
+      columnGap={spaceCells('inline')}
+    >
+      {props.children}
+    </box>
+  )
 }
 
 /** `flexGrow` on an empty box is what "push what follows to the far end" is in a cell layout. */

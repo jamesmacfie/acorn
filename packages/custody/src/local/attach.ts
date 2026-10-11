@@ -19,7 +19,8 @@ export function runningNode(dataDir: string): RunningNode | null {
   const pid = lockedBy(dataDir)
   if (pid === null) return null
   const identity = nodeIdentitySchema.safeParse(JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')))
-  if (!identity.success || !identity.data.port) throw new Error(`A node holds ${dataDir} (pid ${pid}) but its node.json names no port. Stop it and try again.`)
+  if (!identity.success || !identity.data.port)
+    throw new Error(`A node holds ${dataDir} (pid ${pid}) but its node.json names no port. Stop it and try again.`)
   const certPem = readFileSync(join(dataDir, 'tls', 'cert.pem'), 'utf8')
   return {
     pid,

@@ -23,7 +23,13 @@ export default function SaveRequestModal(props: {
 
   const submit = () => {
     if (props.busy || !name().trim()) return
-    props.onSave({ name: name().trim(), folder: folder().trim().replace(/^\/+|\/+$/g, ''), scope: scope() })
+    props.onSave({
+      name: name().trim(),
+      folder: folder()
+        .trim()
+        .replace(/^\/+|\/+$/g, ''),
+      scope: scope(),
+    })
   }
 
   return (
@@ -32,8 +38,8 @@ export default function SaveRequestModal(props: {
     <Modal title="Save request" size="sm" onDismiss={props.onDismiss}>
       <ModalBody>
         <Field label="Name">
-          {/* Enter saves, through the kit's own submit event. The frame did this with a `keydown` on the
-              dialog, which is a DOM event and does not cross. */}
+          {/* Enter saves, through the kit's own submit event. A `keydown` on the dialog is a DOM event and
+              does not cross. */}
           <Input
             value={name()}
             maxLength={120}
@@ -48,11 +54,21 @@ export default function SaveRequestModal(props: {
         </Field>
 
         <Show when={props.inTask}>
-          <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task, and goes when you archive it.' : 'Saved to the project, so every task can use it.'}>
+          <Field
+            label="Keep in"
+            hint={
+              scope() === 'task'
+                ? 'Stays with this task, and goes when you archive it.'
+                : 'Saved to the project, so every task can use it.'
+            }
+          >
             <Select
               value={scope()}
               onChange={(value: string) => setScope(value as 'task' | 'project')}
-              options={[{ value: 'task', label: 'This task' }, { value: 'project', label: 'The project' }]}
+              options={[
+                { value: 'task', label: 'This task' },
+                { value: 'project', label: 'The project' },
+              ]}
             />
           </Field>
         </Show>
@@ -71,12 +87,16 @@ export default function SaveRequestModal(props: {
         </Show>
 
         <Show when={props.error}>
-          <Text tone="danger" wrap>{props.error}</Text>
+          <Text tone="danger" wrap>
+            {props.error}
+          </Text>
         </Show>
       </ModalBody>
 
       <ModalActions>
-        <Button variant="ghost" onPress={props.onDismiss}>Cancel</Button>
+        <Button variant="ghost" onPress={props.onDismiss}>
+          Cancel
+        </Button>
         <Button variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()} onPress={submit}>
           Save
         </Button>

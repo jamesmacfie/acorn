@@ -6,8 +6,12 @@ const GitSourceList = lazy(() => import('./HistoryBrowse').then((module) => ({ d
 const GitSourceDetail = lazy(() => import('./HistoryBrowse').then((module) => ({ default: module.GitSourceDetail })))
 
 export const gitSourceContribution: SourceContribution<never> = {
-  id: 'git', order: 45, glyph: 'git-branch', label: 'Git',
-  projectScoped: true, requiresGitProject: true,
+  id: 'git',
+  order: 45,
+  glyph: 'git-branch',
+  label: 'Git',
+  projectScoped: true,
+  requiresGitProject: true,
   // Other plugins may mark the Git icon (`core:source`), keyed by the routed project. A deploy or CI
   // plugin knows the state of a project's repository, and this icon is that repository's place.
   statusAnnotations: true,

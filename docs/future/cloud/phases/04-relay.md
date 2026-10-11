@@ -22,8 +22,8 @@ soon as it passes this phase.
 - Team Nodes from [phase 3](./03-team-node.md), listening publicly.
 - The pinned TLS agent in `packages/custody/src/broker/nodeBroker.ts`.
 - The Host allowlist in `packages/node-core/src/server/transport/listener.ts`.
-- The WebSocket hub in `packages/node-core/src/server/transport/wsHub.ts` and the port tunnel in
-  `packages/node-core/src/server/transport/tunnel.ts`.
+- The WebSocket hub in `packages/node-core/src/server/transport/wsHub.ts`. The port tunnel in
+  `packages/node-core/src/server/transport/tunnel.ts` was deleted in cleanup phase 09.
 - The design in [relay](../relay.md).
 
 ## In scope

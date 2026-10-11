@@ -3,16 +3,17 @@
 // callback.
 import type { TaskArchiveConcern } from '@acorn/protocol/task.ts'
 import type { TaskRef } from '../core'
+import type { Disposable } from './capabilities'
 import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('task-check')
 
 /** How long one check may take before the fan-out gives up on it (docs/plugins/task-checks.md § Task checks). */
-export const CHECK_TIMEOUT_MS = 2_000
+const CHECK_TIMEOUT_MS = 2_000
 
-/** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). An order
- *  of magnitude below server/storage/archive.ts's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
-export const APPLY_TIMEOUT_MS = 60_000
+/** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). Half
+ *  the archive's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
+const APPLY_TIMEOUT_MS = 60_000
 
 /** How much of a plugin's own text reaches the dialog. Display-only strings, capped by the node, the
  *  same treatment a loaded plugin's failure `reason` gets on its way to the roster. */
@@ -21,7 +22,7 @@ const DETAIL_MAX = 300
 const LABEL_MAX = 80
 /** The dialog draws a list, not a file tree. Five fits above the buttons without pushing the confirm
  *  out of reach. The rest is a count. */
-export const DETAILS_MAX = 5
+const DETAILS_MAX = 5
 
 export type TaskConcern = {
   /** Unique within the check. The host qualifies it with the plugin and check ids before it leaves. */
@@ -64,18 +65,23 @@ const key = (pluginId: string, checkId: string): string => `${pluginId}:${checkI
 
 /** `<pluginId>:<checkId>:<concernId>`. Minted here and parsed here, so the string the client hands
  *  back on archive can only ever name a check the host registered. */
-export const qualifiedConcernId = (pluginId: string, checkId: string, concernId: string): string =>
+const qualifiedConcernId = (pluginId: string, checkId: string, concernId: string): string =>
   `${pluginId}:${checkId}:${concernId}`
 
 // A module singleton, like the route, source and node-action registries beside it, with the same
-// lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (./host.ts § clearRegistrations).
+// lifecycle answer: each registration hands back its own undo, and the plugin host runs it on
+// teardown (./host.ts § clearRegistrations).
 const checks = new Map<string, RegisteredTaskCheck>()
 
-export function registerTaskCheck(check: RegisteredTaskCheck): void {
+export function registerTaskCheck(check: RegisteredTaskCheck): Disposable {
   const id = key(check.pluginId, check.id)
   if (checks.has(id)) throw new Error(`Duplicate task check '${id}'.`)
   checks.set(id, check)
+  return {
+    dispose: () => {
+      if (checks.get(id) === check) checks.delete(id)
+    },
+  }
 }
 
 export function clearTaskChecks(pluginId: string): void {
@@ -96,7 +102,12 @@ const text = (value: unknown, max: number): string | null =>
  * warning. `null` means nothing here is worth a row, either no message or an answer that is not a
  * concern at all.
  */
-export function sanitizeConcern(pluginId: string, checkId: string, value: unknown, canApply: boolean): WireTaskConcern | null {
+export function sanitizeConcern(
+  pluginId: string,
+  checkId: string,
+  value: unknown,
+  canApply: boolean,
+): WireTaskConcern | null {
   if (!value || typeof value !== 'object') return null
   const raw = value as Record<string, unknown>
   const message = text(raw.message, MESSAGE_MAX)
@@ -108,12 +119,14 @@ export function sanitizeConcern(pluginId: string, checkId: string, value: unknow
       return line ? [line] : []
     })
     .slice(0, DETAILS_MAX)
-  const more = typeof raw.detailsMore === 'number' && Number.isInteger(raw.detailsMore) && raw.detailsMore > 0
-    ? raw.detailsMore
-    : 0
+  const more =
+    typeof raw.detailsMore === 'number' && Number.isInteger(raw.detailsMore) && raw.detailsMore > 0
+      ? raw.detailsMore
+      : 0
   // A checkbox is only drawn when there is something behind it. A check with no `apply` that asks for
   // one is offering the owner a decision the host cannot honour.
-  const rawAction = canApply && raw.action && typeof raw.action === 'object' ? raw.action as Record<string, unknown> : null
+  const rawAction =
+    canApply && raw.action && typeof raw.action === 'object' ? (raw.action as Record<string, unknown>) : null
   const label = rawAction ? text(rawAction.label, LABEL_MAX) : null
   return {
     id: qualifiedConcernId(pluginId, checkId, concernId),
@@ -151,15 +164,17 @@ function runOne(check: RegisteredTaskCheck, task: TaskRef): Promise<WireTaskConc
       log.warn(`${check.pluginId}:${check.id} did not answer within ${CHECK_TIMEOUT_MS}ms`)
       finish(null)
     }, CHECK_TIMEOUT_MS)
-    Promise.resolve(check.check(task, controller.signal)).then((answer) => {
-      if (answer === null || answer === undefined) return finish(null)
-      const concern = sanitizeConcern(check.pluginId, check.id, answer, check.apply !== undefined)
-      if (!concern) log.warn(`${check.pluginId}:${check.id} returned an unusable concern`)
-      finish(concern)
-    }).catch((error) => {
-      log.warn(`${check.pluginId}:${check.id} failed: ${describeError(error).message}`)
-      finish(null)
-    })
+    Promise.resolve(check.check(task, controller.signal))
+      .then((answer) => {
+        if (answer === null || answer === undefined) return finish(null)
+        const concern = sanitizeConcern(check.pluginId, check.id, answer, check.apply !== undefined)
+        if (!concern) log.warn(`${check.pluginId}:${check.id} returned an unusable concern`)
+        finish(concern)
+      })
+      .catch((error) => {
+        log.warn(`${check.pluginId}:${check.id} failed: ${describeError(error).message}`)
+        finish(null)
+      })
   })
 }
 
@@ -195,7 +210,9 @@ export async function applyTaskChecks(task: TaskRef, ids: readonly string[]): Pr
       }, APPLY_TIMEOUT_MS)
     })
     try {
-      if (await Promise.race([check.apply(task, controller.signal).then(() => 'done' as const), deadline]) === 'timeout') {
+      if (
+        (await Promise.race([check.apply(task, controller.signal).then(() => 'done' as const), deadline])) === 'timeout'
+      ) {
         log.warn(`${check.pluginId}:${check.id} cleanup did not finish within ${APPLY_TIMEOUT_MS}ms`)
         failures.push(check.pluginId)
       }

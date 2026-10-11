@@ -13,7 +13,7 @@ import type {
 import { resolveWorkflowInputs } from '../validation/definition'
 import { MAX_CHILD_WORKFLOW_DEPTH } from '../definitions/resolution'
 
-export type WorkflowInvocationIdentity = {
+type WorkflowInvocationIdentity = {
   callerKey: string
   payloadFingerprint: string
   rootRunId: string
@@ -73,10 +73,18 @@ export async function persistWorkflowStart(
   assertInvocationIdentity(options)
   let invocationParent: WorkflowRunRow | undefined
   if (options?.invocation?.parentRunId != null) {
-    const [parent] = await db.select().from(schema.workflowRuns)
+    const [parent] = await db
+      .select()
+      .from(schema.workflowRuns)
       .where(eq(schema.workflowRuns.id, options.invocation.parentRunId))
-    if (!parent || options.invocation.depth !== parent.depth + 1 || options.invocation.depth > MAX_CHILD_WORKFLOW_DEPTH) {
-      throw new Error(`A child workflow run must retain parent lineage within ${MAX_CHILD_WORKFLOW_DEPTH} child levels.`)
+    if (
+      !parent ||
+      options.invocation.depth !== parent.depth + 1 ||
+      options.invocation.depth > MAX_CHILD_WORKFLOW_DEPTH
+    ) {
+      throw new Error(
+        `A child workflow run must retain parent lineage within ${MAX_CHILD_WORKFLOW_DEPTH} child levels.`,
+      )
     }
     if ((parent.rootRunId ?? parent.id) !== options.invocation.rootRunId) {
       throw new Error('A child workflow run must keep its parent tree accounting owner.')
@@ -98,77 +106,107 @@ export async function persistWorkflowStart(
   const trigger = options?.trigger ?? def.trigger ?? 'manual'
   const effectiveTools = options?.effectiveTools ?? def.tools ?? {}
   const effectiveBudget = options?.effectiveBudget ?? def.budget ?? {}
-  const deadlineAt = options?.deadlineAt
-    ?? existingIntendedRun?.deadlineAt
-    ?? (effectiveBudget.maxWallTimeMs == null ? null : at + effectiveBudget.maxWallTimeMs)
+  const deadlineAt =
+    options?.deadlineAt ??
+    existingIntendedRun?.deadlineAt ??
+    (effectiveBudget.maxWallTimeMs == null ? null : at + effectiveBudget.maxWallTimeMs)
   const requiresRepoTrust = options?.requiresRepoTrust ?? options?.resolvedGraph?.requiresRepoTrust ?? false
   const created = db.transaction((tx) => {
-    if (options?.processingScope && (options.invocation?.parentRunId || !options.processingScope.scopeId.trim() || !options.processingScope.epoch.trim())) throw new Error('Processing scope must identify a root and explicit epoch')
+    if (
+      options?.processingScope &&
+      (options.invocation?.parentRunId ||
+        !options.processingScope.scopeId.trim() ||
+        !options.processingScope.epoch.trim())
+    )
+      throw new Error('Processing scope must identify a root and explicit epoch')
     const byId = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, runId)).get()
     const byInvocation = options?.invocation
-      ? tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.invocationKey, options.invocation.callerKey)).get()
+      ? tx
+          .select()
+          .from(schema.workflowRuns)
+          .where(eq(schema.workflowRuns.invocationKey, options.invocation.callerKey))
+          .get()
       : undefined
     const existing = byId ?? byInvocation
     if (existing) {
-      const scope = tx.select().from(schema.workflowProcessingScopes).where(eq(schema.workflowProcessingScopes.runId, existing.id)).get()
-      if ((scope?.scopeId ?? null) !== (options?.processingScope?.scopeId ?? null) || (scope?.epoch ?? null) !== (options?.processingScope?.epoch ?? null)
-        || (scope?.baseline ?? false) !== (options?.processingBaseline ?? false)) throw new Error('Workflow invocation conflicts with its frozen processing scope')
-      const matches = existing.id === runId
-        && existing.taskId === taskId
-        && existing.defJson === defJson
-        && existing.resolvedGraphJson === resolvedGraphJson
-        && existing.trigger === trigger
-        && existing.invocationKey === (options?.invocation?.callerKey ?? null)
-        && existing.payloadFingerprint === (options?.invocation?.payloadFingerprint ?? null)
-        && existing.rootRunId === (options?.invocation?.rootRunId ?? runId)
-        && existing.parentRunId === (options?.invocation?.parentRunId ?? null)
-        && existing.parentStepId === (options?.invocation?.parentStepId ?? null)
-        && existing.depth === (options?.invocation?.depth ?? 0)
-        && existing.effectiveToolsJson === JSON.stringify(effectiveTools)
-        && existing.effectiveBudgetJson === JSON.stringify(effectiveBudget)
-        && existing.deadlineAt === deadlineAt
-        && existing.requiresRepoTrust === requiresRepoTrust
-      if (!matches) throw new Error(`Workflow invocation '${options?.invocation?.callerKey ?? runId}' conflicts with an existing run.`)
+      const scope = tx
+        .select()
+        .from(schema.workflowProcessingScopes)
+        .where(eq(schema.workflowProcessingScopes.runId, existing.id))
+        .get()
+      if (
+        (scope?.scopeId ?? null) !== (options?.processingScope?.scopeId ?? null) ||
+        (scope?.epoch ?? null) !== (options?.processingScope?.epoch ?? null) ||
+        (scope?.baseline ?? false) !== (options?.processingBaseline ?? false)
+      )
+        throw new Error('Workflow invocation conflicts with its frozen processing scope')
+      const matches =
+        existing.id === runId &&
+        existing.taskId === taskId &&
+        existing.defJson === defJson &&
+        existing.resolvedGraphJson === resolvedGraphJson &&
+        existing.trigger === trigger &&
+        existing.invocationKey === (options?.invocation?.callerKey ?? null) &&
+        existing.payloadFingerprint === (options?.invocation?.payloadFingerprint ?? null) &&
+        existing.rootRunId === (options?.invocation?.rootRunId ?? runId) &&
+        existing.parentRunId === (options?.invocation?.parentRunId ?? null) &&
+        existing.parentStepId === (options?.invocation?.parentStepId ?? null) &&
+        existing.depth === (options?.invocation?.depth ?? 0) &&
+        existing.effectiveToolsJson === JSON.stringify(effectiveTools) &&
+        existing.effectiveBudgetJson === JSON.stringify(effectiveBudget) &&
+        existing.deadlineAt === deadlineAt &&
+        existing.requiresRepoTrust === requiresRepoTrust
+      if (!matches)
+        throw new Error(
+          `Workflow invocation '${options?.invocation?.callerKey ?? runId}' conflicts with an existing run.`,
+        )
       return false
     }
 
-    tx.insert(schema.workflowRuns).values({
-      id: runId,
-      taskId,
-      name: def.name,
-      status: 'running',
-      posture: def.posture ?? 'gated',
-      trigger,
-      defJson,
-      resolvedGraphJson,
-      rootRunId: options?.invocation?.rootRunId ?? runId,
-      parentRunId: options?.invocation?.parentRunId ?? null,
-      parentStepId: options?.invocation?.parentStepId ?? null,
-      depth: options?.invocation?.depth ?? 0,
-      invocationKey: options?.invocation?.callerKey ?? null,
-      payloadFingerprint: options?.invocation?.payloadFingerprint ?? null,
-      effectiveToolsJson: JSON.stringify(effectiveTools),
-      effectiveBudgetJson: JSON.stringify(effectiveBudget),
-      requiresRepoTrust,
-      deadlineAt,
-      createdAt: at,
-      updatedAt: at,
-    }).run()
-    if (options?.processingScope) tx.insert(schema.workflowProcessingScopes).values({ runId, ...options.processingScope, baseline: options.processingBaseline ?? false }).run()
-    for (const [idx, step] of def.steps.entries()) {
-      tx.insert(schema.workflowSteps).values({
-        id: randomUUID(),
-        runId,
-        idx,
-        name: step.name,
-        kind: step.kind ?? 'agent',
-        mode: step.kind === 'decide' ? 'ai' : 'headless',
-        profileId: step.profileId ?? DEFAULT_PROFILE_ID,
-        model: step.model ?? null,
-        status: 'pending',
+    tx.insert(schema.workflowRuns)
+      .values({
+        id: runId,
+        taskId,
+        name: def.name,
+        status: 'running',
+        posture: def.posture ?? 'gated',
+        trigger,
+        defJson,
+        resolvedGraphJson,
+        rootRunId: options?.invocation?.rootRunId ?? runId,
+        parentRunId: options?.invocation?.parentRunId ?? null,
+        parentStepId: options?.invocation?.parentStepId ?? null,
+        depth: options?.invocation?.depth ?? 0,
+        invocationKey: options?.invocation?.callerKey ?? null,
+        payloadFingerprint: options?.invocation?.payloadFingerprint ?? null,
+        effectiveToolsJson: JSON.stringify(effectiveTools),
+        effectiveBudgetJson: JSON.stringify(effectiveBudget),
+        requiresRepoTrust,
+        deadlineAt,
         createdAt: at,
         updatedAt: at,
-      }).run()
+      })
+      .run()
+    if (options?.processingScope)
+      tx.insert(schema.workflowProcessingScopes)
+        .values({ runId, ...options.processingScope, baseline: options.processingBaseline ?? false })
+        .run()
+    for (const [idx, step] of def.steps.entries()) {
+      tx.insert(schema.workflowSteps)
+        .values({
+          id: randomUUID(),
+          runId,
+          idx,
+          name: step.name,
+          kind: step.kind ?? 'agent',
+          mode: step.kind === 'decide' ? 'ai' : 'headless',
+          profileId: step.profileId ?? DEFAULT_PROFILE_ID,
+          model: step.model ?? null,
+          status: 'pending',
+          createdAt: at,
+          updatedAt: at,
+        })
+        .run()
     }
     return true
   })

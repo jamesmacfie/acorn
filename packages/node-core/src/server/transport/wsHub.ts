@@ -14,11 +14,18 @@ import type { Duplex } from 'node:stream'
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
 import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
-import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import {
+  MAX_NODE_WS_MESSAGE_BYTES,
+  encodeIdFrame,
+  WS_PATH,
+  WS_VIEWERS_HEADER,
+  type WsClientFrame,
+  type WsServerFrame,
+  type WsServerWireFrame,
+} from '@acorn/protocol/ws.ts'
 import { WsViewers, type EventViewer } from './wsViewers'
 import { createWsViewerDispatch, isTaskConfinedWs } from './wsViewerDispatch'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { claimUpgrade } from './upgradeClaim'
 import { emitEvent, measure } from '../telemetry/collector'
 import { createLogger } from '../telemetry/logger'
 
@@ -27,8 +34,15 @@ const log = createLogger('ws')
 // Owners may implement a void hook with an async function. Observe both synchronous throws and
 // returned rejections; cleanup invokes each owner independently so a failure cannot strand peers.
 function invokeOwner(action: () => unknown, failed: () => void = () => {}): void {
-  const reject = (): void => { failed(); log.warn('WebSocket owner handler failed.') }
-  try { void Promise.resolve(action()).catch(reject) } catch { reject() }
+  const reject = (): void => {
+    failed()
+    log.warn('WebSocket owner handler failed.')
+  }
+  try {
+    void Promise.resolve(action()).catch(reject)
+  } catch {
+    reject()
+  }
 }
 
 // A sink is one connection's outlet for stream frames. The owner defines the rest of each payload.
@@ -161,21 +175,17 @@ function watchDrain(conn: Conn): void {
 
 // One frame out, and the whole of this node's backpressure policy.
 //
-// It used to drop a frame when the socket buffered past the mark and increment `seq` anyway, so the
-// client saw a gap; the broker reads a gap as loss and closes the socket
-// (@acorn/custody/broker/nodeBroker.ts), reconnect re-attaches every terminal, and each re-attach
-// makes the node serialise a framebuffer while the client refetches its active queries. A build
-// spewing output was answered with more load, at the moment the node was busiest.
+// A stream frame over the mark is still sent, and its producer is paused until the socket drains.
+// Nothing is dropped, so nothing is lost. A frame with no producer to pause, such as an invalidation
+// ping, is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed
+// something and the broker sees no gap. A gap would make the broker read loss and close the socket
+// (the custody package's nodeBroker), and the reconnect would add load at the moment the node is
+// busiest. Later sheds in the same congested window consume no sequence number at all, because one
+// "you are behind" is the whole message.
 //
-// Now: a stream frame over the mark is still sent, and its producer is paused until the socket drains.
-// Nothing is dropped, so nothing is lost. A frame with no producer to pause — an invalidation ping —
-// is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed something
-// and the broker sees no gap. Later sheds in the same congested window consume no sequence number at
-// all, because one "you are behind" is the whole message.
-// Serialising and writing one frame, as a histogram per channel. At sixty frames a second across
-// every attached socket this is a metric and could never be a span
-// (docs/telemetry/model.md § Hot seams are metrics), and it is where the performance programme's
-// re-escaping cost showed up.
+// Serialising and writing one frame is timed as a histogram per channel. At sixty frames a second
+// across every attached socket this is a metric and could never be a span
+// (docs/telemetry/model.md § Hot seams are metrics).
 //
 // The channel is `<owner>:<verb>`, so the prefix is the label and a plugin's own channel names the
 // plugin as owner. Terminal output is not counted here: it takes the binary path below, which
@@ -208,26 +218,37 @@ function sendFrame(conn: Conn, frame: WsServerFrame, viewerId?: string | null): 
         // One event per congested window, not per shed frame, because the socket falls silent after
         // this until it drains and one "you are behind" is the whole message.
         emitEvent(frameOwner(frame.channel), 'ws.shed', { seam: 'ws.frame', channel: channelPrefix(frame.channel) })
-        conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() })
+        conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame), (error) => {
+          if (error) conn.ws.terminate()
+        })
         return
       }
     }
     conn.seq += 1
     const seq = conn.seq
     const routed = viewerId ? { channel: 'ws:viewer', viewerId, frame } : frame
-    measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() }), {
-      channel: channelPrefix(frame.channel),
-    })
-  } catch { conn.ws.terminate() }
+    measure(
+      frameOwner(frame.channel),
+      'ws.frame',
+      () =>
+        conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => {
+          if (error) conn.ws.terminate()
+        }),
+      {
+        channel: channelPrefix(frame.channel),
+      },
+    )
+  } catch {
+    conn.ws.terminate()
+  }
 }
 
 // Terminal output, as one binary frame instead of an escaped JSON string.
 //
-// The bytes were bytes when the pseudo-terminal produced them, and this used to be the one channel that
-// re-escaped them once per attached socket and again on the helper hop, at 60 frames a second while a
-// build talks. The frame is the session id and then the
-// payload (@acorn/protocol/ws.ts § The one binary frame); the desktop broker forwards it without
-// looking inside, and the renderer's bridge tags it with the node id.
+// The bytes were bytes when the pseudo-terminal produced them, so JSON would re-escape them once per
+// attached socket and again on the helper hop, at 60 frames a second while a build talks. The frame is
+// the session id and then the payload (@acorn/protocol/ws.ts § The one binary frame); the desktop
+// broker forwards it without looking inside, and the renderer's bridge tags it with the node id.
 //
 // Everything the JSON path does is still done here: the same backpressure decision, and the same
 // refusal to drop bytes out of the middle of a stream. What it does not do is take a sequence number,
@@ -263,8 +284,12 @@ function sendStreamFrame(conn: Conn, owner: EventViewer, id: string, msg: Stream
       watchDrain(conn)
       // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
     }
-    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => { if (error) conn.ws.terminate() })
-  } catch { conn.ws.terminate() }
+    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => {
+      if (error) conn.ws.terminate()
+    })
+  } catch {
+    conn.ws.terminate()
+  }
 }
 
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
@@ -299,9 +324,6 @@ export function onWsBroadcast(listener: (frame: WsServerFrame) => void): () => v
   return () => void nodeListeners.delete(listener)
 }
 
-// True when any socket is connected. notify.ts uses the same "no window layer means no-op" idea for WS.
-export const wsHasClients = (): boolean => conns.size > 0
-
 export type WsAuthDeps = {
   internalToken: string
   // The live task token ids (../auth/activeCredentials.ts), checked at upgrade like HTTP checks them.
@@ -326,13 +348,8 @@ export type WsAuthDeps = {
 // socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
 type Authorized = { deviceId: string | null; internal?: InternalClaims }
 
+// Exported for the one property a loopback test socket can't reach: an internal token from a remote peer.
 export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
-  return authorize(req, deps)
-}
-
-export type { Authorized as AuthorizedWsUpgrade }
-
-async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
   if (!deps.allowedHosts.has(req.headers.host ?? '')) return null
   const bearer = req.headers.authorization
   if (bearer?.startsWith('Bearer ')) {
@@ -342,18 +359,29 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
     return authenticated ? { deviceId: authenticated.deviceId } : null
   }
   const token = req.headers['x-acorn-internal']
-  // HMAC-verified, not compared with `===`, which used to leak the token's length and a prefix-match
-  // position through timing. INTERNAL_TOKEN is now a signing key rather than the credential
-  // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null`, since it has no
-  // device row to revoke, but the claims are carried so a future sweep can close a task's sockets when
-  // the task ends.
+  // HMAC-verified, not compared with `===`, which would leak the token's length and a prefix-match
+  // position through timing. INTERNAL_TOKEN is a signing key rather than the credential
+  // (server/auth/internalTokens.ts). An internal socket gets `deviceId: null`, since it has no device
+  // row to revoke, but its claims are carried for the task-scope checks.
   if (!isLoopbackPeer(req.socket.remoteAddress) || typeof token !== 'string' || !token) return null
   const claims = authenticateInternalToken(deps.internalToken, deps.internalCredentials, token)
   return claims ? { deviceId: null, internal: claims } : null
 }
 
 function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiplexed: boolean): void {
-  const conn: Conn = { ws, viewers: new WsViewers(), multiplexed, deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0, held: new Set(), shedding: false, drainTimer: null, mark }
+  const conn: Conn = {
+    ws,
+    viewers: new WsViewers(),
+    multiplexed,
+    deviceId: authorized.deviceId,
+    seq: 0,
+    internal: authorized.internal,
+    missedPongs: 0,
+    held: new Set(),
+    shedding: false,
+    drainTimer: null,
+    mark,
+  }
   conns.add(conn)
   ws.on('pong', () => {
     conn.missedPongs = 0
@@ -364,7 +392,12 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiple
     release: (id) => releaseStream(conn, id),
     invoke: (action) => invokeOwner(action),
   })
-  ws.on('message', (raw) => invokeOwner(() => dispatch.receive(raw.toString()), () => ws.terminate()))
+  ws.on('message', (raw) =>
+    invokeOwner(
+      () => dispatch.receive(raw.toString()),
+      () => ws.terminate(),
+    ),
+  )
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
     // Before the detaches: a socket that died while it was behind must not leave the PTY it was
@@ -395,7 +428,11 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const ready = (socket: Duplex): boolean => !disposed && !socket.destroyed && socket.writable
   const refuse = (socket: Duplex): void => {
     if (ready(socket)) {
-      try { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n', () => socket.destroy()) } catch { socket.destroy() }
+      try {
+        socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n', () => socket.destroy())
+      } catch {
+        socket.destroy()
+      }
     } else socket.destroy()
   }
   // Immediate path: the revoke that happened in this process tells us directly.
@@ -431,37 +468,48 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   // A background sweep must never be the reason the process stays alive.
   sweep.unref?.()
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    // Only claim our path. Other upgrades, if any, are left for their own handlers.
+    // This is the listener's only upgrade handler, so it destroys an upgrade to any other path. Node
+    // stops doing that once an 'upgrade' listener exists, and an unanswered socket would stay open for
+    // the life of the process and hang `server.close()`.
     let path: string
     try {
       // Only a syntactic base for parsing the path out. A request with no Host is refused by
-      // authorize() below regardless, so the placeholder never decides anything.
+      // authorizeWsUpgrade() below regardless, so the placeholder never decides anything.
       path = new URL(req.url ?? '', `http://${req.headers.host ?? 'placeholder.invalid'}`).pathname
     } catch {
       socket.destroy()
       return
     }
-    if (path !== WS_PATH) return
-    // Synchronously, before the async authorize below: the "nobody answered" sweeper runs as the last
-    // upgrade listener and cannot wait for our promise (server/transport/upgradeClaim.ts).
-    claimUpgrade(socket)
+    if (path !== WS_PATH) {
+      socket.destroy()
+      return
+    }
     pending.add(socket)
-    const onPeerError = (): void => { socket.destroy() }
+    const onPeerError = (): void => {
+      socket.destroy()
+    }
     socket.on('error', onPeerError)
     socket.once('close', () => pending.delete(socket))
     void (async () => {
-      const authorized = await authorize(req, deps)
+      const authorized = await authorizeWsUpgrade(req, deps)
       if (!ready(socket) || !authorized) return refuse(socket)
       // Cache the import-and-construction promise, so concurrent first upgrades share one server.
       loading ??= import('ws').then(({ WebSocketServer }) => {
         if (disposed) throw new Error('WebSocket hub disposed')
-        return (wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(deps.maxMessageBytes ?? MAX_NODE_WS_MESSAGE_BYTES, MAX_NODE_WS_MESSAGE_BYTES) }))
+        return (wss = new WebSocketServer({
+          noServer: true,
+          maxPayload: Math.min(deps.maxMessageBytes ?? MAX_NODE_WS_MESSAGE_BYTES, MAX_NODE_WS_MESSAGE_BYTES),
+        }))
       })
       const loaded = await loading
       if (!ready(socket)) return refuse(socket)
       loaded.handleUpgrade(req, socket, head, (ws) => {
         pending.delete(socket)
-        if (disposed) { ws.on('error', () => {}); ws.terminate(); return }
+        if (disposed) {
+          ws.on('error', () => {})
+          ws.terminate()
+          return
+        }
         onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, req.headers[WS_VIEWERS_HEADER] === '1')
         socket.off('error', onPeerError)
       })

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type {
-  AgentEventRecord,
-  AgentSession,
-  AgentSessionSnapshot,
-} from '../../contract/wire.ts'
+import type { AgentEventRecord, AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const session = (lastEventSeq: number): AgentSession => ({
@@ -24,7 +20,8 @@ const session = (lastEventSeq: number): AgentSession => ({
   config: {},
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [], queuedTurns: 0,
+  subagents: [],
+  queuedTurns: 0,
   lastEventSeq,
   lastReadSeq: 0,
   archivedAt: null,

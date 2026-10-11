@@ -9,7 +9,9 @@ export class EventViewers {
   readonly outbox = new SubscriptionOutbox()
   multiplexed = false
   private probed = false
-  private legacyOwner: string | null = null
+  // The one viewer the single-viewer transport routes to. A broker without multiplexing, such as the
+  // terminal client's, always uses that transport.
+  private singleOwner: string | null = null
   private readonly owners = new Map<string, Map<string, OutgoingFrame>>()
 
   constructor(private readonly reject: (viewerId: string, error: NodeTransportError) => void) {}
@@ -17,7 +19,7 @@ export class EventViewers {
   setTransport(multiplexed: boolean): void {
     this.probed = true
     this.multiplexed = multiplexed
-    this.legacyOwner = null
+    this.singleOwner = null
   }
 
   track(viewerId: string, frame: WsClientFrame, intent?: WsSubscriptionIntent, cleanup = false): OutgoingFrame | null {
@@ -33,7 +35,7 @@ export class EventViewers {
   wire(entry: OutgoingFrame): string | null {
     if (!this.admit(entry.viewerId)) return null
     if (this.multiplexed) return JSON.stringify({ channel: 'ws:viewer', viewerId: entry.viewerId, frame: entry.frame })
-    this.legacyOwner = entry.viewerId
+    this.singleOwner = entry.viewerId
     return JSON.stringify(entry.frame)
   }
 
@@ -44,29 +46,39 @@ export class EventViewers {
   retire(viewerId: string): boolean {
     this.owners.delete(viewerId)
     this.outbox.retire(viewerId)
-    const resetLegacy = this.legacyOwner === viewerId
-    if (resetLegacy) this.legacyOwner = null
-    return resetLegacy
+    const resetSingle = this.singleOwner === viewerId
+    if (resetSingle) this.singleOwner = null
+    return resetSingle
   }
 
   clear(): void {
     this.owners.clear()
     this.outbox.clear()
-    this.legacyOwner = null
+    this.singleOwner = null
   }
 
-  externalId(viewerId: string): string | undefined { return viewerId === this.defaultId ? undefined : viewerId }
-  legacyRecipient(): string | undefined { return this.legacyOwner ? this.externalId(this.legacyOwner) : undefined }
+  externalId(viewerId: string): string | undefined {
+    return viewerId === this.defaultId ? undefined : viewerId
+  }
+  singleRecipient(): string | undefined {
+    return this.singleOwner ? this.externalId(this.singleOwner) : undefined
+  }
 
   private admit(viewerId: string): boolean {
-    if (this.probed && !this.multiplexed && this.legacyOwner && this.legacyOwner !== viewerId) {
+    if (this.probed && !this.multiplexed && this.singleOwner && this.singleOwner !== viewerId) {
       this.retire(viewerId)
-      this.reject(viewerId, { code: 'viewers_unsupported', message: 'This Node supports one event viewer. Upgrade the Node to use another window.' })
+      this.reject(viewerId, {
+        code: 'viewers_unsupported',
+        message: 'This Node supports one event viewer. Upgrade the Node to use another window.',
+      })
       return false
     }
     if (this.owners.has(viewerId)) return true
     if (this.owners.size >= WS_MAX_VIEWERS) {
-      this.reject(viewerId, { code: 'viewer_limit', message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.` })
+      this.reject(viewerId, {
+        code: 'viewer_limit',
+        message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.`,
+      })
       return false
     }
     this.owners.set(viewerId, new Map())

@@ -6,16 +6,21 @@ import { rollbarItemsForConnectionsRoute, rollbarItemsKey } from './api'
 // that returns 404 or a changed query key that orphans a persisted IndexedDB cache.
 describe('rollbar wire contract', () => {
   it('sorts and dedupes the connection set in the list route', () => {
-    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toBe('/v1/p/rollbar/items?integrations=rollbar-a%2Crollbar-b')
+    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b'])).toBe(
+      '/v1/p/rollbar/items?integrations=rollbar-a%2Crollbar-b',
+    )
   })
 
   it('preserves the query key shape for cache compatibility', () => {
-    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toEqual(['rollbar-items', 'connections', 'rollbar-a', 'rollbar-b'])
+    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b'])).toEqual([
+      'rollbar-items',
+      'connections',
+      'rollbar-a',
+      'rollbar-b',
+    ])
   })
 
-  // The same net protocol's api.test.ts keeps over its own builders, now scoped to this plugin:
+  // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin:
   // enumerated from the module rather than listed, so a new route is covered the day it lands. A path
   // outside /v1/p/rollbar/ escapes this plugin's mount and would 404 into the SPA shell.
   it('namespaces every exported route builder under its own plugin prefix', () => {
@@ -24,9 +29,11 @@ describe('rollbar wire contract', () => {
       .filter(([name]) => name.endsWith('Route'))
       .map(([name, value]): [string, unknown] => [
         name,
-        typeof value === 'function' ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy)) : value,
+        typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy))
+          : value,
       ])
-    expect(paths.length).toBe(6) // guards against the filter silently matching nothing
+    expect(paths.length).toBe(5) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
       expect(path as string, name).toMatch(/^\/v1\/p\/rollbar\//)

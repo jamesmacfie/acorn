@@ -42,7 +42,8 @@ export async function startControlPlaneStub(options: ControlPlaneStubOptions): P
       rejected.push(reason)
       response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify({ error: reason }))
     }
-    if (request.method !== 'POST' || request.url !== ENROLLMENT_PATH) return reject(404, `no route for ${request.method} ${request.url}`)
+    if (request.method !== 'POST' || request.url !== ENROLLMENT_PATH)
+      return reject(404, `no route for ${request.method} ${request.url}`)
     // A forced failure first, and before the token is spent, because that is what a transient failure
     // is: the control plane never recorded the enrollment, so the token is still good and the node's
     // retry is supposed to work.
@@ -58,7 +59,8 @@ export async function startControlPlaneStub(options: ControlPlaneStubOptions): P
     request.on('data', (chunk: Buffer) => chunks.push(chunk))
     request.on('end', () => {
       const parsed = enrollmentRequestSchema.safeParse(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown)
-      if (!parsed.success) return reject(400, `payload does not match the published schema: ${parsed.error.issues[0]?.message}`)
+      if (!parsed.success)
+        return reject(400, `payload does not match the published schema: ${parsed.error.issues[0]?.message}`)
       accepted.push(parsed.data)
       response
         .writeHead(200, { 'content-type': 'application/json' })

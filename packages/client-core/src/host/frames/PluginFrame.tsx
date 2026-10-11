@@ -11,7 +11,6 @@ import { createLogger } from '../../infra/telemetry/logger'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction } from './broker'
 import { createFrameServices, type PluginFrameProps } from './frameServices'
 
-export { SUBSCRIBABLE_CHANNELS } from './channels'
 export type { PluginFrameProps } from './frameServices'
 
 const PLUGIN_FRAME_SCHEME = 'app-plugin'
@@ -60,8 +59,8 @@ export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
   const [misbehaving, setMisbehaving] = createSignal<string | null>(null)
   // The frame took the port and never said a word: a bundle that threw at module scope, or one that was
-  // never a frame bundle. Until this existed the surface was a blank rectangle and the only evidence was
-  // a console error inside an iframe nobody opens devtools on.
+  // never a frame bundle. Without this the surface is a blank rectangle and the only evidence is a
+  // console error inside an iframe nobody opens devtools on.
   const [silent, setSilent] = createSignal(false)
 
   // The iframe element, for the broker's `frameHasFocus` gate on `openUrl`: a click or keypress
@@ -72,17 +71,17 @@ export default function PluginFrame(props: PluginFrameProps) {
   // while a component is being set up, and the services are a plain function on purpose.
   const navigate = useNavigate()
 
-  // The bridge's fourteen effects, built from this frame's props (./frameServices.ts). Kept out of
-  // this file so they can be unit-tested: the repo's client suites run in bare Node with no Solid
-  // transform, so nothing in a `.tsx` file can be reached by one.
-  const services = () => createFrameServices(props, {
-    qc,
-    // Only this component holds the element to compare against, which is why the check is passed in
-    // rather than implemented over there: a click or keypress inside the frame's document makes this
-    // element the shell document's activeElement.
-    frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
-    navigate,
-  })
+  // The bridge's effects, built from this frame's props (./frameServices.ts). Kept out of this file so a
+  // bare-Node suite with no Solid transform can unit-test them.
+  const services = () =>
+    createFrameServices(props, {
+      qc,
+      // Only this component holds the element to compare against, which is why the check is passed in
+      // rather than implemented over there: a click or keypress inside the frame's document makes this
+      // element the shell document's activeElement.
+      frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
+      navigate,
+    })
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a
   // frame mounting for the first time gets its selection in `context` rather than racing its own load
@@ -126,16 +125,25 @@ export default function PluginFrame(props: PluginFrameProps) {
     port = null
     retire?.()
   }
-  onCleanup(() => { retireFrame(); frameEl = undefined })
+  onCleanup(() => {
+    retireFrame()
+    frameEl = undefined
+  })
 
   // Every routed selection after the one the frame connected with. `defer` skips the initial value:
   // that one already crossed in `context`, and posting it again would tell the frame to
   // reload the ticket it is in the middle of loading. A change that lands before the frame connects needs
   // nothing either, because `context()` is built at load time and reads whatever is current then.
-  createEffect(on(() => props.item, (next, previous) => {
-    if (!port || !next || next === previous) return
-    postSelect(port, next)
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => props.item,
+      (next, previous) => {
+        if (!port || !next || next === previous) return
+        postSelect(port, next)
+      },
+      { defer: true },
+    ),
+  )
 
   // The handshake. One channel per frame load: the host keeps port1 and transfers port2 in, so nothing
   // after this rides window.postMessage and there is no origin check to get wrong.
@@ -145,13 +153,22 @@ export default function PluginFrame(props: PluginFrameProps) {
     retireFrame()
     const channel = new MessageChannel()
     let bridgeOwnsPort = false
-    const cleanup: (() => void)[] = [() => { if (!bridgeOwnsPort) channel.port1.close() }, () => channel.port2.close()]
+    const cleanup: (() => void)[] = [
+      () => {
+        if (!bridgeOwnsPort) channel.port1.close()
+      },
+      () => channel.port2.close(),
+    ]
     let retired = false
     const retireThisLoad = () => {
       if (retired) return
       retired = true
       for (const dispose of cleanup.reverse()) {
-        try { dispose() } catch (error) { log.warn('frame cleanup failed', error) }
+        try {
+          dispose()
+        } catch (error) {
+          log.warn('frame cleanup failed', error)
+        }
       }
     }
     retireLoad = retireThisLoad
@@ -174,20 +191,20 @@ export default function PluginFrame(props: PluginFrameProps) {
       const deadline = props.controllerOnly
         ? null
         : setTimeout(() => {
-          log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
-          // An error record and not only a span, because this is the failure a person reports as
-          // "the pane is blank" and there is nothing else in the app that names the plugin.
-          boot.end('error', { 'error.name': 'FrameNeverConnected' })
-          emitError(props.binding.pluginId, {
-            name: 'FrameNeverConnected',
-            message: `surface '${props.binding.surface}' did not connect within ${HANDSHAKE_DEADLINE_MS}ms`,
-            handled: true,
-            attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
-          })
-          if (retireLoad !== retireThisLoad) return
-          retireIfCurrent()
-          setSilent(true)
-        }, HANDSHAKE_DEADLINE_MS)
+            log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
+            // An error record and not only a span, because this is the failure a person reports as
+            // "the pane is blank" and there is nothing else in the app that names the plugin.
+            boot.end('error', { 'error.name': 'FrameNeverConnected' })
+            emitError(props.binding.pluginId, {
+              name: 'FrameNeverConnected',
+              message: `surface '${props.binding.surface}' did not connect within ${HANDSHAKE_DEADLINE_MS}ms`,
+              handled: true,
+              attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
+            })
+            if (retireLoad !== retireThisLoad) return
+            retireIfCurrent()
+            setSilent(true)
+          }, HANDSHAKE_DEADLINE_MS)
       if (deadline !== null) cleanup.push(() => clearTimeout(deadline))
       const bridge = createFrameBridge({
         port: channel.port1,
@@ -248,17 +265,23 @@ export default function PluginFrame(props: PluginFrameProps) {
   }
 
   const FrameBody = () => {
-    onCleanup(() => { retireFrame(); frameEl = undefined })
-    return <iframe
+    onCleanup(() => {
+      retireFrame()
+      frameEl = undefined
+    })
+    return (
+      <iframe
         // The bundle hash is the origin, so a plugin update is a new origin and a new frame. There is
         // nothing cached under the old one to reason about.
         src={`${pluginFrameOrigin(props.hash)}/index.html`}
         title={props.binding.surface}
         sandbox="allow-scripts allow-same-origin"
         aria-hidden={props.controllerOnly ? 'true' : undefined}
-        style={props.controllerOnly
-          ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
-          : { border: '0', width: '100%', height: '100%', display: 'block' }}
+        style={
+          props.controllerOnly
+            ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
+            : { border: '0', width: '100%', height: '100%', display: 'block' }
+        }
         ref={(frame) => {
           frameEl = frame
           const load = () => onLoad(frame)
@@ -266,6 +289,7 @@ export default function PluginFrame(props: PluginFrameProps) {
           detachLoad = () => frame.removeEventListener('load', load)
         }}
       />
+    )
   }
 
   // Register cleanup while this component owns a Solid root. The load event has no reactive owner.

@@ -1,15 +1,15 @@
 // How a definition reads as a graph: which steps each one waits on, and the order the list draws them
-// in. Both the editor (./draft.ts) and the run pane (../runs/runPaneModel.ts) read it.
+// in. Both the editor and the run pane read it.
 //
 // Its own module because the run pane's model is registered before the first draw, and importing it
-// from ./draft.ts put the whole editor on the renderer's startup graph (docs/frontend/startup-budget.md § Startup
-// budget).
+// from ./draft.ts would put the whole editor on the renderer's startup graph
+// (docs/frontend/startup-budget.md § Startup budget).
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 
 /** The steps one waits on, with the "absent means the step declared before it" rule applied. The
- *  runner reads `after` the same way (../../server/validation/definition.ts), so the picture the editor
- *  draws is the graph that runs. */
+ *  runner reads `after` the same way (`workflowEdges`), so the picture the editor draws is the graph
+ *  that runs. */
 export function effectiveAfter(def: WorkflowDef, index: number): readonly string[] {
   const step = def.steps[index]
   if (!step) return []
@@ -30,8 +30,8 @@ export function edges(def: WorkflowDef): Map<string, readonly string[]> {
  *  A node waiting on more than one step carries `parents` so the row can say so.
  *
  *  Only a fork indents: a branch target, or a step that waits on more than one. A straight chain
- *  stays flush under its first step, because indenting every link by rank turned a ten-step chain
- *  into a staircase that spent a third of the column on margin. */
+ *  stays flush under its first step, because indenting every link by rank would turn a long chain
+ *  into a staircase that spends the column on margin. */
 export type GraphRow = { name: string; depth: number; parents: readonly string[] }
 
 const MAX_DEPTH = 4
@@ -62,12 +62,16 @@ export function graphOrder(def: WorkflowDef): GraphRow[] {
     // Nothing ready means a cycle. The footer names it; the list still has to draw every node, so the
     // rest go out in declaration order rather than vanishing.
     if (!ready.length) {
-      for (const name of [...waiting].sort((a, b) => (declared.get(a) ?? 0) - (declared.get(b) ?? 0))) rows.push(row(name))
+      for (const name of [...waiting].sort((a, b) => (declared.get(a) ?? 0) - (declared.get(b) ?? 0)))
+        rows.push(row(name))
       break
     }
     const key = (name: string): [number, number] => {
       const parents = (graph.get(name) ?? []).filter((parent) => placedAt.has(parent))
-      return [parents.length ? Math.max(...parents.map((parent) => placedAt.get(parent) ?? -1)) : -1, declared.get(name) ?? 0]
+      return [
+        parents.length ? Math.max(...parents.map((parent) => placedAt.get(parent) ?? -1)) : -1,
+        declared.get(name) ?? 0,
+      ]
     }
     const next = ready.sort((a, b) => {
       const [aLast, aDecl] = key(a)

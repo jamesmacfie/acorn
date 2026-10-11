@@ -9,16 +9,21 @@ import { claudeBashLaunch, normalizeAcpUpdate } from './acpNormalizer'
 import { BACKGROUND_OUTPUT_CAP, ClaudeBackgroundCommands, claudeTaskNotification } from './claudeBackgroundCommands'
 import type { AgentDriverEvent } from './types'
 
-type Captured = { events: Array<{ sessionUpdate?: SessionUpdate; extNotification?: { method: string; params: unknown } }> }
-const capture = JSON.parse(readFileSync(new URL('./__fixtures__/claudeBackgroundCommandWire.json', import.meta.url), 'utf8')) as {
+type Captured = {
+  events: Array<{ sessionUpdate?: SessionUpdate; extNotification?: { method: string; params: unknown } }>
+}
+const capture = JSON.parse(
+  readFileSync(new URL('./__fixtures__/claudeBackgroundCommandWire.json', import.meta.url), 'utf8'),
+) as {
   succeeded: Captured
   failed: Captured
 }
 
-const card = (run: Captured): AgentToolCall => run.events
-  .flatMap((entry) => entry.sessionUpdate ? normalizeAcpUpdate(entry.sessionUpdate, 'Claude Code') : [])
-  .flatMap((event) => event.type === 'tool' ? [event.tool] : [])
-  .reduce(mergeToolCall)
+const card = (run: Captured): AgentToolCall =>
+  run.events
+    .flatMap((entry) => (entry.sessionUpdate ? normalizeAcpUpdate(entry.sessionUpdate, 'Claude Code') : []))
+    .flatMap((event) => (event.type === 'tool' ? [event.tool] : []))
+    .reduce(mergeToolCall)
 
 describe('Claude background commands on the wire', () => {
   it('reads the launch receipt as a running background command, not a finished call', () => {
@@ -30,18 +35,27 @@ describe('Claude background commands on the wire', () => {
       // The receipt's text gives way to the command's own output.
       output: '',
     })
-    const receipt = capture.succeeded.events.flatMap((entry) => entry.sessionUpdate ? [claudeBashLaunch(entry.sessionUpdate)] : [])
+    const receipt = capture.succeeded.events
+      .flatMap((entry) => (entry.sessionUpdate ? [claudeBashLaunch(entry.sessionUpdate)] : []))
       .find(Boolean)
     expect(receipt).toEqual({
       taskId: 'b3jeu131u',
-      outputPath: '/private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/7dc0c46a-c1c3-4375-8c17-6916b57efbbe/tasks/b3jeu131u.output',
+      outputPath:
+        '/private/tmp/claude-501/-private-tmp-acorn-bg-capture-work/7dc0c46a-c1c3-4375-8c17-6916b57efbbe/tasks/b3jeu131u.output',
     })
   })
 
   it('reads the exit code and outcome from the task notification', () => {
-    const ended = (run: Captured) => run.events.flatMap((entry) => entry.extNotification ? [claudeTaskNotification(entry.extNotification.params)] : [])
-    expect(ended(capture.succeeded)).toEqual([{ toolUseId: 'toolu_01HcvFNs7ANgoJSj8u9SbiFk', status: 'completed', exitCode: 0 }])
-    expect(ended(capture.failed)).toEqual([{ toolUseId: 'toolu_01LNKGfaEr9SjBdxhDrYR2Vm', status: 'failed', exitCode: 1 }])
+    const ended = (run: Captured) =>
+      run.events.flatMap((entry) =>
+        entry.extNotification ? [claudeTaskNotification(entry.extNotification.params)] : [],
+      )
+    expect(ended(capture.succeeded)).toEqual([
+      { toolUseId: 'toolu_01HcvFNs7ANgoJSj8u9SbiFk', status: 'completed', exitCode: 0 },
+    ])
+    expect(ended(capture.failed)).toEqual([
+      { toolUseId: 'toolu_01LNKGfaEr9SjBdxhDrYR2Vm', status: 'failed', exitCode: 1 },
+    ])
   })
 })
 
@@ -58,7 +72,13 @@ describe('ClaudeBackgroundCommands', () => {
     tasks = join(root, 'project', 'session', 'tasks')
     mkdirSync(tasks, { recursive: true })
     events = []
-    commands = new ClaudeBackgroundCommands(async (event) => { events.push(event) }, Promise.resolve([root]), 10)
+    commands = new ClaudeBackgroundCommands(
+      async (event) => {
+        events.push(event)
+      },
+      Promise.resolve([root]),
+      10,
+    )
     commands.turnId = 'turn-1'
   })
   afterEach(() => {
@@ -66,9 +86,12 @@ describe('ClaudeBackgroundCommands', () => {
     rmSync(base, { recursive: true, force: true })
   })
 
-  const notification = (toolUseId: string, summary: string, status = 'completed') =>
-    ({ sessionId: 's', message: { type: 'system', subtype: 'task_notification', tool_use_id: toolUseId, status, summary } })
-  const output = () => events.flatMap((event) => event.type === 'tool' && event.tool.output != null ? [event.tool] : [])
+  const notification = (toolUseId: string, summary: string, status = 'completed') => ({
+    sessionId: 's',
+    message: { type: 'system', subtype: 'task_notification', tool_use_id: toolUseId, status, summary },
+  })
+  const output = () =>
+    events.flatMap((event) => (event.type === 'tool' && event.tool.output != null ? [event.tool] : []))
 
   it('copies output onto the card as it is written, then settles it on the launch turn', async () => {
     const path = join(tasks, 'task1.output')
@@ -82,14 +105,30 @@ describe('ClaudeBackgroundCommands', () => {
     appendFileSync(path, 'done\n')
     await commands.notified(notification('call-1', 'Background command "x" completed (exit code 0)'))
     expect(events).toEqual([
-      { type: 'tool', tool: { id: 'call-1', title: '', kind: 'execute', output: 'first\n', outputAppend: true }, acornTurnId: 'turn-1' },
-      { type: 'tool', tool: { id: 'call-1', title: '', kind: 'execute', output: 'second\n', outputAppend: true }, acornTurnId: 'turn-1' },
-      { type: 'tool', tool: { id: 'call-1', title: '', kind: 'execute', output: 'done\n', outputAppend: true }, acornTurnId: 'turn-1' },
-      { type: 'tool', tool: { id: 'call-1', title: '', kind: 'execute', background: true, status: 'completed', exitCode: 0 }, acornTurnId: 'turn-1' },
+      {
+        type: 'tool',
+        tool: { id: 'call-1', title: '', kind: 'execute', output: 'first\n', outputAppend: true },
+        acornTurnId: 'turn-1',
+      },
+      {
+        type: 'tool',
+        tool: { id: 'call-1', title: '', kind: 'execute', output: 'second\n', outputAppend: true },
+        acornTurnId: 'turn-1',
+      },
+      {
+        type: 'tool',
+        tool: { id: 'call-1', title: '', kind: 'execute', output: 'done\n', outputAppend: true },
+        acornTurnId: 'turn-1',
+      },
+      {
+        type: 'tool',
+        tool: { id: 'call-1', title: '', kind: 'execute', background: true, status: 'completed', exitCode: 0 },
+        acornTurnId: 'turn-1',
+      },
     ])
   })
 
-  it('reads nothing from a path outside Claude\'s folder, and still settles the card', async () => {
+  it("reads nothing from a path outside Claude's folder, and still settles the card", async () => {
     const outside = join(base, 'elsewhere', 'tasks')
     mkdirSync(outside, { recursive: true })
     writeFileSync(join(outside, 'task2.output'), 'secret\n')
@@ -97,7 +136,11 @@ describe('ClaudeBackgroundCommands', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     await commands.notified(notification('call-2', 'Background command "x" failed with exit code 1', 'failed'))
     expect(events).toEqual([
-      { type: 'tool', tool: { id: 'call-2', title: '', kind: 'execute', background: true, status: 'failed', exitCode: 1 }, acornTurnId: 'turn-1' },
+      {
+        type: 'tool',
+        tool: { id: 'call-2', title: '', kind: 'execute', background: true, status: 'failed', exitCode: 1 },
+        acornTurnId: 'turn-1',
+      },
     ])
   })
 

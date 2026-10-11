@@ -7,12 +7,19 @@ import type { AgentGoalVerdict } from './wire.ts'
 export const MAX_AGENT_GOAL_CHARS = 2_000
 
 /** Usage across the turns and checks a step owns so far. An unknown value stays unknown. */
-export type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult['capture']['usage'] }
+type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult['capture']['usage'] }
 
 /** Where a step's completion condition stands (docs/workflows/agent-steps.md § Completion conditions).
  *  `checking` and `continuing` are progress. The rest are terminal: `stopped` means the step ended for
  *  a reason of its own (a refusal, `BLOCKED:`, a failed turn, cancellation, a timeout, or the budget). */
-export type AgentExecuteGoalStatus = 'checking' | 'continuing' | 'satisfied' | 'blocked' | 'exhausted' | 'unavailable' | 'stopped'
+export type AgentExecuteGoalStatus =
+  | 'checking'
+  | 'continuing'
+  | 'satisfied'
+  | 'blocked'
+  | 'exhausted'
+  | 'unavailable'
+  | 'stopped'
 
 export type AgentExecuteGoalSummary = {
   objective: string
@@ -106,6 +113,6 @@ export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.
 // on a profile from this (docs/workflows/step-kinds.md § Contributed step kinds).
 //
 // Read off the profile, which names its own driver: the built-in Claude and Codex profiles, and every
-// harness a manifest contributes (../server/harnessRegistry.ts).
+// harness a manifest contributes (`createHarnessRegistry`).
 export const managedProviderForProfile = (profileId: string | undefined): string | null =>
   (profileId ? agentProfileRegistry.get(profileId)?.managedProvider : undefined) ?? null

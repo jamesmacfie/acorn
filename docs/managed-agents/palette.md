@@ -2,7 +2,7 @@
 
 The agents plugin registers its own palette rows, one more per installed harness and custom agent, plus the open session's
 actions. [Command palette and shortcuts](../command-palette-and-shortcuts.md) covers how the palette
-searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
+searches, and [command kinds](../plugins/commands.md#command-kinds) holds the vocabulary.
 
 ## From the command palette
 

@@ -5,14 +5,13 @@ import { CORE_NAMESPACE } from './routes/registry'
 import { mountCovers, registeredHandler } from '../testkit/mountCoverage'
 
 // Every core route is reachable by a task-scoped agent token unless something says otherwise, because
-// `requireUser` accepts either credential kind. Three route reviews in a row found the same shape of
-// hole: a route that should have been device-only was mounted at `requireUser` because nobody wrote
-// the line, and nothing failed when they didn't.
+// `requireUser` accepts either credential kind. A route that should be device-only but is mounted at
+// `requireUser` because nobody wrote the line is a hole nothing else fails on.
 //
-// This test is that failure. It reads the mount table the way a request does — off the built app, not
-// out of the source text — and asserts every route under /v1/core is either covered by a gate mount or
-// named below with the reason it is open. Adding a route under an already-gated prefix stays free;
-// adding one anywhere else is now a decision someone has to write down.
+// This test is that failure. It reads the mount table the way a request does, off the built app rather
+// than out of the source text, and asserts every route under /v1/core is either covered by a gate mount
+// or named below with the reason it is open. Adding a route under an already-gated prefix stays free;
+// adding one anywhere else is a decision someone has to write down.
 //
 // Modelled on the `child_process` allowlist in tools/arch/boundaries.test.ts, and it lives in
 // node-core rather than tools/arch because it needs to build the app, not parse it.
@@ -22,7 +21,7 @@ import { mountCovers, registeredHandler } from '../testkit/mountCoverage'
 const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // Filtered rather than gated, in the handler: a confined caller is answered with its own task and
   // nothing else. Gating these would break the agent surfaces that legitimately ask about their own
-  // task; leaving them unfiltered handed over every other task's title, branch and worktree path.
+  // task; leaving them unfiltered would hand over every other task's title, branch and worktree path.
   'GET /v1/core/tasks': 'routes/tasks.ts filters the list by mayActOnTask',
   'GET /v1/core/task-statuses': 'routes/worktree.ts filters the roster by mayActOnTask',
 

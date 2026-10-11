@@ -5,9 +5,9 @@ import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@aco
 // agent's session id is what the pane's provenance badge and the context assembler's `origin` field
 // read; `author: 'workflow'` is how a seeded PR snapshot and a run handoff are told apart from a note
 // the owner typed.
-export type NoteWriter = { author: NoteAuthor; originSessionId?: string; originTaskId?: string }
+type NoteWriter = { author: NoteAuthor; originSessionId?: string; originTaskId?: string }
 
-export type NoteCreateOptions = {
+type NoteCreateOptions = {
   author?: NoteAuthor
   kind?: NoteKind
   originSessionId?: string
@@ -16,7 +16,7 @@ export type NoteCreateOptions = {
   body?: string
 }
 
-// The eight methods the five consumers actually call, restated here so the signature belongs to
+// The methods consumers call, restated here so the signature belongs to
 // the provider rather than being defined by NotesStore's class shape. read rejects on a missing
 // note rather than resolving null. Every caller already treats "no such note" as an exception path
 // (`.catch(() => null)` where it is optional), and changing that here would silently swallow a

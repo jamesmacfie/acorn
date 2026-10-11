@@ -54,10 +54,18 @@ const capitalized = (words: string) => words[0]!.toUpperCase() + words.slice(1)
 /** The plan sorted by a column first. Other sort columns stay behind it, in their order. */
 const sortedBy = (plan: PanelPlan, column: string): PanelPlan => {
   const [first, ...rest] = plan.sort ?? []
-  return { ...plan, sort: [{ ...first, column, direction: first?.direction ?? 'desc' }, ...rest.filter(entry => entry.column !== column)] }
+  return {
+    ...plan,
+    sort: [
+      { ...first, column, direction: first?.direction ?? 'desc' },
+      ...rest.filter((entry) => entry.column !== column),
+    ],
+  }
 }
-const sortedTowards = (plan: PanelPlan, direction: Direction): PanelPlan =>
-  ({ ...plan, sort: (plan.sort ?? []).map((entry, index) => index === 0 ? { ...entry, direction } : entry) })
+const sortedTowards = (plan: PanelPlan, direction: Direction): PanelPlan => ({
+  ...plan,
+  sort: (plan.sort ?? []).map((entry, index) => (index === 0 ? { ...entry, direction } : entry)),
+})
 
 /**
  * One placed panel's render boundary and chrome. Geometry remains owned by PanelGrid and arrives as a
@@ -80,39 +88,76 @@ export default function PanelGridItem(props: {
   const quickEdit = (edit: (plan: PanelPlan) => PanelPlan) => props.actions.quickEdit(edit)
   const rename = (title: string | undefined, current: string) => {
     setRenaming(false)
-    if (title !== undefined && title !== current) quickEdit(plan => ({ ...plan, title }))
+    if (title !== undefined && title !== current) quickEdit((plan) => ({ ...plan, title }))
   }
 
   // `Menu` has no submenu, so View as and Sort by are flat labelled groups, as Move to is.
   const quickEditItems = (menu: MenuContext, plan: PanelPlan) => {
-    const views = () => availableViews(plan).map(entry => {
-      const refused = props.region ? regionRefusal(props.region, entry.id, {}) : undefined
-      return { ...entry, available: entry.available && !refused, reason: entry.reason ?? refused }
-    })
+    const views = () =>
+      availableViews(plan).map((entry) => {
+        const refused = props.region ? regionRefusal(props.region, entry.id, {}) : undefined
+        return { ...entry, available: entry.available && !refused, reason: entry.reason ?? refused }
+      })
     const columns = () => outputPlanColumns(plan)
     const sort = () => plan.sort?.[0]
-    const sortType = () => columns().find(column => column.id === sort()?.column)?.type
-    return <>
-      <Menu.Separator />
-      <Menu.Label>View as</Menu.Label>
-      <For each={views()}>{view => (
-        <Menu.Item context={menu} kind="radio" checked={view.id === plan.view.kind} disabled={!view.available && view.id !== plan.view.kind}
-          trailing={<Show when={!view.available && view.reason}>{reason => <Text emphasis="muted">{reason()}</Text>}</Show>}
-          onSelect={() => { if (view.id !== plan.view.kind) quickEdit(current => switchView(current, view.id)) }}>{view.label}</Menu.Item>
-      )}</For>
-      <Menu.Separator />
-      <Menu.Label>Sort by</Menu.Label>
-      <For each={columns()}>{column => (
-        <Menu.Item context={menu} kind="radio" checked={column.id === sort()?.column}
-          onSelect={() => { if (column.id !== sort()?.column) quickEdit(current => sortedBy(current, column.id)) }}>{column.label}</Menu.Item>
-      )}</For>
-      <For each={['asc', 'desc'] as const}>{direction => (
-        <Menu.Item context={menu} kind="radio" checked={!!sort() && sort()!.direction === direction} disabled={!sort()}
-          onSelect={() => { if (sort()?.direction !== direction) quickEdit(current => sortedTowards(current, direction)) }}>
-          {capitalized(sortDirectionLabel(direction, sortType()))}
-        </Menu.Item>
-      )}</For>
-    </>
+    const sortType = () => columns().find((column) => column.id === sort()?.column)?.type
+    return (
+      <>
+        <Menu.Separator />
+        <Menu.Label>View as</Menu.Label>
+        <For each={views()}>
+          {(view) => (
+            <Menu.Item
+              context={menu}
+              kind="radio"
+              checked={view.id === plan.view.kind}
+              disabled={!view.available && view.id !== plan.view.kind}
+              trailing={
+                <Show when={!view.available && view.reason}>
+                  {(reason) => <Text emphasis="muted">{reason()}</Text>}
+                </Show>
+              }
+              onSelect={() => {
+                if (view.id !== plan.view.kind) quickEdit((current) => switchView(current, view.id))
+              }}
+            >
+              {view.label}
+            </Menu.Item>
+          )}
+        </For>
+        <Menu.Separator />
+        <Menu.Label>Sort by</Menu.Label>
+        <For each={columns()}>
+          {(column) => (
+            <Menu.Item
+              context={menu}
+              kind="radio"
+              checked={column.id === sort()?.column}
+              onSelect={() => {
+                if (column.id !== sort()?.column) quickEdit((current) => sortedBy(current, column.id))
+              }}
+            >
+              {column.label}
+            </Menu.Item>
+          )}
+        </For>
+        <For each={['asc', 'desc'] as const}>
+          {(direction) => (
+            <Menu.Item
+              context={menu}
+              kind="radio"
+              checked={!!sort() && sort()!.direction === direction}
+              disabled={!sort()}
+              onSelect={() => {
+                if (sort()?.direction !== direction) quickEdit((current) => sortedTowards(current, direction))
+              }}
+            >
+              {capitalized(sortDirectionLabel(direction, sortType()))}
+            </Menu.Item>
+          )}
+        </For>
+      </>
+    )
   }
 
   const chrome = (published: Accessor<DashboardRevision | undefined>) => (
@@ -135,18 +180,36 @@ export default function PanelGridItem(props: {
     >
       {(menu) => (
         <>
-          <Menu.Item context={menu} onSelect={props.actions.edit} trailing={<Kbd size="xs">{formatChord('enter')}</Kbd>}>Edit…</Menu.Item>
-          <Menu.Item context={menu} onSelect={props.actions.editWithAi}>Edit with AI…</Menu.Item>
-          <Menu.Item context={menu} disabled={!published()} onSelect={() => setRenaming(true)}>Rename</Menu.Item>
-          <Show when={published()}>{revision => quickEditItems(menu, revision().content)}</Show>
+          <Menu.Item
+            context={menu}
+            onSelect={props.actions.edit}
+            trailing={<Kbd size="xs">{formatChord('enter')}</Kbd>}
+          >
+            Edit…
+          </Menu.Item>
+          <Menu.Item context={menu} onSelect={props.actions.editWithAi}>
+            Edit with AI…
+          </Menu.Item>
+          <Menu.Item context={menu} disabled={!published()} onSelect={() => setRenaming(true)}>
+            Rename
+          </Menu.Item>
+          <Show when={published()}>{(revision) => quickEditItems(menu, revision().content)}</Show>
           <Menu.Separator />
-          <Menu.Item context={menu} disabled={!published()} onSelect={() => setAbout(published())}>About this panel</Menu.Item>
-          <Menu.Item context={menu} disabled={!published() || !props.actions.canDuplicate()} onSelect={() => props.actions.duplicate(published()!.content)}>
+          <Menu.Item context={menu} disabled={!published()} onSelect={() => setAbout(published())}>
+            About this panel
+          </Menu.Item>
+          <Menu.Item
+            context={menu}
+            disabled={!published() || !props.actions.canDuplicate()}
+            onSelect={() => props.actions.duplicate(published()!.content)}
+          >
             Duplicate
           </Menu.Item>
           <Menu.Separator />
           <Show when={!props.layout.collapsed()}>
-            <Menu.Item context={menu} onSelect={props.actions.beginLayout}>Move or resize</Menu.Item>
+            <Menu.Item context={menu} onSelect={props.actions.beginLayout}>
+              Move or resize
+            </Menu.Item>
           </Show>
           <Menu.Item context={menu} disabled={!props.actions.canMove(-1)} onSelect={() => props.actions.move(-1)}>
             Move up
@@ -158,12 +221,18 @@ export default function PanelGridItem(props: {
             <Menu.Separator />
             <Menu.Label>Move to</Menu.Label>
             <For each={props.actions.moveTargets()}>
-              {(tab) => <Menu.Item context={menu} onSelect={() => props.actions.moveToTab(tab.id)}>{tab.name}</Menu.Item>}
+              {(tab) => (
+                <Menu.Item context={menu} onSelect={() => props.actions.moveToTab(tab.id)}>
+                  {tab.name}
+                </Menu.Item>
+              )}
             </For>
           </Show>
           <Menu.Separator />
           {/* Remove keeps the definition for its other placements; Delete destroys it everywhere. */}
-          <Menu.Item context={menu} onSelect={props.actions.remove}>Remove from this dashboard</Menu.Item>
+          <Menu.Item context={menu} onSelect={props.actions.remove}>
+            Remove from this dashboard
+          </Menu.Item>
           <Menu.Item
             context={menu}
             tone="danger"
@@ -197,9 +266,9 @@ export default function PanelGridItem(props: {
       {...(props.layout.gestureKind() ? { 'data-gesture': props.layout.gestureKind() } : {})}
       {...(props.layout.keyboardActive()
         ? {
-          'aria-roledescription': 'movable panel',
-          'aria-label': `${props.definition.title}. Arrows move, shift and arrows resize, Enter to finish, Escape to cancel.`,
-        }
+            'aria-roledescription': 'movable panel',
+            'aria-label': `${props.definition.title}. Arrows move, shift and arrows resize, Enter to finish, Escape to cancel.`,
+          }
         : {})}
       onKeyDown={props.layout.onKeyDown}
       onBlur={props.layout.onBlur}
@@ -210,15 +279,25 @@ export default function PanelGridItem(props: {
           workspaceId={props.workspaceId}
           placement={props.scope}
           actions={chrome}
-          {...(renaming() ? { rename: { onDone: (title: string | undefined) => rename(title, props.definition.title) } } : {})}
+          {...(renaming()
+            ? { rename: { onDone: (title: string | undefined) => rename(title, props.definition.title) } }
+            : {})}
           onEditPanel={props.actions.openStudio}
           headProps={props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag }}
         />
       </Show>
-      <Show when={about()}>{revision => (
-        <PanelAbout revision={revision()} onDismiss={() => setAbout(undefined)}
-          onEdit={() => { setAbout(undefined); props.actions.edit() }} />
-      )}</Show>
+      <Show when={about()}>
+        {(revision) => (
+          <PanelAbout
+            revision={revision()}
+            onDismiss={() => setAbout(undefined)}
+            onEdit={() => {
+              setAbout(undefined)
+              props.actions.edit()
+            }}
+          />
+        )}
+      </Show>
       <Show when={!props.layout.collapsed()}>
         {handle('e')}
         {handle('s')}

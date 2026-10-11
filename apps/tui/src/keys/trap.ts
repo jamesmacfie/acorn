@@ -6,20 +6,15 @@ import { OVERLAY_OWN, TRAP } from './tiers'
 
 // A trap, in a terminal.
 //
-// `client-core/kit/keys/trap.ts` contains Tab inside a modal by walking focusable DOM elements.
-// There is nothing to walk here and it is not ported. What a terminal modal is instead is a scope:
-// the box goes on the region store's stack while it is drawn, and every question the store answers
-// is answered inside it, so there is nothing behind the dialog for a key to reach
-// (../keys/regions.ts § Scopes, docs/tui/traps.md § Traps). Which leaves one layer here, for the key that
-// closes the thing.
+// The desktop's trap contains Tab inside a modal by walking focusable DOM elements. There is nothing
+// to walk here and it is not ported. What a terminal modal is instead is a scope: the box goes on the
+// region store's stack while it is drawn, and every question the store answers is answered inside it,
+// so there is nothing behind the dialog for a key to reach (./regions.ts § Scopes,
+// docs/tui/traps.md § Traps). Which leaves one layer here, for the key that closes the thing.
 //
-// It was two. The second bound every intent but `dismiss` to a handler that returned true, and that
-// cannot work: a swallow has to name every key it swallows, and the moment its table differs from
-// the table something else binds, the difference is a key that leaks. That is exactly how Tab got
-// out. This file read `keysFor()`, where `nextRegion` is `f6` alone, while ./install.ts binds
-// `hostKeysFor()`, which adds `tab` for this host. So the one key the footer advertised walked the
-// keys onto a rail row behind the plugin trust prompt, and the swallow then ate everything but
-// Escape. A scope names nothing and has nothing to leak (docs/tui/traps.md § Traps).
+// No layer swallows the other intents. A swallow has to name every key it swallows, and wherever its
+// table differs from the one something else binds (`keysFor()` against this host's `hostKeysFor()`,
+// which adds `tab`), the difference is a key that leaks. A scope names nothing and has nothing to leak.
 //
 // The layer is global rather than bound to the overlay's box, and that is the point: a layer with a
 // target only fires when focus is inside it, and Escape has to close the dialog from anywhere.
@@ -49,8 +44,16 @@ export function overlayKeys(bindings: readonly { key: string; cmd: () => boolean
 export function trapKeys(dismiss: () => void): void {
   const engine = keymap<Renderable, KeyEvent>()
   if (!engine) return
-  onCleanup(engine.registerLayer({
-    priority: TRAP,
-    bindings: keysFor().dismiss.map((key) => ({ key, cmd: () => { dismiss(); return true } })),
-  }))
+  onCleanup(
+    engine.registerLayer({
+      priority: TRAP,
+      bindings: keysFor().dismiss.map((key) => ({
+        key,
+        cmd: () => {
+          dismiss()
+          return true
+        },
+      })),
+    }),
+  )
 }

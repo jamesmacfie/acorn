@@ -15,12 +15,11 @@ import type { DocumentSurfaceProps } from './documentSurface'
 // things only a render can show: that a `remote` region is given the same document accessor a `frame`
 // region gets, and that the selection which opened the pane reaches it.
 //
-// Both were missing, and both are the reason the Database pane's palette rows work at all. `document`
-// is how `bridge.document.write` reaches the editor beside the tree — without it the broker refuses
-// the verb, because its absence IS the permission check (./broker.ts). The retained pane intent is how
-// a tree mounting for the first time learns which row opened it; a frame region has always consumed it
-// into `context.item` (./PluginFrame.tsx) and a tree never did, so a command that opened a closed pane
-// arrived with no selection at all.
+// Both are why the Database pane's palette rows work. `document` is how `bridge.document.write`
+// reaches the editor beside the tree; without it the broker refuses the verb, because its absence IS
+// the permission check (./broker.ts). The retained pane intent is how a tree mounting for the first time
+// learns which row opened it, consumed into `context.item` as a frame region does (./PluginFrame.tsx);
+// without it a command that opened a closed pane arrives with no selection at all.
 
 const remoteProps: { document?: unknown; scope?: () => unknown; openingItem?: string }[] = []
 const editorOrigins: string[] = []
@@ -49,36 +48,44 @@ const { setDocumentSurface, _resetDocumentSurface } = await import('./documentSu
 
 const HASH = 'a'.repeat(64)
 
-const row = (): NodePluginRow => ({
-  name: 'database',
-  required: false,
-  disabled: false,
-  running: true,
-  state: 'active',
-  installed: {
-    version: '1.0.0',
-    baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
-    client: { hash: HASH, bytes: 12 },
-    contributions: {
-      frames: [{
-        target: 'pane',
-        id: 'database',
-        label: 'Database',
-        glyph: 'database',
-        order: 70,
-        scope: 'task',
-        formFactor: ['desktop'],
-        claimsKeys: [],
-        layout: 'document-over-frame',
-        regions: {
-          document: { kind: 'document', languageId: 'sql', read: '/v1/p/database/tasks/:taskId/scratch' },
-          frame: { kind: 'remote', entry: 'panel' },
-        },
-      }],
+const row = (): NodePluginRow =>
+  ({
+    name: 'database',
+    required: false,
+    disabled: false,
+    running: true,
+    state: 'active',
+    installed: {
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
+      client: { hash: HASH, bytes: 12 },
+      contributions: {
+        frames: [
+          {
+            target: 'pane',
+            id: 'database',
+            label: 'Database',
+            glyph: 'database',
+            order: 70,
+            scope: 'task',
+            formFactor: ['desktop'],
+            claimsKeys: [],
+            layout: 'document-over-frame',
+            regions: {
+              document: { kind: 'document', languageId: 'sql', read: '/v1/p/database/tasks/:taskId/scratch' },
+              frame: { kind: 'remote', entry: 'panel' },
+            },
+          },
+        ],
+      },
     },
-  },
-} as unknown as NodePluginRow)
+  }) as unknown as NodePluginRow
 
 describe('a composed pane’s remote region', () => {
   beforeEach(() => {
@@ -108,10 +115,16 @@ describe('a composed pane’s remote region', () => {
     const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
     const qc = new QueryClient()
     registerQueryOwner(qc, 'origin-a')
-    const dispose = render(() => createComponent(QueryClientProvider, {
-      client: qc,
-      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
-    }), document.createElement('div'))
+    const dispose = render(
+      () =>
+        createComponent(QueryClientProvider, {
+          client: qc,
+          get children() {
+            return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never)
+          },
+        }),
+      document.createElement('div'),
+    )
     setActiveNode('ambient-b')
 
     // The layout and both region components are lazy, so the regions arrive a microtask later.
@@ -139,17 +152,26 @@ describe('a composed pane’s remote region', () => {
     _resetFrameContributions()
     const declaration = row()
     const surface = declaration.installed!.contributions.frames![0]
-    Object.assign(surface, { layout: 'list-detail', regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } } })
+    Object.assign(surface, {
+      layout: 'list-detail',
+      regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } },
+    })
     _seedPluginDistribution([['node-a', [declaration]]], [`database ${HASH}`])
     syncFrameContributions()
     openPane('task-1', 'database', { kind: 'plugin:select', item: 'request-9' })
     const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
     const qc = new QueryClient()
     registerQueryOwner(qc, null)
-    const dispose = render(() => createComponent(QueryClientProvider, {
-      client: qc,
-      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
-    }), document.createElement('div'))
+    const dispose = render(
+      () =>
+        createComponent(QueryClientProvider, {
+          client: qc,
+          get children() {
+            return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never)
+          },
+        }),
+      document.createElement('div'),
+    )
     await vi.waitFor(() => expect(remoteProps).toHaveLength(2))
     for (const region of remoteProps) {
       expect(region.openingItem).toBe('request-9')

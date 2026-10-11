@@ -5,21 +5,33 @@ import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { ChangesToolCard } from './ToolCard'
 
 const { openPane } = vi.hoisted(() => ({ openPane: vi.fn() }))
-vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), openPane }))
+vi.mock('@acorn/plugin-api/client', async (original) => ({ ...(await original<Record<string, unknown>>()), openPane }))
 
 const hosts: Array<() => void> = []
-afterEach(() => { for (const dispose of hosts.splice(0)) dispose(); openPane.mockClear() })
+afterEach(() => {
+  for (const dispose of hosts.splice(0)) dispose()
+  openPane.mockClear()
+})
 
 function draw(fileChanges: AgentToolCardProps['fileChanges']) {
   const host = document.createElement('div')
   document.body.append(host)
   const [changes, setChanges] = createSignal(fileChanges)
-  const dispose = render(() => <ChangesToolCard
-    taskId="task" defaultOpen={false}
-    tool={{ id: 'edit', title: 'Changed /repo/src/a.ts', paths: ['/repo/src/a.ts'], status: 'completed' }}
-    fileChanges={changes()}
-  />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  const dispose = render(
+    () => (
+      <ChangesToolCard
+        taskId="task"
+        defaultOpen={false}
+        tool={{ id: 'edit', title: 'Changed /repo/src/a.ts', paths: ['/repo/src/a.ts'], status: 'completed' }}
+        fileChanges={changes()}
+      />
+    ),
+    host,
+  )
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return { host, setChanges }
 }
 

@@ -148,7 +148,6 @@ package applies at each session's next start or resume, never in the middle of a
 A compaction can drop the index from a long session's context, as it can drop a custom agent's
 instructions on a harness with no system prompt. The next start sends it again.
 
-<a id="native-delivery"></a>
 Claude Code and Codex load skills with their own skill support instead of the index. See
 [native skills](./native-skills.md).
 

@@ -33,10 +33,24 @@ export default function AiModelsSettings(props: { context: SettingsPageContext }
     <ConnectionsPage page={AI_MODELS_PAGE} label="AI models" navigate={props.context.navigate}>
       {(list) => (
         <>
-          <SettingsSection id="keys" label="API keys" actions={<Button size="sm" onPress={list.openAdd}><Icon name="plus" /> Add a key</Button>}>
+          <SettingsSection
+            id="keys"
+            label="API keys"
+            actions={
+              <Button size="sm" onPress={list.openAdd}>
+                <Icon name="plus" /> Add a key
+              </Button>
+            }
+          >
             <For
               each={list.connections()}
-              fallback={<Show when={!list.failed()}><EmptyState align="start" size="sm" busy={list.pending()}>{list.pending() ? 'Reading keys…' : 'No API keys. Add one from Anthropic or OpenAI.'}</EmptyState></Show>}
+              fallback={
+                <Show when={!list.failed()}>
+                  <EmptyState align="start" size="sm" busy={list.pending()}>
+                    {list.pending() ? 'Reading keys…' : 'No API keys. Add one from Anthropic or OpenAI.'}
+                  </EmptyState>
+                </Show>
+              }
             >
               {(connection) => (
                 <SettingRow
@@ -44,21 +58,51 @@ export default function AiModelsSettings(props: { context: SettingsPageContext }
                   description={connectionRowText(connection, list.providerOf(connection))}
                 >
                   <Badge tone={connectionTone(connection)}>{connectionStatusLabel(connection)}</Badge>
-                  <Button size="sm" variant="ghost" label={`Manage ${connectionName(connection)}`} onPress={() => list.openConnection(connection)}>Manage</Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    label={`Manage ${connectionName(connection)}`}
+                    onPress={() => list.openConnection(connection)}
+                  >
+                    Manage
+                  </Button>
                 </SettingRow>
               )}
             </For>
           </SettingsSection>
 
-          <SettingsSection id="clis" label="Agent CLIs" help="Command-line agents on this computer, such as Claude Code. Each one uses its own sign-in.">
-            <Show when={harnesses().length || missing().length} fallback={<EmptyState align="start" size="sm" busy={status.isPending}>{status.isError ? "Couldn't ask this node which agent CLIs it has." : status.isPending ? 'Looking for agent CLIs…' : 'No agent CLIs found on this computer.'}</EmptyState>}>
+          <SettingsSection
+            id="clis"
+            label="Agent CLIs"
+            help="Command-line agents on this computer, such as Claude Code. Each one uses its own sign-in."
+          >
+            <Show
+              when={harnesses().length || missing().length}
+              fallback={
+                <EmptyState align="start" size="sm" busy={status.isPending}>
+                  {status.isError
+                    ? "Couldn't ask this node which agent CLIs it has."
+                    : status.isPending
+                      ? 'Looking for agent CLIs…'
+                      : 'No agent CLIs found on this computer.'}
+                </EmptyState>
+              }
+            >
               {/* `Index` rather than `For`: the route refetches on a short stale time, so every row would
                   be a new object each time. */}
               <Index each={harnesses()}>
-                {(harness) => <SettingRow label={harness().label}><Badge tone="ok">Installed</Badge></SettingRow>}
+                {(harness) => (
+                  <SettingRow label={harness().label}>
+                    <Badge tone="ok">Installed</Badge>
+                  </SettingRow>
+                )}
               </Index>
               <Index each={missing()}>
-                {(harness) => <SettingRow label={harness().label}><Badge>Not installed</Badge></SettingRow>}
+                {(harness) => (
+                  <SettingRow label={harness().label}>
+                    <Badge>Not installed</Badge>
+                  </SettingRow>
+                )}
               </Index>
             </Show>
           </SettingsSection>

@@ -27,8 +27,11 @@ const FILE = join(import.meta.dirname, '../../packages/plugin-sdk/src/testing/so
 async function core(sourceId: string): Promise<[DataSourceRegistration, DataSourceDescription]> {
   const source = registeredDataSource({ pluginId: 'core', sourceId })
   if (!source?.coreHandler) throw new Error(`core:${sourceId} isn't registered`)
-  const description = await source.coreHandler({ operation: 'describe', source: { pluginId: 'core', sourceId }, scope: { parameters: {} } },
-    {} as never, new AbortController().signal) as DataSourceDescription
+  const description = (await source.coreHandler(
+    { operation: 'describe', source: { pluginId: 'core', sourceId }, scope: { parameters: {} } },
+    {} as never,
+    new AbortController().signal,
+  )) as DataSourceDescription
   return [source, description]
 }
 
@@ -46,12 +49,21 @@ async function fieldLists() {
     'linear:issues': [issueSource, issueSourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
   }
-  return Object.fromEntries(Object.entries(sources).sort(([a], [b]) => a.localeCompare(b)).map(([id, [registration, description]]) =>
-    [id, { name: registration.name, schema: description.schema, fields: description.fields }]))
+  return Object.fromEntries(
+    Object.entries(sources)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([id, [registration, description]]) => [
+        id,
+        { name: registration.name, schema: description.schema, fields: description.fields },
+      ]),
+  )
 }
 
 it('keeps the SDK field lists equal to what each source describes', async () => {
   const actual = `${JSON.stringify(await fieldLists(), null, 2)}\n`
   if (process.env.UPDATE_SOURCE_FIELDS) writeFileSync(FILE, actual)
-  expect(readFileSync(FILE, 'utf8'), 'Run UPDATE_SOURCE_FIELDS=1 pnpm --filter @acorn/arch-tests test sourceFields').toBe(actual)
+  expect(
+    readFileSync(FILE, 'utf8'),
+    'Run UPDATE_SOURCE_FIELDS=1 pnpm --filter @acorn/arch-tests test sourceFields',
+  ).toBe(actual)
 })

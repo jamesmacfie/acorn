@@ -4,14 +4,13 @@
 // owns the shape underneath, which is what lets the terminal host read the ranks out of the same
 // function and indent a list by them (docs/ui-design/every-node.md § Every node at 80 by 24).
 //
-// The numbers are proliferate's, copied rather than re-derived, from
-// `references/proliferate/apps/packages/product-client/src/domain/workflows/graph-layout.ts`: 200 by
-// 92 cards on a 22 px grid, a rank gap of 60 and a lane pitch of 236.
+// The numbers are copied from proliferate's workflow graph layout rather than re-derived: 200 by 92
+// cards on a 22 px grid, a rank gap of 60 and a lane pitch of 236.
 
 /** Card geometry: 200×92 cards on a 22px grid. */
 export const GRAPH_CARD_W = 200
 export const GRAPH_CARD_H = 92
-export const GRAPH_GRID = 22
+const GRAPH_GRID = 22
 /** Vertical pitch between ranks (card height plus room for the wire). */
 const RANK_GAP = 60
 /** Horizontal pitch between lanes (card width plus a gutter). */
@@ -27,8 +26,8 @@ export type GraphEdgeRef = { from: string; to: string }
 
 /** A card, placed. `rank` is how many steps it is from a root, which is the indentation a host with
  *  no pixels draws instead of a position. */
-export type PlacedCard = { id: string; x: number; y: number; rank: number; parents: readonly string[] }
-export type PlacedEdge = { from: string; to: string; path: string; control: GraphPoint }
+type PlacedCard = { id: string; x: number; y: number; rank: number; parents: readonly string[] }
+type PlacedEdge = { from: string; to: string; path: string; control: GraphPoint }
 export type GraphLayout = {
   cards: readonly PlacedCard[]
   at: (id: string) => PlacedCard | undefined
@@ -118,7 +117,7 @@ function edgeControl(from: GraphPoint, to: GraphPoint, cards: readonly PlacedCar
     }
   }
   if (bestStart === -1) return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
-  const ratio = ((bestStart + bestEnd) / 2) / (EDGE_SAMPLES - 1)
+  const ratio = (bestStart + bestEnd) / 2 / (EDGE_SAMPLES - 1)
   return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
 }
 

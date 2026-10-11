@@ -18,29 +18,14 @@ script. The capability belongs to one Node runtime and is disposed with the term
 
 ## Pages
 
-<a id="sessions"></a>
-<a id="the-screen-and-who-pays-for-it"></a>
-<a id="task-script-evidence"></a>
-
 - [Terminal sessions](./terminal/sessions.md) covers storage, attach and restore, the screen and
   ring, binary output frames, session lifecycle, and task script evidence.
-
-<a id="activity-and-status"></a>
-<a id="backpressure"></a>
-<a id="sending-text-to-an-agent"></a>
 
 - [Activity and delivery](./terminal/activity.md) covers idle and blocked detection, the frames those
   edges send, backpressure, and `sendToAgent`.
 
-<a id="process-broker"></a>
-<a id="workflow-steps"></a>
-<a id="from-the-command-palette"></a>
-
 - [Run targets](./terminal/run-targets.md) covers the process broker, run target trust and
   serialization, the two workflow step kinds, and the palette rows.
-
-<a id="client"></a>
-<a id="native-terminal-client-sessions"></a>
 
 - [The terminal drawer](./terminal/client.md) covers the drawer, held terminals, the `pty` rectangle,
   and terminal client sessions.

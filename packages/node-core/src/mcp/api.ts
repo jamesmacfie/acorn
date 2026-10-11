@@ -11,16 +11,18 @@ const TOKEN_FILE = credentialFileFromEnv(process.env)
 // The agent session id (provenance): stamped on notes/memory writes server-side. Transport
 // metadata, never a tool arg. Sent on every call so the harness can attribute writes.
 const SESSION_ID = process.env.ACORN_SESSION_ID ?? ''
-const TOOL_CEILING = process.env.ACORN_TOOL_CEILING ?? ''
 
-export type ApiResult = { ok: true; data: unknown } | { ok: false; kind: 'acorn-not-running' | 'api-error'; detail: string }
+export type ApiResult =
+  | { ok: true; data: unknown }
+  | { ok: false; kind: 'acorn-not-running' | 'api-error'; detail: string }
 
 let cachedUrl: string | null = null
 
 function currentToken(): string {
   if (!TOKEN_FILE) return API_TOKEN
-  try { return readFileSync(TOKEN_FILE, 'utf8') }
-  catch {
+  try {
+    return readFileSync(TOKEN_FILE, 'utf8')
+  } catch {
     // Only a pre-file tmux environment may use its launch token until reconciliation creates the
     // stable file. An explicitly supplied file must fail closed if it disappears.
     return process.env.ACORN_API_TOKEN_FILE ? '' : API_TOKEN
@@ -62,12 +64,12 @@ async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
         headers: {
           'x-acorn-internal': currentToken(),
           ...(SESSION_ID ? { 'x-acorn-session-id': SESSION_ID } : {}),
-          ...(TOOL_CEILING ? { 'x-acorn-tool-ceiling': TOOL_CEILING } : {}),
           ...(init?.body ? { 'content-type': 'application/json' } : {}),
           ...init?.headers,
         },
       })
-      if (!res.ok) return { ok: false, kind: 'api-error', detail: `${res.status} ${await res.text().catch(() => '')}`.trim() }
+      if (!res.ok)
+        return { ok: false, kind: 'api-error', detail: `${res.status} ${await res.text().catch(() => '')}`.trim() }
       return { ok: true, data: await res.json() }
     } catch (e) {
       if (attempt === 0 && DATA_DIR) {
@@ -85,8 +87,9 @@ export const apiSend = (
   path: string,
   body: unknown,
   metadata?: { callId?: string },
-): Promise<ApiResult> => apiCall(path, {
-  method,
-  body: JSON.stringify(body),
-  headers: metadata?.callId ? { 'x-acorn-tool-call-id': metadata.callId } : undefined,
-})
+): Promise<ApiResult> =>
+  apiCall(path, {
+    method,
+    body: JSON.stringify(body),
+    headers: metadata?.callId ? { 'x-acorn-tool-call-id': metadata.callId } : undefined,
+  })

@@ -6,7 +6,6 @@ import { DatabasePaneApp } from './app'
 // DOM: what it emits is a tree of acorn's own component names, and the shell mounts its own
 // components for them. So there is no stylesheet here and no root element.
 //
-// The pane is still `document-over-frame`: the SQL editor above is the host's, and this tree
-// fills the region below it. What changed is that the region is no longer an iframe, so the two halves
-// of the pane are now the same kind of thing.
+// The pane is `document-over-frame`: the SQL editor above is the host's, and this tree fills the region
+// below it.
 mountTree({ panel: solidTree(DatabasePaneApp) })

@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { formatNodeStat, nodeStatContributions, nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 
 const stat = (id: string, order: number, label: [string, string] = ['thing', 'things']): NodeStatContribution => ({
-  id, order, label, fetch: () => Promise.resolve(0),
+  id,
+  order,
+  label,
+  fetch: () => Promise.resolve(0),
 })
 
 const disposables: { dispose(): void }[] = []

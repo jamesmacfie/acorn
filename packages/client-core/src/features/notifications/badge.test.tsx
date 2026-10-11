@@ -10,19 +10,30 @@ const drawn: (number | null)[] = []
 const install = (canDraw: boolean): void => {
   drawn.length = 0
   ;(window as { acorn?: unknown }).acorn = canDraw
-    ? { notify: { show: async () => true, onActivate: () => () => {}, setBadge: (count: number | null) => drawn.push(count) } }
+    ? {
+        notify: {
+          show: async () => true,
+          onActivate: () => () => {},
+          setBadge: (count: number | null) => drawn.push(count),
+        },
+      }
     : {}
 }
 
-afterEach(() => { delete (window as { acorn?: unknown }).acorn })
+afterEach(() => {
+  delete (window as { acorn?: unknown }).acorn
+})
 
 // The writes are outside the root because Solid flushes queued effects when `createRoot` returns,
 // not part-way through its body. Each case asserts before disposing, since disposal is itself a
-// write now.
+// write.
 it('draws the pill on the icon and clears it at zero', () => {
   install(true)
   const [pill, setPill] = createSignal(0)
-  const dispose = createRoot((dispose) => { trackBadge(pill, () => true); return dispose })
+  const dispose = createRoot((dispose) => {
+    trackBadge(pill, () => true)
+    return dispose
+  })
   setPill(2)
   setPill(0)
   expect(drawn).toEqual([null, 2, null])
@@ -34,7 +45,10 @@ it('draws the pill on the icon and clears it at zero', () => {
 it('takes the number off the icon when the scope ends', () => {
   install(true)
   const [pill, setPill] = createSignal(0)
-  const dispose = createRoot((dispose) => { trackBadge(pill, () => true); return dispose })
+  const dispose = createRoot((dispose) => {
+    trackBadge(pill, () => true)
+    return dispose
+  })
   setPill(3)
   expect(drawn.at(-1)).toBe(3)
   dispose()
@@ -45,7 +59,10 @@ it('takes the number off the icon when the scope ends', () => {
 it('clears the icon once when the switch is off', () => {
   install(true)
   const [pill, setPill] = createSignal(0)
-  const dispose = createRoot((dispose) => { trackBadge(pill, () => false); return dispose })
+  const dispose = createRoot((dispose) => {
+    trackBadge(pill, () => false)
+    return dispose
+  })
   setPill(2)
   expect(drawn).toEqual([null])
   dispose()
@@ -53,6 +70,12 @@ it('clears the icon once when the switch is off', () => {
 
 it('does nothing where the host cannot draw one', () => {
   install(false)
-  createRoot((dispose) => { trackBadge(() => 3, () => true); return dispose })()
+  createRoot((dispose) => {
+    trackBadge(
+      () => 3,
+      () => true,
+    )
+    return dispose
+  })()
   expect(drawn).toEqual([])
 })

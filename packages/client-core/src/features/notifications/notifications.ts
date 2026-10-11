@@ -8,7 +8,7 @@ import { createSignal } from 'solid-js'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { homeNodeId } from '../../infra/node/fleet'
 
-export type NoticeKind = string
+type NoticeKind = string
 export type NoticeTarget = {
   kind: string
   resourceId: string
@@ -59,8 +59,8 @@ export function openNoticeTarget(notice: Notice): void {
   if (notice.target) openTarget(notice.taskId, notice.target)
 }
 
-// The same dispatch for an attention item, which carries the identical target shape but is not a
-// Notice (registries/attention.ts). Exported so the inbox does not repeat the handler-table lookup.
+// The same dispatch for an `AttentionItem`, which carries the identical target shape but is not a
+// Notice. Exported so the inbox does not repeat the handler-table lookup.
 export function openTarget(taskId: string, target: NoticeTarget): void {
   targetHandlers.get(target.kind)?.(taskId, target)
 }
@@ -68,7 +68,12 @@ export function openTarget(taskId: string, target: NoticeTarget): void {
 // `read` is how an edge you watched happen still gets a row without moving the pill
 // (deliver.ts § the seen rule). Everything else pushes unread.
 export function pushNotice(n: Omit<Notice, 'id' | 'read'> & { read?: boolean }): Notice {
-  const notice: Notice = { ...n, nodeId: n.nodeId ?? activeNodeId() ?? undefined, id: noticeId(n.at), read: n.read ?? false }
+  const notice: Notice = {
+    ...n,
+    nodeId: n.nodeId ?? activeNodeId() ?? undefined,
+    id: noticeId(n.at),
+    read: n.read ?? false,
+  }
   setNotices((prev) => capNotices([notice, ...prev]))
   return notice
 }
@@ -95,7 +100,9 @@ export function markRead(id: string): void {
 export function markAllRead(): void {
   const visible = new Set(noticesForActiveNode().map((n) => n.id))
   setNotices((prev) =>
-    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+    prev.some((n) => !n.read && visible.has(n.id))
+      ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n))
+      : prev,
   )
 }
 // Viewing a task acknowledges its notices on the active node, matching `unreadForTask` and
@@ -103,20 +110,30 @@ export function markAllRead(): void {
 // nodes holding one task UUID must never collide (docs/architecture/fleet.md § Client state and
 // fleet behavior).
 export function markTaskRead(taskId: string): void {
-  const visible = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
+  const visible = new Set(
+    noticesForActiveNode()
+      .filter((n) => n.taskId === taskId)
+      .map((n) => n.id),
+  )
   setNotices((prev) =>
-    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+    prev.some((n) => !n.read && visible.has(n.id))
+      ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n))
+      : prev,
   )
 }
 
 // Clearing the things the notices point at clears the notices too, so the bell agrees with the rows
 // the owner just dismissed. Active node only, like `markTaskRead`: the resource ids are that node's.
 export function markTargetsRead(kind: string, resourceIds: ReadonlySet<string>): void {
-  const visible = new Set(noticesForActiveNode()
-    .filter((n) => n.target?.kind === kind && resourceIds.has(n.target.resourceId))
-    .map((n) => n.id))
+  const visible = new Set(
+    noticesForActiveNode()
+      .filter((n) => n.target?.kind === kind && resourceIds.has(n.target.resourceId))
+      .map((n) => n.id),
+  )
   setNotices((prev) =>
-    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+    prev.some((n) => !n.read && visible.has(n.id))
+      ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n))
+      : prev,
   )
 }
 
@@ -127,7 +144,11 @@ export function markTargetsRead(kind: string, resourceIds: ReadonlySet<string>):
 // Active-node rows only, for the same reason `markTaskRead` filters: the event carries no node id and
 // two nodes may hold one task id by construction.
 export function dropNoticesForTask(taskId: string): void {
-  const doomed = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
+  const doomed = new Set(
+    noticesForActiveNode()
+      .filter((n) => n.taskId === taskId)
+      .map((n) => n.id),
+  )
   if (!doomed.size) return
   setNotices((prev) => prev.filter((n) => !doomed.has(n.id)))
 }
@@ -139,7 +160,12 @@ export function hydrateNotices(json: string | undefined): void {
     const raw = JSON.parse(json) as unknown
     if (!Array.isArray(raw)) return
     const restored = raw.filter(
-      (n): n is Notice => !!n && typeof n === 'object' && typeof (n as Notice).id === 'string' && typeof (n as Notice).taskId === 'string' && typeof (n as Notice).title === 'string',
+      (n): n is Notice =>
+        !!n &&
+        typeof n === 'object' &&
+        typeof (n as Notice).id === 'string' &&
+        typeof (n as Notice).taskId === 'string' &&
+        typeof (n as Notice).title === 'string',
     )
     setNotices((prev) => capNotices([...prev, ...restored.filter((r) => !prev.some((p) => p.id === r.id))]))
   } catch {
@@ -147,7 +173,9 @@ export function hydrateNotices(json: string | undefined): void {
   }
 }
 export function hydrateNoticeValues(restored: Notice[]): void {
-  setNotices((prev) => capNotices([...prev, ...restored.filter((candidate) => !prev.some((notice) => notice.id === candidate.id))]))
+  setNotices((prev) =>
+    capNotices([...prev, ...restored.filter((candidate) => !prev.some((notice) => notice.id === candidate.id))]),
+  )
 }
 export const serializeNotices = (): string => JSON.stringify(notices())
 

@@ -88,11 +88,13 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     const attempts = inFlight.get(key) ?? []
     attempts.push(pending)
     inFlight.set(key, attempts)
-    void savePref(options.queryClient, key, pending.raw, { surfaceFailure: pending.slice.id !== 'core.notices' }).then((saved) => {
-      if (saved) lastStored.set(key, pending.raw)
-      attempts.splice(attempts.indexOf(pending), 1)
-      if (!attempts.length) inFlight.delete(key)
-    })
+    void savePref(options.queryClient, key, pending.raw, { surfaceFailure: pending.slice.id !== 'core.notices' }).then(
+      (saved) => {
+        if (saved) lastStored.set(key, pending.raw)
+        attempts.splice(attempts.indexOf(pending), 1)
+        if (!attempts.length) inFlight.delete(key)
+      },
+    )
   }
 
   const write = (slice: PersistedStateSlice<unknown>, scopeId: string, raw: string) => {
@@ -105,13 +107,17 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
       return
     }
     if (slice.maxBytes != null && utf8Bytes(raw) > slice.maxBytes) {
-      if (slice.id === 'core.notices') log.error(`${slice.id}: value exceeds ${slice.maxBytes} bytes`, undefined, { 'slice.id': slice.id })
+      if (slice.id === 'core.notices')
+        log.error(`${slice.id}: value exceeds ${slice.maxBytes} bytes`, undefined, { 'slice.id': slice.id })
       else pushBackgroundError('', `Could not save ${slice.id}`, `Persisted value exceeds ${slice.maxBytes} bytes.`)
       return
     }
     cancelQueued(key)
     queued.set(key, { slice, raw })
-    timers.set(key, setTimeout(() => flushKey(key), WRITE_THROTTLE_MS))
+    timers.set(
+      key,
+      setTimeout(() => flushKey(key), WRITE_THROTTLE_MS),
+    )
   }
 
   createEffect(() => {
@@ -154,27 +160,33 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
       if (activeSlices.has(slice)) continue
       // Roots belong to startup, not the registry effect, so membership changes do not dispose and
       // recreate unrelated subscriptions. The codec runs inside its own effect to track deep stores.
-      const dispose = runWithOwner(owner, () => createRoot((dispose) => {
-        createEffect(() => {
-          const values = slice.binding!.values()
-          const currentScopes = new Set(Object.keys(values))
-          for (const [scopeId, value] of Object.entries(values)) {
-            try {
-              write(slice, scopeId, stringifyPersistedValue(slice, value))
-            } catch (error) {
-              pushBackgroundError('', `Could not save ${slice.id}`, error instanceof Error ? error.message : String(error))
+      const dispose = runWithOwner(owner, () =>
+        createRoot((dispose) => {
+          createEffect(() => {
+            const values = slice.binding!.values()
+            const currentScopes = new Set(Object.keys(values))
+            for (const [scopeId, value] of Object.entries(values)) {
+              try {
+                write(slice, scopeId, stringifyPersistedValue(slice, value))
+              } catch (error) {
+                pushBackgroundError(
+                  '',
+                  `Could not save ${slice.id}`,
+                  error instanceof Error ? error.message : String(error),
+                )
+              }
             }
-          }
-          for (const removedScope of previousScopes.get(slice) ?? []) {
-            if (!currentScopes.has(removedScope)) write(slice, removedScope, PERSISTED_STATE_TOMBSTONE)
-          }
-          previousScopes.set(slice, currentScopes)
-        })
-        onCleanup(() => {
-          for (const [key, pending] of queued) if (pending.slice === slice) flushKey(key)
-        })
-        return dispose
-      }))!
+            for (const removedScope of previousScopes.get(slice) ?? []) {
+              if (!currentScopes.has(removedScope)) write(slice, removedScope, PERSISTED_STATE_TOMBSTONE)
+            }
+            previousScopes.set(slice, currentScopes)
+          })
+          onCleanup(() => {
+            for (const [key, pending] of queued) if (pending.slice === slice) flushKey(key)
+          })
+          return dispose
+        }),
+      )!
       activeSlices.set(slice, dispose)
     }
   })

@@ -37,7 +37,7 @@ export function resolveInRoot(root: string, relPath: string): string | null {
   }
 }
 
-export type ConfineFailure = 'absolute' | 'escapes' | 'missing' | 'not-file'
+type ConfineFailure = 'absolute' | 'escapes' | 'missing' | 'not-file'
 export type ConfineResult = { ok: true; path: string } | { ok: false; reason: ConfineFailure }
 
 // The variant for a path that must already exist and be a regular file (agent file mentions).
@@ -66,7 +66,7 @@ export async function confineExistingFile(root: string, relPath: string): Promis
 
 // A repository can commit any bytes it likes into a TOML file Acorn parses on the event loop, so a
 // configuration read stops at this size rather than handing the parser an unbounded document.
-export const MAX_CONFIG_FILE_BYTES = 1024 * 1024
+const MAX_CONFIG_FILE_BYTES = 1024 * 1024
 
 // Read a configuration file of at most MAX_CONFIG_FILE_BYTES. O_NONBLOCK and the regular-file check
 // keep a FIFO from blocking the open. Symlinks are followed, as a plain read would follow them, so a
@@ -76,7 +76,8 @@ export function readConfigFileSync(path: string): string {
   try {
     const stat = fstatSync(fd)
     if (!stat.isFile()) throw new Error(`${path} is not a regular file.`)
-    const tooLarge = () => new Error(`${path} is larger than the ${MAX_CONFIG_FILE_BYTES}-byte limit for configuration files.`)
+    const tooLarge = () =>
+      new Error(`${path} is larger than the ${MAX_CONFIG_FILE_BYTES}-byte limit for configuration files.`)
     if (stat.size > MAX_CONFIG_FILE_BYTES) throw tooLarge()
     // Count what is actually read too: the file can grow after the stat.
     const chunks: Buffer[] = []

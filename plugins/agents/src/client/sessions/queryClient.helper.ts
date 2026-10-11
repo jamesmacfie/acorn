@@ -1,5 +1,5 @@
 // Tests only. The pane model reads the custom agents through the query cache, as the host's pane
-// models do (client-core paneModels.ts keeps the query client in scope), so a test builds it inside
+// models do (client-core's pane models keep the query client in scope), so a test builds it inside
 // one. Queries are off, so nothing reaches for a node.
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
-import type { DashboardHistoryResponse, DashboardMeasureSample } from '@acorn/protocol/api.ts'
+import type { DashboardHistoryResponse } from '@acorn/protocol/api.ts'
 import { type AppDatabase, schema } from '../db'
 
 // The measure-history store, node-side with its own table and no write route. See
@@ -10,18 +10,15 @@ import { type AppDatabase, schema } from '../db'
 export const HOUR_MS = 60 * 60 * 1000
 export const DAY_MS = 24 * HOUR_MS
 export const hourBucket = (at: number): number => Math.floor(at / HOUR_MS) * HOUR_MS
-export const dayBucket = (at: number): number => Math.floor(at / DAY_MS) * DAY_MS
+const dayBucket = (at: number): number => Math.floor(at / DAY_MS) * DAY_MS
 
 /** Hourly retention window. See docs/dashboards/sampling.md § Sampling and retention for the full policy. */
 export const HOURLY_RETENTION_MS = 14 * DAY_MS
 /** Daily retention window. See docs/dashboards/sampling.md § Sampling and retention for the full policy. */
-export const DAILY_RETENTION_MS = 400 * DAY_MS
+const DAILY_RETENTION_MS = 400 * DAY_MS
 /** Hard cap per panel after compaction. See docs/dashboards/sampling.md § Sampling and retention. */
-export const MAX_SAMPLES_PER_PANEL = 1000
+const MAX_SAMPLES_PER_PANEL = 1000
 
-// Imported from the protocol rather than redeclared, so the client's sparkline and this store
-// describe one row instead of two that could drift apart.
-export type MeasureSample = DashboardMeasureSample
 export type MeasureSeries = DashboardHistoryResponse
 
 /** Record one sample, resetting the series first if the panel's meaning changed.
@@ -32,7 +29,11 @@ export type MeasureSeries = DashboardHistoryResponse
 export async function appendSample(
   db: AppDatabase,
   sample: {
-    panelId: string; signature: string; bucket: number; value: number; recordedAt: number
+    panelId: string
+    signature: string
+    bucket: number
+    value: number
+    recordedAt: number
     /** A series written under this older signature is relabelled rather than reset. */
     adopt?: string
   },
@@ -45,7 +46,9 @@ export async function appendSample(
     .limit(1)
   const previous = existing[0]?.signature
   if (previous !== undefined && previous !== input.signature && previous === adopt) {
-    await db.update(schema.dashboardMeasureSamples).set({ signature: input.signature })
+    await db
+      .update(schema.dashboardMeasureSamples)
+      .set({ signature: input.signature })
       .where(eq(schema.dashboardMeasureSamples.panelId, input.panelId))
   }
   const reset = previous !== undefined && previous !== input.signature && previous !== adopt
@@ -75,7 +78,10 @@ export async function readSeries(db: AppDatabase, panelId: string, since?: numbe
     .where(
       since === undefined
         ? eq(schema.dashboardMeasureSamples.panelId, panelId)
-        : and(eq(schema.dashboardMeasureSamples.panelId, panelId), sql`${schema.dashboardMeasureSamples.bucket} >= ${since}`),
+        : and(
+            eq(schema.dashboardMeasureSamples.panelId, panelId),
+            sql`${schema.dashboardMeasureSamples.bucket} >= ${since}`,
+          ),
     )
     .orderBy(asc(schema.dashboardMeasureSamples.bucket))
   return {
@@ -84,7 +90,7 @@ export async function readSeries(db: AppDatabase, panelId: string, since?: numbe
   }
 }
 
-export async function deleteSeries(db: AppDatabase, panelIds: readonly string[]): Promise<number> {
+async function deleteSeries(db: AppDatabase, panelIds: readonly string[]): Promise<number> {
   if (panelIds.length === 0) return 0
   const result = await db
     .delete(schema.dashboardMeasureSamples)
@@ -94,7 +100,7 @@ export async function deleteSeries(db: AppDatabase, panelIds: readonly string[])
 
 /** Every panel this store holds samples for. Feeds the orphan sweep in docs/dashboards/sampling.md § Sampling
  *  and retention. */
-export async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
+async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
   const rows = await db
     .selectDistinct({ panelId: schema.dashboardMeasureSamples.panelId })
     .from(schema.dashboardMeasureSamples)
@@ -138,13 +144,15 @@ export async function compactHistory(
   }
   for (const [panelId, days] of keepPerPanel) {
     const keep = [...days.values()]
-    const result = await db.delete(schema.dashboardMeasureSamples).where(
-      and(
-        eq(schema.dashboardMeasureSamples.panelId, panelId),
-        lt(schema.dashboardMeasureSamples.bucket, hourlyFloor),
-        notInArray(schema.dashboardMeasureSamples.bucket, keep),
-      ),
-    )
+    const result = await db
+      .delete(schema.dashboardMeasureSamples)
+      .where(
+        and(
+          eq(schema.dashboardMeasureSamples.panelId, panelId),
+          lt(schema.dashboardMeasureSamples.bucket, hourlyFloor),
+          notInArray(schema.dashboardMeasureSamples.bucket, keep),
+        ),
+      )
     collapsed += Number(result.changes ?? 0)
   }
 
@@ -166,7 +174,10 @@ export async function compactHistory(
     const over = await db.delete(schema.dashboardMeasureSamples).where(
       and(
         eq(schema.dashboardMeasureSamples.panelId, panelId),
-        notInArray(schema.dashboardMeasureSamples.bucket, rows.map((row) => row.bucket)),
+        notInArray(
+          schema.dashboardMeasureSamples.bucket,
+          rows.map((row) => row.bucket),
+        ),
       ),
     )
     dropped += Number(over.changes ?? 0)

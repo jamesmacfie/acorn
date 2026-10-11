@@ -8,10 +8,51 @@ import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
 import type { RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { readJson } from './node/apiClient'
 import { mergePrefs } from './persistence/devicePrefs'
-import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, runTargetsRoute, tasksKey, tasksRoute, archivedTasksRoute, deletedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import {
+  coreTelemetrySummaryRoute,
+  type TelemetrySummary,
+  integrationMappingsRoute,
+  integrationProjectsRoute,
+  integrationsKey,
+  integrationsRoute,
+  modelBackendsKey,
+  modelBackendsRoute,
+  projectsKey,
+  projectsRoute,
+  workspaceExternalProjectsRoute,
+  type IntegrationMapping,
+  type IntegrationMappingsResponse,
+  type IntegrationProject,
+  type IntegrationProjectsResponse,
+  type Project,
+  type ProjectsResponse,
+  prefsKey,
+  prefsRoute,
+  runTargetsRoute,
+  tasksKey,
+  tasksRoute,
+  archivedTasksRoute,
+  deletedTasksRoute,
+  type ArchivedTask,
+  type Task,
+  workspacesKey,
+  workspacesRoute,
+  type Workspace,
+  type IntegrationsResponse,
+  type WorkspaceExternalProjectsResponse,
+} from '@acorn/protocol/api.ts'
 
-export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
-export type { ArchivedTask, Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
+export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
+export type {
+  ArchivedTask,
+  IntegrationMapping,
+  IntegrationProject,
+  IntegrationsResponse,
+  Project,
+  ProjectsResponse,
+  Task,
+  Workspace,
+} from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 
@@ -25,17 +66,18 @@ export const tasksOptions = (enabled: boolean) => ({
 
 // Archived tasks for the archive page, newest first. Keyed under tasksKey so every invalidation of the
 // active list, including `tasks:changed`, refreshes this one too.
-export const archivedTasksKey = [...tasksKey, 'archived'] as const
+const archivedTasksKey = [...tasksKey, 'archived'] as const
 export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> => readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> =>
+    readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
 })
 
 // Every deleted task's id (docs/workspaces-and-tasks/archive.md § Deleting a task), so a reference to
 // one reads "Deleted task" instead of a link to nothing. Under tasksKey, so the tasks change a delete
 // broadcasts refreshes it. An array rather than a Set, because the query cache is persisted as JSON.
-export const deletedTasksKey = [...tasksKey, 'deleted'] as const
+const deletedTasksKey = [...tasksKey, 'deleted'] as const
 export const deletedTasksOptions = (enabled: boolean) => ({
   queryKey: deletedTasksKey,
   enabled,
@@ -43,12 +85,11 @@ export const deletedTasksOptions = (enabled: boolean) => ({
 })
 
 // One task's run targets, for the run buttons in the task's pane switcher. A visit draws the cached
-// list in the same frame as the panes, so the buttons no longer arrive late and push the switcher
-// down, and asks the node again once the shell's 30-second stale time has passed. `run:changed`
-// refreshes one task's entry (node/watchNodeEvents.ts) and `project:changed` every entry
-// (projects/watchProjectChanges.ts). Nothing reports a hand edit to `.acorn/config.toml`, so the stale
-// time and window focus are what pick one up. A configuration the node cannot read answers with no
-// buttons, as the task view always did.
+// list in the same frame as the panes, so the buttons do not arrive late and push the switcher down,
+// and asks the node again once the shell's stale time has passed. `run:changed` refreshes one task's
+// entry (node/watchNodeEvents.ts) and `project:changed` every entry (projects/watchProjectChanges.ts).
+// Nothing reports a hand edit to `.acorn/config.toml`, so the stale time and window focus are what
+// pick one up. A configuration the node cannot read answers with no buttons.
 export const runTargetsKey = ['run-targets'] as const
 export const runTargetsOptions = (taskId: string, enabled: boolean) => ({
   queryKey: [...runTargetsKey, taskId] as const,
@@ -71,7 +112,8 @@ export const workspacesOptions = (enabled: boolean) => ({
 export const projectsOptions = (enabled: boolean) => ({
   queryKey: projectsKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<Project[]> => (await readJson<ProjectsResponse>(projectsRoute, { signal })).projects,
+  queryFn: async ({ signal }: QueryContext): Promise<Project[]> =>
+    (await readJson<ProjectsResponse>(projectsRoute, { signal })).projects,
 })
 
 // External projects linked to a workspace (docs/workspaces-and-tasks.md): (integrationId, externalId) pairs.
@@ -87,10 +129,9 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
 // (settings/ConnectionProjectMap.tsx). Per connection, so a provider that is down shows its
 // own error row and its siblings still list.
 //
-// No staleTime and no retry. A picker's list is a claim about the provider now (the surface this
-// replaced had to reach past a five-minute cache by hand to get that), and a connection that
+// No staleTime and no retry. A picker's list is a claim about the provider now, and a connection that
 // failed should say so at once with a Retry button rather than after three silent attempts.
-export const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
+const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
 export const integrationProjectsOptions = (connectionId: string, enabled: boolean) => ({
   queryKey: integrationProjectsKey(connectionId),
   enabled: enabled && !!connectionId,
@@ -134,7 +175,7 @@ export const prefsOptions = (enabled: boolean) => ({
 //
 // For a named node, because the page follows the settings header's node switcher rather than the
 // window's active node. `null` is the node serving this window, when there is no fleet.
-export const telemetrySummaryKey = ['telemetry-summary'] as const
+const telemetrySummaryKey = ['telemetry-summary'] as const
 export const telemetrySummaryOptions = (enabled: boolean, nodeId: string | null) => ({
   queryKey: [...telemetrySummaryKey, nodeId ?? ''] as const,
   enabled,
@@ -159,7 +200,8 @@ export const integrationsOptions = (enabled: boolean) => ({
   queryKey: integrationsKey,
   enabled,
   staleTime: 5 * 60 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> =>
+    readJson<IntegrationsResponse>(integrationsRoute, { signal }),
 })
 
 // Everything a Generate control can spend: every connected model-provider key, plus every agent CLI
@@ -173,5 +215,6 @@ export const modelBackendsOptions = (enabled: boolean) => ({
   queryKey: modelBackendsKey,
   enabled,
   staleTime: 30 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<ModelBackendsResponse> => readJson<ModelBackendsResponse>(modelBackendsRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<ModelBackendsResponse> =>
+    readJson<ModelBackendsResponse>(modelBackendsRoute, { signal }),
 })

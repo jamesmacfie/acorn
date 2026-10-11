@@ -1,8 +1,8 @@
 export { createLogger, describeError } from './logger.ts'
-export type { Logger } from './logger.ts'
+
 export { startResponsivenessMonitor } from './responsiveness.ts'
 export { startPageFacts } from './pageFacts.ts'
 export { answerSurfaceHealthRequests } from './surfaceHealth.ts'
-export { featureMounted, featureUsable, openFeature, whenOpenFeaturesSettle } from './featureOpening.ts'
-export type { UsableState } from './featureOpening.ts'
+export { featureUsable, openFeature, whenOpenFeaturesSettle } from './featureOpening.ts'
+
 export type { ResponsivenessPulse } from './responsiveness.ts'

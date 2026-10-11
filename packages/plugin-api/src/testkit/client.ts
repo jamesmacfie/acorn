@@ -1,9 +1,9 @@
 // The client half of the test seam: how a plugin's client-side tests reach the host.
 //
-// A sibling of ./index.ts rather than more exports on it. ./index.ts re-exports the node host, so
+// A sibling of ../testkit.ts rather than more exports on it. ../testkit.ts re-exports the node host, so
 // the arch suite classifies it as node code, and a client import from there would cross the one
-// boundary this repo does not let anything cross (tools/arch/boundaries.test.ts § side). This file
-// is classified as client for the same reason ./client/index.ts is.
+// boundary this repo does not let anything cross (`side` in tools/arch/boundaries.test.ts). The arch
+// suite classifies this file as client by its name.
 //
 // Same two rules as its sibling: node-environment safe (no `.tsx`, nothing that touches `window`,
 // since a barrel evaluates every module on it and plugin vitest configs are bare node), and test
@@ -21,8 +21,11 @@ export type { Project } from '@acorn/client-core/infra/queries.ts'
 // its own plugin's slots and needs somebody on the other side of it (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points). Production code never writes these — the chrome pass does, from a roster row —
 // which is exactly why they belong here rather than on ./client.
-export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export {
+  extensionPointRegistry,
+  extensionRegistry,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export type { ExtensionContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // Hover and diagnostics providers by language, for an owner's test that needs one present. The chrome
 // pass fills it from `contributions.documentServices` in production.
 export { documentServiceRegistry } from '@acorn/client-core/host/registries/panes'
@@ -39,10 +42,16 @@ export { provideClientCapability } from '@acorn/client-core/infra/node'
 // test. This is how a pane test sees exactly what the sandbox would post, with no worker and no host on
 // the other side. Production code never builds one; the SDK's `mountTree` does, per slot.
 export { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
-export type { RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
 
 // Client host state used by plugin tests.
-export { contentLinkRegistry, openInAppUrl, parseInAppTarget, activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/host/registries/panes'
+export {
+  contentLinkRegistry,
+  openInAppUrl,
+  parseInAppTarget,
+  activeRefPanel,
+  closeRefPanel,
+  refPanelRegistry,
+} from '@acorn/client-core/host/registries/panes'
 export { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 // Pane tests invoke the commands their mounted pane registered through the real host registry.
 export { commandRegistry } from '@acorn/client-core/host/registries/commands'

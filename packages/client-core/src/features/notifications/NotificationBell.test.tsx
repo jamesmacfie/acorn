@@ -31,13 +31,17 @@ beforeEach(() => {
   selectedTasks.length = 0
   openedSessions.length = 0
   activateNotice = undefined
-  releaseTarget = registerNoticeTargetHandler('managed-agent', (_taskId, target) => openedSessions.push(target.resourceId))
+  releaseTarget = registerNoticeTargetHandler('managed-agent', (_taskId, target) =>
+    openedSessions.push(target.resourceId),
+  )
   ;(window as { acorn?: unknown }).acorn = {
     notify: {
       show: async () => true,
       onActivate: (callback: (tag: string) => void) => {
         activateNotice = callback
-        return () => { activateNotice = undefined }
+        return () => {
+          activateNotice = undefined
+        }
       },
       setBadge: (count: number | null) => drawn.push(count),
     },
@@ -57,11 +61,14 @@ afterEach(() => {
 const mount = (): void => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   qc.setQueryData(prefsKey, {})
-  dispose = render(() => (
-    <QueryClientProvider client={qc}>
-      <NotificationBell onSelectTask={(taskId) => selectedTasks.push(taskId)} />
-    </QueryClientProvider>
-  ), host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={qc}>
+        <NotificationBell onSelectTask={(taskId) => selectedTasks.push(taskId)} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 const button = (text: string): HTMLElement => {
@@ -86,8 +93,20 @@ it('puts the unread count on the app icon and takes it off again', () => {
 
 it('keeps the current view when completion notices arrive and the window gains focus', () => {
   mount()
-  pushNotice({ taskId: 't1', kind: 'agent-completed', title: 'First finished', at: 1, target: { kind: 'managed-agent', resourceId: 's1' } })
-  pushNotice({ taskId: 't2', kind: 'agent-completed', title: 'Second finished', at: 2, target: { kind: 'managed-agent', resourceId: 's2' } })
+  pushNotice({
+    taskId: 't1',
+    kind: 'agent-completed',
+    title: 'First finished',
+    at: 1,
+    target: { kind: 'managed-agent', resourceId: 's1' },
+  })
+  pushNotice({
+    taskId: 't2',
+    kind: 'agent-completed',
+    title: 'Second finished',
+    at: 2,
+    target: { kind: 'managed-agent', resourceId: 's2' },
+  })
   window.dispatchEvent(new Event('focus'))
   expect(selectedTasks).toEqual([])
   expect(openedSessions).toEqual([])
@@ -95,8 +114,20 @@ it('keeps the current view when completion notices arrive and the window gains f
 
 it('opens the clicked banner’s session even when another notice arrived later', () => {
   mount()
-  const earlier = pushNotice({ taskId: 't1', kind: 'agent-completed', title: 'First finished', at: 1, target: { kind: 'managed-agent', resourceId: 's1' } })
-  pushNotice({ taskId: 't2', kind: 'agent-completed', title: 'Second finished', at: 2, target: { kind: 'managed-agent', resourceId: 's2' } })
+  const earlier = pushNotice({
+    taskId: 't1',
+    kind: 'agent-completed',
+    title: 'First finished',
+    at: 1,
+    target: { kind: 'managed-agent', resourceId: 's1' },
+  })
+  pushNotice({
+    taskId: 't2',
+    kind: 'agent-completed',
+    title: 'Second finished',
+    at: 2,
+    target: { kind: 'managed-agent', resourceId: 's2' },
+  })
   expect(activateNotice).toBeDefined()
   activateNotice!(earlier.id)
   expect(selectedTasks).toEqual(['t1'])
@@ -105,7 +136,13 @@ it('opens the clicked banner’s session even when another notice arrived later'
 
 it('opens a session when its row in the bell is clicked', () => {
   mount()
-  pushNotice({ taskId: 't1', kind: 'agent-completed', title: 'First finished', at: 1, target: { kind: 'managed-agent', resourceId: 's1' } })
+  pushNotice({
+    taskId: 't1',
+    kind: 'agent-completed',
+    title: 'First finished',
+    at: 1,
+    target: { kind: 'managed-agent', resourceId: 's1' },
+  })
   button('Notifications').click()
   button('First finished').click()
   expect(selectedTasks).toEqual(['t1'])

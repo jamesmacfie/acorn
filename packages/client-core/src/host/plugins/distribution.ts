@@ -13,18 +13,24 @@ import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './h
 import { createLogger } from '../../infra/telemetry/logger'
 import { runtimeIdentityForRow, legacyRuntimeIdentityWithheld } from './runtimeIdentity'
 import {
-  awaitingInputApproval, awaitingSkillApproval, decisionKey, derivePluginDistribution,
-  type DevicePluginEntry, type NodePluginObservation, type PluginDistributionSnapshot, type PluginTrustRequest,
+  awaitingInputApproval,
+  awaitingSkillApproval,
+  decisionKey,
+  derivePluginDistribution,
+  type DevicePluginEntry,
+  type NodePluginObservation,
+  type PluginDistributionSnapshot,
+  type PluginTrustRequest,
 } from './distributionModel'
 import { contributionAvailability, nodePluginRuntime, nodePluginServiceAvailable } from './availabilityModel'
 import { stopTreeWorkers } from '../tree/workerTeardown'
 
 const log = createLogger('plugins')
 const emptyHost = (): PluginHostState => ({ cached: {}, acks: [], devGrants: [] })
-const emptySnapshot = (): PluginDistributionSnapshot => derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR)
+const emptySnapshot = (): PluginDistributionSnapshot =>
+  derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR)
 const [distribution, setDistribution] = createSignal<PluginDistributionSnapshot>(emptySnapshot())
 let initialized = false
-let requestedGeneration = 0
 let reconcileTail: Promise<void> = Promise.resolve()
 let lastHostState = emptyHost()
 const dismissed = new Set<string>()
@@ -40,13 +46,15 @@ export const devicePlugins = (): readonly DevicePluginEntry[] => distribution().
 const [reviewFirst, setReviewFirst] = createSignal<string>()
 export const pendingTrust = (): readonly PluginTrustRequest[] => {
   const first = reviewFirst()
-  return distribution().pendingTrust.filter((request) => !dismissed.has(decisionKey(request.row.name, request.hash)))
+  return distribution()
+    .pendingTrust.filter((request) => !dismissed.has(decisionKey(request.row.name, request.hash)))
     .sort((a, b) => Number(b.row.name === first) - Number(a.row.name === first))
 }
 
 /** The skills the terminal client approves on a node: those of a plugin waiting on nothing else there.
  *  The node's grant is one answer, and what a plugin reads is left to the desktop app. */
-export const terminalAnswersSkills = (row: NodePluginRow): boolean => awaitingSkillApproval(row) && !awaitingInputApproval(row)
+export const terminalAnswersSkills = (row: NodePluginRow): boolean =>
+  awaitingSkillApproval(row) && !awaitingInputApproval(row)
 
 /** The requests the terminal client answers: a client bundle, or skills alone. It draws no dashboards,
  *  so it can't approve what a plugin reads and leaves those to the desktop app. */
@@ -68,6 +76,7 @@ export const activeBundles = (): ReadonlyMap<string, { hash: string }> | null =>
   for (const [id, entry] of snapshot.selectedDevice) bundles.set(id, { hash: entry.hash })
   return bundles
 }
+
 export const bundleAccepted = (pluginId: string, hash: string): boolean =>
   distribution().acceptedKeys.has(decisionKey(pluginId, hash))
 
@@ -85,17 +94,24 @@ export const loadedPluginStateOnNode = (nodeId: string, pluginId: string): Loade
   const local = distribution().selectedDevice.get(pluginId)
   if (local) return local.row.disabled ? 'disabled' : 'enabled'
   const runtime = nodePluginRuntime(distribution(), nodeId, pluginId)
-  return runtime.kind === 'active' || runtime.kind === 'compiled-active' ? 'enabled'
-    : runtime.kind === 'absent' || runtime.kind === 'unknown' ? 'absent' : 'disabled'
+  return runtime.kind === 'active' || runtime.kind === 'compiled-active'
+    ? 'enabled'
+    : runtime.kind === 'absent' || runtime.kind === 'unknown'
+      ? 'absent'
+      : 'disabled'
 }
 export const pluginInstalledAtOnNode = (nodeId: string, pluginId: string): number | undefined =>
-  distribution().byNode.get(nodeId)?.rows.find((row) => row.name === pluginId)?.installed?.installedAt
+  distribution()
+    .byNode.get(nodeId)
+    ?.rows.find((row) => row.name === pluginId)?.installed?.installedAt
 
 const disabledDeviceIds = (): Set<string> => {
   try {
     const list: unknown = JSON.parse(readDevicePrefs()[PrefKeys.devicePluginsDisabled] ?? '[]')
     return new Set(Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [])
-  } catch { return new Set() }
+  } catch {
+    return new Set()
+  }
 }
 
 export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
@@ -109,16 +125,33 @@ export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
       continue
     }
     const manifest = parsed.data
-    entries.push({ hash, row: {
-      name: manifest.id, label: manifest.name, required: false, disabled: disabled.has(manifest.id),
-      running: !disabled.has(manifest.id), state: disabled.has(manifest.id) ? 'disabled' : 'active',
-      emits: manifest.emits,
-      installed: {
-        version: manifest.version, apiVersion: manifest.apiVersion, permissions: manifest.permissions,
-        contributions: manifest.contributions, client: { hash, bytes: cached.bytes },
-        source: cached.sourceLabel, icon: manifest.icon, icons: manifest.icons, emits: manifest.emits,
+    entries.push({
+      hash,
+      row: {
+        name: manifest.id,
+        label: manifest.name,
+        required: false,
+        disabled: disabled.has(manifest.id),
+        running: !disabled.has(manifest.id),
+        state: disabled.has(manifest.id) ? 'disabled' : 'active',
+        emits: manifest.emits,
+        installed: {
+          version: manifest.version,
+          apiVersion: manifest.apiVersion,
+          permissions: manifest.permissions,
+          contributions: manifest.contributions,
+          client: { hash, bytes: cached.bytes },
+          source: cached.sourceLabel,
+          icon: manifest.icon,
+          icons: manifest.icons,
+          emits: manifest.emits,
+        },
       },
-    }, sourceLabel: cached.sourceLabel ?? 'this device', nodeIds: cached.nodeIds ?? [], sameHashNodeIds: [], installSource: cached.installSource })
+      sourceLabel: cached.sourceLabel ?? 'this device',
+      nodeIds: cached.nodeIds ?? [],
+      sameHashNodeIds: [],
+      installSource: cached.installSource,
+    })
   }
   return entries
 }
@@ -132,17 +165,31 @@ const activeSelectionSignature = (snapshot: PluginDistributionSnapshot): string 
   const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
   const selections = nodeId ? snapshot.selectionsByNode.get(nodeId) : undefined
   const observation = nodeId ? snapshot.byNode.get(nodeId) : undefined
-  const runtimes = observation?.reachable && !observation.stale
-    ? observation.rows.map((row) => {
-      const runtime = runtimeIdentityForRow(row)
-      return [row.name, runtime?.version, runtime?.client?.hash, runtime?.contributions,
-        runtime ? null : row.installed?.contributions]
-    })
-    : []
+  const runtimes =
+    observation?.reachable && !observation.stale
+      ? observation.rows.map((row) => {
+          const runtime = runtimeIdentityForRow(row)
+          return [
+            row.name,
+            runtime?.version,
+            runtime?.client?.hash,
+            runtime?.contributions,
+            runtime ? null : row.installed?.contributions,
+          ]
+        })
+      : []
   const device = [...snapshot.selectedDevice].map(([id, entry]) => [
-    id, entry.hash, entry.row.disabled, snapshot.acceptedKeys.has(decisionKey(id, entry.hash)),
+    id,
+    entry.hash,
+    entry.row.disabled,
+    snapshot.acceptedKeys.has(decisionKey(id, entry.hash)),
   ])
-  return JSON.stringify([nodeId, runtimes, [...(selections ?? [])].map(([id, selection]) => [id, selection.hash]), device])
+  return JSON.stringify([
+    nodeId,
+    runtimes,
+    [...(selections ?? [])].map(([id, selection]) => [id, selection.hash]),
+    device,
+  ])
 }
 
 function publish(next: PluginDistributionSnapshot): void {
@@ -150,8 +197,10 @@ function publish(next: PluginDistributionSnapshot): void {
   const changed = activeSelectionSignature(previous) !== activeSelectionSignature(next)
   const selectedKeys = (snapshot: PluginDistributionSnapshot): ReadonlySet<string> => {
     const keys = [...snapshot.selectionsByNode.values()].flatMap((entries) =>
-      [...entries.values()].filter((selection) => selection.hash && !snapshot.selectedDevice.has(selection.pluginId))
-        .map((selection) => decisionKey(selection.pluginId, selection.hash)))
+      [...entries.values()]
+        .filter((selection) => selection.hash && !snapshot.selectedDevice.has(selection.pluginId))
+        .map((selection) => decisionKey(selection.pluginId, selection.hash)),
+    )
     for (const [id, entry] of snapshot.selectedDevice) {
       const key = decisionKey(id, entry.hash)
       if (!entry.row.disabled && snapshot.acceptedKeys.has(key)) keys.push(key)
@@ -159,10 +208,11 @@ function publish(next: PluginDistributionSnapshot): void {
     return new Set(keys)
   }
   const retained = selectedKeys(next)
-  for (const key of selectedKeys(previous)) if (!retained.has(key)) {
-    const [pluginId, hash] = JSON.parse(key) as [string, string]
-    stopTreeWorkers({ pluginId, hash }, 'plugin selection withdrawn')
-  }
+  for (const key of selectedKeys(previous))
+    if (!retained.has(key)) {
+      const [pluginId, hash] = JSON.parse(key) as [string, string]
+      stopTreeWorkers({ pluginId, hash }, 'plugin selection withdrawn')
+    }
   initialized = true
   setDistribution(next)
   if (changed) for (const listener of listeners) listener()
@@ -178,16 +228,19 @@ export function markPluginNodeStale(nodeId: string): void {
   if (!observation || observation.stale) return
   const byNode = new Map(current.byNode)
   byNode.set(nodeId, { ...observation, reachable: false, stale: true })
-  publish(derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins))
+  publish(
+    derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins),
+  )
 }
 
 /** Remove a node immediately so an in-flight read cannot keep its authority alive. */
 export function forgetPluginNode(nodeId: string): void {
-  requestedGeneration++
   const byNode = new Map(distribution().byNode)
   if (!byNode.delete(nodeId)) return
   const current = distribution()
-  publish(derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins))
+  publish(
+    derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins),
+  )
 }
 
 async function rosterFor(nodeId: string): Promise<readonly NodePluginRow[]> {
@@ -199,9 +252,11 @@ async function rosterFor(nodeId: string): Promise<readonly NodePluginRow[]> {
 const PASS_CONCURRENCY = 4
 async function eachBounded<T>(items: readonly T[], work: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items]
-  await Promise.all(Array.from({ length: Math.min(PASS_CONCURRENCY, queue.length) }, async () => {
-    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item)
-  }))
+  await Promise.all(
+    Array.from({ length: Math.min(PASS_CONCURRENCY, queue.length) }, async () => {
+      for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item)
+    }),
+  )
 }
 
 export type DistributionSyncOptions = { nodeIds?: readonly string[]; trustOnly?: boolean; deviceOnly?: boolean }
@@ -215,14 +270,15 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
   const selected = activeNodeId()
   const wanted = options.nodeIds ?? nodes().map((node) => node.nodeId)
   if (!options.trustOnly && !options.deviceOnly && selected && wanted.length > 1 && wanted.includes(selected)) {
-    enqueuePass({ nodeIds: [selected] }).catch(() => { /* logged by the queue */ })
+    enqueuePass({ nodeIds: [selected] }).catch(() => {
+      /* logged by the queue */
+    })
     return enqueuePass({ nodeIds: wanted.filter((id) => id !== selected) })
   }
   return enqueuePass(options)
 }
 
 function enqueuePass(options: DistributionSyncOptions): Promise<void> {
-  const generation = ++requestedGeneration
   const pass = async (): Promise<void> => {
     if (!pluginHostAvailable()) return
     const previous = distribution()
@@ -245,10 +301,11 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
     await eachBounded(reads, async (nodeId) => {
       try {
         const rows = await rosterFor(nodeId)
-        for (const row of rows) if (legacyRuntimeIdentityWithheld(row)) {
-          log.warn(`${row.name} on ${nodeId} has no provable running identity; loaded UI is withheld`)
-        }
-        byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, generation, observedAt: Date.now() })
+        for (const row of rows)
+          if (legacyRuntimeIdentityWithheld(row)) {
+            log.warn(`${row.name} on ${nodeId} has no provable running identity; loaded UI is withheld`)
+          }
+        byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, observedAt: Date.now() })
       } catch (error) {
         log.warn(`could not read the plugin roster on ${nodeId}`, error)
         const old = byNode.get(nodeId)
@@ -275,18 +332,34 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
     // Even a cached hash must be reported by this node to update provenance in custody.
     await eachBounded(puts, async (put) => {
       const result = await cachePluginBundle(put)
-      if ('error' in result) log.warn(`${put.pluginId} from ${put.nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': put.pluginId })
+      if ('error' in result)
+        log.warn(`${put.pluginId} from ${put.nodeId} was not cached: ${result.error}`, undefined, {
+          'plugin.id': put.pluginId,
+        })
     })
     const host = await readPluginHostState()
     lastHostState = host
-    const offers = [...byNode.values()].flatMap((observation) => observation.rows.flatMap((row) =>
-      [runtimeIdentityForRow(row), row.installed].filter((declaration) => declaration?.client).map((declaration) => ({
-        pluginId: row.name, nodeId: observation.nodeId, hash: declaration!.client!.hash,
-      }))))
+    const offers = [...byNode.values()].flatMap((observation) =>
+      observation.rows.flatMap((row) =>
+        [runtimeIdentityForRow(row), row.installed]
+          .filter((declaration) => declaration?.client)
+          .map((declaration) => ({
+            pluginId: row.name,
+            nodeId: observation.nodeId,
+            hash: declaration!.client!.hash,
+          })),
+      ),
+    )
     const local = deviceEntries(host).map((entry) => ({
       ...entry,
       nodeIds: [...new Set(offers.filter((offer) => offer.pluginId === entry.row.name).map((offer) => offer.nodeId))],
-      sameHashNodeIds: [...new Set(offers.filter((offer) => offer.pluginId === entry.row.name && offer.hash === entry.hash).map((offer) => offer.nodeId))],
+      sameHashNodeIds: [
+        ...new Set(
+          offers
+            .filter((offer) => offer.pluginId === entry.row.name && offer.hash === entry.hash)
+            .map((offer) => offer.nodeId),
+        ),
+      ],
     }))
     setDevicePluginIds([...new Set(local.map((entry) => entry.row.name))])
     const currentPaired = options.trustOnly || options.deviceOnly ? paired : new Set(nodes().map((node) => node.nodeId))
@@ -312,23 +385,39 @@ export function _seedPluginDistribution(
   rosters: Iterable<readonly [string, readonly NodePluginRow[]]>,
   accepted: readonly string[] = [],
 ): void {
-  const byNode = new Map<string, NodePluginObservation>([...rosters].map(([nodeId, rows]) =>
-    [nodeId, { nodeId, rows, reachable: true, stale: false, generation: 1, observedAt: Date.now() }]))
+  const byNode = new Map<string, NodePluginObservation>(
+    [...rosters].map(([nodeId, rows]) => [
+      nodeId,
+      { nodeId, rows, reachable: true, stale: false, observedAt: Date.now() },
+    ]),
+  )
   const cached: PluginHostState['cached'] = {}
-  for (const observation of byNode.values()) for (const row of observation.rows) {
-    for (const declaration of [runtimeIdentityForRow(row), row.installed]) {
-      if (declaration?.client) cached[declaration.client.hash] = { pluginId: row.name, version: declaration.version, bytes: declaration.client.bytes }
+  for (const observation of byNode.values())
+    for (const row of observation.rows) {
+      for (const declaration of [runtimeIdentityForRow(row), row.installed]) {
+        if (declaration?.client)
+          cached[declaration.client.hash] = {
+            pluginId: row.name,
+            version: declaration.version,
+            bytes: declaration.client.bytes,
+          }
+      }
     }
-  }
   const acks = accepted.map((value) => {
     const split = value.lastIndexOf(' ')
     const pluginId = value.slice(0, split)
     const hash = value.slice(split + 1)
-    const declaration = [...byNode.values()].flatMap((observation) => observation.rows)
+    const declaration = [...byNode.values()]
+      .flatMap((observation) => observation.rows)
       .filter((row) => row.name === pluginId)
       .flatMap((row) => [runtimeIdentityForRow(row), row.installed])
       .find((offer) => offer?.client?.hash === hash)
-    return { pluginId, hash, decision: 'accepted', ...(declaration ? { declaration: clientDeclaration(declaration) } : {}) } as PluginAckRecord
+    return {
+      pluginId,
+      hash,
+      decision: 'accepted',
+      ...(declaration ? { declaration: clientDeclaration(declaration) } : {}),
+    } as PluginAckRecord
   })
   initialized = true
   dismissed.clear()
@@ -341,13 +430,17 @@ export function _seedDevicePluginDistribution(entries: readonly DevicePluginEntr
   setDevicePluginIds(entries.map((entry) => entry.row.name))
   const current = distribution()
   const cached = { ...lastHostState.cached }
-  for (const entry of entries) cached[entry.hash] = {
-    pluginId: entry.row.name, version: entry.row.installed!.version, bytes: entry.row.installed!.client?.bytes ?? 0,
-  }
+  for (const entry of entries)
+    cached[entry.hash] = {
+      pluginId: entry.row.name,
+      version: entry.row.installed!.version,
+      bytes: entry.row.installed!.client?.bytes ?? 0,
+    }
   const acks = lastHostState.acks.map((ack) => {
     const entry = entries.find((candidate) => candidate.row.name === ack.pluginId && candidate.hash === ack.hash)
     return entry?.row.installed && ack.decision === 'accepted'
-      ? { ...ack, declaration: clientDeclaration(entry.row.installed) } : ack
+      ? { ...ack, declaration: clientDeclaration(entry.row.installed) }
+      : ack
   })
   lastHostState = { ...lastHostState, cached, acks }
   publish(derivePluginDistribution(current.byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, entries))
@@ -363,7 +456,6 @@ export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void
 
 export function _resetPluginDistribution(): void {
   setDevicePluginIds([])
-  requestedGeneration++
   initialized = false
   dismissed.clear()
   lastHostState = emptyHost()

@@ -25,7 +25,8 @@ export const workflowDefinitions = (
   const core = ctx.core
   // `plugin:workflows:defs-changed` (docs/plugins/events.md § Hearing another plugin): the rail list and
   // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
-  const defsChanged = (workspaceId: string) => ctx.events.send({ channel: pluginChannel('workflows', 'defs-changed'), workspaceId })
+  const defsChanged = (workspaceId: string) =>
+    ctx.events.send({ channel: pluginChannel('workflows', 'defs-changed'), workspaceId })
 
   // The second store a definition can live in (docs/workflows/definitions.md § Database definitions). Every
   // route behind it is device-only, because a row is executable configuration with no committed
@@ -33,26 +34,38 @@ export const workflowDefinitions = (
   const draftQueries = workflowDraftQueries(store, (scope, id, consumer, remove) => {
     const userId = core.identity.active()
     if (!userId) throw new Error('Draft query references require an active owner')
-    return ctx.dataSources.setQueryConsumer(scope, id, consumer,
-      { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) }, remove)
+    return ctx.dataSources.setQueryConsumer(
+      scope,
+      id,
+      consumer,
+      { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) },
+      remove,
+    )
   })
   const bridge: WorkflowDefsBridge = {
-    // File authoring and export load on first use: about 28 KB of the node's boot graph for an action a
-    // person starts from the editor.
-    files: async request => {
+    // File authoring and export load on first use, so an action a person starts from the editor stays
+    // off the node's boot graph.
+    files: async (request) => {
       const { workflowFileAuthoring } = await import('../files/authoring')
       const result = await workflowFileAuthoring(store, {
         catalog: runner.validationCatalog(),
         scope: async (projectId, source) => {
           const project = await core.projects.byId(projectId)
-          if (!project || (source === 'repo' && !project.path)) throw new Error('Choose a local project for file authoring')
-          return { root: source === 'repo' ? project.path! : homedir(), workspaceId: project.workspaceId, resolveInRoot: core.fs.resolveInRoot }
+          if (!project || (source === 'repo' && !project.path))
+            throw new Error('Choose a local project for file authoring')
+          return {
+            root: source === 'repo' ? project.path! : homedir(),
+            workspaceId: project.workspaceId,
+            resolveInRoot: core.fs.resolveInRoot,
+          }
         },
         query: async (scope, queryId, revision) => {
           const userId = core.identity.active()
           if (!userId) throw new Error('Export requires an active owner')
-          const result = await ctx.dataSources.queryPublication({ ...scope, action: 'inspect', queryId, revision },
-            { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) })
+          const result = await ctx.dataSources.queryPublication(
+            { ...scope, action: 'inspect', queryId, revision },
+            { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) },
+          )
           if (!result.published) throw new Error('Publish the saved query before exporting')
           return result.published.content
         },
@@ -66,18 +79,25 @@ export const workflowDefinitions = (
       const invocation = () => {
         const userId = core.identity.active()
         if (!userId) throw new Error('Publication requires an active owner')
-        return { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
+        return {
+          principal: { kind: 'internal' as const, scope: 'service' as const, userId },
+          signal: AbortSignal.timeout(60_000),
+        }
       }
       const publications = workflowPublication(store, {
         catalog: () => runner.validationCatalog(),
         scope: async (workspaceId, projectId) => {
           const project = projectId ? await core.projects.byId(projectId) : null
-          if (projectId && (!project || project.workspaceId !== workspaceId)) throw new Error('Project is outside this scope')
+          if (projectId && (!project || project.workspaceId !== workspaceId))
+            throw new Error('Project is outside this scope')
           return { workspaceId, projectId: projectId ?? '', repoDir: project?.path ?? null, userDir: homedir() }
         },
-        query: request => ctx.dataSources.queryPublication(request, invocation()),
-        validateQuery: async (scope, reference, context) => { await ctx.dataSources.resolveQuery(scope, reference, context, invocation()) },
-        queryConsumer: (scope, id, consumer, remove) => ctx.dataSources.setQueryConsumer(scope, id, consumer, invocation(), remove),
+        query: (request) => ctx.dataSources.queryPublication(request, invocation()),
+        validateQuery: async (scope, reference, context) => {
+          await ctx.dataSources.resolveQuery(scope, reference, context, invocation())
+        },
+        queryConsumer: (scope, id, consumer, remove) =>
+          ctx.dataSources.setQueryConsumer(scope, id, consumer, invocation(), remove),
       })
       return {
         preparePublication: publications.prepare,
@@ -91,7 +111,10 @@ export const workflowDefinitions = (
       }
     })(),
     list: async (workspaceId) =>
-      mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
+      mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), {
+        userDir: homedir(),
+        catalog: runner.validationCatalog(),
+      }),
     // A row, or a committed file the editor opens read-only. The merged list carries a summary of
     // each definition and the editor needs the whole thing, so a file id resolves here rather than
     // fattening every list read (docs/workflows/authoring.md § Authoring).
@@ -104,13 +127,26 @@ export const workflowDefinitions = (
         return { ...row, ...(published ? { publishedDef: published.def } : {}) }
       }
       const project = projectId ? await core.projects.byId(projectId) : null
-      const loaded = loadWorkflowFiles(file[1] === 'repo' ? project?.path ?? null : null, homedir(), runner.validationCatalog())
+      const loaded = loadWorkflowFiles(
+        file[1] === 'repo' ? (project?.path ?? null) : null,
+        homedir(),
+        runner.validationCatalog(),
+      )
       const found = loaded.workflows.find((workflow) => workflow.id === file[2] && workflow.source === file[1])
       if (!found) return null
       const { id: _id, source: _source, ...def } = found
       // `revision: 0` is the marker: a file has no row to save into, so the editor draws it
       // read-only and offers "Copy to database" instead of Save.
-      return { id, workspaceId: project?.workspaceId ?? '', projectId: project?.id ?? null, name: found.name, revision: 0, createdAt: 0, updatedAt: 0, def }
+      return {
+        id,
+        workspaceId: project?.workspaceId ?? '',
+        projectId: project?.id ?? null,
+        name: found.name,
+        revision: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        def,
+      }
     },
     // A row is a draft, so neither write validates. A workflow being built is invalid most of
     // the way: it has no steps the moment it is created, and a step has no prompt until one is
@@ -141,7 +177,7 @@ export const workflowDefinitions = (
         }),
       }
     },
-    // Wiring only; the two calls and the repair pass are in ../server/authoring/generationRequest.ts.
+    // Wiring only; the two calls and the repair pass are in `generateWorkflowRequest`.
     // The runner's validation catalog rather than the pure one built from the kinds alone: it
     // carries each contributed kind's own `validate`, without which a workspace definition with a
     // broken step passes the example filter and teaches the model the mistake.
@@ -177,14 +213,15 @@ export const workflowDefinitions = (
         principal,
         signal,
         sources: ctx.dataSources,
-        generate: input => core.models.generateText({
-          userId, backendId: request.backendId,
-          input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
-        }),
+        generate: (input) =>
+          core.models.generateText({
+            userId,
+            backendId: request.backendId,
+            input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
+          }),
       })
     },
     modelBackends: (userId) => core.models.available(userId),
-    saveToRepo: async () => ({ error: 'Use Export to repository to review the published dependency graph before writing files.' }),
   }
   // The same writes the editor's Save makes, for `workflow_draft` (../agentTools/drafts.ts).
   const drafts: WorkflowDraftWriter = {
@@ -203,6 +240,17 @@ export const workflowDefinitions = (
 }
 
 export type WorkflowDraftWriter = {
-  create(input: { id: string; workspaceId: string; projectId: string; def: WorkflowDef; agentOrigin: WorkflowAgentOrigin }): Promise<StoredWorkflowDef>
-  update(id: string, def: WorkflowDef, revision: number, agentCallId: string): Promise<{ row: StoredWorkflowDef } | { conflict: StoredWorkflowDef } | null>
+  create(input: {
+    id: string
+    workspaceId: string
+    projectId: string
+    def: WorkflowDef
+    agentOrigin: WorkflowAgentOrigin
+  }): Promise<StoredWorkflowDef>
+  update(
+    id: string,
+    def: WorkflowDef,
+    revision: number,
+    agentCallId: string,
+  ): Promise<{ row: StoredWorkflowDef } | { conflict: StoredWorkflowDef } | null>
 }

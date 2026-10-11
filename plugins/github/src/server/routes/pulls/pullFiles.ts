@@ -3,7 +3,14 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { PullDiffResponse, PullFilesResponse } from '../../../shared/api'
 import { filesResource } from '../../resourceKeys'
-import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
+import {
+  type AppEnv,
+  type Cached,
+  ownerId,
+  type PluginDatabase,
+  respondError,
+  serveThenRevalidate,
+} from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
 import { readFiles } from '../mirror/prMirror'
 import { topologyOf } from '../mirror/prDocument'
@@ -22,12 +29,15 @@ const orderedByRequest = <T extends { path: string }>(files: T[], paths: string[
   })
 }
 
-type FilesRead<T> = (sync: typeof syncState.$inferSelect, key: { userId: string; repoId: number; number: number }) => Promise<T | null>
+type FilesRead<T> = (
+  sync: typeof syncState.$inferSelect,
+  key: { userId: string; repoId: number; number: number },
+) => Promise<T | null>
 
 // The files resource behind both the files route and the diff route: resolve the pull, then serve the
 // mirror, refreshing it first when it is cold or stale. `read` answers null for a mirror that cannot
 // serve, which the engine treats as cold.
-const serveFiles = async <T,>(db: PluginDatabase, c: Context<AppEnv>, emit: GithubEmit, read: FilesRead<T>) => {
+const serveFiles = async <T>(db: PluginDatabase, c: Context<AppEnv>, emit: GithubEmit, read: FilesRead<T>) => {
   const userId = ownerId(c)
   const token = await githubToken(c)
   const owner = c.req.param('owner')
@@ -78,33 +88,40 @@ const handleFilesRead = async (
   // read blocks on a refresh that rewrites it rather than serving the file as if it had no diff.
   const served = await serveFiles<PullFilesResponse>(db, c, emit, async (sync, key) => {
     const files = await readFiles(c.env.BLOBS, db, key, { includePatches, paths })
-    return files.ok ? { files: orderedByRequest(files.files, paths), completeness: files.completeness, revision: files.revision } : null
+    return files.ok
+      ? { files: orderedByRequest(files.files, paths), completeness: files.completeness, revision: files.revision }
+      : null
   })
   return served instanceof Response ? served : c.json(served)
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
-// path/status/+/−/sha/patch in one call, richer than the GraphQL composite, which dropped files).
-// Mirror logic is shared with the batch route, see prMirror.ts.
+// path/status/+/−/sha/patch in one call, which the GraphQL composite does not). Mirror logic is
+// shared with the batch route (`mirrorFiles`).
 //
 // GET answers with PullFilesResponse: the files in provider order and whether that is all of them.
 // `?path=` narrows it to one file. GET `/diff` answers with the same files as a segmented document
-// (PullDiffResponse) for the diff viewer, whose segments come from ./diffDocument.ts. There is no
-// batch patch read any more: the viewer reads segments, never whole patches.
+// (PullDiffResponse) for the diff viewer, which reads segments through the diff document routes and
+// never whole patches.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
-export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
-  const path = c.req.query('path')
-  const summaryOnly = c.req.query('summary') === '1' && !path
-  return handleFilesRead(db, c, emit, { summaryOnly, paths: path ? [path] : undefined })
-}).get('/:owner/:repo/pulls/:number/diff', async (c) => {
-  // The document: every file in provider order with its segment descriptors and no patch text. A
-  // missing patch body is the same integrity failure the files read repairs, and repairs the same way.
-  const served = await serveFiles<PullDiffResponse>(db, c, emit, async (sync, key) => {
-    const files = await readFiles(c.env.BLOBS, db, key, { includePatches: false })
-    if (!files.ok) return null
-    const topology = await topologyOf(c.env.BLOBS, files.files)
-    return topology.ok ? { document: topology.document, completeness: files.completeness, revision: files.revision } : null
-  })
-  return served instanceof Response ? served : c.json(served)
-})
+export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>
+  new Hono<AppEnv>()
+    .get('/:owner/:repo/pulls/:number/files', async (c) => {
+      const path = c.req.query('path')
+      const summaryOnly = c.req.query('summary') === '1' && !path
+      return handleFilesRead(db, c, emit, { summaryOnly, paths: path ? [path] : undefined })
+    })
+    .get('/:owner/:repo/pulls/:number/diff', async (c) => {
+      // The document: every file in provider order with its segment descriptors and no patch text. A
+      // missing patch body is the same integrity failure the files read repairs, and repairs the same way.
+      const served = await serveFiles<PullDiffResponse>(db, c, emit, async (sync, key) => {
+        const files = await readFiles(c.env.BLOBS, db, key, { includePatches: false })
+        if (!files.ok) return null
+        const topology = await topologyOf(c.env.BLOBS, files.files)
+        return topology.ok
+          ? { document: topology.document, completeness: files.completeness, revision: files.revision }
+          : null
+      })
+      return served instanceof Response ? served : c.json(served)
+    })

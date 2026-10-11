@@ -13,9 +13,9 @@ import type { Size } from '../../tokens/tokens'
 // ordering (pinned-first projects, substring branches, and so on). Shared by project pickers and
 // the create-PR branch selectors so they look and behave identically. Esc / outside-click close it.
 //
-// Anchoring, dismissal and reflow come from ui/anchor.ts; see docs/ui-design/interaction.md § Menus and
-// right-click for why (this file was the extraction's starting point) and for the portal/fixed
-// positioning it relies on. Picker keeps only the filter/list semantics.
+// Anchoring, dismissal and reflow come from `createAnchoredPopover`; see
+// docs/ui-design/interaction.md § Menus and right-click for why and for the portal/fixed positioning it
+// relies on. Picker keeps only the filter/list semantics.
 //
 // Two ways to fill it, and which one a caller uses is decided by where the caller runs. `results` and
 // its companions are callbacks: the caller owns filtering and ordering, which is what a pinned-first
@@ -150,62 +150,62 @@ export default function Picker<T>(props: PickerProps<T>) {
       <Show when={open()}>
         {/* A control a caller puts in `tools` is not the one the caption names. */}
         <FieldProvider value={NO_FIELD}>
-        <Portal>
-          <div
-            ref={(el) => popover.setSurface(el)}
-            class="repo-picker-popover repo-picker-popover-fixed"
-            role="listbox"
-            style={popover.surfaceStyle()}
-          >
-            <div class="repo-picker-tools">
-              <input
-                ref={inputRef}
-                class="repo-picker-filter"
-                placeholder={props.placeholder}
-                value={filter()}
-                onInput={(e) => {
-                  setFilter(e.currentTarget.value)
-                  props.onSearch?.(e.currentTarget.value)
-                }}
-              />
-              {props.tools}
+          <Portal>
+            <div
+              ref={(el) => popover.setSurface(el)}
+              class="repo-picker-popover repo-picker-popover-fixed"
+              role="listbox"
+              style={popover.surfaceStyle()}
+            >
+              <div class="repo-picker-tools">
+                <input
+                  ref={inputRef}
+                  class="repo-picker-filter"
+                  placeholder={props.placeholder}
+                  value={filter()}
+                  onInput={(e) => {
+                    setFilter(e.currentTarget.value)
+                    props.onSearch?.(e.currentTarget.value)
+                  }}
+                />
+                {props.tools}
+              </div>
+              {props.status}
+              <Show when={rows().length} fallback={<p class="repo-picker-empty">{props.emptyText}</p>}>
+                <ul class="repo-picker-list">
+                  <For each={rows()}>
+                    {(row, index) => (
+                      <PickerRow
+                        label={row.label}
+                        description={row.note}
+                        active={row.active}
+                        disabled={row.disabled}
+                        leading={
+                          row.removable ? (
+                            <ConfirmButton
+                              variant="bare"
+                              size="xs"
+                              iconOnly
+                              label={props.removeLabel ?? 'Remove'}
+                              tip={props.removeLabel ?? 'Remove'}
+                              confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
+                              onConfirm={() => props.onRemove?.(row.id)}
+                            >
+                              <Icon name="x" />
+                            </ConfirmButton>
+                          ) : (
+                            props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
+                          )
+                        }
+                        onSelect={() => choose(row)}
+                      />
+                    )}
+                  </For>
+                </ul>
+              </Show>
+              <Show when={props.footer}>{(footer) => <div class="repo-picker-footer">{footer()(close)}</div>}</Show>
             </div>
-            {props.status}
-            <Show when={rows().length} fallback={<p class="repo-picker-empty">{props.emptyText}</p>}>
-              <ul class="repo-picker-list">
-                <For each={rows()}>
-                  {(row, index) => (
-                    <PickerRow
-                      label={row.label}
-                      description={row.note}
-                      active={row.active}
-                      disabled={row.disabled}
-                      leading={row.removable
-                        ? (
-                          <ConfirmButton
-                            variant="bare"
-                            size="xs"
-                            iconOnly
-                            label={props.removeLabel ?? 'Remove'}
-                            tip={props.removeLabel ?? 'Remove'}
-                            confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
-                            onConfirm={() => props.onRemove?.(row.id)}
-                          >
-                            <Icon name="x" />
-                          </ConfirmButton>
-                        )
-                        : props.leading?.((props.results?.(filter()) ?? [])[index()] as T)}
-                      onSelect={() => choose(row)}
-                    />
-                  )}
-                </For>
-              </ul>
-            </Show>
-            <Show when={props.footer}>
-              {(footer) => <div class="repo-picker-footer">{footer()(close)}</div>}
-            </Show>
-          </div>
-        </Portal>
+          </Portal>
         </FieldProvider>
       </Show>
     </div>

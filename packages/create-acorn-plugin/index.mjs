@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
  * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '3'
+export const API_VERSION = '5'
 export const BASELINE = 'acorn-1'
 
 /**
@@ -59,8 +59,8 @@ function manifest(id, name, rectangle = false) {
     JSON.stringify(
       {
         // Editor completion and inline errors for every field below, from the schema generated out of
-        // the host's own Zod contract (packages/protocol/src/pluginSchema.test.ts). Nothing reads it at
-        // load time; it is there so a typo is a red squiggle rather than a failed boot.
+        // the host's own Zod contract (packages/plugin-types/acorn-plugin.schema.json). Nothing reads it
+        // at load time; it is there so a typo is a red squiggle rather than a failed boot.
         $schema: SCHEMA_URL,
         id,
         name,
@@ -363,8 +363,8 @@ edit → reload instead of edit → prompt → restart. Reload starts a fresh No
 - **Your routes are confined to \`/v1/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
-- **\`apiVersion\` must cover the loading node's major.** \`"3"\` covers major 3; a tested plugin can
-  declare a range such as \`"2 || 3"\`. A range that excludes the host is a \`failed\` roster row.
+- **\`apiVersion\` must cover the loading node's major.** \`"5"\` covers major 5; a tested plugin can
+  declare a range such as \`"4 || 5"\`. A range that excludes the host is a \`failed\` roster row.
 
 ## Extend another plugin's UI
 
@@ -634,7 +634,7 @@ export function dataSourceFiles(id, name, { row, inputs }) {
       $schema: SCHEMA_URL, id, name, version: '1.0.0', baseline: BASELINE, apiVersion: API_VERSION,
       node: './dist/node.js',
       permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
-      // `npm run build` rewrites this entry from src/source.ts, so the two can't disagree.
+      // `npm run build` rewrites this entry from the built source module, so the two can't disagree.
       contributions: { dataSources: [definition] },
     }, null, 2) + '\n',
     'package.json': JSON.stringify({

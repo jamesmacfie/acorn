@@ -1,9 +1,8 @@
 // Runtime service: owns run-target instances per task (docs/terminal/run-targets.md § Process
 // broker). An instance is just a terminal session in the task's worktree, so status derives from the
 // session map. Reachability comes from the target's `url` (fixed) or `url_command`
-// (run-and-parse-stdout, the existing term:previewUrl shape). acorn allocates no ports; isolation is
-// the script's job via ACORN_*. Deps are injected so the service is unit-testable under plain Node
-// (the run IPC wires the PTY glue).
+// (run it and parse its stdout). acorn allocates no ports; isolation is the script's job via ACORN_*.
+// Deps are injected so the service is unit-testable under plain Node (terminalRunGlue wires the PTY).
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/runTargets.ts' // canonical wire shapes — never redeclared here
 import type { LayoutRecipe, PluginHookRegistry, RunTarget } from '@acorn/plugin-api/node'
 
@@ -12,12 +11,18 @@ export type RuntimeDeps = {
   // `errors` carries structured config parse errors for the palette rows; `layouts` the
   // [layout.<id>] recipes (docs/workspaces-and-tasks/project-config.md § Layout recipes).
   // `repoTargetIds` names the targets whose winning layer was the checkout's own `.acorn/config.toml`,
-  // which is untrusted input: those are the ones that must pass the trust gate before they run. It is
-  // required, not optional. Both halves of this gate used to be optional, so a deps object that simply
-  // omitted them compiled fine and silently ran a cloned repository's committed command with no
-  // review. The type carries the gate now, and a caller that cannot answer has to say so out loud.
+  // which is untrusted input: those are the ones that must pass the trust gate before they run. Both
+  // halves of the gate are required, so a deps object that omits them does not compile and cannot
+  // silently run a cloned repository's committed command with no review.
   loadTargets(taskId: string): Promise<
-    | { targets: RunTarget[]; cwd: string; errors?: { source: string; message: string }[]; layouts?: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
+    | {
+        targets: RunTarget[]
+        cwd: string
+        errors?: { source: string; message: string }[]
+        layouts?: LayoutRecipe[]
+        repoTargetIds: string[]
+        repoConfigHash: string | null
+      }
     | { error: string }
   >
   // Spawn the target's command as a terminal session in cwd (ACORN_* env rides spawnOne). → session id.
@@ -34,7 +39,7 @@ export type RuntimeDeps = {
   retireSession(sessionId: string): void
   // Run a short-lived script (stop / url_command) in cwd; ok + trimmed stdout.
   runScript(taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }>
-  // Throws when the repo's configuration has not been acknowledged (server/repoConfigTrust.ts). Required
+  // Throws when the repo's configuration has not been acknowledged (server/projects/repoConfigTrust.ts). Required
   // for the same reason `repoTargetIds` is. The expected hash must match the current approved snapshot.
   authorizeRepoConfig(taskId: string, expectedHash: string): Promise<void>
   // A declared target started or stopped through this service (docs/plugins/events.md § Hearing a core event
@@ -42,7 +47,7 @@ export type RuntimeDeps = {
   onChange?(taskId: string, targetId: string, running: boolean): void
 }
 
-// The last non-empty stdout line is the URL (same parse as term:previewUrl).
+// The last non-empty stdout line is the URL.
 export const parseUrlOutput = (output: string | undefined): string | undefined =>
   output
     ?.split('\n')
@@ -92,7 +97,9 @@ export class RuntimeService {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    try { this.stopObservingExits() } finally {
+    try {
+      this.stopObservingExits()
+    } finally {
       this.operations.clear()
       this.instances.clear()
       this.instanceKeysBySession.clear()
@@ -102,15 +109,29 @@ export class RuntimeService {
 
   private key = (taskId: string, targetId: string) => `${taskId}\u0000${targetId}`
 
-  private operate(taskId: string, targetId: string, kind: 'start' | 'stop' | 'restart', run: () => Promise<RunResult>): Promise<RunResult> {
+  private operate(
+    taskId: string,
+    targetId: string,
+    kind: 'start' | 'stop' | 'restart',
+    run: () => Promise<RunResult>,
+  ): Promise<RunResult> {
     if (this.disposed) return Promise.resolve({ ok: false, reason: 'Run target service disposed.' })
     const key = this.key(taskId, targetId)
     const previous = this.operations.get(key)
     if (kind === 'start' && previous?.kind === 'start') return previous.promise
     const operation = { kind, promise: Promise.resolve<RunResult>({ ok: false }) }
-    operation.promise = (previous ? previous.promise.then(() => {}, () => {}) : Promise.resolve())
-      .then(() => this.disposed ? { ok: false, reason: 'Run target service disposed.' } : run())
-      .finally(() => { if (this.operations.get(key) === operation) this.operations.delete(key) })
+    operation.promise = (
+      previous
+        ? previous.promise.then(
+            () => {},
+            () => {},
+          )
+        : Promise.resolve()
+    )
+      .then(() => (this.disposed ? { ok: false, reason: 'Run target service disposed.' } : run()))
+      .finally(() => {
+        if (this.operations.get(key) === operation) this.operations.delete(key)
+      })
     this.operations.set(key, operation)
     return operation.promise
   }
@@ -121,7 +142,10 @@ export class RuntimeService {
 
   async targets(
     taskId: string,
-  ): Promise<{ targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: LayoutRecipe[] } | { error: string }> {
+  ): Promise<
+    | { targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: LayoutRecipe[] }
+    | { error: string }
+  > {
     const cfg = await this.deps.loadTargets(taskId)
     this.assertLive()
     if ('error' in cfg) return cfg
@@ -148,7 +172,10 @@ export class RuntimeService {
     const target = cfg.targets.find((t) => t.id === targetId)
     if (!target) return { ok: false, reason: `No run target '${targetId}'.` }
     if (cfg.repoTargetIds.includes(targetId)) {
-      if (!cfg.repoConfigHash) throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), { code: 'needs-trust' })
+      if (!cfg.repoConfigHash)
+        throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), {
+          code: 'needs-trust',
+        })
       await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
     }
     this.assertLive()
@@ -231,7 +258,10 @@ export class RuntimeService {
     const target = cfg.targets.find((t) => t.id === targetId)
     if (!target) return { ok: false, reason: `No run target '${targetId}'.` }
     if (cfg.repoTargetIds.includes(targetId)) {
-      if (!cfg.repoConfigHash) throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), { code: 'needs-trust' })
+      if (!cfg.repoConfigHash)
+        throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), {
+          code: 'needs-trust',
+        })
       await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
     }
     this.assertLive()
@@ -239,7 +269,9 @@ export class RuntimeService {
       const inst = this.instances.get(this.key(taskId, targetId))
       const res = await this.deps.runScript(taskId, target.restart, inst?.cwd ?? cfg.cwd)
       this.assertLive()
-      return res.ok ? { ok: true, sessionId: inst?.sessionId } : { ok: false, reason: res.reason ?? 'Restart script failed.' }
+      return res.ok
+        ? { ok: true, sessionId: inst?.sessionId }
+        : { ok: false, reason: res.reason ?? 'Restart script failed.' }
     }
     if (this.instances.has(this.key(taskId, targetId))) {
       const stopped = await this.stopOwned(taskId, targetId)
@@ -286,7 +318,10 @@ export class RuntimeService {
     if (!inst || !this.deps.isRunning(inst.sessionId)) return undefined
     // Execute only the command captured at admission, even if this target was edited on disk.
     const url = await resolveTargetUrl(inst.target, (script) => this.deps.runScript(taskId, script, inst.cwd))
-    return !this.disposed && this.instances.get(this.key(taskId, target.id)) === inst && this.deps.isRunning(inst.sessionId)
-      ? url : undefined
+    return !this.disposed &&
+      this.instances.get(this.key(taskId, target.id)) === inst &&
+      this.deps.isRunning(inst.sessionId)
+      ? url
+      : undefined
   }
 }

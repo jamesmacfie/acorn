@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   writeJson: vi.fn(),
   pushBackgroundError: vi.fn(),
 }))
-// savePref owns the pref write itself now, so stub the transport rather than a sibling module.
+// savePref owns the pref write itself, so stub the transport.
 vi.mock('../../infra/node/apiClient', () => ({ writeJson: mocks.writeJson }))
 vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 
@@ -19,7 +19,9 @@ const NODE_PREF = 'agent_tool_permissions'
 const withLocalStorage = <T>(run: () => T): T => {
   const store = new Map<string, string>()
   ;(globalThis as { localStorage?: unknown }).localStorage = {
-    get length() { return store.size },
+    get length() {
+      return store.size
+    },
     key: (index: number) => [...store.keys()][index] ?? null,
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => void store.set(key, value),
@@ -59,7 +61,9 @@ describe('savePref', () => {
   it('does not let an older equal-value failure roll back a newer successful attempt', async () => {
     const client = new QueryClient()
     client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
-    mocks.writeJson.mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce({ key: NODE_PREF, value: 'dark' })
+    mocks.writeJson
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValueOnce({ key: NODE_PREF, value: 'dark' })
 
     const first = savePref(client, NODE_PREF, 'dark')
     const second = savePref(client, NODE_PREF, 'dark')
@@ -70,24 +74,25 @@ describe('savePref', () => {
 
   it('writes a DEVICE pref locally and never reaches a node', async () => {
     // The point of the tier: `theme` is a property of this installation, `localStorage.setItem`
-    // cannot fail in a way a retry would fix, and the optimistic-write-and-roll-back dance above
-    // exists for a network round trip that no longer happens. The cache write still happens, because
-    // that is what every reactive reader sees.
+    // cannot fail in a way a retry would fix, and there is no network round trip to roll back. The
+    // cache write still happens, because that is what every reactive reader sees.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { theme: 'light' })
       await expect(savePref(client, 'theme', 'dark')).resolves.toBe(true)
       expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
       expect(mocks.writeJson).not.toHaveBeenCalled()
-      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:acorn-1:theme', 'dark']])
+      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([
+        ['acorn-pref:acorn-1:theme', 'dark'],
+      ])
     })
   })
 
   it('has the DEVICE value in localStorage before the cache notifies', async () => {
     // Readers see prefs through `prefsOptions.select` = mergePrefs(raw, readDevicePrefs()), where
     // device wins. So the cache write must land after localStorage, or select recomputes against the
-    // old device value and discards the new one: that is how a theme or style change used to appear
-    // to do nothing until an unrelated pref write re-ran select seconds later.
+    // old device value and discards the new one, and a theme or style change appears to do nothing
+    // until an unrelated pref write re-runs select.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { style: 'terminal' })
@@ -96,7 +101,9 @@ describe('savePref', () => {
       localStorage.setItem('acorn-pref:acorn-1:style', 'terminal')
       // The shape every reader actually observes: prefsOptions' select over the raw cache.
       const observer = new QueryObserver<Record<string, string>, Error, Record<string, string>>(client, {
-        queryKey: prefsKey, enabled: false, select: mergePrefs,
+        queryKey: prefsKey,
+        enabled: false,
+        select: mergePrefs,
       })
       const unsubscribe = observer.subscribe(() => {})
       try {
@@ -110,14 +117,25 @@ describe('savePref', () => {
 
   it('refuses an oversize descriptor value before writing', async () => {
     const registration = persistedStateRegistry.register({
-      id: 'test.bounded', key: 'test-bounded', scope: 'app', restore: 'view', version: 1,
-      codec: { parse: String, serialize: String }, empty: () => '', unknownIds: 'drop', maxBytes: 3,
+      id: 'test.bounded',
+      key: 'test-bounded',
+      scope: 'app',
+      restore: 'view',
+      version: 1,
+      codec: { parse: String, serialize: String },
+      empty: () => '',
+      unknownIds: 'drop',
+      maxBytes: 3,
     })
     try {
       const client = new QueryClient()
       await expect(savePref(client, 'test-bounded', 'four')).resolves.toBe(false)
       expect(mocks.writeJson).not.toHaveBeenCalled()
-      expect(mocks.pushBackgroundError).toHaveBeenCalledWith('', 'Could not save test.bounded', 'Persisted value exceeds 3 bytes.')
+      expect(mocks.pushBackgroundError).toHaveBeenCalledWith(
+        '',
+        'Could not save test.bounded',
+        'Persisted value exceeds 3 bytes.',
+      )
     } finally {
       registration.dispose()
     }

@@ -1,7 +1,7 @@
 // The skills a provider receives at every start and resume (docs/managed-agents/skills.md § Delivery).
 //
 // A harness with its own skill support gets a copy of every skill in a folder it loads natively
-// (./skillFolder.ts). Everything else goes in the index: names, descriptions and the absolute path of
+// (`writeSkillFolder`). Everything else goes in the index: names, descriptions and the absolute path of
 // each `SKILL.md`, under one fixed sentence from acorn. The agent reads a body only when a task matches,
 // so ten skills cost ten lines.
 //
@@ -89,7 +89,10 @@ const removedText = (names: readonly string[]) =>
  * Plans one start. `folder` is where to write the native copy, for a harness with its own skill support,
  * or `null`. `lastTold` is the session row's record of what the agent was told before.
  */
-export async function prepareSkillStart(skills: readonly DeliverableSkill[], options: { folder: string | null; lastTold: unknown }): Promise<SkillStart> {
+export async function prepareSkillStart(
+  skills: readonly DeliverableSkill[],
+  options: { folder: string | null; lastTold: unknown },
+): Promise<SkillStart> {
   let native: DeliverableSkill[] = []
   let plugins: string[] = []
   let failure: string | undefined
@@ -110,7 +113,11 @@ export async function prepareSkillStart(skills: readonly DeliverableSkill[], opt
     plugins,
     firstTurn(advertised) {
       const loaded = native.filter((skill) => advertised.has(nativeSkillName(skill.name)))
-      const index = skillIndex([...portable, ...native.filter((skill) => !loaded.includes(skill))].sort((a, b) => a.name.localeCompare(b.name)))
+      const index = skillIndex(
+        [...portable, ...native.filter((skill) => !loaded.includes(skill))].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      )
       const now = [...loaded.map((skill) => nativeSkillName(skill.name)), ...index.delivered]
       // A native skill not advertised yet may still load, and an omitted one is still on. Neither is gone.
       const kept = new Set([...now, ...native.map((skill) => nativeSkillName(skill.name)), ...index.omitted])
@@ -118,14 +125,27 @@ export async function prepareSkillStart(skills: readonly DeliverableSkill[], opt
       if (!skills.length && !removed.length) return null
       const content = [index.text, removed.length ? removedText(removed) : null].filter(Boolean).join('\n\n')
       return {
-        part: content ? { type: 'context', contextId: 'skills', source: 'context.skills', label: 'Skills', content, capturedAt: Date.now() } : null,
+        part: content
+          ? {
+              type: 'context',
+              contextId: 'skills',
+              source: 'context.skills',
+              label: 'Skills',
+              content,
+              capturedAt: Date.now(),
+            }
+          : null,
         report: {
-          native: loaded.map((skill) => skill.name), delivered: index.delivered, omitted: index.omitted, removed, told: now,
+          native: loaded.map((skill) => skill.name),
+          delivered: index.delivered,
+          omitted: index.omitted,
+          removed,
+          told: now,
           ...(failure ? { failure } : {}),
         },
       }
     },
-    retire: () => options.folder ? removeSkillFolder(options.folder).catch(() => undefined) : Promise.resolve(),
+    retire: () => (options.folder ? removeSkillFolder(options.folder).catch(() => undefined) : Promise.resolve()),
   }
 }
 
@@ -133,9 +153,17 @@ export async function prepareSkillStart(skills: readonly DeliverableSkill[], opt
 export function skillReportLine(report: SkillReport): string {
   const loadable = [...report.native.map((name) => `${nativeSkillName(name)} (native)`), ...report.delivered]
   return [
-    report.failure ? `Couldn't prepare the harness's own skill folder (${report.failure}), so every skill went in acorn's list.` : null,
-    loadable.length ? `Skills the agent can load: ${loadable.join(', ')}.` : report.omitted.length ? 'No skills fit in the list.' : null,
+    report.failure
+      ? `Couldn't prepare the harness's own skill folder (${report.failure}), so every skill went in acorn's list.`
+      : null,
+    loadable.length
+      ? `Skills the agent can load: ${loadable.join(', ')}.`
+      : report.omitted.length
+        ? 'No skills fit in the list.'
+        : null,
     report.omitted.length ? `${report.omitted.length} more didn't fit: ${report.omitted.join(', ')}.` : null,
     report.removed.length ? `The agent was told these are gone: ${report.removed.join(', ')}.` : null,
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 }

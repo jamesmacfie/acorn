@@ -1,5 +1,6 @@
 import { runsResponseSchema, type RunRow } from '@acorn/protocol/runs.ts'
 import type { Env } from '../bindings'
+import type { Disposable } from '../pluginHost/capabilities'
 import { dispatchPluginRoute } from '../pluginHost/dispatch'
 import { createLogger, describeError } from '../telemetry/logger'
 
@@ -16,7 +17,7 @@ const log = createLogger('runs')
 export type RunSource = {
   pluginId: string
   /** `GET` → `{ runs }`. Confined to the plugin's own namespace on every call, not merely at
-   *  registration (../plugin/dispatch.ts). */
+   *  registration (`confinePluginPath`). */
   runs: string
 }
 
@@ -25,23 +26,29 @@ export type RunSource = {
 export type RunSourceRegistration = Omit<RunSource, 'pluginId'>
 
 // A module singleton, like the route, source and node-action registries beside it, with the same
-// lifecycle answer: the host clears a plugin's entries before re-registering them.
+// lifecycle answer: each registration hands back its own undo, and the plugin host runs it on teardown.
 const sources = new Map<string, RunSource>()
 
-export function registerRunSource(source: RunSource): void {
+export function registerRunSource(source: RunSource): Disposable {
   const clash = sources.get(source.pluginId)
   if (clash && clash.runs !== source.runs) {
-    throw new Error(`Duplicate run source for '${source.pluginId}': already registered for ${clash.runs}, now for ${source.runs}.`)
+    throw new Error(
+      `Duplicate run source for '${source.pluginId}': already registered for ${clash.runs}, now for ${source.runs}.`,
+    )
   }
   sources.set(source.pluginId, source)
+  return {
+    dispose: () => {
+      if (sources.get(source.pluginId) === source) sources.delete(source.pluginId)
+    },
+  }
 }
 
 export function clearRunSources(pluginId: string): void {
   sources.delete(pluginId)
 }
 
-export const runSources = (): RunSource[] =>
-  [...sources.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId))
+export const runSources = (): RunSource[] => [...sources.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId))
 
 /** How long one source may take before the merge gives up on it. A run list is something a person is
  *  waiting on, and one slow plugin must not decide how long everyone waits. */
@@ -57,27 +64,36 @@ const SOURCE_TIMEOUT_MS = 2_000
  * silent. */
 export async function readRuns(env: Env): Promise<{ runs: RunRow[]; failed: string[] }> {
   const failed: string[] = []
-  const answers = await Promise.all(runSources().map(async (source): Promise<RunRow[]> => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS)
-    try {
-      const response = await dispatchPluginRoute(env, source.pluginId, source.runs, { method: 'GET' }, controller.signal)
-      if (!response.ok) throw new Error(`${response.status} from ${source.runs}`)
-      const parsed = runsResponseSchema.safeParse(await response.json())
-      if (!parsed.success) throw new Error(`${source.runs} did not answer with a run list`)
-      // Provenance is the host's. A row never names its own source, even when the source is right.
-      return parsed.data.runs.map((run) => ({ ...run, pluginId: source.pluginId }))
-    } catch (error) {
-      log.warn(`${source.pluginId} could not answer: ${describeError(error).message}`)
-      failed.push(source.pluginId)
-      return []
-    } finally {
-      clearTimeout(timer)
-    }
-  }))
+  const answers = await Promise.all(
+    runSources().map(async (source): Promise<RunRow[]> => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS)
+      try {
+        const response = await dispatchPluginRoute(
+          env,
+          source.pluginId,
+          source.runs,
+          { method: 'GET' },
+          controller.signal,
+        )
+        if (!response.ok) throw new Error(`${response.status} from ${source.runs}`)
+        const parsed = runsResponseSchema.safeParse(await response.json())
+        if (!parsed.success) throw new Error(`${source.runs} did not answer with a run list`)
+        // Provenance is the host's. A row never names its own source, even when the source is right.
+        return parsed.data.runs.map((run) => ({ ...run, pluginId: source.pluginId }))
+      } catch (error) {
+        log.warn(`${source.pluginId} could not answer: ${describeError(error).message}`)
+        failed.push(source.pluginId)
+        return []
+      } finally {
+        clearTimeout(timer)
+      }
+    }),
+  )
   // Newest first, ties broken by owner then id so two runs started in the same millisecond do not
   // swap places between reads.
-  const runs = answers.flat().sort((a, b) =>
-    b.startedAt - a.startedAt || a.pluginId.localeCompare(b.pluginId) || a.id.localeCompare(b.id))
+  const runs = answers
+    .flat()
+    .sort((a, b) => b.startedAt - a.startedAt || a.pluginId.localeCompare(b.pluginId) || a.id.localeCompare(b.id))
   return { runs, failed: failed.sort() }
 }

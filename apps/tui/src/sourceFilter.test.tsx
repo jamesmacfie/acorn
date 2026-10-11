@@ -12,11 +12,11 @@ import { regionFocus } from './keys/regions'
 // Its own file, and drawn as one region rather than through the whole shell, because nothing that
 // contributes a source *by descriptor* is wired into this host's fixture: no connection, no roster
 // entry, no chrome contribution. Building one to reach the panel would make the test a plugin
-// integration first and an assertion second, which is the call phase 3 already made about a Linear
-// case. So the panel is asked for directly, the way `plugins/plugins.test.tsx` asks for it, and it is
-// drawn inside a region so that the two walks the filter uses — Down into the rows and Escape out of
-// the panel — have a region to walk (../keys/regions.ts § moveStop). The list's search reads a query
-// client, which the shell provides per node, so each render brings its own.
+// integration first and an assertion second. So the panel is asked for directly, the way
+// `plugins/plugins.test.tsx` asks for it, and it is drawn inside a region so that the two walks the
+// filter uses — Down into the rows and Escape out of the panel — have a region to walk
+// (./keys/regions.ts § moveStop). The list's search reads a query client, which the shell provides per
+// node, so each render brings its own.
 
 const caretLine = (screen: Cells): string => screen.lines.find((line) => line.includes('›')) ?? ''
 
@@ -29,23 +29,33 @@ describe('a descriptor source list', () => {
       import('./chrome/promotionStore'),
     ])
     const registration = sourceRegistry.register({
-      id: 'task-items', order: 9999, glyph: 'x', label: 'Incidents',
-      promotion: { canPromote: () => true,
+      id: 'task-items',
+      order: 9999,
+      glyph: 'x',
+      label: 'Incidents',
+      promotion: {
+        canPromote: () => true,
         prepare: (_item, context) => ({ origin: 'probe:item', projectId: context.projectId, title: 'Second incident' }),
         create: vi.fn(),
       },
     })
     const descriptor = {
-      id: 'task-items', label: 'Incidents', glyph: 'circle', order: 10,
-      items: '/v1/p/probe/task-items', onSelect: { verb: 'createTask' },
+      id: 'task-items',
+      label: 'Incidents',
+      glyph: 'circle',
+      order: 10,
+      items: '/v1/p/probe/task-items',
+      onSelect: { verb: 'createTask' },
     } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
     const list = sourcePanel({ pluginId: 'probe', descriptor }).regions!.list
-    let screen = await renderCells(() => (
-      <box flexDirection="column" flexGrow={1}
-        ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}>
-        <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
-      </box>
-    ), { width: 44, height: 12 })
+    let screen = await renderCells(
+      () => (
+        <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}>
+          <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
+        </box>
+      ),
+      { width: 44, height: 12 },
+    )
     try {
       for (let turn = 0; turn < 40 && !screen.text.includes('Second incident'); turn += 1) {
         await new Promise((done) => setTimeout(done, 100))
@@ -68,19 +78,22 @@ describe('a descriptor source list', () => {
     await bootFixture()
     const { sourcePanel } = await import('./plugins/SourcePanel')
     const descriptor = {
-      id: 'items', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
+      id: 'items',
+      label: 'Issues',
+      glyph: 'circle',
+      order: 10,
+      items: '/v1/p/probe/items',
     } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
     const list = sourcePanel({ pluginId: 'probe', descriptor }).regions!.list
 
-    let screen = await renderCells(() => (
-      <box
-        flexDirection="column"
-        flexGrow={1}
-        ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}
-      >
-        <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
-      </box>
-    ), { width: 44, height: 12 })
+    let screen = await renderCells(
+      () => (
+        <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}>
+          <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
+        </box>
+      ),
+      { width: 44, height: 12 },
+    )
     try {
       // The fan-out answers off a tick, not off a frame, so wait for the rows rather than flushing.
       for (let turn = 0; turn < 40 && !screen.text.includes('Rotate'); turn += 1) {

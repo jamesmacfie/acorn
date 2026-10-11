@@ -1,11 +1,19 @@
 import { createSignal, type Component } from 'solid-js'
 import { clientCapabilityId } from '@acorn/plugin-api/client'
 
-export type WorkflowGitLaunchRequest = { nodeId: string | null; projectId: string; commitId: string; title: string; generation?: number }
+export type WorkflowGitLaunchRequest = {
+  nodeId: string | null
+  projectId: string
+  commitId: string
+  title: string
+  tracked?: true
+}
 const [request, setRequest] = createSignal<WorkflowGitLaunchRequest | null>(null)
-let generation = 0
 export const workflowGitLaunchRequest = request
-export const openWorkflowGitLaunch = (next: WorkflowGitLaunchRequest) => { setRequest({ ...next, generation: ++generation }) }
+// `tracked` marks a request opened here, so its dialog stays current only while it's still the open request.
+export const openWorkflowGitLaunch = (next: WorkflowGitLaunchRequest) => {
+  setRequest({ ...next, tracked: true })
+}
 export const closeWorkflowGitLaunch = (expected?: WorkflowGitLaunchRequest) => {
   if (!expected || request() === expected) setRequest(null)
 }

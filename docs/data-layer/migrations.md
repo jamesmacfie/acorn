@@ -11,7 +11,7 @@ you change a schema. It's part of the [data layer](../data-layer.md).
 3. Check every chain with `pnpm db:check`.
 
 Launching a Node applies pending migrations. Core and eight plugins own chains: agents, browser,
-changes, database, github, http, terminal, and workflows. Each starts from one baseline migration, and
+database, git, github, http, terminal, and workflows. Each starts from one baseline migration, and
 later migrations append to it. Older SQL histories and their one-way data transformations aren't an
 upgrade path into a baseline. Run the recoverable reset in [local development](../local-development.md)
 before starting a Node on an older data root. It keeps a private recovery copy and never removes

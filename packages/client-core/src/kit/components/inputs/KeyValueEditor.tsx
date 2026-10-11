@@ -5,12 +5,10 @@ import { Input } from './Input'
 
 export type KVRow = { enabled?: boolean; key: string; value: string }
 
-// The editable name/value grid, lifted from the http plugin's, which was the correct
-// implementation, including the two things that are easy to get wrong:
+// The editable name/value grid. Two things are easy to get wrong:
 //
 //   1. `<Index>`, not `<For>`. `<For>` keys rows by object reference, so replacing a row on every
-//      keystroke tears down its input and drops focus. `<Index>` keys by position. This gotcha
-//      recurs across the codebase and the port must not lose it.
+//      keystroke tears down its input and drops focus. `<Index>` keys by position.
 //   2. The trailing blank row that materialises as you type, so there is always somewhere to type;
 //      rows the user empties out are dropped, except the one being typed in.
 //
@@ -53,7 +51,9 @@ export function KeyValueEditor(props: {
       style={extraCols() ? { '--kv-extra-cols': String(extraCols()) } : undefined}
     >
       <div class="ui-kvgrid-head" role="row">
-        <Show when={withEnable()}><span /></Show>
+        <Show when={withEnable()}>
+          <span />
+        </Show>
         <span>{props.keyPlaceholder ?? 'Name'}</span>
         <span>{props.valuePlaceholder ?? 'Value'}</span>
         <Index each={props.columns ?? []}>{(column) => <span>{column().header}</span>}</Index>
@@ -94,9 +94,7 @@ export function KeyValueEditor(props: {
                 />
               </Show>
             </div>
-            <Show when={props.rowHint?.(row())}>
-              {(hint) => <p class="ui-kvgrid-hint">{hint()}</p>}
-            </Show>
+            <Show when={props.rowHint?.(row())}>{(hint) => <p class="ui-kvgrid-hint">{hint()}</p>}</Show>
           </>
         )}
       </Index>

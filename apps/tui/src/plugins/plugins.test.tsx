@@ -10,15 +10,13 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { renderCells } from '../kit/render'
 import { Text } from '../kit/showing'
 
-// What phase 5 promises, tested at the two levels it can be: the sandbox for real, and the drawing in
-// cells (docs/tui.md).
+// Loaded plugins in the terminal, tested at the two levels they can be: the sandbox for real, and the
+// drawing in cells (docs/tui.md).
 //
-// The sandbox half never skips. It starts a real `node:worker_threads` worker under `--permission`,
+// The sandbox half starts a real `node:worker_threads` worker under `--permission`,
 // hands it a bundle out of a real content-addressed cache, and asserts both halves of the containment
 // claim: the batch it sends arrives, and the file it was not granted does not open. None of that needs
-// a terminal, so it runs on whatever Node the repo is on.
-//
-// The drawing half skips without `node:ffi`, like every other test that renders (../ffi.ts).
+// a terminal.
 
 let config: string
 
@@ -82,7 +80,11 @@ test('a decision is recorded per (plugin, bundle), and only for bundles this dev
     nodeId: 'node-1',
     version: '1.0.0',
     declaration: 'test-declaration',
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+    permissions: {
+      api: [],
+      events: [],
+      node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    },
     webviews: [],
     keyClaims: [],
     navigationDestinations: [],
@@ -175,7 +177,11 @@ addEventListener('message', (event) => {
 test('a descriptor source keeps its region identity across chrome refreshes', async () => {
   const { sourcePanel } = await import('./SourcePanel')
   const descriptor = {
-    id: 'identity', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
+    id: 'identity',
+    label: 'Issues',
+    glyph: 'circle',
+    order: 10,
+    items: '/v1/p/probe/items',
   } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
   const first = sourcePanel({ pluginId: 'identity-probe', descriptor })
   const refreshed = sourcePanel({
@@ -188,13 +194,16 @@ test('a descriptor source keeps its region identity across chrome refreshes', as
 })
 
 test('a descriptor source draws its list and its detail in cells', async () => {
-  // What `client-core/host/chrome/sourcePanel.ts` exists for. The chrome registry used to name
-  // `ChromeSourcePanel` directly, which is `<main class="panes">` and DOM kit primitives all the way
-  // down, so selecting a descriptor source here threw "[Reconciler] Unknown component type: main"
-  // instead of drawing anything. Both regions render, which is the whole claim.
+  // What the `setSourcePanel` seam exists for. The DOM's `ChromeSourcePanel` is `<main class="panes">`
+  // and DOM kit primitives all the way down, and the reconciler throws "Unknown component type: main"
+  // on it. Both regions render, which is the whole claim.
   const { sourcePanel } = await import('./SourcePanel')
   const descriptor = {
-    id: 'issues', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
+    id: 'issues',
+    label: 'Issues',
+    glyph: 'circle',
+    order: 10,
+    items: '/v1/p/probe/items',
   } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
   const panel = sourcePanel({ pluginId: 'probe', descriptor })
   expect(panel.regions).toBeDefined()
@@ -202,7 +211,9 @@ test('a descriptor source draws its list and its detail in cells', async () => {
 
   for (const region of [panel.regions!.list, panel.regions!.detail]) {
     // The list's search reads a query client, which the shell provides per node.
-    const screen = await renderCells(() => <QueryClientProvider client={new QueryClient()}>{createComponent(region, {})}</QueryClientProvider>)
+    const screen = await renderCells(() => (
+      <QueryClientProvider client={new QueryClient()}>{createComponent(region, {})}</QueryClientProvider>
+    ))
     // A real wait: the list runs a fan-out query and the detail asks the surface registry, and both
     // answer off a tick rather than off a frame.
     await new Promise((done) => setTimeout(done, 150))
@@ -230,7 +241,9 @@ test('a descriptor source draws its list and its detail in cells', async () => {
   detail.done()
 }, 30_000)
 
-async function mountProbe(source: string): Promise<{ ops: readonly TreeMutation[]; refusals: string[]; release: () => void }> {
+async function mountProbe(
+  source: string,
+): Promise<{ ops: readonly TreeMutation[]; refusals: string[]; release: () => void }> {
   const { createPluginCustody } = await import('./custody')
   const { installPluginWorkers } = await import('./workerFactory')
   const { acquireTreeWorker } = await import('@acorn/client-core/host/tree/workerHost.ts')
@@ -263,7 +276,14 @@ async function mountProbe(source: string): Promise<{ ops: readonly TreeMutation[
   })
   worker.mount('s1', 'main', {})
   await Promise.race([seen, new Promise((done) => setTimeout(done, 10_000))])
-  return { ops: batches, refusals, release: () => { worker.unmount('s1'); worker.release() } }
+  return {
+    ops: batches,
+    refusals,
+    release: () => {
+      worker.unmount('s1')
+      worker.release()
+    },
+  }
 }
 
 test('a plugin worker draws its tree and cannot read a file it was not granted', async () => {
@@ -288,15 +308,22 @@ test('the terminal worker adapter keeps two tree bridge ports separate', async (
   const { acquireTreeWorker } = await import('@acorn/client-core/host/tree/workerHost.ts')
   const hash = createHash('sha256').update(SCOPED_PROBE_BUNDLE).digest('hex')
   const custody = createPluginCustody(brokerServing(SCOPED_PROBE_BUNDLE))
-  expect(await custody.cachePut({ nodeId: 'node-1', pluginId: 'scoped-probe', hash, version: '1.0.0' })).toEqual({ hash })
+  expect(await custody.cachePut({ nodeId: 'node-1', pluginId: 'scoped-probe', hash, version: '1.0.0' })).toEqual({
+    hash,
+  })
   installPluginWorkers()
   const refusals: string[] = []
   const worker = acquireTreeWorker({
-    pluginId: 'scoped-probe', hash, connect: () => ({ dispose: () => {} }),
+    pluginId: 'scoped-probe',
+    hash,
+    connect: () => ({ dispose: () => {} }),
     onRefused: (reason) => refusals.push(reason),
   })
   const batches = new Map<string, TreeMutation[]>()
-  for (const [slot, taskId] of [['s1', 'task-a'], ['s2', 'task-b']] as const) {
+  for (const [slot, taskId] of [
+    ['s1', 'task-a'],
+    ['s2', 'task-b'],
+  ] as const) {
     worker.transport(slot).onBatch((ops) => batches.set(slot, [...ops]))
     worker.mount(slot, 'main', {}, () => ({
       context: { surface: 'main', target: 'remote', nodeId: 'node-1', taskId, theme: 'terminal', style: 'terminal' },
@@ -329,15 +356,16 @@ test('a worker that dies at module scope fails its slot rather than hanging', as
 // ── Reserved regions ──────────────────────────────────────────────────────────────────────────────
 
 test('a pane that reserved a footer draws the rows delivered into it', async () => {
-  // What `client-core/host/chrome/extendedPane.ts` exists for. The frame registry wrapped a loaded
-  // plugin's pane in the DOM's `ExtendedPane` — a `div` around an `aside` holding a `PanelGrid` — so a
-  // pane that declared a `pane.footer` or a `pane.aside` was refused by the reconciler rather than
-  // drawn. This host's wrapper puts both under the owner's own tree (./ExtendedPane.tsx).
+  // What the `setExtendedPane` seam exists for. The DOM's `ExtendedPane` is a `div` around an `aside`
+  // holding a `PanelGrid`, which the reconciler refuses. This host's wrapper puts a `pane.footer` and a
+  // `pane.aside` under the owner's own tree (./ExtendedPane.tsx).
+  //
   // A node, because a contributor's rows come through the fleet fan-out and a fan-out over no nodes
   // answers with none (client-core/infra/node/fanout.ts).
   const { bootFixture } = await import('../harness')
   await bootFixture()
-  const { extensionPointRegistry, extensionRegistry } = await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
+  const { extensionPointRegistry, extensionRegistry } =
+    await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
   const { ExtendedPane } = await import('./ExtendedPane')
   const point = { pointId: 'board:card-links', region: { columns: 2, rows: 2 } } as never
 
@@ -377,8 +405,8 @@ test('a pane that reserved a footer draws the rows delivered into it', async () 
     expect(drawn.text).toContain('ACORN-14')
     expect(drawn.text).toContain('Tracked items')
     expect(drawn.text).toContain('tracker')
-    // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and its terminal
-    // projection is the dashboards programme's question (docs/tui/plugin-losses.md § What a plugin loses here).
+    // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and it has no
+    // terminal projection (docs/tui/plugin-losses.md § What a plugin loses here).
     expect(drawn.text).toContain('board:card-links is a dashboard')
   } finally {
     rows.dispose()
@@ -390,25 +418,38 @@ test('a project view’s detail regions draw above and below it, capped, and onl
   // The terminal half of docs/plugins/detail-regions.md: the same mount rule and the same arbitration
   // as the desktop, in reading order around the owner's own view, at a narrow width.
   const { createSignal } = await import('solid-js')
-  const { extensionPointRegistry, extensionRegistry } = await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
+  const { extensionPointRegistry, extensionRegistry } =
+    await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
   const { ExtendedPane } = await import('./ExtendedPane')
   const mounts: string[] = []
-  const point = (id: string) => extensionPointRegistry.register({ id, ownerId: 'tracker', label: id, kind: 'remote' as const, mode: 'stack' as const, max: 2 })
-  const contributor = (pluginId: string, pointId: string) => extensionRegistry.register({
-    id: `plugin:${pluginId}:${pointId}`,
-    pluginId,
-    point: pointId,
-    label: pluginId,
-    order: 500,
-    carrier: 'component' as const,
-    component: (props: { item?: string }) => {
-      mounts.push(pluginId)
-      return <Text>{`${pluginId} on ${props.item}`}</Text>
-    },
-  })
+  const point = (id: string) =>
+    extensionPointRegistry.register({
+      id,
+      ownerId: 'tracker',
+      label: id,
+      kind: 'remote' as const,
+      mode: 'stack' as const,
+      max: 2,
+    })
+  const contributor = (pluginId: string, pointId: string) =>
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:${pointId}`,
+      pluginId,
+      point: pointId,
+      label: pluginId,
+      order: 500,
+      carrier: 'component' as const,
+      component: (props: { item?: string }) => {
+        mounts.push(pluginId)
+        return <Text>{`${pluginId} on ${props.item}`}</Text>
+      },
+    })
   const registered = [
-    point('tracker:summary'), point('tracker:links'),
-    contributor('alpha', 'tracker:summary'), contributor('beta', 'tracker:summary'), contributor('gamma', 'tracker:summary'),
+    point('tracker:summary'),
+    point('tracker:links'),
+    contributor('alpha', 'tracker:summary'),
+    contributor('beta', 'tracker:summary'),
+    contributor('gamma', 'tracker:summary'),
     contributor('delta', 'tracker:links'),
   ]
   const [item, setItem] = createSignal<string | undefined>('ENG-1')
@@ -419,11 +460,14 @@ test('a project view’s detail regions draw above and below it, capped, and onl
   }
 
   try {
-    const screen = await renderCells(() => (
-      <ExtendedPane detail={detail}>
-        <Text>the issue itself</Text>
-      </ExtendedPane>
-    ), { width: 40, height: 16 })
+    const screen = await renderCells(
+      () => (
+        <ExtendedPane detail={detail}>
+          <Text>the issue itself</Text>
+        </ExtendedPane>
+      ),
+      { width: 40, height: 16 },
+    )
     let lines = (await screen.frame()).text.split('\n')
     const at = (text: string) => lines.findIndex((line) => line.includes(text))
     expect(at('alpha on ENG-1')).toBeGreaterThanOrEqual(0)
@@ -456,19 +500,29 @@ test('a project view’s detail regions draw above and below it, capped, and onl
 
 test('a tree drawn from a batch and the same tree written as JSX draw the same cells', async () => {
   const { TreeHost } = await import('./TreeHost')
-  const ops: TreeMutation[] = [{
-    op: 'insert',
-    parent: null,
-    index: 0,
-    node: { id: 'n1', type: 'Text', props: { emphasis: 'strong' }, children: [{ id: 't1', type: '#text', props: { value: 'from a worker' }, children: [] }] },
-  }]
+  const ops: TreeMutation[] = [
+    {
+      op: 'insert',
+      parent: null,
+      index: 0,
+      node: {
+        id: 'n1',
+        type: 'Text',
+        props: { emphasis: 'strong' },
+        children: [{ id: 't1', type: '#text', props: { value: 'from a worker' }, children: [] }],
+      },
+    },
+  ]
 
   let send: ((batch: readonly TreeMutation[]) => void) | undefined
   const remote = await renderCells(() => (
     <TreeHost
       pluginId="probe"
       transport={{
-        onBatch: (listener) => { send = listener; return () => {} },
+        onBatch: (listener) => {
+          send = listener
+          return () => {}
+        },
         onFailed: () => () => {},
         send: () => {},
       }}
@@ -518,10 +572,13 @@ test('a closed fence draws a viewer with Preview and Copy beside it, capped at f
   const fence = (body: string) => `\`\`\`json\n${body}\n\`\`\``
   try {
     const [text, setText] = createSignal(`Intro\n\n${fence('{"a": 0}')}\n\n\`\`\`json\n{"streaming": `)
-    const screen = await renderCells(() => {
-      const fences = markdownFences({ taskId: 'task-1' })
-      return <Markdown text={text()} fences={fences} />
-    }, { width: 60, height: 40 })
+    const screen = await renderCells(
+      () => {
+        const fences = markdownFences({ taskId: 'task-1' })
+        return <Markdown text={text()} fences={fences} />
+      },
+      { width: 60, height: 40 },
+    )
     let drawn = (await screen.frame()).text
     expect(drawn).toContain('table of {"a": 0} in task-1')
     expect(drawn).toContain('[Source]')
@@ -549,12 +606,23 @@ test('a closed fence draws a viewer with Preview and Copy beside it, capped at f
     // A tree that is not a top-level owner keeps plain fences, whatever its worker sends.
     let send: ((batch: readonly TreeMutation[]) => void) | undefined
     const transport = {
-      onBatch: (listener: (batch: readonly TreeMutation[]) => void) => { send = listener; return () => {} },
+      onBatch: (listener: (batch: readonly TreeMutation[]) => void) => {
+        send = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       send: () => {},
     }
-    const node: TreeMutation = { op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Markdown', props: { text: fence('{"tree": 1}'), fences: 'please' }, children: [] } }
-    const contributor = await renderCells(() => <TreeHost pluginId="probe" transport={transport} />, { width: 60, height: 10 })
+    const node: TreeMutation = {
+      op: 'insert',
+      parent: null,
+      index: 0,
+      node: { id: 'n1', type: 'Markdown', props: { text: fence('{"tree": 1}'), fences: 'please' }, children: [] },
+    }
+    const contributor = await renderCells(() => <TreeHost pluginId="probe" transport={transport} />, {
+      width: 60,
+      height: 10,
+    })
     send!([node])
     await new Promise((done) => setTimeout(done, 100))
     drawn = (await contributor.frame()).text
@@ -562,7 +630,10 @@ test('a closed fence draws a viewer with Preview and Copy beside it, capped at f
     expect(drawn).not.toContain('table of')
     contributor.done()
 
-    const owner = await renderCells(() => <TreeHost pluginId="probe" transport={transport} markdownFences={{ taskId: 'task-2' }} />, { width: 60, height: 10 })
+    const owner = await renderCells(
+      () => <TreeHost pluginId="probe" transport={transport} markdownFences={{ taskId: 'task-2' }} />,
+      { width: 60, height: 10 },
+    )
     send!([node])
     await new Promise((done) => setTimeout(done, 100))
     expect((await owner.frame()).text).toContain('table of {"tree": 1} in task-2')

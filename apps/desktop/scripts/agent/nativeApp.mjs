@@ -13,7 +13,7 @@ const run = promisify(execFile)
 // and rebuilds, and each gets its own bundle path, which is what tells two sessions apart. It is not
 // the installed app's `com.acorn.desktop`, so trusting it trusts test builds and nothing else.
 export const TEST_APP_ID = 'com.acorn.desktop.agent-test'
-export const TEST_APP_NAME = 'Acorn Agent Test'
+const TEST_APP_NAME = 'Acorn Agent Test'
 
 const escapeXml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 

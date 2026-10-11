@@ -5,6 +5,7 @@ import type { z } from 'zod'
 import { MAX_PLUGIN_MANIFEST_BYTES, readPluginFile } from './packageFiles'
 import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SEARCH_MAX } from '@acorn/protocol/settingsPages.ts'
 import { NODE_CORE_FACETS } from './coreFacets'
+import { isRecord } from '../integrations/codec'
 import { pluginManifestShape, CONTRIBUTION_KINDS } from '@acorn/protocol/plugin/contract.ts'
 import { validateDependencies, validateNodeDeclarations, validateRuntimeContributions } from './manifestValidation/node'
 import { validateFrames, validateSurfaceDestinations } from './manifestValidation/surfaces'
@@ -16,12 +17,8 @@ import { ManifestReferences, validateContributionIds } from './manifestValidatio
 export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 export type {
   NodePermissions,
-  PluginAgentContextDescriptor,
   PluginAuditActionDescriptor,
-  PluginChromeAction,
-  PluginClientRouteDescriptor,
   PluginCommandDescriptor,
-  PluginDocumentRegion,
   PluginExtensionDescriptor,
   PluginExtensionPointDescriptor,
   PluginFrameSurface,
@@ -29,21 +26,23 @@ export type {
   PluginCustomAgentDescriptor,
   PluginAgentToolDescriptor,
   PluginContextSectionDescriptor,
-  PluginKeybindingDescriptor,
-  PluginPaneRegion,
-  PluginRefResolverDescriptor,
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
 } from '@acorn/protocol/plugin/contract.ts'
-export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 
 /**
  * Whether a manifest gives the node something to hold with no node bundle behind it. Harnesses, custom
  * agents and skills are all data another plugin consumes, so a package made of only those still runs on
  * the node as a plugin with an empty `init` (./loader.ts), and its row reads as node-activated.
  */
-export const contributesNodeData = (contributions: { harnesses: readonly unknown[]; customAgents?: readonly unknown[]; skills?: readonly unknown[] }): boolean =>
-  contributions.harnesses.length > 0 || (contributions.customAgents?.length ?? 0) > 0 || (contributions.skills?.length ?? 0) > 0
+export const contributesNodeData = (contributions: {
+  harnesses: readonly unknown[]
+  customAgents?: readonly unknown[]
+  skills?: readonly unknown[]
+}): boolean =>
+  contributions.harnesses.length > 0 ||
+  (contributions.customAgents?.length ?? 0) > 0 ||
+  (contributions.skills?.length ?? 0) > 0
 
 // Cross-field checks run after protocol field parsing, in the order reported to plugin authors.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
@@ -76,11 +75,12 @@ export type PluginManifestResult =
   | { ok: true; manifest: PluginManifest; unknown: ManifestUnknown }
   | { ok: false; reason: string }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
 const droppedKeys = (raw: unknown, kept: object, prefix: string): string[] =>
-  isRecord(raw) ? Object.keys(raw).filter((key) => !(key in kept)).map((key) => `${prefix}${key}`) : []
+  isRecord(raw)
+    ? Object.keys(raw)
+        .filter((key) => !(key in kept))
+        .map((key) => `${prefix}${key}`)
+    : []
 
 function unknownIn(json: unknown, manifest: PluginManifest): string[] {
   if (!isRecord(json)) return []
@@ -90,7 +90,9 @@ function unknownIn(json: unknown, manifest: PluginManifest): string[] {
   return [
     ...droppedKeys(json, manifest, ''),
     // Contributions keep unknown keys; compare against the schema's known kind list.
-    ...Object.keys(contributions).filter((kind) => !CONTRIBUTION_KINDS.includes(kind)).map((kind) => `contributions.${kind}`),
+    ...Object.keys(contributions)
+      .filter((kind) => !CONTRIBUTION_KINDS.includes(kind))
+      .map((kind) => `contributions.${kind}`),
     ...droppedKeys(permissions, manifest.permissions, 'permissions.'),
     ...droppedKeys(node, manifest.permissions.node, 'permissions.node.'),
     // Core facets are array values, so key comparison cannot find unknown entries.
@@ -114,11 +116,16 @@ function caughtSettingsPlacements(raw: unknown, parsed: PluginManifest['contribu
     if (!isRecord(source)) return []
     return (['category', 'settingsScope', 'keywords', 'sections', 'railSourceVisibility'] as const)
       .filter((key) => source[key] !== undefined && frame[key] === undefined)
-      .map((key) => `contributions.frames.${frame.id}.${key}: ${Array.isArray(source[key])
-        ? key === 'railSourceVisibility'
-          ? `not accepted (at most ${RAIL_SOURCE_VISIBILITY_MAX} source ids)`
-          : `not accepted (at most ${SETTINGS_SEARCH_MAX} entries, each a short string${key === 'sections' ? ' or { id, label, keywords } with an id of its own' : ''})`
-        : String(source[key])}`)
+      .map(
+        (key) =>
+          `contributions.frames.${frame.id}.${key}: ${
+            Array.isArray(source[key])
+              ? key === 'railSourceVisibility'
+                ? `not accepted (at most ${RAIL_SOURCE_VISIBILITY_MAX} source ids)`
+                : `not accepted (at most ${SETTINGS_SEARCH_MAX} entries, each a short string${key === 'sections' ? ' or { id, label, keywords } with an id of its own' : ''})`
+              : String(source[key])
+          }`,
+      )
   })
 }
 
@@ -129,8 +136,10 @@ function caughtSettingsPlacements(raw: unknown, parsed: PluginManifest['contribu
 function foreignRailSourceSwitches(manifest: PluginManifest): string[] {
   const own = (manifest.contributions.sources ?? []).map((source) => source.id)
   return manifest.contributions.frames.flatMap((frame) =>
-    foreignRailSources(frame.railSourceVisibility ?? [], own).map((id) =>
-      `contributions.frames.${frame.id}.railSourceVisibility: '${id}' is not one of this plugin's sources`))
+    foreignRailSources(frame.railSourceVisibility ?? [], own).map(
+      (id) => `contributions.frames.${frame.id}.railSourceVisibility: '${id}' is not one of this plugin's sources`,
+    ),
+  )
 }
 
 /** Validate a parsed object and retain field paths in the author-facing error. The testkit uses the
@@ -162,11 +171,17 @@ export function parsePluginManifest(json: unknown, source: string = MANIFEST_FIL
   if (parsed.success) return { ok: true, manifest: parsed.data, unknown: unknownIn(json, parsed.data) }
   // Keep the path so an author can find the failing descriptor.
   const issues = parsed.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => {
-    const path = issue.path.map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`)).join('').replace(/^\./, '')
+    const path = issue.path
+      .map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`))
+      .join('')
+      .replace(/^\./, '')
     return path ? `${path}: ${issue.message}` : issue.message
   })
   const extra = parsed.error.issues.length - issues.length
-  return { ok: false, reason: `${source} does not match the manifest schema — ${issues.join('; ')}${extra > 0 ? ` (and ${extra} more)` : ''}` }
+  return {
+    ok: false,
+    reason: `${source} does not match the manifest schema — ${issues.join('; ')}${extra > 0 ? ` (and ${extra} more)` : ''}`,
+  }
 }
 
 /** Read a plugin directory without throwing, and return a reason when its manifest fails. */
@@ -175,13 +190,19 @@ export function readPluginManifestResult(dir: string): PluginManifestResult {
   try {
     text = readPluginFile(dir, MANIFEST_FILE, MAX_PLUGIN_MANIFEST_BYTES).toString('utf8')
   } catch (error) {
-    return { ok: false, reason: `${MANIFEST_FILE} is missing or unreadable: ${error instanceof Error ? error.message : String(error)}` }
+    return {
+      ok: false,
+      reason: `${MANIFEST_FILE} is missing or unreadable: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
   let json: unknown
   try {
     json = JSON.parse(text)
   } catch (error) {
-    return { ok: false, reason: `${MANIFEST_FILE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}` }
+    return {
+      ok: false,
+      reason: `${MANIFEST_FILE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
   return parsePluginManifest(json)
 }

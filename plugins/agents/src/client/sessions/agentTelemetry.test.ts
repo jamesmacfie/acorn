@@ -1,12 +1,21 @@
 import { afterEach, expect, it, vi } from 'vitest'
 const end = vi.fn()
-vi.mock('@acorn/plugin-api/client', () => ({ telemetryFor: () => ({ startOperation: () => ({ traceId: 'trace', spanId: 'span', end }) }) }))
+vi.mock('@acorn/plugin-api/client', () => ({
+  telemetryFor: () => ({ startOperation: () => ({ traceId: 'trace', spanId: 'span', end }) }),
+}))
 const { startAgentView } = await import('./agentTelemetry')
-afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 it('waits for content and two frames, then ends once', () => {
   vi.useFakeTimers()
   const frames: FrameRequestCallback[] = []
-  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length })
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    frames.push(cb)
+    return frames.length
+  })
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
   const view = startAgentView('agents.session.open')
   expect(end).not.toHaveBeenCalled()

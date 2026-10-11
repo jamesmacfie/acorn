@@ -7,7 +7,13 @@ import { createEffect, createRoot, Suspense } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { withQueryClient } from './queryClient.helper'
-import type { AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentTurn, AgentWsFrame } from '../../contract/wire.ts'
+import type {
+  AgentEventRecord,
+  AgentProviderDescriptor,
+  AgentSession,
+  AgentTurn,
+  AgentWsFrame,
+} from '../../contract/wire.ts'
 
 let deliver: (frame: AgentWsFrame) => void = () => {}
 vi.mock('./wsChannel', () => ({
@@ -18,13 +24,30 @@ vi.mock('./wsChannel', () => ({
 }))
 
 const session = {
-  id: 's1', taskId: 't1', title: 's1', providerId: 'claude', config: {}, createdAt: 1, updatedAt: 1,
-  lastEventSeq: 4, lastReadSeq: 4, attention: 'none', controller: 'acorn', runtimeState: 'working',
-  subagents: [], queuedTurns: 0, kind: 'interactive', archivedAt: null,
+  id: 's1',
+  taskId: 't1',
+  title: 's1',
+  providerId: 'claude',
+  config: {},
+  createdAt: 1,
+  updatedAt: 1,
+  lastEventSeq: 4,
+  lastReadSeq: 4,
+  attention: 'none',
+  controller: 'acorn',
+  runtimeState: 'working',
+  subagents: [],
+  queuedTurns: 0,
+  kind: 'interactive',
+  archivedAt: null,
 } as unknown as AgentSession
 
 const sessions = vi.fn(async () => ({ sessions: [session], delegations: [], nextCursor: null }))
-const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({ ...session, lastEventSeq: body.lastReadSeq, ...body }))
+const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({
+  ...session,
+  lastEventSeq: body.lastReadSeq,
+  ...body,
+}))
 const enqueue = vi.fn(async (_id: string, _body: unknown) => ({}))
 const snapshot = vi.fn(async () => ({ session, turns: [] as AgentTurn[], events: [], requests: [] }))
 const providers = vi.fn(async (_force?: boolean): Promise<AgentProviderDescriptor[]> => [])
@@ -49,10 +72,17 @@ const { createAgentPaneModel, sessionIsBlank } = await import('./agentPaneModel'
 const { agentTelemetry, claimAgentSelection } = await import('./agentTelemetry')
 const { clearManagedSession } = await import('./managedSelection')
 
-const event = (seq: number): AgentEventRecord => ({
-  id: `e${seq}`, sessionId: 's1', turnId: 'turn', seq, schemaVersion: 1, searchText: null, createdAt: 100 + seq,
-  event: { type: 'assistant_message', text: 'more' },
-} as unknown as AgentEventRecord)
+const event = (seq: number): AgentEventRecord =>
+  ({
+    id: `e${seq}`,
+    sessionId: 's1',
+    turnId: 'turn',
+    seq,
+    schemaVersion: 1,
+    searchText: null,
+    createdAt: 100 + seq,
+    event: { type: 'assistant_message', text: 'more' },
+  }) as unknown as AgentEventRecord
 
 afterEach(() => {
   clearManagedSession('t1')
@@ -68,7 +98,13 @@ afterEach(() => {
   providers.mockImplementation(async () => [])
 })
 
-const claude = { id: 'claude', label: 'Claude', installed: true, capabilities: [], diagnostics: [] } as unknown as AgentProviderDescriptor
+const claude = {
+  id: 'claude',
+  label: 'Claude',
+  installed: true,
+  capabilities: [],
+  diagnostics: [],
+} as unknown as AgentProviderDescriptor
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 it('marks read up to the newest event frame, which the row no longer carries', async () => {
@@ -79,7 +115,7 @@ it('marks read up to the newest event frame, which the row no longer carries', a
   })
   vi.useFakeTimers()
   for (let seq = 5; seq <= 9; seq++) deliver({ channel: 'agent:event', event: event(seq) })
-  // The row stays as the node last sent it: rewriting it per event woke every roster reader.
+  // The row stays as the node last sent it: rewriting it per event would wake every roster reader.
   expect(managedAgentStore.sessions()[0]).toBe(session)
   await vi.advanceTimersByTimeAsync(350)
   expect(patch).toHaveBeenCalledTimes(1)
@@ -130,7 +166,9 @@ it('archives without asking only when nothing would be lost', () => {
   expect(sessionIsBlank({ turns: [{}] as never }, empty)).toBe(false)
   expect(sessionIsBlank({ turns: [] }, { ...empty, text: 'hi' })).toBe(false)
   expect(sessionIsBlank({ turns: [] }, { ...empty, attachments: [{}] as never })).toBe(false)
-  expect(sessionIsBlank({ turns: [] }, { ...empty, contexts: [{ type: 'context', source: 'context.task' }] as never })).toBe(false)
+  expect(
+    sessionIsBlank({ turns: [] }, { ...empty, contexts: [{ type: 'context', source: 'context.task' }] as never }),
+  ).toBe(false)
 })
 
 // The pane's list header only shows "Agents" and a count, but the model is built inside it, so any
@@ -141,13 +179,20 @@ it('draws the list header while the providers are still being probed', async () 
   const host = document.createElement('div')
   function Header() {
     const model = createAgentPaneModel({ id: 't1' } as never, { shown: () => false })
-    return <p>{`Agents ${model.taskSessions().length}, ${model.choices().length} choices, loading ${model.providersLoading()}`}</p>
+    return (
+      <p>{`Agents ${model.taskSessions().length}, ${model.choices().length} choices, loading ${model.providersLoading()}`}</p>
+    )
   }
-  const dispose = render(() => (
-    <QueryClientProvider client={client}>
-      <Suspense fallback={<p>waiting</p>}><Header /></Suspense>
-    </QueryClientProvider>
-  ), host)
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Suspense fallback={<p>waiting</p>}>
+          <Header />
+        </Suspense>
+      </QueryClientProvider>
+    ),
+    host,
+  )
   await settle()
   expect(host.textContent).toBe('Agents 1, 0 choices, loading true')
   dispose()
@@ -158,11 +203,17 @@ it('reads the providers from the cache on the next task, and refreshes them with
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const modelFor = (taskId: string) => {
     let built!: ReturnType<typeof createAgentPaneModel>
-    const dispose = render(() => (
-      <QueryClientProvider client={client}>
-        {(() => { built = createAgentPaneModel({ id: taskId } as never, { shown: () => false }); return null })()}
-      </QueryClientProvider>
-    ), document.createElement('div'))
+    const dispose = render(
+      () => (
+        <QueryClientProvider client={client}>
+          {(() => {
+            built = createAgentPaneModel({ id: taskId } as never, { shown: () => false })
+            return null
+          })()}
+        </QueryClientProvider>
+      ),
+      document.createElement('div'),
+    )
     return { model: built, dispose }
   }
 
@@ -184,22 +235,47 @@ it('reads the providers from the cache on the next task, and refreshes them with
   second.dispose()
 })
 
-
 it('retries a saved turn through fresh host admission without copying host policy fields', async () => {
-  const turn: AgentTurn = { id: 'failed', sessionId: 's1', ordinal: 0, source: 'workflow', status: 'failed',
-    providerTurnRef: null, stopReason: null, usage: null, error: null, attempt: 1, createdAt: 0, startedAt: 0, completedAt: 1, input: [{ type: 'text', text: 'Work' }],
-    effectivePolicy: { attendance: 'autonomous', initialAttendance: 'autonomous', posture: 'autonomous',
-      followUpOf: 'origin', continuationOf: 'origin', model: 'opus', effort: 'high' } }
+  const turn: AgentTurn = {
+    id: 'failed',
+    sessionId: 's1',
+    ordinal: 0,
+    source: 'workflow',
+    status: 'failed',
+    providerTurnRef: null,
+    stopReason: null,
+    usage: null,
+    error: null,
+    attempt: 1,
+    createdAt: 0,
+    startedAt: 0,
+    completedAt: 1,
+    input: [{ type: 'text', text: 'Work' }],
+    effectivePolicy: {
+      attendance: 'autonomous',
+      initialAttendance: 'autonomous',
+      posture: 'autonomous',
+      followUpOf: 'origin',
+      continuationOf: 'origin',
+      model: 'opus',
+      effort: 'high',
+    },
+  }
   snapshot.mockResolvedValue({ session: { ...session, lastEventSeq: 0 }, turns: [turn], events: [], requests: [] })
   managedAgentStore.upsertSession(session)
   await managedAgentStore.loadSnapshot(session.id)
   const { model, dispose } = createRoot((dispose) => ({
-    model: withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false })), dispose,
+    model: withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false })),
+    dispose,
   }))
-  model.sessionActions().find((action) => action.id === 'retry')!.run()
+  model
+    .sessionActions()
+    .find((action) => action.id === 'retry')!
+    .run()
   await settle()
   expect(enqueue).toHaveBeenCalledWith('s1', {
-    input: turn.input, source: 'interactive',
+    input: turn.input,
+    source: 'interactive',
     effectivePolicy: { model: 'opus', effort: 'high', retryOfTurnId: 'failed', includePartialHistory: true },
   })
   expect(model.error()).toBe('')

@@ -36,7 +36,7 @@ const ROOT = resolve(PKG, '../..')
 /** Installed path under the app's resource root, the staged directory it comes from, and any
  *  subdirectory that belongs to a different component. Mirrors `bundle.resources` in
  *  src-tauri/tauri.conf.json. */
-export const COMPONENTS = [
+const COMPONENTS = [
   { component: 'renderer', path: 'client', staged: 'dist/client' },
   { component: 'frame-bridge', path: 'bridge', staged: 'dist/bridge' },
   { component: 'node-service', path: 'helper', staged: 'dist/helper', skip: ['node_modules'] },
@@ -45,7 +45,7 @@ export const COMPONENTS = [
   { component: 'bundled-plugins', path: 'plugins', staged: 'dist/bundled-plugins' },
 ]
 
-export const EXCLUDED_METADATA = ['*.map', '.DS_Store', 'size-report.json', 'startup-graph.json']
+const EXCLUDED_METADATA = ['*.map', '.DS_Store', 'size-report.json', 'startup-graph.json']
 const isMetadata = (name) => name.endsWith('.map') || EXCLUDED_METADATA.includes(name)
 const isJavaScript = (name) => /\.[cm]?js$/.test(name)
 const inside = (root, path) => path === root || path.startsWith(root + sep)
@@ -98,7 +98,7 @@ async function rendererStartup(clientDir) {
   const size = (files) => [...files].reduce((sum, file) => sum + statSync(join(clientDir, file)).size, 0)
   const scripts = [...graph.startupFiles].filter((file) => !file.endsWith('.css'))
   const styles = [...graph.startupFiles].filter((file) => file.endsWith('.css'))
-  // The compiled roster, imported by ./src/client/activate.ts after the first frame.
+  // The compiled roster, which the client's `startClientPlugins` imports after the first frame.
   return { scripts: size(scripts), styles: size(styles), registration: graph.rosterFiles && size(graph.rosterFiles) }
 }
 

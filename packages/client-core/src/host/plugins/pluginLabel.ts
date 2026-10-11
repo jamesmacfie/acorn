@@ -23,7 +23,9 @@ export function pluginLabel(plugin: string | Named): string {
   const device = snapshot.devicePlugins.find((entry) => entry.row.name === plugin)
   if (device) return labelOf(device.row)
   const active = activeNodeId()
-  const observations = [...snapshot.byNode.values()].sort((a, b) => Number(b.nodeId === active) - Number(a.nodeId === active))
+  const observations = [...snapshot.byNode.values()].sort(
+    (a, b) => Number(b.nodeId === active) - Number(a.nodeId === active),
+  )
   for (const observation of observations) {
     const row = observation.rows.find((candidate) => candidate.name === plugin)
     if (row?.label?.trim()) return labelOf(row)

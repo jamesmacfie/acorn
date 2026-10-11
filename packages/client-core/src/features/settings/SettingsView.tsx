@@ -1,22 +1,56 @@
-import { createEffect, createMemo, createSignal, Index, on, onCleanup, onMount, Show, Suspense, untrack } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  Index,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Suspense,
+  untrack,
+} from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import type { SettingsCategory } from '@acorn/protocol/settingsPages.ts'
 import { SETTINGS_CATEGORIES } from '@acorn/protocol/settingsPages.ts'
 import { connectionName } from '@acorn/protocol/integrations.ts'
-import { integrationsOptions, projectsOptions, workspacesOptions, type Project, type Workspace } from '../../infra/queries'
+import {
+  integrationsOptions,
+  projectsOptions,
+  workspacesOptions,
+  type Project,
+  type Workspace,
+} from '../../infra/queries'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { nodePlugins } from '../../infra/node/nodePlugins'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { activePluginNodeStale, pluginRosterKnown } from '../../infra/node/hostCapabilities'
 import { confirmAction } from '../../host/registries/shell/willPhase'
-import { buildSettingsIndex, searchSettings, type SettingsSearchObject, type SettingsSearchResult } from '../../host/registries/shell/settingsSearch'
 import {
-  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, projectSettingsTarget, resolveSettingsAlias,
-  settingsCategoryOf, settingsDetailPage, settingsPagesInOrder, settingsRegistry, settingsScopeOf, WORKSPACE_SETTINGS_PREFIX,
-  workspaceSettingsTarget, type SettingsContribution, type SettingsNavigate, type SettingsPageContext,
+  buildSettingsIndex,
+  searchSettings,
+  type SettingsSearchObject,
+  type SettingsSearchResult,
+} from '../../host/registries/shell/settingsSearch'
+import {
+  isStandaloneSettingsPage,
+  parseSettingsTarget,
+  PROJECT_SETTINGS_PREFIX,
+  projectSettingsTarget,
+  resolveSettingsAlias,
+  settingsCategoryOf,
+  settingsDetailPage,
+  settingsPagesInOrder,
+  settingsRegistry,
+  settingsScopeOf,
+  WORKSPACE_SETTINGS_PREFIX,
+  workspaceSettingsTarget,
+  type SettingsContribution,
+  type SettingsNavigate,
+  type SettingsPageContext,
 } from '../../host/registries/shell/settings'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 import { RegionLoading } from '../../host/layouts/RegionLoading'
@@ -38,7 +72,7 @@ import { connectionPageOf, openConnectionPage } from './connections/connections'
 import { featureUsable } from '../../infra/telemetry/featureOpening'
 import './settings.css'
 
-// Settings as a place: a full-window layer with a rail of nine groups on the left and one page on the
+// Settings as a place: a full-window layer with a rail of groups on the left and one page on the
 // right (docs/frontend/settings.md § Settings).
 //
 // A layer and not a route. The shell mounts it over the workspace, which stays mounted underneath, so a
@@ -83,7 +117,14 @@ type Resolved = {
 
 /** `depth` 1 is a workspace under Overview and 2 a project under its workspace. A workspace row with
  *  projects carries `expanded`. */
-type RailRow = { key: string; label: string; category: SettingsCategory; depth?: 1 | 2; expanded?: boolean; workspaceId?: string }
+type RailRow = {
+  key: string
+  label: string
+  category: SettingsCategory
+  depth?: 1 | 2
+  expanded?: boolean
+  workspaceId?: string
+}
 
 /** One step of the header's path above the title. `to` names the page it opens, for its tip. */
 type Crumb = { label: string; to?: string; run?: () => void }
@@ -94,8 +135,10 @@ type Crumb = { label: string; to?: string; run?: () => void }
 function landOnSection(page: () => HTMLElement | undefined, section: string): () => void {
   let stopWatching = () => {}
   let clearMark = () => {}
-  const find = () => [...(page()?.querySelectorAll<HTMLElement>('[data-settings-section]') ?? [])]
-    .find((element) => element.dataset.settingsSection === section)
+  const find = () =>
+    [...(page()?.querySelectorAll<HTMLElement>('[data-settings-section]') ?? [])].find(
+      (element) => element.dataset.settingsSection === section,
+    )
   const land = (target: HTMLElement) => {
     stopWatching()
     // A section on a tab that is not showing, as on a project's page: pick its tab first. The kit's tab
@@ -116,7 +159,10 @@ function landOnSection(page: () => HTMLElement | undefined, section: string): ()
   else {
     const root = page()
     if (root) {
-      const observer = new MutationObserver(() => { const found = find(); if (found) land(found) })
+      const observer = new MutationObserver(() => {
+        const found = find()
+        if (found) land(found)
+      })
       observer.observe(root, { childList: true, subtree: true })
       const timeout = setTimeout(() => observer.disconnect(), LANDING_WAIT_MS)
       stopWatching = () => {
@@ -141,7 +187,9 @@ function SettingsUsable() {
 export default function SettingsView(props: {
   request: SettingsRequest
   onClose: () => void
-  onLinkPlace?: (link: { nodeId: string; place: { kind: 'settings'; pageId?: string; sectionId?: string } } | null) => void
+  onLinkPlace?: (
+    link: { nodeId: string; place: { kind: 'settings'; pageId?: string; sectionId?: string } } | null,
+  ) => void
   onCopyLink?: () => void
 }) {
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -172,7 +220,9 @@ export default function SettingsView(props: {
   // row, a deep link. The remembered page carries its section too, but reopening settings there should
   // not flash a highlight nobody asked for.
   const requestedSection = requested ? initial.section : undefined
-  const [landing, setLanding] = createSignal<{ section: string } | undefined>(requestedSection ? { section: requestedSection } : undefined)
+  const [landing, setLanding] = createSignal<{ section: string } | undefined>(
+    requestedSection ? { section: requestedSection } : undefined,
+  )
   const [status, setStatus] = createSignal('')
   const [query, setQuery] = createSignal('')
   // Below about 900 px the rail and the page take turns. Opening settings shows the page; its back
@@ -192,16 +242,23 @@ export default function SettingsView(props: {
     if (selected.startsWith(WORKSPACE_SETTINGS_PREFIX)) {
       const page = workspacePage()
       const workspace = workspaceById(selected.slice(WORKSPACE_SETTINGS_PREFIX.length))
-      return workspaceMode() === 'on' && page && workspace ? { page, category: 'workspaces', name: workspace.name, workspace } : undefined
+      return workspaceMode() === 'on' && page && workspace
+        ? { page, category: 'workspaces', name: workspace.name, workspace }
+        : undefined
     }
     if (selected.startsWith(PROJECT_SETTINGS_PREFIX)) {
       const page = projectPage()
-      const project = projects.data?.find((candidate) => candidate.id === selected.slice(PROJECT_SETTINGS_PREFIX.length))
+      const project = projects.data?.find(
+        (candidate) => candidate.id === selected.slice(PROJECT_SETTINGS_PREFIX.length),
+      )
       const workspace = project && workspaceById(project.workspaceId)
-      return page && project ? { page, category: 'workspaces', name: project.name, project, ...(workspace ? { workspace } : {}) } : undefined
+      return page && project
+        ? { page, category: 'workspaces', name: project.name, project, ...(workspace ? { workspace } : {}) }
+        : undefined
     }
-    const page = railPages().find((candidate) => candidate.id === selected)
-      ?? (activePluginNodeStale() ? settingsRegistry.get(selected) : undefined)
+    const page =
+      railPages().find((candidate) => candidate.id === selected) ??
+      (activePluginNodeStale() ? settingsRegistry.get(selected) : undefined)
     return page ? { page, category: settingsCategoryOf(page), name: page.title ?? page.label } : undefined
   })
 
@@ -225,7 +282,7 @@ export default function SettingsView(props: {
 
   // Every way off a page comes through here: another page, Back to acorn, Escape, the palette and a
   // deep link. A form holding unsaved changes asks its question in this one place rather than in each
-  // of them (./unsavedChanges.ts).
+  // of them (`createUnsavedChanges`).
   const unsaved = createUnsavedChanges()
   const leave = (then: () => void) => {
     // A text field saves on blur, and a field removed from the document never blurs. Blurring it first
@@ -244,7 +301,9 @@ export default function SettingsView(props: {
       goes: "Your changes on this page aren't saved.",
       stays: 'Everything already saved stays as it is.',
       danger: true,
-    }).then((discard) => { if (discard) then() })
+    }).then((discard) => {
+      if (discard) then()
+    })
   }
   // The page a detail page was opened from, so going back from a project returns to Overview when that
   // is where the person came from, rather than always to the project's workspace.
@@ -252,95 +311,168 @@ export default function SettingsView(props: {
   // Counts arrivals, so going to the page already on screen draws it afresh: its rail row, clicked from
   // one of its items, goes back to the list, as every other way onto a page does.
   const [visit, setVisit] = createSignal(0)
-  const go = (asked: Selection, opened?: () => void) => leave(() => {
-    const next = resolveAlias(asked)
-    setStatus('')
-    setCameFrom(selection().page)
-    setSelection(next)
-    setVisit((count) => count + 1)
-    setLanding(next.section ? { section: next.section } : undefined)
-    setPageOpen(true)
-    opened?.()
-  })
+  const go = (asked: Selection, opened?: () => void) =>
+    leave(() => {
+      const next = resolveAlias(asked)
+      setStatus('')
+      setCameFrom(selection().page)
+      setSelection(next)
+      setVisit((count) => count + 1)
+      setLanding(next.section ? { section: next.section } : undefined)
+      setPageOpen(true)
+      opened?.()
+    })
   const close = () => leave(() => props.onClose())
 
   // A request that arrives while settings is open: a palette row, or a deep link from under the layer.
-  createEffect(on(() => props.request, (request) => { if (request.target) go(selectionFrom(request.target)) }, { defer: true }))
+  createEffect(
+    on(
+      () => props.request,
+      (request) => {
+        if (request.target) go(selectionFrom(request.target))
+      },
+      { defer: true },
+    ),
+  )
 
   // A dot for whatever waits on the person. Any attention row that lands on a settings page marks that
   // page: a plugin that failed to start or waits for a decision, a loaded plugin's own rows when it has
-  // no rail source of its own, and a connection whose credential was refused (docs/notifications.md
+  // no rail source of its own, and a connection whose credential was refused (docs/notifications/rows-and-targets.md
   // § What a row points at).
   const inbox = createAttentionInbox()
   const waiting = (key: string): boolean =>
-    inbox().rows.some((row) => row.item.target.kind === 'settings' && parseSettingsTarget(row.item.target.resourceId).pageId === key)
+    inbox().rows.some(
+      (row) => row.item.target.kind === 'settings' && parseSettingsTarget(row.item.target.resourceId).pageId === key,
+    )
 
   // Which workspaces show their projects in the rail. Only while expanded, so a node with thirty
-  // projects is still a short rail (the brief's open decision 2). Opening a workspace's page or one of
+  // projects is still a short rail. Opening a workspace's page or one of
   // its projects expands it; the row's chevron and the arrow keys expand and collapse it.
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set())
-  const setOpen = (workspaceId: string, open: boolean) => setExpanded((set) => {
-    if (set.has(workspaceId) === open) return set
-    const next = new Set(set)
-    if (open) next.add(workspaceId)
-    else next.delete(workspaceId)
-    return next
-  })
-  createEffect(on(() => current()?.workspace?.id, (workspaceId) => { if (workspaceId) setOpen(workspaceId, true) }))
+  const setOpen = (workspaceId: string, open: boolean) =>
+    setExpanded((set) => {
+      if (set.has(workspaceId) === open) return set
+      const next = new Set(set)
+      if (open) next.add(workspaceId)
+      else next.delete(workspaceId)
+      return next
+    })
+  createEffect(
+    on(
+      () => current()?.workspace?.id,
+      (workspaceId) => {
+        if (workspaceId) setOpen(workspaceId, true)
+      },
+    ),
+  )
 
-  const rows = createMemo((): RailRow[] => railPages().flatMap((page) => {
-    const category = settingsCategoryOf(page)
-    const row: RailRow = { key: page.id, label: page.label, category }
-    // Workspaces follow Overview, the one page core files ahead of them, and each open workspace is
-    // followed by its projects.
-    if (category !== 'workspaces' || !workspacePage()) return [row]
-    if (workspaceMode() !== 'on') return [row, ...(workspaceMode() === 'off' && projectPage()
-      ? (projects.data ?? []).map((project): RailRow => ({ key: projectSettingsTarget(project.id), label: project.name, category, depth: 1 }))
-      : [])]
-    return [row, ...(workspaces.data ?? []).flatMap((workspace): RailRow[] => {
-      const members = projectPage() ? (projects.data ?? []).filter((project) => project.workspaceId === workspace.id) : []
-      const open = members.length > 0 && expanded().has(workspace.id)
+  const rows = createMemo((): RailRow[] =>
+    railPages().flatMap((page) => {
+      const category = settingsCategoryOf(page)
+      const row: RailRow = { key: page.id, label: page.label, category }
+      // Workspaces follow Overview, the one page core files ahead of them, and each open workspace is
+      // followed by its projects.
+      if (category !== 'workspaces' || !workspacePage()) return [row]
+      if (workspaceMode() !== 'on')
+        return [
+          row,
+          ...(workspaceMode() === 'off' && projectPage()
+            ? (projects.data ?? []).map((project): RailRow => ({
+                key: projectSettingsTarget(project.id),
+                label: project.name,
+                category,
+                depth: 1,
+              }))
+            : []),
+        ]
       return [
-        {
-          key: workspaceSettingsTarget(workspace.id), label: workspace.name, category, depth: 1, workspaceId: workspace.id,
-          ...(members.length ? { expanded: open } : {}),
-        },
-        ...(open ? members.map((project): RailRow => ({ key: projectSettingsTarget(project.id), label: project.name, category, depth: 2 })) : []),
+        row,
+        ...(workspaces.data ?? []).flatMap((workspace): RailRow[] => {
+          const members = projectPage()
+            ? (projects.data ?? []).filter((project) => project.workspaceId === workspace.id)
+            : []
+          const open = members.length > 0 && expanded().has(workspace.id)
+          return [
+            {
+              key: workspaceSettingsTarget(workspace.id),
+              label: workspace.name,
+              category,
+              depth: 1,
+              workspaceId: workspace.id,
+              ...(members.length ? { expanded: open } : {}),
+            },
+            ...(open
+              ? members.map((project): RailRow => ({
+                  key: projectSettingsTarget(project.id),
+                  label: project.name,
+                  category,
+                  depth: 2,
+                }))
+              : []),
+          ]
+        }),
       ]
-    })]
-  }))
-  // Search reads declarations only (../../host/registries/shell/settingsSearch.ts), plus the names of the
-  // things settings holds a page for. Each name lands on the page that holds it today.
+    }),
+  )
+  // Search reads declarations only (`buildSettingsIndex`), plus the names of the things settings holds a page
+  // for. Each name lands on the page that holds it today.
   const searchObjects = createMemo((): SettingsSearchObject[] => {
     const pageFor = (id: string) => railPages().find((page) => page.id === id)
-    const on = (id: string, names: readonly (string | { name: string; keywords: readonly string[] })[]): SettingsSearchObject[] => {
+    const on = (
+      id: string,
+      names: readonly (string | { name: string; keywords: readonly string[] })[],
+    ): SettingsSearchObject[] => {
       const page = pageFor(id)
       if (!page) return []
-      const at = { page: id, pageLabel: page.title ?? page.label, group: categoryLabel(settingsCategoryOf(page)), scope: settingsScopeOf(page) }
+      const at = {
+        page: id,
+        pageLabel: page.title ?? page.label,
+        group: categoryLabel(settingsCategoryOf(page)),
+        scope: settingsScopeOf(page),
+      }
       return names.map((name) => ({ ...at, ...(typeof name === 'string' ? { name } : name) }))
     }
     const group = categoryLabel('workspaces')
     // Every workspace and every project is a page of its own, whether or not the rail has it expanded,
     // so search finds a project's name and its sections inside a collapsed workspace too.
     return [
-      ...(workspaceMode() === 'on' && workspacePage() ? (workspaces.data ?? []) : []).map((workspace): SettingsSearchObject => ({
-        name: workspace.name, page: workspaceSettingsTarget(workspace.id), pageLabel: workspace.name,
-        group, scope: 'workspace', isPage: true, sections: workspacePage()?.sections ?? [],
-      })),
+      ...(workspaceMode() === 'on' && workspacePage() ? (workspaces.data ?? []) : []).map(
+        (workspace): SettingsSearchObject => ({
+          name: workspace.name,
+          page: workspaceSettingsTarget(workspace.id),
+          pageLabel: workspace.name,
+          group,
+          scope: 'workspace',
+          isPage: true,
+          sections: workspacePage()?.sections ?? [],
+        }),
+      ),
       ...(projectPage() ? (projects.data ?? []) : []).map((project): SettingsSearchObject => ({
-        name: project.name, page: projectSettingsTarget(project.id), pageLabel: project.name,
-        group, scope: 'project', isPage: true,
+        name: project.name,
+        page: projectSettingsTarget(project.id),
+        pageLabel: project.name,
+        group,
+        scope: 'project',
+        isPage: true,
         sections: projectPage()?.sections ?? [],
       })),
       // A connection's name opens its own page, on Services or AI models, whichever lists it.
       ...(integrations.data?.integrations ?? []).flatMap((connection) => {
         const provider = integrations.data?.providers.find((candidate) => candidate.id === connection.providerId)
-        return on(connectionPageOf(provider), [connectionName(connection)])
-          .map((object) => ({ ...object, open: (navigate: SettingsNavigate) => openConnectionPage(navigate, connection, provider) }))
+        return on(connectionPageOf(provider), [connectionName(connection)]).map((object) => ({
+          ...object,
+          open: (navigate: SettingsNavigate) => openConnectionPage(navigate, connection, provider),
+        }))
       }),
-      ...on('nodes', nodes().map((node) => node.label)),
+      ...on(
+        'nodes',
+        nodes().map((node) => node.label),
+      ),
       // A plugin shows its name, and its id still finds it: "http" lands on API requests.
-      ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] }))),
+      ...on(
+        'plugins',
+        (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] })),
+      ),
     ]
   })
   const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects(), categoryLabel))
@@ -348,12 +480,17 @@ export default function SettingsView(props: {
   // with the same words. The section's lands deeper, so it is the one kept.
   const matches = createMemo(() => {
     const found = searchSettings(index(), query())
-    const echoed = new Set(found.filter((result) => result.section && result.sectionLabel === result.pageLabel).map((result) => result.page))
+    const echoed = new Set(
+      found.filter((result) => result.section && result.sectionLabel === result.pageLabel).map((result) => result.page),
+    )
     return found.filter((result) => result.section || result.sectionLabel || !echoed.has(result.page))
   })
   const groups = createMemo(() =>
-    SETTINGS_CATEGORIES.map((category) => ({ category, rows: rows().filter((row) => row.category === category) }))
-      .filter((group) => group.rows.length))
+    SETTINGS_CATEGORIES.map((category) => ({
+      category,
+      rows: rows().filter((row) => row.category === category),
+    })).filter((group) => group.rows.length),
+  )
 
   const openResult = (result: SettingsSearchResult) => {
     if (result.open) return result.open(context.navigate)
@@ -369,9 +506,18 @@ export default function SettingsView(props: {
   createEffect(() => {
     const nodeId = pageNode()
     const selected = selection()
-    props.onLinkPlace?.(nodeId && current() ? {
-      nodeId, place: { kind: 'settings', pageId: selected.page, ...(selected.section ? { sectionId: selected.section } : {}) },
-    } : null)
+    props.onLinkPlace?.(
+      nodeId && current()
+        ? {
+            nodeId,
+            place: {
+              kind: 'settings',
+              pageId: selected.page,
+              ...(selected.section ? { sectionId: selected.section } : {}),
+            },
+          }
+        : null,
+    )
   })
 
   const context: SettingsPageContext = {
@@ -390,7 +536,7 @@ export default function SettingsView(props: {
     },
   }
 
-  // A page's own detail, such as one custom agent open from the list (./settingsDetail.ts). The header
+  // A page's own detail, such as one custom agent open from the list (`createDetailRequest`). The header
   // names it and goes back to the page's list.
   const details = createSettingsDetails()
   const detail = () => (current() ? details.current() : undefined)
@@ -422,11 +568,16 @@ export default function SettingsView(props: {
     if (!resolved) return []
     const overview = overviewPage()
     const group: Crumb = { label: categoryLabel(resolved.category) }
-    if (overview && (resolved.workspace || resolved.project)) Object.assign(group, { to: overview.label, run: () => go({ page: overview.id }) })
+    if (overview && (resolved.workspace || resolved.project))
+      Object.assign(group, { to: overview.label, run: () => go({ page: overview.id }) })
     const steps = [group]
     const workspace = resolved.workspace
     if (workspaceMode() === 'on' && resolved.project && workspace) {
-      steps.push({ label: workspace.name, to: workspace.name, run: () => go({ page: workspaceSettingsTarget(workspace.id) }) })
+      steps.push({
+        label: workspace.name,
+        to: workspace.name,
+        run: () => go({ page: workspaceSettingsTarget(workspace.id) }),
+      })
     }
     const open = detail()
     if (open) steps.push({ label: resolved.name, to: open.backLabel?.() ?? resolved.name, run: () => leave(open.back) })
@@ -434,7 +585,7 @@ export default function SettingsView(props: {
   })
 
   // The plugin that contributed the page on screen, if one did. Its strip is drawn by this view, above
-  // and outside the box the page's own content sits in (./plugins/PluginStrip.tsx).
+  // and outside the box the page's own content sits in (`PluginStrip`).
   const pluginOwner = () => {
     const page = current()?.page
     return page ? settingsRegistry.ownerOf(page.id) : undefined
@@ -525,7 +676,9 @@ export default function SettingsView(props: {
         </span>
       </Show>
       <span class="settings-rail-label">{row().label}</span>
-      <Show when={waiting(row().key)}><StatusDot tone="warn" label="Needs you" /></Show>
+      <Show when={waiting(row().key)}>
+        <StatusDot tone="warn" label="Needs you" />
+      </Show>
     </button>
   )
 
@@ -555,7 +708,9 @@ export default function SettingsView(props: {
     return (
       <>
         <Badge>{resolved.project ? 'Project' : 'Workspace'}</Badge>
-        <Show when={nodes().length > 1}><Badge>Node: {nodeLabel(activeNodeId())}</Badge></Show>
+        <Show when={nodes().length > 1}>
+          <Badge>Node: {nodeLabel(activeNodeId())}</Badge>
+        </Show>
       </>
     )
   }
@@ -565,7 +720,7 @@ export default function SettingsView(props: {
       ref={root}
       class="settings-view"
       // Focusable, so a confirmation that closes over a page whose button went away can hand the focus
-      // back to the layer and Escape and ⌘[ still work (../../host/registries/shell/willPhase.tsx).
+      // back to the layer and Escape and ⌘[ still work (`confirmAction`).
       tabindex="-1"
       role="dialog"
       aria-modal="true"
@@ -588,9 +743,13 @@ export default function SettingsView(props: {
       }}
     >
       <nav class="settings-rail" aria-label="Settings pages">
-        <Button variant="ghost" size="sm" onPress={close}><Icon name="arrow-left" /> Back to acorn</Button>
+        <Button variant="ghost" size="sm" onPress={close}>
+          <Icon name="arrow-left" /> Back to acorn
+        </Button>
         <Input
-          ref={(element) => { search = element }}
+          ref={(element) => {
+            search = element
+          }}
           type="search"
           kind="filter"
           size="sm"
@@ -599,7 +758,10 @@ export default function SettingsView(props: {
           assist={false}
           value={query()}
           onInput={setQuery}
-          onSubmit={() => { const first = matches()[0]; if (first) openResult(first) }}
+          onSubmit={() => {
+            const first = matches()[0]
+            if (first) openResult(first)
+          }}
           onKeyDown={(event) => {
             if (event.key !== 'ArrowDown') return
             event.preventDefault()
@@ -613,7 +775,9 @@ export default function SettingsView(props: {
               <Index each={groups()}>
                 {(group) => (
                   <div class="settings-rail-group" role="group" aria-label={categoryLabel(group().category)}>
-                    <div class="settings-rail-heading" aria-hidden="true">{categoryLabel(group().category)}</div>
+                    <div class="settings-rail-heading" aria-hidden="true">
+                      {categoryLabel(group().category)}
+                    </div>
                     <Index each={group().rows}>{railItem}</Index>
                   </div>
                 )}
@@ -622,7 +786,13 @@ export default function SettingsView(props: {
           >
             <Show
               when={matches().length}
-              fallback={<div class="settings-rail-empty"><EmptyState align="start" size="sm">No settings match "{query().trim()}".</EmptyState></div>}
+              fallback={
+                <div class="settings-rail-empty">
+                  <EmptyState align="start" size="sm">
+                    No settings match "{query().trim()}".
+                  </EmptyState>
+                </div>
+              }
             >
               <Index each={matches()}>
                 {(result) => {
@@ -660,13 +830,17 @@ export default function SettingsView(props: {
               <header class="settings-header">
                 <div class="settings-heading-text">
                   <div class="settings-back-to-rail">
-                    <Button variant="ghost" size="sm" onPress={() => setPageOpen(false)}><Icon name="chevron-left" /> Settings</Button>
+                    <Button variant="ghost" size="sm" onPress={() => setPageOpen(false)}>
+                      <Icon name="chevron-left" /> Settings
+                    </Button>
                   </div>
                   <nav class="settings-breadcrumb" aria-label="Breadcrumb">
                     <Index each={crumbs()}>
                       {(crumb, at) => (
                         <>
-                          <Show when={at > 0}><span aria-hidden="true"> › </span></Show>
+                          <Show when={at > 0}>
+                            <span aria-hidden="true"> › </span>
+                          </Show>
                           <Show when={crumb().run} fallback={crumb().label}>
                             {(run) => (
                               <button
@@ -700,12 +874,24 @@ export default function SettingsView(props: {
                   outside the box that holds the page, so nothing the plugin draws can sit on it. */}
               {/* Keyed, so one plugin's failed switch is not still said on the next plugin's page. */}
               <Show when={pluginOwner()} keyed>
-                {(owner) => <PluginStrip pluginId={owner} railSources={resolved().page.railSourceVisibility} navigate={context.navigate} />}
+                {(owner) => (
+                  <PluginStrip
+                    pluginId={owner}
+                    railSources={resolved().page.railSourceVisibility}
+                    navigate={context.navigate}
+                  />
+                )}
               </Show>
               <div class="settings-body" data-plugin={pluginOwner() ? '' : undefined}>
                 <div ref={pageElement} class="settings-page">
                   {/* A plain wrapper carries the live region, so the line is announced when it appears. */}
-                  <Show when={status()}><div role="status"><Text emphasis="muted" wrap>{status()}</Text></div></Show>
+                  <Show when={status()}>
+                    <div role="status">
+                      <Text emphasis="muted" wrap>
+                        {status()}
+                      </Text>
+                    </div>
+                  </Show>
                   {/* Its own boundary, so a page's lazy chunk holds only the page and not the rail. One
                       per page, inside the keyed Show: a boundary that has drawn never shows its
                       placeholder again (patches/README.md), so a shared one left the next page blank
@@ -714,7 +900,10 @@ export default function SettingsView(props: {
                     {(_key) => {
                       const page = untrack(() => resolved().page)
                       return (
-                        <ContributionBoundary contributionId={`settings:${page.id}`} owner={settingsRegistry.ownerOf(page.id)}>
+                        <ContributionBoundary
+                          contributionId={`settings:${page.id}`}
+                          owner={settingsRegistry.ownerOf(page.id)}
+                        >
                           <Suspense fallback={<RegionLoading label={page.label} />}>
                             <UnsavedChangesContext.Provider value={unsaved}>
                               <SettingsDetailContext.Provider value={details}>

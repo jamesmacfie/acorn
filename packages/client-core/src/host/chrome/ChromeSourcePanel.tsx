@@ -33,18 +33,11 @@ const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'da
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
 // (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
-// Two components rather than one, registered as the `regions` half of `SourceContribution`
-// (../registries/sources/sources.ts). This used to be a single component drawing `<main class="panes">`
-// with a `.pane pane-left` and a `.pane pane-right`, which meant Linear, Rollbar and HTTP were the
-// only browse sources not on `ListDetail`: two inset cards with a gap where GitHub and Workflows had
-// one surface and a divider, no resize handle, and no collapse. The comment on the detail half below
-// already called this "master/detail like every other Source browse" — the markup was the thing that
-// disagreed.
-//
-// Splitting it costs nothing, because the two halves never shared state. Which row is selected is the
-// URL (`decodeProjectSurfaceItem` below), which is why a row click, a pasted link and the back button
-// are one thing here. The terminal host already supplied two halves for these sources
-// (apps/tui/src/plugins/SourcePanel.tsx); this is the desktop catching up.
+// Two components, registered as the `regions` half of `SourceContribution`, so a descriptor source
+// draws on `ListDetail` like every other browse source: one surface, a divider, a resize handle and
+// collapse. The two halves share no state. Which row is selected is the URL
+// (`decodeProjectSurfaceItem` below), which is why a row click, a pasted link and the back button are
+// one thing here.
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
@@ -53,7 +46,14 @@ export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourc
 // contributes the plugin's message and its action, and shared CSS owns the geometry.
 function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
   return (
-    <Show when={props.empty} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
+    <Show
+      when={props.empty}
+      fallback={
+        <EmptyState align="start" size="sm">
+          Nothing to show.
+        </EmptyState>
+      }
+    >
       {(empty) => (
         <EmptyState
           align="start"
@@ -61,7 +61,9 @@ function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSo
           action={
             <Show when={empty().action}>
               {(action) => (
-                <Button onPress={() => void runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
+                <Button
+                  onPress={() => void runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}
+                >
                   {empty().actionLabel ?? 'Open'}
                 </Button>
               )}
@@ -81,7 +83,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const params = useParams()
   const queryClient = useQueryClient()
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
-  // sits under, which remounts it. Same reasoning as plugins/frames/register.ts.
+  // sits under, which remounts it. Frames capture their node the same way (`mountedFrameNode`).
   const nodeId = activeNodeId() ?? ''
   const collapsed = sidebarCollapsed(props.descriptor.id)
 
@@ -97,16 +99,12 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   // project, so carrying the project would split one cache entry into one per project and refetch the
   // identical list on every project switch. The `navigate` verb below still gets the project, because
   // that addresses a surface at `/p/:projectId/x/…` whether or not the rail cares.
-  const projectId = () => props.descriptor.projectScoped ? params.projectId : undefined
+  const projectId = () => (props.descriptor.projectScoped ? params.projectId : undefined)
   const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
   const [result, { refetch }] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
-    (node, { projectId }, signal) => readRailItems(
-      props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items!, projectId),
-      node,
-      signal,
-    ),
+    (node, { projectId }, signal) =>
+      readRailItems(props.pluginId, scopedSourceItemsPath(props.descriptor.items!, projectId), node, signal),
     scope,
     { nodeIds: [nodeId] },
   )
@@ -124,7 +122,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
     nodeId,
     descriptor: () => props.descriptor,
     projectId,
-    text: () => collapsed() ? '' : filter(),
+    text: () => (collapsed() ? '' : filter()),
     loaded: allItems,
   })
   const items = search.items
@@ -144,7 +142,9 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const workspace = () => workspaceForProject(workspaces.data, params.projectId)
   const attachTasks = () => {
     const projectIds = new Set(workspace()?.projects.map((project) => project.id) ?? [])
-    return (tasks.data ?? []).filter((task) => task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)))
+    return (tasks.data ?? []).filter(
+      (task) => task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)),
+    )
   }
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
 
@@ -215,15 +215,16 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const select = (item: PluginRailItem): void => {
     // Discarded on purpose: a rail row has already had any refusal as a toast, and only the palette
     // reads the answer back (./actions.ts).
-    if (props.descriptor.onSelect) void runChromeAction(props.descriptor.onSelect, {
-      pluginId: props.pluginId,
-      nodeId,
-      item,
-      promote: setPromoteItem,
-      // Only the `navigate` verb reads these two, and a rail panel is the one caller that has them.
-      ...(params.projectId ? { projectId: params.projectId } : {}),
-      navigate,
-    })
+    if (props.descriptor.onSelect)
+      void runChromeAction(props.descriptor.onSelect, {
+        pluginId: props.pluginId,
+        nodeId,
+        item,
+        promote: setPromoteItem,
+        // Only the `navigate` verb reads these two, and a rail panel is the one caller that has them.
+        ...(params.projectId ? { projectId: params.projectId } : {}),
+        navigate,
+      })
   }
 
   // The selection, read back out of the URL rather than held here. A project-scoped surface has no
@@ -259,9 +260,11 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
         {/* No count until the list answers: a 0 while loading claims an empty list. */}
         <SectionHeader
           count={row() ? items().length : undefined}
-          actions={(
+          actions={
             <>
-              <Show when={row() && row()!.freshness !== 'live'}><span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span></Show>
+              <Show when={row() && row()!.freshness !== 'live'}>
+                <span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span>
+              </Show>
               <IconButton
                 icon="refresh-cw"
                 tip={`Refresh ${props.descriptor.label}`}
@@ -270,7 +273,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
                 onPress={() => void refresh()}
               />
             </>
-          )}
+          }
         >
           {props.descriptor.label}
         </SectionHeader>
@@ -287,7 +290,11 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
         </FilterBar>
         {/* Only beside rows. With none, the empty state below says the same thing in its place. */}
         <Show when={items().length ? sourceSearchNotice(search) : undefined}>
-          {(notice) => <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>{notice()}</EmptyState>}
+          {(notice) => (
+            <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>
+              {notice()}
+            </EmptyState>
+          )}
         </Show>
       </Show>
 
@@ -299,13 +306,15 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
         {(entry) => (
           <Show
             when={!collapsed()}
-            fallback={(
+            fallback={
               <Inline>
                 <Icon name="triangle-alert" tone="warn" title={`Couldn't reach ${entry().label}. ${entry().reason}`} />
               </Inline>
-            )}
+            }
           >
-            <Alert variant="banner" tone="warn">Couldn't reach {entry().label}. {entry().reason}</Alert>
+            <Alert variant="banner" tone="warn">
+              Couldn't reach {entry().label}. {entry().reason}
+            </Alert>
           </Show>
         )}
       </Show>
@@ -314,72 +323,80 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
           clipped at the column edge. Same shape as the kit's `.ui-rows-scroll` and docker's
           `.docker-list`. */}
       <div class="scroll">
-          <Show
-            when={row()}
-            fallback={(
-              <Show when={!collapsed()}>
-                <EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>
-              </Show>
-            )}
-          >
-            {/* The authored empty state, or the fixed string for a source that declares none. Renders
+        <Show
+          when={row()}
+          fallback={
+            <Show when={!collapsed()}>
+              <EmptyState align="start" busy={!unavailable()}>
+                {unavailable() ? 'No cached items.' : 'Loading…'}
+              </EmptyState>
+            </Show>
+          }
+        >
+          {/* The authored empty state, or the fixed string for a source that declares none. Renders
                 only under `row()`, meaning the plugin's route answered with nothing. An unreachable node
                 is the banner above, because "nothing is assigned to you" is a claim the host cannot make
                 on a failed fetch. A search with no rows says where it stands instead, because the
                 source's sentence would claim there is nothing at all. */}
-            <For
-              each={items()}
-              fallback={(
-                <Show when={!collapsed()}>
-                  <Show
-                    when={search.status() !== 'idle'}
-                    fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}
-                  >
-                    <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>{sourceSearchEmpty(search.status())}</EmptyState>
-                  </Show>
+          <For
+            each={items()}
+            fallback={
+              <Show when={!collapsed()}>
+                <Show
+                  when={search.status() !== 'idle'}
+                  fallback={
+                    <SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />
+                  }
+                >
+                  <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>
+                    {sourceSearchEmpty(search.status())}
+                  </EmptyState>
                 </Show>
-              )}
-            >
-              {(item) => (
-                <Row
-                  onPress={props.descriptor.onSelect ? () => select(item) : undefined}
-                  selected={item.id === detailItem()}
-                  collapsed={collapsed() ? railMark(item) : undefined}
-                  leading={<Show when={item.icon}>{(name) => <Icon name={name()} tone={iconTone(item.severity)} />}</Show>}
-                  meta={(
-                    <Show
-                      when={item.fields?.length}
-                      fallback={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
-                    >
-                      <For each={item.fields}>{(field) => <span class="ui-row-field muted">{field}</span>}</For>
-                    </Show>
-                  )}
-                  metaFields={item.fields?.length}
-                  metaFirst={item.fieldsFirst}
-                  trailing={(
-                    <>
-                      <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
-                      {/* Row-level actions behind the shared overflow menu, drawn from the
+              </Show>
+            }
+          >
+            {(item) => (
+              <Row
+                onPress={props.descriptor.onSelect ? () => select(item) : undefined}
+                selected={item.id === detailItem()}
+                collapsed={collapsed() ? railMark(item) : undefined}
+                leading={
+                  <Show when={item.icon}>{(name) => <Icon name={name()} tone={iconTone(item.severity)} />}</Show>
+                }
+                meta={
+                  <Show
+                    when={item.fields?.length}
+                    fallback={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
+                  >
+                    <For each={item.fields}>{(field) => <span class="ui-row-field muted">{field}</span>}</For>
+                  </Show>
+                }
+                metaFields={item.fields?.length}
+                metaFirst={item.fieldsFirst}
+                trailing={
+                  <>
+                    <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
+                    {/* Row-level actions behind the shared overflow menu, drawn from the
                           context-menu registry: core's "Create task…" above, the workflows plugin's
                           "Start workflow…" beside it, and a loaded plugin's `item.row` row after
                           those. No menu at all when nothing offers a row. */}
-                      <Show when={contextMenuItems('item.row', rowTarget(item)).length}>
-                        <RowActions ariaLabel={`Actions for ${item.title}`}>
-                          {(menu) => <ContextMenuItems context={menu} location="item.row" target={rowTarget(item)} />}
-                        </RowActions>
-                      </Show>
-                    </>
-                  )}
-                  title={item.title}
-                  tip={item.title}
-                  label={item.title}
-                >
-                  {item.title}
-                </Row>
-              )}
-            </For>
-          </Show>
-        </div>
+                    <Show when={contextMenuItems('item.row', rowTarget(item)).length}>
+                      <RowActions ariaLabel={`Actions for ${item.title}`}>
+                        {(menu) => <ContextMenuItems context={menu} location="item.row" target={rowTarget(item)} />}
+                      </RowActions>
+                    </Show>
+                  </>
+                }
+                title={item.title}
+                tip={item.title}
+                label={item.title}
+              >
+                {item.title}
+              </Row>
+            )}
+          </For>
+        </Show>
+      </div>
       <Show when={promoteItem()}>
         {(item) => (
           <PromoteToTaskModal
@@ -388,7 +405,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             headerLabel="Create task"
             itemTitle={item().title}
             attachTasks={attachTasks()}
-            existingBranches={(tasks.data ?? []).flatMap((task) => task.branch ? [task.branch] : [])}
+            existingBranches={(tasks.data ?? []).flatMap((task) => (task.branch ? [task.branch] : []))}
             onClose={() => setPromoteItem(null)}
             onCreated={afterPromote}
             onAttached={afterPromote}
@@ -412,17 +429,19 @@ export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
   }
 
   return (
-    <Show when={props.descriptor.panels} fallback={(
-      <Show when={surface()}>
-        {(found) => (
-          <Dynamic
-            component={found().component}
-            projectId={params.projectId ?? ''}
-            item={decodeProjectSurfaceItem(params[found().item])}
-          />
-        )}
-      </Show>
-    )}
+    <Show
+      when={props.descriptor.panels}
+      fallback={
+        <Show when={surface()}>
+          {(found) => (
+            <Dynamic
+              component={found().component}
+              projectId={params.projectId ?? ''}
+              item={decodeProjectSurfaceItem(params[found().item])}
+            />
+          )}
+        </Show>
+      }
     >
       {/* The user's own dashboard, beside this source's list (docs/dashboards/placements.md § Placements). Only
           one of the two can be present: the manifest refuses a source that both reserves a region and

@@ -5,17 +5,25 @@
 // Why it exists. The facade's real half is a grammar per language and a stylesheet built from CSS
 // custom properties, and neither means anything in cells: this host's `editor` rectangle draws the
 // file read-only and hands the reader's own `$EDITOR` a PTY when they want to type (./rectangle.tsx,
-// docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, `EditorPane.tsx` reached the real
-// module and the terminal client carried seventeen CodeMirror grammars and a colour theme it has no
+// docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, the editor pane reaches the
+// real module and the terminal client carries every CodeMirror grammar and a colour theme it has no
 // way to draw.
 //
-// A module rather than an empty alias, with the facade's names and the facade's types, so
-// `EditorPane.tsx` compiles and runs unchanged and this host loses no feature. The CodeMirror types
-// are type-only imports and are erased, so nothing below puts a byte of the library in the bundle.
+// A module rather than an empty alias, with the facade's names and the facade's types, so the
+// editor pane's controller (`editorController.ts`) compiles and runs unchanged and this host loses no
+// feature. The CodeMirror types are type-only imports and are erased, so nothing below puts a byte
+// of the library in the bundle.
 //
 // Graphical engine imports and state construction belong to the DOM Rectangle's mount.
 // The terminal host retains the shared text custody API without importing grammars or views.
-export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
+export {
+  documentCustody,
+  recoverDocumentCustody,
+  fileDocumentCustodies,
+  reserveDocumentDestinations,
+  reserveFileSourceCustodies,
+  type DocumentCustody,
+} from '@acorn/client-core/features/editor/documentCustody.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
@@ -33,7 +41,7 @@ export const languageForPath = (_path: string): Promise<Extension> => Promise.re
  *  can make the same guard decision without importing the DOM host's grammar table. */
 export const shouldHighlightDocument = (_characters: number): boolean => false
 
-/** The palette is already the terminal's: OpenTUI paints from the same theme tokens the rest of this
+/** The palette is already the terminal's: paint draws from the same theme tokens the rest of this
  *  host reads (./roles.ts), and there is no second stylesheet to hand a colour list to. */
 export const editorTheme = (): Extension => []
 
@@ -44,19 +52,22 @@ export const editorSearch = (): Extension => []
 export const openReplacePanel = (_view: EditorView): boolean => false
 
 import type { LanguageServiceSource } from '@acorn/client-core/features/editor'
-export type { LanguageServiceSource }
 /** No tooltip or underline to draw in cells. The terminal asks the same routes through explicit
  *  commands instead (../plugins/DocumentSurface.tsx, Editor's own Diagnostics button). */
 export const languageServices = (_source: LanguageServiceSource): Extension => []
 /** Never dispatched here, because this host builds no view to dispatch to. Typed as the real effect
- *  so `EditorPane.tsx` compiles unchanged, with no CodeMirror byte behind it. */
-export const refreshLanguageServices = { of: () => ({}) } as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
+ *  so `editorController.ts` compiles unchanged, with no CodeMirror byte behind it. */
+export const refreshLanguageServices = {
+  of: () => ({}),
+} as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
 
 export const refreshEditorTheme = (_view: EditorView): void => {}
 
 /** A watcher that has nothing to watch. It still returns the stop function, because the caller stores
  *  it and calls it on cleanup. */
-export const watchEditorTheme = (_view: EditorView): (() => void) => () => {}
+export const watchEditorTheme =
+  (_view: EditorView): (() => void) =>
+  () => {}
 
 export const captureViewState = (_view: EditorView): EditorViewState => ({ anchor: 0, head: 0, scrollTop: 0 })
 

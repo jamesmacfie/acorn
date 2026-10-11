@@ -6,9 +6,8 @@
 // clicks a roster row.
 //
 // A contract file rather than client/, because `client/terminalClient.ts` is the client's full PTY
-// surface (eight verbs including `write`, `attach`, `kill` and `resize`) and importing it was the whole
-// agents-to-terminal coupling edge. A consumer that wants to open a session shouldn't thereby get the
-// ability to type into every session on the node.
+// surface (including `write`, `attach`, `kill` and `resize`). A consumer that wants to open a session
+// shouldn't thereby get the ability to type into every session on the node.
 //
 // Only `create` and `list`. Streams, input, teardown and profile enumeration stay terminal's own: a
 // plugin that needs those is describing a slot, not a capability.
@@ -30,7 +29,9 @@ export type TerminalSessionsClient = {
 const createdListeners = new Set<(session: TerminalSession, nodeId: string) => void>()
 export function onTerminalSessionCreated(listener: (session: TerminalSession, nodeId: string) => void): () => void {
   createdListeners.add(listener)
-  return () => { createdListeners.delete(listener) }
+  return () => {
+    createdListeners.delete(listener)
+  }
 }
 
 export const terminalSessions: TerminalSessionsClient = {

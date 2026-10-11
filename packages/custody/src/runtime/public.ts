@@ -1,5 +1,5 @@
 export { helperMark } from '../bootMarks.ts'
-export { createHelper } from '../index.ts'
-export type { Helper } from '../index.ts'
+export { createHelper } from '../helper.ts'
+export type { Helper } from '../helper.ts'
 export { nodeKeyCustody } from '../custody/nodeKeys.ts'
 export { serviceEnvironment } from '../supervision/serviceHost.ts'

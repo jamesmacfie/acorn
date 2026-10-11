@@ -3,7 +3,6 @@
 // A layout region is a focus group (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing, on focus as a property of
 // the tree). `nextRegion` cycles the groups inside one pane, `nextPane` cycles the panes of the task
 // row, and each group remembers the node focus was last on so coming back lands where you left.
-// This generalises the single `focusedPane` per task to every region of every pane.
 //
 // It is also the app's one emit point for `runtime:focus-changed`, whose contract lives beside this
 // focus model in docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing. The event is renderer-local
@@ -31,11 +30,9 @@ export const focusedRegion = (): RegionRef | null => focused()
 /** Document order, so the chords walk the layout the way it is drawn rather than the order regions
  *  happened to mount in. Recomputed per call: the list is one entry per visible region. */
 const ordered = (): Group[] =>
-  [...groups].sort((a, b) =>
-    a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-  )
+  [...groups].sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
 
-export function registerRegion(element: HTMLElement, ref: RegionRef): () => void {
+function registerRegion(element: HTMLElement, ref: RegionRef): () => void {
   const group: Group = { ...ref, element }
   groups.push(group)
   return () => {
@@ -45,7 +42,7 @@ export function registerRegion(element: HTMLElement, ref: RegionRef): () => void
 }
 
 /** Called when focus lands inside a region. Idempotent, because focusin fires for every node. */
-export function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
+function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
   const group = groups.find((candidate) => candidate.paneId === ref.paneId && candidate.regionId === ref.regionId)
   if (group && node) group.last = node
   const current = focused()
@@ -58,8 +55,9 @@ export function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
 
 /** The first thing inside a region a keyboard can reach, for a group with nothing remembered. */
 const firstStop = (element: HTMLElement): HTMLElement | undefined =>
-  element.querySelector<HTMLElement>('[tabindex]:not([tabindex="-1"]), button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
-  ?? undefined
+  element.querySelector<HTMLElement>(
+    '[tabindex]:not([tabindex="-1"]), button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
+  ) ?? undefined
 
 function enter(group: Group | undefined): boolean {
   if (!group) return false
@@ -77,7 +75,7 @@ export function moveRegion(delta: 1 | -1): boolean {
   const inPane = ordered().filter((group) => group.paneId === (current?.paneId ?? ordered()[0]?.paneId))
   if (inPane.length < 2) return false
   const at = inPane.findIndex((group) => group.regionId === current?.regionId)
-  return enter(inPane[(((at < 0 ? 0 : at) + delta) + inPane.length) % inPane.length])
+  return enter(inPane[((at < 0 ? 0 : at) + delta + inPane.length) % inPane.length])
 }
 
 /** Move to the next or previous pane in the task row, landing on whatever it last had focused. */
@@ -86,7 +84,7 @@ export function movePane(delta: 1 | -1): boolean {
   for (const group of ordered()) if (!panes.includes(group.paneId)) panes.push(group.paneId)
   if (panes.length < 2) return false
   const at = panes.indexOf(focused()?.paneId ?? '')
-  const paneId = panes[(((at < 0 ? 0 : at) + delta) + panes.length) % panes.length]
+  const paneId = panes[((at < 0 ? 0 : at) + delta + panes.length) % panes.length]
   return enter(ordered().find((group) => group.paneId === paneId))
 }
 

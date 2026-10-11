@@ -11,32 +11,48 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('../../host/registries/commands/clientEvents', () => ({ clientEvents: { emit: mocks.emit } }))
 vi.mock('../../features/notifications/notifications', async (importOriginal) => ({
-  ...await importOriginal<object>(),
+  ...(await importOriginal<object>()),
   pushBackgroundError: mocks.pushBackgroundError,
 }))
 vi.mock('../../features/settings/savePref', () => ({ savePref: mocks.savePref }))
 
 import { createAppStartupRestore } from './appStartup'
-import { hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId, workspaceHistory } from '../../features/workspaces/lastWorkspace'
+import {
+  hydrateWorkspaceHistory,
+  noteWorkspaceVisit,
+  previousWorkspaceId,
+  workspaceHistory,
+} from '../../features/workspaces/lastWorkspace'
 
 const TASK = { id: 'task-1', projectId: 'project-1', title: 'A task' } as Task
 const PROJECT = { id: 'project-1', name: 'A project' } as Project
-const WORKSPACE = { id: 'workspace-2', name: 'Two', isDefault: false, sort: 0, projects: [{ id: 'project-1', name: 'A project', sort: 0 }] } as Workspace
+const WORKSPACE = {
+  id: 'workspace-2',
+  name: 'Two',
+  isDefault: false,
+  sort: 0,
+  projects: [{ id: 'project-1', name: 'A project', sort: 0 }],
+} as Workspace
 
 // A whole boot, minus the parts a restore never reads.
-const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | undefined, contributionsReady = () => true) => createRoot((dispose) => ({
-  dispose,
-  ...createAppStartupRestore({
-    queryClient: new QueryClient(),
-    prefs: () => prefs,
-    prefsSettled: () => true,
-    cacheRestoring: () => false,
-    contributionsReady,
-    projects: () => [PROJECT],
-    tasks: () => [TASK],
-    workspaces,
-  }),
-}))
+const boot = (
+  prefs: Record<string, string>,
+  workspaces: () => Workspace[] | undefined,
+  contributionsReady = () => true,
+) =>
+  createRoot((dispose) => ({
+    dispose,
+    ...createAppStartupRestore({
+      queryClient: new QueryClient(),
+      prefs: () => prefs,
+      prefsSettled: () => true,
+      cacheRestoring: () => false,
+      contributionsReady,
+      projects: () => [PROJECT],
+      tasks: () => [TASK],
+      workspaces,
+    }),
+  }))
 
 // Which workspace to reopen. App.tsx opens it once the pass is done, so this only has to hand the
 // saved id over, and not before the workspaces it names are known.
@@ -74,11 +90,14 @@ describe('launch workspace restore', () => {
   })
 
   it('restores the visit order before reopening the workspace', () => {
-    const startup = boot({
-      last_workspace: 'workspace-2',
-      // The pair saved before the order was a list still reads.
-      workspace_history: JSON.stringify({ current: 'workspace-2', previous: 'workspace-1' }),
-    }, () => [WORKSPACE])
+    const startup = boot(
+      {
+        last_workspace: 'workspace-2',
+        // The pair saved before the order was a list still reads.
+        workspace_history: JSON.stringify({ current: 'workspace-2', previous: 'workspace-1' }),
+      },
+      () => [WORKSPACE],
+    )
 
     expect(startup.restored()).toBe(true)
     expect(workspaceHistory()).toEqual({ recent: ['workspace-2', 'workspace-1'] })
@@ -97,15 +116,19 @@ describe('launch workspace restore', () => {
   it('saves the new order after a workspace switch', () => {
     vi.useFakeTimers()
     try {
-      const startup = boot({
-        last_workspace: 'workspace-2',
-        workspace_history: JSON.stringify({ recent: ['workspace-2', 'workspace-1'] }),
-      }, () => [WORKSPACE])
+      const startup = boot(
+        {
+          last_workspace: 'workspace-2',
+          workspace_history: JSON.stringify({ recent: ['workspace-2', 'workspace-1'] }),
+        },
+        () => [WORKSPACE],
+      )
 
       noteWorkspaceVisit('workspace-1')
       vi.advanceTimersByTime(500)
       expect(mocks.savePref).toHaveBeenCalledWith(
-        expect.any(QueryClient), 'workspace_history',
+        expect.any(QueryClient),
+        'workspace_history',
         JSON.stringify({ recent: ['workspace-1', 'workspace-2'] }),
         { surfaceFailure: true },
       )

@@ -23,14 +23,9 @@ import {
 // and everything else still draws.
 
 /** Why a contribution did not make it into the tree. */
-export type CommandGraphIssue =
-  | 'duplicate-id'
-  | 'missing-parent'
-  | 'parent-not-group'
-  | 'cross-owner-parent'
-  | 'cycle'
+export type CommandGraphIssue = 'duplicate-id' | 'missing-parent' | 'parent-not-group' | 'cross-owner-parent' | 'cycle'
 
-export type CommandGraphDiagnostic = {
+type CommandGraphDiagnostic = {
   /** The command that was dropped. */
   id: string
   issue: CommandGraphIssue
@@ -74,18 +69,14 @@ export type CommandGraph = {
    */
   search(query: string): readonly CommandNode[]
   /**
-   * The same search, with the scores it ranked on.
-   *
-   * The palette's root holds more than commands while the compatibility rows are still around, and
-   * those rows are scored by the same `fuzzyScore`. A caller merging the two lists needs one number
-   * per row or it cannot interleave them, and would have to fall back to showing commands as a block
-   * — which is not what the flat list does today (./session.ts § the root projection).
+   * The same search, with the scores it ranked on, for a caller that filters the hits itself, as the
+   * palette session's group rows do.
    */
   ranked(query: string): readonly CommandNodeHit[]
 }
 
 /** One search hit: the node, and what it scored. */
-export type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
+type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
 
 type Draft = {
   command: CommandContribution
@@ -234,9 +225,10 @@ export function buildCommandGraph(
   const build = (draft: Draft, depth: number, trail: readonly string[], inherited: Inherited): CommandNode => {
     const title = commandTitle(draft.command)
     const breadcrumb = [...trail, title]
-    const available = inherited.available
-      && commandAvailable(draft.command, context)
-      && (context === undefined || commandScopeSatisfied(draft.command, context))
+    const available =
+      inherited.available &&
+      commandAvailable(draft.command, context) &&
+      (context === undefined || commandScopeSatisfied(draft.command, context))
     const discoverable = available && inherited.discoverable && !!draft.command.palette
     const children = draft.children
       .sort(bySibling)
@@ -265,13 +257,15 @@ export function buildCommandGraph(
   const ranked = (query: string): readonly CommandNodeHit[] => {
     const trimmed = query.trim()
     if (!trimmed) return top().map((node) => ({ node, score: 0 }))
-    return [...nodes.values()]
-      .filter((node) => node.discoverable)
-      .map((node) => ({ node, score: score(trimmed, node) }))
-      .filter((row): row is CommandNodeHit => row.score !== null)
-      // Relevance first, then the sibling order the author stated, so two equal hits do not swap
-      // places between renders.
-      .sort((a, b) => b.score - a.score || orderOf(a.node.command) - orderOf(b.node.command))
+    return (
+      [...nodes.values()]
+        .filter((node) => node.discoverable)
+        .map((node) => ({ node, score: score(trimmed, node) }))
+        .filter((row): row is CommandNodeHit => row.score !== null)
+        // Relevance first, then the sibling order the author stated, so two equal hits do not swap
+        // places between renders.
+        .sort((a, b) => b.score - a.score || orderOf(a.node.command) - orderOf(b.node.command))
+    )
   }
 
   return {

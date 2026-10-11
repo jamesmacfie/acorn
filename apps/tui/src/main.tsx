@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { latestSignal } from '@acorn/client-core/kit/lib/latestSignal'
 import { bootMark, heldLines, holdLine, printBootMarks } from './boot'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
@@ -34,7 +35,9 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 if (values.help) {
-  process.stdout.write('Usage: acorn [--node <name|id|https://endpoint>] [--task <id>]\n       acorn --link <acorn://node/place>\n')
+  process.stdout.write(
+    'Usage: acorn [--node <name|id|https://endpoint>] [--task <id>]\n       acorn --link <acorn://node/place>\n',
+  )
   process.exit(0)
 }
 if (values.link !== undefined && (values.task !== undefined || values.node !== undefined)) {
@@ -56,11 +59,15 @@ if (values.link !== undefined) {
   }
 }
 
-// Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
-// no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
-// soon as the child is spawned, and the shell draws from the persisted cache while it boots
+// Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. The
+// renderer doesn't wait for a node this run started: `openNode` returns as soon as the child is
+// spawned, and the shell draws from the persisted cache while it boots
 // (./node/open.ts, docs/tui/process.md § Attach or start).
-const opened = await openNode(link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node, undefined, !link).catch((error: unknown) => {
+const opened = await openNode(
+  link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node,
+  undefined,
+  !link,
+).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
@@ -86,29 +93,12 @@ const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-co
 const { fileCacheStorage } = await import('./node/cache')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { refreshNodeQueries } = await import('./chrome/recovery')
-const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
-const { startDeviceConfigSync } = await import('@acorn/client-core/infra/persistence/deviceConfigSync.ts')
+const { startClientRuntime } = await import('@acorn/client-core/host/clientRuntime.ts')
 const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
 const { paletteFor, reportsTruecolor, setPalette } = await import('./appearance')
-const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
-const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
-const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
-const { watchWorkspaceChanges } = await import('@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts')
-const { watchNodeEvents } = await import('@acorn/client-core/infra/node/watchNodeEvents.ts')
 const { createEffect, createRoot, createSignal } = await import('solid-js')
 const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
-const { startClientTelemetry } = await import('@acorn/client-core/infra/telemetry/emitter.ts')
-const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/post.ts')
 const [linkReady, setLinkReady] = createSignal(false)
-
-// This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
-// off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
-// arrangement the desktop's composition root has (docs/telemetry/model.md § The switch).
-//
-// The poster is client-core's, unchanged. A batch leaves over the ordinary API client, which on this
-// host is the platform seam installed above, so the terminal client needed no transport of its own —
-// only a different `runtime` on the batch (docs/tui/reporting.md § What the terminal client reports).
-startClientTelemetry({ runtime: 'tui', post: postTelemetryBatch('tui') })
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
@@ -116,7 +106,7 @@ setCacheStorage(fileCacheStorage())
 
 // Which node this run addresses, said out loud before the fleet is read. `selectActiveNode` keeps a
 // selection it still recognises and otherwise prefers the home node, which is the LOCAL one — so
-// without this line `acorn --node <remote>` opened a remote node's broker connection and then sent
+// without this line `acorn --node <remote>` opens a remote node's broker connection and then sends
 // every request to the machine's own node. It also makes `activeCacheId()` and the client below the
 // same partition, which is what the watchers write into.
 setActiveNode(opened.nodeId)
@@ -126,40 +116,58 @@ setActiveNode(opened.nodeId)
 if (!opened.starting) await selectActiveNode()
 
 // One client and one persister per node, and this host reads the same pair every other host does
-// (docs/caching.md § Renderer query cache). `App` used to mint a second `QueryClient` of its own, so
-// the shell read a cache nothing persisted and nothing invalidated: every start was cold, and a task
-// created anywhere else never appeared. `clientFor` hands back both halves, so there is nothing to
+// (docs/caching.md § Renderer query cache). `clientFor` hands back both halves, so there is nothing to
 // build here beyond driving them.
 const { client, persistence } = clientFor(opened.nodeId)
 const cacheLease = persistence.acquire()
 // Await the shared public restore before this host draws its first shell.
 await cacheLease.restored
 bootMark('cache restored')
-const stopDeviceConfig = await startDeviceConfigSync(() => client, (config) => {
-  // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
-  // Without a selected theme, retain the terminal's own palette.
-  const id = config.themeFollowSystem ? config.themeLight : config.theme
-  setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+
+// The runtime both clients share: telemetry, the node event watchers, notices, client schedules and
+// device config sync (client-core/host/clientRuntime.ts). Awaited, so the device config's theme is the
+// palette the first frame draws in.
+//
+// Telemetry posts over the ordinary API client, which on this host is the platform seam installed
+// above, so the terminal client needs no transport of its own, only a different `runtime` on the
+// batch (docs/tui/reporting.md § What the terminal client reports).
+//
+// Loaded plugin bundles wait for the worker factory, which loads after the first frame with the rest
+// of the plugin work (`fillIn` below).
+let pluginWorkersInstalled!: () => void
+const pluginsReady = new Promise<void>((resolve) => {
+  pluginWorkersInstalled = resolve
+})
+const stopClientRuntime = await startClientRuntime({
+  runtime: 'tui',
+  client: () => client,
+  onDeviceConfig: (config) => {
+    // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
+    // Without a selected theme, retain the terminal's own palette.
+    const id = config.themeFollowSystem ? config.themeLight : config.theme
+    setPalette(paletteFor(id ? (themeColorTokens(id) ?? {}) : {}, reportsTruecolor()))
+  },
+  pluginsReady,
 })
 
 // The shell, and not one line earlier: a module that reaches the node must not be evaluated before
 // `installPlatform` has run, or `send` finds no transport and falls back to global `fetch` with a
 // relative path. The suite's harness imports it the same way (./harness.tsx).
 //
-// What is NOT in here any more is the roster. Those twelve plugin barrels were 224 KB of this graph
-// and every one of their `init` and `activate` passes ran before a cell was drawn; they load after
-// the first frame now (./roster.ts, scripts/check-startup-graph.mjs).
+// The roster is not in here: its plugin barrels and their `init` and `activate` passes load after the
+// first frame (./roster.ts, ../scripts/check-startup-graph.mjs).
 const { App } = await import('./App')
 bootMark('App imported')
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
 //
-// `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
-// the PTY's, which is the whole reason a rectangle owns its keys (docs/tui/process.md § Signals and exit).
-// The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
-// The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
-// the cells, and the screen closes first on the way out so the last frame lands while the alternate
+// Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is the PTY's, which is the
+// whole reason a rectangle owns its keys (docs/tui/process.md § Signals and exit). The terminal half
+// handles `SIGWINCH` itself, so nothing here listens for a resize.
+//
+// The surface is two halves composed. The terminal owns the modes and the bytes, the screen owns the
+// cells, and the screen closes first on the way out so the last frame lands while the alternate
 // screen is still ours (./input/terminal.ts § The two halves compose, ./renderer.ts).
 //
 // The kitty keyboard protocol is asked for there and not assumed: a terminal that does not know the
@@ -214,8 +222,8 @@ async function fillIn(): Promise<void> {
     import('./roster'),
     import('./plugins/workerFactory'),
   ])
-  // Loaded bundles are first discovered by `watchPluginChanges` below. Install their Node worker
-  // factory here, before that first pass, rather than in the graph needed to draw empty chrome.
+  // Loaded bundles are first discovered by the shared runtime's plugin watcher, which waits for this.
+  // Their Node worker factory is installed here rather than in the graph needed to draw empty chrome.
   installPluginWorkers()
   installRoster()
   bootMark('roster registered')
@@ -229,45 +237,33 @@ async function fillIn(): Promise<void> {
   const { registerDevicePluginCommands } = await import('./plugins/commands')
   stopDeviceCommands = registerDevicePluginCommands().dispose
 
-  // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
-  // of the client the shell reads — which it now is (docs/plugins/events.md § Hearing a core event). The
-  // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
-  // another window moved nothing on screen until a restart.
-  watchTaskChanges()
-  watchConnectionChanges()
-  watchProjectChanges()
-  watchWorkspaceChanges()
-  watchNodeEvents()
+  pluginWorkersInstalled()
 
-  // The node's arrival, which is behind the first frame now. Everything the shell asked for while a
+  // The node's arrival, which is behind the first frame. Everything the shell asked for while a
   // node it had just spawned was booting came back as `ECONNREFUSED`, and the first non-offline state
   // is when those are worth asking again. The desktop's composition root holds the same effect for the
   // same reason (apps/desktop/src/client/index.tsx).
   createRoot(() => {
-    let refresh = 0
+    const refresh = latestSignal()
     createEffect(() => {
-      const current = ++refresh
+      const current = refresh.next()
       if (nodeState(opened.nodeId) === 'offline') return
       void refreshNodeQueries(client).then(() => {
-        if (current === refresh && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
+        if (!current.aborted && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
       })
     })
   })
 
-  // Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
-  // device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
-  // has not is queued for the trust prompt, which the shell draws as an overlay.
-  //
-  // The watcher owns that first pass as well as the reload one, and runs it when a node first becomes
-  // reachable. Fired from here it asked a node this run had just spawned and was still `offline`, found
-  // no roster, and never ran again — the same boot race the effect above answers for the query cache.
-  watchPluginChanges()
   if (link) {
     // Core places need the compiled roster, which is already installed above. Plugin paths and
     // sources need the selected Node's loaded contributions too. A stalled roster read must not
     // keep the terminal on its remembered place forever; after the deadline, the resolver gives a
     // specific unavailable-view refusal if the contribution still has not arrived.
-    if ((link.kind === 'task' && !link.pane) || (link.kind === 'settings' && !link.pageId) || (link.kind === 'project' && !link.rest.length)) {
+    if (
+      (link.kind === 'task' && !link.pane) ||
+      (link.kind === 'settings' && !link.pageId) ||
+      (link.kind === 'project' && !link.rest.length)
+    ) {
       setLinkReady(true)
     } else {
       const { preparePluginContributionsForNode } = await import('@acorn/client-core/host/plugins/reload.ts')
@@ -277,7 +273,9 @@ async function fillIn(): Promise<void> {
           if (opened.starting) await opened.starting.catch(() => undefined)
           await preparePluginContributionsForNode(opened.nodeId)
         })().catch((error: unknown) => log.warn('could not load linked node plugin contributions', error)),
-        new Promise<void>((resolve) => { deadline = setTimeout(resolve, 15_000) }),
+        new Promise<void>((resolve) => {
+          deadline = setTimeout(resolve, 15_000)
+        }),
       ])
       if (deadline) clearTimeout(deadline)
       setLinkReady(true)
@@ -295,7 +293,9 @@ async function fillIn(): Promise<void> {
 // emitter, and the same line held fifty times says nothing the first one did not.
 const heldWarnings = new Set<string>()
 process.removeAllListeners('warning')
-process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warning.message}`) })
+process.on('warning', (warning) => {
+  heldWarnings.add(`${warning.name}: ${warning.message}`)
+})
 // Whether this terminal is the one the reader is looking at, which is the gate's `focused()` and
 // therefore the difference between a notice that lands read and one that raises a banner. The
 // renderer asks for DEC 1004 focus reports and turns `ESC [ I` and `ESC [ O` into these two events.
@@ -304,8 +304,12 @@ process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warnin
 // nothing draws from it. It starts true because unknown counts as focused — a terminal that never
 // answers must not be treated as one nobody is watching (client-core § defaultDeliveryContext).
 let terminalFocused = true
-renderer.on('focus', () => { terminalFocused = true })
-renderer.on('blur', () => { terminalFocused = false })
+renderer.on('focus', () => {
+  terminalFocused = true
+})
+renderer.on('blur', () => {
+  terminalFocused = false
+})
 setHostFocused(() => terminalFocused)
 
 const engine = installKeymap(renderer)
@@ -315,7 +319,7 @@ const engine = installKeymap(renderer)
 let stopDeviceCommands: (() => void) | undefined
 async function quit(code = 0): Promise<never> {
   stopDeviceCommands?.()
-  stopDeviceConfig()
+  stopClientRuntime()
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()
@@ -337,12 +341,20 @@ async function quit(code = 0): Promise<never> {
 }
 
 // `q` is the shell's, registered as a command with a confirm when this TUI is the thing that started
-// the node (chrome/Shell.tsx). `Ctrl+C` is not: it is the signal a terminal sends to say stop now,
+// the node (./chrome/Shell.tsx). `Ctrl+C` is not: it is the signal a terminal sends to say stop now,
 // and it stops now. Inside an entered rectangle it never reaches here at all, which is the whole
 // point of the Rectangle contract.
 engine.registerLayer({
   priority: COMMAND,
-  bindings: [{ key: 'ctrl+c', cmd: () => { void quit(); return true } }],
+  bindings: [
+    {
+      key: 'ctrl+c',
+      cmd: () => {
+        void quit()
+        return true
+      },
+    },
+  ],
 })
 // A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
 process.once('SIGTERM', () => void quit())
@@ -353,15 +365,17 @@ process.once('SIGTERM', () => void quit())
 // (./chrome/nodeState.ts).
 if (opened.starting) {
   setNodeStarting(true)
-  void opened.starting.then(async () => {
-    await selectActiveNode()
-    await refreshNodeQueries(client)
-    setNodeStarting(false)
-  }).catch((error: unknown) => {
-    setNodeStarting(false)
-    log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
-    void quit(1)
-  })
+  void opened.starting
+    .then(async () => {
+      await selectActiveNode()
+      await refreshNodeQueries(client)
+      setNodeStarting(false)
+    })
+    .catch((error: unknown) => {
+      setNodeStarting(false)
+      log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+      void quit(1)
+    })
 }
 
 // The tree mounts on the screen's root node rather than on the surface around it
@@ -380,7 +394,7 @@ await render(
         log.warn(`No task ${id} on this node.`)
         // Not from here. A warm cache answers the tasks query on the first tick, so this callback can
         // fire inside `render()` — and `renderer.destroy()` from inside a render pass throws, which
-        // took the exit path with it and printed nothing at all. Let the frame finish, then leave.
+        // takes the exit path with it and prints nothing at all. Let the frame finish, then leave.
         setTimeout(() => void quit(1))
       }}
       onQuit={() => void quit()}

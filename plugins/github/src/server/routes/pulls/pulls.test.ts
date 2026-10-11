@@ -1,4 +1,11 @@
-import { makeTestDb, makeTestPluginDb, schema, testSecretEnv, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import {
+  makeTestDb,
+  makeTestPluginDb,
+  schema,
+  testSecretEnv,
+  type TestDb,
+  type TestPluginDb,
+} from '@acorn/plugin-api/testkit'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,17 +68,39 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     vi.clearAllMocks()
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
-    // The GitHub token comes from a stored integration row now, not from the caller's identity.
+    // The GitHub token comes from a stored integration row, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     const now = Date.now()
-    await core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await core.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await core.db.insert(schema.projects).values({
-      id: 'project-runn', name: 'runn', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/Runn-Fast/runn.git', githubOwner: 'Runn-Fast', githubName: 'runn', githubRepoId: REPO_ID,
-      createdAt: now, updatedAt: now,
+      id: 'project-runn',
+      name: 'runn',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/Runn-Fast/runn.git',
+      githubOwner: 'Runn-Fast',
+      githubName: 'runn',
+      githubRepoId: REPO_ID,
+      createdAt: now,
+      updatedAt: now,
     })
     // Seed the repo so resolveRepoForUser hits the mirror (no GitHub round-trip for resolution).
-    await plugin.db.insert(repos).values({ userId: 'james', id: REPO_ID, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: 0, fetchedAt: Date.now() })
+    await plugin.db.insert(repos).values({
+      userId: 'james',
+      id: REPO_ID,
+      owner: 'Runn-Fast',
+      name: 'runn',
+      private: true,
+      defaultBranch: 'main',
+      pushedAt: 0,
+      fetchedAt: Date.now(),
+    })
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
@@ -85,31 +114,64 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     core.cleanup()
   })
 
-  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env)
+  const getOpen = () =>
+    app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), {
+      DB: core.db,
+      ...testSecretEnv(ENC_KEY),
+    } as Env)
 
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
     // A local-first task on the same branch with no PR yet; the refresh should adopt PR #42.
     await core.db.insert(schema.tasks).values({
-      id: 'task-1', title: 'wip', origin: 'local', projectId: 'project-runn', branch: 'feature-x', status: 'active', createdAt: 0, updatedAt: 0,
+      id: 'task-1',
+      title: 'wip',
+      origin: 'local',
+      projectId: 'project-runn',
+      branch: 'feature-x',
+      status: 'active',
+      createdAt: 0,
+      updatedAt: 0,
     })
     vi.mocked(gh).mockResolvedValueOnce(responseJson([ghPull], { headers: { etag: '"pulls-v1"' } }))
 
     const res = await getOpen()
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([publicPull])
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100', { headers: {} })
+    expect(gh).toHaveBeenCalledWith(
+      'token',
+      '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100',
+      { headers: {} },
+    )
 
     const [task] = await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1'))
-    expect(task.pullNumber).toBe(42) // Flow B: task inherited the freshly-opened PR
+    expect(task.pullNumber).toBe(42) // the task inherited the freshly-opened PR
 
-    const [sync] = await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
+    const [sync] = await plugin.db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
     expect(sync.etag).toBe('"pulls-v1"')
   })
 
   it('stale: serves the mirror immediately, then revalidates with If-None-Match → 304 keeps rows', async () => {
     const stale = Date.now() - PULLS_STALE_AFTER_MS - 1
-    await plugin.db.insert(pullRequests).values({ userId: 'james', repoId: REPO_ID, number: 42, nodeId: 'PR_kw42', state: 'open', draft: false, title: 'Add sync engine', headRef: 'feature-x', baseRef: 'main', author: 'james', updatedAt: publicPull.updatedAt, fetchedAt: stale })
-    await plugin.db.insert(syncState).values({ userId: 'james', resource: pullsResource(REPO_ID, 'open'), etag: '"pulls-v1"', fetchedAt: stale })
+    await plugin.db.insert(pullRequests).values({
+      userId: 'james',
+      repoId: REPO_ID,
+      number: 42,
+      nodeId: 'PR_kw42',
+      state: 'open',
+      draft: false,
+      title: 'Add sync engine',
+      headRef: 'feature-x',
+      baseRef: 'main',
+      author: 'james',
+      updatedAt: publicPull.updatedAt,
+      fetchedAt: stale,
+    })
+    await plugin.db
+      .insert(syncState)
+      .values({ userId: 'james', resource: pullsResource(REPO_ID, 'open'), etag: '"pulls-v1"', fetchedAt: stale })
     vi.mocked(gh).mockResolvedValueOnce(new Response(null, { status: 304 }))
 
     const res = await getOpen()
@@ -117,24 +179,43 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     expect(await res.json()).toEqual([publicPull]) // stale mirror served immediately
 
     await settleBackground()
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100', { headers: { 'If-None-Match': '"pulls-v1"' } })
+    expect(gh).toHaveBeenCalledWith(
+      'token',
+      '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100',
+      { headers: { 'If-None-Match': '"pulls-v1"' } },
+    )
     expect(await plugin.db.select().from(pullRequests).where(eq(pullRequests.repoId, REPO_ID))).toHaveLength(1)
-    const [sync] = await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
+    const [sync] = await plugin.db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
     expect(sync.fetchedAt).toBeGreaterThan(stale)
   })
 
   // The list's Search field (docs/github-integration/surfaces.md § Searching pull requests).
-  const search = (q: string, state = 'open') => app.fetch(
-    new Request(`http://acorn.test/api/repos/Runn-Fast/runn/pulls/search?state=${state}&q=${encodeURIComponent(q)}`),
-    { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env,
-  )
+  const search = (q: string, state = 'open') =>
+    app.fetch(
+      new Request(`http://acorn.test/api/repos/Runn-Fast/runn/pulls/search?state=${state}&q=${encodeURIComponent(q)}`),
+      { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env,
+    )
 
-  it('search: fixes the repository and tab, and quotes the reader\'s words', async () => {
-    vi.mocked(gh).mockResolvedValueOnce(responseJson({
-      total_count: 120,
-      incomplete_results: false,
-      items: [{ number: 7, title: 'Old sync fix', state: 'closed', draft: false, user: { login: 'ann' }, updated_at: '2026-01-01T00:00:00Z' }],
-    }))
+  it("search: fixes the repository and tab, and quotes the reader's words", async () => {
+    vi.mocked(gh).mockResolvedValueOnce(
+      responseJson({
+        total_count: 120,
+        incomplete_results: false,
+        items: [
+          {
+            number: 7,
+            title: 'Old sync fix',
+            state: 'closed',
+            draft: false,
+            user: { login: 'ann' },
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      }),
+    )
 
     const res = await search('sync repo:evil/x', 'closed')
     expect(res.status).toBe(200)
@@ -143,10 +224,21 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     // A typed qualifier is text to match, so it cannot widen the search to another repository.
     expect(q).toBe('"sync" "repo:evil/x" repo:Runn-Fast/runn is:pr is:closed')
     expect(await res.json()).toEqual({
-      pulls: [{
-        number: 7, title: 'Old sync fix', state: 'closed', draft: false, author: 'ann', headRef: null, baseRef: null,
-        updatedAt: Date.parse('2026-01-01T00:00:00Z'), mergeable: null, mergeStateStatus: null, autoMergeEnabled: false,
-      }],
+      pulls: [
+        {
+          number: 7,
+          title: 'Old sync fix',
+          state: 'closed',
+          draft: false,
+          author: 'ann',
+          headRef: null,
+          baseRef: null,
+          updatedAt: Date.parse('2026-01-01T00:00:00Z'),
+          mergeable: null,
+          mergeStateStatus: null,
+          autoMergeEnabled: false,
+        },
+      ],
       total: 120,
       incomplete: true,
     })

@@ -140,10 +140,13 @@ describe('fetchFleet', () => {
       return Promise.resolve('fresh')
     })
     expect(asked).toEqual(['b'])
-    expect(result.rows.map((row) => [row.nodeId, row.data])).toEqual([['a', 'remembered'], ['b', 'fresh']])
+    expect(result.rows.map((row) => [row.nodeId, row.data])).toEqual([
+      ['a', 'remembered'],
+      ['b', 'fresh'],
+    ])
   })
 
-  it('writes through each node\'s own cache, so a later single-node read is warm', async () => {
+  it("writes through each node's own cache, so a later single-node read is warm", async () => {
     await fetchFleet(KEY, (nodeId) => Promise.resolve(`from-${nodeId}`))
     expect(clientFor('a').client.getQueryData(KEY)).toBe('from-a')
     expect(clientFor('b').client.getQueryData(KEY)).toBe('from-b')
@@ -153,10 +156,14 @@ describe('fetchFleet', () => {
 
   it('honours an explicit node subset', async () => {
     const asked: string[] = []
-    const result = await fetchFleet(KEY, (nodeId) => {
-      asked.push(nodeId)
-      return Promise.resolve('ok')
-    }, { nodeIds: ['b'] })
+    const result = await fetchFleet(
+      KEY,
+      (nodeId) => {
+        asked.push(nodeId)
+        return Promise.resolve('ok')
+      },
+      { nodeIds: ['b'] },
+    )
     expect(asked).toEqual(['b'])
     expect(result.rows.map((row) => row.nodeId)).toEqual(['b'])
   })
@@ -165,14 +172,17 @@ describe('fetchFleet', () => {
     _resetFleet()
     installFleet([], [])
     await refreshFleet()
-    expect(await fetchFleet(KEY, () => Promise.reject(new Error('never called')))).toEqual({ rows: [], unavailable: [] })
+    expect(await fetchFleet(KEY, () => Promise.reject(new Error('never called')))).toEqual({
+      rows: [],
+      unavailable: [],
+    })
   })
 })
 
 // What a fleet surface draws on the tick it mounts. Navigating away and back drops the resource but not
 // the per-node QueryClient, so there's a real list to show while it revalidates.
 describe('cachedFleet', () => {
-  it('serves each node\'s last answer, badged refreshing', () => {
+  it("serves each node's last answer, badged refreshing", () => {
     clientFor('a').client.setQueryData(KEY, 'remembered-a')
     clientFor('b').client.setQueryData(KEY, 'remembered-b')
     expect(cachedFleet(KEY).rows.map((row) => [row.nodeId, row.data, row.freshness])).toEqual([
@@ -204,18 +214,39 @@ describe('onFleetInvalidation', () => {
   it('keeps fleet data current when a mounted reader also refetches the shared key', async () => {
     const client = clientFor('a').client
     const key = workspacesKey
-    const solid: Workspace = { id: 'workspace', name: 'Acorn', isDefault: true, sort: 0, projects: [], appearance: {
-      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'solid', color: 'blue' },
-    } }
-    const gradient: Workspace = { ...solid, appearance: {
-      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'gradient', colors: ['blue', 'purple'], angle: 135 },
-    } }
+    const solid: Workspace = {
+      id: 'workspace',
+      name: 'Acorn',
+      isDefault: true,
+      sort: 0,
+      projects: [],
+      appearance: {
+        version: 1,
+        kind: 'icon',
+        icon: 'rocket',
+        background: { kind: 'solid', color: 'blue' },
+      },
+    }
+    const gradient: Workspace = {
+      ...solid,
+      appearance: {
+        version: 1,
+        kind: 'icon',
+        icon: 'rocket',
+        background: { kind: 'gradient', colors: ['blue', 'purple'], angle: 135 },
+      },
+    }
     client.setQueryData(key, [solid])
-    const fetch = async () => { await new Promise((resolve) => setTimeout(resolve, 25)); return [gradient] }
+    const fetch = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      return [gradient]
+    }
     const observer = new QueryObserver(client, { queryKey: key, queryFn: fetch, staleTime: Infinity })
     const unobserve = observer.subscribe(() => {})
     let refreshed: ReturnType<typeof fetchFleet<Workspace[]>> | undefined
-    const stop = onFleetInvalidation(key, () => { refreshed = fetchFleet(key, fetch, { nodeIds: ['a'] }) })
+    const stop = onFleetInvalidation(key, () => {
+      refreshed = fetchFleet(key, fetch, { nodeIds: ['a'] })
+    })
     try {
       const eventRefresh = client.invalidateQueries({ queryKey: key })
       await new Promise((resolve) => setTimeout(resolve, 1))
@@ -223,14 +254,20 @@ describe('onFleetInvalidation', () => {
       await Promise.all([eventRefresh, mutationRefresh])
       expect(client.getQueryData(key)).toEqual([gradient])
       expect((await refreshed)?.rows.map((row) => row.data)).toEqual([[gradient]])
-    } finally { stop(); unobserve(); observer.destroy() }
+    } finally {
+      stop()
+      unobserve()
+      observer.destroy()
+    }
   })
 
   it('fires when any node invalidates the key, and stops on unsubscribe', async () => {
     // The fan-out's own fetch puts the entry in each node's cache, so nothing is invalidated first.
     clientFor('b').client.setQueryData(KEY, 'fetched-by-the-fan-out')
     let fired = 0
-    const stop = onFleetInvalidation(KEY, () => { fired += 1 })
+    const stop = onFleetInvalidation(KEY, () => {
+      fired += 1
+    })
 
     await clientFor('b').client.invalidateQueries({ queryKey: KEY })
     expect(fired).toBe(1)
@@ -240,11 +277,13 @@ describe('onFleetInvalidation', () => {
     expect(fired).toBe(1)
   })
 
-  it('ignores another key, and ignores the fan-out\'s own writes so a refetch cannot loop', async () => {
+  it("ignores another key, and ignores the fan-out's own writes so a refetch cannot loop", async () => {
     clientFor('a').client.setQueryData(KEY, 'fetched-by-the-fan-out')
     clientFor('a').client.setQueryData(['fanout', 'other'], 'someone else')
     let fired = 0
-    const stop = onFleetInvalidation(KEY, () => { fired += 1 })
+    const stop = onFleetInvalidation(KEY, () => {
+      fired += 1
+    })
 
     await clientFor('a').client.invalidateQueries({ queryKey: ['fanout', 'other'] })
     clientFor('a').client.setQueryData(KEY, 'written-by-the-fan-out')
@@ -255,7 +294,7 @@ describe('onFleetInvalidation', () => {
 })
 
 // `createFleetQuery` itself cannot run here (see `cachedFleet`'s comment), so the ladder it drives is
-// asserted as the pure function it was split out into.
+// asserted through its pure function.
 describe('retryDelayMs', () => {
   it('waits longer each time, then gives up rather than polling', () => {
     expect(retryDelayMs(0, 1)).toBe(2_000)

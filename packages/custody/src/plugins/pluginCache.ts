@@ -7,7 +7,11 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins/packageFiles.ts'
+import {
+  readPluginFile,
+  MAX_PLUGIN_MANIFEST_BYTES,
+  PluginPackageFileError,
+} from '@acorn/node-core/server/plugins/packageFiles.ts'
 import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
@@ -19,11 +23,11 @@ const log = createLogger('plugins')
 // The content-addressed store of plugin client bundles a node handed over. See docs/security.md,
 // "Third-party plugin bundles", for why the hash is trusted and the claim is not.
 //
-// Only main writes here and only main knows the paths. Nothing on this class hands a filesystem path
+// Only the helper writes here and only the helper knows the paths. Nothing on this class hands a filesystem path
 // to the renderer, which names bundles by hash and nothing else.
 //
 // See docs/future/remote.md: a browser client does the same job with IndexedDB. The renderer reaches
-// this through one narrow module, client-core/host/plugins/host.ts, so the interface is the portable part
+// this through one narrow module in client-core's plugin host, so the interface is the portable part
 // rather than the storage.
 
 const CACHE_DIR = `${ACORN_BASELINE}-plugin-cache`
@@ -57,7 +61,14 @@ export type PluginCacheEntry = z.infer<typeof entrySchema>
 
 const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.string(), entrySchema) })
 
-export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch'
+export type PutFailure =
+  | 'unreachable'
+  | 'not-found'
+  | 'too-large'
+  | 'hash-mismatch'
+  | 'has-node-half'
+  | 'invalid-manifest'
+  | 'plugin-id-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
 type BundledClientBundle = { pluginId: string; version: string; read: () => Uint8Array }
@@ -65,7 +76,9 @@ type BundledPutResult = { pluginId: string; hash: string } | { pluginId: string;
 
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
 // TLS server.
-export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> }
+export type BundleFetcher = {
+  fetch(nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse>
+}
 
 export class PluginCache {
   #entries: Record<string, PluginCacheEntry> | null = null
@@ -84,7 +97,7 @@ export class PluginCache {
   }
 
   /** Cache client code read from this app's packaged resources. Unlike putFromNode there is no remote
-   * hash claim to verify, so the content hash computed here is the identity main trusts. */
+   * hash claim to verify, so the content hash computed here is the identity the helper trusts. */
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
     const result = this.putBundledBatch([{ pluginId, version, read: () => bytes }])[0]!
     if ('error' in result) throw result.error
@@ -101,15 +114,20 @@ export class PluginCache {
       const { pluginId, version } = bundle
       try {
         const bytes = bundle.read()
-        if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
+        if (bytes.byteLength > MAX_BUNDLE_BYTES)
+          throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
         const hash = createHash('sha256').update(bytes).digest('hex')
         const existing = entries[hash]
         // Check the file as well as its row: a missing body must be repaired after a crash.
         if (!existing || !existsSync(join(this.dir, `${hash}.js`))) {
           const now = Date.now()
           const entry = entrySchema.parse({
-            pluginId, version, bytes: bytes.byteLength,
-            nodeIds: existing?.nodeIds ?? [], firstSeen: existing?.firstSeen ?? now, lastSeen: now,
+            pluginId,
+            version,
+            bytes: bytes.byteLength,
+            nodeIds: existing?.nodeIds ?? [],
+            firstSeen: existing?.firstSeen ?? now,
+            lastSeen: now,
           })
           this.writeBundle(hash, bytes)
           entries[hash] = entry
@@ -124,7 +142,7 @@ export class PluginCache {
     return results
   }
 
-  // Main-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
+  // Helper-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
   path(hash: string): string | null {
     return this.has(hash) ? join(this.dir, `${hash}.js`) : null
   }
@@ -141,25 +159,37 @@ export class PluginCache {
 
     let response: NodeFetchResponse
     try {
-      response = await this.broker.fetch(nodeId, {
-        requestId: `plugin-bundle-${pluginId}-${claim.hash.slice(0, 12)}`,
-        path: corePluginBundleByHashRoute(pluginId, claim.hash),
-        method: 'GET',
-        headers: {},
-      }, { maxResponseBytes: MAX_BUNDLE_BYTES })
+      response = await this.broker.fetch(
+        nodeId,
+        {
+          requestId: `plugin-bundle-${pluginId}-${claim.hash.slice(0, 12)}`,
+          path: corePluginBundleByHashRoute(pluginId, claim.hash),
+          method: 'GET',
+          headers: {},
+        },
+        { maxResponseBytes: MAX_BUNDLE_BYTES },
+      )
       if (response.status === 404) {
         // A node from before the hash-addressed route only has /client.js. The device still hashes
         // what arrives and refuses anything other than this exact claim below.
-        response = await this.broker.fetch(nodeId, {
-          requestId: `plugin-bundle-legacy-${pluginId}-${claim.hash.slice(0, 12)}`,
-          path: corePluginBundleRoute(pluginId),
-          method: 'GET',
-          headers: {},
-        }, { maxResponseBytes: MAX_BUNDLE_BYTES })
+        // Mixed-version path until 2026-12-26.
+        response = await this.broker.fetch(
+          nodeId,
+          {
+            requestId: `plugin-bundle-legacy-${pluginId}-${claim.hash.slice(0, 12)}`,
+            path: corePluginBundleRoute(pluginId),
+            method: 'GET',
+            headers: {},
+          },
+          { maxResponseBytes: MAX_BUNDLE_BYTES },
+        )
       }
     } catch (error) {
       if (error instanceof NodeResponseTooLargeError) return { error: 'too-large' }
-      log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, { 'plugin.id': pluginId, 'node.id': nodeId })
+      log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, {
+        'plugin.id': pluginId,
+        'node.id': nodeId,
+      })
       return { error: 'unreachable' }
     }
     if (response.status !== 200) return { error: response.status === 404 ? 'not-found' : 'unreachable' }
@@ -169,7 +199,10 @@ export class PluginCache {
     if (hash !== claim.hash) {
       // Loud, and refused. The one failure in this file that is a security event rather than an
       // operational one, and the owner sees it as a blocked row rather than a silent absence.
-      log.error(`${pluginId} from ${nodeId} does not match the hash it advertised; refusing the bundle`, { 'plugin.id': pluginId, 'node.id': nodeId })
+      log.error(`${pluginId} from ${nodeId} does not match the hash it advertised; refusing the bundle`, {
+        'plugin.id': pluginId,
+        'node.id': nodeId,
+      })
       return { error: 'hash-mismatch' }
     }
 
@@ -195,11 +228,16 @@ export class PluginCache {
   }
 
   /** Validate the package before any entry is added. A folder is re-read for every update. */
-  async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
+  async putFromSource(
+    source: PluginInstallSource,
+    expectedPluginId?: string,
+  ): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
     try {
       const { withPluginPackage } = await import('@acorn/node-core/server/plugins/installer.ts')
       return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
-        const rawManifest: unknown = JSON.parse(readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'))
+        const rawManifest: unknown = JSON.parse(
+          readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'),
+        )
         if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
         if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
         if (!manifest.client) return { error: 'invalid-manifest' as const }
@@ -208,18 +246,21 @@ export class PluginCache {
         this.writeBundle(hash, bytes)
         const now = Date.now()
         const existing = this.entries()[hash]
-        this.writeIndex({ ...this.entries(), [hash]: {
-          pluginId: manifest.id,
-          version: manifest.version,
-          bytes: bytes.byteLength,
-          nodeIds: existing?.nodeIds ?? [],
-          source: { kind: 'device' },
-          installSource: source,
-          sourceLabel: describePluginSource(source),
-          manifest: rawManifest,
-          firstSeen: existing?.firstSeen ?? now,
-          lastSeen: now,
-        } })
+        this.writeIndex({
+          ...this.entries(),
+          [hash]: {
+            pluginId: manifest.id,
+            version: manifest.version,
+            bytes: bytes.byteLength,
+            nodeIds: existing?.nodeIds ?? [],
+            source: { kind: 'device' },
+            installSource: source,
+            sourceLabel: describePluginSource(source),
+            manifest: rawManifest,
+            firstSeen: existing?.firstSeen ?? now,
+            lastSeen: now,
+          },
+        })
         this.removeDevice(manifest.id, hash)
         return { hash, pluginId: manifest.id, version: manifest.version }
       })
@@ -257,7 +298,10 @@ export class PluginCache {
 
   forgetNode(nodeId: string): void {
     const entries = Object.fromEntries(
-      Object.entries(this.entries()).map(([hash, entry]) => [hash, { ...entry, nodeIds: entry.nodeIds.filter((id) => id !== nodeId) }]),
+      Object.entries(this.entries()).map(([hash, entry]) => [
+        hash,
+        { ...entry, nodeIds: entry.nodeIds.filter((id) => id !== nodeId) },
+      ]),
     )
     this.writeIndex(entries)
   }
@@ -331,7 +375,10 @@ export class PluginCache {
   private writeIndex(entries: Record<string, PluginCacheEntry>): void {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const path = join(this.dir, INDEX_FILE)
-    writePrivateAtomic(path, `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`)
+    writePrivateAtomic(
+      path,
+      `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`,
+    )
     this.#entries = entries
   }
 }

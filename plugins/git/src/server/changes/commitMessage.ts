@@ -3,14 +3,13 @@
 //
 // Every function here is pure over a status read and a patch, so the budget rule and the wording are
 // a table test rather than something only a live provider can show. The git calls and the
-// `core.models` call are next door in ./localGit.ts, and the route that spends a key is in
-// ./routes/localGit.ts.
+// `core.models` call are in `localGitBridge`'s `commitMessage`.
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { COMMIT_MESSAGE_MAX_PROMPT_CHARS } from '../../shared/changes/api'
 
 /** Which diff a generated message should describe.
  *
- *  The same rule the commit button follows (../client/model.ts § commitMode): with something in the
+ *  The same rule the commit button follows (`commitMode` in the client): with something in the
  *  index the commit is the index, and with nothing in it the commit is every tracked change. Derived
  *  from the node's own status read rather than taken from the request, because the panel's copy is up
  *  to one poll old and the message has to describe what the next commit will actually contain.
@@ -47,7 +46,9 @@ export function commitFiles(changes: readonly LocalChange[], scope: CommitDiffSc
  *  binary, a rename with no content change — sorts last rather than first, because "no numstat" is
  *  not "no bytes". */
 const sizeOf = (file: CommitFile): number =>
-  file.additions == null && file.deletions == null ? Number.MAX_SAFE_INTEGER : (file.additions ?? 0) + (file.deletions ?? 0)
+  file.additions == null && file.deletions == null
+    ? Number.MAX_SAFE_INTEGER
+    : (file.additions ?? 0) + (file.deletions ?? 0)
 
 /** Roughly how many characters a file's patch will take: its lines, plus git's per-file header.
  *
@@ -60,16 +61,13 @@ const estimate = (file: CommitFile): number => PATCH_HEADER_CHARS + Math.min(siz
 
 /** Which files' patches to ask git for, and which to name without one.
  *
- *  Smallest first until the budget's estimate is spent. Smallest first rather than largest, because a
- *  message is a summary and ten small files say more about the shape of a change than half of one
- *  large one. The first file is always included, so a single enormous file still gets its patch read
- *  and trimmed rather than being described by its name alone.
+ *  Smallest first until the budget's estimate is spent, because ten small files say more about the
+ *  shape of a change than half of one large one. The first file is always included, so a single
+ *  enormous file still gets its patch read and trimmed. Everything left over is still listed with its
+ *  counts, so the model knows those files moved.
  *
- *  Everything left over is still listed, with its counts, so the model knows those files moved and
- *  can say so.
- *
- *  This is also what bounds the argv of the one `git diff` call: the cheapest a file can be is its
- *  header, so a 12,000-character budget can never name more than 75 paths. */
+ *  This also bounds the argv of the one `git diff` call: the cheapest a file can be is its header, so
+ *  a 12,000-character budget can never name more than 75 paths. */
 export function splitByBudget(
   files: readonly CommitFile[],
   budget = COMMIT_MESSAGE_MAX_PROMPT_CHARS,
@@ -164,7 +162,10 @@ export function buildCommitPrompt(args: {
     spent += Math.min(patch.length, room)
   }
   if (args.omit.length) {
-    lines.push('', `The last ${args.omit.length} file${args.omit.length === 1 ? '' : 's'} above changed too; their patches did not fit.`)
+    lines.push(
+      '',
+      `The last ${args.omit.length} file${args.omit.length === 1 ? '' : 's'} above changed too; their patches did not fit.`,
+    )
   }
   return lines.join('\n')
 }

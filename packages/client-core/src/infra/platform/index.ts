@@ -10,7 +10,19 @@ import type {
   NodeStatus,
   NodeTransportError,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type {
+  NodePluginPermissions,
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginCustomAgentGrant,
+  PluginExtensionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '@acorn/protocol/api.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
@@ -57,9 +69,6 @@ export type FleetBridge = {
   // Only the local node is supervised by the app that hosts this client; a remote node is
   // restarted by whatever started it.
   restartLocal(): Promise<void>
-  // Preview tunnel: in, a port on the node; out, a port on this machine.
-  tunnelOpen(request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }>
-  tunnelClose(match: { nodeId?: string; taskId?: string }): void
 }
 
 // Custody of third-party plugin bundles. See docs/security/plugin-bundles.md § Third-party plugin bundles for
@@ -68,7 +77,10 @@ export type FleetBridge = {
 export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
-  install(request: { source: import('@acorn/protocol/api.ts').PluginInstallSource; expectedPluginId?: string }): Promise<PluginDeviceInstallResult>
+  install(request: {
+    source: import('@acorn/protocol/api.ts').PluginInstallSource
+    expectedPluginId?: string
+  }): Promise<PluginDeviceInstallResult>
   remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
   trustForget(request: { pluginId: string; hash: string }): Promise<void>
@@ -112,9 +124,9 @@ export type CliInstaller = {
   install(): Promise<CliInstallState>
 }
 
-// The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
-// rest of the product on this probe was the original mistake (`capabilities.ts`).
-export type FolderPicker = { pick(): Promise<string | null> }
+// The native folder dialog. Its own group rather than part of `DesktopExtras`, so a gate on it hides
+// only what needs the dialog, not the rest of the product (see `HostRequirement`).
+type FolderPicker = { pick(): Promise<string | null> }
 
 // Choosing files to attach, and saving one to disk. Unlike the folder dialog these are not
 // desktop-only: a page can open its own file input and click its own download link, so the seam
@@ -149,6 +161,10 @@ export type Notify = {
   setBadge(count: number | null): void
 }
 
+// Whether anybody can see this client, for work that should pause while nobody can (client
+// schedules). A page answers from its own `document`, so only a host without one installs this.
+type HostVisibility = { hidden(): boolean; onChange(cb: () => void): () => void }
+
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
@@ -156,7 +172,7 @@ export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
 // The shell retains one preview per local task. Node switches retire every preview. Ensure replays
 // browsing state after observer registration and reconciles configured home independently of it.
-export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 export type PreviewViews = {
   ensure(taskId: string, url: string): Promise<boolean>
   setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
@@ -171,8 +187,14 @@ export type PreviewViews = {
 
 // Host-owned page surface for an accepted loaded plugin. The sandboxed plugin frame never sees this;
 // PluginWebview and its broker are the only callers.
-export type PluginWebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
-export type PluginWebviewBlocked = { key: string; url: string; host: string }
+type PluginWebviewState = {
+  key: string
+  url: string
+  loading: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+}
+type PluginWebviewBlocked = { key: string; url: string; host: string }
 export type PluginWebviews = {
   ensure(key: string, url: string, hosts: readonly string[]): Promise<boolean>
   setBounds(key: string, rect: { x: number; y: number; width: number; height: number }): void
@@ -231,15 +253,50 @@ export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
 }
 // Which plugins this device is developing, and against which node. See docs/security/plugin-install.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
-export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
-export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
+type PluginDevGrant = {
+  pluginId: string
+  nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+  path?: string
+  grantedAt: number
+}
+export type PluginDevGrantRequest = {
+  pluginId: string
+  nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+  path?: string
+  grant: boolean
+}
 export type PluginHostState = {
-  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
+  cached: Record<
+    string,
+    {
+      pluginId: string
+      version: string
+      bytes: number
+      source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+      installSource?: import('@acorn/protocol/api.ts').PluginInstallSource
+      sourceLabel?: string
+      manifest?: unknown
+      nodeIds?: string[]
+    }
+  >
   acks: PluginAckRecord[]
   devGrants: PluginDevGrant[]
 }
-export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch' }
-export type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
+export type PluginPutResult =
+  | { hash: string }
+  | {
+      error:
+        | 'unreachable'
+        | 'not-found'
+        | 'too-large'
+        | 'hash-mismatch'
+        | 'has-node-half'
+        | 'invalid-manifest'
+        | 'plugin-id-mismatch'
+    }
+type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 
 // ── The desktop implementation ────────────────────────────────────────────────────────────────
 
@@ -272,14 +329,13 @@ type AcornPreload = {
   nodeForget?: FleetBridge['forget']
   nodeReconnect?: FleetBridge['reconnect']
   nodeRestartLocal?: FleetBridge['restartLocal']
-  nodeTunnelOpen?: FleetBridge['tunnelOpen']
-  nodeTunnelClose?: FleetBridge['tunnelClose']
   plugins?: PluginCustody
   config?: DeviceConfigBridge
   recovery?: RecoveryActions
   folderPath?: FolderPicker
   files?: FileDialogs
   notify?: Notify
+  visibility?: HostVisibility
   preview?: PreviewViews
   webview?: PluginWebviews
 }
@@ -360,19 +416,15 @@ export const fleetBridge = (): FleetBridge | null => {
       return adopt(request)
     },
     rename: async (nodeId, label) => (await acorn.nodeRename?.(nodeId, label)) ?? null,
-    forget: async (nodeId, revoke) => { await acorn.nodeForget?.(nodeId, revoke) },
+    forget: async (nodeId, revoke) => {
+      await acorn.nodeForget?.(nodeId, revoke)
+    },
     reconnect: (nodeId) => acorn.nodeReconnect?.(nodeId),
     restartLocal: async () => {
       const restart = acorn.nodeRestartLocal
       if (!restart) throw new Error('This build does not supervise a local node.')
       await restart()
     },
-    tunnelOpen: async (request) => {
-      const open = acorn.nodeTunnelOpen
-      if (!open) throw new Error('This build cannot tunnel.')
-      return open(request)
-    },
-    tunnelClose: (match) => acorn.nodeTunnelClose?.(match),
   }
 }
 
@@ -414,11 +466,13 @@ export const pickFiles = async (options: { accept?: readonly string[] } = {}): P
     // the same outcome as the owner walking away from the dialog.
     input.oncancel = () => resolve([])
     input.onchange = () => {
-      void Promise.all([...(input.files ?? [])].map(async (file) => ({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        bytes: new Uint8Array(await file.arrayBuffer()),
-      }))).then(resolve)
+      void Promise.all(
+        [...(input.files ?? [])].map(async (file) => ({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        })),
+      ).then(resolve)
     }
     input.click()
   })
@@ -445,7 +499,7 @@ export const saveFile = async (request: SaveRequest): Promise<boolean> => {
 export const notifyHost = (): Notify | null => acornGlobal()?.notify ?? null
 
 // The page's own notifications, held until they close. A `Notification` whose only reference is the
-// browser's can be collected with its click handler still unfired, which is the bug orca hit.
+// browser's can be collected with its click handler still unfired.
 const shownNotifications = new Map<string, Notification>()
 // Subscribers to the fallback's clicks. A host that installs the group answers `onNoticeActivated`
 // itself, so this set stays empty there.
@@ -487,6 +541,23 @@ export const canSetBadge = (): boolean => !!acornGlobal()?.notify
 /** The number on the app icon, or null for none. A no-op where there is no icon to draw on. */
 export const setBadge = (count: number | null): void => acornGlobal()?.notify?.setBadge(count)
 
+// Whether this client is out of sight: the host's answer where it installed one, the page's otherwise,
+// and visible where there is neither.
+export const hostHidden = (): boolean => {
+  const host = acornGlobal()?.visibility
+  if (host) return host.hidden()
+  return typeof document !== 'undefined' && document.hidden
+}
+
+/** Called whenever `hostHidden()` may have changed its answer. */
+export const onHostVisibilityChange = (cb: () => void): (() => void) => {
+  const host = acornGlobal()?.visibility
+  if (host) return host.onChange(cb)
+  if (typeof document === 'undefined') return () => {}
+  document.addEventListener('visibilitychange', cb)
+  return () => document.removeEventListener('visibilitychange', cb)
+}
+
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.
 export const canPairNodes = (): boolean => !!acornGlobal()?.nodeProbe
@@ -496,7 +567,14 @@ export type OverlayPresentation = {
   generation: number
   viewport?: { width: number; height: number }
   pages: Array<{ bounds: VisibleElementRect; blockers: number[] }>
-  surfaces: Array<{ id: number; role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'; bounds: VisibleElementRect; radius: number[]; interactive: boolean; modal: boolean }>
+  surfaces: Array<{
+    id: number
+    role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'
+    bounds: VisibleElementRect
+    radius: number[]
+    interactive: boolean
+    modal: boolean
+  }>
 }
 export type RendererLayer = { update(presentation: OverlayPresentation): Promise<boolean> }
 export const rendererLayer = (): RendererLayer | null => acornGlobal()?.rendererLayer ?? null

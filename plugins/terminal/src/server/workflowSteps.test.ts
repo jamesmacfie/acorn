@@ -36,7 +36,17 @@ const runProcess = vi.fn(async (spec: ProcSpec) => {
 })
 
 const SCRIPTS = new Map<string, { result?: ProcResult; chunks?: ['out' | 'err', string][] }>([
-  ['two-chunks', { chunks: [['out', 'one\n'], ['err', 'oops\n'], ['out', 'two\n']], result: procResult({ stdout: 'one\ntwo\n', stderr: 'oops\n' }) }],
+  [
+    'two-chunks',
+    {
+      chunks: [
+        ['out', 'one\n'],
+        ['err', 'oops\n'],
+        ['out', 'two\n'],
+      ],
+      result: procResult({ stdout: 'one\ntwo\n', stderr: 'oops\n' }),
+    },
+  ],
   ['fails', { result: procResult({ code: 3, stderr: 'nope\n' }) }],
   ['slow', { result: procResult({ code: null, timedOut: true }) }],
   ['interrupted', { result: procResult({ code: null, aborted: true }) }],
@@ -55,7 +65,11 @@ const core = {
 
 const validationContext = { label: "step 'shell'" }
 
-const step = (withTable: Record<string, unknown>): StepDef => ({ name: 'shell', kind: 'terminal:command', with: withTable })
+const step = (withTable: Record<string, unknown>): StepDef => ({
+  name: 'shell',
+  kind: 'terminal:command',
+  with: withTable,
+})
 
 const run = async (withTable: Record<string, unknown>) => {
   const events: Record<string, unknown>[] = []
@@ -73,12 +87,18 @@ describe('the terminal:command step', () => {
 
   it('names what is missing rather than saying the step is invalid', () => {
     expect(validate(step({}), validationContext)).toEqual(["step 'shell' has no command"])
-    expect(validate(step({ command: 'true', timeoutMs: 10 }), validationContext))
-      .toEqual([`step 'shell' timeout must be between 1000 and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`])
-    expect(validate(step({ command: 'true', timeoutMs: MAX_COMMAND_TIMEOUT_MS + 1 }), validationContext)).toHaveLength(1)
-    expect(validate(step({ command: 'true', env: 'NOT AN ASSIGNMENT' }), validationContext))
-      .toEqual(["step 'shell' env: 'NOT AN ASSIGNMENT' is not a KEY=value line"])
-    expect(validate(step({ command: 'true', timeoutMs: 5_000, allowFailure: true, env: 'A=1' }), validationContext)).toEqual([])
+    expect(validate(step({ command: 'true', timeoutMs: 10 }), validationContext)).toEqual([
+      `step 'shell' timeout must be between 1000 and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`,
+    ])
+    expect(validate(step({ command: 'true', timeoutMs: MAX_COMMAND_TIMEOUT_MS + 1 }), validationContext)).toHaveLength(
+      1,
+    )
+    expect(validate(step({ command: 'true', env: 'NOT AN ASSIGNMENT' }), validationContext)).toEqual([
+      "step 'shell' env: 'NOT AN ASSIGNMENT' is not a KEY=value line",
+    ])
+    expect(
+      validate(step({ command: 'true', timeoutMs: 5_000, allowFailure: true, env: 'A=1' }), validationContext),
+    ).toEqual([])
   })
 
   it('reads KEY=value lines and skips blanks and comments', () => {
@@ -88,12 +108,19 @@ describe('the terminal:command step', () => {
   it('reports the exit code, stdout and stderr', async () => {
     const { outcome } = await run({ command: 'two-chunks' })
     expect(outcome.status).toBe('done')
-    expect(outcome).toMatchObject({ structured: { exitCode: 0, stdout: 'one\ntwo\n', stderr: 'oops\n', truncated: false } })
+    expect(outcome).toMatchObject({
+      structured: { exitCode: 0, stdout: 'one\ntwo\n', stderr: 'oops\n', truncated: false },
+    })
   })
 
   it('runs in the task’s checkout, with the step’s environment and the default timeout', async () => {
     await run({ command: 'anything', env: 'GREETING=hello' })
-    expect(lastSpec).toMatchObject({ file: '/bin/sh', args: ['-c', 'anything'], cwd: '/tmp/checkout', timeoutMs: COMMAND_TIMEOUT_MS })
+    expect(lastSpec).toMatchObject({
+      file: '/bin/sh',
+      args: ['-c', 'anything'],
+      cwd: '/tmp/checkout',
+      timeoutMs: COMMAND_TIMEOUT_MS,
+    })
     expect(lastSpec?.env).toMatchObject({ GREETING: 'hello', ACORN_TASK_ID: 'task1' })
   })
 
@@ -124,33 +151,39 @@ describe('the terminal:command step', () => {
 })
 
 describe('the terminal:run-target step', () => {
-  const service = (over: Partial<{ start: unknown; status: unknown }> = {}) => ({
-    start: async () => ({ ok: true, sessionId: 'sess1' }),
-    status: async () => ({ running: true, url: 'http://localhost:5173' }),
-    ...over,
-  } as Parameters<typeof runTargetStep>[0])
+  const service = (over: Partial<{ start: unknown; status: unknown }> = {}) =>
+    ({
+      start: async () => ({ ok: true, sessionId: 'sess1' }),
+      status: async () => ({ running: true, url: 'http://localhost:5173' }),
+      ...over,
+    }) as Parameters<typeof runTargetStep>[0]
 
-  const context = (withTable: Record<string, unknown>) => ({
-    run: { id: 'run1', taskId: 'task1' },
-    step: { id: 'step1' },
-    def: { name: 'dev', kind: 'terminal:run-target', with: withTable },
-    renderedPrompt: '',
-    tools: {},
-    budget: {},
-    signal: new AbortController().signal,
-    inputs: {},
-    upstream: [],
-    emit: () => {},
-  } as unknown as StepContext)
+  const context = (withTable: Record<string, unknown>) =>
+    ({
+      run: { id: 'run1', taskId: 'task1' },
+      step: { id: 'step1' },
+      def: { name: 'dev', kind: 'terminal:run-target', with: withTable },
+      renderedPrompt: '',
+      tools: {},
+      budget: {},
+      signal: new AbortController().signal,
+      inputs: {},
+      upstream: [],
+      emit: () => {},
+    }) as unknown as StepContext
 
   it('refuses a step with no target', () => {
-    expect(runTargetStep(service()).validate({ with: {} }, { label: "step 'dev'" }))
-      .toEqual(["step 'dev' has no run target"])
+    expect(runTargetStep(service()).validate({ with: {} }, { label: "step 'dev'" })).toEqual([
+      "step 'dev' has no run target",
+    ])
   })
 
   it('reports the session and the URL the target came up on', async () => {
     const outcome = await runTargetStep(service()).handler(context({ target: 'dev' }))
-    expect(outcome).toMatchObject({ status: 'done', structured: { targetId: 'dev', sessionId: 'sess1', url: 'http://localhost:5173' } })
+    expect(outcome).toMatchObject({
+      status: 'done',
+      structured: { targetId: 'dev', sessionId: 'sess1', url: 'http://localhost:5173' },
+    })
   })
 
   it('does not wait when the step says not to', async () => {
@@ -161,7 +194,10 @@ describe('the terminal:run-target step', () => {
 
   it('fails when the target will not start', async () => {
     const refused = service({ start: async () => ({ ok: false, reason: 'No run target dev.' }) })
-    expect(await runTargetStep(refused).handler(context({ target: 'dev' }))).toEqual({ status: 'failed', error: 'No run target dev.' })
+    expect(await runTargetStep(refused).handler(context({ target: 'dev' }))).toEqual({
+      status: 'failed',
+      error: 'No run target dev.',
+    })
   })
 
   it('fails when the target exits before it reports a URL', async () => {

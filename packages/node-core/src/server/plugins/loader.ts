@@ -4,16 +4,22 @@
 // a built-in is a skip plus a report, never a throw (docs/plugins/loaded-plugins.md § Loaded plugins, "Failures are
 // contained").
 //
-// The loader used to be inert unless ACORN_UNSAFE_PLUGINS=1, because there was no consent surface and
-// a default-on loader would have run third-party code nobody agreed to. Phase 5 removed the flag: the
-// only way a package reaches `<dataRoot>/plugins` now is through the installer, an
-// owner-authenticated route, and the device asks again before it runs the client half.
+// The loader runs whatever is in `<dataRoot>/plugins`. A package gets there through the
+// owner-authenticated installer, the app's bundled packages, or a developer's own `build:plugin`, and
+// the device asks again before it runs the client half.
 import { createHash } from 'node:crypto'
 import { readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
-import { contributesNodeData, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
+import {
+  contributesNodeData,
+  PLUGIN_API_MAJOR,
+  readPluginManifestResult,
+  speaksApiVersion,
+  type ManifestUnknown,
+  type PluginManifest,
+} from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
@@ -25,15 +31,15 @@ import type { LoadedPluginBinding } from '../pluginHost/context'
 import { createLogger } from '../telemetry/logger'
 import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 
-import { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES, readPluginFile, streamPluginFile, visitPluginFile } from './packageFiles'
+import {
+  MAX_CLIENT_BUNDLE_BYTES,
+  MAX_PLUGIN_FILE_BYTES,
+  readPluginFile,
+  streamPluginFile,
+  visitPluginFile,
+} from './packageFiles'
 
 const log = createLogger('plugins')
-
-// A client bundle is one ESM file that has to travel a broker request and land in a device's cache
-// (docs/plugins.md). The ceiling is here rather than only in the
-// device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
-// generous enough that no honest bundle meets it.
-export { MAX_CLIENT_BUNDLE_BYTES } from './packageFiles'
 
 export type LoadedPlugin = {
   manifest: PluginManifest
@@ -48,8 +54,8 @@ export type LoadedPlugin = {
 }
 
 /** What the plugin host binds a loaded plugin's context to: its permissions, storage, and the manifest
- *  contributions the host registers for it. One function for boot and reload, because two copies
- *  drifted and a reload dropped the plugin's data sources (./reload.ts). */
+ *  contributions the host registers for it. One function for boot and reload, so a reload cannot drop
+ *  a contribution that boot registers. */
 export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding => ({
   permissions: entry.manifest.permissions.node,
   events: entry.manifest.permissions.events,
@@ -77,13 +83,13 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   dir: entry.dir,
 })
 
-// Every package on disk whose manifest parsed, whether or not it has a node half to run. This is the
-// list phase 2 distributes from: a client-only plugin has nothing to load in this process but its
+// Every package on disk whose manifest parsed, whether or not it has a node half to run. Devices get
+// their bundles from this list: a client-only plugin has nothing to load in this process but its
 // bundle still has to reach every paired device.
 export type InstalledPlugin = {
   manifest: PluginManifest
   dir: string
-  // What the manifest declared that this build has no meaning for (./pluginManifest.ts § ManifestUnknown).
+  // What the manifest declared that this build has no meaning for (./manifest.ts § ManifestUnknown).
   // Retained and reported rather than dropped silently: it rides the roster row out to the device, which
   // raises one attention row per entry.
   unknown: ManifestUnknown
@@ -94,8 +100,8 @@ export type InstalledPlugin = {
   // wanted: the device hashes the bytes it actually received, finds they do not match this claim, and
   // refuses them. Fail closed.
   client: { hash: string; bytes: number } | null
-  // From the package's lockfile, absent when it has none (installed before phase 5, or copied in by
-  // hand). Display only: the structured source stays in the lockfile, which is the one thing that has
+  // From the package's lockfile, absent when it has none (an install from before lockfiles, or copied
+  // in by hand). Display only: the structured source stays in the lockfile, which is the one thing that has
   // to be able to re-resolve it.
   source?: string
   installedAt?: number
@@ -138,13 +144,12 @@ export type InstalledPluginInfo = {
 
 // Why one directory did not produce a plugin (docs/plugins/loaded-plugins.md § Loaded plugins, "Failures are
 // contained"). `id` is the directory name when the manifest could not be read at all, since it is the
-// only handle we have on the thing that failed. `at` used to be missing, and every load failure
-// rendered as a 56-year-old event that sorted last within its severity band; the roster needs it so
-// the bell can say "20 minutes ago".
+// only handle we have on the thing that failed. `at` is what lets the bell say "20 minutes ago" and
+// sort the row by age.
 export type PluginLoadFailure = { id: string; dir: string; reason: string; at: number }
 
 // The same record before it is stamped. One timestamp per pass, applied at the return: these walks
-// are synchronous, so a clock read at each of the nine record sites would differ by microseconds and
+// are synchronous, so a clock read at each record site would differ by microseconds and
 // claim a precision the roster does not have.
 type UnstampedFailure = Omit<PluginLoadFailure, 'at'>
 
@@ -157,13 +162,12 @@ export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlu
 
 // Installed packages live beside the per-plugin SQLite files, under the same `<dataRoot>/plugins`.
 // They cannot collide: the id pattern forbids a dot, so no directory can be named `<id>.sqlite`.
-// Owned by the installer, which is the only thing that writes there; re-exported under the name the
-// loader has always used.
+// Owned by the installer, and re-exported under the loader's name for it.
 export { pluginInstallRoot as pluginInstallDir } from './installer'
 
 // Identity plus content, so a file that was replaced between two scans is re-read and one that was
-// not is not. Phase 5 made `scanInstalled` a per-request call from the roster route, and sha256 over
-// an 8 MiB bundle on every GET is a cost with no answer attached to it.
+// not is not. `scanInstalled` runs on every roster request, and sha256 over an 8 MiB bundle on every
+// GET is a cost with no answer attached to it.
 const digestCache = new Map<string, { key: string; value: { hash: string; bytes: number } }>()
 
 // The client entrypoint's hash and size, or null. Every failure is null rather than a throw: a
@@ -215,7 +219,15 @@ export type ActivePluginSnapshot = {
 /** Retain the manifest and the exact client bytes as one boot or reload candidate. The reported
  * digest is computed from these retained bytes, never from a later disk scan. */
 export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<ActivePluginSnapshot> {
-  const { id, label: _label, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
+  const {
+    id,
+    label: _label,
+    hasNode,
+    source: _source,
+    installedAt: _installedAt,
+    bundled: _bundled,
+    ...declaration
+  } = installedPluginInfo(entry)
   const bundle = await readClientBundle([entry], id)
   return {
     id,
@@ -273,10 +285,9 @@ const isDirectory = (path: string): boolean => {
 /** Every package on disk whose manifest parses and whose apiVersion this node speaks, with nothing
  * imported and nothing executed.
  *
- * Split out of `loadExternalPlugins` because phase 5 gave the roster route a second question to
- * answer: the load result describes what this process assembled at boot, and after an install or an
- * uninstall that is no longer what is on disk. This is the "right now" answer, and comparing the two
- * is how the roster knows a restart is pending (server/routes/plugins/plugins.ts). */
+ * Separate from `loadExternalPlugins` because the load result describes what this process assembled at
+ * boot, and after an install or an uninstall that is no longer what is on disk. This is the "right
+ * now" answer, and comparing the two is how the roster knows a restart is pending (`pluginState`). */
 export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[]; failures: PluginLoadFailure[] } {
   const root = pluginInstallRoot(dataRoot)
   const installed: InstalledPlugin[] = []
@@ -328,9 +339,8 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
 // ── Declared dependencies ─────────────────────────────────────────────────────────────────────────
 //
 // `requires.plugins` in the manifest (@acorn/protocol/plugin/contract.ts). Two things come out of it, and
-// the first is the one worth having: a package that consumes another plugin's capability used to fail at
-// whichever route reached for it first, with a message about a missing capability and nothing naming the
-// package that was supposed to provide it.
+// the first is the one worth having: a package missing a plugin it consumes is refused at load, naming
+// that plugin, rather than failing at whichever route reaches for the missing capability first.
 //
 // A requirement is met by anything present on this node under that id: a built-in, another loaded
 // package, or a client-only one, because a client-only package still contributes its manifest. Disabled
@@ -358,11 +368,19 @@ function resolveRequires(
       if (builtins.has(dependency.id)) continue
       const version = versions.get(dependency.id)
       if (version === undefined) {
-        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires the plugin '${dependency.id}', which is not installed on this node` })
+        unmet.push({
+          id: entry.manifest.id,
+          dir: entry.dir,
+          reason: `requires the plugin '${dependency.id}', which is not installed on this node`,
+        })
         break
       }
       if (dependency.version && !speaksApiVersion(dependency.version, majorOf(version))) {
-        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires '${dependency.id}' version ${dependency.version}; this node has ${version}` })
+        unmet.push({
+          id: entry.manifest.id,
+          dir: entry.dir,
+          reason: `requires '${dependency.id}' version ${dependency.version}; this node has ${version}`,
+        })
         break
       }
     }
@@ -413,7 +431,11 @@ type EntryOutcome = { loaded?: LoadedPlugin; installed?: InstalledPlugin; failur
 
 // Never rejects: every way a package can fail is a failure row, so one bad package cannot stop its
 // siblings from loading.
-async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: ReadonlySet<string>): Promise<EntryOutcome> {
+async function loadEntry(
+  entry: InstalledPlugin,
+  dataRoot: string,
+  builtins: ReadonlySet<string>,
+): Promise<EntryOutcome> {
   const { manifest, dir } = entry
   // Before anything runs: a skill that fails its checks fails the package, with the reason, rather
   // than quietly leaving the agent without a procedure the owner installed for it.
@@ -444,7 +466,11 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
     if (builtins.has(manifest.id)) {
       return {
         installed: entry,
-        failure: { id: manifest.id, dir, reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name` },
+        failure: {
+          id: manifest.id,
+          dir,
+          reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name`,
+        },
       }
     }
     return {
@@ -469,7 +495,13 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   if (manifest.migrations) {
     const declared = resolveInRoot(dir, manifest.migrations)
     if (!declared) {
-      return { failure: { id: manifest.id, dir, reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory` } }
+      return {
+        failure: {
+          id: manifest.id,
+          dir,
+          reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory`,
+        },
+      }
     }
     try {
       migrationsFolder = pluginMigrationsChain(manifest.id, declared)
@@ -482,7 +514,13 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   // must not be able to point the loader at a file outside its own directory.
   const entrypoint = resolveInRoot(dir, manifest.node)
   if (!entrypoint) {
-    return { failure: { id: manifest.id, dir, reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory` } }
+    return {
+      failure: {
+        id: manifest.id,
+        dir,
+        reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory`,
+      },
+    }
   }
 
   let plugin: NodePlugin
@@ -499,9 +537,19 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
       permissions: manifest.permissions.node,
     })
   } catch (error) {
-    const code = error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
-    const resource = error instanceof Error && 'resource' in error ? ` (${String((error as Error & { resource?: unknown }).resource)})` : ''
-    return { failure: { id: manifest.id, dir, reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}` } }
+    const code =
+      error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
+    const resource =
+      error instanceof Error && 'resource' in error
+        ? ` (${String((error as Error & { resource?: unknown }).resource)})`
+        : ''
+    return {
+      failure: {
+        id: manifest.id,
+        dir,
+        reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}`,
+      },
+    }
   }
 
   const storage: PluginStorage = {
@@ -539,22 +587,26 @@ export async function loadExternalPlugins(
   const installed: InstalledPlugin[] = []
   const failures: UnstampedFailure[] = [...scan.failures]
 
-  // Every package starts at once, and the results fold back in directory order. A worker's start
-  // happens almost entirely off this thread: its bootstrap and the bundle's evaluation take about
-  // 45 ms a package. Awaiting them one at a time would make boot wait for the sum.
-  const outcomes = await Promise.all(scan.installed.map((entry) =>
-    // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
-    // harness registration; merely setting `disabled` would still import the Node bundle above it.
-    hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
-      ? Promise.resolve({ installed: entry } as EntryOutcome)
-      : loadEntry(entry, dataRoot, builtins)))
+  // Every package starts at once, and the results fold back in directory order. A worker's start,
+  // its bootstrap and the bundle's evaluation, happens almost entirely off this thread, so awaiting
+  // them one at a time would make boot wait for the sum.
+  const outcomes = await Promise.all(
+    scan.installed.map((entry) =>
+      // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
+      // harness registration; merely setting `disabled` would still import the Node bundle above it.
+      hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
+        ? Promise.resolve({ installed: entry } as EntryOutcome)
+        : loadEntry(entry, dataRoot, builtins),
+    ),
+  )
   for (const outcome of outcomes) {
     if (outcome.failure) failures.push(outcome.failure)
     if (outcome.loaded) {
       // Shadowing a built-in during a staged migration (docs/plugins/dev-loop.md § The dev loop). Loud rather
       // than silent, because "the version running is not the one in this binary" is the single most
       // confusing thing a support thread can fail to mention.
-      if (outcome.loaded.shadowsBuiltin) log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)
+      if (outcome.loaded.shadowsBuiltin)
+        log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)
       loaded.push(outcome.loaded)
     }
     if (outcome.installed) installed.push(outcome.installed)

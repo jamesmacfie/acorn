@@ -1,12 +1,12 @@
+import type { Disposable } from '../pluginHost/capabilities'
 import type { IntegrationProviderContribution, ProviderRouteContribution } from './types'
 
 // A module singleton, like the HTTP route registry and unlike the capability registry, because a provider
 // contribution is a static descriptor rather than a per-boot object bound to a database handle. It
 // is written by plugin init rather than by a one-time side-effect import, and that matters because
-// `startServiceRuntime` can run several times in one process (its own test does it four times), so a
-// second boot would hit the duplicate-id guards below and fail the whole boot. Hence
-// `removePluginProviders`, the exact counterpart of `removePluginRoutes`, called by the plugin host
-// before each init.
+// `bootNode` can run several times in one process (its tests do), so a second boot would hit the
+// duplicate-id guards below and fail the whole boot. Hence the undo each registration hands back,
+// which the plugin host runs on teardown.
 //
 // Owner is tracked rather than inferred from the id: a plugin may contribute several providers
 // (model-providers registers two), and the ids are not derived from the plugin name.
@@ -15,13 +15,17 @@ class IntegrationProviderRegistry {
   readonly #owners = new Map<string, string>() // providerId → owning plugin
   readonly #routes: ProviderRouteContribution[] = []
 
-  register(provider: IntegrationProviderContribution, owner?: string): void {
+  register(provider: IntegrationProviderContribution, owner?: string): Disposable {
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate integration provider '${provider.id}'.`)
     if ((provider.capabilities.comments === 'write') !== !!provider.comment) {
-      throw new Error(`Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`)
+      throw new Error(
+        `Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`,
+      )
     }
     if (provider.image && !provider.detail) {
-      throw new Error(`Provider '${provider.id}' declares \`image\` without \`detail\`, which core reads to check the URL.`)
+      throw new Error(
+        `Provider '${provider.id}' declares \`image\` without \`detail\`, which core reads to check the URL.`,
+      )
     }
     if (provider.capabilities.contextFormat && (!provider.codec || !provider.taskContext)) {
       throw new Error(`Provider '${provider.id}' declares context formatting without a codec and formatter.`)
@@ -31,15 +35,29 @@ class IntegrationProviderRegistry {
     }
     const resourceIds = new Set<string>()
     for (const resource of provider.resources) {
-      if (resourceIds.has(resource.id)) throw new Error(`Provider '${provider.id}' declares duplicate resource '${resource.id}'.`)
+      if (resourceIds.has(resource.id))
+        throw new Error(`Provider '${provider.id}' declares duplicate resource '${resource.id}'.`)
       resourceIds.add(resource.id)
-      if (resource.ttlMs <= 0 || typeof resource.key !== 'function' || typeof resource.read !== 'function' || typeof resource.refresh !== 'function') {
+      if (
+        resource.ttlMs <= 0 ||
+        typeof resource.key !== 'function' ||
+        typeof resource.read !== 'function' ||
+        typeof resource.refresh !== 'function'
+      ) {
         throw new Error(`Provider '${provider.id}' resource '${resource.id}' is not executable.`)
       }
     }
-    if (provider.codec && !provider.conformance) throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
+    if (provider.codec && !provider.conformance)
+      throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
     this.#providers.set(provider.id, provider)
     if (owner) this.#owners.set(provider.id, owner)
+    return {
+      dispose: () => {
+        if (this.#providers.get(provider.id) !== provider) return
+        this.#providers.delete(provider.id)
+        this.#owners.delete(provider.id)
+      },
+    }
   }
 
   // Drop everything `plugin` contributed on a previous boot, providers and their routers alike.
@@ -82,14 +100,22 @@ class IntegrationProviderRegistry {
     return [...this.#providers.values()]
   }
 
-  registerRoute(route: ProviderRouteContribution): void {
+  registerRoute(route: ProviderRouteContribution): Disposable {
     this.validateContribution(route.providerId, 'Provider route')
-    // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
+    // Keyed by (providerId, prefix): the prefix is namespace-relative, so two providers may both
     // contribute the empty prefix. Only the same provider doing it twice is a collision.
-    if (this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)) {
+    if (
+      this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)
+    ) {
       throw new Error(`Duplicate provider route prefix '${route.prefix}' for provider '${route.providerId}'.`)
     }
     this.#routes.push(route)
+    return {
+      dispose: () => {
+        const index = this.#routes.indexOf(route)
+        if (index >= 0) this.#routes.splice(index, 1)
+      },
+    }
   }
 
   routes(): readonly ProviderRouteContribution[] {
@@ -97,7 +123,8 @@ class IntegrationProviderRegistry {
   }
 
   validateContribution(providerId: string, kind: string): void {
-    if (!this.#providers.has(providerId)) throw new Error(`${kind} names unregistered integration provider '${providerId}'.`)
+    if (!this.#providers.has(providerId))
+      throw new Error(`${kind} names unregistered integration provider '${providerId}'.`)
   }
 }
 

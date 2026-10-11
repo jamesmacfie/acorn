@@ -80,8 +80,10 @@ export async function listConnectionProjects(args: {
     const claimed = await args.secrets.use(
       connection.encryptedCredentials,
       `${connection.provider}: list projects`,
-      (secret) => providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
-        source.list({ connection, secret })),
+      (secret) =>
+        providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
+          source.list({ connection, secret }),
+        ),
     )
     return { ok: true, value: boundProviderProjects(claimed) }
   } catch (error) {
@@ -92,7 +94,11 @@ export async function listConnectionProjects(args: {
         .update(schema.integrations)
         .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
         .where(eq(schema.integrations.id, connection.id))
-      broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
+      broadcastConnectionChanged({
+        integrationId: connection.id,
+        providerId: connection.provider,
+        status: 'needs-auth',
+      })
       return failure('provider_secret_unreadable', 401)
     }
     // 400 does not survive as a client status. A provider rejecting its own request is this node's

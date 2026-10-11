@@ -12,11 +12,7 @@ import {
   type SearchCommand,
   type SettingCommand,
 } from './commands'
-import {
-  createCommandSession,
-  type CommandFleetNode,
-  type CommandSession,
-} from './sessionStore'
+import { createCommandSession, type CommandFleetNode, type CommandSession } from './sessionStore'
 
 // The session's transitions, as one suite both hosts are held to.
 //
@@ -38,17 +34,34 @@ afterEach(() => {
   for (const disposable of held.splice(0).reverse()) disposable.dispose()
 })
 
-const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id, title: id, category: 'navigation', palette: true, kind: 'group', ...over,
-} as CommandContribution)
+const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'navigation',
+    palette: true,
+    kind: 'group',
+    ...over,
+  }) as CommandContribution
 
-const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id, title: id, category: 'action', palette: true, run: () => {}, ...over,
-} as CommandContribution)
+const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    run: () => {},
+    ...over,
+  }) as CommandContribution
 
 const CONTEXT: CommandExecutionContext = {
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 't-1',
+  paneId: null,
+  surfaceId: null,
 }
 
 /** Everything queued has run: a search answered and an activation's promise settled. */
@@ -62,11 +75,14 @@ const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve,
  * driving a session whose observer of the outside world had not started yet.
  */
 async function withSession(
-  body: (session: CommandSession, world: {
-    setContext: (next: CommandExecutionContext) => void
-    closes: () => number
-    opens: () => number
-  }) => void | Promise<void>,
+  body: (
+    session: CommandSession,
+    world: {
+      setContext: (next: CommandExecutionContext) => void
+      closes: () => number
+      opens: () => number
+    },
+  ) => void | Promise<void>,
   options: {
     fleet?: readonly CommandFleetNode[]
     context?: CommandExecutionContext
@@ -80,8 +96,12 @@ async function withSession(
     session = createCommandSession({
       context,
       ...(options.fleet ? { fleet: () => options.fleet! } : {}),
-      onOpen: () => { opens += 1 },
-      onClose: () => { closes += 1 },
+      onOpen: () => {
+        opens += 1
+      },
+      onClose: () => {
+        closes += 1
+      },
     })
     return disposeRoot
   })
@@ -96,9 +116,8 @@ const ids = (session: CommandSession): string[] => session.rows().map((row) => r
 
 describe('the empty root', () => {
   it('lists the top level in the order its owners declared, and nothing else', async () => {
-    // Every row here comes from the command registry, and that is the assertion. There was a second
-    // way into this list until 2026-09-03 — a row provider the host handed the session — and its
-    // rows sorted ahead of the commands by a number nobody could see
+    // Every row here comes from the command registry, and that is the assertion: a second way into this
+    // list would sort its rows against the commands by a number nobody can see
     // (docs/command-palette-and-shortcuts.md).
     register(leaf('cmd.archive', { title: 'Archive task', order: 20 }))
     register(leaf('cmd.new', { title: 'New task', order: 10 }))
@@ -257,10 +276,15 @@ describe('the cursor', () => {
   })
 
   it('never lands on a row that is not selectable, and stops at both ends', async () => {
-    register(search('find', {
-      minQueryLength: 0, debounceMs: 0,
-      query: async () => { throw new Error('the node said no') },
-    }))
+    register(
+      search('find', {
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async () => {
+          throw new Error('the node said no')
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       await settle()
@@ -301,7 +325,13 @@ describe('outcomes', () => {
   })
 
   it('keeps the frame open with the message when the command throws', async () => {
-    register(leaf('cmd.bad', { run: () => { throw new Error('nope') } }))
+    register(
+      leaf('cmd.bad', {
+        run: () => {
+          throw new Error('nope')
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openRoot()
       session.activate()
@@ -315,9 +345,15 @@ describe('outcomes', () => {
   it('ignores a second Enter while the first is still running', async () => {
     let calls = 0
     let release = (): void => {}
-    register(leaf('cmd.slow', {
-      run: () => new Promise<void>((resolve) => { calls += 1; release = () => resolve() }),
-    }))
+    register(
+      leaf('cmd.slow', {
+        run: () =>
+          new Promise<void>((resolve) => {
+            calls += 1
+            release = () => resolve()
+          }),
+      }),
+    )
     await withSession(async (session) => {
       session.openRoot()
       session.activate()
@@ -349,12 +385,14 @@ describe('the world moving underneath', () => {
   it('lets a command that navigates close through its own outcome instead', async () => {
     let move = (): void => {}
     await withSession(async (session, world) => {
-      register(leaf('cmd.goto', {
-        run: async () => {
-          move()
-          await Promise.resolve()
-        },
-      }))
+      register(
+        leaf('cmd.goto', {
+          run: async () => {
+            move()
+            await Promise.resolve()
+          },
+        }),
+      )
       move = () => world.setContext({ ...CONTEXT, taskId: 't-9' })
       session.openRoot()
       session.activate()
@@ -368,13 +406,15 @@ describe('the world moving underneath', () => {
 
   it('closes as soon as a command that moved the world settles without closing', async () => {
     await withSession(async (session, world) => {
-      register(leaf('cmd.moves', {
-        run: async () => {
-          world.setContext({ ...CONTEXT, projectId: 'p-2' })
-          await Promise.resolve()
-          return { effect: 'stay' as const, status: 'done' }
-        },
-      }))
+      register(
+        leaf('cmd.moves', {
+          run: async () => {
+            world.setContext({ ...CONTEXT, projectId: 'p-2' })
+            await Promise.resolve()
+            return { effect: 'stay' as const, status: 'done' }
+          },
+        }),
+      )
       session.openRoot()
       session.activate()
       await settle()
@@ -445,21 +485,36 @@ describe('opening at a command', () => {
 const item = (id: string, over: Record<string, unknown> = {}): CommandSearchItem =>
   ({ id, title: id, ...over }) as CommandSearchItem
 
-const search = (id: string, over: Partial<SearchCommand>): CommandContribution => ({
-  id, title: id, category: 'action', palette: true, kind: 'search',
-  query: async () => [], select: () => {}, ...over,
-} as CommandContribution)
+const search = (id: string, over: Partial<SearchCommand>): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    kind: 'search',
+    query: async () => [],
+    select: () => {},
+    ...over,
+  }) as CommandContribution
 
-const input = (id: string, over: Partial<InputCommand>): CommandContribution => ({
-  id, title: id, category: 'action', palette: true, kind: 'input',
-  submit: () => {}, ...over,
-} as CommandContribution)
+const input = (id: string, over: Partial<InputCommand>): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    kind: 'input',
+    submit: () => {},
+    ...over,
+  }) as CommandContribution
 
 const labels = (session: CommandSession): string[] => session.rows().map((row) => row.label)
 
 /** Fake timers plus the microtasks a settled promise needs. `advanceTimersByTimeAsync` awaits between
  *  timers, so one call covers both a debounce and the fetch it started. */
-const tick = async (ms = 0): Promise<void> => { await vi.advanceTimersByTimeAsync(ms) }
+const tick = async (ms = 0): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(ms)
+}
 
 describe('a search frame', () => {
   beforeEach(() => vi.useFakeTimers())
@@ -479,7 +534,14 @@ describe('a search frame', () => {
 
   it('asks once when the typing stops, and only for the last thing typed', async () => {
     const asked: string[] = []
-    register(search('find', { query: async (text) => { asked.push(text); return [item('issue-1')] } }))
+    register(
+      search('find', {
+        query: async (text) => {
+          asked.push(text)
+          return [item('issue-1')]
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       session.setQuery('r')
@@ -493,7 +555,14 @@ describe('a search frame', () => {
 
   it('says what it wants until the query is long enough, and asks for it trimmed', async () => {
     const asked: string[] = []
-    register(search('find', { query: async (text) => { asked.push(text); return [] } }))
+    register(
+      search('find', {
+        query: async (text) => {
+          asked.push(text)
+          return []
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       expect(labels(session)).toEqual(['Type at least 2 characters to search.'])
@@ -510,7 +579,14 @@ describe('a search frame', () => {
 
   it('waits for the composition to end before asking, so an IME costs one request', async () => {
     const asked: string[] = []
-    register(search('find', { query: async (text) => { asked.push(text); return [] } }))
+    register(
+      search('find', {
+        query: async (text) => {
+          asked.push(text)
+          return []
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       session.setComposing(true)
@@ -527,12 +603,14 @@ describe('a search frame', () => {
 
   it('gives up on what it asked when the query, the frame or the world moves', async () => {
     const signals: AbortSignal[] = []
-    register(search('find', {
-      query: (_text, _context, signal) => {
-        signals.push(signal)
-        return new Promise<CommandSearchItem[]>(() => {})
-      },
-    }))
+    register(
+      search('find', {
+        query: (_text, _context, signal) => {
+          signals.push(signal)
+          return new Promise<CommandSearchItem[]>(() => {})
+        },
+      }),
+    )
     const held = signals
 
     await withSession(async (session) => {
@@ -577,11 +655,16 @@ describe('a search frame', () => {
 
   it('cannot be given an old answer by a provider that ignored its signal', async () => {
     let releaseFirst: (items: CommandSearchItem[]) => void = () => {}
-    register(search('find', {
-      query: (text) => text === 'ro'
-        ? new Promise<CommandSearchItem[]>((resolve) => { releaseFirst = resolve })
-        : Promise.resolve([item('new')]),
-    }))
+    register(
+      search('find', {
+        query: (text) =>
+          text === 'ro'
+            ? new Promise<CommandSearchItem[]>((resolve) => {
+                releaseFirst = resolve
+              })
+            : Promise.resolve([item('new')]),
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       session.setQuery('ro')
@@ -600,10 +683,14 @@ describe('a search frame', () => {
   it('walks instruction, loading, empty, error, retry and pick', async () => {
     let answer: () => Promise<CommandSearchItem[]> = async () => []
     const picked: CommandSearchItem[] = []
-    register(search('find', {
-      query: () => answer(),
-      select: (chosen) => { picked.push(chosen) },
-    }))
+    register(
+      search('find', {
+        query: () => answer(),
+        select: (chosen) => {
+          picked.push(chosen)
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('find')
       expect(session.kind()).toBe('search')
@@ -611,7 +698,10 @@ describe('a search frame', () => {
 
       // Loading: the debounce has fired and nobody has answered yet.
       let release: (items: CommandSearchItem[]) => void = () => {}
-      answer = () => new Promise((resolve) => { release = resolve })
+      answer = () =>
+        new Promise((resolve) => {
+          release = resolve
+        })
       session.setQuery('rol')
       await tick(300)
       expect(labels(session)).toEqual(['Searching…'])
@@ -627,7 +717,7 @@ describe('a search frame', () => {
       answer = () => Promise.reject(new Error('the node said no'))
       session.setQuery('roll')
       await tick(300)
-      expect(labels(session)).toEqual(['Couldn\'t search. the node said no'])
+      expect(labels(session)).toEqual(["Couldn't search. the node said no"])
       expect(session.selectedRow()).toBeNull()
 
       answer = async () => [item('issue-1', { subtitle: 'runn/runn', badge: '12' })]
@@ -653,12 +743,16 @@ describe('an input frame', () => {
   it('submits once, on Enter, and never twice', async () => {
     const sent: string[] = []
     let release: () => void = () => {}
-    register(input('ask', {
-      submit: (text) => {
-        sent.push(text)
-        return new Promise<void>((resolve) => { release = () => resolve() })
-      },
-    }))
+    register(
+      input('ask', {
+        submit: (text) => {
+          sent.push(text)
+          return new Promise<void>((resolve) => {
+            release = () => resolve()
+          })
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('ask')
       expect(session.kind()).toBe('input')
@@ -683,10 +777,14 @@ describe('an input frame', () => {
 
   it('refuses what its own validation refuses, without asking anybody', async () => {
     const sent: string[] = []
-    register(input('ask', {
-      validate: (text) => (text.length < 4 ? 'say a little more' : undefined),
-      submit: (text) => { sent.push(text) },
-    }))
+    register(
+      input('ask', {
+        validate: (text) => (text.length < 4 ? 'say a little more' : undefined),
+        submit: (text) => {
+          sent.push(text)
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('ask')
       session.setQuery('ab')
@@ -724,12 +822,16 @@ describe('an input frame', () => {
   it('gives up on a submission the reader escaped out of', async () => {
     let signal!: AbortSignal
     let release: () => void = () => {}
-    register(input('ask', {
-      submit: (_text, _context, sent) => {
-        signal = sent
-        return new Promise<void>((resolve) => { release = () => resolve() })
-      },
-    }))
+    register(
+      input('ask', {
+        submit: (_text, _context, sent) => {
+          signal = sent
+          return new Promise<void>((resolve) => {
+            release = () => resolve()
+          })
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('ask')
       session.setQuery('select 1')
@@ -751,10 +853,13 @@ describe('scope', () => {
     register(leaf('needs.project', { scope: 'project' }))
     register(leaf('needs.workspace', { scope: 'workspace' }))
     register(leaf('needs.nothing', { scope: 'none' }))
-    await withSession((session) => {
-      session.openRoot()
-      expect(ids(session)).toEqual(['needs.nothing'])
-    }, { context: { ...CONTEXT, taskId: null, projectId: null, workspaceId: null } })
+    await withSession(
+      (session) => {
+        session.openRoot()
+        expect(ids(session)).toEqual(['needs.nothing'])
+      },
+      { context: { ...CONTEXT, taskId: null, projectId: null, workspaceId: null } },
+    )
 
     await withSession((session) => {
       session.openRoot()
@@ -764,58 +869,99 @@ describe('scope', () => {
 
   it('will not open at a command the captured identity hides', async () => {
     register(leaf('needs.task', { scope: 'task' }))
-    await withSession((session) => {
-      session.openAt('needs.task')
-      // The root, not the command: a shortcut aimed at something this session cannot run opens the
-      // list rather than a frame that could only fail.
-      expect(session.kind()).toBe('root')
-      expect(ids(session)).toEqual([])
-    }, { context: { ...CONTEXT, taskId: null } })
+    await withSession(
+      (session) => {
+        session.openAt('needs.task')
+        // The root, not the command: a shortcut aimed at something this session cannot run opens the
+        // list rather than a frame that could only fail.
+        expect(session.kind()).toBe('root')
+        expect(ids(session)).toEqual([])
+      },
+      { context: { ...CONTEXT, taskId: null } },
+    )
   })
 
   it('asks the captured node, and only fans out when a command says fleet', async () => {
     const asked: (string | null)[] = []
-    register(search('here', { minQueryLength: 0, debounceMs: 0, query: async (_t, context) => { asked.push(context.nodeId); return [] } }))
-    register(search('everywhere', {
-      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
-      query: async (_t, context) => { asked.push(context.nodeId); return [] },
-    }))
-    await withSession(async (session) => {
-      session.openAt('here')
-      await settle()
-      expect(asked).toEqual(['node-1'])
+    register(
+      search('here', {
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async (_t, context) => {
+          asked.push(context.nodeId)
+          return []
+        },
+      }),
+    )
+    register(
+      search('everywhere', {
+        scope: 'fleet',
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async (_t, context) => {
+          asked.push(context.nodeId)
+          return []
+        },
+      }),
+    )
+    await withSession(
+      async (session) => {
+        session.openAt('here')
+        await settle()
+        expect(asked).toEqual(['node-1'])
 
-      asked.length = 0
-      session.close()
-      session.openAt('everywhere')
-      await settle()
-      expect(asked).toEqual(['node-1', 'node-2'])
-    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+        asked.length = 0
+        session.close()
+        session.openAt('everywhere')
+        await settle()
+        expect(asked).toEqual(['node-1', 'node-2'])
+      },
+      {
+        fleet: [
+          { nodeId: 'node-1', label: 'laptop' },
+          { nodeId: 'node-2', label: 'desktop' },
+        ],
+      },
+    )
   })
 
   it('keeps two nodes’ rows apart, and one node’s failure off the other’s rows', async () => {
     const chosen: { id: string; nodeId: string | null }[] = []
-    register(search('everywhere', {
-      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
-      query: async (_text, context) => {
-        if (context.nodeId === 'node-2') throw new Error('no answer within 5s')
-        return [item('dup')]
-      },
-      select: (picked, context) => { chosen.push({ id: picked.id, nodeId: context.nodeId }) },
-    }))
-    await withSession(async (session) => {
-      session.openAt('everywhere')
-      await settle()
-      // The error first, then the rows the other node did answer with.
-      expect(labels(session)).toEqual(['Couldn\'t search desktop. no answer within 5s', 'dup'])
-      expect(ids(session)).toEqual(['error:desktop:0', 'node-1:dup'])
-      expect(session.rows()[1]?.hint).toBe('laptop')
+    register(
+      search('everywhere', {
+        scope: 'fleet',
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async (_text, context) => {
+          if (context.nodeId === 'node-2') throw new Error('no answer within 5s')
+          return [item('dup')]
+        },
+        select: (picked, context) => {
+          chosen.push({ id: picked.id, nodeId: context.nodeId })
+        },
+      }),
+    )
+    await withSession(
+      async (session) => {
+        session.openAt('everywhere')
+        await settle()
+        // The error first, then the rows the other node did answer with.
+        expect(labels(session)).toEqual(["Couldn't search desktop. no answer within 5s", 'dup'])
+        expect(ids(session)).toEqual(['error:desktop:0', 'node-1:dup'])
+        expect(session.rows()[1]?.hint).toBe('laptop')
 
-      session.activate()
-      await settle()
-      // Picked against the node that answered with it, not against whichever node is active.
-      expect(chosen).toEqual([{ id: 'dup', nodeId: 'node-1' }])
-    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+        session.activate()
+        await settle()
+        // Picked against the node that answered with it, not against whichever node is active.
+        expect(chosen).toEqual([{ id: 'dup', nodeId: 'node-1' }])
+      },
+      {
+        fleet: [
+          { nodeId: 'node-1', label: 'laptop' },
+          { nodeId: 'node-2', label: 'desktop' },
+        ],
+      },
+    )
   })
 
   it('comes back to a whole root when a search opened at directly is escaped', async () => {
@@ -830,35 +976,59 @@ describe('scope', () => {
   })
 
   it('namespaces a fleet row so two nodes answering with the same id are both reachable', async () => {
-    register(search('everywhere', {
-      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
-      query: async () => [item('dup')],
-    }))
-    await withSession(async (session) => {
-      session.openAt('everywhere')
-      await settle()
-      expect(ids(session)).toEqual(['node-1:dup', 'node-2:dup'])
-    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+    register(
+      search('everywhere', {
+        scope: 'fleet',
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async () => [item('dup')],
+      }),
+    )
+    await withSession(
+      async (session) => {
+        session.openAt('everywhere')
+        await settle()
+        expect(ids(session)).toEqual(['node-1:dup', 'node-2:dup'])
+      },
+      {
+        fleet: [
+          { nodeId: 'node-1', label: 'laptop' },
+          { nodeId: 'node-2', label: 'desktop' },
+        ],
+      },
+    )
   })
 })
 
-
-const setting = (id: string, over: Partial<SettingCommand>): CommandContribution => ({
-  id, title: id, category: 'navigation', palette: true, kind: 'setting',
-  options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
-  read: async () => 'on',
-  write: async (value: string) => value,
-  ...over,
-} as CommandContribution)
+const setting = (id: string, over: Partial<SettingCommand>): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'navigation',
+    palette: true,
+    kind: 'setting',
+    options: [
+      { value: 'on', label: 'On' },
+      { value: 'off', label: 'Off' },
+    ],
+    read: async () => 'on',
+    write: async (value: string) => value,
+    ...over,
+  }) as CommandContribution
 
 const badges = (session: CommandSession): (string | undefined)[] => session.rows().map((row) => row.badge)
 
 describe('a setting frame', () => {
   it('asks the owner what the value is on entry, and marks that choice and no other', async () => {
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-      read: async () => 'dark',
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        read: async () => 'dark',
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       // Nothing is drawn until the answer lands: a list with nothing marked reads as "none of these".
@@ -872,12 +1042,20 @@ describe('a setting frame', () => {
 
   it('writes the picked value, stays open, and marks what the owner says it stored', async () => {
     const written: string[] = []
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-      read: async () => 'light',
-      // A provider that normalises what it was given still leaves the list marking the right row.
-      write: async (value) => { written.push(value); return 'dark' },
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        read: async () => 'light',
+        // A provider that normalises what it was given still leaves the list marking the right row.
+        write: async (value) => {
+          written.push(value)
+          return 'dark'
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -892,11 +1070,18 @@ describe('a setting frame', () => {
   })
 
   it('keeps the old value on a failed write, and says why', async () => {
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-      read: async () => 'light',
-      write: async () => { throw new Error('the node said no') },
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        read: async () => 'light',
+        write: async () => {
+          throw new Error('the node said no')
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -910,11 +1095,16 @@ describe('a setting frame', () => {
   })
 
   it('refuses a canonical value that names none of the declared choices', async () => {
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-      read: async () => 'light',
-      write: async () => 'neon',
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        read: async () => 'light',
+        write: async () => 'neon',
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -925,10 +1115,15 @@ describe('a setting frame', () => {
   })
 
   it('draws the choices unmarked when the stored value names none of them', async () => {
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-      read: async () => 'a-theme-whose-plugin-left',
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        read: async () => 'a-theme-whose-plugin-left',
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -939,13 +1134,15 @@ describe('a setting frame', () => {
 
   it('shows a failed read as one unselectable line, and Enter reads again', async () => {
     let attempts = 0
-    register(setting('theme', {
-      read: async () => {
-        attempts++
-        if (attempts === 1) throw new Error('the node is not answering')
-        return 'off'
-      },
-    }))
+    register(
+      setting('theme', {
+        read: async () => {
+          attempts++
+          if (attempts === 1) throw new Error('the node is not answering')
+          return 'off'
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -979,10 +1176,19 @@ describe('a setting frame', () => {
 
   it('narrows the choices with the query rather than asking anybody again', async () => {
     let reads = 0
-    register(setting('theme', {
-      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'nord', label: 'Nord' }],
-      read: async () => { reads++; return 'light' },
-    }))
+    register(
+      setting('theme', {
+        options: [
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+          { value: 'nord', label: 'Nord' },
+        ],
+        read: async () => {
+          reads++
+          return 'light'
+        },
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       await settle()
@@ -996,10 +1202,15 @@ describe('a setting frame', () => {
   it('leaves an answer that arrives after Escape nowhere to land', async () => {
     let release: (value: string) => void = () => {}
     register(group('appearance'))
-    register(setting('theme', {
-      parentId: 'appearance',
-      read: () => new Promise<string>((resolve) => { release = resolve }),
-    }))
+    register(
+      setting('theme', {
+        parentId: 'appearance',
+        read: () =>
+          new Promise<string>((resolve) => {
+            release = resolve
+          }),
+      }),
+    )
     await withSession(async (session) => {
       session.openAt('theme')
       session.back()
@@ -1083,13 +1294,18 @@ describe('a contributor going away underneath', () => {
     vi.useFakeTimers()
     try {
       let picked = 0
-      const register2 = () => commandRegistry.register(search('docker.find', {
-        ownerId: 'docker',
-        minQueryLength: 0,
-        debounceMs: 0,
-        query: async () => [item('c1')],
-        select: () => { picked++ },
-      }))
+      const register2 = () =>
+        commandRegistry.register(
+          search('docker.find', {
+            ownerId: 'docker',
+            minQueryLength: 0,
+            debounceMs: 0,
+            query: async () => [item('c1')],
+            select: () => {
+              picked++
+            },
+          }),
+        )
 
       // The control, so the assertion below is about disposal rather than about a row that was never
       // selectable: with the command registered, picking the row reaches its `select`.

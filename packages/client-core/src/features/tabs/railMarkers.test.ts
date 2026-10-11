@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  clampMarkerPriority,
-  isValidRailMarker,
-  resolveRailMarkers,
-  type RailMarker,
-} from './railMarkers'
+import { clampMarkerPriority, isValidRailMarker, resolveRailMarkers, type RailMarker } from './railMarkers'
 
 const marker = (over: Partial<RailMarker> & { id: string }): RailMarker => ({
   label: `label for ${over.id}`,
@@ -41,10 +36,12 @@ describe('resolveRailMarkers', () => {
   })
 
   it('sends the loser of a contested corner to its next choice', () => {
-    expect(positions([
-      marker({ id: 'high', priority: 200, placements: ['top-end'] }),
-      marker({ id: 'low', priority: 100, placements: ['top-end', 'bottom-end'] }),
-    ])).toEqual({ high: 'top-end', low: 'bottom-end' })
+    expect(
+      positions([
+        marker({ id: 'high', priority: 200, placements: ['top-end'] }),
+        marker({ id: 'low', priority: 100, placements: ['top-end', 'bottom-end'] }),
+      ]),
+    ).toEqual({ high: 'top-end', low: 'bottom-end' })
   })
 
   it('keeps a marker with no free position in the legend but off the control', () => {
@@ -57,10 +54,12 @@ describe('resolveRailMarkers', () => {
   })
 
   it('lets a host state outrank the range plugin markers are clamped to', () => {
-    expect(positions([
-      marker({ id: 'plugin', priority: clampMarkerPriority(9999), placements: ['top-start', 'bottom-start'] }),
-      marker({ id: 'core-pin', priority: 240, placements: ['top-start', 'bottom-start'] }),
-    ])).toEqual({ 'core-pin': 'top-start', plugin: 'bottom-start' })
+    expect(
+      positions([
+        marker({ id: 'plugin', priority: clampMarkerPriority(9999), placements: ['top-start', 'bottom-start'] }),
+        marker({ id: 'core-pin', priority: 240, placements: ['top-start', 'bottom-start'] }),
+      ]),
+    ).toEqual({ 'core-pin': 'top-start', plugin: 'bottom-start' })
   })
 
   it('carries a marker-level busy flag without touching anything else', () => {
@@ -75,7 +74,9 @@ describe('resolveRailMarkers', () => {
     expect(isValidRailMarker(marker({ id: 'a', placements: [] }))).toBe(false)
     expect(isValidRailMarker(marker({ id: '', label: 'x' }))).toBe(false)
     // Dropped rather than thrown over: one bad contribution must not blank the rail.
-    expect(resolveRailMarkers([marker({ id: 'a', label: '' }), marker({ id: 'b' })]).placed.map((m) => m.id)).toEqual(['b'])
+    expect(resolveRailMarkers([marker({ id: 'a', label: '' }), marker({ id: 'b' })]).placed.map((m) => m.id)).toEqual([
+      'b',
+    ])
   })
 })
 

@@ -124,9 +124,12 @@ describe('Codex response and TTY parsing', () => {
   })
 
   it('reads the current app-server window duration field', () => {
-    const provider = parseCodexRpcResponse({
-      result: { rateLimits: { primary: { usedPercent: 100, resetsAt: 2, windowDurationMins: 30 } } },
-    }, 10)
+    const provider = parseCodexRpcResponse(
+      {
+        result: { rateLimits: { primary: { usedPercent: 100, resetsAt: 2, windowDurationMins: 30 } } },
+      },
+      10,
+    )
     expect(provider.quotas[0]).toMatchObject({ resetsAt: 2_000, windowSeconds: 1_800 })
   })
 
@@ -146,13 +149,17 @@ describe('Codex response and TTY parsing', () => {
   })
 
   it('classifies TTY authentication and update errors', () => {
-    expect(() => parseCodexTtyOutput('Please log in')).toThrowError(expect.objectContaining({ code: 'authentication_required' }))
-    expect(() => parseCodexTtyOutput('Codex update available')).toThrowError(expect.objectContaining({ code: 'update_required' }))
+    expect(() => parseCodexTtyOutput('Please log in')).toThrowError(
+      expect.objectContaining({ code: 'authentication_required' }),
+    )
+    expect(() => parseCodexTtyOutput('Codex update available')).toThrowError(
+      expect.objectContaining({ code: 'update_required' }),
+    )
   })
 
   it('blames the flags, not the output, when the CLI rejects an option', () => {
-    // What codex 0.154 printed after it dropped `untrusted` from --ask-for-approval. Read as a plain
-    // parse failure, this said "/status had no limits", which sent the search to the wrong place.
+    // What codex 0.154 prints for the dropped `untrusted` value of --ask-for-approval. Read as a plain
+    // parse failure, it says "/status had no limits", which points the search at the wrong place.
     const rejected = "error: invalid value 'untrusted' for '--ask-for-approval <APPROVAL_POLICY>'"
     expect(() => parseCodexTtyOutput(rejected)).toThrowError(
       expect.objectContaining({ code: 'execution_failure', message: expect.stringContaining('rejected the options') }),

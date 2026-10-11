@@ -25,20 +25,16 @@ import type { LayoutProps } from './regions'
 // a frame reaches the document through `bridge.document`, and the host reaches the frame with a surface
 // action when a chord lands in the editor.
 //
-// What is not a region: the button bar. Look at what database's bar actually holds, a searchable
-// saved-queries picker with per-row delete chips, a Generate button visible only when a model
-// connection exists, an Execute button disabled on connection status. A host-drawn action bar stops
-// being cheap immediately. The bar is common, not impossible, so it is the plugin's, drawn as the first
-// row of its own region.
+// What is not a region: the button bar. A real bar holds things like a searchable picker with per-row
+// delete chips and buttons gated on connection state, so a host-drawn bar stops being cheap at once.
+// The bar is the plugin's, drawn as the first row of its own region.
 //
 // One component and two names, because the axis is in the name and never in a prop
 // (docs/panes/layout.md § Layout model, on adding a ninth).
 //
-// Narrow: the frame region collapses to a sheet the document can summon. Terminal: the document region
-// is a host text view, read-only in a first version, and the frame region draws its tree.
+// Narrow: the frame region collapses to a sheet the document can summon. Terminal: both regions draw,
+// with the split moved by a key.
 
-// Matches the pixel height the compiled database pane opened at, so a move to this layout is not also a
-// visual change.
 const DEFAULT_DOCUMENT_SIZE = 200
 const MIN_DOCUMENT_SIZE = 80
 const MAX_DOCUMENT_FRACTION = 0.7
@@ -48,9 +44,9 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   let root: HTMLDivElement | undefined
   let dragStart: number | null = null
   // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
-  // window is not what it is allowed to fill, and no layout may read the window's width (shell.css §
-  // Layouts, docs/ui-design/closed-kit.md § What the kit and layouts must never do, "never do these" item 12). Before the element is
-  // measurable there is no ceiling to apply, which is the honest answer: the floor still holds.
+  // window is not what it is allowed to fill, and no layout may read the window's width (the pane
+  // layouts block in shell.css, and docs/ui-design/closed-kit.md § What the kit and layouts must never
+  // do, item 12). Before the element is measurable there is no ceiling to apply; the floor still holds.
   const ceiling = () => {
     const extent = axis === 'x' ? (root?.offsetWidth ?? 0) : (root?.offsetHeight ?? 0)
     return extent > 0 ? extent * MAX_DOCUMENT_FRACTION : Number.POSITIVE_INFINITY
@@ -58,10 +54,13 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   const drag = createSplitDrag({
     axis,
     label: `Resize ${props.label} editor`,
-    onStart: () => { dragStart = size() },
-    onDelta: (deltaPx) =>
-      setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), ceiling())),
-    onCommit: () => { dragStart = null },
+    onStart: () => {
+      dragStart = size()
+    },
+    onDelta: (deltaPx) => setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), ceiling())),
+    onCommit: () => {
+      dragStart = null
+    },
   })
 
   return (
@@ -74,7 +73,9 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         {props.regions.document?.()}
       </div>
       <div {...drag.handleProps} class="ui-split-handle" data-axis={axis} />
-      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>{props.regions.frame?.()}</div>
+      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>
+        {props.regions.frame?.()}
+      </div>
     </div>
   )
 }

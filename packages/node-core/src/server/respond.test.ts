@@ -58,7 +58,10 @@ describe('error envelope', () => {
   })
 
   it('passes structured details through', async () => {
-    expect(await bodyOf(await get('/v1/core/detailed'))).toMatchObject({ code: 'revision_conflict', details: { revision: 7 } })
+    expect(await bodyOf(await get('/v1/core/detailed'))).toMatchObject({
+      code: 'revision_conflict',
+      details: { revision: 7 },
+    })
   })
 })
 
@@ -180,7 +183,9 @@ describe('the request span', () => {
   it('names the plugin on a git spawn the plugin route made', async () => {
     await get('/v1/p/rollbar/repo')
     flushTelemetry()
-    const histogram = seen.find((record): record is TelemetryMetric => record.kind === 'metric' && record.name === 'git.rev-parse')!
+    const histogram = seen.find(
+      (record): record is TelemetryMetric => record.kind === 'metric' && record.name === 'git.rev-parse',
+    )!
     expect(histogram.attrs.owner).toBe('rollbar')
     // The spawn is counted twice on purpose: once as git and once as a child process, because "how
     // long does git take" and "how long does this node spend starting children" are two questions.

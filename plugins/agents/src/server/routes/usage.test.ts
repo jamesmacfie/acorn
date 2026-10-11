@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
-import { requireUser } from '@acorn/plugin-api/testkit'
+import { requireUser, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { SecretService } from '@acorn/plugin-api/testkit'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
@@ -11,10 +11,7 @@ import { emptyAgentPricingPreferences, type AgentPricingPreferences } from '../.
 import { defaultAgentConcurrency, type AgentConcurrencyLimits } from '../../shared/concurrency'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../pricingStore'
 import { readAgentConcurrency, writeAgentConcurrency } from '../concurrencyStore'
-import {
-  defaultAgentSessionDefaults,
-  type AgentSessionDefaults,
-} from '../../shared/sessionDefaults'
+import { defaultAgentSessionDefaults, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import { customAgentRegistry, deleteCustomAgent, readCustomAgents, saveCustomAgent } from '../customAgents'
 import type { CustomAgent } from '../../shared/customAgents'
@@ -58,14 +55,12 @@ const unusedSettings = {
     throw new Error('deleteCustomAgent is not part of this case')
   },
 }
-const request = (path: string, method = 'GET', body?: unknown) => new Request(
-  `http://acorn.test${path}`,
-  {
+const request = (path: string, method = 'GET', body?: unknown) =>
+  new Request(`http://acorn.test${path}`, {
     method,
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-  },
-)
+  })
 
 const authed = () => {
   const app = new Hono<AppEnv>()
@@ -108,7 +103,9 @@ describe('agent usage routes', () => {
     const app = authed()
     expect(await (await app.fetch(request('/api/agents/usage'), {} as Env)).json()).toEqual(snapshot)
     expect(await (await app.fetch(request('/api/agents/usage/refresh', 'POST'), {} as Env)).json()).toEqual(snapshot)
-    expect(await (await app.fetch(request('/api/agents/usage/refresh/claude', 'POST'), {} as Env)).json()).toEqual(snapshot)
+    expect(await (await app.fetch(request('/api/agents/usage/refresh/claude', 'POST'), {} as Env)).json()).toEqual(
+      snapshot,
+    )
     expect((await app.fetch(request('/api/agents/usage/refresh/missing', 'POST'), {} as Env)).status).toBe(404)
     expect(calls).toEqual([{ userId: 'james' }, { userId: 'james', force: true }])
     expect(providerCalls).toEqual([
@@ -163,7 +160,12 @@ describe('agent usage routes', () => {
   it('reads, validates, and persists plugin-owned pricing preferences', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({
+        secrets: new SecretService('33'.repeat(32)),
+        db: testDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -185,10 +187,13 @@ describe('agent usage routes', () => {
       expect(await saved.json()).toEqual(preferences)
       expect(await (await app.fetch(request('/api/agents/pricing'), env)).json()).toEqual(preferences)
 
-      const invalid = await app.fetch(request('/api/agents/pricing', 'PUT', {
-        version: 1,
-        claude: { overrides: [], customModels: [{ model: '', price: {} }] },
-      }), env)
+      const invalid = await app.fetch(
+        request('/api/agents/pricing', 'PUT', {
+          version: 1,
+          claude: { overrides: [], customModels: [{ model: '', price: {} }] },
+        }),
+        env,
+      )
       expect(invalid.status).toBe(400)
       expect((await invalid.json()).error.code).toBe('bad_request')
       expect(await (await app.fetch(request('/api/agents/pricing'), env)).json()).toEqual(preferences)
@@ -200,7 +205,12 @@ describe('agent usage routes', () => {
   it('reads, validates, and persists the dispatch concurrency limits', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({
+        secrets: new SecretService('44'.repeat(32)),
+        db: testDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -209,8 +219,7 @@ describe('agent usage routes', () => {
       })
       const app = authed()
       const env = {} as Env
-      expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json())
-        .toEqual(defaultAgentConcurrency())
+      expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json()).toEqual(defaultAgentConcurrency())
 
       const limits: AgentConcurrencyLimits = { provider: 6, workspace: 8 }
       const saved = await app.fetch(request('/api/agents/concurrency', 'PUT', limits), env)
@@ -218,7 +227,10 @@ describe('agent usage routes', () => {
       expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json()).toEqual(limits)
 
       // Zero and a number past the ceiling are both refused, and neither disturbs what is stored.
-      for (const body of [{ provider: 0, workspace: 8 }, { provider: 6, workspace: 500 }]) {
+      for (const body of [
+        { provider: 0, workspace: 8 },
+        { provider: 6, workspace: 500 },
+      ]) {
         const refused = await app.fetch(request('/api/agents/concurrency', 'PUT', body), env)
         expect(refused.status).toBe(400)
         expect((await refused.json()).error.code).toBe('bad_request')
@@ -232,21 +244,27 @@ describe('agent usage routes', () => {
   it('merges a new-session defaults write onto the values the runtime maintains', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({
+        secrets: new SecretService('44'.repeat(32)),
+        db: testDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
         sessionDefaults: (userId) => readAgentSessionDefaults(core.prefs, userId),
         setSessionDefaults: async (userId, patch) => {
-          const merged = { ...await readAgentSessionDefaults(core.prefs, userId), ...patch }
+          const merged = { ...(await readAgentSessionDefaults(core.prefs, userId)), ...patch }
           await writeAgentSessionDefaults(core.prefs, userId, merged)
           return merged
         },
       })
       const app = authed()
       const env = {} as Env
-      expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json())
-        .toEqual(defaultAgentSessionDefaults())
+      expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual(
+        defaultAgentSessionDefaults(),
+      )
 
       // What the runtime writes as sessions change.
       const tracked = await app.fetch(
@@ -277,7 +295,9 @@ describe('agent usage routes', () => {
 
       const spawned = { mode: 'explicit', profileId: 'codex', pinned: { codex: { reasoning: 'high' } } }
       expect((await app.fetch(request('/api/agents/session-defaults', 'PUT', { spawned }), env)).status).toBe(200)
-      const saved = await (await app.fetch(request('/api/agents/session-defaults'), env)).json() as AgentSessionDefaults
+      const saved = (await (
+        await app.fetch(request('/api/agents/session-defaults'), env)
+      ).json()) as AgentSessionDefaults
       expect(saved.spawned).toEqual(spawned)
       expect(saved.pinned).toEqual({ codex: { model: 'gpt-5.1-codex-max' } })
       expect(saved.last).toEqual({ codex: { reasoning: 'high' } })
@@ -289,8 +309,9 @@ describe('agent usage routes', () => {
       )
       expect(refused.status).toBe(400)
       expect((await refused.json()).error.code).toBe('bad_request')
-      expect((await (await app.fetch(request('/api/agents/session-defaults'), env)).json() as AgentSessionDefaults).pinned)
-        .toEqual({ codex: { model: 'gpt-5.1-codex-max' } })
+      expect(
+        ((await (await app.fetch(request('/api/agents/session-defaults'), env)).json()) as AgentSessionDefaults).pinned,
+      ).toEqual({ codex: { model: 'gpt-5.1-codex-max' } })
     } finally {
       testDb.cleanup()
     }
@@ -312,11 +333,20 @@ describe('custom agent routes', () => {
   it('creates, edits and deletes the owner’s agents, lists a plugin’s after them, and keeps a plugin’s read only', async () => {
     const testDb = makeTestDb()
     const disposePlugin = customAgentRegistry.register({
-      id: 'lint:tidy', name: 'Tidy', providerId: 'claude', profileId: 'claude-code', options: {},
+      id: 'lint:tidy',
+      name: 'Tidy',
+      providerId: 'claude',
+      profileId: 'claude-code',
+      options: {},
       source: { kind: 'plugin', pluginId: 'lint' },
     })
     try {
-      const core = createCoreServices({ secrets: new SecretService('45'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({
+        secrets: new SecretService('45'.repeat(32)),
+        db: testDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -329,24 +359,40 @@ describe('custom agent routes', () => {
 
       const created = await app.fetch(request('/api/agents/custom-agents', 'POST', reviewer), env)
       expect(created.status).toBe(200)
-      const saved = await created.json() as CustomAgent
+      const saved = (await created.json()) as CustomAgent
       expect(saved).toMatchObject({ ...reviewer, source: { kind: 'user' } })
 
-      const edited = await app.fetch(request(`/api/agents/custom-agents/${saved.id}`, 'PUT', { ...reviewer, name: 'Reviewer' }), env)
+      const edited = await app.fetch(
+        request(`/api/agents/custom-agents/${saved.id}`, 'PUT', { ...reviewer, name: 'Reviewer' }),
+        env,
+      )
       expect(edited.status).toBe(200)
-      expect((await (await app.fetch(request('/api/agents/custom-agents'), env)).json() as CustomAgent[]).map((agent) => agent.name))
-        .toEqual(['Reviewer', 'Tidy'])
+      expect(
+        ((await (await app.fetch(request('/api/agents/custom-agents'), env)).json()) as CustomAgent[]).map(
+          (agent) => agent.name,
+        ),
+      ).toEqual(['Reviewer', 'Tidy'])
 
       // A plugin's agent is listed but cannot be written through the owner's route.
       expect((await app.fetch(request('/api/agents/custom-agents/lint:tidy', 'PUT', reviewer), env)).status).toBe(400)
       // An unknown id is a 404 rather than a quiet create.
       expect((await app.fetch(request('/api/agents/custom-agents/missing', 'PUT', reviewer), env)).status).toBe(404)
       // An instruction past the ceiling is refused at the boundary.
-      expect((await app.fetch(request('/api/agents/custom-agents', 'POST', { ...reviewer, instructions: 'x'.repeat(16_001) }), env)).status).toBe(400)
+      expect(
+        (
+          await app.fetch(
+            request('/api/agents/custom-agents', 'POST', { ...reviewer, instructions: 'x'.repeat(16_001) }),
+            env,
+          )
+        ).status,
+      ).toBe(400)
 
       expect((await app.fetch(request(`/api/agents/custom-agents/${saved.id}`, 'DELETE'), env)).status).toBe(200)
-      expect((await (await app.fetch(request('/api/agents/custom-agents'), env)).json() as CustomAgent[]).map((agent) => agent.id))
-        .toEqual(['lint:tidy'])
+      expect(
+        ((await (await app.fetch(request('/api/agents/custom-agents'), env)).json()) as CustomAgent[]).map(
+          (agent) => agent.id,
+        ),
+      ).toEqual(['lint:tidy'])
     } finally {
       disposePlugin()
       testDb.cleanup()

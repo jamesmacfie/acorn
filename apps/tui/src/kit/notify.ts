@@ -16,8 +16,8 @@ import { createSignal } from 'solid-js'
  *  than writing a preference of its own (../chrome/TerminalNotifications.tsx). Anything unrecognised
  *  reads as `both`, which is the default.
  *
- *  Here rather than in ./bell.ts, where phase 3 left it, because both channels read it and this is
- *  the file the platform seam may import. `bell.ts` re-exports it. */
+ *  Here rather than in ./bell.ts because both channels read it and this is the file the platform seam
+ *  may import. `bell.ts` re-exports it. */
 export type NotifyMode = 'off' | 'bell' | 'terminal' | 'both'
 
 export function notifyMode(env: NodeJS.ProcessEnv = process.env): NotifyMode {
@@ -44,7 +44,8 @@ export type NotifyBackend = 'osc9' | 'osc99' | 'osc777'
  */
 export function detectBackend(env: NodeJS.ProcessEnv = process.env): NotifyBackend | null {
   const program = env.TERM_PROGRAM ?? ''
-  if (program === 'iTerm.app' || program === 'ghostty' || program === 'WezTerm' || program === 'WarpTerminal') return 'osc9'
+  if (program === 'iTerm.app' || program === 'ghostty' || program === 'WezTerm' || program === 'WarpTerminal')
+    return 'osc9'
   // Kitty announces itself in the environment rather than in `TERM_PROGRAM`, and it is asked before
   // the `TERM` table because a kitty inside tmux reports `TERM=screen`.
   if (env.KITTY_WINDOW_ID || env.TERM === 'xterm-kitty') return 'osc99'
@@ -75,9 +76,7 @@ export function sequence(backend: NotifyBackend, title: string, body?: string): 
   const rest = body ? sanitise(body) : ''
   if (backend === 'osc9') return `${ESC}]9;${rest ? `${head}: ${rest}` : head}${ST}`
   if (backend === 'osc99') {
-    return rest
-      ? `${ESC}]99;i=1:d=0;${head}${ST}${ESC}]99;i=1:p=body;${rest}${ST}`
-      : `${ESC}]99;;${head}${ST}`
+    return rest ? `${ESC}]99;i=1:d=0;${head}${ST}${ESC}]99;i=1:p=body;${rest}${ST}` : `${ESC}]99;;${head}${ST}`
   }
   // The one backend whose fields are separated by a character a title may legitimately contain, so
   // here the semicolon is the thing being escaped from.
@@ -87,8 +86,7 @@ export function sequence(backend: NotifyBackend, title: string, body?: string): 
 
 /** Wrap a sequence so tmux hands it to the terminal underneath rather than eating it. Every ESC is
  *  doubled, which is what tmux's own passthrough asks for. */
-export const wrapTmux = (seq: string): string =>
-  `${ESC}Ptmux;${seq.replaceAll(ESC, `${ESC}${ESC}`)}${ST}`
+export const wrapTmux = (seq: string): string => `${ESC}Ptmux;${seq.replaceAll(ESC, `${ESC}${ESC}`)}${ST}`
 
 /** What to write for this notification on this terminal, or the empty string when there is nothing to
  *  write: the mode is `off` or `bell`, or this terminal takes no sequence we know. */
@@ -126,4 +124,6 @@ export function showInTerminal(
 // (client-core/features/notifications/badge.ts). Zero draws nothing.
 const [badge, setBadge] = createSignal(0)
 export { badge as terminalBadge }
-export const setTerminalBadge = (count: number | null): void => { setBadge(count ?? 0) }
+export const setTerminalBadge = (count: number | null): void => {
+  setBadge(count ?? 0)
+}

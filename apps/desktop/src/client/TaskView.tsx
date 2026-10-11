@@ -4,17 +4,36 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, runTargetsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
+import {
+  prefsOptions,
+  runTargetsOptions,
+  tasksKey,
+  tasksOptions,
+  workspacesOptions,
+  type Task,
+} from '@acorn/client-core/infra/queries.ts'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { projectPath, registerCommands } from '@acorn/client-core/host/registries/commands'
-import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands'
+import {
+  registerKeybindings,
+  resolveKeybindings,
+  keybindingRegistry,
+} from '@acorn/client-core/host/registries/commands'
 import { workspaceForProject } from '@acorn/client-core/features/workspaces'
 import { refreshSessionSources } from '@acorn/client-core/features/tasks'
 import { requestTerminalFocusIntent } from '@acorn/client-core/host/registries/commands'
 import { hasHostCapability } from '@acorn/client-core/infra/node'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { runApi } from '@acorn/client-core/features/tasks'
-import { activeTaskId, dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import {
+  activeTaskId,
+  dispatchLayout,
+  layoutForTask,
+  maximizedPane,
+  setActiveTaskId,
+  setMaximizedPane,
+  setSelectedSource,
+} from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { formatChord } from '@acorn/client-core/features/tasks'
 import { taskStatus } from '@acorn/client-core/features/tasks'
@@ -43,11 +62,9 @@ export default function TaskView(props: {
   onToggleTerminal: () => void
   onOpenTerminal: () => void
 }) {
-  // "Does this node run terminals", from the node's plugin roster, not "is this Electron", which is
-  // what it used to mean and why the whole run-target/agent block vanished off-desktop.
+  // "Does this node run terminals", from the node's plugin roster, not from which app is running.
   // `terminalSessions` is terminal's contract surface (create + list), not its renderer client: the
-  // shell has no business holding write/attach/kill/resize, which is what importing
-  // client/terminalClient handed it.
+  // shell has no business holding write/attach/kill/resize.
   const hasEngine = () => hasHostCapability({ plugin: 'terminal' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -114,31 +131,51 @@ export default function TaskView(props: {
     // still answers for itself, and the group only says where they are.
     const paneCommands = paneContributions().flatMap((pane) => [
       {
-        id: `pane.show.${pane.id}`, title: `Show pane: ${pane.label}`, category: 'pane' as const,
-        hint: pane.description, palette: true, parentId: PANES_GROUP,
+        id: `pane.show.${pane.id}`,
+        title: `Show pane: ${pane.label}`,
+        category: 'pane' as const,
+        hint: pane.description,
+        palette: true,
+        parentId: PANES_GROUP,
         when: () => paneAvailable(pane, props.task),
         run: () => dispatchLayout(props.task.id, { type: 'show', pane: pane.id }),
       },
       {
-        id: `pane.close.${pane.id}`, title: `Close pane: ${pane.label}`, category: 'pane' as const,
-        palette: true, parentId: PANES_GROUP,
-        when: () => paneAvailable(pane, props.task) && layoutForTask(props.task.id)?.panes.includes(pane.id) === true && (layoutForTask(props.task.id)?.panes.length ?? 0) > 1,
+        id: `pane.close.${pane.id}`,
+        title: `Close pane: ${pane.label}`,
+        category: 'pane' as const,
+        palette: true,
+        parentId: PANES_GROUP,
+        when: () =>
+          paneAvailable(pane, props.task) &&
+          layoutForTask(props.task.id)?.panes.includes(pane.id) === true &&
+          (layoutForTask(props.task.id)?.panes.length ?? 0) > 1,
         run: () => dispatchLayout(props.task.id, { type: 'close', pane: pane.id }),
       },
       {
         id: `pane.pin.${pane.id}`,
         title: () => `${layoutForTask(props.task.id)?.pinned?.includes(pane.id) ? 'Unpin' : 'Pin'} pane: ${pane.label}`,
-        category: 'pane' as const, palette: true, parentId: PANES_GROUP,
+        category: 'pane' as const,
+        palette: true,
+        parentId: PANES_GROUP,
         when: () => layoutForTask(props.task.id)?.panes.includes(pane.id) === true,
         run: () => dispatchLayout(props.task.id, { type: 'pin', pane: pane.id }),
       },
       {
-        id: `pane.move-left.${pane.id}`, title: `Move pane left: ${pane.label}`, category: 'pane' as const, palette: true, parentId: PANES_GROUP,
+        id: `pane.move-left.${pane.id}`,
+        title: `Move pane left: ${pane.label}`,
+        category: 'pane' as const,
+        palette: true,
+        parentId: PANES_GROUP,
         when: () => (layoutForTask(props.task.id)?.panes.indexOf(pane.id) ?? -1) > 0,
         run: () => dispatchLayout(props.task.id, { type: 'move', pane: pane.id, direction: -1 }),
       },
       {
-        id: `pane.move-right.${pane.id}`, title: `Move pane right: ${pane.label}`, category: 'pane' as const, palette: true, parentId: PANES_GROUP,
+        id: `pane.move-right.${pane.id}`,
+        title: `Move pane right: ${pane.label}`,
+        category: 'pane' as const,
+        palette: true,
+        parentId: PANES_GROUP,
         when: () => {
           const panes = layoutForTask(props.task.id)?.panes ?? []
           const index = panes.indexOf(pane.id)
@@ -151,43 +188,108 @@ export default function TaskView(props: {
       // Both groups are task-scoped, so a palette opened over a browse source does not offer them at
       // all: there is no task for either to be about.
       {
-        id: PANES_GROUP, kind: 'group', title: 'Panes', hint: 'show, close, pin and move the panes on this task',
-        category: 'pane', palette: true, scope: 'task', order: 200,
+        id: PANES_GROUP,
+        kind: 'group',
+        title: 'Panes',
+        hint: 'show, close, pin and move the panes on this task',
+        category: 'pane',
+        palette: true,
+        scope: 'task',
+        order: 200,
       },
       ...paneCommands,
       {
-        id: TERMINAL_GROUP, kind: 'group', title: 'Terminal', hint: 'the drawer and a shell in the worktree',
-        category: 'terminal', palette: true, scope: 'task', order: 300, requires: { plugin: 'terminal' },
+        id: TERMINAL_GROUP,
+        kind: 'group',
+        title: 'Terminal',
+        hint: 'the drawer and a shell in the worktree',
+        category: 'terminal',
+        palette: true,
+        scope: 'task',
+        order: 300,
+        requires: { plugin: 'terminal' },
       },
-      { id: 'task.terminal.toggle', parentId: TERMINAL_GROUP, title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: props.onToggleTerminal },
+      {
+        id: 'task.terminal.toggle',
+        parentId: TERMINAL_GROUP,
+        title: () => (props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer'),
+        category: 'terminal',
+        palette: true,
+        requires: { plugin: 'terminal' },
+        run: props.onToggleTerminal,
+      },
       // A plain shell only. A terminal running a harness CLI is that harness's command and is
       // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts), which
       // is a different owner and so cannot hang inside this group
       // (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
-      { id: 'task.terminal.new-shell', parentId: TERMINAL_GROUP, title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
+      {
+        id: 'task.terminal.new-shell',
+        parentId: TERMINAL_GROUP,
+        title: 'New terminal',
+        hint: 'open a shell in the task worktree',
+        category: 'terminal',
+        palette: true,
+        requires: { plugin: 'terminal' },
+        run: () => openProfile('shell'),
+      },
       // Top-level, and deliberately: one guarded action with a confirmation behind it is not a group,
       // and burying it a keystroke deeper would not make it safer.
-      { id: 'task.archive', title: 'Archive task', hint: 'guarded teardown', category: 'task', palette: true, scope: 'task', run: openClose },
+      {
+        id: 'task.archive',
+        title: 'Archive task',
+        hint: 'guarded teardown',
+        category: 'task',
+        palette: true,
+        scope: 'task',
+        run: openClose,
+      },
       ...paneContributions().map((pane) => ({
-        id: `pane.restore.${pane.id}`, title: `Restore ${pane.label} pane row`, category: 'pane' as const,
+        id: `pane.restore.${pane.id}`,
+        title: `Restore ${pane.label} pane row`,
+        category: 'pane' as const,
         when: () => maximizedPane(props.task.id) === pane.id,
         run: () => setMaximizedPane(props.task.id, null),
       })),
     ])
     const bindings = registerKeybindings([
-      ...paneContributions().flatMap((pane) => pane.defaultChord ? [{
-        id: `pane.show.${pane.id}`, command: `pane.show.${pane.id}`, description: `Show ${pane.label} pane`, category: 'Panes',
-        defaultChord: pane.defaultChord, when: 'task' as const,
-        active: () => paneAvailable(pane, props.task),
-      }] : []),
-      { id: 'task.terminal.toggle', command: 'task.terminal.toggle', description: 'Toggle terminal drawer', category: 'Panes', defaultChord: 'meta+shift+t', when: 'task' },
+      ...paneContributions().flatMap((pane) =>
+        pane.defaultChord
+          ? [
+              {
+                id: `pane.show.${pane.id}`,
+                command: `pane.show.${pane.id}`,
+                description: `Show ${pane.label} pane`,
+                category: 'Panes',
+                defaultChord: pane.defaultChord,
+                when: 'task' as const,
+                active: () => paneAvailable(pane, props.task),
+              },
+            ]
+          : [],
+      ),
+      {
+        id: 'task.terminal.toggle',
+        command: 'task.terminal.toggle',
+        description: 'Toggle terminal drawer',
+        category: 'Panes',
+        defaultChord: 'meta+shift+t',
+        when: 'task',
+      },
       ...paneContributions().map((pane) => ({
-        id: `pane.restore.${pane.id}`, command: `pane.restore.${pane.id}`, description: `Restore ${pane.label} pane row`, category: 'Panes',
-        defaultChord: 'escape', when: 'pane' as const, pane: pane.id,
+        id: `pane.restore.${pane.id}`,
+        command: `pane.restore.${pane.id}`,
+        description: `Restore ${pane.label} pane row`,
+        category: 'Panes',
+        defaultChord: 'escape',
+        when: 'pane' as const,
+        pane: pane.id,
         active: () => maximizedPane(props.task.id) === pane.id,
       })),
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   // While the guarded teardown runs (it can take seconds: teardown script plus worktree removal),
@@ -211,7 +313,10 @@ export default function TaskView(props: {
       // that does not run terminals gets the plain status flip instead.
       if (hasEngine()) {
         const result = await archiveOrDeleteTask(archivedTaskId, pendingAction(), {
-          guarded: true, force: true, skipTeardown, applyChecks: pendingChecks(),
+          guarded: true,
+          force: true,
+          skipTeardown,
+          applyChecks: pendingChecks(),
         })
         if (!result.ok) {
           if (result.archivedTaskIds?.length) {
@@ -237,23 +342,27 @@ export default function TaskView(props: {
     })
 
     function finishArchive(archivedTaskIds: string[]) {
-      completeTaskArchive(archivedTaskId, () => {
-        // Only when the archived task is still the one being looked at. A guarded teardown takes
-        // seconds, and the owner is free to move to another task while it runs; moving them again
-        // when it finishes takes them off whatever they went to, which they chose and this did not.
-        if (!archivedTaskIds.includes(activeTaskId() ?? '')) return
-        // Read now rather than before the request, so the task moved to is one that still exists.
-        const next = nextTask(archivedTaskIds)
-        if (next) {
-          activateTaskSignals(next)
-          navigate(pathForTask(next))
-        } else {
-          const source = defaultSourceId()
-          if (source) setSelectedSource(source)
-          setActiveTaskId(null)
-          navigate(projectPath(archivedProjectId))
-        }
-      }, archivedTaskIds)
+      completeTaskArchive(
+        archivedTaskId,
+        () => {
+          // Only when the archived task is still the one being looked at. A guarded teardown takes
+          // seconds, and the owner is free to move to another task while it runs; moving them again
+          // when it finishes takes them off whatever they went to, which they chose and this did not.
+          if (!archivedTaskIds.includes(activeTaskId() ?? '')) return
+          // Read now rather than before the request, so the task moved to is one that still exists.
+          const next = nextTask(archivedTaskIds)
+          if (next) {
+            activateTaskSignals(next)
+            navigate(pathForTask(next))
+          } else {
+            const source = defaultSourceId()
+            if (source) setSelectedSource(source)
+            setActiveTaskId(null)
+            navigate(projectPath(archivedProjectId))
+          }
+        },
+        archivedTaskIds,
+      )
     }
   }
 
@@ -279,7 +388,9 @@ export default function TaskView(props: {
         label="Terminal"
         glyph="square-terminal"
         active={props.terminalOpen}
-        data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined}
+        data-tip-key={
+          shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined
+        }
         data-tip-sub="Terminals for this task"
         aria-expanded={props.terminalOpen}
         onClick={props.onToggleTerminal}
@@ -290,7 +401,13 @@ export default function TaskView(props: {
   return (
     <div class="workspace-wrap">
       <main class="panes panes-workspace task-layout">
-        <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={closing()} shortcutFor={shortcutFor} />
+        <TaskPaneHost
+          task={props.task}
+          extraButtons={extraButtons()}
+          onCloseTask={openClose}
+          closing={closing()}
+          shortcutFor={shortcutFor}
+        />
 
         <Show when={runError() || closeError()}>
           <Alert
@@ -320,15 +437,20 @@ export default function TaskView(props: {
                 </Show>
               </span>
               <Show when={status()?.missing}>
-                <span class="workspace-footer-repair"><Icon name="triangle-alert" /> Worktree folder is missing</span>
+                <span class="workspace-footer-repair">
+                  <Icon name="triangle-alert" /> Worktree folder is missing
+                </span>
               </Show>
               <Show when={!status()?.missing && status()?.dirty}>
                 <span class="workspace-footer-dirty">
-                  <StatusDot tone="warn" /> {status()?.dirtyCount} uncommitted file{status()?.dirtyCount === 1 ? '' : 's'}
+                  <StatusDot tone="warn" /> {status()?.dirtyCount} uncommitted file
+                  {status()?.dirtyCount === 1 ? '' : 's'}
                 </span>
               </Show>
               <Show when={status() && !status()!.missing && !status()!.dirty}>
-                <span class="muted"><StatusDot tone="ok" /> No uncommitted changes</span>
+                <span class="muted">
+                  <StatusDot tone="ok" /> No uncommitted changes
+                </span>
               </Show>
             </>
           )}

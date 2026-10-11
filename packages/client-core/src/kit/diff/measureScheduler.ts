@@ -66,19 +66,20 @@ export function createDiffMeasureScheduler(options: DiffMeasureSchedulerOptions)
   let frameCommits = 0
   let disposed = false
 
-  const observer = typeof ResizeObserver === 'function'
-    ? new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.target === viewportElement) {
-            options.viewport?.(entry.contentRect.width, entry.contentRect.height)
-            continue
+  const observer =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.target === viewportElement) {
+              options.viewport?.(entry.contentRect.width, entry.contentRect.height)
+              continue
+            }
+            const block = observed.get(entry.target)
+            if (block) dirty.add(block.id)
           }
-          const block = observed.get(entry.target)
-          if (block) dirty.add(block.id)
-        }
-        run()
-      })
-    : null
+          run()
+        })
+      : null
   if (observer) counts.activeObservers = 1
 
   const schedule = () => {
@@ -150,7 +151,11 @@ export function createDiffMeasureScheduler(options: DiffMeasureSchedulerOptions)
     }
 
     if (!dirty.size) return
-    if (wait > 0) settle = setTimeout(() => { settle = 0; schedule() }, wait)
+    if (wait > 0)
+      settle = setTimeout(() => {
+        settle = 0
+        schedule()
+      }, wait)
     else schedule()
   }
 
@@ -212,5 +217,3 @@ export function createDiffMeasureScheduler(options: DiffMeasureSchedulerOptions)
     },
   }
 }
-
-export type DiffMeasureScheduler = ReturnType<typeof createDiffMeasureScheduler>

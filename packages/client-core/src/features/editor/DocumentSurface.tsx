@@ -12,7 +12,11 @@ import { isLanguageId } from '@acorn/protocol/languageIds.ts'
 import { readJson, writeJson } from '../../infra/node/apiClient'
 import { debounce } from '../../kit/lib/state/debounce'
 import { executeCommand } from '../../host/registries/commands/commands'
-import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../../host/registries/commands/keybindings'
+import {
+  keybindingRegistry,
+  resolveFrameKeybinding,
+  resolveKeybindings,
+} from '../../host/registries/commands/keybindings'
 import {
   documentUri,
   documentViewState,
@@ -49,30 +53,23 @@ const log = createLogger('document-surface')
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/editor.md.
 //
-// This is the whole point of the design, so it is worth being blunt about what is where. The plugin
-// declared a language id and two routes and that is all it declared. Everything else on this screen, the
-// editor instance, the theme, the dirty document, the autosave debounce, cmd+S, the
-// flush-before-unmount, the view state and its eviction, is the host's, which is why a plugin cannot get
-// any of it wrong. It also never sees a byte of the editor: a frame that bundled its own would be
-// megabytes and would run without language services, because a plugin origin serves one file.
-//
-// Three of the things this file's first release deliberately left out have since arrived with their
-// consumer, the database pane, and they are the parts worth knowing about:
+// The plugin declares a language id and two routes, nothing else. The editor instance, the theme, the
+// dirty document, the autosave debounce, cmd+S, the flush-before-unmount, the view state and its
+// eviction are the host's, so a plugin can't get any of them wrong. A frame that bundled its own editor
+// would be megabytes and would run without language services, because a plugin origin serves one file.
 //
 //   - `onHandle` hands the composed pane's frame region a read, write and flush view of this document.
-//     The splitter itself is the layout's, not this component's; this one still just fills whatever
-//     rectangle it was given.
+//     The splitter is the layout's; this component fills whatever rectangle it is given.
 //   - Surface actions. A chord like cmd+Enter is pressed with focus inside this editor, where the
 //     plugin's iframe has no keyboard at all, so the host resolves it and posts the command across. The
-//     document is flushed first, and that ordering is a contract rather than an implementation detail:
-//     without it every plugin independently rediscovers "it ran the previous version of my query".
-//   - Completions, as a plain POST to a route the plugin declared. The host stays a dumb proxy: it never
-//     learns the language, which is what lets the same mechanism serve SQL, GraphQL and YAML.
+//     document is flushed first, and that order is a contract: without it the plugin runs the previous
+//     version of the person's query.
+//   - Completions, as a plain POST to a route the plugin declared. The host never learns the language,
+//     so the same mechanism serves SQL, GraphQL and YAML.
 //
-// The editor is imported here at module scope and not in the frame registry, which is the file that
-// registers this pane: that one is evaluated on every shell boot, so it reaches this module through
-// `lazy()` instead. The grammars arrive when a document pane first opens, which is the only moment they
-// are needed, and a shell that never opens one never loads them.
+// The editor is imported here at module scope, not in the frame registry that registers this pane: that
+// one is evaluated on every shell boot, so it reaches this module through `lazy()`, and a shell that
+// never opens a document pane never loads the grammars.
 
 export type DocumentSurfaceProps = {
   pluginId: string
@@ -120,15 +117,15 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
   const address = [nodeId, props.scope.taskId ? 'task' : 'project', scope, uri, readPath, writePath]
   // A language id the manifest parser already checked, re-checked because the manifest reached this
-  // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
+  // device as a roster row, which is bytes a node sent.
   //
-  // Started here and awaited beside the document's text below, because the grammar is a download of
-  // its own (./language.ts fetches one per language). Kicked off at mount so it is in flight while the
-  // read route answers, and the two land together.
+  // Started at mount and awaited beside the document's text below, because the grammar is a download
+  // of its own, so it is in flight while the read route answers and the two land together.
   // `.catch` rather than a rejection the load block has to handle: a grammar that will not download
   // means no highlighting, and no highlighting beats no document.
-  const language = measure(props.pluginId, 'editor.language.load', () => languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext'))
-    .catch(() => [] as Extension)
+  const language = measure(props.pluginId, 'editor.language.load', () =>
+    languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext'),
+  ).catch(() => [] as Extension)
 
   let host: HTMLElement | undefined
   let view: EditorView | undefined
@@ -145,7 +142,11 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     if (view) {
       const state = captureViewState(view)
       rememberDocumentViewState(nodeId, scope, uri, state)
-      if (custody) { custody.viewState = state; custody.state = view.state; custody.flushRecovery() }
+      if (custody) {
+        custody.viewState = state
+        custody.state = view.state
+        custody.flushRecovery()
+      }
     }
   }
 
@@ -157,12 +158,16 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     if (!custody || !writePath) return
     try {
       await custody.flush(async (text) => {
-        if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document is larger than 2 MiB. Its full text is retained for recovery.')
+        if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES)
+          throw new Error('Document is larger than 2 MiB. Its full text is retained for recovery.')
         const result = await writeJson<unknown>(writePath, {
-          method: 'PUT', nodeId, headers: { 'content-type': 'application/json' },
+          method: 'PUT',
+          nodeId,
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ text } satisfies PluginDocumentBody),
         })
-        if (result && typeof result === 'object' && 'ok' in result && result.ok === false) throw new Error('Save failed')
+        if (result && typeof result === 'object' && 'ok' in result && result.ok === false)
+          throw new Error('Save failed')
         return {}
       })
       if (!disposed) setError('')
@@ -178,7 +183,8 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     scheduleSave.cancel()
     const revision = custody?.revision
     await save()
-    if (disposed || custody?.dirty || custody?.revision !== revision) throw new Error('The document changed while saving. Try again.')
+    if (disposed || custody?.dirty || custody?.revision !== revision)
+      throw new Error('The document changed while saving. Try again.')
   }
 
   // A chord pressed with focus inside this editor. It cannot reach the shell's window dispatcher, since
@@ -208,13 +214,15 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // document.
     void flush()
       .then(() => executeCommand(binding.command))
-      .catch((cause: unknown) => log.error(`command ${binding.command} failed`, cause, { 'command.id': binding.command }))
+      .catch((cause: unknown) =>
+        log.error(`command ${binding.command} failed`, cause, { 'command.id': binding.command }),
+      )
     return true
   }
 
   // The plugin's items, offered for this view only. CodeMirror's completion sources hang off the state
-  // rather than off a global per-language registry, so unlike Monaco there is nothing here that a second
-  // document pane in the same language could be offered by mistake.
+  // rather than off a global per-language registry, so a second document pane in the same language
+  // can't be offered them by mistake.
   type CompletionSource = (context: CompletionContext) => Promise<CompletionResult | null>
   const completions = (): CompletionSource | null => {
     const declared = props.region.completions
@@ -249,12 +257,14 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       const options = items.slice(0, MAX_COMPLETION_ITEMS).flatMap<Completion>((item) => {
         // Route output is bytes a node sent, so the shape is checked rather than believed.
         if (typeof item?.label !== 'string' || !item.label) return []
-        return [{
-          label: item.label,
-          type: COMPLETION_KIND[item.kind ?? 'text'] ?? COMPLETION_KIND.text,
-          ...(typeof item.insertText === 'string' ? { apply: item.insertText } : {}),
-          ...(typeof item.detail === 'string' ? { detail: item.detail } : {}),
-        }]
+        return [
+          {
+            label: item.label,
+            type: COMPLETION_KIND[item.kind ?? 'text'] ?? COMPLETION_KIND.text,
+            ...(typeof item.insertText === 'string' ? { apply: item.insertText } : {}),
+            ...(typeof item.detail === 'string' ? { detail: item.detail } : {}),
+          },
+        ]
       })
       return { from: word?.from ?? context.pos, options }
     }
@@ -282,11 +292,17 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     const { taskId } = props.scope
     const projectId = taskId ? taskById(taskId)?.projectId : props.scope.projectId
     return {
-      location: 'content.selection', nodeId,
-      ...(taskId ? { taskId } : {}), ...(projectId ? { projectId } : {}),
-      ownerId: props.pluginId, contentKind: 'document',
+      location: 'content.selection',
+      nodeId,
+      ...(taskId ? { taskId } : {}),
+      ...(projectId ? { projectId } : {}),
+      ownerId: props.pluginId,
+      contentKind: 'document',
       languageId: isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext',
-      readOnly: !writePath, text: selected.text, revision: custody.revision, range: selected.range,
+      readOnly: !writePath,
+      text: selected.text,
+      revision: custody.revision,
+      range: selected.range,
     }
   }
   const selectionIsCurrent = (target: ContentSelectionTarget): boolean =>
@@ -310,7 +326,9 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       let text: string
       const recovery = recoverDocumentCustody(address)
       try {
-        const body = recovery?.dirty ? await Promise.resolve({ text: recovery.acknowledged.toString() }) : await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
+        const body = recovery?.dirty
+          ? await Promise.resolve({ text: recovery.acknowledged.toString() })
+          : await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
         if (typeof body?.text !== 'string') {
           log.warn(`${props.pluginId} returned an unusable document`, body, { 'plugin.id': props.pluginId })
           return setError('This plugin returned an unreadable document.')
@@ -320,7 +338,9 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         if (!recovery && new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
           if (disposed) return
           setOversizedText(body.text)
-          return setError('Document exceeds 2 MiB. Export its full text before replacing it through the authorized storage route, then reopen this pane.')
+          return setError(
+            'Document exceeds 2 MiB. Export its full text before replacing it through the authorized storage route, then reopen this pane.',
+          )
         }
         recordSample(props.pluginId, 'editor.document.characters', body.text.length)
         text = body.text
@@ -332,30 +352,40 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       if (!host) return
 
       const highlighted = shouldHighlightDocument(recovery?.current.length ?? text.length)
-      if (!highlighted) recordSample(props.pluginId, 'editor.syntax.skipped', text.length, 'character', { reason: 'document-size' })
+      if (!highlighted)
+        recordSample(props.pluginId, 'editor.syntax.skipped', text.length, 'character', { reason: 'document-size' })
       const grammar: Extension = []
       custody = recovery ?? documentCustody(address, text)
       releaseCustody = custody.retain()
       if (custody.error) setError(custody.error)
       const autocomplete = completions()
       const extensions: Extension[] = [
-          basicSetup,
-          editorSearch(),
-          editorTheme(),
-          grammar,
-          // Highest precedence, so a surface action wins over whatever the editor would have done with
-          // the same chord.
-          Prec.highest(EditorView.domEventHandlers({ keydown: onEditorKeyDown })),
-          // A read route with no write route is a real mode, not a degenerate one.
-          ...(writePath ? [] : [EditorState.readOnly.of(true), EditorView.editable.of(false)]),
-          ...(autocomplete ? [EditorState.languageData.of(() => [{ autocomplete }])] : []),
-          ...(hover || diagnostics
-            ? [languageServices({ nodeId, routes: () => services, revision: () => custody?.revision, onUnavailable: (reason) => { if (!disposed) setServicesOff(reason) } })]
-            : []),
-          ...(writePath
-            ? [
+        basicSetup,
+        editorSearch(),
+        editorTheme(),
+        grammar,
+        // Highest precedence, so a surface action wins over whatever the editor would have done with
+        // the same chord.
+        Prec.highest(EditorView.domEventHandlers({ keydown: onEditorKeyDown })),
+        // A read route with no write route is a real mode, not a degenerate one.
+        ...(writePath ? [] : [EditorState.readOnly.of(true), EditorView.editable.of(false)]),
+        ...(autocomplete ? [EditorState.languageData.of(() => [{ autocomplete }])] : []),
+        ...(hover || diagnostics
+          ? [
+              languageServices({
+                nodeId,
+                routes: () => services,
+                revision: () => custody?.revision,
+                onUnavailable: (reason) => {
+                  if (!disposed) setServicesOff(reason)
+                },
+              }),
+            ]
+          : []),
+        ...(writePath
+          ? [
               // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same
-              // semantics the editor pane has, now owned once instead of per plugin.
+              // semantics the editor pane has, owned once rather than per plugin.
               EditorView.updateListener.of((update) => {
                 if (update.docChanged && !disposed && custody) {
                   custody.state = update.state
@@ -364,13 +394,32 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
                   else scheduleSave.cancel()
                 }
               }),
-              EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
-              Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void flush().catch(() => {}); return true } }])),
+              EditorView.domEventHandlers({
+                blur: () => {
+                  scheduleSave.flush()
+                  return false
+                },
+              }),
+              Prec.highest(
+                keymap.of([
+                  {
+                    key: 'Mod-s',
+                    run: () => {
+                      void flush().catch(() => {})
+                      return true
+                    },
+                  },
+                ]),
+              ),
             ]
-            : []),
+          : []),
       ]
-      const state = measure(props.pluginId, 'editor.state.create', () => EditorState.create({ doc: custody!.current, extensions }))
-      const restored = custody.state ? custody.state.update({ effects: StateEffect.reconfigure.of(extensions) }).state : state
+      const state = measure(props.pluginId, 'editor.state.create', () =>
+        EditorState.create({ doc: custody!.current, extensions }),
+      )
+      const restored = custody.state
+        ? custody.state.update({ effects: StateEffect.reconfigure.of(extensions) }).state
+        : state
       view = measure(props.pluginId, 'editor.view.create', () => new EditorView({ state: restored, parent: host }))
       custody.state = view.state
       unsubscribe = custody.subscribe(() => {
@@ -378,13 +427,14 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         if (custody.error) setError(custody.error)
         if (!view.state.doc.eq(custody.current)) view.setState(custody.state ?? view.state)
       })
-      if (highlighted) void language.then((loaded) => {
-        if (disposed || !view || !custody || (Array.isArray(loaded) && !loaded.length)) return
-        view.dispatch({ effects: StateEffect.appendConfig.of(loaded) })
-        custody.state = view.state
-      })
+      if (highlighted)
+        void language.then((loaded) => {
+          if (disposed || !view || !custody || (Array.isArray(loaded) && !loaded.length)) return
+          view.dispatch({ effects: StateEffect.appendConfig.of(loaded) })
+          custody.state = view.state
+        })
       stopTheme = watchEditorTheme(view)
-      const remembered = custody.viewState ?? documentViewState(nodeId, scope, uri) as EditorViewState | undefined
+      const remembered = custody.viewState ?? (documentViewState(nodeId, scope, uri) as EditorViewState | undefined)
       if (remembered) applyViewState(view, remembered)
       // The frame's view of this document. `write` goes through a transaction, so it lands in the undo
       // stack and schedules the same autosave a keystroke would. Loading a saved query is an edit like
@@ -398,10 +448,11 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         },
         write: writePath
           ? (next) => {
-            if (disposed) throw new Error('This document grant has retired.')
-            if (new TextEncoder().encode(next).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document is too large.')
-            view?.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
-          }
+              if (disposed) throw new Error('This document grant has retired.')
+              if (new TextEncoder().encode(next).byteLength > MAX_DOCUMENT_BYTES)
+                throw new Error('Document is too large.')
+              view?.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
+            }
           : () => {},
         flush,
       })
@@ -410,26 +461,42 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
 
   return (
     // Not `.pane`: this section's only mount point is a host layout region, which is already inside a `.pane`,
-    // so carrying the class too drew a second border, radius, shadow and background inside the first, and
+    // so carrying the class too would draw a second border, radius, shadow and background inside the first, and
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
       <Show when={servicesOff()}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
       <Show when={ready() || oversizedText() !== undefined}>
-        <Button onPress={() => {
-          const text = custody?.current.toString() ?? oversizedText()
-          if (disposed || text === undefined) return
-          void saveFile({ bytes: new TextEncoder().encode(text), suggestedName: `${props.surfaceId}.txt`, mimeType: 'text/plain;charset=utf-8' }).catch((cause: unknown) => {
-            if (!disposed) setError(cause instanceof Error ? cause.message : 'Export failed')
-          })
-        }}>Export full text</Button>
+        <Button
+          onPress={() => {
+            const text = custody?.current.toString() ?? oversizedText()
+            if (disposed || text === undefined) return
+            void saveFile({
+              bytes: new TextEncoder().encode(text),
+              suggestedName: `${props.surfaceId}.txt`,
+              mimeType: 'text/plain;charset=utf-8',
+            }).catch((cause: unknown) => {
+              if (!disposed) setError(cause instanceof Error ? cause.message : 'Export failed')
+            })
+          }}
+        >
+          Export full text
+        </Button>
       </Show>
       {/* The editor owns these pixels, so the box is a rectangle: the kit owns it and the way in and out
           of it with the keyboard, which is what stops a reader who tabs into an editor region from
           being stuck there (ui/Rectangle.tsx). */}
       <Show when={ready()}>
         <SelectionActions select={selectionTarget} isCurrent={selectionIsCurrent}>
-          <Rectangle kind="editor" label={`${props.surfaceId} document`} mount={(element) => { host = element }} />
+          <Rectangle
+            kind="editor"
+            label={`${props.surfaceId} document`}
+            mount={(element) => {
+              host = element
+            }}
+          />
         </SelectionActions>
       </Show>
     </section>

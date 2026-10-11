@@ -6,30 +6,94 @@ import { blankPlan, createStudioStore, type StudioReview } from './studioStore'
 
 const memory = () => {
   const values = new Map<string, string>()
-  return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => void values.set(key, value), removeItem: (key: string) => void values.delete(key) }
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => void values.set(key, value),
+    removeItem: (key: string) => void values.delete(key),
+  }
 }
 const draft = (content: PanelPlan, draftRevision = 1): DashboardDraft =>
-  ({ id: 'd1', workspaceId: 'w', content, draftRevision, basePublishedRevision: null, publishedRevision: null, updatedAt: 0 } as DashboardDraft)
+  ({
+    id: 'd1',
+    workspaceId: 'w',
+    content,
+    draftRevision,
+    basePublishedRevision: null,
+    publishedRevision: null,
+    updatedAt: 0,
+  }) as DashboardDraft
 // A plan the schema accepts, which a blank plan with no source isn't.
-const sourced = (plan: PanelPlan): PanelPlan => ({ ...plan, sources: [{ id: 'tasks', label: 'Tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
-  name: 'Tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
-  query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
-} } }] })
-const titled = (title: string) => (plan: PanelPlan): PanelPlan => ({ ...plan, title })
+const sourced = (plan: PanelPlan): PanelPlan => ({
+  ...plan,
+  sources: [
+    {
+      id: 'tasks',
+      label: 'Tasks',
+      role: 'primary',
+      reference: {
+        kind: 'inline',
+        bindings: {},
+        content: {
+          name: 'Tasks',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          sourceParameters: {},
+          query: {
+            source: { pluginId: 'core', sourceId: 'tasks' },
+            scope: { workspaceId: 'w', parameters: {} },
+            sort: [],
+          },
+        },
+      },
+    },
+  ],
+})
+const titled =
+  (title: string) =>
+  (plan: PanelPlan): PanelPlan => ({ ...plan, title })
 
-const proposal = (base: PanelPlan, candidate: PanelPlan) => ({ state: 'proposal', base, candidate, baseRevision: 0, summary: 'Renamed', diff: [], problems: [],
-  context: [], usage: { requests: 1, inputTokens: 0, outputTokens: 0 }, providerId: 'p', modelId: 'm' }) as StudioReview['proposal']
+const proposal = (base: PanelPlan, candidate: PanelPlan) =>
+  ({
+    state: 'proposal',
+    base,
+    candidate,
+    baseRevision: 0,
+    summary: 'Renamed',
+    diff: [],
+    problems: [],
+    context: [],
+    usage: { requests: 1, inputTokens: 0, outputTokens: 0 },
+    providerId: 'p',
+    modelId: 'm',
+  }) as StudioReview['proposal']
 
 let dispose: () => void
 const setup = () => {
-  const client = { create: vi.fn(async (content: PanelPlan) => draft(content)), save: vi.fn(async (_id: string, revision: number, content: PanelPlan) => draft(content, revision + 1)) }
+  const client = {
+    create: vi.fn(async (content: PanelPlan) => draft(content)),
+    save: vi.fn(async (_id: string, revision: number, content: PanelPlan) => draft(content, revision + 1)),
+  }
   const conversations = memory()
-  const store = createRoot(done => { dispose = done; return createStudioStore({ nodeId: 'n', client, recovery: dashboardRecoveryStore(memory()), recoveryId: 'new:w', conversations }) })
+  const store = createRoot((done) => {
+    dispose = done
+    return createStudioStore({
+      nodeId: 'n',
+      client,
+      recovery: dashboardRecoveryStore(memory()),
+      recoveryId: 'new:w',
+      conversations,
+    })
+  })
   return { store, client, conversations }
 }
 
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0) })
-afterEach(() => { dispose(); vi.useRealTimers() })
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(0)
+})
+afterEach(() => {
+  dispose()
+  vi.useRealTimers()
+})
 
 describe('studio store', () => {
   it('makes each change an undo step and clears redo on a new change', () => {
@@ -65,12 +129,12 @@ describe('studio store', () => {
   it('folds a derived change into the step that caused it and keeps redo', () => {
     const { store } = setup()
     store.apply(titled('Picked'))
-    store.apply(plan => ({ ...plan, refresh: 60 }), { derived: true })
+    store.apply((plan) => ({ ...plan, refresh: 60 }), { derived: true })
     store.undo()
     expect(store.plan()).toMatchObject({ title: blankPlan().title })
     expect(store.plan().refresh).toBeUndefined()
     store.redo()
-    store.apply(plan => ({ ...plan, refresh: 30 }), { derived: true })
+    store.apply((plan) => ({ ...plan, refresh: 30 }), { derived: true })
     expect(store.canUndo()).toBe(true)
   })
 
@@ -78,7 +142,10 @@ describe('studio store', () => {
     const { store } = setup()
     for (let index = 0; index < 70; index += 1) store.apply(titled(`Title ${index}`))
     let steps = 0
-    while (store.canUndo()) { store.undo(); steps += 1 }
+    while (store.canUndo()) {
+      store.undo()
+      steps += 1
+    }
     expect(steps).toBe(60)
     expect(store.plan().title).toBe('Title 9')
   })
@@ -92,7 +159,7 @@ describe('studio store', () => {
 
   it('saves to the Node 750 ms after the last change to a valid plan', async () => {
     const { store, client } = setup()
-    store.apply(plan => titled('First')(sourced(plan)))
+    store.apply((plan) => titled('First')(sourced(plan)))
     expect(store.saveState()).toBe('Saved on this computer')
     vi.advanceTimersByTime(500)
     store.apply(titled('Second'))
@@ -140,7 +207,7 @@ describe('studio store', () => {
   it('rebases a proposal over an edit it does not touch, and discards without a change', () => {
     const { store } = setup()
     const base = store.plan()
-    store.apply(plan => ({ ...plan, refresh: 60 }))
+    store.apply((plan) => ({ ...plan, refresh: 60 }))
     store.reviewProposal(proposal(base, titled('Proposed')(base)))
     expect(store.review()?.merged).toMatchObject({ title: 'Proposed', refresh: 60 })
     store.reviewProposal(undefined)
@@ -160,7 +227,7 @@ describe('studio store', () => {
   it("moves a new panel's AI conversation to its draft id when the Node assigns one", async () => {
     const { store, conversations } = setup()
     conversations.setItem('acorn:ai-authoring:v1:n:dashboard:new:w', '{"context":[]}')
-    store.apply(plan => titled('First')(sourced(plan)))
+    store.apply((plan) => titled('First')(sourced(plan)))
     await vi.advanceTimersByTimeAsync(750)
     expect(conversations.getItem('acorn:ai-authoring:v1:n:dashboard:d1')).toBe('{"context":[]}')
     expect(conversations.getItem('acorn:ai-authoring:v1:n:dashboard:new:w')).toBeNull()

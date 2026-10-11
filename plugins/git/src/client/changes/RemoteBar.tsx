@@ -1,7 +1,5 @@
 import { Show } from 'solid-js'
-import {
-  Alert, Button, ConfirmButton, Icon, IconButton, Menu, Text, Toolbar,
-} from '@acorn/plugin-api/ui'
+import { Alert, Button, ConfirmButton, Icon, IconButton, Menu, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
 import { PUSH_ACTIONS_POINT, type PushActionsProps } from './extensionPoints'
@@ -47,11 +45,16 @@ const COMMAND: Record<Exclude<RemoteAction, 'abort'>, string> = {
 const countsTip = (state: ReturnType<ChangesModel['status']>): string | undefined =>
   state.upstream == null ? undefined : `${state.behind ?? 0} behind, ${state.ahead ?? 0} ahead`
 
-/** Which verb the primary button runs. Publish and Push are one call
- *  (../server/localDiff.ts § pushArgs). Never `abort`, which only the banner offers. */
+/** Which verb the primary button runs. Publish and Push are one call (`pushArgs` on the node).
+ *  Never `abort`, which only the banner offers. */
 const actionFor = (verb: RemoteVerb): Exclude<RemoteAction, 'abort'> => (verb === 'publish' ? 'push' : verb)
 
-const OPERATION_TITLE = { merge: 'Merge in progress', rebase: 'Rebase in progress', 'cherry-pick': 'Cherry-pick in progress', revert: 'Revert in progress' } as const
+const OPERATION_TITLE = {
+  merge: 'Merge in progress',
+  rebase: 'Rebase in progress',
+  'cherry-pick': 'Cherry-pick in progress',
+  revert: 'Revert in progress',
+} as const
 
 /** The banner for a Git operation that has stopped part way.
  *
@@ -93,10 +96,9 @@ function OperationBanner(props: { model: ChangesModel }) {
  *
  *  No heading above the run. Each label says the whole verb instead.
  *
- *  Force push sits last, below a rule, as every destructive item does (docs/ui-design/interaction.md § Menus and
- *  right-click). It is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
- *  the armed label is the prompt on every host, and a dialog was refused by the programme's
- *  decisions table. */
+ *  Force push sits last, below a rule, as every destructive item does
+ *  (docs/ui-design/interaction.md § Menus and right-click). It is a `Menu.Item` with `confirm`, like
+ *  the row's Discard: the armed label is the prompt on every host. */
 function RemoteMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const run = (action: RemoteAction) => void model().remote(action)
@@ -119,20 +121,35 @@ function RemoteMenu(props: { model: ChangesModel }) {
     >
       {(menu) => (
         <>
-          <Menu.Item context={menu} title={COMMAND.fetch} onSelect={() => run('fetch')}>Fetch</Menu.Item>
-          <Menu.Item context={menu} title={`${COMMAND['pull-ff']} — refused on a diverged branch`} onSelect={() => run('pull-ff')}>
+          <Menu.Item context={menu} title={COMMAND.fetch} onSelect={() => run('fetch')}>
+            Fetch
+          </Menu.Item>
+          <Menu.Item
+            context={menu}
+            title={`${COMMAND['pull-ff']} — refused on a diverged branch`}
+            onSelect={() => run('pull-ff')}
+          >
             Pull fast-forward only
           </Menu.Item>
-          <Menu.Item context={menu} title={COMMAND.rebase} onSelect={() => run('rebase')}>Pull with rebase</Menu.Item>
-          <Menu.Item context={menu} title={COMMAND.push} onSelect={() => run('push')}>Push</Menu.Item>
+          <Menu.Item context={menu} title={COMMAND.rebase} onSelect={() => run('rebase')}>
+            Pull with rebase
+          </Menu.Item>
+          <Menu.Item context={menu} title={COMMAND.push} onSelect={() => run('push')}>
+            Push
+          </Menu.Item>
           <Menu.Separator />
           <Menu.Item
             context={menu}
             tone="danger"
             confirm="Force push?"
-            onArm={() => { armedForce = model().forceObservation() }}
+            onArm={() => {
+              armedForce = model().forceObservation()
+            }}
             title={`${COMMAND.force} — replaces the upstream with this branch`}
-            onSelect={() => { void model().remote('force', armedForce); armedForce = undefined }}
+            onSelect={() => {
+              void model().remote('force', armedForce)
+              armedForce = undefined
+            }}
           >
             Force push
           </Menu.Item>
@@ -145,7 +162,8 @@ function RemoteMenu(props: { model: ChangesModel }) {
 /** The banner, the bar, and the `git:push-actions` slot under it.
  *
  *  Mounted at the top of the footer, above the commit editor, because the order top to bottom is what
- *  happens in order: see where you are, land the commit, then send it (docs/panes/layout.md § Layout model).
+ *  happens in order: see where you are, land the commit, then send it
+ *  (docs/panes/layout.md § Layout model).
  */
 export function RemoteBar(props: { model: ChangesModel }) {
   const model = () => props.model
@@ -154,7 +172,12 @@ export function RemoteBar(props: { model: ChangesModel }) {
   // Disabled rather than hidden while an operation is in flight. The row keeps its shape, and the
   // tooltip is where the reason goes; a control that vanishes leaves a reader wondering what moved.
   const stalled = () => status().operation != null
-  const primaryCommand = () => verb() === 'pull' ? status().pullPolicy === 'rebase' ? COMMAND.rebase : COMMAND['pull-ff'] : COMMAND[actionFor(verb())]
+  const primaryCommand = () =>
+    verb() === 'pull'
+      ? status().pullPolicy === 'rebase'
+        ? COMMAND.rebase
+        : COMMAND['pull-ff']
+      : COMMAND[actionFor(verb())]
   return (
     <>
       <OperationBanner model={model()} />
@@ -165,7 +188,11 @@ export function RemoteBar(props: { model: ChangesModel }) {
         <Text>{status().branch ?? 'No branch (detached)'}</Text>
         <Toolbar.Spacer />
         <Show when={remoteCounts(status())}>
-          {(counts) => <Text emphasis="muted" tip={countsTip(status())}>{counts()}</Text>}
+          {(counts) => (
+            <Text emphasis="muted" tip={countsTip(status())}>
+              {counts()}
+            </Text>
+          )}
         </Show>
         <Button
           size="sm"

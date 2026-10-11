@@ -1,8 +1,4 @@
-// The agents.sessionExecute implementation (contract/sessionExecute.ts).
-//
-// Moved from apps/node/src/wiring/managedWorkflowStep.ts, which existed in the app only because
-// workflows couldn't import agents. It's agents' code: every line touches ManagedAgentRuntime, its
-// session store and its turn lifecycle.
+// The agents.sessionExecute implementation (AGENTS_SESSION_EXECUTE).
 import { randomUUID } from 'node:crypto'
 import { describeError, HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
@@ -20,12 +16,13 @@ import { contextBlock } from '../drivers/contextBlock'
 import { ExecutionEvents } from './executionEvents'
 import type { TurnFollowUps } from './turnFollowUps'
 import { persistedAttendance, resolveAttendance, sessionAttendance } from './attendance'
-import { goalContinuationPrompt, goalJudgeUnavailable, MAX_GOAL_CONTINUATIONS, type GoalJudgePorts } from './sessionGoal'
+import {
+  goalContinuationPrompt,
+  goalJudgeUnavailable,
+  MAX_GOAL_CONTINUATIONS,
+  type GoalJudgePorts,
+} from './sessionGoal'
 import { StepGoal, type GoalDecision } from './stepGoal'
-
-// The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
-// calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
-export { managedProviderForProfile }
 
 function turnEvents(snapshot: AgentSessionSnapshot, turnIds: readonly string[]): StreamEvent[] {
   return snapshot.events
@@ -43,9 +40,10 @@ const MAX_CONTINUATIONS = 2
 
 // Sent when a turn ended without what the step needs. The model can end a turn on a progress report,
 // and a step with nothing to parse would otherwise fail on work that was still going.
-const continuationPrompt = (schema: object | undefined): string => schema
-  ? 'Your turn ended before the fenced `json` result block this step needs. If the work is finished, reply with that block. If it is not, carry on and end with the block. If something is blocking you, say what it is.'
-  : 'Your turn ended without a final message. If the work is finished, reply with the result. If it is not, carry on. If something is blocking you, say what it is.'
+const continuationPrompt = (schema: object | undefined): string =>
+  schema
+    ? 'Your turn ended before the fenced `json` result block this step needs. If the work is finished, reply with that block. If it is not, carry on and end with the block. If something is blocking you, say what it is.'
+    : 'Your turn ended without a final message. If the work is finished, reply with the result. If it is not, carry on. If something is blocking you, say what it is.'
 
 // Placed after the work request and before the result contract, so the model reads what to do, when it
 // is finished, and how to answer, in that order.
@@ -56,21 +54,28 @@ const goalInstruction = (goal: string): string =>
 // either way. Past the per-turn context cap the blocks go inline in the text instead, which only the
 // larger whole-input cap bounds, so a step with a big diff upstream still runs.
 function stepInput(request: AgentSessionExecuteRequest, goal: string | undefined): AgentInputPart[] {
-  const text = promptWithResultContract(goal ? [request.prompt, goalInstruction(goal)].join('\n\n') : request.prompt, request.schema)
+  const text = promptWithResultContract(
+    goal ? [request.prompt, goalInstruction(goal)].join('\n\n') : request.prompt,
+    request.schema,
+  )
   const context = request.context ?? []
   const bytes = context.reduce((total, item) => total + Buffer.byteLength(item.content, 'utf8'), 0)
-  if (bytes > MAX_AGENT_CONTEXT_BYTES) return [{ type: 'text', text: [text, ...context.map(contextBlock)].join('\n\n') }]
-  return [{ type: 'text', text }, ...context.map((item): AgentInputPart => ({
-    type: 'context',
-    contextId: randomUUID(),
-    ...item,
-    provenance: request.runId ? `Workflow run ${request.runId}` : 'Workflow',
-    byteSize: Buffer.byteLength(item.content, 'utf8'),
-    estimatedTokens: Math.ceil(Buffer.byteLength(item.content, 'utf8') / 4),
-    freshness: 'live',
-    sensitivity: 'workspace',
-    capturedAt: Date.now(),
-  }))]
+  if (bytes > MAX_AGENT_CONTEXT_BYTES)
+    return [{ type: 'text', text: [text, ...context.map(contextBlock)].join('\n\n') }]
+  return [
+    { type: 'text', text },
+    ...context.map((item): AgentInputPart => ({
+      type: 'context',
+      contextId: randomUUID(),
+      ...item,
+      provenance: request.runId ? `Workflow run ${request.runId}` : 'Workflow',
+      byteSize: Buffer.byteLength(item.content, 'utf8'),
+      estimatedTokens: Math.ceil(Buffer.byteLength(item.content, 'utf8') / 4),
+      freshness: 'live',
+      sensitivity: 'workspace',
+      capturedAt: Date.now(),
+    })),
+  ]
 }
 
 const SETTLED = ['completed', 'failed', 'cancelled', 'interrupted']
@@ -87,7 +92,10 @@ const sum = (values: (number | undefined)[]): number | undefined =>
  * joined it. Codex counts a thread cumulatively, so its last report already includes the earlier turns
  * and summing would count them twice. A turn that reported nothing adds nothing.
  */
-function operationUsage(session: AgentSession, turns: readonly AgentTurn[]): { costUsd: number | null; usage: HeadlessResult['capture']['usage'] } {
+function operationUsage(
+  session: AgentSession,
+  turns: readonly AgentTurn[],
+): { costUsd: number | null; usage: HeadlessResult['capture']['usage'] } {
   const reported = turns.flatMap((turn) => (turn.usage ? [turn.usage] : []))
   const counted = session.providerId === 'codex' ? reported.slice(-1) : reported
   if (!counted.length) return { costUsd: null, usage: undefined }
@@ -114,7 +122,10 @@ function resultFromSnapshot(
   const turn = snapshot.turns.at(-1)
   if (!turn || snapshot.turns.some((candidate) => !SETTLED.includes(candidate.status))) return null
   const events = turnEvents(snapshot, turnIds)
-  const result = assistantResult(snapshot.events.filter((record) => record.turnId === turn.id), Infinity)
+  const result = assistantResult(
+    snapshot.events.filter((record) => record.turnId === turn.id),
+    Infinity,
+  )
   const structuredOutput = result ? parseStructuredResult(result, schema) : null
   const capture = {
     result,
@@ -142,19 +153,27 @@ function resultFromSnapshot(
       status: 'error',
       exitCode: null,
       capture,
-      stderrTail: 'The model declined this request. Rephrase the step\'s prompt, or run the step on another model.',
+      stderrTail: "The model declined this request. Rephrase the step's prompt, or run the step on another model.",
       agentSessionId: snapshot.session.id,
     }
   }
   if (result?.trimStart().startsWith('BLOCKED:')) {
-    return { status: 'error', exitCode: null, capture, stderrTail: result.trim().split('\n')[0]!, agentSessionId: snapshot.session.id }
+    return {
+      status: 'error',
+      exitCode: null,
+      capture,
+      stderrTail: result.trim().split('\n')[0]!,
+      agentSessionId: snapshot.session.id,
+    }
   }
   if (!result || (schema && structuredOutput == null)) {
     return {
       status: 'malformed',
       exitCode: 0,
       capture,
-      stderrTail: schema ? 'Managed agent returned no parseable structured result.' : 'Managed agent returned no response.',
+      stderrTail: schema
+        ? 'Managed agent returned no parseable structured result.'
+        : 'Managed agent returned no response.',
       agentSessionId: snapshot.session.id,
     }
   }
@@ -167,12 +186,15 @@ async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExe
     if (session.taskId !== request.taskId || session.providerId !== providerId || session.kind !== 'workflow') {
       throw new Error('The persisted managed workflow session does not match this step.')
     }
-    const attendance = request.posture === undefined
-      ? sessionAttendance(session) : resolveAttendance(session, 'workflow', request.posture)
+    const attendance =
+      request.posture === undefined
+        ? sessionAttendance(session)
+        : resolveAttendance(session, 'workflow', request.posture)
     if (session.config.initialAttendance === undefined) {
       return runtime.store.patchSession(session.id, { config: { ...session.config, initialAttendance: attendance } })
     }
-    if (sessionAttendance(session) !== attendance) throw new Error('The workflow session posture does not match this run.')
+    if (sessionAttendance(session) !== attendance)
+      throw new Error('The workflow session posture does not match this run.')
     return session
   }
   return runtime.createSession(
@@ -201,7 +223,11 @@ const CONFIG_READY_TIMEOUT_MS = 30_000
 /** The provider options a step asked for, applied to its session. Ordered after the provider's
  *  `session_metadata` because that list is the only thing a value can be validated against, and
  *  before the turn is enqueued because the Claude driver reads a switch through `setConfig` only. */
-async function applyRequestedConfig(runtime: ManagedAgentRuntime, sessionId: string, wanted: Record<string, string> | undefined): Promise<void> {
+async function applyRequestedConfig(
+  runtime: ManagedAgentRuntime,
+  sessionId: string,
+  wanted: Record<string, string> | undefined,
+): Promise<void> {
   if (!wanted || !Object.keys(wanted).length) return
   await runtime.wait(sessionId, 0, 'ready', CONFIG_READY_TIMEOUT_MS)
   await runtime.applyRequestedConfig(sessionId, wanted)
@@ -210,7 +236,10 @@ async function applyRequestedConfig(runtime: ManagedAgentRuntime, sessionId: str
 type JudgeUsage = { inputTokens?: number; outputTokens?: number }
 
 /** Adds what the completion checks reported to the turns' usage. Tokens only: a check reports no cost. */
-function withJudgeUsage(usage: HeadlessResult['capture']['usage'], judged: readonly JudgeUsage[]): HeadlessResult['capture']['usage'] {
+function withJudgeUsage(
+  usage: HeadlessResult['capture']['usage'],
+  judged: readonly JudgeUsage[],
+): HeadlessResult['capture']['usage'] {
   if (!judged.length) return usage
   return {
     ...usage,
@@ -220,8 +249,12 @@ function withJudgeUsage(usage: HeadlessResult['capture']['usage'], judged: reado
 }
 
 /** The step ends on `reason` with whatever its last turn produced. */
-const stopped = (result: HeadlessResult, reason: string): HeadlessResult =>
-  ({ ...result, status: 'error', exitCode: null, stderrTail: reason })
+const stopped = (result: HeadlessResult, reason: string): HeadlessResult => ({
+  ...result,
+  status: 'error',
+  exitCode: null,
+  stderrTail: reason,
+})
 
 /**
  * `followUps` is the operation registry, loaded on the first step. A step opens an operation on its
@@ -244,8 +277,11 @@ export function createSessionExecute(
     // Checked before any work starts, so a goal never runs without its check.
     const objective = request.goal?.trim()
     if (request.goal !== undefined) {
-      if (!objective || objective.length > MAX_AGENT_GOAL_CHARS) throw new Error(`A completion condition must be 1 to ${MAX_AGENT_GOAL_CHARS} characters.`)
-      const unavailable = judge ? goalJudgeUnavailable(judge, request.profileId!) : 'This node has no completion checker.'
+      if (!objective || objective.length > MAX_AGENT_GOAL_CHARS)
+        throw new Error(`A completion condition must be 1 to ${MAX_AGENT_GOAL_CHARS} characters.`)
+      const unavailable = judge
+        ? goalJudgeUnavailable(judge, request.profileId!)
+        : 'This node has no completion checker.'
       if (unavailable) throw new Error(unavailable)
     }
     const session = await sessionFor(runtime, request, providerId)
@@ -253,25 +289,29 @@ export function createSessionExecute(
     const registry = await followUps?.()
     const beforeSeq = (await runtime.store.requireSession(session.id)).lastEventSeq
     const forwarding = new ExecutionEvents(session.id, beforeSeq, request.onEvent)
-    const unsubscribe = runtime.subscribe((frame) => forwarding.receive(frame))
+    const unsubscribe = runtime.frames.subscribe((frame) => forwarding.receive(frame))
     try {
-      const first = await runtime.enqueueTurn(session.id, {
-        input: stepInput(request, objective),
-        source: 'workflow',
-        effectivePolicy: {
-          // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
-          // them only through the session config above. Both are written so the two drivers see one
-          // request, and `configOptions` wins over the older `model` field where a file sets both.
-          model: request.configOptions?.model ?? request.model,
-          ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
-          ...(request.configOptions ? { configOptions: request.configOptions } : {}),
-          workflowRunId: request.runId,
-          workflowStepId: request.stepId,
-          schema: request.schema,
-          toolCeiling: request.tools ?? {},
+      const first = await runtime.enqueueTurn(
+        session.id,
+        {
+          input: stepInput(request, objective),
+          source: 'workflow',
+          effectivePolicy: {
+            // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
+            // them only through the session config above. Both are written so the two drivers see one
+            // request, and `configOptions` wins over the older `model` field where a file sets both.
+            model: request.configOptions?.model ?? request.model,
+            ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
+            ...(request.configOptions ? { configOptions: request.configOptions } : {}),
+            workflowRunId: request.runId,
+            workflowStepId: request.stepId,
+            schema: request.schema,
+            toolCeiling: request.tools ?? {},
+          },
+          idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
         },
-        idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
-      }, { posture: request.posture })
+        { posture: request.posture },
+      )
       persistedAttendance(first.effectivePolicy)
       // Every turn the step owns, in the order they were queued. Notes join through the operation.
       const turnIds = [first.id]
@@ -280,9 +320,16 @@ export function createSessionExecute(
         turnIds.push(turnId)
         forwarding.acceptTurn(turnId)
       })
-      const goal = objective && judge
-        ? new StepGoal({ judge, store: runtime.store, onChange: request.onGoal }, objective, session.id, request.profileId!, first.id)
-        : null
+      const goal =
+        objective && judge
+          ? new StepGoal(
+              { judge, store: runtime.store, onChange: request.onGoal },
+              objective,
+              session.id,
+              request.profileId!,
+              first.id,
+            )
+          : null
       // The events the loop below waits past. It moves on whenever the step is still waiting on a turn,
       // because a wait for `turn_completed` after `beforeSeq` is already met by the first turn.
       let waitSeq = beforeSeq
@@ -315,7 +362,10 @@ export function createSessionExecute(
         void cancellation.catch(() => {})
       }
       const unfinished = (snapshot: AgentSessionSnapshot) => ({
-        result: assistantResult(snapshot.events.filter((record) => record.turnId === turnIds.at(-1)), Infinity),
+        result: assistantResult(
+          snapshot.events.filter((record) => record.turnId === turnIds.at(-1)),
+          Infinity,
+        ),
         structuredOutput: null,
         sessionId: snapshot.session.providerSessionRef,
         costUsd: null,
@@ -331,16 +381,23 @@ export function createSessionExecute(
       const admit = async (kind: 'turn' | 'check', snapshot: AgentSessionSnapshot): Promise<string | null> => {
         if (!request.admitAutomatic) return null
         const { costUsd, usage } = operationUsage(snapshot.session, snapshot.turns)
-        return request.admitAutomatic({ kind, usage: { costUsd, usage: withJudgeUsage(usage, goal?.judgeUsage ?? []) } })
+        return request.admitAutomatic({
+          kind,
+          usage: { costUsd, usage: withJudgeUsage(usage, goal?.judgeUsage ?? []) },
+        })
       }
       const enqueueAutomatic = async (text: string, key: string): Promise<string> => {
         forwarding.beginEnqueue()
-        const next = await runtime.enqueueTurn(session.id, {
-          input: [{ type: 'text', text }],
-          source: 'workflow',
-          effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
-          idempotencyKey: key,
-        }, { originTurnId: first.id })
+        const next = await runtime.enqueueTurn(
+          session.id,
+          {
+            input: [{ type: 'text', text }],
+            source: 'workflow',
+            effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
+            idempotencyKey: key,
+          },
+          { originTurnId: first.id },
+        )
         turnIds.push(next.id)
         forwarding.acceptTurn(next.id)
         return next.id
@@ -371,7 +428,8 @@ export function createSessionExecute(
           // A note admitted or a turn queued while the judge ran makes this verdict stale.
           if (cancelled || turnSet() !== checked || operation?.admitting.size) return 'stale'
           const after = await runtime.captureExecution(session.id, turnIds)
-          if (cancelled || turnSet() !== checked || after.turns.some((turn) => !SETTLED.includes(turn.status))) return 'stale'
+          if (cancelled || turnSet() !== checked || after.turns.some((turn) => !SETTLED.includes(turn.status)))
+            return 'stale'
           await goal.save(turnIds, snapshot.session.lastEventSeq, verdict)
           if (cancelled) return 'stale'
         }
@@ -389,9 +447,17 @@ export function createSessionExecute(
             const settled = resultFromSnapshot(snapshot, turnIds, request.schema)
             // A cancel that lands after the step's turns finished leaves an ordinary step's result
             // standing. A step with a goal publishes no success once cancelled: its check never finished.
-            return finish(settled && !(goal && settled.status === 'ok')
-              ? settled
-              : { status: 'cancelled', exitCode: null, capture: settled?.capture ?? unfinished(snapshot), stderrTail: '', agentSessionId: session.id })
+            return finish(
+              settled && !(goal && settled.status === 'ok')
+                ? settled
+                : {
+                    status: 'cancelled',
+                    exitCode: null,
+                    capture: settled?.capture ?? unfinished(snapshot),
+                    stderrTail: '',
+                    agentSessionId: session.id,
+                  },
+            )
           }
           const elapsed = Date.now() - startedAt
           if (elapsed >= timeoutMs) {
@@ -406,7 +472,14 @@ export function createSessionExecute(
             })
           }
           try {
-            if (!recheck) await runtime.wait(session.id, waitSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed), request.signal)
+            if (!recheck)
+              await runtime.wait(
+                session.id,
+                waitSeq,
+                'turn_completed',
+                Math.min(1_000, timeoutMs - elapsed),
+                request.signal,
+              )
           } catch (error) {
             if (!cancelled) throw error
             continue
@@ -435,16 +508,26 @@ export function createSessionExecute(
                 goal.set('stopped', refused)
                 stop = { key, reason: refused }
               } else {
-                goal.queued(await enqueueAutomatic(
-                  promptWithResultContract(goalContinuationPrompt(goal.objective, goal.summary().verdict!.reason), request.schema),
-                  `workflow-goal:${first.id}:${goal.automatic + 1}`,
-                ), 'goal')
+                goal.queued(
+                  await enqueueAutomatic(
+                    promptWithResultContract(
+                      goalContinuationPrompt(goal.objective, goal.summary().verdict!.reason),
+                      request.schema,
+                    ),
+                    `workflow-goal:${first.id}:${goal.automatic + 1}`,
+                  ),
+                  'goal',
+                )
                 continue
               }
             }
           }
           const result = stop?.key === key ? stopped(settled, stop.reason) : settled
-          if (result.status === 'malformed' && repairs < MAX_CONTINUATIONS && (!goal || goal.automatic < MAX_GOAL_CONTINUATIONS)) {
+          if (
+            result.status === 'malformed' &&
+            repairs < MAX_CONTINUATIONS &&
+            (!goal || goal.automatic < MAX_GOAL_CONTINUATIONS)
+          ) {
             const refused = await admit('turn', snapshot)
             if (cancelled) continue
             if (refused) {
@@ -454,7 +537,10 @@ export function createSessionExecute(
               continue
             }
             repairs += 1
-            const turnId = await enqueueAutomatic(continuationPrompt(request.schema), `workflow-continue:${first.id}:${repairs}`)
+            const turnId = await enqueueAutomatic(
+              continuationPrompt(request.schema),
+              `workflow-continue:${first.id}:${repairs}`,
+            )
             goal?.queued(turnId, 'repair')
             continue
           }
@@ -478,6 +564,8 @@ export function createSessionExecute(
         request.signal?.removeEventListener('abort', abort)
         if (operation) registry!.release(operation)
       }
-    } finally { unsubscribe() }
+    } finally {
+      unsubscribe()
+    }
   }
 }

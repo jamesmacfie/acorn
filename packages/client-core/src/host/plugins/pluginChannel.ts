@@ -35,10 +35,13 @@ const nudge = (pluginId: string): void => {
   const since = Date.now() - (lastPushAt.get(pluginId) ?? 0)
   if (since >= COALESCE_MS) return announce(pluginId)
   if (trailing.has(pluginId)) return
-  trailing.set(pluginId, setTimeout(() => {
-    trailing.delete(pluginId)
-    announce(pluginId)
-  }, COALESCE_MS - since))
+  trailing.set(
+    pluginId,
+    setTimeout(() => {
+      trailing.delete(pluginId)
+      announce(pluginId)
+    }, COALESCE_MS - since),
+  )
 }
 
 const route = (frame: WsServerFrame): void => {

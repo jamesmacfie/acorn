@@ -20,20 +20,40 @@ export class NoteDraft {
   private readers = 0
   private queue: Promise<unknown> = Promise.resolve()
 
-  constructor(private readonly key: string, private readonly location: NoteLocation, private readonly slug: string) {
+  constructor(
+    private readonly key: string,
+    private readonly location: NoteLocation,
+    private readonly slug: string,
+  ) {
     try {
       const saved = JSON.parse(readLocal(key) ?? 'null') as Recovery | null
-      if (saved && [saved.body, saved.title].every((edit) => !edit || (typeof edit.value === 'string' && Number.isSafeInteger(edit.revision) && edit.revision > 0))) {
+      if (
+        saved &&
+        [saved.body, saved.title].every(
+          (edit) =>
+            !edit || (typeof edit.value === 'string' && Number.isSafeInteger(edit.revision) && edit.revision > 0),
+        )
+      ) {
         this.recovery = saved
         this.revision = Math.max(saved.body?.revision ?? 0, saved.title?.revision ?? 0)
       }
-    } catch { /* An invalid device scrap cannot replace the Node's document. */ }
+    } catch {
+      /* An invalid device scrap cannot replace the Node's document. */
+    }
   }
 
-  get body(): string | undefined { return this.recovery.body?.value }
-  get title(): string | undefined { return this.recovery.title?.value }
-  get error(): string { return this.recovery.error ?? '' }
-  get dirty(): boolean { return !!(this.recovery.body || this.recovery.title) }
+  get body(): string | undefined {
+    return this.recovery.body?.value
+  }
+  get title(): string | undefined {
+    return this.recovery.title?.value
+  }
+  get error(): string {
+    return this.recovery.error ?? ''
+  }
+  get dirty(): boolean {
+    return !!(this.recovery.body || this.recovery.title)
+  }
 
   retain(): () => void {
     this.readers++
@@ -91,10 +111,17 @@ export class NoteDraft {
           const body = this.recovery.body
           const title = this.recovery.title
           error = ''
-          for (const [field, edit] of [['body', body], ['title', title]] as const) {
-            if (!edit || (field === 'title' && !edit.value.trim()) || edit.revision <= this.acknowledged[field]) continue
+          for (const [field, edit] of [
+            ['body', body],
+            ['title', title],
+          ] as const) {
+            if (!edit || (field === 'title' && !edit.value.trim()) || edit.revision <= this.acknowledged[field])
+              continue
             try {
-              const result = field === 'body' ? await api.write(this.location, this.slug, edit.value) : await api.setTitle(this.location, this.slug, edit.value.trim())
+              const result =
+                field === 'body'
+                  ? await api.write(this.location, this.slug, edit.value)
+                  : await api.setTitle(this.location, this.slug, edit.value.trim())
               if ('error' in result) throw new Error(result.error)
               if (!result.ok) throw new Error('The note was not saved.')
               this.acknowledged[field] = edit.revision
@@ -107,7 +134,9 @@ export class NoteDraft {
           }
         }
         return error
-      } finally { this.pendingSave = undefined }
+      } finally {
+        this.pendingSave = undefined
+      }
     })
     return this.pendingSave
   }
@@ -126,6 +155,9 @@ export class NoteDraft {
 export function noteDraft(nodeId: string | null, location: NoteLocation, slug: string): NoteDraft {
   const key = address(nodeId, location, slug)
   let draft = drafts.get(key)
-  if (!draft) { draft = new NoteDraft(key, location, slug); if (draft.dirty) drafts.set(key, draft) }
+  if (!draft) {
+    draft = new NoteDraft(key, location, slug)
+    if (draft.dirty) drafts.set(key, draft)
+  }
   return draft
 }

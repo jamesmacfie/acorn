@@ -36,8 +36,16 @@ describe('agent delegation reservations', () => {
   afterEach(() => ctx.cleanup())
 
   it('replays an owner-scoped call id without consuming another slot', () => {
-    const first = store.reserveShared({ ownerTaskId: 'task-a', ownerSessionId: 'session-a', idempotencyKey: 'agent_spawn:call-1' })
-    const replay = store.reserveShared({ ownerTaskId: 'task-a', ownerSessionId: 'session-a', idempotencyKey: 'agent_spawn:call-1' })
+    const first = store.reserveShared({
+      ownerTaskId: 'task-a',
+      ownerSessionId: 'session-a',
+      idempotencyKey: 'agent_spawn:call-1',
+    })
+    const replay = store.reserveShared({
+      ownerTaskId: 'task-a',
+      ownerSessionId: 'session-a',
+      idempotencyKey: 'agent_spawn:call-1',
+    })
     expect(replay).toEqual({ spawn: first.spawn, created: false })
   })
 
@@ -72,9 +80,17 @@ describe('agent delegation reservations', () => {
   })
 
   it('inherits root lineage and refuses a third delegation level', async () => {
-    const first = store.reserveShared({ ownerTaskId: 'task-a', ownerSessionId: 'root', idempotencyKey: 'agent_spawn:first' }).spawn
+    const first = store.reserveShared({
+      ownerTaskId: 'task-a',
+      ownerSessionId: 'root',
+      idempotencyKey: 'agent_spawn:first',
+    }).spawn
     await store.complete(first.id, 'child-one', 'turn-one')
-    const second = store.reserveShared({ ownerTaskId: 'task-a', ownerSessionId: 'child-one', idempotencyKey: 'agent_spawn:second' }).spawn
+    const second = store.reserveShared({
+      ownerTaskId: 'task-a',
+      ownerSessionId: 'child-one',
+      idempotencyKey: 'agent_spawn:second',
+    }).spawn
     await store.complete(second.id, 'child-two', 'turn-two')
 
     expect(second).toMatchObject({
@@ -83,28 +99,41 @@ describe('agent delegation reservations', () => {
       parentSpawnId: first.id,
       depth: 2,
     })
-    expect(() => store.reserveShared({
-      ownerTaskId: 'task-a',
-      ownerSessionId: 'child-two',
-      idempotencyKey: 'agent_spawn:third',
-    })).toThrow(DelegationLimitError)
+    expect(() =>
+      store.reserveShared({
+        ownerTaskId: 'task-a',
+        ownerSessionId: 'child-two',
+        idempotencyKey: 'agent_spawn:third',
+      }),
+    ).toThrow(DelegationLimitError)
   })
 
   it('atomically admits no more than twelve concurrent creating descendants', async () => {
-    const attempts = await Promise.allSettled(Array.from(
-      { length: delegationLimits.maxLiveDescendants + 4 },
-      (_, index) => Promise.resolve().then(() => store.reserveShared({
-        ownerTaskId: 'task-a',
-        ownerSessionId: 'root',
-        idempotencyKey: `agent_spawn:${index}`,
-      })),
-    ))
-    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(delegationLimits.maxLiveDescendants)
+    const attempts = await Promise.allSettled(
+      Array.from({ length: delegationLimits.maxLiveDescendants + 4 }, (_, index) =>
+        Promise.resolve().then(() =>
+          store.reserveShared({
+            ownerTaskId: 'task-a',
+            ownerSessionId: 'root',
+            idempotencyKey: `agent_spawn:${index}`,
+          }),
+        ),
+      ),
+    )
+    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(
+      delegationLimits.maxLiveDescendants,
+    )
     expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(4)
-    expect(attempts.filter((attempt) => attempt.status === 'rejected').every((attempt) =>
-      attempt.status === 'rejected'
-      && attempt.reason instanceof DelegationLimitError
-      && attempt.reason.code === 'live_limit')).toBe(true)
+    expect(
+      attempts
+        .filter((attempt) => attempt.status === 'rejected')
+        .every(
+          (attempt) =>
+            attempt.status === 'rejected' &&
+            attempt.reason instanceof DelegationLimitError &&
+            attempt.reason.code === 'live_limit',
+        ),
+    ).toBe(true)
   })
 
   it('counts provisioned nonterminal sessions and releases their slots only at terminal state', async () => {
@@ -116,30 +145,38 @@ describe('agent delegation reservations', () => {
         ownerSessionId: 'root',
         idempotencyKey: `agent_spawn:${index}`,
       }).spawn
-      const child = await sessions.createSession({
-        taskId: 'task-a',
-        providerId: 'codex',
-        profileId: 'codex',
-        kind: 'delegated',
-        config: {},
-      }, PROVIDER)
+      const child = await sessions.createSession(
+        {
+          taskId: 'task-a',
+          providerId: 'codex',
+          profileId: 'codex',
+          kind: 'delegated',
+          config: {},
+        },
+        PROVIDER,
+      )
       children.push(child.id)
       await store.complete(spawn.id, child.id, `turn-${index}`)
     }
-    expect(() => store.reserveShared({
-      ownerTaskId: 'task-a',
-      ownerSessionId: 'root',
-      idempotencyKey: 'agent_spawn:blocked',
-    })).toThrow(DelegationLimitError)
+    expect(() =>
+      store.reserveShared({
+        ownerTaskId: 'task-a',
+        ownerSessionId: 'root',
+        idempotencyKey: 'agent_spawn:blocked',
+      }),
+    ).toThrow(DelegationLimitError)
 
-    await db.update(schema.agentSessions)
+    await db
+      .update(schema.agentSessions)
       .set({ runtimeState: 'stopped' })
       .where(eq(schema.agentSessions.id, children[0]!))
-    expect(store.reserveShared({
-      ownerTaskId: 'task-a',
-      ownerSessionId: 'root',
-      idempotencyKey: 'agent_spawn:replacement',
-    }).created).toBe(true)
+    expect(
+      store.reserveShared({
+        ownerTaskId: 'task-a',
+        ownerSessionId: 'root',
+        idempotencyKey: 'agent_spawn:replacement',
+      }).created,
+    ).toBe(true)
   })
 
   it('projects creating lineage by spawn id but never across a task boundary', async () => {
@@ -149,29 +186,37 @@ describe('agent delegation reservations', () => {
       idempotencyKey: 'agent_spawn:visible',
     }).spawn
     const sessions = new AgentStore(db, ctx.core)
-    const sameTask = await sessions.createSession({
-      taskId: 'task-a',
-      providerId: 'codex',
-      profileId: 'codex',
-      kind: 'delegated',
-      config: { delegationSpawnId: spawn.id },
-    }, PROVIDER)
-    const otherTask = await sessions.createSession({
-      taskId: 'task-b',
-      providerId: 'codex',
-      profileId: 'codex',
-      kind: 'delegated',
-      config: { delegationSpawnId: spawn.id },
-    }, PROVIDER)
+    const sameTask = await sessions.createSession(
+      {
+        taskId: 'task-a',
+        providerId: 'codex',
+        profileId: 'codex',
+        kind: 'delegated',
+        config: { delegationSpawnId: spawn.id },
+      },
+      PROVIDER,
+    )
+    const otherTask = await sessions.createSession(
+      {
+        taskId: 'task-b',
+        providerId: 'codex',
+        profileId: 'codex',
+        kind: 'delegated',
+        config: { delegationSpawnId: spawn.id },
+      },
+      PROVIDER,
+    )
 
-    expect(await store.visibilityForSessions([sameTask])).toEqual([{
-      sessionId: sameTask.id,
-      ownerTaskId: 'task-a',
-      ownerSessionId: 'terminal-a',
-      managedParentSessionId: null,
-      depth: 1,
-      isolation: 'shared',
-    }])
+    expect(await store.visibilityForSessions([sameTask])).toEqual([
+      {
+        sessionId: sameTask.id,
+        ownerTaskId: 'task-a',
+        ownerSessionId: 'terminal-a',
+        managedParentSessionId: null,
+        depth: 1,
+        isolation: 'shared',
+      },
+    ])
     expect(await store.visibilityForSessions([otherTask])).toEqual([])
   })
 })

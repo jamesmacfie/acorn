@@ -1,7 +1,17 @@
 import { AGENT_STANDING_CONTEXT } from '../contract/standingContext'
 import { readAgentCheckoutActivity } from '../server/sessions/checkoutActivity'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import {
+  acornMcp,
+  agentProfileRegistry,
+  AGENTS_CUSTOM_AGENT_REGISTRY,
+  AGENTS_HARNESS_REGISTRY,
+  getProfile,
+  registerDeletedTaskPurge,
+  type InternalEnvFactory,
+  type NodePlugin,
+  resolveCommand,
+} from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import type { McpPackageManager } from '../server/mcpPackageManager'
@@ -20,7 +30,13 @@ import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
 import type { TurnFollowUps } from '../server/sessions/turnFollowUps'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_ACTIVITY, AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
+import {
+  AGENTS_ACTIVITY,
+  AGENTS_REQUESTS,
+  AGENTS_REVIEW_INPUT,
+  AGENTS_SESSIONS,
+  AGENTS_TURNS,
+} from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { AGENTS_TRANSCRIPT_MEDIA } from '../contract/transcriptMedia'
 import { createTranscriptMedia } from '../server/sessions/transcriptMedia'
@@ -30,7 +46,13 @@ import { createToolCallers } from '../server/sessions/toolCaller'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
-import { contributedCustomAgent, customAgentRegistry, deleteCustomAgent, readCustomAgents, saveCustomAgent } from '../server/customAgents'
+import {
+  contributedCustomAgent,
+  customAgentRegistry,
+  deleteCustomAgent,
+  readCustomAgents,
+  saveCustomAgent,
+} from '../server/customAgents'
 import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
@@ -55,7 +77,9 @@ import { removeExpiredHistory } from '../server/sessions/historyRetention'
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
   if (builtInProfileDisposables) return
-  builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
+  builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) =>
+    agentProfileRegistry.register(profile),
+  )
 }
 
 // The two built-in harnesses, one per tier. See docs/managed-agents/harnesses.md § Harnesses. Claude is a launch
@@ -63,7 +87,7 @@ export function registerBuiltInProfiles(): void {
 // fork, compaction, archive, and delete, and ACP expresses none of them.
 //
 // Released in `dispose` like the profiles beside them, because one process can boot the runtime several
-// times. `apps/node/src/service/runtime.test.ts` does.
+// times. `apps/node/src/composition/runtime.test.ts` does.
 let builtInDriverDisposables: (() => void)[] | null = null
 function registerBuiltInDrivers(): void {
   if (builtInDriverDisposables) return
@@ -75,9 +99,9 @@ function registerBuiltInDrivers(): void {
 
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
 // than inside the usage service, because a plugin-contributed harness feeds the same registry
-// (../server/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
-// Each probe's module loads on its first collection: about 27 KB of the node's boot graph for a read
-// that spawns the provider's CLI and takes seconds anyway.
+// (`agentUsageCollectors`). `probeDir` is only known at init, so it arrives as a parameter.
+// Each probe's module loads on its first collection, which keeps it out of the node's boot graph for a
+// read that spawns the provider's CLI and takes seconds anyway.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -86,7 +110,8 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
       provider: claudeHarness.id,
       label: claudeHarness.label,
       ...(claudeHarness.glyph ? { glyph: claudeHarness.glyph } : {}),
-      collect: async (pricing) => (await import('../server/usage/claudeUsage')).collectClaudeUsage({ probeDir, pricing }),
+      collect: async (pricing) =>
+        (await import('../server/usage/claudeUsage')).collectClaudeUsage({ probeDir, pricing }),
     }),
     agentUsageCollectors.register({
       provider: 'codex',
@@ -99,7 +124,7 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 
-// The one thing this plugin still cannot resolve for itself.
+// What this plugin cannot resolve for itself.
 export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
   // See docs/security/credentials.md § Credential handling.
@@ -114,10 +139,14 @@ export type AgentsPluginDeps = {
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
   let runtime: ManagedAgentRuntime | null = null
   let packageManager: Promise<McpPackageManager> | null = null
-  const managedPackages = (): Promise<McpPackageManager> => packageManager ??= Promise.all([
-    import('../server/mcpPackageManager'), import('../server/mcpPackageInstall'),
-  ]).then(async ([{ McpPackageManager }, { trustedNpmCli }]) =>
-    new McpPackageManager(join(dataDir, 'managed-mcp'), await trustedNpmCli(), runtime!.mcpServers))
+  const managedPackages = (): Promise<McpPackageManager> =>
+    (packageManager ??= Promise.all([
+      import('../server/mcpPackageManager'),
+      import('../server/mcpPackageInstall'),
+    ]).then(
+      async ([{ McpPackageManager }, { trustedNpmCli }]) =>
+        new McpPackageManager(join(dataDir, 'managed-mcp'), await trustedNpmCli(), runtime!.mcpServers),
+    ))
   let delegation: AgentDelegationService | null = null
   let toolCallers: ReturnType<typeof createToolCallers> | null = null
   let messages: Promise<SessionMessages> | null = null
@@ -144,7 +173,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     emits: [
       { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
       { verb: 'request-changed', description: 'An agent input request was created or changed state' },
-      { verb: 'sessions-changed', description: 'A managed agent session was created, renamed, archived, restored, or deleted' },
+      {
+        verb: 'sessions-changed',
+        description: 'A managed agent session was created, renamed, archived, restored, or deleted',
+      },
       { verb: 'activity', description: 'A tool call or subagent started or finished, or the context fill changed' },
       { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
     ],
@@ -160,7 +192,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // See docs/data-layer/migrations.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
-      stopCheckoutActivity = core.checkoutAdmission.registerOwner('turns', (taskIds) => readAgentCheckoutActivity(store, taskIds))
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('turns', (taskIds) =>
+        readAgentCheckoutActivity(store, taskIds),
+      )
       // The runtime and the Usage page share one service. A suspected limit failure asks only its own
       // harness collector for a fresh reset time; ordinary page reads keep using the cached snapshot.
       const probeDir = join(dataDir, 'agent-usage-probe')
@@ -173,17 +207,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       // The first decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,
       // a redactor or a context injector registers a handler here; the point exists whether or not
-      // anybody does, because declaring it is the consent.
+      // anybody does, because declaring it is the consent. Required instruction checks don't run here:
+      // the queue dispatcher runs them immediately before the driver sends, and this point keeps its
+      // optional plugin-hook failure semantics.
       ctx.hooks.declare({
         id: 'before-send',
         label: 'send a prompt',
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
       })
-      // Required instruction checks run in the queue dispatcher immediately before driver send.
-      // This extension point retains its optional plugin-hook failure semantics.
       // The second: a harness permission request, before anyone sees it. Observe and veto only
-      // (../server/sessions/permissionPolicy.ts).
+      // (`settlePermissionRequest`).
       ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
       // The third and fourth: every tool call a bridged harness makes, before it runs and after
       // (docs/managed-agents/loop-hooks.md). Only `before-tool` allows `ask`.
@@ -200,7 +234,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Whatever the root configured, read here rather than captured: a harness session started
         // before the root set it would otherwise keep offering no tools for the life of the process.
         mcp: acornMcp,
-        standingContext: (taskId) => ctx.capabilities.get(AGENT_STANDING_CONTEXT)?.build(taskId) ?? Promise.resolve(null),
+        standingContext: (taskId) =>
+          ctx.capabilities.get(AGENT_STANDING_CONTEXT)?.build(taskId) ?? Promise.resolve(null),
         secrets: core.secrets,
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
@@ -237,10 +272,16 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const resume = profile.resumeArgv(resolveCommand(profile), session.providerSessionRef)
           // The session's MCP servers go with it, because `--resume` alone starts without them
           // (docs/mcp.md § Your own servers). A contributed harness has no terminal spelling for them yet.
-          const mcp = await runtime!.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: continue in a terminal')
-          const handoff = profile.id === claudeCodeProfile.id
-            ? claudeHandoffMcp(mcp.servers)
-            : profile.id === codexProfile.id ? codexHandoffMcp(mcp.servers, mcp.secrets) : { args: [], env: {} }
+          const mcp = await runtime!.mcpServers.resolve(
+            sessionMcpSelection(session.config),
+            'agent MCP server: continue in a terminal',
+          )
+          const handoff =
+            profile.id === claudeCodeProfile.id
+              ? claudeHandoffMcp(mcp.servers)
+              : profile.id === codexProfile.id
+                ? codexHandoffMcp(mcp.servers, mcp.secrets)
+                : { args: [], env: {} }
           const terminal = await sessions.create({
             taskId: session.taskId,
             profileId: session.profileId,
@@ -256,8 +297,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         terminalHandoffRunning: async (sessionId) => {
           const sessions = ctx.capabilities.get(TERMINAL_SESSIONS)
           if (!sessions) return false
-          return (await sessions.list()).some((terminal) =>
-            terminal.agentSessionId === sessionId && terminal.status === 'running')
+          return (await sessions.list()).some(
+            (terminal) => terminal.agentSessionId === sessionId && terminal.status === 'running',
+          )
         },
       })
       // Archiving a task stops its provider processes, because otherwise they live until the node exits
@@ -268,40 +310,49 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         id: 'stop-sessions',
         mode: 'transform',
         run: async (payload) => {
-          await runtime?.stopTaskSessions(payload.taskId as string)
+          await runtime?.upkeep.stopTaskSessions(payload.taskId as string)
           return { payload }
         },
       })
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
       ctx.dataSources.register(sessionSource)
-      ctx.routes.fetch(async (request, context) =>
-        (await import('../server/data/usageSourceHandler')).createUsageSourceHandler(store, core)(request, context),
-      { prefix: '/data/usage' })
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/data/usageSourceHandler')).createUsageSourceHandler(store, core)(request, context),
+        { prefix: '/data/usage' },
+      )
       ctx.dataSources.register(usageSource)
 
-      // A plugin's notes to a session (../server/sessions/sessionMessages.ts). Entries are read live, and
+      // A plugin's notes to a session (`SessionMessages`). Entries are read live, and
       // `ready` and every roster change connect the ones a late or reloaded plugin filed.
       // Loaded on the first contribution, to stay inside the service boot budget
       // (apps/node/scripts/check-service-budget.mjs).
       ctx.extensionPoints.declare(AGENTS_SESSION_MESSENGER, 'Session messengers')
       // The reviewers a workflow step or a delegated turn offers its finished turn to, and the
-      // operations their notes join (../server/sessions/turnFollowUps.ts). Loaded on first use.
+      // operations their notes join (`TurnFollowUps`). Loaded on first use.
       ctx.extensionPoints.declare(AGENTS_TURN_FOLLOW_UP, 'Turn reviewers')
       const entries = () => ctx.extensionPoints.handlers(AGENTS_SESSION_MESSENGER)
       const messagesRuntime = runtime
-      const followUpRegistry = () => followUps ??= import('../server/sessions/turnFollowUps').then(({ TurnFollowUps }) => new TurnFollowUps({
-        runtime: messagesRuntime,
-        entries: () => ctx.extensionPoints.handlers(AGENTS_TURN_FOLLOW_UP),
-        delegationLive: async (turn) => await delegation?.reports.operationLive(turn) ?? false,
-      }))
+      const followUpRegistry = () =>
+        (followUps ??= import('../server/sessions/turnFollowUps').then(
+          ({ TurnFollowUps }) =>
+            new TurnFollowUps({
+              runtime: messagesRuntime,
+              entries: () => ctx.extensionPoints.handlers(AGENTS_TURN_FOLLOW_UP),
+              delegationLive: async (turn) => (await delegation?.reports.operationLive(turn)) ?? false,
+            }),
+        ))
       reconcileMessages = async () => {
         if (!messages && !entries().length) return
-        messages ??= import('../server/sessions/sessionMessages').then(({ SessionMessages }) => new SessionMessages({
-          runtime: messagesRuntime,
-          entries,
-          notice: (notice) => ctx.events.notice(notice),
-          followUps: followUpRegistry,
-        }))
+        messages ??= import('../server/sessions/sessionMessages').then(
+          ({ SessionMessages }) =>
+            new SessionMessages({
+              runtime: messagesRuntime,
+              entries,
+              notice: (notice) => ctx.events.notice(notice),
+              followUps: followUpRegistry,
+            }),
+        )
         await (await messages).reconcile()
       }
       pluginsChanged = ctx.events.on('plugins:changed', () => void reconcileMessages?.().catch(() => undefined))
@@ -309,7 +360,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       delegation = new AgentDelegationService(
         runtime,
         new AgentDelegationStore(store),
-        async () => await ctx.capabilities.get(TERMINAL_SESSIONS)?.list() ?? [],
+        async () => (await ctx.capabilities.get(TERMINAL_SESSIONS)?.list()) ?? [],
         core.tasks,
         deps.reconciled,
         followUpRegistry,
@@ -338,7 +389,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
-      // core's table (../server/pricingStore.ts).
+      // core's table (`readAgentPricingPreferences`).
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
         ...usageService,
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
@@ -354,7 +405,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read, merge, write. Settings sends the checkbox and the pinned values; the runtime writes
         // `last` as sessions change, and neither should flatten the other.
         setSessionDefaults: async (userId, patch) => {
-          const merged = { ...await readAgentSessionDefaults(core.prefs, userId), ...patch }
+          const merged = { ...(await readAgentSessionDefaults(core.prefs, userId)), ...patch }
           await writeAgentSessionDefaults(core.prefs, userId, merged)
           return merged
         },
@@ -364,22 +415,29 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       instructionReviewRoute = ctx.capabilities.provide(AGENT_INSTRUCTION_REVIEW, {
         tasks: async () => (await core.tasks.active()).map(({ id, title, projectId }) => ({ id, title, projectId })),
-        admission: () => runtime!.instructionAdmission(),
+        admission: () => runtime!.instructionAdmission.get(),
       })
       securityDiagnosticsRoute = ctx.capabilities.provide(AGENT_SECURITY_DIAGNOSTICS, {
         check: async (nodeId, userId, scope, signal) => {
           const { collectSecurityDiagnostics } = await import('../server/securityDiagnostics')
-          return collectSecurityDiagnostics({
-            core,
-            defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
-            managedMcp: () => runtime!.mcpServers.list(),
-            instructionObservation: async (projectId) => (await runtime!.observedInstructionAdmission())?.latest(projectId) ?? null,
-            readBlockProviders: () => runtime!.readBlockProviders(),
-            staticDependencyPolicy: async (root, signal) => {
-              const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
-              return policy?.read(root, signal)
+          return collectSecurityDiagnostics(
+            {
+              core,
+              defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
+              managedMcp: () => runtime!.mcpServers.list(),
+              instructionObservation: async (projectId) =>
+                (await runtime!.instructionAdmission.built())?.latest(projectId) ?? null,
+              readBlockProviders: () => runtime!.providers.readBlockProviders(),
+              staticDependencyPolicy: async (root, signal) => {
+                const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
+                return policy?.read(root, signal)
+              },
             },
-          }, nodeId, userId, scope, signal)
+            nodeId,
+            userId,
+            scope,
+            signal,
+          )
         },
         scopes: async () => {
           const { securityScopeChoices } = await import('../server/securityDiagnostics')
@@ -389,9 +447,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       projectChanged = ctx.events.on('project:changed', (event) => {
         if (typeof event.projectId !== 'string') return
         const projectId = event.projectId
-        void core.projects.byId(projectId).then(async (project) => {
-          if (!project) await (await runtime!.instructionAdmission()).store.deleteProject(projectId)
-        }).catch(() => undefined)
+        void core.projects
+          .byId(projectId)
+          .then(async (project) => {
+            if (!project) await (await runtime!.instructionAdmission.get()).store.deleteProject(projectId)
+          })
+          .catch(() => undefined)
       })
 
       // agents.harnessRegistry (docs/managed-agents/harnesses.md § Harnesses). The plugin host resolves this per
@@ -405,7 +466,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
 
-      // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
+      // This plugin's sessions, for the merged run list core assembles (`packages/protocol/src/runtime/runs.ts`). A
       // pointer at the route above; nothing here knows workflows is on the same list.
       ctx.runs.register({ runs: '/v1/p/agents/runs' })
       // Transcripts for the archive page's search (docs/plugins/search-providers.md § Search providers).
@@ -414,7 +475,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         label: 'Agent sessions',
         search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
       })
-      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
+      ctx.routes.register(agentUsage, {
+        prefix: '',
+        note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents',
+      })
       ctx.routes.register(agentInstructionReview, { prefix: '', note: 'device-only instruction review and approval' })
       ctx.routes.register(agentSecurityDiagnostics, { prefix: '', note: 'device-only passive security diagnostics' })
 
@@ -427,9 +491,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         consent: (name, revision) => runtime!.mcpServers.consent(name, revision),
         test: async (name) => {
           const configured = await runtime!.mcpServers.get(name)
-          if (configured && !configured.consented) return { ok: false, error: 'Review and consent to this exact server configuration before testing it.' }
+          if (configured && !configured.consented)
+            return { ok: false, error: 'Review and consent to this exact server configuration before testing it.' }
           const resolved = await runtime!.mcpServers.resolve([name], 'agent MCP server: test the connection')
-          if (resolved.unavailable.length) return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
+          if (resolved.unavailable.length)
+            return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
           const [server] = resolved.servers
           if (!server) return null
           // Loaded on first use: the MCP client and its transports are a large part of a boot graph that
@@ -438,35 +504,53 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           return probeMcpServer(server, resolved.secrets)
         },
         planPackage: async (coordinate, targetName, expectedRevision, exceptions, signal) => {
-          const plan = await (await managedPackages()).plan(coordinate, targetName, expectedRevision, exceptions, signal)
-          for (const exception of plan.exceptions) ctx.audit.record('mcp-publication-exception', {
-            subject: exception.coordinate,
-            details: { reason: exception.reason, reviewedAt: exception.reviewedAt },
-          })
+          const plan = await (
+            await managedPackages()
+          ).plan(coordinate, targetName, expectedRevision, exceptions, signal)
+          for (const exception of plan.exceptions)
+            ctx.audit.record('mcp-publication-exception', {
+              subject: exception.coordinate,
+              details: { reason: exception.reason, reviewedAt: exception.reviewedAt },
+            })
           return plan
         },
-        testPackagePlan: (name, planId, bin, signal) => managedPackages().then((manager) => manager.testPlan(name, planId, bin, signal)),
+        testPackagePlan: (name, planId, bin, signal) =>
+          managedPackages().then((manager) => manager.testPlan(name, planId, bin, signal)),
         activatePackage: async (name, planId, bin, enabled, signal) => {
           const server = await (await managedPackages()).activate(name, planId, bin, enabled, signal)
-          ctx.audit.record('mcp-package-activation', { subject: name, details: { package: server.managed?.package ?? '', version: server.managed?.version ?? '', bin } })
+          ctx.audit.record('mcp-package-activation', {
+            subject: name,
+            details: { package: server.managed?.package ?? '', version: server.managed?.version ?? '', bin },
+          })
           return server
         },
-        pendingReviews: () => runtime!.pendingMcpReviews(),
+        pendingReviews: async () => (await runtime!.mcpReviews.get()).pending(),
         approveReview: async (name, sessionId, revision, digest) => {
-          const server = await runtime!.approveMcpCatalogue(name, sessionId, revision, digest)
+          const server = await (await runtime!.mcpReviews.get()).approve(name, sessionId, revision, digest)
           ctx.audit.record('mcp-catalogue-approval', { subject: name, details: { sessionId, digest } })
           return server
         },
       })
-      ctx.routes.register(agentMcpServers, { prefix: '', note: '/mcp-servers — the MCP servers acorn declares to agent sessions' })
+      ctx.routes.register(agentMcpServers, {
+        prefix: '',
+        note: '/mcp-servers — the MCP servers acorn declares to agent sessions',
+      })
 
       // Harness bridges (docs/managed-agents/loop-hooks.md): a bridged harness's tool calls, and which
       // harnesses a plugin's tool hooks reach. Coverage is loaded on first use, like each bridge call.
       loopHooksRoute = ctx.capabilities.provide(AGENT_LOOP_HOOKS, {
         answer: (caller, request) => runtime!.loopHook(caller, request),
-        coverage: async (pluginId) => (await import('../server/sessions/loopHooks')).loopCoverage(ctx.hooks, await runtime!.providers(), pluginId),
+        coverage: async (pluginId) =>
+          (await import('../server/sessions/loopHooks')).loopCoverage(
+            ctx.hooks,
+            await runtime!.providers.list(),
+            pluginId,
+          ),
       })
-      ctx.routes.register(agentLoopHooks, { prefix: '', note: '/loop-hook, /loop-coverage — harness bridge calls and what they reach' })
+      ctx.routes.register(agentLoopHooks, {
+        prefix: '',
+        note: '/loop-hook, /loop-coverage — harness bridge calls and what they reach',
+      })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
@@ -486,28 +570,30 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
       })
 
-      // The owner's "Keep agent history for archived tasks" (docs/data-layer/backup-and-retention.md § Retention). Daily,
-      // and a no-op until the owner picks a limit, so the setting is the one switch that matters.
+      // The owner's "Keep agent history for archived tasks"
+      // (docs/data-layer/backup-and-retention.md § Retention). Daily, and a no-op until the owner picks a
+      // limit, so the setting is the one switch that matters.
       ctx.schedules.register({
         scheduleId: 'archived-history-prune',
         name: 'Remove agent history of long-archived tasks',
         cadence: { daily: '03:50' },
         timeout: 300,
-        run: (signal) => removeExpiredHistory({
-          runtime: runtime!,
-          prefs: core.prefs,
-          userId: ctx.core.identity.active(),
-          archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
-          signal,
-        }),
+        run: (signal) =>
+          removeExpiredHistory({
+            runtime: runtime!,
+            prefs: core.prefs,
+            userId: ctx.core.identity.active(),
+            archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
+            signal,
+          }),
       })
 
       // Deleted tasks' sessions, transcripts and the rest (docs/workspaces-and-tasks/archive.md § Deleting
-      // a task). The longest timeout the engine allows, because a task with a long history takes a while
-      // at 22,000 events a second; the next run carries on from where one stops.
+      // a task). The longest timeout the engine allows, because a task with a long history takes a while;
+      // the next run carries on from where one stops.
       registerDeletedTaskPurge(ctx, (taskIds, signal) => runtime!.purgeDeletedTasks(taskIds, signal), { timeout: 300 })
 
-      // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
+      // agents.sessionExecute. The workflow runner resolves this at call
       // time and falls back to its own headless runner, so a node without this plugin still runs
       // non-managed workflow steps.
       // Loaded on the first step, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
@@ -515,33 +601,44 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // The judge is the same one interactive goals use, so a step's completion check runs through its own harness.
       const goalJudge = { models: ctx.core.models, currentUserId: () => ctx.core.identity.active() }
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
-        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry, goalJudge)(request))
+        (await import('../server/sessions/sessionExecute')).createSessionExecute(
+          executeRuntime,
+          followUpRegistry,
+          goalJudge,
+        )(request),
+      )
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
-      // Who a signed tool call came from, for another plugin's tools (contract/toolCaller.ts).
+      // Who a signed tool call came from, for another plugin's tools (`AgentToolCallerLookup`).
       toolCallers = createToolCallers(runtime.store)
       ctx.capabilities.provide(AGENTS_TOOL_CALLER, toolCallers.lookup)
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
-      // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
+      // and it interrupts every unsettled session. Same reason as workflows (`AGENTS_RUNTIME`).
       ctx.capabilities.provide(AGENTS_RUNTIME, {
         reconcile: async () => {
           await runtime!.reconcile()
           await delegation!.reconcile()
         },
       })
-      // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
+      // agents.draftAttachments. What a plugin that edits an unsent image
       // attachment reaches this plugin through, since a sandbox cannot call another plugin's routes.
       // Read and write only, and only for a draft: the composer still owns which attachment is in the
       // turn, because the node cannot transact with an array in the client.
-      draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
-      // agents.transcriptMedia (contract/transcriptMedia.ts). What a plugin drawing a sent attachment or
+      draftAttachmentsRoute = ctx.capabilities.provide(
+        AGENTS_DRAFT_ATTACHMENTS,
+        createDraftAttachments(runtime.attachments),
+      )
+      // agents.transcriptMedia. What a plugin drawing a sent attachment or
       // an artifact reads the bytes through. Read-only, and only after checking the media belongs to
       // the session and the session to the task.
       const sessions = runtime.store
-      transcriptMediaRoute = ctx.capabilities.provide(AGENTS_TRANSCRIPT_MEDIA, createTranscriptMedia({
-        taskIdForSession: async (sessionId) => (await sessions.getSession(sessionId))?.taskId ?? null,
-        attachments: runtime.attachments,
-        artifacts: runtime.artifacts,
-      }))
+      transcriptMediaRoute = ctx.capabilities.provide(
+        AGENTS_TRANSCRIPT_MEDIA,
+        createTranscriptMedia({
+          taskIdForSession: async (sessionId) => (await sessions.getSession(sessionId))?.taskId ?? null,
+          attachments: runtime.attachments,
+          artifacts: runtime.artifacts,
+        }),
+      )
     },
     ready: async () => {
       await reconcileMessages?.()

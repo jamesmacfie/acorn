@@ -2,9 +2,8 @@
 // only thing that carries anything between them (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // No JSX import here (docs/frontend/registries.md § Registries and plugins). The host that draws these
-// deliveries is `plugins/chrome/ExtensionPointHost.tsx`.
+// deliveries is `ExtensionPointHost`.
 import {
-  parseExtensionPointRef,
   takesPluginExtensions,
   type ArbitrationMode,
   type DetailRegion,
@@ -18,7 +17,7 @@ import type { Component } from 'solid-js'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { Registry } from '../../../kit/lib/state/registry'
 
-export type { ArbitrationMode, ExtensionPointKind, ExtensionPointLocation }
+export type { ExtensionPointLocation }
 
 /** A point plugin A hosts. `id` is the qualified `<ownerId>:<pointId>` the host minted
  *  (docs/plugins/cooperative-extension-points.md § Cooperative extension points); nothing else in the app addresses a point by any
@@ -53,7 +52,7 @@ export type ExtensionPointContribution = {
    *  (docs/plugins/detail-regions.md). Shown on the developer view. */
   mounts?: readonly { surface: string; region: DetailRegion }[]
   /** The platform question, the same field every host-filtered contribution takes
-   *  (../hostCapabilities.ts). */
+   *  (infra/node/hostCapabilities.ts). */
   requires?: HostCapabilityRequirement
   /** Is the owning plugin running on the node being looked at? A point whose owner is not there has no
    *  surface on screen, so it has nothing to deliver into. */
@@ -97,7 +96,7 @@ export type ExtensionContribution = {
   component?: Component<any>
   /** `frame`: the id of the `inline` surface this places. */
   frame?: string
-  /** As on the point above (../hostCapabilities.ts). */
+  /** As on the point above (infra/node/hostCapabilities.ts). */
   requires?: HostCapabilityRequirement
   when?: () => boolean
   /** `items` only. */
@@ -122,8 +121,9 @@ export const extensionPointFor = (
   surface: string,
   location: ExtensionPointLocation,
 ): ExtensionPointContribution | undefined =>
-  extensionPointRegistry.entries().find((point) =>
-    point.ownerId === ownerId && point.surface === surface && point.location === location)
+  extensionPointRegistry
+    .entries()
+    .find((point) => point.ownerId === ownerId && point.surface === surface && point.location === location)
 
 /**
  * Everything eligible for one point right now, in declared order, whatever the point's kind.
@@ -145,12 +145,15 @@ export function extensionDeliveries(pointId: string): ExtensionContribution[] {
   // (dashboards/region.ts). Nothing renders an aside through this function, but "who may fill this
   // location" is a property of the location, and this is where a test can reach it.
   if (point.kind === 'rows' && !takesPluginExtensions(point.location ?? 'pane.footer')) return []
-  return extensionRegistry.entries()
-    .filter((entry) =>
-      entry.point === pointId
-      && carrierFits(point.kind, entry.carrier)
-      && hasHostCapability(entry.requires)
-      && (entry.when?.() ?? true))
+  return extensionRegistry
+    .entries()
+    .filter(
+      (entry) =>
+        entry.point === pointId &&
+        carrierFits(point.kind, entry.carrier) &&
+        hasHostCapability(entry.requires) &&
+        (entry.when?.() ?? true),
+    )
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 }
 
@@ -161,7 +164,7 @@ export function extensionDeliveries(pointId: string): ExtensionContribution[] {
  * `items` covers two kinds because rows and annotations are both descriptors on a route; what differs
  * is the shape the host asks for and draws, which is the point's business.
  */
-export const carrierFits = (kind: ExtensionPointKind, carrier: ExtensionContribution['carrier']): boolean => {
+const carrierFits = (kind: ExtensionPointKind, carrier: ExtensionContribution['carrier']): boolean => {
   switch (kind) {
     case 'rows':
     case 'annotation':
@@ -195,12 +198,17 @@ export function unmatchedExtensions(): { entry: ExtensionContribution; reason: s
     // A hook's real matching happens on the node, so the client has nothing true to say about it.
     if (entry.carrier === 'route') return []
     if (!point) {
-      const suggestion = nearestPointId(entry.point, points.map((candidate) => candidate.id))
-      return [{
-        entry,
-        reason: 'no plugin on this node declares that point',
-        ...(suggestion ? { suggestion } : {}),
-      }]
+      const suggestion = nearestPointId(
+        entry.point,
+        points.map((candidate) => candidate.id),
+      )
+      return [
+        {
+          entry,
+          reason: 'no plugin on this node declares that point',
+          ...(suggestion ? { suggestion } : {}),
+        },
+      ]
     }
     if (!carrierFits(point.kind, entry.carrier)) {
       return [{ entry, reason: `that point takes ${point.kind}, and this contributes ${entry.carrier}` }]
@@ -217,17 +225,10 @@ export function unmatchedExtensions(): { entry: ExtensionContribution; reason: s
  * misspelt half of `<owner>:<point>`, and a real Levenshtein here would suggest a stranger's point for
  * a name that shares four letters with it. `undefined` is a better answer than a wrong one.
  */
-export function nearestPointId(wanted: string, declared: readonly string[]): string | undefined {
+function nearestPointId(wanted: string, declared: readonly string[]): string | undefined {
   const [owner, point] = wanted.split(':')
-  return declared.find((candidate) => candidate.startsWith(`${owner}:`))
-    ?? declared.find((candidate) => candidate.endsWith(`:${point}`))
+  return (
+    declared.find((candidate) => candidate.startsWith(`${owner}:`)) ??
+    declared.find((candidate) => candidate.endsWith(`:${point}`))
+  )
 }
-
-/** Which packages a plugin's manifest says it reaches into, for the disclosure surfaces. `null` refs
- *  are dropped rather than reported, because the node refused them at parse and anything unparseable
- *  here will never deliver. */
-export const extensionPointOwners = (points: readonly { point: string }[]): string[] =>
-  [...new Set(points.flatMap((entry) => {
-    const ref = parseExtensionPointRef(entry.point)
-    return ref ? [ref.owner] : []
-  }))].sort()

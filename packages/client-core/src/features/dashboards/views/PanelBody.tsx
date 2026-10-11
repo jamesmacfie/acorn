@@ -7,24 +7,35 @@ import type { PanelViewProps } from './props'
 import StatView from './StatView'
 import TableView from './TableView'
 
-// The one place a panel's body is drawn, for both the placed panel (Panel.tsx) and the wizard's live
-// preview (the panel studio's StudioPreview.tsx). docs/dashboards/mapping-and-editor.md § The generated editor and § Placements cover why
-// there is exactly one view switch and what an unresolved view kind falls back to.
+// The one place a panel's body is drawn, for both the placed panel (`PublishedDashboardPanel`) and the
+// studio's live preview (`StudioPreview`). docs/dashboards/mapping-and-editor.md § The generated editor
+// and § Placements cover why there is exactly one view switch and what an unresolved view kind falls back
+// to.
 
 export default function PanelBody(props: PanelViewProps) {
   return (
     <Switch
-      fallback={(
+      fallback={
         <EmptyState align="start" size="sm" title="Can't draw this view">
           {`This version of acorn has no ${props.view.kind} view. Edit the panel to choose another.`}
         </EmptyState>
-      )}
+      }
     >
-      <Match when={props.view.kind === 'stat'}><StatView {...props} /></Match>
-      <Match when={props.view.kind === 'list'}><ListView {...props} /></Match>
-      <Match when={props.view.kind === 'table'}><TableView {...props} /></Match>
-      <Match when={props.view.kind === 'board'}><BoardView {...props} /></Match>
-      <Match when={props.view.kind === 'chart'}><ChartView {...props} /></Match>
+      <Match when={props.view.kind === 'stat'}>
+        <StatView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'list'}>
+        <ListView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'table'}>
+        <TableView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'board'}>
+        <BoardView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'chart'}>
+        <ChartView {...props} />
+      </Match>
     </Switch>
   )
 }

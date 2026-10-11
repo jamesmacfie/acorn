@@ -4,8 +4,7 @@
 // starts it with the test runner's own node binary.
 //
 // The turn ends on a timer rather than in the same tick as the question, because a real agent is
-// blocked on the answer in between, and answering a question that has not been asked yet proves
-// nothing.
+// blocked on the answer in between.
 let nextId = 1
 
 function send(message) {

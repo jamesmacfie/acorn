@@ -14,8 +14,9 @@ A Home board belongs to one workspace, and switching workspace switches the boar
 action resolves against the workspace you're in, so a shared board could offer rows whose project is
 somewhere else. The workspace is the scope key's third segment, `home/<tabId>/<workspaceId>`, so
 the same panel can be placed in several workspaces with its own rect in each. The routed project
-decides the workspace. A board saved before boards were per workspace is adopted, once, by the first
-workspace to open Home (`adoptLegacyHome` in `persist.ts`). Adoption doesn't overwrite a board.
+decides the workspace. With no project routed, Home draws an unscoped board, keyed `home`. The next
+workspace to open Home adopts it (`adoptUnscopedHome` in `persist.ts`). Adoption doesn't overwrite a
+board.
 
 ## Home tabs
 

@@ -5,21 +5,27 @@ import { isFieldKind, laysOut, type Node } from '../tree/node'
 import { sliceToWidth } from '../width'
 import { measuredField, toVisual } from '../wrap'
 import {
-  ATTRS, clipOf, fill, inside, intersect, isEmptyClip, put, wholeOf, writeRun,
-  type Buffer, type Clip, type Style,
+  ATTRS,
+  clipOf,
+  fill,
+  inside,
+  intersect,
+  isEmptyClip,
+  put,
+  wholeOf,
+  writeRun,
+  type Buffer,
+  type Clip,
+  type Style,
 } from './buffer'
 
-// The tree into the cells: one depth-first walk, and every behaviour the old renderables had.
+// The tree into the cells: one depth-first walk.
 //
-// This is where the rendering fault class ends, because the three things a `Renderable` did wrong are
-// all decisions this file makes instead:
+// Three decisions a node with behaviour would make for itself are made here instead:
 //
-//   a `#text` under a box     is a one-line run at the box's content origin. It was an error thrown
-//                             from inside whatever signal had just moved, and four crashes in one
-//                             week were a bare `{count()}` under a `<Stack>`.
+//   a `#text` under a box     is a one-line run at the box's content origin, not an error.
 //   a `span`'s colour         is read here, off the span, and inherited from its parent `text` where
-//                             it names none. A span that dropped its colour drew every line of every
-//                             diff in the parent's — which was white, on a white terminal.
+//                             it names none.
 //   a rectangle we mistrust   is clipped rather than believed. A node's rectangle says where its
 //                             content goes and the clip says which cells may show it, and the two
 //                             differ exactly when something overflows.
@@ -82,17 +88,13 @@ const maskOf = (value: unknown): number =>
 
 /** A node's own run style, over the one it inherits.
  *
- *  Two shapes, because a `span` and a `text` do not take the same props yet: a `text` gets `fg` and
- *  an attribute mask, and a `span` gets one `style` object with the attributes as booleans, which is
- *  what `../kit/roles.ts § spanStyle` still answers. The slice that merges the two leaves this
- *  reading one shape; until then reading both is what keeps a styled word inside a sentence its own
- *  colour. Attributes accumulate down the run and a colour replaces, which is what nesting a
+ *  Two shapes: `fg` and an attribute mask as props, or one `style` object with `fg` and the attributes
+ *  as booleans. Attributes accumulate down the run and a colour replaces, which is what nesting a
  *  `strong` inside a muted line means. */
 function styleOf(node: Node, inherited: Style): Style {
   const props = node.props
-  const bag = typeof props.style === 'object' && props.style !== null
-    ? (props.style as Record<string, unknown>)
-    : undefined
+  const bag =
+    typeof props.style === 'object' && props.style !== null ? (props.style as Record<string, unknown>) : undefined
   let attrs = inherited.attrs | maskOf(props.attributes)
   if (bag) {
     for (const name of Object.keys(ATTRS) as (keyof typeof ATTRS)[]) if (bag[name] === true) attrs |= ATTRS[name]
@@ -122,7 +124,10 @@ function piecesOf(segments: readonly Segment[], from: number, to: number): Segme
   for (const segment of segments) {
     const end = at + segment.text.length
     if (end > from && at < to) {
-      pieces.push({ text: segment.text.slice(Math.max(0, from - at), Math.min(segment.text.length, to - at)), style: segment.style })
+      pieces.push({
+        text: segment.text.slice(Math.max(0, from - at), Math.min(segment.text.length, to - at)),
+        style: segment.style,
+      })
     }
     at = end
     if (at >= to) break
@@ -167,9 +172,7 @@ function drawText(node: Node, buffer: Buffer, clip: Clip): void {
  *  A cell of edge either side of it, which is what a bordered panel reads as: `┌─Keys──────┐`.
  *  `left` is the only alignment this app asks for (`../panel.tsx`) and the other two are here because
  *  the prop offers them. */
-function drawTitle(
-  buffer: Buffer, clip: Clip, node: Node, sides: Sides, title: string, style: Style,
-): void {
+function drawTitle(buffer: Buffer, clip: Clip, node: Node, sides: Sides, title: string, style: Style): void {
   const rect = node.rect
   const from = rect.x + (sides.left ? 1 : 0)
   const to = rect.x + rect.w - (sides.right ? 1 : 0)
@@ -187,7 +190,11 @@ function drawTitle(
  *  `Rule` is one edge with no corners at all, which is how a single line becomes the divider between
  *  two regions. */
 function drawBorder(
-  buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides, style: Style,
+  buffer: Buffer,
+  clip: Clip,
+  rect: Node['rect'],
+  sides: Sides,
+  style: Style,
   leftAccent?: { glyph: string; color: Color },
 ): void {
   if (rect.w <= 0 || rect.h <= 0) return
@@ -221,7 +228,14 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   const sides = sidesOf(props.border)
   if (anySide(sides)) {
     const style: Style = { fg: toColor(props.borderColor), attrs: 0 }
-    drawBorder(buffer, own, node.rect, sides, style, props.borderLeftAccent as { glyph: string; color: Color } | undefined)
+    drawBorder(
+      buffer,
+      own,
+      node.rect,
+      sides,
+      style,
+      props.borderLeftAccent as { glyph: string; color: Color } | undefined,
+    )
     if (sides.top && typeof props.title === 'string') drawTitle(buffer, own, node, sides, props.title, style)
   }
 
@@ -236,7 +250,7 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   const inner = intersect(own, clipOf(content))
 
   // A `#text` or a `span` directly under a box, which nothing laid out, drawn as one line at the
-  // content origin. The orphan-text rule made unnecessary rather than moved.
+  // content origin.
   const loose = node.children.filter((child) => !laysOut(child.kind))
   if (loose.length > 0) {
     const text = segmentsOf(loose, PLAIN, [])
@@ -254,11 +268,10 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
  * and the clip above has already cut them to the viewport, so all a scroll viewport needs of paint is
  * the bar (../layout/pass.ts § A viewport moves its children).
  *
- * **Drawn over the last column rather than given one.** OpenTUI's bar was a sibling of the viewport,
- * so it took a cell of layout while it was visible — and that is a cycle: the content's height
- * depends on the width it wraps at, the width depends on whether the bar is showing, and the bar
- * depends on the height. A frame that resolves that cycle by iterating is a frame that can fail to
- * settle. The viewport always reserves that rightmost cell for the overlaid bar, so wrapped text
+ * **Drawn over the last column rather than given one.** A bar that takes a cell of layout while it is visible
+ * is a cycle: the content's height depends on the width it wraps at, the width depends on whether the bar is
+ * showing, and the bar depends on the height. A frame that resolves that cycle by iterating is a frame that
+ * can fail to settle. The viewport always reserves that rightmost cell for the overlaid bar, so wrapped text
  * remains readable whether the bar is showing or not, without a width cycle.
  *
  * The thumb and track match the virtual list in `../kit/showing/collection.tsx`.
@@ -291,7 +304,7 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * Everything drawn here comes off the node as a prop, because the state is the component's — the
  * value the model holds, the caret's offset into it, how far the field has scrolled, and whether the
  * region store has given it the keys. Nothing on the node knows how to edit, so nothing on the node
- * can be in a state the component disagrees with (../kit/asking.tsx).
+ * can be in a state the component disagrees with (../kit/asking/fieldRef.ts § fieldRef).
  *
  * **The rows are the ones Yoga measured**, out of the same cache, which is what keeps the caret on a
  * row the reader can see (../wrap.ts § measuredField).
@@ -302,10 +315,9 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * for all of itself scrolls to nought.
  *
  * **The two colours are the component's, said out loud.** A field's text colour and its placeholder's
- * are both props here, for the reason `../kit/asking/fieldRef.ts` already gives about the first: an edit
- * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
- * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
- * read it (docs/ui-design/appearance.md § Roles, and what each host makes of them).
+ * are both props, so the kit names a slot rather than paint choosing a colour that is none of the
+ * sixteen a terminal has and comes from no theme (docs/ui-design/appearance.md § Roles, and what each
+ * host makes of them).
  */
 function drawField(node: Node, buffer: Buffer, clip: Clip): void {
   const own = intersect(clip, clipOf(node.rect))
@@ -324,8 +336,14 @@ function drawField(node: Node, buffer: Buffer, clip: Clip): void {
     const first = line ? 0 : scroll
     for (let at = first; at < rows.length && at - first < Math.max(node.rect.h, 1); at += 1) {
       const row = rows[at]!
-      writeRun(buffer, own, node.rect.x - (line ? scroll : 0), node.rect.y + at - first,
-        value.slice(row.from, row.to), style)
+      writeRun(
+        buffer,
+        own,
+        node.rect.x - (line ? scroll : 0),
+        node.rect.y + at - first,
+        value.slice(row.from, row.to),
+        style,
+      )
     }
   }
 
@@ -350,8 +368,8 @@ function drawField(node: Node, buffer: Buffer, clip: Clip): void {
  *  `Color` type (../colour.ts). Above that xterm's palette is arithmetic rather than a table — a
  *  6×6×6 cube and then a 24-step grey ramp — and there is nothing in `Color` between a slot and a
  *  triple, so the arithmetic is done here and the answer is a triple. A program that asked for cube
- *  colour 141 gets the colour, on a terminal that takes 24-bit; on one that does not, `../flush.ts`
- *  has nowhere to put it either way. */
+ *  colour 141 gets the colour, on a terminal that takes 24-bit; on one that does not, the flush has
+ *  nowhere to put it either way. */
 function paletteColor(index: number): Color {
   if (index < 16) return index
   if (index < 232) {
@@ -414,10 +432,11 @@ function drawPty(node: Node, buffer: Buffer, clip: Clip): void {
       const style: Style = {
         fg: cellColor(cell.getFgColor(), cell.isFgPalette(), cell.isFgRGB()),
         bg: cellColor(cell.getBgColor(), cell.isBgPalette(), cell.isBgRGB()),
-        attrs: (cell.isBold() ? ATTRS.bold : 0)
-          | (cell.isDim() ? ATTRS.dim : 0)
-          | (cell.isUnderline() ? ATTRS.underline : 0)
-          | (cell.isInverse() ? ATTRS.inverse : 0),
+        attrs:
+          (cell.isBold() ? ATTRS.bold : 0) |
+          (cell.isDim() ? ATTRS.dim : 0) |
+          (cell.isUnderline() ? ATTRS.underline : 0) |
+          (cell.isInverse() ? ATTRS.inverse : 0),
       }
       const chars = cell.getChars()
       put(buffer, own, node.rect.x + at, y, chars === '' ? ' ' : chars, style)
@@ -439,7 +458,10 @@ function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
   // two agree without a rule between them (../layout/props.ts § visible).
   if (node.props.visible === false) return
-  if (node.kind === 'text') { drawText(node, buffer, clip); return }
+  if (node.kind === 'text') {
+    drawText(node, buffer, clip)
+    return
+  }
   drawBox(node, buffer, clip)
   // A field's own content and caret go inside the box it also is, so a bordered or coloured field
   // draws both. Nothing in the kit gives one a border, and the box half costs one branch.

@@ -17,6 +17,8 @@
  * describes. */
 export type PluginAuditRegistry = {
   declare(action: { id: string; label: string }): void
-  record(action: string, entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> }): void
+  record(
+    action: string,
+    entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> },
+  ): void
 }
-

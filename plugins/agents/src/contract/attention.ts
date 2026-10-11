@@ -6,7 +6,8 @@ function managedState(session: AgentSession): AttentionState {
   switch (session.attention) {
     case 'permission':
     case 'question':
-    case 'workflow_gate': return 'blocked'
+    case 'workflow_gate':
+      return 'blocked'
   }
   const settled = ['ready', 'stopped', 'archived'].includes(session.runtimeState)
   // A workflow step that fails is the run's failure to report (run-failed), not an agent's.

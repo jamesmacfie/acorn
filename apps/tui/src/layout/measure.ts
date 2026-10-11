@@ -8,8 +8,8 @@ import { measuredField } from '../wrap'
 //
 // A `text` node is a leaf to Yoga with a measure function on it. The function concatenates its `#text`
 // and `span` children in order, wraps or truncates the result at the width Yoga is offering, and
-// answers with the widest line and the number of lines. `wrapMode` decides which, exactly as
-// `../kit/cells.tsx` § Line passes it today.
+// answers with the widest line and the number of lines. `wrapMode` decides which, and the kit's
+// `Line` is what sets it.
 //
 // Cached on the node by the width and the text, so a frame that moved nothing measures nothing. Yoga
 // only calls a measure function on a node it considers dirty, but the same node is measured more than
@@ -19,10 +19,9 @@ import { measuredField } from '../wrap'
 // Paint reads the same lines out of the same cache, so the run it draws is the run that was measured.
 // If those two ever disagreed, every wrapped paragraph in the app would be a line out.
 //
-// A field's rows are the same arrangement one question over, and the cache for them is in `../wrap.ts`
-// rather than here: `../kit/asking/fieldRef.ts` reads it too, and a static import of this module from there
-// would put `yoga-layout` in the eager graph of the build that does not use it
-// (../wrap.ts § The cache is here rather than in ./layout/measure.ts).
+// A field's rows are the same arrangement one question over, and their cache is `measuredField`
+// rather than here: `fieldRef` reads it too, and a static import of this module from there would put
+// `yoga-layout` in the eager graph of the build that does not use it.
 
 type Measured = { key: string; lines: readonly string[]; width: number }
 
@@ -100,18 +99,20 @@ export function measuredRun(node: Node, limit: number): Measured {
 
 /** The measure function a `textarea` is a leaf to Yoga with: as tall as its wrapped rows are.
  *
- *  OpenTUI's edit buffer answers the same way, and it was measured rather than assumed — a textarea
- *  stacked between two lines of text moves the line below it down one row per line of content, which
- *  is also why a `Textarea` without `grow` is exactly as tall as what is in it. */
-export const measureField = (node: Node): MeasureFunction => (width, widthMode) => {
-  const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
-  const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
-  const field = measuredField(node, limit)
-  return {
-    width: widthMode === MeasureMode.Exactly ? offered : Math.min(field.width, limit),
-    height: field.rows.length,
+ *  OpenTUI's edit buffer answers the same way: a textarea stacked between two lines of text moves the
+ *  line below it down one row per line of content, which is also why a `Textarea` without `grow` is
+ *  exactly as tall as what is in it. */
+export const measureField =
+  (node: Node): MeasureFunction =>
+  (width, widthMode) => {
+    const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
+    const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
+    const field = measuredField(node, limit)
+    return {
+      width: widthMode === MeasureMode.Exactly ? offered : Math.min(field.width, limit),
+      height: field.rows.length,
+    }
   }
-}
 
 /** The measure function Yoga calls, bound to the node whose run it measures.
  *
@@ -119,12 +120,14 @@ export const measureField = (node: Node): MeasureFunction => (width, widthMode) 
  *  is no limit to wrap at. `AtMost` is an offer, and a run that does not wrap answers with the offer
  *  rather than its natural width, so the box shrinks and paint clips one line instead of the layout
  *  growing past its parent. `Exactly` is not a question. */
-export const measureRun = (node: Node): MeasureFunction => (width, widthMode) => {
-  const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
-  const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
-  const run = measuredRun(node, limit)
-  return {
-    width: widthMode === MeasureMode.Exactly ? offered : Math.min(run.width, limit),
-    height: run.lines.length,
+export const measureRun =
+  (node: Node): MeasureFunction =>
+  (width, widthMode) => {
+    const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
+    const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
+    const run = measuredRun(node, limit)
+    return {
+      width: widthMode === MeasureMode.Exactly ? offered : Math.min(run.width, limit),
+      height: run.lines.length,
+    }
   }
-}

@@ -1,11 +1,9 @@
 // The task's agent state, on its rail row. One marker in the top-right corner: a turning loader while
 // any agent in the task is moving, replaced by the alert glyph the moment one of them needs the owner.
 //
-// Both kinds of agent count. A managed session is this plugin's own (managedStore.ts); a terminal
-// agent session is a CLI harness running in the task's worktree, which core holds because several
-// surfaces read it but whose meaning — "an agent is working" — is this plugin's to say. Before this,
-// core drew the loader from terminal sessions only, under the task glyph, and a managed agent working
-// away in the background left the row looking idle.
+// Both kinds of agent count. A managed session is this plugin's own; a terminal agent session is a CLI
+// harness running in the task's worktree, which core holds because several surfaces read it but whose
+// meaning, "an agent is working", is this plugin's to say.
 import { agentSessionsFor, type RailMarker, type RailMarkerContribution } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
@@ -20,29 +18,33 @@ export type AgentRailState = { working: number; attention: number }
  *  "what is this task's agent doing", and "it needs you" is the answer that matters. */
 export function agentRailMarkers({ working, attention }: AgentRailState): RailMarker[] {
   if (attention)
-    return [{
-      id: 'attention',
-      label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
-      // The same shape the pane header, the task sidebar and Agent Center give these two states
-      // (stateTone.ts), so a reader learns one vocabulary.
-      icon: runtimeIcon('waiting'),
-      tone: 'warn',
-      placements: ['top-end'],
-    }]
+    return [
+      {
+        id: 'attention',
+        label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
+        // The same shape the pane header, the task sidebar and Agent Center give these two states
+        // (`runtimeIcon`), so a reader learns one vocabulary.
+        icon: runtimeIcon('waiting'),
+        tone: 'warn',
+        placements: ['top-end'],
+      },
+    ]
   if (working)
-    return [{
-      id: 'working',
-      label: `${working} agent${working > 1 ? 's' : ''} working`,
-      icon: runtimeIcon('working'),
-      tone: 'accent',
-      busy: true,
-      placements: ['top-end'],
-    }]
+    return [
+      {
+        id: 'working',
+        label: `${working} agent${working > 1 ? 's' : ''} working`,
+        icon: runtimeIcon('working'),
+        tone: 'accent',
+        busy: true,
+        placements: ['top-end'],
+      },
+    ]
   return []
 }
 
 // The task's own slice, not the roster: this runs for every row in the rail, and a slice only wakes the
-// row whose task changed (managedStore.ts § taskSlices).
+// row whose task changed.
 const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) =>
   managedAgentStore.sessionsForTask(taskId).filter(predicate).length
 
@@ -50,9 +52,10 @@ const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) 
 // spinner only for this task's workflow agents, so a spinner on the Agent button with none here says
 // the agent at work is not the workflow's.
 const WORKFLOWS_PANE_ID = 'workflows'
-const hasAgentWork = (session: AgentSession) => isActiveAgent(session)
-  || (!['stopped', 'failed', 'archived'].includes(session.runtimeState)
-    && session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
+const hasAgentWork = (session: AgentSession) =>
+  isActiveAgent(session) ||
+  (!['stopped', 'failed', 'archived'].includes(session.runtimeState) &&
+    session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
 const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && hasAgentWork(session)
 
 export const agentRailMarkerContribution: RailMarkerContribution = {
@@ -63,14 +66,13 @@ export const agentRailMarkerContribution: RailMarkerContribution = {
       return agentRailMarkers({ working: forTask(target.taskId, isWorkingWorkflowAgent), attention: 0 })
     // The same answer on the task's rail row and on its Agent button in the pane rail, so the corner
     // that says "working" on the left says it on the right too.
-    const taskId = target.kind === 'task' ? target.id
-      : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
+    const taskId =
+      target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
     if (!taskId) return []
     return agentRailMarkers({
       // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
       // working" (docs/terminal/activity.md § Activity and status).
-      working: agentSessionsFor(taskId).filter((session) => !session.idle).length
-        + forTask(taskId, hasAgentWork),
+      working: agentSessionsFor(taskId).filter((session) => !session.idle).length + forTask(taskId, hasAgentWork),
       attention: forTask(taskId, needsAttention),
     })
   },

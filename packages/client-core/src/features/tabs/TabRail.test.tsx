@@ -19,7 +19,11 @@ import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { writeDevicePref } from '../../infra/persistence/devicePrefs'
 
 const { archiveTaskMock, copyLinkMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
-  archiveTaskMock: vi.fn(), copyLinkMock: vi.fn(), createTaskMock: vi.fn(), navigateMock: vi.fn(), readJsonMock: vi.fn(),
+  archiveTaskMock: vi.fn(),
+  copyLinkMock: vi.fn(),
+  createTaskMock: vi.fn(),
+  navigateMock: vi.fn(),
+  readJsonMock: vi.fn(),
 }))
 vi.mock('../../host/registries/commands/copyLink', () => ({ copyLink: copyLinkMock }))
 vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock }))
@@ -33,7 +37,7 @@ vi.mock('../tasks/taskBridge', () => ({
 }))
 // The real archiveOrDeleteTask, over the mocked archiveTask above.
 vi.mock('../tasks/confirmTaskArchive', async (original) => ({
-  ...await original<typeof import('../tasks/confirmTaskArchive')>(),
+  ...(await original<typeof import('../tasks/confirmTaskArchive')>()),
   confirmTaskArchive: async () => ({ confirmed: true, checked: [], action: 'archive' }),
 }))
 
@@ -71,7 +75,10 @@ const workflowTask = (id: string, title: string, parentId: string): Task => ({
 
 const prefetched: string[] = []
 const pane = (over: Partial<PaneContribution> = {}): PaneContribution => ({
-  id: 'notes', label: 'Notes', glyph: 'notepad-text', order: 30,
+  id: 'notes',
+  label: 'Notes',
+  glyph: 'notepad-text',
+  order: 30,
   component: () => null,
   prefetch: (asked) => void prefetched.push(`notes:${asked.id}`),
   ...over,
@@ -117,10 +124,19 @@ const mount = (tasks = [task('t1', 'First'), task('t2', 'Second')], gitProject =
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   queryClient.setQueryData(tasksKey, tasks)
   queryClient.setQueryData(workspacesKey, gitProject ? [{ id: 'w1', name: 'Workspace', projects: [{ id: 'p1' }] }] : [])
-  queryClient.setQueryData(projectsKey, [{ id: 'p1', name: 'acorn', workspaceId: 'w1', vcs: gitProject ? 'git' : null, color: null, hidden: false }])
+  queryClient.setQueryData(projectsKey, [
+    { id: 'p1', name: 'acorn', workspaceId: 'w1', vcs: gitProject ? 'git' : null, color: null, hidden: false },
+  ])
   queryClient.setQueryData(integrationsKey, { integrations: [] })
   queryClient.setQueryData(prefsKey, {})
-  dispose = render(() => <QueryClientProvider client={queryClient}><TabRail /></QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={queryClient}>
+        <TabRail />
+      </QueryClientProvider>
+    ),
+    host,
+  )
   return [...host.querySelectorAll('.tabrail-item')] as HTMLElement[]
 }
 
@@ -136,8 +152,10 @@ const dispatchMouse = (row: HTMLElement, type: string, clientY: number, clientX 
   row.dispatchEvent(event)
   return event
 }
-const taskLabels = () => [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
-  .map((row) => row.querySelector('button')?.getAttribute('aria-label'))
+const taskLabels = () =>
+  [...host.querySelectorAll<HTMLElement>('.tabrail-item')].map((row) =>
+    row.querySelector('button')?.getAttribute('aria-label'),
+  )
 const pointAt = (element: Element) => {
   Object.defineProperty(document, 'elementFromPoint', {
     configurable: true,
@@ -152,14 +170,23 @@ describe('workspace scope after archiving a project-folder task', () => {
     setActiveTaskId(parent.id)
     mount([parent, child, task('remaining', 'Remaining task')], true)
     const evicted: string[] = []
-    const off = clientEvents.on('runtime:task-archived', ({ taskId }) => { evicted.push(taskId) })
+    const off = clientEvents.on('runtime:task-archived', ({ taskId }) => {
+      evicted.push(taskId)
+    })
     let finishArchive!: () => void
-    archiveTaskMock.mockImplementation(() => new Promise((resolve) => {
-      finishArchive = () => resolve({ id: parent.id, archivedTaskIds: [child.id, parent.id] })
-    }))
+    archiveTaskMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishArchive = () => resolve({ id: parent.id, archivedTaskIds: [child.id, parent.id] })
+        }),
+    )
     try {
-      host.querySelector<HTMLElement>('[data-task-id="parent"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
-      const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent?.includes('Archive'))!
+      host
+        .querySelector<HTMLElement>('[data-task-id="parent"]')!
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+      const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+        item.textContent?.includes('Archive'),
+      )!
       archiveButton.click()
       await vi.waitFor(() => expect(archiveTaskMock).toHaveBeenCalledWith(parent.id))
       setActiveTaskId(child.id)
@@ -167,42 +194,55 @@ describe('workspace scope after archiving a project-folder task', () => {
       await vi.waitFor(() => expect(activeTaskId()).toBeNull())
       expect(navigateMock).toHaveBeenLastCalledWith('/p/p1')
       expect(evicted).toEqual([child.id, parent.id])
-    } finally { off() }
-  })
-
-  it.each([false, true])('returns to the project and retains the roster when refresh precedes the response: %s', async (refreshFirst) => {
-    const current = { ...task('current', 'Project folder'), branch: null, worktreePath: null }
-    const remaining = task('remaining', 'Same workspace')
-    const elsewhere = { ...task('elsewhere', 'Other workspace'), projectId: 'p2' }
-    setActiveTaskId(current.id)
-    mount([current, remaining, elsewhere], true)
-    queryClient.setQueryData(workspacesKey, [
-      { id: 'w1', name: 'Workspace', projects: [{ id: 'p1' }] },
-      { id: 'w2', name: 'Other workspace', projects: [{ id: 'p2' }] },
-    ])
-    await vi.waitFor(() => expect(taskLabels()).toEqual(['Project folder', 'Same workspace']))
-
-    let finishArchive!: () => void
-    archiveTaskMock.mockImplementation(() => new Promise<{ id: string }>((resolve) => { finishArchive = () => resolve({ id: current.id }) }))
-    host.querySelector<HTMLElement>('[data-task-id="current"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
-    const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((item) => item.textContent?.includes('Archive'))!
-    archiveButton.click()
-    await vi.waitFor(() => expect(archiveTaskMock).toHaveBeenCalledWith(current.id))
-
-    if (refreshFirst) {
-      queryClient.setQueryData(tasksKey, [remaining, elsewhere])
-      await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
+    } finally {
+      off()
     }
-    finishArchive()
-    await vi.waitFor(() => expect(activeTaskId()).toBeNull())
-    expect(navigateMock).toHaveBeenLastCalledWith('/p/p1')
-    if (!refreshFirst) queryClient.setQueryData(tasksKey, [remaining, elsewhere])
-    await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
-
-    setActiveTaskId(elsewhere.id)
-    await vi.waitFor(() => expect(taskLabels()).toEqual(['Other workspace']))
   })
+
+  it.each([false, true])(
+    'returns to the project and retains the roster when refresh precedes the response: %s',
+    async (refreshFirst) => {
+      const current = { ...task('current', 'Project folder'), branch: null, worktreePath: null }
+      const remaining = task('remaining', 'Same workspace')
+      const elsewhere = { ...task('elsewhere', 'Other workspace'), projectId: 'p2' }
+      setActiveTaskId(current.id)
+      mount([current, remaining, elsewhere], true)
+      queryClient.setQueryData(workspacesKey, [
+        { id: 'w1', name: 'Workspace', projects: [{ id: 'p1' }] },
+        { id: 'w2', name: 'Other workspace', projects: [{ id: 'p2' }] },
+      ])
+      await vi.waitFor(() => expect(taskLabels()).toEqual(['Project folder', 'Same workspace']))
+
+      let finishArchive!: () => void
+      archiveTaskMock.mockImplementation(
+        () =>
+          new Promise<{ id: string }>((resolve) => {
+            finishArchive = () => resolve({ id: current.id })
+          }),
+      )
+      host
+        .querySelector<HTMLElement>('[data-task-id="current"]')!
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+      const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+        item.textContent?.includes('Archive'),
+      )!
+      archiveButton.click()
+      await vi.waitFor(() => expect(archiveTaskMock).toHaveBeenCalledWith(current.id))
+
+      if (refreshFirst) {
+        queryClient.setQueryData(tasksKey, [remaining, elsewhere])
+        await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
+      }
+      finishArchive()
+      await vi.waitFor(() => expect(activeTaskId()).toBeNull())
+      expect(navigateMock).toHaveBeenLastCalledWith('/p/p1')
+      if (!refreshFirst) queryClient.setQueryData(tasksKey, [remaining, elsewhere])
+      await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
+
+      setActiveTaskId(elsewhere.id)
+      await vi.waitFor(() => expect(taskLabels()).toEqual(['Other workspace']))
+    },
+  )
 })
 
 describe('hovering a task row', () => {
@@ -229,7 +269,16 @@ describe('hovering a task row', () => {
 
   it('asks every pane that offers a prefetch, and no pane that does not', () => {
     registered.push(paneRegistry.register(pane()))
-    registered.push(paneRegistry.register(pane({ id: 'agents', label: 'Agent', order: 15, prefetch: (asked) => void prefetched.push(`agents:${asked.id}`) })))
+    registered.push(
+      paneRegistry.register(
+        pane({
+          id: 'agents',
+          label: 'Agent',
+          order: 15,
+          prefetch: (asked) => void prefetched.push(`agents:${asked.id}`),
+        }),
+      ),
+    )
     registered.push(paneRegistry.register(pane({ id: 'quiet', label: 'Quiet', order: 40, prefetch: undefined })))
     const rows = mount()
 
@@ -244,8 +293,9 @@ describe('dragging a task row', () => {
     setActiveTaskId('t1')
     const rows = mount()
     rows[1]!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
-    const copy = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((item) => item.textContent?.includes('Copy link'))!
+    const copy = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+      item.textContent?.includes('Copy link'),
+    )!
     copy.click()
     expect(copyLinkMock).toHaveBeenCalledWith(null, { kind: 'task', taskId: 't2' })
     expect(activeTaskId()).toBe('t1')
@@ -278,11 +328,7 @@ describe('dragging a task row', () => {
   })
 
   it('moves a root with its descendants without changing the hierarchy', async () => {
-    const rows = mount([
-      task('parent', 'Parent'),
-      task('child', 'Child', 'parent'),
-      task('other', 'Other'),
-    ])
+    const rows = mount([task('parent', 'Parent'), task('child', 'Child', 'parent'), task('other', 'Other')])
     vi.spyOn(rows[2]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
     pointAt(rows[2]!)
 
@@ -291,15 +337,15 @@ describe('dragging a task row', () => {
     dispatchMouse(rows[0]!, 'mouseup', 40)
 
     await vi.waitFor(() => expect(taskLabels()).toEqual(['Other', 'Parent', 'Child']))
-    expect([...host.querySelectorAll<HTMLElement>('.tabrail-item')].map((row) => row.dataset.taskDepth))
-      .toEqual([undefined, undefined, '1'])
+    expect([...host.querySelectorAll<HTMLElement>('.tabrail-item')].map((row) => row.dataset.taskDepth)).toEqual([
+      undefined,
+      undefined,
+      '1',
+    ])
   })
 
   it('orders a task whose parent is gone with the other roots', async () => {
-    const rows = mount([
-      task('orphan', 'Orphan', 'archived'),
-      task('root', 'Root'),
-    ])
+    const rows = mount([task('orphan', 'Orphan', 'archived'), task('root', 'Root')])
     vi.spyOn(rows[0]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
     pointAt(rows[0]!)
 
@@ -312,11 +358,7 @@ describe('dragging a task row', () => {
   })
 
   it('does not offer a drop that would separate a child from its parent', () => {
-    const rows = mount([
-      task('parent', 'Parent'),
-      task('child', 'Child', 'parent'),
-      task('other', 'Other'),
-    ])
+    const rows = mount([task('parent', 'Parent'), task('child', 'Child', 'parent'), task('other', 'Other')])
     vi.spyOn(rows[2]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
     pointAt(rows[2]!)
 
@@ -368,14 +410,12 @@ describe('task lineage in the core rail fallback', () => {
   })
 
   it('indents a child under its parent and keeps the child selectable', () => {
-    mount([
-      task('child', 'Child', 'parent'),
-      task('other', 'Other'),
-      task('parent', 'Parent'),
-    ])
+    mount([task('child', 'Child', 'parent'), task('other', 'Other'), task('parent', 'Parent')])
     const rows = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
     expect(rows.map((row) => row.querySelector('button')?.getAttribute('aria-label'))).toEqual([
-      'Other', 'Parent', 'Child',
+      'Other',
+      'Parent',
+      'Child',
     ])
     expect(rows.map((row) => row.dataset.taskDepth)).toEqual([undefined, undefined, '1'])
 
@@ -392,7 +432,9 @@ describe('task lineage in the core rail fallback', () => {
     const rows = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
     expect(rows.map((row) => row.dataset.taskDepth)).toEqual([undefined, undefined, undefined])
     expect(rows.map((row) => row.querySelector('button')?.getAttribute('aria-label'))).toEqual([
-      'Orphan', 'Cycle A', 'Cycle B',
+      'Orphan',
+      'Cycle A',
+      'Cycle B',
     ])
 
     rows[2]!.querySelector<HTMLButtonElement>('button')!.click()
@@ -403,40 +445,54 @@ describe('task lineage in the core rail fallback', () => {
     const parent = task('parent', 'Parent')
     const child = task('child', 'Child', parent.id)
     mount([parent, child])
-    const before = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
-      .find((row) => row.querySelector('button')?.getAttribute('aria-label') === 'Child')
+    const before = [...host.querySelectorAll<HTMLElement>('.tabrail-item')].find(
+      (row) => row.querySelector('button')?.getAttribute('aria-label') === 'Child',
+    )
     expect(before?.dataset.taskDepth).toBe('1')
 
     queryClient.setQueryData(tasksKey, [child])
     await vi.waitFor(() => {
-      const row = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
-        .find((candidate) => candidate.querySelector('button')?.getAttribute('aria-label') === 'Child')
+      const row = [...host.querySelectorAll<HTMLElement>('.tabrail-item')].find(
+        (candidate) => candidate.querySelector('button')?.getAttribute('aria-label') === 'Child',
+      )
       expect(row?.dataset.taskDepth).toBeUndefined()
     })
 
-    const after = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
-      .find((row) => row.querySelector('button')?.getAttribute('aria-label') === 'Child')
+    const after = [...host.querySelectorAll<HTMLElement>('.tabrail-item')].find(
+      (row) => row.querySelector('button')?.getAttribute('aria-label') === 'Child',
+    )
     expect(after).toBe(before)
   })
 })
 
 describe('a row whose markers are read again', () => {
   // A contributor builds fresh marker objects on every read, and the agents plugin's rail marker is
-  // read again on every event a streaming agent sends. Rebuilding the elements each time restarted a
-  // spinning marker's turn 25 times a second.
+  // read again on every event a streaming agent sends. Rebuilding the elements each time would restart a
+  // spinning marker's turn on every event.
   it('keeps the marker elements while the markers say the same thing', () => {
     const [tick, setTick] = createSignal(0)
     const [label, setLabel] = createSignal('1 agent working')
-    registered.push(railMarkerRegistry.register({
-      id: 'test',
-      order: 10,
-      markers: (target) => {
-        tick()
-        return target.kind === 'task'
-          ? [{ id: 'working', label: label(), icon: 'loader-circle', tone: 'accent', busy: true, placements: ['top-end'] }]
-          : []
-      },
-    }))
+    registered.push(
+      railMarkerRegistry.register({
+        id: 'test',
+        order: 10,
+        markers: (target) => {
+          tick()
+          return target.kind === 'task'
+            ? [
+                {
+                  id: 'working',
+                  label: label(),
+                  icon: 'loader-circle',
+                  tone: 'accent',
+                  busy: true,
+                  placements: ['top-end'],
+                },
+              ]
+            : []
+        },
+      }),
+    )
     mount()
     const before = [...host.querySelectorAll('.tabrail-marker')]
     expect(before).toHaveLength(2)
@@ -451,17 +507,39 @@ describe('a row whose markers are read again', () => {
 })
 
 describe('source status marks', () => {
-  // `core:source` (host/annotations/statusAnnotations.ts): a consenting source's icon takes other
+  // `core:source` (`requestSourceAnnotations`): a consenting source's icon takes other
   // plugins' marks, and every rail — core's or a replacement — draws the same data.
   const deploysSource = (count: number) => {
-    registered.push(sourceRegistry.register({ id: 'deploys-src', order: 10, glyph: 'rocket', label: 'Deploys', statusAnnotations: true }))
+    registered.push(
+      sourceRegistry.register({
+        id: 'deploys-src',
+        order: 10,
+        glyph: 'rocket',
+        label: 'Deploys',
+        statusAnnotations: true,
+      }),
+    )
     registered.push(sourceRegistry.register({ id: 'quiet-src', order: 11, glyph: 'box', label: 'Quiet' }))
-    const marks = vi.fn(async (keys: PluginAnnotationKey[]) => keys.flatMap((key) => Array.from({ length: count }, (_, index) => ({
-      key, severity: 'warn' as const, text: `Deploy ${index + 1}`,
-    }))))
-    registered.push(extensionRegistry.register({
-      id: 'plugin:deploys:source-status', pluginId: 'deploys', point: CORE_SOURCE_POINT, label: 'Deploy status', order: 500, carrier: 'items', marks,
-    } as ExtensionContribution))
+    const marks = vi.fn(async (keys: PluginAnnotationKey[]) =>
+      keys.flatMap((key) =>
+        Array.from({ length: count }, (_, index) => ({
+          key,
+          severity: 'warn' as const,
+          text: `Deploy ${index + 1}`,
+        })),
+      ),
+    )
+    registered.push(
+      extensionRegistry.register({
+        id: 'plugin:deploys:source-status',
+        pluginId: 'deploys',
+        point: CORE_SOURCE_POINT,
+        label: 'Deploy status',
+        order: 500,
+        carrier: 'items',
+        marks,
+      } as ExtensionContribution),
+    )
     return marks
   }
   const sourceButton = (id: string) => host.querySelector<HTMLElement>(`.tabrail-source[data-source-id="${id}"]`)
@@ -490,7 +568,9 @@ describe('source status marks', () => {
     )
     expect(sourceButton('quiet-src')!.querySelectorAll('.tabrail-marker')).toHaveLength(0)
 
-    sourceButton('deploys-src')!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+    sourceButton('deploys-src')!.dispatchEvent(
+      new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }),
+    )
     expect(document.querySelector('[role="menu"]')?.getAttribute('aria-label')).toBe('Actions for Deploys')
     expect(selectedSource()).toBe('quiet-src')
   })
@@ -499,20 +579,40 @@ describe('source status marks', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     deploysSource(1)
     let replacement: { value?: unknown } | undefined
-    registered.push(exclusiveSlotRegistry.register({
-      id: 'plugin:alt:rail', pluginId: 'alt', slot: 'rail', label: 'Alt rail',
-      component: (props: { value?: unknown }) => { replacement = props; return <span data-alt-rail /> },
-    }))
+    registered.push(
+      exclusiveSlotRegistry.register({
+        id: 'plugin:alt:rail',
+        pluginId: 'alt',
+        slot: 'rail',
+        label: 'Alt rail',
+        component: (props: { value?: unknown }) => {
+          replacement = props
+          return <span data-alt-rail />
+        },
+      }),
+    )
     mount()
     choose('alt')
-    await vi.waitFor(() => expect((replacement?.value as RailProps | undefined)?.sources.find((entry) => entry.id === 'deploys-src')?.markers
-      .map((marker) => marker.label)).toEqual(['Deploy 1 — deploys']))
+    await vi.waitFor(() =>
+      expect(
+        (replacement?.value as RailProps | undefined)?.sources
+          .find((entry) => entry.id === 'deploys-src')
+          ?.markers.map((marker) => marker.label),
+      ).toEqual(['Deploy 1 — deploys']),
+    )
     expect(host.querySelector('[data-alt-rail]')).not.toBeNull()
 
-    registered.push(exclusiveSlotRegistry.register({
-      id: 'plugin:broken:rail', pluginId: 'broken', slot: 'rail', label: 'Broken rail',
-      component: () => { throw new Error('rail exploded') },
-    }))
+    registered.push(
+      exclusiveSlotRegistry.register({
+        id: 'plugin:broken:rail',
+        pluginId: 'broken',
+        slot: 'rail',
+        label: 'Broken rail',
+        component: () => {
+          throw new Error('rail exploded')
+        },
+      }),
+    )
     choose('broken')
     await vi.waitFor(() => expect(sourceButton('deploys-src')?.querySelectorAll('.tabrail-marker')).toHaveLength(1))
     expect(sourceButton('deploys-src')!.getAttribute('data-tip-legend')).toContain('Deploy 1 — deploys')
@@ -527,19 +627,33 @@ describe('new task setup choice', () => {
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     // The dialog is a Modal, which portals to the body rather than rendering inside the rail.
-    const checkbox = () => [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')]
-      .find((input) => input.closest('label')?.textContent?.includes('Skip setup script'))
+    const checkbox = () =>
+      [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')].find((input) =>
+        input.closest('label')?.textContent?.includes('Skip setup script'),
+      )
     expect(checkbox()?.checked).toBe(false)
 
-    const titleLabel = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((label) => label.textContent === 'Title')!
+    const titleLabel = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find(
+      (label) => label.textContent === 'Title',
+    )!
     const title = document.getElementById(titleLabel.htmlFor) as HTMLInputElement
     title.value = 'Skip setup'
     title.dispatchEvent(new InputEvent('input', { bubbles: true }))
     checkbox()!.click()
     expect(checkbox()?.checked).toBe(true)
-    await vi.waitFor(() => expect([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')?.disabled).toBe(false))
-    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true }), null))
+    await vi.waitFor(() =>
+      expect(
+        [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find(
+          (button) => button.textContent === 'Create task',
+        )?.disabled,
+      ).toBe(false),
+    )
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')]
+      .find((button) => button.textContent === 'Create task')!
+      .click()
+    await vi.waitFor(() =>
+      expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true }), null),
+    )
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     expect(checkbox()?.checked).toBe(false)
@@ -564,10 +678,15 @@ describe('new task worktree validation', () => {
     })
     const open = () => host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     const title = () => {
-      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
+      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find(
+        (field) => field.textContent === 'Title',
+      )!
       return document.getElementById(label.htmlFor) as HTMLInputElement
     }
-    const submit = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    const submit = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find(
+        (button) => button.textContent === 'Create task',
+      )!
     const fill = (value: string) => {
       title().value = value
       title().dispatchEvent(new InputEvent('input', { bubbles: true }))
@@ -577,7 +696,9 @@ describe('new task worktree validation', () => {
     fill('Same title')
     await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0))
     const oldRequests = pending.splice(0)
-    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Cancel')!.click()
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')]
+      .find((button) => button.textContent === 'Cancel')!
+      .click()
     open()
     fill('Same title')
     await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0))
@@ -600,15 +721,21 @@ describe('new task worktree validation', () => {
     })
     createTaskMock.mockResolvedValue(task('created', 'Cannot check'))
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
-    const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
+    const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find(
+      (field) => field.textContent === 'Title',
+    )!
     const title = document.getElementById(label.htmlFor) as HTMLInputElement
     title.value = 'Cannot check'
     title.dispatchEvent(new InputEvent('input', { bubbles: true }))
-    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find(
+      (button) => button.textContent === 'Create task',
+    )!
     await vi.waitFor(() => expect(submit.disabled).toBe(false))
     expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
     submit.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' }), null))
+    await vi.waitFor(() =>
+      expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' }), null),
+    )
   })
 
   it('keeps a typed branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
@@ -616,29 +743,39 @@ describe('new task worktree validation', () => {
     mount([{ ...task('t1', 'Taken'), branch: 'taken' }], true)
     readJsonMock.mockImplementation(async (url: string) => {
       if (url.endsWith('/config')) return { config: { branchPrefix: null } }
-      if (url.includes('worktree-availability')) return new URL(url, 'http://acorn.test').searchParams.get('branch') === 'taken'
-        ? { available: false, reason: 'This branch name already exists in another worktree' }
-        : { available: true }
+      if (url.includes('worktree-availability'))
+        return new URL(url, 'http://acorn.test').searchParams.get('branch') === 'taken'
+          ? { available: false, reason: 'This branch name already exists in another worktree' }
+          : { available: true }
       if (url.endsWith('/worktrees')) return []
       throw new Error('No live Node in this test.')
     })
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     const input = (label: string) => {
-      const field = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((candidate) => candidate.textContent === label)!
+      const field = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find(
+        (candidate) => candidate.textContent === label,
+      )!
       return document.getElementById(field.htmlFor) as HTMLInputElement
     }
     const fill = (field: HTMLInputElement, value: string) => {
       field.value = value
       field.dispatchEvent(new InputEvent('input', { bubbles: true }))
     }
-    const submit = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    const submit = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find(
+        (button) => button.textContent === 'Create task',
+      )!
     fill(input('Title'), 'Another title')
     const advanced = document.querySelector<HTMLDetailsElement>('[role="dialog"] details')!
     advanced.open = true
     advanced.dispatchEvent(new Event('toggle'))
     fill(input('Branch name'), 'taken')
     fill(input('Title'), 'Taken')
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')?.textContent).toContain('This branch name already exists in another worktree'))
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+        'This branch name already exists in another worktree',
+      ),
+    )
     expect(input('Branch name').value).toBe('taken')
     expect(submit().disabled).toBe(true)
     submit().click()
@@ -647,13 +784,19 @@ describe('new task worktree validation', () => {
 
     fill(input('Branch name'), 'available-name')
     await vi.waitFor(() => expect(submit().disabled).toBe(false))
-    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('This branch name already exists in another worktree')
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain(
+      'This branch name already exists in another worktree',
+    )
     createTaskMock.mockResolvedValue(task('created', 'Taken'))
     submit().click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name', branchSource: 'exact' }), null))
+    await vi.waitFor(() =>
+      expect(createTaskMock).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'available-name', branchSource: 'exact' }),
+        null,
+      ),
+    )
   })
 })
-
 
 describe('advanced task branch choices', () => {
   it('shows the server suffix for a derived name and groups the bases by task and local branch', async () => {
@@ -662,13 +805,20 @@ describe('advanced task branch choices', () => {
     readJsonMock.mockImplementation(async (url: string) => {
       if (url.endsWith('/config')) return { config: { branchPrefix: null } }
       if (url.includes('worktree-availability')) return { available: true, branch: 'taken-2' }
-      if (url.endsWith('/branches')) return { current: 'main', tasks: [{ branch: 'feature/parent', taskId: 't1', title: 'Parent work' }], other: [{ name: 'main', committedAt: 1 }] }
+      if (url.endsWith('/branches'))
+        return {
+          current: 'main',
+          tasks: [{ branch: 'feature/parent', taskId: 't1', title: 'Parent work' }],
+          other: [{ name: 'main', committedAt: 1 }],
+        }
       if (url.endsWith('/worktrees')) return []
       throw new Error('No live Node.')
     })
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     const field = (name: string) => {
-      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((item) => item.textContent === name)!
+      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find(
+        (item) => item.textContent === name,
+      )!
       return document.getElementById(label.htmlFor)!
     }
     const title = field('Title') as HTMLInputElement
@@ -687,9 +837,16 @@ describe('advanced task branch choices', () => {
     const parent = document.querySelector<HTMLButtonElement>('[role="option"][data-value="feature/parent"]')!
     parent.click()
     createTaskMock.mockResolvedValue(task('created', 'Taken'))
-    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find(
+      (button) => button.textContent === 'Create task',
+    )!
     await vi.waitFor(() => expect(submit.disabled).toBe(false))
     submit.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'taken', branchSource: 'derived', baseBranch: 'feature/parent' }), null))
+    await vi.waitFor(() =>
+      expect(createTaskMock).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'taken', branchSource: 'derived', baseBranch: 'feature/parent' }),
+        null,
+      ),
+    )
   })
 })

@@ -7,9 +7,18 @@ import { invalidateWorktreeStatus } from '@acorn/plugin-api/node'
 import { changesEditorFileStatus } from './editorFileStatus'
 
 const dirs: string[] = []
-const fixture = () => { const dir = mkdtempSync(join(tmpdir(), 'acorn-editor-status-')); dirs.push(dir); return dir }
+const fixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'acorn-editor-status-'))
+  dirs.push(dir)
+  return dir
+}
 const git = (dir: string, ...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' })
-afterEach(() => { for (const dir of dirs.splice(0)) { invalidateWorktreeStatus(dir); rmSync(dir, { recursive: true, force: true }) } })
+afterEach(() => {
+  for (const dir of dirs.splice(0)) {
+    invalidateWorktreeStatus(dir)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 it('reads only Git status for a task checkout and preserves the parser scopes', async () => {
   const dir = fixture()
@@ -28,13 +37,16 @@ it('reads only Git status for a task checkout and preserves the parser scopes', 
   writeFileSync(join(dir, 'src/new.ts'), 'new\n')
   const provider = changesEditorFileStatus({ tasks: { root: async () => dir } })
   const answer = await provider.read('task', { root: dir })
-  expect(answer).toMatchObject({ kind: 'ready', changes: [
-    { path: 'src/a.ts', status: 'modified', staged: true },
-    { path: 'src/a.ts', status: 'modified', staged: false },
-    { path: 'src/added.ts', status: 'added', staged: true },
-    { path: 'src/gone.ts', status: 'deleted', staged: true },
-    { path: 'src/new.ts', status: 'untracked', staged: false },
-  ] })
+  expect(answer).toMatchObject({
+    kind: 'ready',
+    changes: [
+      { path: 'src/a.ts', status: 'modified', staged: true },
+      { path: 'src/a.ts', status: 'modified', staged: false },
+      { path: 'src/added.ts', status: 'added', staged: true },
+      { path: 'src/gone.ts', status: 'deleted', staged: true },
+      { path: 'src/new.ts', status: 'untracked', staged: false },
+    ],
+  })
   expect(await provider.read('task', { root: fixture() })).toEqual({ kind: 'unavailable' })
 })
 
@@ -59,7 +71,11 @@ it('reports a staged rename and an unresolved merge conflict from Git', async ()
   writeFileSync(join(dir, 'conflict.txt'), 'main\n')
   git(dir, 'add', 'conflict.txt')
   git(dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'main')
-  try { git(dir, 'merge', '--no-commit', 'other') } catch { /* Git exits one for the expected conflict. */ }
+  try {
+    git(dir, 'merge', '--no-commit', 'other')
+  } catch {
+    /* Git exits one for the expected conflict. */
+  }
   git(dir, 'mv', 'rename.txt', 'moved.txt')
   const provider = changesEditorFileStatus({ tasks: { root: async () => dir } })
   const answer = await provider.read('task', { root: dir })

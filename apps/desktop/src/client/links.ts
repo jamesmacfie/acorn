@@ -6,10 +6,12 @@ const log = createLogger('links')
 let opening = Promise.resolve()
 
 function enqueue(href: string) {
-  const next = opening.then(() => openLink(href)).catch((error: unknown) => {
-    log.error('Could not open Acorn link', error)
-    return reportLinkFailure(href, error instanceof Error ? error.message : String(error))
-  })
+  const next = opening
+    .then(() => openLink(href))
+    .catch((error: unknown) => {
+      log.error('Could not open Acorn link', error)
+      return reportLinkFailure(href, error instanceof Error ? error.message : String(error))
+    })
   opening = next.then(() => {})
   return next
 }
@@ -36,16 +38,20 @@ export async function startDesktopLinks(): Promise<() => void> {
     void enqueue(href).then(done, (error: unknown) => done({ kind: 'error', reason: String(error) }))
   }
   window.addEventListener('acorn:agent-link', onAgentLink)
-  const stop = (stopNative: () => void = () => {}) => () => {
-    stopNative()
-    stopContent()
-    window.removeEventListener('acorn:agent-link', onAgentLink)
-  }
+  const stop =
+    (stopNative: () => void = () => {}) =>
+    () => {
+      stopNative()
+      stopContent()
+      window.removeEventListener('acorn:agent-link', onAgentLink)
+    }
   const shell = desktopLinks()
   if (!shell) return stop()
   let stopNative = () => {}
   try {
-    stopNative = await shell.subscribe(() => { void drainNativeLinks().catch(() => {}) })
+    stopNative = await shell.subscribe(() => {
+      void drainNativeLinks().catch(() => {})
+    })
     await drainNativeLinks()
     return stop(stopNative)
   } catch (error) {

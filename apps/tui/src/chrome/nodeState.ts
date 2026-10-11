@@ -29,7 +29,8 @@ const SENTENCES: Partial<Record<NodeConnectionState, string>> = {
 // A sixth state, and it is not on the wire. `NodeConnectionState` describes a socket, and a node this
 // `acorn` spawned a moment ago has no socket to describe: the broker has never heard of it, which
 // `nodeState` reads as `offline` and would say was unreachable. It is not unreachable, it is booting,
-// and this is the one run where the shell is drawn in front of that (docs/tui/process.md § Attach or start).
+// and this is the one run where the shell is drawn in front of that
+// (docs/tui/process.md § Attach or start).
 //
 // Client-local rather than a wire state, because only the process that spawned the child knows. Set
 // in `main.tsx` when the handshake is still in flight and cleared when it lands or fails.
@@ -45,9 +46,8 @@ export const markNodeRecovered = (nodeId: string): void => {
 
 export { nodeStarting, setNodeStarting }
 
-export const nodeTone = (state: NodeConnectionState): DotTone =>
-  (nodeStarting() ? 'warn' : TONES[state] ?? 'muted')
+export const nodeTone = (state: NodeConnectionState): DotTone => (nodeStarting() ? 'warn' : (TONES[state] ?? 'muted'))
 
 /** What the footer says, or nothing at all while the node is fine. */
 export const nodeSentence = (state: NodeConnectionState): string | undefined =>
-  (nodeStarting() ? 'starting the node…' : SENTENCES[state])
+  nodeStarting() ? 'starting the node…' : SENTENCES[state]

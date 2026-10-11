@@ -5,12 +5,23 @@ import { activeNodeId, prefsOptions, queryOwner, tasksOptions } from '@acorn/plu
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
 import AgentEventCard from './AgentEventCard'
 import {
-  createConversationProjection, findSubagentItem, isChatItem, visibleConversationItems,
+  createConversationProjection,
+  findSubagentItem,
+  isChatItem,
+  visibleConversationItems,
   type AgentConversationItem,
 } from './conversationItems'
 import { sessionModelSummary } from '../settings/agentConfigOptions'
 import {
-  Button, createTimelineWindow, EmptyState, Icon, Inline, Text, Timeline, Toolbar, type TimelineControls,
+  Button,
+  createTimelineWindow,
+  EmptyState,
+  Icon,
+  Inline,
+  Text,
+  Timeline,
+  Toolbar,
+  type TimelineControls,
 } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
@@ -18,12 +29,8 @@ import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPref
 import { readingPlace, rememberReadingPlace } from './readingPlaceStore'
 import { codexPlanHandoffState, type CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
-// The session's stream, as a `Timeline` of cards.
-//
-// `follow` is the kit's: the scroller, staying on the newest turn until the reader scrolls away from
-// it, and the place a reader is returned to when they come back are all the timeline's now
-// (client-core/src/kit/components/content/Timeline.tsx). This file used to hold that machinery and a scroll element of
-// its own, and none of it was anything but a transcript's ordinary behaviour.
+// The session's stream, as a `Timeline` of cards. The scroller, staying on the newest turn until the
+// reader scrolls away, and the place a reader comes back to are all the kit timeline's (`follow`).
 export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
@@ -70,19 +77,28 @@ export default function AgentTranscript(props: {
   // ordinary event does not rebuild the maps below, or wake every card that reads from them.
   const turns = createMemo(() => props.snapshot.turns)
   const requests = createMemo(() => props.snapshot.requests)
-  // One map above the list, not `turns.find` inside it. The row body ran that find once per row per
-  // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
-  // of turns, twenty-five times a second.
+  // One map above the list, not `turns.find` inside it. A find in the row body runs once per row per
+  // render, so a streamed event would cost rows times turns, and a long session has thousands of rows.
   const turnsById = createMemo(() => new Map(turns().map((turn) => [turn.id, turn])))
   // Same reason, keyed the way the sidebar and every notice name a request. A request's card draws from
   // the row rather than from its own event, because whether anybody has answered yet, and what they
   // said, both live on the row and keep changing long after the event is written.
-  const requestsById = createMemo(() =>
-    new Map(requests().map((request) => [request.providerRequestId, request])))
-  const proposalStates = createMemo(() => new Map(props.snapshot.events.flatMap((record) =>
-    record.event.type === 'plan_proposal'
-      ? [[record.id, codexPlanHandoffState(props.snapshot.session, turns(), props.snapshot.events, record)] as const]
-      : [])))
+  const requestsById = createMemo(() => new Map(requests().map((request) => [request.providerRequestId, request])))
+  const proposalStates = createMemo(
+    () =>
+      new Map(
+        props.snapshot.events.flatMap((record) =>
+          record.event.type === 'plan_proposal'
+            ? [
+                [
+                  record.id,
+                  codexPlanHandoffState(props.snapshot.session, turns(), props.snapshot.events, record),
+                ] as const,
+              ]
+            : [],
+        ),
+      ),
+  )
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
   // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
   // the card's own children as its top level, which the projection already built as a tree.
@@ -98,7 +114,8 @@ export default function AgentTranscript(props: {
   // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
   const items = createMemo(() => {
     const visible = agentTelemetry.measure('agents.transcript.visible', () =>
-      visibleConversationItems(focused()?.children ?? conversation(), (requestId) => requestsById().get(requestId)))
+      visibleConversationItems(focused()?.children ?? conversation(), (requestId) => requestsById().get(requestId)),
+    )
     const shown = props.chatsOnly ? visible.filter(isChatItem) : visible
     agentTelemetry.observe('agents.transcript.items', shown.length)
     return shown
@@ -109,9 +126,8 @@ export default function AgentTranscript(props: {
   const itemKeys = createMemo(() => items().map((item) => item.key))
   const itemsByKey = createMemo(() => new Map(items().map((item) => [item.key, item])))
   // The rows drawn are the newest page of those keys and as many older pages as the reader asked for
-  // (docs/managed-agents/transcript.md § The window). The canonical 7,000-event session
-  // projects to 3,387 cards, and building all of them on open was the cost the window removes. The
-  // projection above still covers the whole session: only the drawing is windowed.
+  // (docs/managed-agents/transcript.md § The window). The projection above still covers the whole
+  // session: only the drawing is windowed.
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -144,11 +160,12 @@ export default function AgentTranscript(props: {
   // microtask, then stay out of the 25 Hz streaming path. This is deliberately a turn-scoped probe,
   // not one record per card.
   let measuringInitialCards = true
-  queueMicrotask(() => { measuringInitialCards = false })
+  queueMicrotask(() => {
+    measuringInitialCards = false
+  })
   // Each row reads its item from a signal of its own, written only when its key's item is a different
   // object. A memo per row over `itemsByKey` would do the same, but the map is new on every event, so
-  // all the memos would re-run: about 10 ms an event on a 1,240-card transcript, against 0.3 ms for this
-  // loop.
+  // every row's memo would re-run on every event.
   const rows = new Map<string, Setter<AgentConversationItem>>()
   createComputed(() => {
     const byKey = itemsByKey()
@@ -173,15 +190,21 @@ export default function AgentTranscript(props: {
           sessionModel={sessionModel()}
           turn={turnsById().get(item().turnId ?? '')}
           menuScope={menuScope()}
-          request={item().event.type === 'request'
-            ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId)
-            : undefined}
-          focusRequest={item().event.type === 'request'
-            && (item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId === props.focusRequestId}
+          request={
+            item().event.type === 'request'
+              ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId)
+              : undefined
+          }
+          focusRequest={
+            item().event.type === 'request' &&
+            (item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId === props.focusRequestId
+          }
           onRequestResolved={props.onRequestResolved}
-          planHandoffState={item().event.type === 'plan_proposal'
-            ? proposalStates().get(item().key) as CodexPlanHandoffState | undefined
-            : undefined}
+          planHandoffState={
+            item().event.type === 'plan_proposal'
+              ? (proposalStates().get(item().key) as CodexPlanHandoffState | undefined)
+              : undefined
+          }
           onPlanImplemented={props.onPlanImplemented}
         />
       </Timeline.Turn>
@@ -197,15 +220,15 @@ export default function AgentTranscript(props: {
         {(narrowed) => {
           const subagent = narrowed
           return (
-          <Toolbar ariaLabel="Subagent run">
-            <Button variant="bare" size="sm" onPress={props.onExitSubagent}>
-              <Icon name="arrow-left" /> {props.snapshot.session.title}
-            </Button>
-            <Inline>
-              <Text emphasis="strong">{subagent().title ?? 'Subagent'}</Text>
-              <Text emphasis="muted">{subagentSummary(subagent(), sessionModel())}</Text>
-            </Inline>
-          </Toolbar>
+            <Toolbar ariaLabel="Subagent run">
+              <Button variant="bare" size="sm" onPress={props.onExitSubagent}>
+                <Icon name="arrow-left" /> {props.snapshot.session.title}
+              </Button>
+              <Inline>
+                <Text emphasis="strong">{subagent().title ?? 'Subagent'}</Text>
+                <Text emphasis="muted">{subagentSummary(subagent(), sessionModel())}</Text>
+              </Inline>
+            </Toolbar>
           )
         }}
       </Show>
@@ -231,7 +254,15 @@ export default function AgentTranscript(props: {
           ariaLabel="Agent transcript"
           // "Go to top" means the oldest turn, which the window may be hiding, so it draws every turn
           // first. That is the explicit way to reach the start of a long session in one step.
-          controls={(api) => props.onControls?.({ ...api, toTop: () => { drawn.showAll(); api.toTop() } })}
+          controls={(api) =>
+            props.onControls?.({
+              ...api,
+              toTop: () => {
+                drawn.showAll()
+                api.toTop()
+              },
+            })
+          }
           // The projected count, for the timeline's health reading, against the drawn count.
           total={total()}
           hidden={drawn.start()}
@@ -240,21 +271,19 @@ export default function AgentTranscript(props: {
           onTrim={drawn.trim}
         >
           {/*
-            `For` over the rows' keys, not `Index` over their positions. An item that changed is a new
-            object, so `For` over the objects would remount a card on each streamed event and take any
-            in-progress selection with it — which is why this was an `Index`. But `Index` keys by
-            position: a filter (chats-only, or a resolved permission leaving the thread) shifts every
-            later row onto a new item while its card keeps the previous item's local state, its
-            open/closed tool fold. Keyed by the projection's stable id instead, a card's DOM stays tied to
+            `For` over the rows' keys, not over the items or `Index` over their positions. An item that
+            changed is a new object, so `For` over the items would remount a card on each streamed event
+            and take any in-progress selection with it. `Index` keys by position: a filter (chats-only,
+            or a resolved permission leaving the thread) shifts every later row onto a new item while its
+            card keeps the previous item's local state, its open/closed tool fold. Keyed by the
+            projection's stable id instead, a card's DOM stays tied to
             its own item — the same key reuses the row, an appended key mounts one card, a removed key
             disposes one — while streamed text and status still update through the row's signal.
           */}
           {/* One fold setting for the whole list, read by every tool card below it. See the note on
               createAgentToolFoldSetting for why it is not resolved per card. */}
           <AgentToolFoldContext.Provider value={foldSetting}>
-            <For each={drawn.keys()}>
-              {(key, index) => row(key, index)}
-            </For>
+            <For each={drawn.keys()}>{(key, index) => row(key, index)}</For>
           </AgentToolFoldContext.Provider>
         </Timeline>
       </Show>

@@ -1,9 +1,8 @@
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
-export function contextSnapshot(input: Omit<
-  AgentContextSnapshot,
-  'type' | 'byteSize' | 'estimatedTokens' | 'capturedAt'
-> & { capturedAt?: number }): AgentContextSnapshot {
+export function contextSnapshot(
+  input: Omit<AgentContextSnapshot, 'type' | 'byteSize' | 'estimatedTokens' | 'capturedAt'> & { capturedAt?: number },
+): AgentContextSnapshot {
   const bytes = new TextEncoder().encode(input.content).byteLength
   return {
     ...input,

@@ -5,16 +5,14 @@ import type { CommandExecutionContext, SearchCommand } from './commands'
 // A search whose rows are already on this machine: fetch the list once when the frame opens, then
 // filter it here as the reader types.
 //
-// This is what the last two `paletteRows` contributions actually were. The terminal's run targets and
-// the workflow definitions come from the open task's configuration in one read, and the old palette
-// fetched them when it opened and filtered them with the same fuzzy scorer this uses.
-// Written as a remote search they would spend a request per keystroke on data that never moved, so
-// the two knobs the search contract exposes are turned off: nothing is debounced, because there is
-// nothing to wait for, and there is no minimum query, because an empty one is the whole list.
+// The terminal's run targets and the workflow definitions, for example, come from the open task's
+// configuration in one read. Written as a remote search they would spend a request per keystroke on
+// data that never moved, so the two knobs the search contract exposes are turned off: nothing is
+// debounced, because there is nothing to wait for, and there is no minimum query, because an empty one
+// is the whole list.
 //
 // The compiled tier only. A loaded plugin's rows come over a route and are debounced and bounded
-// (host/chrome/chromeCommands.ts), which is the difference between code in this bundle and a
-// manifest.
+// (chrome/chromeCommands.ts), which is the difference between code in this bundle and a manifest.
 
 /** What a local search fetches when its frame opens. */
 export type LocalSearchLoad = (

@@ -5,15 +5,7 @@ import { Button, SectionHeader } from '../../kit/components/primitives'
 import Icon from '../../kit/components/content/Icon'
 import { toast } from '../notifications/toast'
 import { activeCacheId } from '../../infra/node/activeNode'
-import {
-  applyMove,
-  applyResize,
-  COLS,
-  sizeFor,
-  sizePresets,
-  type PanelLayout,
-  type Rect,
-} from './layout'
+import { applyMove, applyResize, COLS, sizeFor, sizePresets, type PanelLayout, type Rect } from './layout'
 import type { PanelDefinition, PanelId } from './model'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import {
@@ -26,11 +18,7 @@ import {
 import DashboardPanelHost, { deletePanelDefinition, type DashboardEditorSession } from './DashboardPanelHost'
 import PanelGridItem, { type PanelGridGestureKind } from './PanelGridItem'
 import { panelGridHeight, panelPlaceholderStyle, panelSlotStyle } from './panelGridGeometry'
-import {
-  regionAllows,
-  regionHasRoom,
-  type PanelRegion,
-} from './region'
+import { regionAllows, regionHasRoom, type PanelRegion } from './region'
 import {
   dashboards,
   homeTabs,
@@ -47,14 +35,12 @@ import {
 import './dashboards.css'
 
 // One placement: the grid of panels a person put somewhere and the gestures that arrange it.
-// `PanelGridItem` owns each panel's render/chrome boundary; this owns only the shared arrangement.
+// `PanelGridItem` owns each panel's render/chrome boundary; this owns only the shared arrangement and
+// its measurement, and commits only what the pure layout functions answer.
 // See docs/dashboards/placements.md § Placements and § The grid.
 //
-// It takes a scope rather than assuming home, because `panelsAt` and `layoutAt` already do. A task
-// pane or a plugin-reserved region is this component with a different scope.
-//
-// Cell collision arithmetic is in `layout.ts`, and `panelGridGeometry.ts` projects the resolved cells
-// back to pixels. This orchestrator owns measurement and commits only the pure functions' answers.
+// It takes a scope rather than assuming home: a task pane or a plugin-reserved region is this component
+// with a different scope.
 
 /** Below this the cells are too small to mean anything, so the grid collapses to one column. */
 const MIN_CELL_PX = 44
@@ -130,7 +116,7 @@ export default function PanelGrid(props: {
   //
   // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the
   // overlay agree to the pixel whatever a style pack sets, and nothing here joins the
-  // JS-reads-a-token list (ui/tokenAxes.ts, `BRIDGE_TOKENS`).
+  // JS-reads-a-token list (`BRIDGE_TOKENS`).
   const measure = () => {
     const el = gridEl
     if (!el) return
@@ -144,7 +130,7 @@ export default function PanelGrid(props: {
   }
 
   // Observed from the grid's own ref, not from mount: an empty placement draws no grid, so a mount-time
-  // observer never attached and the first panel published there kept the starting cell size.
+  // observer would never attach and the first panel published there would keep the starting cell size.
   let observer: ResizeObserver | undefined
   onCleanup(() => observer?.disconnect())
   const attachGrid = (element: HTMLDivElement) => {
@@ -196,9 +182,10 @@ export default function PanelGrid(props: {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         const step = pitch()
-        const next = kind === 'move'
-          ? applyMove(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
-          : applyResize(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
+        const next =
+          kind === 'move'
+            ? applyMove(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
+            : applyResize(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
         latest = next
         const landed = next.rects[id] ?? start
         setGesture({
@@ -317,8 +304,8 @@ export default function PanelGrid(props: {
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
   // Move up and move down are reinterpreted onto geometry as a swap toward the neighbour in reading
-  // order (docs/dashboards/placements.md § The grid). On a one-column window they behave as they did before
-  // geometry existed.
+  // order (docs/dashboards/placements.md § The grid). On a one-column window that is a move up or down
+  // the list.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
     const current = committed()
@@ -344,9 +331,10 @@ export default function PanelGrid(props: {
   //
   // Tabs only. Moving to a task pane would be the same two calls and a different destination.
 
-  const moveTargets = () => props.scope.surface !== 'home'
-    ? []
-    : homeTabs(dashboards(), props.scope.workspaceId).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
+  const moveTargets = () =>
+    props.scope.surface !== 'home'
+      ? []
+      : homeTabs(dashboards(), props.scope.workspaceId).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
 
   /** Keeps the definition and takes a fresh rect at the destination. A rect is per (scope, panel), so
    *  there is nothing to carry across. The destination is in this workspace: the targets are its own
@@ -354,7 +342,11 @@ export default function PanelGrid(props: {
    *  "somewhere nobody is looking" the wizard's Where control already refuses. */
   const moveToTab = (id: PanelId, tabId: string) => {
     unplacePanel(props.scope, id)
-    placePanelAt(homeTabScope(tabId, props.scope.workspaceId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
+    placePanelAt(
+      homeTabScope(tabId, props.scope.workspaceId),
+      id,
+      sizePresets(panelDefinition(id)?.view.kind ?? 'list').m,
+    )
   }
 
   // ── Publishing from the menu ────────────────────────────────────────────────────────────────
@@ -373,36 +365,48 @@ export default function PanelGrid(props: {
   const openStudio = (dashboardId: string) => setTypedEditing({ dashboardId })
 
   /** The device's definition follows each publication, as the studio host's does. */
-  const recordPublication = (published: PublishedPanel) => savePanel({
-    id: published.id, title: published.plan.title, shaping: {}, view: published.plan.view,
-    publication: { dashboardId: published.id, sources: published.sources, fieldRoles: published.fieldRoles },
-  })
+  const recordPublication = (published: PublishedPanel) =>
+    savePanel({
+      id: published.id,
+      title: published.plan.title,
+      shaping: {},
+      view: published.plan.view,
+      publication: { dashboardId: published.id, sources: published.sources, fieldRoles: published.fieldRoles },
+    })
 
   const quickEdit = (definition: PanelDefinition, edit: (plan: PanelPlan) => PanelPlan) => {
     const dashboardId = definition.publication!.dashboardId
     publishQuickEdit({ ...publishing(), dashboardId, edit }).then(recordPublication, (error: unknown) => {
-      if (error instanceof PanelHasUnpublishedEdits) toast(error.message, { durationMs: 8000, action: { label: 'Open', onPress: () => openStudio(dashboardId) } })
+      if (error instanceof PanelHasUnpublishedEdits)
+        toast(error.message, { durationMs: 8000, action: { label: 'Open', onPress: () => openStudio(dashboardId) } })
       else toast(publishFailureMessage(error, "Couldn't update this panel."), { tone: 'danger' })
     })
   }
 
   /** A copy beside the original, at its size: to the right when the row has room, else below. */
   const duplicate = (definition: PanelDefinition, plan: PanelPlan) => {
-    publishNewPanel({ ...publishing(), plan: { ...plan, title: `${plan.title} copy` } }).then((published) => {
-      recordPublication(published)
-      const original = committed().rects[definition.id]
-      placePanelAt(props.scope, published.id, original ?? sizePresets(plan.view.kind).m)
-      if (original) {
-        const beside = original.x + 2 * original.w <= COLS ? { ...original, x: original.x + original.w } : { ...original, y: original.y + original.h }
-        setLayoutAt(props.scope, applyMove(layoutAt(props.scope), published.id, beside, sizeOf))
-      }
-      toast('Duplicated', { action: { label: 'Edit…', onPress: () => openStudio(published.id) } })
-    }, (error: unknown) => toast(publishFailureMessage(error, "Couldn't duplicate this panel."), { tone: 'danger' }))
+    publishNewPanel({ ...publishing(), plan: { ...plan, title: `${plan.title} copy` } }).then(
+      (published) => {
+        recordPublication(published)
+        const original = committed().rects[definition.id]
+        placePanelAt(props.scope, published.id, original ?? sizePresets(plan.view.kind).m)
+        if (original) {
+          const beside =
+            original.x + 2 * original.w <= COLS
+              ? { ...original, x: original.x + original.w }
+              : { ...original, y: original.y + original.h }
+          setLayoutAt(props.scope, applyMove(layoutAt(props.scope), published.id, beside, sizeOf))
+        }
+        toast('Duplicated', { action: { label: 'Edit…', onPress: () => openStudio(published.id) } })
+      },
+      (error: unknown) => toast(publishFailureMessage(error, "Couldn't duplicate this panel."), { tone: 'danger' }),
+    )
   }
 
-  const tabPanel = () => (props.panelAria
-    ? { id: props.panelAria.id, role: 'tabpanel' as const, 'aria-labelledby': props.panelAria.labelledBy }
-    : {})
+  const tabPanel = () =>
+    props.panelAria
+      ? { id: props.panelAria.id, role: 'tabpanel' as const, 'aria-labelledby': props.panelAria.labelledBy }
+      : {}
 
   const addButton = () => (
     <Button size="sm" variant="ghost" onPress={() => setTypedEditing({})}>
@@ -424,7 +428,10 @@ export default function PanelGrid(props: {
         {/* The fallback needs no gate: reaching it means no panels, and the Show above already
             established at least one source to offer, or a heading, which is a tab bar that has
             to survive its own tab being empty. */}
-        <Show when={panels().length || props.heading || props.empty} fallback={<div class="dash-placement-add">{addButton()}</div>}>
+        <Show
+          when={panels().length || props.heading || props.empty}
+          fallback={<div class="dash-placement-add">{addButton()}</div>}
+        >
           <Show when={props.heading || !props.empty}>
             <SectionHeader level="group" actions={<Show when={hasRoom() && !props.empty}>{addButton()}</Show>}>
               {props.heading ?? 'Panels'}
@@ -448,41 +455,44 @@ export default function PanelGrid(props: {
                 <div class="dash-grid-overlay" aria-hidden="true" />
               </Show>
               <For each={panels()}>
-                {(definition) => <PanelGridItem
-                  definition={definition}
-                  workspaceId={props.scope.workspaceId}
-                  scope={props.scope}
-                  {...(props.region ? { region: props.region } : {})}
-                  layout={{
-                    collapsed,
-                    style: () => slotStyle(definition.id),
-                    gestureKind: () => gesture()?.id === definition.id ? gesture()!.kind : undefined,
-                    keyboardActive: () => keyboardGesture()?.id === definition.id,
-                    announcement,
-                    register: (element) => slots.set(definition.id, element),
-                    unregister: () => slots.delete(definition.id),
-                    onKeyDown: (event) => onSlotKeyDown(definition.id, event),
-                    onBlur: () => onSlotBlur(definition.id),
-                    onBeginDrag: (event) => beginDrag(definition.id, event),
-                    onBeginResize: (edge, event) => beginResize(definition.id, edge, event),
-                  }}
-                  actions={{
-                    edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
-                    editWithAi: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId, withAi: true }),
-                    openStudio,
-                    quickEdit: (edit) => quickEdit(definition, edit),
-                    canDuplicate: hasRoom,
-                    duplicate: (plan) => duplicate(definition, plan),
-                    beginLayout: () => enterLayoutMode(definition.id),
-                    canMove: (delta) => canMove(definition.id, delta),
-                    move: (delta) => moveTo(definition.id, delta),
-                    moveTargets,
-                    moveToTab: (tabId) => moveToTab(definition.id, tabId),
-                    remove: () => unplacePanel(props.scope, definition.id),
-                    delete: () => deletePanelDefinition(definition, props.scope.workspaceId),
-                    deleteFailed: () => toast("Couldn't delete this panel. Try again.", { tone: 'danger' }),
-                  }}
-                />}
+                {(definition) => (
+                  <PanelGridItem
+                    definition={definition}
+                    workspaceId={props.scope.workspaceId}
+                    scope={props.scope}
+                    {...(props.region ? { region: props.region } : {})}
+                    layout={{
+                      collapsed,
+                      style: () => slotStyle(definition.id),
+                      gestureKind: () => (gesture()?.id === definition.id ? gesture()!.kind : undefined),
+                      keyboardActive: () => keyboardGesture()?.id === definition.id,
+                      announcement,
+                      register: (element) => slots.set(definition.id, element),
+                      unregister: () => slots.delete(definition.id),
+                      onKeyDown: (event) => onSlotKeyDown(definition.id, event),
+                      onBlur: () => onSlotBlur(definition.id),
+                      onBeginDrag: (event) => beginDrag(definition.id, event),
+                      onBeginResize: (edge, event) => beginResize(definition.id, edge, event),
+                    }}
+                    actions={{
+                      edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
+                      editWithAi: () =>
+                        setTypedEditing({ dashboardId: definition.publication!.dashboardId, withAi: true }),
+                      openStudio,
+                      quickEdit: (edit) => quickEdit(definition, edit),
+                      canDuplicate: hasRoom,
+                      duplicate: (plan) => duplicate(definition, plan),
+                      beginLayout: () => enterLayoutMode(definition.id),
+                      canMove: (delta) => canMove(definition.id, delta),
+                      move: (delta) => moveTo(definition.id, delta),
+                      moveTargets,
+                      moveToTab: (tabId) => moveToTab(definition.id, tabId),
+                      remove: () => unplacePanel(props.scope, definition.id),
+                      delete: () => deletePanelDefinition(definition, props.scope.workspaceId),
+                      deleteFailed: () => toast("Couldn't delete this panel. Try again.", { tone: 'danger' }),
+                    }}
+                  />
+                )}
               </For>
               {/* The candidate cells, under the floating panel: the shape of the panel that lands
                   there rather than a wireframe of it. */}
@@ -491,7 +501,9 @@ export default function PanelGrid(props: {
               </Show>
             </div>
           </Show>
-          <div class="dash-live" aria-live="polite">{announcement()}</div>
+          <div class="dash-live" aria-live="polite">
+            {announcement()}
+          </div>
         </Show>
 
         <DashboardPanelHost
@@ -501,7 +513,6 @@ export default function PanelGrid(props: {
           returnLabel={props.returnLabel}
           onClose={() => setTypedEditing(undefined)}
         />
-
       </section>
     </Show>
   )

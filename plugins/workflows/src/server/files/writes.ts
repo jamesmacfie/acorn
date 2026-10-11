@@ -6,8 +6,9 @@ import type { WorkflowFileWrite } from '../../shared/workflowFileAuthoring'
 export type WorkflowFileRoot = { root: string; resolveInRoot(root: string, path: string): string | null }
 export const fileHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
-export function confinedWorkflowFile(scope: WorkflowFileRoot, path: string): string {
-  if (!/^\.acorn\/workflows\/[A-Za-z0-9][A-Za-z0-9_-]*\.toml$/.test(path)) throw new Error('Choose a workflow file inside .acorn/workflows')
+function confinedWorkflowFile(scope: WorkflowFileRoot, path: string): string {
+  if (!/^\.acorn\/workflows\/[A-Za-z0-9][A-Za-z0-9_-]*\.toml$/.test(path))
+    throw new Error('Choose a workflow file inside .acorn/workflows')
   const absolute = scope.resolveInRoot(scope.root, path)
   if (!absolute) throw new Error('Workflow file is outside the allowed root')
   return absolute
@@ -29,7 +30,10 @@ function removeFailedWrite(path: string, cause: unknown): never {
     unlinkSync(path)
   } catch (cleanupError) {
     if ((cleanupError as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw new AggregateError([cause, cleanupError], 'Workflow publication failed and its temporary file could not be removed')
+      throw new AggregateError(
+        [cause, cleanupError],
+        'Workflow publication failed and its temporary file could not be removed',
+      )
     }
   }
   throw cause
@@ -39,7 +43,8 @@ function removeFailedWrite(path: string, cause: unknown): never {
 export function writeWorkflowFile(scope: WorkflowFileRoot, write: WorkflowFileWrite): void {
   const check = () => {
     const current = readWorkflowFile(scope, write.path)
-    if ((current === null ? null : fileHash(current)) !== write.expectedHash) throw new Error(`File changed outside Acorn: ${write.path}`)
+    if ((current === null ? null : fileHash(current)) !== write.expectedHash)
+      throw new Error(`File changed outside Acorn: ${write.path}`)
   }
   check()
   const absolute = confinedWorkflowFile(scope, write.path)
@@ -50,7 +55,8 @@ export function writeWorkflowFile(scope: WorkflowFileRoot, write: WorkflowFileWr
   try {
     writeFileSync(temp, write.text, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
     check()
-    if (confinedWorkflowFile(scope, write.path) !== absolute || scope.resolveInRoot(scope.root, tempPath) !== temp) throw new Error('Workflow path changed during publication')
+    if (confinedWorkflowFile(scope, write.path) !== absolute || scope.resolveInRoot(scope.root, tempPath) !== temp)
+      throw new Error('Workflow path changed during publication')
     renameSync(temp, absolute)
   } catch (error) {
     removeFailedWrite(temp, error)

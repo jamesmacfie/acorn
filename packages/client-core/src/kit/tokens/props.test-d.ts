@@ -6,9 +6,32 @@
 // the build here rather than in review.
 import type { Component } from 'solid-js'
 import type {
-  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState, Field, FilterBar, Input,
-  Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner, StatusDot, Table,
-  Textarea, ToggleButton, Toolbar, TreeRow,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Chip,
+  CodeBlock,
+  DescriptionList,
+  EmptyState,
+  Field,
+  FilterBar,
+  Input,
+  Kbd,
+  ListDetail,
+  Meter,
+  Row,
+  SectionHeader,
+  SegmentedControl,
+  Select,
+  Spinner,
+  StatusDot,
+  Table,
+  Textarea,
+  ToggleButton,
+  Toolbar,
+  TreeRow,
 } from '../components/primitives'
 import type { ChipRow } from '../components/layout/ChipRow'
 import type { Facts } from '../components/content/Facts'

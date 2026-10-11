@@ -24,9 +24,8 @@ describe('clampDim', () => {
   })
 })
 
-// The chunk-list ring (phase 6 of the performance programme). What it replaced was one string rebuilt
-// as `ring = trimRing(ring + data)` on every chunk, so that expression is the reference implementation
-// the ASCII cases below are measured against, spelled out here because it no longer exists in src.
+// The chunk-list ring, checked against the naive reference: one string rebuilt as
+// `ring = trimRing(ring + data)` on every chunk. The ASCII cases below compare the two.
 const oldRing = (chunks: readonly string[]): string => {
   let ring = ''
   for (const chunk of chunks) {
@@ -91,8 +90,8 @@ describe('OutputRing', () => {
   })
 
   it('counts the tail in bytes, which is what changed for its two readers', () => {
-    // `slice(-n)` counted UTF-16 code units; this counts bytes, so a tail full of non-ASCII is a
-    // slightly shorter window. Both readers are heuristics over recent output — the blocked-prompt
+    // This counts bytes, not UTF-16 code units, so a tail full of non-ASCII is a slightly shorter
+    // window. Both readers are heuristics over recent output — the blocked-prompt
     // scan over the last 4,000 and the transcript tail over the last 10,000 (./terminal.ts) — so a
     // shorter window is a smaller sample of the same thing, and worth knowing rather than fixing.
     const ring = fill(['x'.repeat(100), '中'.repeat(100)])
@@ -105,8 +104,14 @@ describe('OutputRing', () => {
 it('keeps exact UTF-8 byte suffixes across physical block cuts, wraps, and oversized callbacks', () => {
   const ring = new OutputRing()
   let reference = Buffer.alloc(0)
-  const chunks = ['a'.repeat(4095), '🌰中é', 'x'.repeat(RING_CAP - 23), 'é'.repeat(RING_CAP), '',
-    ...Array.from({ length: 170 }, (_, i) => `row${i}中\n`.repeat(777))]
+  const chunks = [
+    'a'.repeat(4095),
+    '🌰中é',
+    'x'.repeat(RING_CAP - 23),
+    'é'.repeat(RING_CAP),
+    '',
+    ...Array.from({ length: 170 }, (_, i) => `row${i}中\n`.repeat(777)),
+  ]
   for (const chunk of chunks) {
     const encoded = Buffer.from(chunk)
     reference = Buffer.concat([reference, encoded]).subarray(-RING_CAP)
@@ -125,7 +130,7 @@ it('retains few fixed blocks after tiny callbacks and repeated head overflow', (
   expect(ring.tail()).toBe('ba'.repeat(RING_CAP / 2))
   const blocks = (ring as unknown as { blocks: Buffer[] }).blocks
   expect(blocks.filter(Boolean)).toHaveLength(64)
-  expect(blocks.every(block => block.buffer.byteLength === 4096)).toBe(true)
+  expect(blocks.every((block) => block.buffer.byteLength === 4096)).toBe(true)
 })
 
 describe('resolveBackend', () => {
@@ -146,11 +151,33 @@ describe('parseTmuxSessions', () => {
 describe('tmux arg builders', () => {
   it('build create-or-noop + attach argv', () => {
     expect(tmuxName('abc')).toBe('acorn-abc')
-    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual(['new-session', '-A', '-d', '-s', 'acorn-abc', '-c', '/repo', 'claude'])
-    // env is set explicitly via -e so a pre-existing tmux server can't drop ACORN_* (no-tools bug)
-    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual([
-      'new-session', '-A', '-d', '-e', 'ACORN_TASK_ID=t1', '-e', 'ACORN_API_TOKEN=tok', '-s', 'acorn-abc', '-c', '/repo', 'claude',
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual([
+      'new-session',
+      '-A',
+      '-d',
+      '-s',
+      'acorn-abc',
+      '-c',
+      '/repo',
+      'claude',
     ])
+    // env is set explicitly via -e so a pre-existing tmux server can't drop ACORN_* (no-tools bug)
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual(
+      [
+        'new-session',
+        '-A',
+        '-d',
+        '-e',
+        'ACORN_TASK_ID=t1',
+        '-e',
+        'ACORN_API_TOKEN=tok',
+        '-s',
+        'acorn-abc',
+        '-c',
+        '/repo',
+        'claude',
+      ],
+    )
     expect(tmuxAttachArgs('acorn-abc')).toEqual(['-u', '-T', 'RGB', 'attach', '-t', 'acorn-abc'])
   })
 })

@@ -19,7 +19,11 @@ const PROVIDER = {
 const submitWith = (failure: unknown): Promise<string> =>
   createRoot(async (dispose) => {
     rotate.mockRejectedValueOnce(failure)
-    const form = createCredentialForm(() => PROVIDER, () => {}, () => 'conn-1')
+    const form = createCredentialForm(
+      () => PROVIDER,
+      () => {},
+      () => 'conn-1',
+    )
     form.setValue('token', 'lin_api_key')
     await form.submit()
     const message = form.error()
@@ -31,12 +35,12 @@ const submitWith = (failure: unknown): Promise<string> =>
 // stops matching turns a diagnosis back into "something went wrong", and nothing else would notice.
 describe('createCredentialForm error copy', () => {
   it('names the provider when the provider refused the credential', async () => {
-    expect(await submitWith(new ApiError('provider_needs_auth', 401, 'provider_needs_auth')))
-      .toBe('Those credentials were rejected by Linear.')
+    expect(await submitWith(new ApiError('provider_needs_auth', 401, 'provider_needs_auth'))).toBe(
+      'Those credentials were rejected by Linear.',
+    )
   })
 
-  // The reason this file exists. Anything outside the one known code used to read as one sentence
-  // with nothing in it to look up.
+  // Anything outside the one known code reads as one sentence, so it has to carry something to look up.
   it('carries the code and the request id for every other failure', async () => {
     const failure = new ApiError('provider_unavailable', 502, 'provider_unavailable', { requestId: 'r7-123' })
     expect(await submitWith(failure)).toBe('Could not connect this provider. (provider_unavailable · r7-123)')

@@ -2,8 +2,15 @@ import { createEffect, createMemo, createRoot, createSignal, onCleanup } from 's
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
-  activateTaskSignals, clientEvents, consumePaneIntent, onScopeEvicted, openTarget, pathForTask,
-  projectsOptions, tasksOptions, type Task,
+  activateTaskSignals,
+  clientEvents,
+  consumePaneIntent,
+  onScopeEvicted,
+  openTarget,
+  pathForTask,
+  projectsOptions,
+  tasksOptions,
+  type Task,
 } from '@acorn/plugin-api/client'
 import { pullDetailOptions, pullsOptions, taskPullsOptions } from '../queries'
 import { parsePullRef, type PullRef } from '../../shared/pullRef'
@@ -24,7 +31,11 @@ const roots = new Map<string, { model: PrTabsModel; dispose: () => void }>()
 export function prTabsModel(task: Task): PrTabsModel {
   const held = roots.get(task.id)
   if (held) return held.model
-  for (const [id, entry] of roots) if (id !== task.id) { entry.dispose(); roots.delete(id) }
+  for (const [id, entry] of roots)
+    if (id !== task.id) {
+      entry.dispose()
+      roots.delete(id)
+    }
   const entry = createRoot((dispose) => ({ model: build(task), dispose }))
   roots.set(task.id, entry)
   return entry.model
@@ -60,16 +71,21 @@ function build(task: Task) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const primary = createMemo<PullRef | null>(() => task.github && task.pullNumber != null
-    ? { owner: task.github.owner, repo: task.github.name, number: String(task.pullNumber) }
-    : null)
+  const primary = createMemo<PullRef | null>(() =>
+    task.github && task.pullNumber != null
+      ? { owner: task.github.owner, repo: task.github.name, number: String(task.pullNumber) }
+      : null,
+  )
   const repoEnabled = () => !!primary()
   const relations = createQuery(() => taskPullsOptions(task.id, repoEnabled()))
-  const openPulls = createQuery(() => pullsOptions(primary()?.owner ?? '', primary()?.repo ?? '', 'open', repoEnabled()))
+  const openPulls = createQuery(() =>
+    pullsOptions(primary()?.owner ?? '', primary()?.repo ?? '', 'open', repoEnabled()),
+  )
   // The primary's conversation is the discovery anchor even while another tab is selected. Keeping
   // this observer mounted means mention tabs do not disappear when the reader follows one.
   const primaryDetail = createQuery(() =>
-    pullDetailOptions(primary()?.owner ?? '', primary()?.repo ?? '', primary()?.number ?? '', repoEnabled()))
+    pullDetailOptions(primary()?.owner ?? '', primary()?.repo ?? '', primary()?.number ?? '', repoEnabled()),
+  )
   const tasks = createQuery(() => tasksOptions(true))
   const projects = createQuery(() => projectsOptions(true))
 
@@ -100,10 +116,9 @@ function build(task: Task) {
     consumePaneIntent(event.taskId, event.paneId)
     selectItem(event.intent.item)
   })
-  // `head:changed` for this task, not the old content-free `term:status` ping. Two pull-request keys
-  // were being invalidated on every terminal idle-to-working edge, on every connected client.
-  // What actually moves a pull is a commit landing in the task's worktree, which is what this event
-  // names.
+  // `head:changed` for this task: what moves a pull is a commit landing in the task's worktree, which
+  // is what this event names. A terminal status ping would invalidate two pull-request keys on every
+  // idle-to-working edge, on every connected client.
   const offStatus = clientEvents.on('head:changed', (event) => {
     if (event.taskId !== task.id) return
     void queryClient.invalidateQueries({ queryKey: taskPullsKey(task.id) })
@@ -129,7 +144,8 @@ function build(task: Task) {
     })
   })
   const selected = createMemo(() => tabs().find((tab) => pullRefKey(tab.pull) === selectedKey()) ?? tabs()[0])
-  const tabIsPrimary = (tab: TaskPullTab | undefined) => !!primary() && !!tab && pullRefKey(primary()!) === pullRefKey(tab.pull)
+  const tabIsPrimary = (tab: TaskPullTab | undefined) =>
+    !!primary() && !!tab && pullRefKey(primary()!) === pullRefKey(tab.pull)
   const isPrimary = () => tabIsPrimary(selected())
 
   const selectedDetail = createQuery(() => {
@@ -139,13 +155,17 @@ function build(task: Task) {
   const selectedProjects = createMemo(() => {
     const pull = selected()?.pull
     if (!pull) return []
-    return (projects.data ?? []).filter((project) =>
-      project.github?.owner.toLowerCase() === pull.owner.toLowerCase()
-      && project.github.name.toLowerCase() === pull.repo.toLowerCase())
+    return (projects.data ?? []).filter(
+      (project) =>
+        project.github?.owner.toLowerCase() === pull.owner.toLowerCase() &&
+        project.github.name.toLowerCase() === pull.repo.toLowerCase(),
+    )
   })
-  const selectedProject = createMemo(() =>
-    selectedProjects().find((project) => project.id === task.projectId)
-    ?? (selectedProjects().length === 1 ? selectedProjects()[0] : undefined))
+  const selectedProject = createMemo(
+    () =>
+      selectedProjects().find((project) => project.id === task.projectId) ??
+      (selectedProjects().length === 1 ? selectedProjects()[0] : undefined),
+  )
 
   const linkedTaskRows = (tab: TaskPullTab): Task[] => {
     const ids = new Set(tab.linkedTasks.filter((linked) => linked.id !== task.id).map((linked) => linked.id))
@@ -177,12 +197,12 @@ function build(task: Task) {
     return !!tab && !isPrimary() && linkedTaskRows(tab).length === 0
   }
   const taskCreationTitle = () => {
-    if (!selectedProject()) return selectedProjects().length > 1
-      ? 'More than one project uses this repository. Create the task from the pull request list.'
-      : 'Add this repository as a project first.'
-    if (!selectedDetail.data?.pull?.headRef) return selectedDetail.isError
-      ? "Couldn't load this pull request."
-      : 'Loading the pull request branch…'
+    if (!selectedProject())
+      return selectedProjects().length > 1
+        ? 'More than one project uses this repository. Create the task from the pull request list.'
+        : 'Add this repository as a project first.'
+    if (!selectedDetail.data?.pull?.headRef)
+      return selectedDetail.isError ? "Couldn't load this pull request." : 'Loading the pull request branch…'
     return `Create a task for #${selected()!.pull.number}`
   }
   const createSelectedTask = async () => {

@@ -12,10 +12,8 @@ import { loadWorkflowFiles } from './files'
 export const GENERATE_MAX_WORKFLOW_TARGETS = 40
 export const GENERATE_MAX_WORKFLOW_CATALOG_JSON_CHARS = 12_000
 
-const outputSchemas = (
-  def: WorkflowDef,
-): WorkflowCatalogTarget['outputs'] => {
-  return (def.outputs ?? []).map(output => ({ name: output.name, schema: structuredClone(output.schema) }))
+const outputSchemas = (def: WorkflowDef): WorkflowCatalogTarget['outputs'] => {
+  return (def.outputs ?? []).map((output) => ({ name: output.name, schema: structuredClone(output.schema) }))
 }
 
 /** A definition's reference and input and output contract. Input defaults stay on the Node; the
@@ -38,8 +36,8 @@ export const workflowCatalogTarget = (
 /** A child is a valid leaf. A definition with runtime children would exceed the one-level tree limit
  *  when selected here, so it is not an available target even though it can run as a root. */
 const canBeChild = (def: WorkflowDef, validation: WorkflowValidationCatalog): boolean =>
-  !validateWorkflow(def, validation).length
-  && !def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map')
+  !validateWorkflow(def, validation).length &&
+  !def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map')
 
 const canBecomeChild = (def: WorkflowDef): boolean =>
   !def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map')
@@ -55,12 +53,15 @@ export async function scopedWorkflowCatalog(args: {
   userDir: string | null
   validation: WorkflowValidationCatalog
 }): Promise<WorkflowCatalog> {
-  const rows = (await defsForProject(args.db, args.workspaceId, args.projectId))
-    .filter((row) => canBecomeChild(row.def))
-  const repo = loadWorkflowFiles(args.repoDir, null, args.validation).workflows
-    .filter((def) => canBeChild(def, args.validation))
-  const user = loadWorkflowFiles(null, args.userDir, args.validation).workflows
-    .filter((def) => canBeChild(def, args.validation))
+  const rows = (await defsForProject(args.db, args.workspaceId, args.projectId)).filter((row) =>
+    canBecomeChild(row.def),
+  )
+  const repo = loadWorkflowFiles(args.repoDir, null, args.validation).workflows.filter((def) =>
+    canBeChild(def, args.validation),
+  )
+  const user = loadWorkflowFiles(null, args.userDir, args.validation).workflows.filter((def) =>
+    canBeChild(def, args.validation),
+  )
   const workflows = [
     ...rows.map((row) => workflowCatalogTarget({ source: 'database', id: row.id }, row.def, !!row.publishedRevision)),
     ...repo.map((def) => workflowCatalogTarget({ source: 'repo', path: `.acorn/workflows/${def.id}.toml` }, def)),
@@ -86,7 +87,8 @@ export function generationWorkflowCatalog(catalog: WorkflowCatalog, excludeDatab
   const workflows: typeof candidates = []
   for (const entry of candidates) {
     const nextSize = JSON.stringify([...workflows, entry]).length
-    if (workflows.length >= GENERATE_MAX_WORKFLOW_TARGETS || nextSize > GENERATE_MAX_WORKFLOW_CATALOG_JSON_CHARS) continue
+    if (workflows.length >= GENERATE_MAX_WORKFLOW_TARGETS || nextSize > GENERATE_MAX_WORKFLOW_CATALOG_JSON_CHARS)
+      continue
     workflows.push(entry)
   }
   return { ...catalog, workflows }

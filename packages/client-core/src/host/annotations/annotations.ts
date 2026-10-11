@@ -5,7 +5,11 @@
 // one request, and the owner's draw site reads the marks back by key. Requests and retained results are
 // partitioned by contributor; rows still read one point-level reactive map.
 import { createSignal, type Accessor } from 'solid-js'
-import { annotationKeyOf, type PluginAnnotationKey, type PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import {
+  annotationKeyOf,
+  type PluginAnnotationKey,
+  type PluginAnnotationMark,
+} from '@acorn/protocol/extensionPoints.ts'
 import {
   extensionDeliveries,
   extensionPointRegistry,
@@ -74,12 +78,6 @@ export function annotationsFor(pointId: string, key: PluginAnnotationKey): Stamp
   return store(pointId).read().get(annotationKeyOf(point.key, key)) ?? []
 }
 
-/** Does anything currently annotate this point? This is a map read, never a fetch. */
-export const hasAnnotations = (pointId: string): boolean => store(pointId).read().size > 0
-
-/** Changes when the number of annotated keys changes, for layout consumers such as the diff. */
-export const annotationSignature = (pointId: string): string => String(store(pointId).read().size)
-
 /**
  * Ask every eligible contributor about one visible key batch.
  *
@@ -116,12 +114,13 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
     const freshnessRevision = contribution.freshnessRevision?.() ?? 0
     const existing = state.contributors.get(contribution.id)
     if (
-      existing?.registration === contribution
-      && existing.point === point
-      && existing.requestScope === requestScope
-      && existing.freshnessRevision === freshnessRevision
-      && existing.keySignature === keySignature
-    ) continue
+      existing?.registration === contribution &&
+      existing.point === point &&
+      existing.requestScope === requestScope &&
+      existing.freshnessRevision === freshnessRevision &&
+      existing.keySignature === keySignature
+    )
+      continue
 
     existing?.controller?.abort()
     const controller = new AbortController()
@@ -137,31 +136,38 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
     state.contributors.set(contribution.id, requestState)
     changed = true
 
-    void contribution.marks([...keys], controller.signal).then((answer) => {
-      if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
-      const limit = point.acceptedMarks ?? Number.POSITIVE_INFINITY
-      if (answer.length > limit) {
-        log.warn(`${contribution.pluginId} returned too many marks for ${pointId}; ignored ${answer.length - limit}`, undefined, {
-          'plugin.id': contribution.pluginId,
-          'annotation.point': pointId,
-          'annotation.rows': answer.length,
-          'annotation.limit': limit,
-        })
-      }
-      const marksByKey = new Map<string, StampedMark[]>()
-      for (const mark of answer.slice(0, limit)) {
-        const stamped: StampedMark = { ...mark, pluginId: contribution.pluginId }
-        const lookup = annotationKeyOf(fields, mark.key)
-        marksByKey.set(lookup, [...(marksByKey.get(lookup) ?? []), stamped])
-      }
-      requestState.controller = null
-      requestState.marksByKey = marksByKey
-      publish(state)
-    }).catch((error: unknown) => {
-      if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
-      requestState.controller = null
-      recordSurfaceFailure(contribution.pluginId, contribution.id, error)
-    })
+    void contribution
+      .marks([...keys], controller.signal)
+      .then((answer) => {
+        if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
+        const limit = point.acceptedMarks ?? Number.POSITIVE_INFINITY
+        if (answer.length > limit) {
+          log.warn(
+            `${contribution.pluginId} returned too many marks for ${pointId}; ignored ${answer.length - limit}`,
+            undefined,
+            {
+              'plugin.id': contribution.pluginId,
+              'annotation.point': pointId,
+              'annotation.rows': answer.length,
+              'annotation.limit': limit,
+            },
+          )
+        }
+        const marksByKey = new Map<string, StampedMark[]>()
+        for (const mark of answer.slice(0, limit)) {
+          const stamped: StampedMark = { ...mark, pluginId: contribution.pluginId }
+          const lookup = annotationKeyOf(fields, mark.key)
+          marksByKey.set(lookup, [...(marksByKey.get(lookup) ?? []), stamped])
+        }
+        requestState.controller = null
+        requestState.marksByKey = marksByKey
+        publish(state)
+      })
+      .catch((error: unknown) => {
+        if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
+        requestState.controller = null
+        recordSurfaceFailure(contribution.pluginId, contribution.id, error)
+      })
   }
 
   // Stale marks disappear in the same turn. Successful answers later fill only their own partition.

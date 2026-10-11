@@ -3,7 +3,6 @@ import type { PluginStyleDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { styleRegistry } from '../registries/shell/styles'
 
-export const PLUGIN_STYLE_PREFIX = 'plugin:'
 export const pluginStyleId = (pluginId: string, styleId: string): string => `plugin:${pluginId}:${styleId}`
 const SAFE_ID = /^plugin:[a-z][a-z0-9-]{1,31}:[a-z0-9][a-z0-9-]{0,63}$/
 
@@ -38,12 +37,15 @@ export function registerPluginStyle(pluginId: string, descriptor: PluginStyleDes
   const id = pluginStyleId(pluginId, descriptor.id)
   const css = pluginStyleBlock(id, descriptor)
   const families = [...new Set(Object.keys(descriptor.tokens).map((token) => STYLE_TOKEN_FAMILIES[token]))]
-  const entry = styleRegistry.register({
-    id,
-    label: `${descriptor.label} (${pluginId})`,
-    description: descriptor.description,
-    families,
-  }, pluginId)
+  const entry = styleRegistry.register(
+    {
+      id,
+      label: `${descriptor.label} (${pluginId})`,
+      description: descriptor.description,
+      families,
+    },
+    pluginId,
+  )
   blocks.set(id, css)
   flush()
   return {

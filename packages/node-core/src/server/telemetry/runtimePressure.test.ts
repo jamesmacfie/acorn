@@ -19,7 +19,9 @@ it('samples only while collecting and releases its timer on disposal', () => {
     enabled = false
     vi.advanceTimersByTime(10_000)
     expect(gauge).not.toHaveBeenCalled()
-  } finally { stop() }
+  } finally {
+    stop()
+  }
   expect(vi.getTimerCount()).toBe(0)
 })
 
@@ -39,7 +41,17 @@ describe('a window the process spent suspended', () => {
       sources: {
         now: () => clock,
         loop: () => ({ ...loop }),
-        delay: { enable: () => true, disable: () => true, reset() { max = 20 }, percentile: () => 20e6, get max() { return max * 1e6 } },
+        delay: {
+          enable: () => true,
+          disable: () => true,
+          reset() {
+            max = 20
+          },
+          percentile: () => 20e6,
+          get max() {
+            return max * 1e6
+          },
+        },
       },
     })
     const window = (w: { gap: number; active: number; max: number }) => {
@@ -67,7 +79,7 @@ describe('a window the process spent suspended', () => {
   it('reports a real block, because the loop was busy for all of it', () => {
     const { window, durations, stop } = sampler()
     window({ gap: 20_000, active: 15_050, max: 15_020 })
-    // Longer than the thirty seconds the sampler used to throw away as a probable sleep.
+    // Longer than thirty seconds, and still counted rather than thrown away as a probable sleep.
     window({ gap: 45_000, active: 40_010, max: 40_000 })
     stop()
     expect(durations.get('runtime.event_loop.max')).toEqual([15_020, 40_000])

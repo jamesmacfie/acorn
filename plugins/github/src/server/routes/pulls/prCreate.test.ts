@@ -16,7 +16,7 @@ vi.mock('../../githubApi', async (importOriginal) => {
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
 // Two handles, for two different tables in two different files, which is the shape every github route
-// test has now:
+// test has:
 //   `plugin.db` is this plugin's migrated github.sqlite, which the router is a factory over. None of
 //     the paths asserted below reach it, each returning before the sync-state bust, but it's a real
 //     migrated handle rather than a stub so the router can't silently stop touching it unnoticed.
@@ -64,10 +64,16 @@ describe('prCreate auth + ApiError envelope', () => {
 
   it("folds GitHub's 422 prose into the envelope message with a stable validation_failed code", async () => {
     vi.mocked(gh).mockResolvedValue(
-      new Response(JSON.stringify({ message: 'Validation Failed', errors: [{ message: 'A pull request already exists for acme:feat.' }] }), {
-        status: 422,
-        headers: { 'content-type': 'application/json' },
-      }),
+      new Response(
+        JSON.stringify({
+          message: 'Validation Failed',
+          errors: [{ message: 'A pull request already exists for acme:feat.' }],
+        }),
+        {
+          status: 422,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
     )
     const res = await post(PRINCIPAL, { title: 't', base: 'main', head: 'feat' })
     expect(res.status).toBe(422)
@@ -86,21 +92,47 @@ describe('compare preview completeness', () => {
   afterEach(() => plugin.cleanup())
 
   const compare = async (fileCount: number) => {
-    vi.mocked(gh).mockResolvedValue(new Response(JSON.stringify({
-      ahead_by: 2,
-      files: Array.from({ length: fileCount }, (_, i) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0, sha: `s${i}`, patch: '@@' })),
-      commits: [],
-    }), { headers: { 'content-type': 'application/json' } }))
+    vi.mocked(gh).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ahead_by: 2,
+          files: Array.from({ length: fileCount }, (_, i) => ({
+            filename: `f${i}.ts`,
+            status: 'modified',
+            additions: 1,
+            deletions: 0,
+            sha: `s${i}`,
+            patch: '@@',
+          })),
+          commits: [],
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      ),
+    )
     const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/repos', prCreate(plugin.db))
-    const res = await app.fetch(new Request('http://acorn.test/api/repos/acme/widget/compare?base=main&head=feat'), { DB: noIntegrations, BLOBS: blobStore(), ...testSecretEnv('0'.repeat(64)) } as Env)
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/acme/widget/compare?base=main&head=feat'), {
+      DB: noIntegrations,
+      BLOBS: blobStore(),
+      ...testSecretEnv('0'.repeat(64)),
+    } as Env)
     return (await res.json()) as Compare
   }
   const blobs = new Map<string, string>()
-  const blobStore = () => ({ get: async (key: string) => blobs.get(key) ?? null, put: async (key: string, value: string) => void blobs.set(key, value) })
+  const blobStore = () => ({
+    get: async (key: string) => blobs.get(key) ?? null,
+    put: async (key: string, value: string) => void blobs.set(key, value),
+  })
 
   // GitHub gives compare no total and stops at 300, so 300 files never claims to be all of them.
   it('calls a 300-file comparison capped and a smaller one complete', async () => {
-    expect((await compare(300)).completeness).toEqual({ kind: 'incomplete', cause: 'upstream-cap', resource: 'compare-files', received: 300, reportedTotal: null, limit: 300 })
+    expect((await compare(300)).completeness).toEqual({
+      kind: 'incomplete',
+      cause: 'upstream-cap',
+      resource: 'compare-files',
+      received: 300,
+      reportedTotal: null,
+      limit: 300,
+    })
     expect((await compare(12)).completeness).toEqual({ kind: 'complete' })
   })
 

@@ -15,6 +15,14 @@ for UI that needs browser APIs, and declare the host requirement
 installs the client plugin host, scoped persistence, query clients, broker event handling,
 notification sources, and the shell registries before rendering.
 
+What the desktop and the terminal client start the same way is one call,
+`startClientRuntime` in `packages/client-core/src/host/clientRuntime.ts`. It wires telemetry, the Node
+event watchers, the plugin watcher, the workflow and system notices, client schedules, and device
+config sync, and returns one function that stops them. Each entry keeps only its own host's work. The
+desktop keeps responsiveness, page facts, desktop links, and sound. The terminal client keeps plugin
+workers, the roster, and the bell, and passes a promise that holds the plugin watcher until its worker
+factory is installed.
+
 `index.html` loads the entry directly as a module, so the page preloads every startup chunk and links
 the stylesheet from the head. Before the entry runs, the page runs `apps/desktop/public/startup-guard.js`,
 a deferred classic script, which runs first because deferred and module scripts run in document order.
@@ -56,13 +64,8 @@ whenever anything upstream changes. Guard against an identical value before touc
 
 ## Pages
 
-<a id="registries-and-plugins"></a>
-<a id="the-desktop-gate-audit"></a>
-
 [Registries and plugins](./frontend/registries.md) covers the client plugin host, contribution
 registries, slots, the three gates, and the platform seam's verbs.
-
-<a id="rail-source-visibility"></a>
 
 [Rail and routing](./frontend/rail-and-routing.md) covers rail source gates and visibility, rail
 markers and node stats, the router, core URLs, and how a source claims tasks.
@@ -70,47 +73,20 @@ markers and node stats, the router, core URLs, and how a source claims tasks.
 [Acorn links](./frontend/acorn-links.md) defines the external address forms, Copy link, desktop and
 terminal delivery, and the extension and test points.
 
-<a id="node-data-access"></a>
-<a id="typed-data-authoring"></a>
-<a id="startup-readiness"></a>
-<a id="connection-and-freshness-ui"></a>
-
 [Data and startup](./frontend/data-and-startup.md) covers the API client and query cache, typed data
 authoring, startup readiness, and connection and freshness UI.
-
-<a id="shell-state"></a>
-<a id="telemetry"></a>
-<a id="restore-and-persistence"></a>
-<a id="processing-and-responsiveness-telemetry"></a>
-<a id="node-shell-navigation-lifetime"></a>
-<a id="preview-pane-lifetime"></a>
 
 [Shell state](./frontend/shell-state.md) covers the shell's views, overlays, focus, the bell, restore
 order, renderer telemetry, and Node and preview lifetimes.
 
-<a id="settings"></a>
-<a id="search-and-deep-links"></a>
-<a id="keys-inside-settings"></a>
-
 [Settings](./frontend/settings.md) covers the settings layer, its rail and groups, the page context,
 search and deep links, and keys inside settings.
-
-<a id="pages-and-the-save-model"></a>
-<a id="forms-and-flows"></a>
 
 [Settings pages](./frontend/settings-pages.md) covers how a settings page saves and how its forms and
 flows are shaped.
 
-<a id="workspaces-and-projects"></a>
-<a id="agents"></a>
-<a id="connections"></a>
-<a id="plugins"></a>
-<a id="the-plugin-strip"></a>
-
 [Settings groups](./frontend/settings-groups.md) covers the Workspaces and projects, Agents,
 Connections, and Plugins pages, and the plugin strip.
-
-<a id="startup-budget"></a>
 
 [Startup budget](./frontend/startup-budget.md) covers the build checks on what each client loads
 before it draws.

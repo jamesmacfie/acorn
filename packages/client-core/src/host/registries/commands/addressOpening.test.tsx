@@ -12,7 +12,10 @@ const state = vi.hoisted(() => ({
   opened: [] as string[],
   openedTask: null as unknown,
   claimed: true,
-  claim: null as null | { target: Record<string, unknown>; contribution: { providerId?: string; path?: () => string | null } },
+  claim: null as null | {
+    target: Record<string, unknown>
+    contribution: { providerId?: string; path?: () => string | null }
+  },
   promotions: [] as unknown[],
   created: 0,
   loadedItems: 0,
@@ -26,7 +29,9 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../../infra/node/activeNode', () => ({
   activeNodeId: () => state.active,
-  setActiveNode: (id: string) => { state.active = id },
+  setActiveNode: (id: string) => {
+    state.active = id
+  },
 }))
 vi.mock('../../../infra/node/fleet', () => ({
   homeNodeId: () => 'node-a',
@@ -47,27 +52,46 @@ vi.mock('../../../features/tasks/tasks', () => ({
 vi.mock('../sources/sources', () => ({
   defaultSourceId: () => 'home',
   matchRoute: (pattern: string, path: string) => pattern === path,
-  sourceIdForPath: (path: string) => path.includes('/pulls') ? 'pulls' : undefined,
+  sourceIdForPath: (path: string) => (path.includes('/pulls') ? 'pulls' : undefined),
   sourceRegistry: {
-    get: (id: string) => id === 'pulls' ? { id } : undefined,
-    entries: () => [{ id: 'plugin-source', projectSurfaceId: 'plugin-surface' }, {
-      id: 'source-github', providerId: 'github', promotion: {
-        fromContentLink: async () => { state.loadedItems++; await state.itemGate; return { number: 42, title: 'Review changes', headRef: 'feature/pr' } },
-        canPromote: () => true,
-        existingTask: async () => { state.existingReads++; await state.existingGate; return state.existing ? { id: 'tracked-task' } : undefined },
-        create: async () => { state.created++; return { id: 'created-task' } },
+    get: (id: string) => (id === 'pulls' ? { id } : undefined),
+    entries: () => [
+      { id: 'plugin-source', projectSurfaceId: 'plugin-surface' },
+      {
+        id: 'source-github',
+        providerId: 'github',
+        promotion: {
+          fromContentLink: async () => {
+            state.loadedItems++
+            await state.itemGate
+            return { number: 42, title: 'Review changes', headRef: 'feature/pr' }
+          },
+          canPromote: () => true,
+          existingTask: async () => {
+            state.existingReads++
+            await state.existingGate
+            return state.existing ? { id: 'tracked-task' } : undefined
+          },
+          create: async () => {
+            state.created++
+            return { id: 'created-task' }
+          },
+        },
       },
-    }],
+    ],
   },
 }))
 vi.mock('../panes/projectSurfaces', () => ({
   projectSurfaceRoutes: () => [{ id: 'plugin-surface', path: '/p/project/x/plugin/item' }],
 }))
 vi.mock('../panes/panes', () => ({
-  paneContribution: (id: string) => id === 'linear' ? { id } : undefined,
+  paneContribution: (id: string) => (id === 'linear' ? { id } : undefined),
 }))
 vi.mock('../panes/contentLinks', () => ({
-  openInAppUrl: (url: string) => { state.opened.push(url); return state.claimed },
+  openInAppUrl: (url: string) => {
+    state.opened.push(url)
+    return state.claimed
+  },
   claimFor: () => state.claim,
 }))
 vi.mock('./clientEvents', () => ({
@@ -86,9 +110,17 @@ function mount(nodeId: string) {
       state.selected.push(source)
       state.navigated.push(path)
     },
-    openTask: (_id: string, path: string, task?: unknown) => { state.navigated.push(path); state.selected.push(null); state.openedTask = task; return true },
+    openTask: (_id: string, path: string, task?: unknown) => {
+      state.navigated.push(path)
+      state.selected.push(null)
+      state.openedTask = task
+      return true
+    },
     hasProject: (id: string) => id === 'project' || id === 'project-b',
-    loadProjects: async () => { state.projectReads++; await state.projectsGate },
+    loadProjects: async () => {
+      state.projectReads++
+      await state.projectsGate
+    },
     showPromotion: (details: unknown) => state.promotions.push(details),
   }
   mounted.push(registerAddressHost(host))
@@ -121,12 +153,17 @@ beforeEach(() => {
 
 function deferred() {
   let release!: () => void
-  const promise = new Promise<void>((resolve) => { release = resolve })
+  const promise = new Promise<void>((resolve) => {
+    release = resolve
+  })
   return { promise, release }
 }
 
 const claimPull = () => {
-  state.claim = { target: { kind: 'pr', item: 'acme/repo#42' }, contribution: { providerId: 'github', path: () => '/p/project/pulls/42' } }
+  state.claim = {
+    target: { kind: 'pr', item: 'acme/repo#42' },
+    contribution: { providerId: 'github', path: () => '/p/project/pulls/42' },
+  }
 }
 
 describe('opening an Acorn address', () => {
@@ -187,10 +224,9 @@ describe('opening an Acorn address', () => {
       'acorn://node-a/p/project',
       'acorn://node-a/p/project/pulls/42',
       'acorn://node-a/p/project/x/plugin/item',
-    ]) expect(await openLink(link)).toEqual({ kind: 'opened' })
-    expect(state.projectPaths).toEqual([
-      '/p/project', '/p/project/pulls/42', '/p/project/x/plugin/item',
     ])
+      expect(await openLink(link)).toEqual({ kind: 'opened' })
+    expect(state.projectPaths).toEqual(['/p/project', '/p/project/pulls/42', '/p/project/x/plugin/item'])
   })
 
   it('reports refused, unpaired, missing, unclaimed, and new-task links without navigation', async () => {
@@ -201,7 +237,8 @@ describe('opening an Acorn address', () => {
       'acorn://node-a/p/missing',
       'acorn://node-a/source/missing',
       'acorn://node-a/new-task?url=https%3A%2F%2Fexample.com',
-    ]) expect(await openLink(link)).toMatchObject({ kind: 'refused', link })
+    ])
+      expect(await openLink(link)).toMatchObject({ kind: 'refused', link })
     state.claimed = false
     expect(await openLink('acorn://node-a/open?url=https%3A%2F%2Fexample.com')).toMatchObject({ kind: 'refused' })
     expect(state.navigated).toEqual([])
@@ -211,10 +248,20 @@ describe('opening an Acorn address', () => {
 
   it('prepares a recognised item without writing until the dialog confirms', async () => {
     mount('node-a')
-    state.claim = { target: { kind: 'pr', item: 'acme/repo#42' }, contribution: { providerId: 'github', path: () => '/p/project/pulls/42' } }
+    state.claim = {
+      target: { kind: 'pr', item: 'acme/repo#42' },
+      contribution: { providerId: 'github', path: () => '/p/project/pulls/42' },
+    }
     expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toEqual({ kind: 'opened' })
     expect(state.projectPaths).toEqual(['/p/project'])
-    expect(state.promotions).toEqual([{ projectId: 'project', sourceId: 'source-github', item: { number: 42, title: 'Review changes', headRef: 'feature/pr' }, itemTitle: 'Review changes' }])
+    expect(state.promotions).toEqual([
+      {
+        projectId: 'project',
+        sourceId: 'source-github',
+        item: { number: 42, title: 'Review changes', headRef: 'feature/pr' },
+        itemTitle: 'Review changes',
+      },
+    ])
     expect(state.created).toBe(0)
     // Dismissing the request does not call the promotion's create method.
     state.promotions = []
@@ -277,14 +324,20 @@ describe('opening an Acorn address', () => {
   it('distinguishes an untracked project and a claimed URL with no promotion', async () => {
     mount('node-a')
     state.claim = { target: { kind: 'pr' }, contribution: { providerId: 'github', path: () => null } }
-    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Repository is not a project in Acorn' })
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({
+      reason: 'Repository is not a project in Acorn',
+    })
     expect(state.toastActions[0].label).toBe('Add project')
     state.toastActions[0].onPress()
     expect(state.settings).toEqual(['settings/workspaces#projects'])
     state.claim = { target: { kind: 'repo' }, contribution: { path: () => '/p/project' } }
-    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Provider has no task promotion' })
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({
+      reason: 'Provider has no task promotion',
+    })
     state.claim = { target: { kind: 'linear.issue', item: 'ENG-42' }, contribution: { providerId: 'linear' } }
-    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Provider has no task promotion' })
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({
+      reason: 'Provider has no task promotion',
+    })
     expect(state.promotions).toEqual([])
   })
 })

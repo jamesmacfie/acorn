@@ -10,8 +10,16 @@ import { HttpStepBodyApp, readStepResponse } from './StepBody'
 // is exactly what the worker would post, and it gets nothing but its props and a bridge.
 
 const props = (over: Partial<WorkflowStepBodyProps> = {}): WorkflowStepBodyProps => ({
-  taskId: 'task-1', projectId: 'project-1', runId: 'run-1', stepId: 'st-1', kind: 'http:request', status: 'done',
-  inputs: null, inputsTruncated: false, outputTruncated: false, revision: 1,
+  taskId: 'task-1',
+  projectId: 'project-1',
+  runId: 'run-1',
+  stepId: 'st-1',
+  kind: 'http:request',
+  status: 'done',
+  inputs: null,
+  inputsTruncated: false,
+  outputTruncated: false,
+  revision: 1,
   output: { status: 201, headers: { 'content-type': 'application/json' }, body: '{"id":7}' },
   ...over,
 })
@@ -26,7 +34,9 @@ function mount(first: WorkflowStepBodyProps) {
     entry: 'stepBody',
     root,
     props: () => first,
-    onProps: (callback) => { update = callback },
+    onProps: (callback) => {
+      update = callback
+    },
     onUnmount: () => {},
     host: {
       invoke: () => Promise.reject(new Error('the step body asks its owner for nothing')),
@@ -82,6 +92,10 @@ describe('the http:request step body', () => {
 
     expect(readStepResponse({ status: '200' })).toBeNull()
     expect(readStepResponse(['nope'])).toBeNull()
-    expect(readStepResponse({ status: 200, headers: { ok: 'yes', bad: 3 } })).toEqual({ status: 200, headers: [['ok', 'yes']], body: '' })
+    expect(readStepResponse({ status: 200, headers: { ok: 'yes', bad: 3 } })).toEqual({
+      status: 200,
+      headers: [['ok', 'yes']],
+      body: '',
+    })
   })
 })

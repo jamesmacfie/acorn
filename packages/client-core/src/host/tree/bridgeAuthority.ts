@@ -37,17 +37,33 @@ export const treeModelAuthorityKey = (
   binding: FrameBinding,
   context: PluginFrameContext,
   document: PluginFrameProps['document'],
-): string => JSON.stringify([
-  hash, identity(qc), binding.pluginId, binding.surface, binding.target, binding.nodeId,
-  binding.taskId ?? null, binding.projectId ?? null,
-  [...binding.api].sort(), [...binding.events].sort(), [...binding.panes].sort(),
-  binding.destinations ?? [], [...(binding.hosts ?? [])].sort(), [...binding.claimsKeys].sort(),
-  identity(document), document ? identity(refreshTreeDocumentGrant(document).generation) : 0,
-])
+): string =>
+  JSON.stringify([
+    hash,
+    identity(qc),
+    binding.pluginId,
+    binding.surface,
+    binding.target,
+    binding.nodeId,
+    binding.taskId ?? null,
+    binding.projectId ?? null,
+    [...binding.api].sort(),
+    [...binding.events].sort(),
+    [...binding.panes].sort(),
+    binding.destinations ?? [],
+    [...(binding.hosts ?? [])].sort(),
+    [...binding.claimsKeys].sort(),
+    identity(document),
+    document ? identity(refreshTreeDocumentGrant(document).generation) : 0,
+  ])
 
-/** Legacy global connect().context retains its immutable initial selection as well as its grants. */
+/** Legacy global connect().context retains its immutable initial selection as well as its grants.
+ *  Mixed-version path until 2026-12-30. */
 export const treeAuthorityKey = (
-  hash: string, qc: QueryClient, binding: FrameBinding, context: PluginFrameContext,
+  hash: string,
+  qc: QueryClient,
+  binding: FrameBinding,
+  context: PluginFrameContext,
   document: PluginFrameProps['document'],
 ): string => JSON.stringify([treeModelAuthorityKey(hash, qc, binding, context, document), context.item ?? null])
 

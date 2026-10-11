@@ -30,8 +30,16 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
     streamSubs.delete(conn)
     const execs = execSubs.get(conn)
     execSubs.delete(conn)
-    for (const handle of streams?.values() ?? []) { try { handle.stop() } catch {} }
-    for (const pty of execs?.values() ?? []) { try { pty.kill() } catch {} }
+    for (const handle of streams?.values() ?? []) {
+      try {
+        handle.stop()
+      } catch {}
+    }
+    for (const pty of execs?.values() ?? []) {
+      try {
+        pty.kill()
+      } catch {}
+    }
   }
 
   events.channel('docker', {
@@ -46,7 +54,7 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
           case 'docker:stats:detach': {
             const { id } = frame
             if (typeof id !== 'string' || !isDockerRef(id)) return
-            const kind = frame.channel.startsWith('docker:logs') ? 'logs' as const : 'stats' as const
+            const kind = frame.channel.startsWith('docker:logs') ? ('logs' as const) : ('stats' as const)
             const key: StreamKey = `${kind}:${id}`
             const mine = streamSubs.get(conn) ?? new Map<StreamKey, { stop(): void }>()
             streamSubs.set(conn, mine)
@@ -58,15 +66,12 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
             }
             if (mine.has(key)) return // attach is idempotent per connection
             let handle: ReturnType<SharedDockerStreams['attach']>
-            try { handle = shared.attach(
-              kind,
-              id,
-              send,
-              () => {
+            try {
+              handle = shared.attach(kind, id, send, () => {
                 mine.delete(key)
                 if (!mine.size) streamSubs.delete(conn)
-              },
-            ) } catch (error) {
+              })
+            } catch (error) {
               if (!mine.size) streamSubs.delete(conn)
               throw error
             }
@@ -103,7 +108,8 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
             return
           case 'docker:exec:resize': {
             const pty = execSubs.get(conn)?.get(frame.execId)
-            if (pty) pty.resize(Math.max(2, Math.min(500, frame.cols || 80)), Math.max(2, Math.min(300, frame.rows || 24)))
+            if (pty)
+              pty.resize(Math.max(2, Math.min(500, frame.cols || 80)), Math.max(2, Math.min(300, frame.rows || 24)))
             return
           }
           case 'docker:exec:kill':

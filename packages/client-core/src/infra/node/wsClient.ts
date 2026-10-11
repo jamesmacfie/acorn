@@ -7,7 +7,18 @@
 //
 // Dispatch is a prefix registry (wsChannels.ts). Core handles the generic `term:status` chrome
 // invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type {
+  AgentSessionChangedEvent,
+  ConnectionChangedEvent,
+  HeadChangedEvent,
+  ProjectChangedEvent,
+  RunTargetChangedEvent,
+  TaskChangedEvent,
+  WorkspaceChangedEvent,
+  WorkspaceProjectsChangedEvent,
+  WorkspacesModeChangedEvent,
+  WorktreeStatusChangedEvent,
+} from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import { type WsClientFrame, type WsServerFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
@@ -23,9 +34,8 @@ type StatusCb = (pluginId?: string) => void
 // rather than a hand-written twin here that drifts when a field is added.
 //
 // The name stays `WorkflowNotice` because it is published through the plugin-api facade, where
-// removing a name costs a major bump and this one has no callers to gain from the rename. Nothing
-// about the payload is workflows' any more: `kind` is a contributed id rather than the closed union it
-// was, and `target` replaced the `runId` pair.
+// removing a name costs a major bump. Nothing about the payload is specific to workflows: `kind` is a
+// contributed id.
 export type WorkflowNotice = NoticeFrame
 type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
@@ -67,15 +77,19 @@ export function registerWsBinaryHandler(handler: BinaryHandler): { dispose(): vo
   if (binaryHandler) throw new Error('binary stream handler already registered')
   binaryHandler = handler
   connect()
-  return { dispose: () => { if (binaryHandler === handler) binaryHandler = null } }
+  return {
+    dispose: () => {
+      if (binaryHandler === handler) binaryHandler = null
+    },
+  }
 }
 
 let bridged = false
 // Which nodes' sockets have been up at least once. A later transition to online is a reconnect, which
 // means re-attach and refetch. The first connect means neither.
 //
-// Per node, not one flag. A single boolean read a second node's first connect as a reconnect, and
-// re-attached every PTY subscription against the active node.
+// Per node, not one flag. A single boolean would read a second node's first connect as a reconnect, and
+// re-attach every PTY subscription against the active node.
 const everOnline = new Set<string>()
 
 // The one send door. A channel owner needs it to attach and detach its own streams, and it is the only
@@ -117,7 +131,12 @@ function connect(): void {
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
       for (const cb of fleetPluginsSubs) cb(nodeId)
     }
-    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspace:changed' && typeof (raw as WorkspaceChangedEvent).workspaceId === 'string') {
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      (raw as { channel?: unknown }).channel === 'workspace:changed' &&
+      typeof (raw as WorkspaceChangedEvent).workspaceId === 'string'
+    ) {
       for (const cb of fleetWorkspaceSubs) cb(nodeId, raw as WorkspaceChangedEvent)
     }
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspaces-mode:changed') {
@@ -171,21 +190,24 @@ function dispatch(raw: unknown): void {
   })
 }
 
-// Core handles only the generic `term:status` chrome invalidation. Terminal registers the PTY
-// payload handler for this prefix through the ordinary channel registry.
+// Workflow notices for the bell, and step events and status changes for run views.
 registerWsChannel('workflow', (frame) => {
-  if (frame.channel === 'workflow:notice') return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
-  if (frame.channel === 'workflow:step:event') return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
-  if (frame.channel === 'workflow:step-changed') stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
+  if (frame.channel === 'workflow:notice')
+    return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
+  if (frame.channel === 'workflow:step:event')
+    return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
+  if (frame.channel === 'workflow:step-changed')
+    stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
 })
 
-// Core's third prefix (docs/api-reference/websocket.md § WebSocket). Content-free like `term:status`, so the
-// subscriber re-reads the roster route (plugins/reload.ts).
+// A plugin was installed, updated, removed, reloaded or toggled
+// (docs/api-reference/websocket.md § WebSocket). Content-free like `term:status`, so each subscriber
+// re-reads what it shows.
 registerWsChannel('plugins', (frame) => {
   if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())
 })
 
-// And its fourth. A task was created, patched, archived, cancelled, or had its links change on the
+// A task was created, patched, archived, cancelled, or had its links change on the
 // node — from this window, from another one, or from an agent (node-core/server/notify.ts). The id is
 // preserved for plugin consumers even though the built-in watcher invalidates the whole task list.
 registerWsChannel('tasks', (frame) => {
@@ -195,9 +217,8 @@ registerWsChannel('tasks', (frame) => {
   tasksSubs.forEach((cb) => cb({ taskId }))
 })
 
-// And its fifth. A connection was made, rotated, tested, disabled, or demoted to `needs-auth` because
-// its credential stopped working (node-core/server/notify.ts). The only core frame with a payload, so it
-// is the only one that reads its own fields — narrowed here rather than at each subscriber, because a
+// A connection was made, rotated, tested, disabled, or demoted to `needs-auth` because its credential
+// stopped working (node-core/server/notify.ts). Narrowed here rather than at each subscriber, because a
 // frame off the wire is `Record<string, unknown>` and every consumer would otherwise repeat the check.
 registerWsChannel('connection', (frame) => {
   if (frame.channel !== 'connection:changed') return
@@ -205,7 +226,13 @@ registerWsChannel('connection', (frame) => {
   if (typeof integrationId !== 'string' || typeof providerId !== 'string') return
   if (frame.deleted === true) return connectionSubs.forEach((cb) => cb({ integrationId, providerId, deleted: true }))
   if (typeof frame.status !== 'string') return
-  connectionSubs.forEach((cb) => cb({ integrationId, providerId, status: frame.status as Extract<ConnectionChangedEvent, { status: unknown }>['status'] }))
+  connectionSubs.forEach((cb) =>
+    cb({
+      integrationId,
+      providerId,
+      status: frame.status as Extract<ConnectionChangedEvent, { status: unknown }>['status'],
+    }),
+  )
 })
 
 // The rest of core's payload-carrying catalogue: HEAD moved, a run target started or stopped, an agent
@@ -214,15 +241,23 @@ registerWsChannel('connection', (frame) => {
 // colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'workspaces-mode', 'worktree']) {
+for (const prefix of [
+  'head',
+  'run',
+  'agent-session',
+  'project',
+  'workspace',
+  'workspace-projects',
+  'workspaces-mode',
+  'worktree',
+]) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
   })
 }
 
-
-// Core's twelfth, and the only one that is an apology. The node's hub shed invalidation frames because
+// The only prefix that is an apology. The node's hub shed invalidation frames because
 // this socket was too far behind to take them (node-core/server/transport/wsHub.ts). Nothing says which
 // ones, so the remedy is the reconnect remedy: mark what is on screen stale and let it refetch.
 registerWsChannel('ws', (frame) => {
@@ -270,8 +305,8 @@ export function wsOnStatus(cb: StatusCb): () => void {
   return () => void statusSubs.delete(cb)
 }
 
-// A reload swapped a plugin's node half (docs/plugins/dev-loop.md § The dev loop). A subscriber rather than a
-// direct call, because plugins/chrome imports this module and the reverse edge would be a cycle.
+// A reload swapped a plugin's node half (docs/plugins/dev-loop.md § The dev loop). Plugins subscribe
+// through the plugin-api facade and re-read what they show.
 export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()
@@ -286,7 +321,9 @@ export function wsOnFleetWorkspaceChanged(cb: (nodeId: string, event: WorkspaceC
 }
 
 /** Grouping changes from any paired Node, including one whose fleet picker is still mounted. */
-export function wsOnFleetWorkspacesModeChanged(cb: (nodeId: string, event: WorkspacesModeChangedEvent) => void): () => void {
+export function wsOnFleetWorkspacesModeChanged(
+  cb: (nodeId: string, event: WorkspacesModeChangedEvent) => void,
+): () => void {
   fleetWorkspacesModeSubs.add(cb)
   connect()
   return () => void fleetWorkspacesModeSubs.delete(cb)
@@ -299,8 +336,8 @@ export function wsOnFleetPluginsChanged(cb: (nodeId: string) => void): () => voi
   return () => void fleetPluginsSubs.delete(cb)
 }
 
-// The node's task list moved. Same subscriber shape and the same reason: tasks/mutations.ts would be a
-// cycle if this module reached into it.
+// The node's task list moved. Same subscriber shape and the same reason: the task mutations module
+// would be a cycle if this module reached into it.
 export function wsOnTasksChanged(cb: (event: TaskChangedEvent) => void): () => void {
   tasksSubs.add(cb)
   connect()
@@ -316,7 +353,10 @@ export function wsOnConnectionChanged(cb: (event: ConnectionChangedEvent) => voi
 
 // Hear one of the payload-carrying node events (the registry above). Same subscriber shape as the
 // three named ones.
-export function wsOnNodeEvent<K extends keyof NodeEventMap>(channel: K, cb: (event: NodeEventMap[K]) => void): () => void {
+export function wsOnNodeEvent<K extends keyof NodeEventMap>(
+  channel: K,
+  cb: (event: NodeEventMap[K]) => void,
+): () => void {
   const subs = nodeEventSubs.get(channel) ?? new Set()
   subs.add(cb as (event: never) => void)
   nodeEventSubs.set(channel, subs)

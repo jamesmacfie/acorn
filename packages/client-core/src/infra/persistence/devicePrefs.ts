@@ -40,10 +40,9 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
 const PREFIX = `acorn-pref:${ACORN_BASELINE}:`
 
 // Exact match, and only exact match. Every key above is an `app`-scope slice, so none of them is
-// ever suffixed: a scoped slice writes `<declaredKey>:<encodedScopeId>`
-// (persistence/persistedState.ts), and the scoped slices are exactly the four composition kinds
-// that now belong to the node they describe (docs/state-ownership/scope-rules.md § Scope rules). Unknown means node,
-// which is what a per-task layout key needs.
+// ever suffixed: a scoped slice writes `<declaredKey>:<encodedScopeId>` (`storageKeyFor`), and every
+// scoped slice belongs to the node it describes (docs/state-ownership/scope-rules.md § Scope rules).
+// Unknown means node, which is what a per-task layout key needs.
 const devicePluginIds = new Set<string>()
 export const setDevicePluginIds = (ids: Iterable<string>): void => {
   devicePluginIds.clear()

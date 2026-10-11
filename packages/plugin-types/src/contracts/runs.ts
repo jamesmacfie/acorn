@@ -14,4 +14,3 @@
 export type PluginRunRegistry = {
   register(source: { runs: string }): void
 }
-

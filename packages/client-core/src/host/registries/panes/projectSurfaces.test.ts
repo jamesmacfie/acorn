@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { pluginProjectRoutePrefix, PROJECT_ROUTE, CREATE_TASK_ROUTE } from '../commands/corePaths'
-import { decodeProjectSurfaceItem, projectSurfacePath, projectSurfaceRegistry, projectSurfaceRoutes } from './projectSurfaces'
+import {
+  decodeProjectSurfaceItem,
+  projectSurfacePath,
+  projectSurfaceRegistry,
+  projectSurfaceRoutes,
+} from './projectSurfaces'
 
 // The address half of a project-scoped plugin surface. What is worth pinning is that the host mints
 // the path and the caller only supplies values, a plugin never gets to say where its surface lives.
@@ -37,8 +42,9 @@ describe('projectSurfacePath', () => {
 
   it('encodes both values, so neither can add a path segment', () => {
     add('linear-issue', '/p/:projectId/x/linear/issues/:identifier', 'identifier')
-    expect(projectSurfacePath('linear-issue', 'project/web', 'conn-1:ENG-42'))
-      .toBe('/p/project%2Fweb/x/linear/issues/conn-1%3AENG-42')
+    expect(projectSurfacePath('linear-issue', 'project/web', 'conn-1:ENG-42')).toBe(
+      '/p/project%2Fweb/x/linear/issues/conn-1%3AENG-42',
+    )
   })
 
   it('answers null for a surface nothing registered on this device', () => {

@@ -1,7 +1,19 @@
-// Bundle module lifetime and mounted authority are separate owners. Modern SDKs share one worker;
-// legacy SDKs use one immutable mounted slot per worker and retain no idle authority.
-import { PLUGIN_BRIDGE_VERSION, type PluginFrameContext, type PluginBridgeAppearance } from '@acorn/protocol/plugin/bridge.ts'
-import { TREE_LIMITS, batchBytes, boundedSandboxMessage, sandboxMessage, type TreeHostOp, type TreeMutation } from '@acorn/protocol/tree/messages.ts'
+// Bundle module lifetime and mounted authority are separate owners. Modern SDKs share one worker.
+// Legacy SDKs, in bundles built before the shared worker, use one immutable mounted slot per worker
+// and retain no idle authority. Mixed-version path until 2026-12-30.
+import {
+  PLUGIN_BRIDGE_VERSION,
+  type PluginFrameContext,
+  type PluginBridgeAppearance,
+} from '@acorn/protocol/plugin/bridge.ts'
+import {
+  TREE_LIMITS,
+  batchBytes,
+  boundedSandboxMessage,
+  sandboxMessage,
+  type TreeHostOp,
+  type TreeMutation,
+} from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { postAppearance, postSelect, postSurfaceAction, type FrameBridge } from '../frames/broker'
 import { registerPageFact } from '../../infra/telemetry/pageFacts'
@@ -11,7 +23,6 @@ import { failedWorkerHandle } from './failedWorkerHandle'
 import { installTreeWorkerTeardown } from './workerTeardown'
 export { treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from './bridgeAuthority'
 
-export const pluginWorkerUrl = (hash: string): string => `/plugin-worker/${hash}.js`
 class TreeCapacityError extends Error {}
 const GRACE_MS = 30_000
 const HEARTBEAT_MS = 10_000
@@ -40,11 +51,23 @@ export type AcquireInput = {
   authority?: string
   context?: PluginFrameContext
   hasFocus?(): boolean
-  connect(port: MessagePort, hasFocus: () => boolean, legacyContext?: PluginFrameContext, authorize?: () => boolean): FrameBridge
+  connect(
+    port: MessagePort,
+    hasFocus: () => boolean,
+    legacyContext?: PluginFrameContext,
+    authorize?: () => boolean,
+  ): FrameBridge
   onRefused(reason: string): void
 }
 type Owner = Omit<AcquireInput, 'hasFocus'>
-type Lease = { owner: Owner; hasFocus: () => boolean; live: Live; slots: Set<string>; released: boolean; admitted: boolean }
+type Lease = {
+  owner: Owner
+  hasFocus: () => boolean
+  live: Live
+  slots: Set<string>
+  released: boolean
+  admitted: boolean
+}
 type Slot = {
   lease: Lease
   batch: ((ops: readonly TreeMutation[]) => void)[]
@@ -94,15 +117,30 @@ export function _setWorkerFactory(factory: ((hash: string) => TreeSandbox) | nul
 }
 const legacyKey = (owner: Owner): string => `${workerKey(owner)}:${owner.authority}`
 registerPageFact('ui.page.workers.tree', () => workers.size)
-const cleanup = (dispose: () => void): void => { try { dispose() } catch { /* finish retiring every owned resource */ } }
-const retiredOwner = (owner: Owner): Owner => ({ pluginId: owner.pluginId, hash: owner.hash, connect: () => { throw new Error('retired owner') }, onRefused: () => {} })
+const cleanup = (dispose: () => void): void => {
+  try {
+    dispose()
+  } catch {
+    /* finish retiring every owned resource */
+  }
+}
+const retiredOwner = (owner: Owner): Owner => ({
+  pluginId: owner.pluginId,
+  hash: owner.hash,
+  connect: () => {
+    throw new Error('retired owner')
+  },
+  onRefused: () => {},
+})
 const focus = (live: Live): boolean => [...live.leases].some((lease) => !lease.released && lease.hasFocus())
-const authorized = (live: Live): boolean => live.mode === 'legacy' && [...live.slots.values()].some((slot) => !!slot.mount && !slot.lease.released)
-
+const authorized = (live: Live): boolean =>
+  live.mode === 'legacy' && [...live.slots.values()].some((slot) => !!slot.mount && !slot.lease.released)
 
 export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
   let primary: TreeWorkerHandle | null
-  try { primary = acquireLease(input) } catch (error) {
+  try {
+    primary = acquireLease(input)
+  } catch (error) {
     if (error instanceof TreeCapacityError) throw error
     return failedWorkerHandle(error instanceof Error ? error.message : String(error), input.onRefused)
   }
@@ -120,31 +158,73 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
   }
   return {
     mount: (id, entry, props, authority) => owner(id).mount(id, entry, props, authority),
-    unmount: (id) => { const handle = slots.get(id); if (!handle) return; handle.unmount(id); handle.release(); slots.delete(id) },
+    unmount: (id) => {
+      const handle = slots.get(id)
+      if (!handle) return
+      handle.unmount(id)
+      handle.release()
+      slots.delete(id)
+    },
     transport: (id) => owner(id).transport(id),
-    bridgePort: (id) => released ? null : id ? slots.get(id)?.bridgePort(id) ?? null : primary?.bridgePort() ?? slots.values().next().value?.bridgePort() ?? null,
+    bridgePort: (id) =>
+      released
+        ? null
+        : id
+          ? (slots.get(id)?.bridgePort(id) ?? null)
+          : (primary?.bridgePort() ?? slots.values().next().value?.bridgePort() ?? null),
     select: (id, item) => slots.get(id)?.select(id, item),
     surfaceAction: (id, command) => slots.get(id)?.surfaceAction(id, command),
     appearance: (id, value) => owner(id).appearance(id, value),
     onHostRequest: (id, handler) => owner(id).onHostRequest(id, handler),
-    release: () => { if (released) return; released = true; primary?.release(); primary = null; for (const handle of slots.values()) handle.release(); slots.clear(); captured = null },
+    release: () => {
+      if (released) return
+      released = true
+      primary?.release()
+      primary = null
+      for (const handle of slots.values()) handle.release()
+      slots.clear()
+      captured = null
+    },
   }
 }
 
 function acquireLease(input: AcquireInput): TreeWorkerHandle {
   const bundle = workerKey(input)
   const admissions = capacityUnits.get(bundle) ?? 0
-  if (admissions >= TREE_LIMITS.slotsPerWorker) throw new TreeCapacityError(`${input.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} tree owners at once`)
+  if (admissions >= TREE_LIMITS.slotsPerWorker)
+    throw new TreeCapacityError(
+      `${input.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} tree owners at once`,
+    )
   // Do not retain the acquiring component's focus closure in the module/legacy context factory.
-  const owner: Owner = { pluginId: input.pluginId, hash: input.hash, authority: `slot-owner:${++ownerSequence}`, context: input.context, connect: input.connect, onRefused: input.onRefused }
+  const owner: Owner = {
+    pluginId: input.pluginId,
+    hash: input.hash,
+    authority: `slot-owner:${++ownerSequence}`,
+    context: input.context,
+    connect: input.connect,
+    onRefused: input.onRefused,
+  }
   // A classification hint may be evicted while its authority worker is still live. Prefer the
   // actual owner, and derive legacy mode from any live context of this hash before probing again.
   const existing = workers.get(bundle)
-  const known = existing?.mode ?? capabilities.get(bundle)
-    ?? ([...workers.values()].some((worker) => !worker.dead && workerKey(worker.owner) === bundle && worker.mode === 'legacy') ? 'legacy' : undefined)
+  const known =
+    existing?.mode ??
+    capabilities.get(bundle) ??
+    ([...workers.values()].some(
+      (worker) => !worker.dead && workerKey(worker.owner) === bundle && worker.mode === 'legacy',
+    )
+      ? 'legacy'
+      : undefined)
   const key = known === 'legacy' ? legacyKey(owner) : bundle
   const live = existing ?? workers.get(key) ?? start(owner, known ?? 'detect', key)
-  const lease: Lease = { owner, hasFocus: input.hasFocus ?? (() => false), live, slots: new Set(), released: false, admitted: true }
+  const lease: Lease = {
+    owner,
+    hasFocus: input.hasFocus ?? (() => false),
+    live,
+    slots: new Set(),
+    released: false,
+    admitted: true,
+  }
   capacityUnits.set(bundle, admissions + 1)
   live.leases.add(lease)
   if (live.grace) clearTimeout(live.grace)
@@ -159,10 +239,32 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
     }
     const extra = lease.slots.size > 0
     const capacity = capacityUnits.get(workerKey(lease.owner)) ?? 0
-    if (extra && capacity >= TREE_LIMITS.slotsPerWorker) throw new TreeCapacityError(`${lease.owner.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`)
+    if (extra && capacity >= TREE_LIMITS.slotsPerWorker)
+      throw new TreeCapacityError(
+        `${lease.owner.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`,
+      )
     const count = slotCounts.get(workerKey(lease.owner)) ?? 0
-    if (count >= TREE_LIMITS.slotsPerWorker) throw new TreeCapacityError(`${lease.owner.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`)
-    const slot: Slot = { lease, batch: [], failed: [], hostRequest: null, inFlight: 0, pending: new Set(), bridge: null, bridgeSide: null, mount: null, sent: false, pendingMount: false, initialBatches: [], pendingFailure: null, authority: null, appearance: null }
+    if (count >= TREE_LIMITS.slotsPerWorker)
+      throw new TreeCapacityError(
+        `${lease.owner.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`,
+      )
+    const slot: Slot = {
+      lease,
+      batch: [],
+      failed: [],
+      hostRequest: null,
+      inFlight: 0,
+      pending: new Set(),
+      bridge: null,
+      bridgeSide: null,
+      mount: null,
+      sent: false,
+      pendingMount: false,
+      initialBatches: [],
+      pendingFailure: null,
+      authority: null,
+      appearance: null,
+    }
     lease.live.slots.set(id, slot)
     lease.slots.add(id)
     slotCounts.set(workerKey(lease.owner), count + 1)
@@ -180,9 +282,22 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       sendMount(lease.live, id, slot)
     },
     unmount: (id) => retireSlot(lease.live, id, lease),
-    bridgePort: (id) => lease.released || lease.live.dead ? null : lease.live.mode === 'legacy' ? lease.live.bootstrap : id ? lease.live.slots.get(id)?.bridgeSide ?? null : null,
-    select(id, item) { const port = lease.live.mode === 'legacy' ? lease.live.bootstrap : lease.live.slots.get(id)?.bridgeSide; if (!lease.released && !lease.live.dead && port) postSelect(port, item) },
-    surfaceAction(id, command) { const port = lease.live.mode === 'legacy' ? lease.live.bootstrap : lease.live.slots.get(id)?.bridgeSide; if (!lease.released && !lease.live.dead && port) postSurfaceAction(port, command) },
+    bridgePort: (id) =>
+      lease.released || lease.live.dead
+        ? null
+        : lease.live.mode === 'legacy'
+          ? lease.live.bootstrap
+          : id
+            ? (lease.live.slots.get(id)?.bridgeSide ?? null)
+            : null,
+    select(id, item) {
+      const port = lease.live.mode === 'legacy' ? lease.live.bootstrap : lease.live.slots.get(id)?.bridgeSide
+      if (!lease.released && !lease.live.dead && port) postSelect(port, item)
+    },
+    surfaceAction(id, command) {
+      const port = lease.live.mode === 'legacy' ? lease.live.bootstrap : lease.live.slots.get(id)?.bridgeSide
+      if (!lease.released && !lease.live.dead && port) postSurfaceAction(port, command)
+    },
     appearance(id, value) {
       if (lease.live.dead) return
       const slot = slotFor(id)
@@ -194,7 +309,9 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       if (lease.live.dead) return () => {}
       const slot = slotFor(id)
       slot.hostRequest = handler
-      return () => { if (slot.hostRequest === handler) slot.hostRequest = null }
+      return () => {
+        if (slot.hostRequest === handler) slot.hostRequest = null
+      }
     },
     transport: (id) => ({
       onBatch(listener) {
@@ -203,23 +320,39 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
         slot.batch.push(listener)
         for (const ops of slot.initialBatches) listener(ops)
         slot.initialBatches.length = 0
-        return () => { const at = slot.batch.indexOf(listener); if (at >= 0) slot.batch.splice(at, 1) }
+        return () => {
+          const at = slot.batch.indexOf(listener)
+          if (at >= 0) slot.batch.splice(at, 1)
+        }
       },
       onFailed(listener) {
         if (lease.live.dead) {
           let subscribed = true
-          queueMicrotask(() => { if (subscribed && !lease.released) listener(lease.live.failureReason!) })
-          return () => { subscribed = false }
+          queueMicrotask(() => {
+            if (subscribed && !lease.released) listener(lease.live.failureReason!)
+          })
+          return () => {
+            subscribed = false
+          }
         }
         const slot = slotFor(id)
         slot.failed.push(listener)
-        if (slot.pendingFailure) queueMicrotask(() => { if (!lease.released) listener(slot.pendingFailure!) })
-        return () => { const at = slot.failed.indexOf(listener); if (at >= 0) slot.failed.splice(at, 1) }
+        if (slot.pendingFailure)
+          queueMicrotask(() => {
+            if (!lease.released) listener(slot.pendingFailure!)
+          })
+        return () => {
+          const at = slot.failed.indexOf(listener)
+          if (at >= 0) slot.failed.splice(at, 1)
+        }
       },
       send: (handler: number, event: KitEvent, payload: unknown) => {
         if (!lease.released && !lease.live.dead && lease.live.slots.get(id)?.lease === lease) {
-          try { lease.live.port.postMessage({ kind: 'tree:event', slot: id, handler, event, payload }) }
-          catch (error) { stop(lease.live, error instanceof Error ? error.message : String(error)) }
+          try {
+            lease.live.port.postMessage({ kind: 'tree:event', slot: id, handler, event, payload })
+          } catch (error) {
+            stop(lease.live, error instanceof Error ? error.message : String(error))
+          }
         }
       },
     }),
@@ -233,8 +366,12 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       // Release the component's container reference even when a caller retains its retired handle.
       lease.hasFocus = () => false
       lease.owner = retiredOwner(lease.owner)
-      if (!current.dead && current.mode === 'detect' && current.leases.size
-        && ![...current.leases].some((other) => legacyKey(other.owner) === legacyKey(current.owner))) {
+      if (
+        !current.dead &&
+        current.mode === 'detect' &&
+        current.leases.size &&
+        ![...current.leases].some((other) => legacyKey(other.owner) === legacyKey(current.owner))
+      ) {
         rotateDetection(current)
         return
       }
@@ -242,8 +379,13 @@ function acquireLease(input: AcquireInput): TreeWorkerHandle {
       if (current.mode !== 'modern') return stop(current, 'no authority leases left')
       current.grace = setTimeout(() => stop(current, 'no trees left'), GRACE_MS)
       // Refresh idle recency before deciding which idle module to evict.
-      if (workers.get(current.key) === current) { workers.delete(current.key); workers.set(current.key, current) }
-      const idle = [...workers.values()].filter((worker) => worker.mode === 'modern' && !worker.leases.size && !worker.dead)
+      if (workers.get(current.key) === current) {
+        workers.delete(current.key)
+        workers.set(current.key, current)
+      }
+      const idle = [...workers.values()].filter(
+        (worker) => worker.mode === 'modern' && !worker.leases.size && !worker.dead,
+      )
       while (idle.length > MAX_IDLE_WORKERS) stop(idle.shift()!, 'idle plugin worker capacity')
     },
   }
@@ -267,7 +409,10 @@ function rotateDetection(live: Live): void {
   stop(live, 'initial authority retired before classification')
   try {
     const replacement = start(next.owner, 'detect', workerKey(next.owner))
-    for (const lease of leases) { lease.live = replacement; replacement.leases.add(lease) }
+    for (const lease of leases) {
+      lease.live = replacement
+      replacement.leases.add(lease)
+    }
     for (const [id, slot] of slots) replacement.slots.set(id, slot)
   } catch (error) {
     for (const [id, slot] of slots) {
@@ -288,7 +433,8 @@ function retireSlot(live: Live, id: string, lease: Lease): void {
   const slot = live.slots.get(id)
   if (!slot || slot.lease !== lease) return
   live.slots.delete(id)
-  if (lease.slots.size > 1) capacityUnits.set(workerKey(lease.owner), (capacityUnits.get(workerKey(lease.owner)) ?? 1) - 1)
+  if (lease.slots.size > 1)
+    capacityUnits.set(workerKey(lease.owner), (capacityUnits.get(workerKey(lease.owner)) ?? 1) - 1)
   lease.slots.delete(id)
   const remaining = (slotCounts.get(workerKey(live.owner)) ?? 1) - 1
   if (remaining) slotCounts.set(workerKey(live.owner), remaining)
@@ -313,15 +459,30 @@ function sendMount(live: Live, id: string, slot: Slot): void {
   if (!live.treeReady && (live.mode === 'modern' || slot.sent)) return
   const message = { kind: 'tree:mount', slot: id, ...slot.mount }
   if (slot.sent || live.mode === 'legacy') {
-    try { live.port.postMessage(message); slot.sent = true; slot.pendingMount = false }
-    catch (error) { failMount(live, id, slot, error) }
+    try {
+      live.port.postMessage(message)
+      slot.sent = true
+      slot.pendingMount = false
+    } catch (error) {
+      failMount(live, id, slot, error)
+    }
     return
   }
   const channel = new MessageChannel()
   let bridge: FrameBridge | null = null
   try {
-    bridge = slot.authority ? slot.authority.connect(channel.port1) : slot.lease.owner.connect(channel.port1, slot.lease.hasFocus)
-    live.port.postMessage({ ...message, slotBridge: 1, bridgePort: channel.port2, context: slot.authority?.context ?? slot.lease.owner.context }, [channel.port2])
+    bridge = slot.authority
+      ? slot.authority.connect(channel.port1)
+      : slot.lease.owner.connect(channel.port1, slot.lease.hasFocus)
+    live.port.postMessage(
+      {
+        ...message,
+        slotBridge: 1,
+        bridgePort: channel.port2,
+        context: slot.authority?.context ?? slot.lease.owner.context,
+      },
+      [channel.port2],
+    )
     if (slot.appearance) postAppearance(channel.port1, slot.appearance)
     slot.bridge = bridge
     slot.bridgeSide = channel.port1
@@ -352,7 +513,12 @@ function classify(live: Live, mode: 'modern' | 'legacy'): void {
     if (workers.get(live.key) === live) workers.delete(live.key)
     live.key = legacyKey(live.owner)
     workers.set(live.key, live)
-    live.bridge = live.owner.connect(live.bootstrap, () => focus(live), live.owner.context, () => authorized(live))
+    live.bridge = live.owner.connect(
+      live.bootstrap,
+      () => focus(live),
+      live.owner.context,
+      () => authorized(live),
+    )
     for (const lease of [...live.leases]) {
       if (legacyKey(lease.owner) === live.key) continue
       const key = legacyKey(lease.owner)
@@ -384,9 +550,34 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
     bridgeChannel = new MessageChannel()
     treeChannel = new MessageChannel()
     const readiness = (worker as TreeSandbox & { ready?: Promise<void> }).ready
-    const current: Live = { key, owner, mode, worker, port: treeChannel.port1, bootstrap: bridgeChannel.port1, bridge: null, slots: new Map(), leases: new Set(), grace: null, beat: null, awaitingPong: false, dead: false, failureReason: null, constructionReady: !readiness, treeReady: false, connected: false, readyProtocol: null }
+    const current: Live = {
+      key,
+      owner,
+      mode,
+      worker,
+      port: treeChannel.port1,
+      bootstrap: bridgeChannel.port1,
+      bridge: null,
+      slots: new Map(),
+      leases: new Set(),
+      grace: null,
+      beat: null,
+      awaitingPong: false,
+      dead: false,
+      failureReason: null,
+      constructionReady: !readiness,
+      treeReady: false,
+      connected: false,
+      readyProtocol: null,
+    }
     live = current
-    if (mode === 'legacy') current.bridge = owner.connect(current.bootstrap, () => focus(current), owner.context, () => authorized(current))
+    if (mode === 'legacy')
+      current.bridge = owner.connect(
+        current.bootstrap,
+        () => focus(current),
+        owner.context,
+        () => authorized(current),
+      )
     else {
       const bootstrapMessage: MessagePort['onmessage'] = (event) => {
         if (current.dead) return
@@ -400,9 +591,23 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
               else if (current.readyProtocol) classify(current, current.readyProtocol)
             } else classify(current, 'legacy')
           }
-          if (current.mode === 'legacy' && current.bootstrap.onmessage !== bootstrapMessage) current.bootstrap.onmessage?.(event)
-          else if (typeof data.id === 'number') current.bootstrap.postMessage({ id: data.id, ok: false, error: { code: 'tree_bridge_required', message: 'tree operations use the bridge passed to this mount', retryable: false, requestId: '' } })
-        } catch (error) { cleanup(() => current.owner.onRefused(String(error))); stop(current, 'plugin bridge setup failed') }
+          if (current.mode === 'legacy' && current.bootstrap.onmessage !== bootstrapMessage)
+            current.bootstrap.onmessage?.(event)
+          else if (typeof data.id === 'number')
+            current.bootstrap.postMessage({
+              id: data.id,
+              ok: false,
+              error: {
+                code: 'tree_bridge_required',
+                message: 'tree operations use the bridge passed to this mount',
+                retryable: false,
+                requestId: '',
+              },
+            })
+        } catch (error) {
+          cleanup(() => current.owner.onRefused(String(error)))
+          stop(current, 'plugin bridge setup failed')
+        }
       }
       current.bootstrap.onmessage = bootstrapMessage
       current.bootstrap.start()
@@ -436,22 +641,31 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
       // Construction waiting has the same two-beat deadline, without queueing traffic on a channel
       // whose transferred endpoint is still owned by a deferred native adapter.
       if (!current.constructionReady) return
-      try { current.port.postMessage({ kind: 'tree:ping' }) }
-      catch (error) { stop(current, error instanceof Error ? error.message : String(error)) }
+      try {
+        current.port.postMessage({ kind: 'tree:ping' })
+      } catch (error) {
+        stop(current, error instanceof Error ? error.message : String(error))
+      }
     }, HEARTBEAT_MS)
-    worker.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION, treeSlotBridge: mode === 'legacy' ? undefined : 1 }, [bridgeChannel.port2, treeChannel.port2])
+    worker.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION, treeSlotBridge: mode === 'legacy' ? undefined : 1 }, [
+      bridgeChannel.port2,
+      treeChannel.port2,
+    ])
     workers.set(key, current)
     if (mode === 'modern') current.owner = { ...retiredOwner(current.owner), onRefused: current.owner.onRefused }
-    if (readiness) void readiness.then(() => {
-      if (current.dead) return
-      current.constructionReady = true
-      current.awaitingPong = false
-      for (const [id, slot] of current.slots) sendMount(current, id, slot)
-    }).catch((error: unknown) => {
-      if (current.dead) return
-      cleanup(() => current.owner.onRefused(String(error)))
-      stop(current, 'plugin worker construction failed')
-    })
+    if (readiness)
+      void readiness
+        .then(() => {
+          if (current.dead) return
+          current.constructionReady = true
+          current.awaitingPong = false
+          for (const [id, slot] of current.slots) sendMount(current, id, slot)
+        })
+        .catch((error: unknown) => {
+          if (current.dead) return
+          cleanup(() => current.owner.onRefused(String(error)))
+          stop(current, 'plugin worker construction failed')
+        })
     return current
   } catch (error) {
     if (live?.beat) clearInterval(live.beat)
@@ -467,9 +681,13 @@ function start(owner: Owner, mode: Live['mode'], key: string): Live {
 
 function handleTreeMessage(live: Live, event: MessageEvent): void {
   if (live.dead) return
-  if (!boundedSandboxMessage(event.data)) return live.owner.onRefused('sent a tree message past the host size or depth limit')
+  if (!boundedSandboxMessage(event.data))
+    return live.owner.onRefused('sent a tree message past the host size or depth limit')
   const parsed = sandboxMessage.safeParse(event.data)
-  if (!parsed.success) return live.owner.onRefused(`sent a tree message the host could not read: ${parsed.error.issues[0]?.message ?? 'unknown'}`)
+  if (!parsed.success)
+    return live.owner.onRefused(
+      `sent a tree message the host could not read: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    )
   const message = parsed.data
   if (message.kind === 'tree:ready' && live.mode === 'detect') {
     live.readyProtocol = message.scopedBridge ? 'modern' : 'legacy'
@@ -479,7 +697,10 @@ function handleTreeMessage(live: Live, event: MessageEvent): void {
     live.treeReady = true
     for (const [id, pending] of live.slots) sendMount(live, id, pending)
   }
-  if (message.kind === 'tree:pong') { live.awaitingPong = false; return }
+  if (message.kind === 'tree:pong') {
+    live.awaitingPong = false
+    return
+  }
   if (message.kind === 'tree:ready') return
   const slot = live.slots.get(message.slot)
   if (message.kind === 'tree:failed') {
@@ -490,7 +711,8 @@ function handleTreeMessage(live: Live, event: MessageEvent): void {
   }
   if (message.kind === 'tree:batch') {
     const bytes = batchBytes(message)
-    if (bytes > TREE_LIMITS.batchBytes) return live.owner.onRefused(`dropped a ${bytes}-byte batch, over the ${TREE_LIMITS.batchBytes}-byte cap`)
+    if (bytes > TREE_LIMITS.batchBytes)
+      return live.owner.onRefused(`dropped a ${bytes}-byte batch, over the ${TREE_LIMITS.batchBytes}-byte cap`)
     if (!slot) return
     if (!slot.batch.length) {
       if (slot.initialBatches.length >= 4) {
@@ -505,11 +727,19 @@ function handleTreeMessage(live: Live, event: MessageEvent): void {
     return
   }
   const deny = (code: string, reason: string): void => {
-    live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ok: false, error: { code, message: reason } })
+    live.port.postMessage({
+      kind: 'tree:host-reply',
+      slot: message.slot,
+      id: message.id,
+      ok: false,
+      error: { code, message: reason },
+    })
   }
   if (!slot) return deny('unmounted', 'this tree is not mounted')
-  if (batchBytes(message.payload ?? null) > TREE_LIMITS.hostRequestBytes) return deny('too_large', `a host request is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
-  if (slot.inFlight >= TREE_LIMITS.hostRequestsPerSlot) return deny('too_many', `no more than ${TREE_LIMITS.hostRequestsPerSlot} host requests at once`)
+  if (batchBytes(message.payload ?? null) > TREE_LIMITS.hostRequestBytes)
+    return deny('too_large', `a host request is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
+  if (slot.inFlight >= TREE_LIMITS.hostRequestsPerSlot)
+    return deny('too_many', `no more than ${TREE_LIMITS.hostRequestsPerSlot} host requests at once`)
   const handler = slot.hostRequest
   if (!handler) return deny('unsupported_host', 'this host does not answer tree requests')
   slot.inFlight++
@@ -530,11 +760,25 @@ function handleTreeMessage(live: Live, event: MessageEvent): void {
     live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ...result })
   }
   slot.pending.add(cancel)
-  if (message.op === 'owner.invoke') timer = setTimeout(() => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }), TREE_LIMITS.hostRequestMs)
-  void Promise.resolve().then(() => {
-    if (settled || live.dead || live.slots.get(message.slot) !== slot) return
-    return handler({ op: message.op, name: message.name, payload: message.payload })
-  }).then((result) => { if (result) reply(result) }).catch((error: unknown) => reply({ ok: false, error: { code: 'internal', message: error instanceof Error ? error.message : String(error) } }))
+  if (message.op === 'owner.invoke')
+    timer = setTimeout(
+      () => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }),
+      TREE_LIMITS.hostRequestMs,
+    )
+  void Promise.resolve()
+    .then(() => {
+      if (settled || live.dead || live.slots.get(message.slot) !== slot) return
+      return handler({ op: message.op, name: message.name, payload: message.payload })
+    })
+    .then((result) => {
+      if (result) reply(result)
+    })
+    .catch((error: unknown) =>
+      reply({
+        ok: false,
+        error: { code: 'internal', message: error instanceof Error ? error.message : String(error) },
+      }),
+    )
 }
 
 function stop(live: Live, reason: string): void {
@@ -548,7 +792,13 @@ function stop(live: Live, reason: string): void {
   live.grace = null
   // External failure listeners may throw. Retirement still reaches every owned handle.
   for (const [id, slot] of [...live.slots]) {
-    for (const failed of slot.failed) { try { failed(reason) } catch { /* isolate callers */ } }
+    for (const failed of slot.failed) {
+      try {
+        failed(reason)
+      } catch {
+        /* isolate callers */
+      }
+    }
     retireSlot(live, id, slot.lease)
   }
   for (const lease of live.leases) {
@@ -558,7 +808,10 @@ function stop(live: Live, reason: string): void {
   }
   live.leases.clear()
   if (live.bridge) cleanup(() => live.bridge!.dispose())
-  else { live.bootstrap.onmessage = null; cleanup(() => live.bootstrap.close()) }
+  else {
+    live.bootstrap.onmessage = null
+    cleanup(() => live.bootstrap.close())
+  }
   live.bridge = null
   live.port.onmessage = null
   cleanup(() => live.port.close())

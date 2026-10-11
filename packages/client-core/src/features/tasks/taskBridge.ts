@@ -1,4 +1,13 @@
-import type { ArchiveOpts, ArchiveResult, DeleteOpts, DeleteResult, RestoreOpts, RestoreResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
+import type {
+  ArchiveOpts,
+  ArchiveResult,
+  DeleteOpts,
+  DeleteResult,
+  RestoreOpts,
+  RestoreResult,
+  TaskArchiveConcern,
+  TaskStatus,
+} from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
@@ -39,7 +48,12 @@ export type TaskBridge = {
 }
 
 const post = <T>(url: string, body?: unknown, nodeId?: string | null) =>
-  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), nodeId })
+  writeJson<T>(url, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    nodeId,
+  })
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
@@ -53,15 +67,17 @@ export const taskBridge = (): TaskBridge => {
       runTargets: (id, runTargets) => put<ProjectConfigResponse>(projectRunTargetsRoute(id), { runTargets }),
       config: (id, patch) => put<ProjectConfigResponse>(projectConfigRoute(id), { patch }),
     },
-    previewUrl: (taskId, script) => post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
+    previewUrl: (taskId, script) =>
+      post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
     task: {
       archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}),
-      archiveConcerns: (id) => readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
-        .then((body) => body?.concerns ?? [])
-        .catch((error) => {
-          log.warn('archive concerns unavailable', error)
-          return []
-        }),
+      archiveConcerns: (id) =>
+        readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
+          .then((body) => body?.concerns ?? [])
+          .catch((error) => {
+            log.warn('archive concerns unavailable', error)
+            return []
+          }),
       restore: (id, opts) => post<RestoreResult>(taskRestoreRoute(id), opts ?? {}),
       delete: (id, opts) => post<DeleteResult>(taskDeleteRoute(id), opts ?? {}),
       onCreated: (id, nodeId) => post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, nodeId).then(() => undefined),

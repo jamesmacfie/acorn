@@ -18,17 +18,22 @@ it('offers keyboard Retry when a pane keeps failing', async () => {
   }
   await expect(client.fetchQuery(query)).rejects.toThrow('connection refused')
   let resets = 0
-  const screen = await renderCells(() => (
-    <QueryClientProvider client={client}>
-      <PaneFailure
-        name="agent"
-        nodeId="node-1"
-        error={new Error('connection refused')}
-        reset={() => { resets += 1 }}
-        region={{ paneId: 'agent', regionId: 'failure' }}
-      />
-    </QueryClientProvider>
-  ), { width: 80, height: 24 })
+  const screen = await renderCells(
+    () => (
+      <QueryClientProvider client={client}>
+        <PaneFailure
+          name="agent"
+          nodeId="node-1"
+          error={new Error('connection refused')}
+          reset={() => {
+            resets += 1
+          }}
+          region={{ paneId: 'agent', regionId: 'failure' }}
+        />
+      </QueryClientProvider>
+    ),
+    { width: 80, height: 24 },
+  )
   try {
     expect(screen.text).toContain('connection refused')
     expect(screen.text).toContain('[Retry]')

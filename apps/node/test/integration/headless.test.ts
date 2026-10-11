@@ -12,7 +12,7 @@ const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../__fixtur
 
 describe('argv templates (docs/workflows.md — flags verified against installed CLIs)', () => {
   // `auto`, not `dontAsk`: `dontAsk` denies anything outside a `permissions.allow` rule and acorn
-  // writes none, so a headless step listed every tool acorn projects and was refused all of them
+  // writes none, so a headless step would list every tool acorn projects and be refused all of them
   // (the profile's own comment has the whole reasoning).
   it('claude-code: -p stream-json with permission pre-approval, model, inline schema, resume', () => {
     const argv = buildHeadlessArgv('claude-code', 'claude', {
@@ -58,7 +58,11 @@ describe('argv templates (docs/workflows.md — flags verified against installed
 describe('parseStreamJson (pure)', () => {
   it('extracts the final result event and keeps all events', () => {
     const out = parseStreamJson(
-      ['{"type":"system","session_id":"s1"}', 'not json noise', '{"type":"result","result":"done","structured_output":{"a":1},"session_id":"s1","total_cost_usd":0.5}'].join('\n'),
+      [
+        '{"type":"system","session_id":"s1"}',
+        'not json noise',
+        '{"type":"result","result":"done","structured_output":{"a":1},"session_id":"s1","total_cost_usd":0.5}',
+      ].join('\n'),
     )
     expect(out.result).toBe('done')
     expect(out.structuredOutput).toEqual({ a: 1 })

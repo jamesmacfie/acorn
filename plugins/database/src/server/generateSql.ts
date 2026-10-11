@@ -18,14 +18,23 @@ export const SQL_SYSTEM_PREAMBLE = [
 // The schema is always sent. The repo's free-form notes and any saved queries picked as worked
 // examples are appended when present. Notes and examples share one character budget and are truncated
 // as a block, because schema fidelity matters more than the last example.
-export function buildSystemPrompt(schemaText: string, ctx?: { notes?: string; examples?: readonly DbSavedQuery[] }): string {
+export function buildSystemPrompt(
+  schemaText: string,
+  ctx?: { notes?: string; examples?: readonly DbSavedQuery[] },
+): string {
   const extras: string[] = []
   const notes = ctx?.notes?.trim()
   if (notes) extras.push(`Schema notes:\n\n${notes}`)
   const examples = (ctx?.examples ?? []).filter((q) => q.sql.trim())
   if (examples.length) {
     const rendered = examples
-      .map((q) => [`-- ${q.name}`, ...(q.notes?.trim() ? [`-- ${q.notes.trim().replace(/\n/g, '\n-- ')}`] : []), q.sql.trim()].join('\n'))
+      .map((q) =>
+        [
+          `-- ${q.name}`,
+          ...(q.notes?.trim() ? [`-- ${q.notes.trim().replace(/\n/g, '\n-- ')}`] : []),
+          q.sql.trim(),
+        ].join('\n'),
+      )
       .join('\n\n')
     extras.push(`Example queries — hand-written and known-correct for this database:\n\n${rendered}`)
   }

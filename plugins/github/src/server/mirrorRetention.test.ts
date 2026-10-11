@@ -6,7 +6,7 @@ import { checks, comments, prFiles, pullRequests, repos, reviews } from '../node
 const USER = 'octocat'
 
 // This plugin's own migrated SQLite file, not core's: retention only ever touches github's mirror
-// tables, which live in <data-root>/plugins/github.sqlite now. Core's handle would not even have the
+// tables, which live in <data-root>/plugins/github.sqlite. Core's handle would not even have the
 // tables to seed.
 describe('GitHub mirror retention repair', () => {
   let testDb: TestPluginDb
@@ -78,7 +78,7 @@ describe('GitHub mirror retention repair', () => {
     })
 
     const statements = deleteRepoMirrorStatements(testDb.db, USER, [99])
-    await testDb.db.batch(statements as [typeof statements[number], ...typeof statements[number][]])
+    await testDb.db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]])
 
     expect(await testDb.db.select().from(pullRequests)).toEqual([])
     expect(await testDb.db.select().from(prFiles)).toEqual([])

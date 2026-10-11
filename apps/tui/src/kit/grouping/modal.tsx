@@ -36,7 +36,11 @@ export function Modal(props: {
 
 /** The lines between the title rule and the actions line. */
 export function ModalBody(props: { children: JSX.Element }) {
-  return <box flexDirection="column" flexGrow={1}>{props.children}</box>
+  return (
+    <box flexDirection="column" flexGrow={1}>
+      {props.children}
+    </box>
+  )
 }
 
 /** The action row; exported flat and as `Modal.Actions` for kit parity. */

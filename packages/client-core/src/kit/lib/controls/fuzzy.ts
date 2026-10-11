@@ -1,14 +1,6 @@
-// The subsequence scorer the whole product ranks lists with.
-//
-// It was `paletteModel.ts` until 2026-09-03, and it held two more things: a flat `PaletteItem` union
-// and the concatenate-then-filter pair both hosts drew the palette with. The session owns the order
-// and the ranking now, because a frame stack cannot be expressed as one concatenation
-// (../../../host/registries/commands/sessionStore.ts), and the union described a row shape nothing produces
-// any more.
-//
-// What is left is spent everywhere: the command graph ranks a command with it, the session ranks a
-// search result with it, and four pickers outside the palette reach it through
-// `@acorn/plugin-api/client`.
+// The subsequence scorer the whole product ranks lists with: the command graph ranks a command with
+// it, the palette session ranks a search result with it, and pickers outside the palette reach it
+// through `@acorn/plugin-api/client`.
 
 /** Subsequence fuzzy match; contiguous runs and word-start hits score higher. Empty query → `0`, so
  *  everything matches and the caller's own order survives. `null` means no match at all. */

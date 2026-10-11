@@ -11,7 +11,14 @@ export { integrationProviderRegistry } from './registry.ts'
 export { providerError } from './respondProvider.ts'
 export { ProviderOperationError, isProviderOperationError } from './types.ts'
 export type {
-  CachedExternalItem, CachedItemCodec, CodecResult, MirroredResourceContribution,
-  ProviderDetailContext, ProviderItemComment, ProviderItemDetail, ProviderItemImage,
-  ProviderProjectSource, ProviderResourceContext, ProviderResourceRefreshContext, ProviderWriteContext,
+  CachedExternalItem,
+  CachedItemCodec,
+  CodecResult,
+  MirroredResourceContribution,
+  ProviderItemComment,
+  ProviderItemDetail,
+  ProviderItemImage,
+  ProviderProjectSource,
+  ProviderResourceContext,
+  ProviderResourceRefreshContext,
 } from './types.ts'

@@ -12,7 +12,7 @@ import type { AgentToolCall } from '../../contract/wire.ts'
 
 /** What the built-in card draws with: the point's props plus host-only metadata and a callback.
  *  The callback lets "carry my last one forward" learn from this card too. It cannot cross a port,
- *  so it stays on this side (@acorn/protocol/extensionPoints.ts). */
+ *  so it stays on this side. */
 type AgentToolRendererProps = AgentToolCardProps & {
   /** The first recorded update, used only by the built-in expanded body. */
   createdAt: number
@@ -72,8 +72,8 @@ function skillLabel(tool: AgentToolCall): string | undefined {
 const toolLabel = (tool: AgentToolCall): string => skillLabel(tool) ?? (tool.title || 'Tool')
 
 /** The state half: a dot, and the word beside it while the call is not finished. The dot carries a
- *  finished call's state on its own, and the word beside it used to read as the entire card whenever
- *  a provider sent its updates without a title.
+ *  finished call's state on its own; a word beside it would read as the entire card whenever a
+ *  provider sent its updates without a title.
  *
  *  A web call adds its one-line summary here, in the fold's `meta` slot, rather than to the label: the
  *  label is the row's accessible name and it is what a reader scans a transcript by, so it stays the
@@ -115,12 +115,11 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   const fold = useAgentToolFold()
   // Seeded from the reader's setting, then the reader's own. A reactive `open` would shut a card the
   // moment its call finished, which is when somebody is most likely to be reading it, and the card
-  // only holds this state for as long as it stays mounted — see the note on Show's children in
-  // AgentEventCard for what used to remount it on every event.
+  // only holds this state for as long as it stays mounted (see the note on Show's children in
+  // AgentEventCard).
   //
-  // The setting, not the call's status. Status was what made this differ by harness: codex reports a
-  // started call as `running`, the ACP path reports it as `pending` and never as `running` at all, so
-  // one provider's cards opened themselves and the other's never did.
+  // The setting, not the call's status, because status differs by harness: codex reports a started
+  // call as `running`, and the ACP path reports it as `pending` and never as `running` at all.
   const [open, setOpen] = createSignal(props.defaultOpen)
   const clock = useOpenToolClock(open)
   const started = () => `${eventTime(props.createdAt).full} · ${formatRelativeTime(props.createdAt, clock())}`
@@ -131,7 +130,13 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
   // the seed above already decided how this card opens, and a new card arriving after a collapse
   // starts collapsed anyway.
-  createEffect(on(() => fold.collapseSignal?.(), () => setOpen(false), { defer: true }))
+  createEffect(
+    on(
+      () => fold.collapseSignal?.(),
+      () => setOpen(false),
+      { defer: true },
+    ),
+  )
   return (
     <Fold
       label={toolLabel(props.tool)}
@@ -150,29 +155,65 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
         when={props.tool.web}
         fallback={
           <Stack gap="row">
-            <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
+            <Show when={props.tool.input}>
+              {(input) => (
+                <CodeBlock wrap maxHeight="block">
+                  {input()}
+                </CodeBlock>
+              )}
+            </Show>
             <Text emphasis="muted">Started {started()}</Text>
             <Show when={output()}>
               {(output) => (
-                <Show when={props.tool.background} fallback={<CodeBlock wrap maxHeight="block" ansi>{output()}</CodeBlock>}>
+                <Show
+                  when={props.tool.background}
+                  fallback={
+                    <CodeBlock wrap maxHeight="block" ansi>
+                      {output()}
+                    </CodeBlock>
+                  }
+                >
                   <BackgroundOutput text={output()} />
                 </Show>
               )}
             </Show>
             <Index each={props.fileChanges ?? []}>
-              {(change) => <Show when={change().patch} fallback={
-                <Stack gap="inline">
-                  <Text emphasis="mono" wrap>{change().path}</Text>
-                  <Text emphasis="muted">{change().patchArtifactId ? 'This diff is too large to show here.' : 'No recorded diff is available.'}</Text>
-                </Stack>
-              }>
-                <StackedDiff path={change().path} patch={change().patch ?? ''} lineNumbers={!change().snippet} />
-              </Show>}
+              {(change) => (
+                <Show
+                  when={change().patch}
+                  fallback={
+                    <Stack gap="inline">
+                      <Text emphasis="mono" wrap>
+                        {change().path}
+                      </Text>
+                      <Text emphasis="muted">
+                        {change().patchArtifactId
+                          ? 'This diff is too large to show here.'
+                          : 'No recorded diff is available.'}
+                      </Text>
+                    </Stack>
+                  }
+                >
+                  <StackedDiff path={change().path} patch={change().patch ?? ''} lineNumbers={!change().snippet} />
+                </Show>
+              )}
             </Index>
             <Show when={props.fileChanges?.length}>
-              <Inline><Button variant="bare" size="sm" onPress={() => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })}>Open in Changes</Button></Inline>
+              <Inline>
+                <Button
+                  variant="bare"
+                  size="sm"
+                  onPress={() => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })}
+                >
+                  Open in Changes
+                </Button>
+              </Inline>
             </Show>
-            <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
+            <For
+              each={(props.tool.paths ?? []).filter(
+                (path) => !props.fileChanges?.some((change) => change.path === path),
+              )}
+            >
               {(path) => <Text emphasis="mono">{path}</Text>}
             </For>
           </Stack>
@@ -198,7 +239,9 @@ const BackgroundOutput: Component<{ text: string }> = (props) => {
   const tail = () => lastLines(props.text, BACKGROUND_TAIL_LINES)
   return (
     <Stack gap="inline">
-      <CodeBlock wrap maxHeight={all() ? 'block' : 'none'} ansi>{all() ? props.text : tail().text}</CodeBlock>
+      <CodeBlock wrap maxHeight={all() ? 'block' : 'none'} ansi>
+        {all() ? props.text : tail().text}
+      </CodeBlock>
       <Show when={tail().hidden > 0}>
         <Inline>
           <Button variant="bare" size="sm" onPress={() => setAll(!all())}>
@@ -212,7 +255,9 @@ const BackgroundOutput: Component<{ text: string }> = (props) => {
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <Show
-    when={props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web || props.fileChanges?.length}
+    when={
+      props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web || props.fileChanges?.length
+    }
     fallback={<AgentToolHead {...props} />}
   >
     <AgentToolFold {...props} />
@@ -232,19 +277,19 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // `mergeProps`, not a spread: a spread would read `props.tool` once and freeze it, and the transcript
   // hands out a fresh tool object on every snapshot.
   const full = mergeProps(props, { defaultOpen, onOpenChange: fold.onToggle })
-  // The slot is the only way in (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Both render
-  // paths arrive here: a compiled contributor's component and a sandboxed plugin's worker tree fill the
-  // same `replace` point, and the host arbitrates between them.
+  // The slot is the only way in (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
+  // Both render paths arrive here: a compiled contributor's component and a sandboxed plugin's worker
+  // tree fill the same `replace` point, and the host arbitrates between them.
   //
-  // Keyed on the stable MCP name when available, otherwise `kind`, which is the harness's own name for what the call did — ACP's tool kind, or
-  // whatever a driver normalised to it. It is the only name for a call that reaches a transcript;
-  // `title` is a sentence the provider wrote for a person to read.
+  // Keyed on the stable MCP name when available, otherwise `kind`, which is the harness's own name for what
+  // the call did — ACP's tool kind, or whatever a driver normalised to it. It is the only name for a call
+  // that reaches a transcript; `title` is a sentence the provider wrote for a person to read.
   return (
     <Slot
       point={AGENT_TOOL_CARD_POINT}
       key={props.tool.name ?? props.tool.kind ?? ''}
       // The task this card is drawn in, so a contributor's buttons can open a pane and resolve a link
-      // rather than being inert (tree/Slot.tsx § taskId). It rides `props` as well, because the owner
+      // rather than being inert (client-core's `Slot`). It rides `props` as well, because the owner
       // chose to tell the contributor which task it is looking at; that is the owner's word and this is
       // the host's.
       taskId={props.taskId}

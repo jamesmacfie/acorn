@@ -110,7 +110,9 @@ describe('capturePty', () => {
   it('retires after a prompt write fails and leaves no capture timers', async () => {
     vi.useFakeTimers()
     const { pty, run } = setup()
-    vi.spyOn(pty, 'write').mockImplementation(() => { throw new Error('synthetic write failure') })
+    vi.spyOn(pty, 'write').mockImplementation(() => {
+      throw new Error('synthetic write failure')
+    })
     const result = run({ promptResponses: [{ pattern: /trust/i, response: '\r' }] })
     const rejection = expect(result).rejects.toMatchObject({ code: 'execution_failure' })
     pty.emitData('Trust this folder?')
@@ -140,9 +142,8 @@ describe('capturePty', () => {
     await result
   })
 
-  // Regression: a `claude /usage` probe was found alive as an orphan (ppid 1) four days after its
-  // run. node-pty's kill() sends SIGHUP, which a CLI parked on a prompt can ignore, so teardown now
-  // escalates. Without the escalation the child is left running and only the SIGHUP is ever sent.
+  // node-pty's kill() sends SIGHUP, which a CLI parked on a prompt can ignore, so a `claude /usage` probe
+  // can outlive its run as an orphan. Teardown escalates; without that, only the SIGHUP is ever sent.
   it('escalates to SIGKILL when the child ignores the polite signal', async () => {
     const pty = new FakePty()
     pty.ignorePolite = true
@@ -153,8 +154,8 @@ describe('capturePty', () => {
       cwd: '/tmp',
       idleMs: 5,
       // A second, not ten milliseconds. The "SIGHUP only, so far" assertion below has to run inside
-      // this window, and at 10ms a loaded machine spent the whole budget between the capture
-      // resolving and the assertion, so an early SIGKILL read as a product failure. Real timers
+      // this window, and at 10ms a loaded machine can spend the whole budget between the capture
+      // resolving and the assertion, so an early SIGKILL reads as a product failure. Real timers
       // throughout: capturePty renders its output through xterm, which fake timers stall.
       killEscalationMs: 1000,
       resolveCommand: () => '/bin/claude',
@@ -162,7 +163,9 @@ describe('capturePty', () => {
     })
     pty.emitData('usage output\n')
     let finished = false
-    void capture.then(() => { finished = true })
+    void capture.then(() => {
+      finished = true
+    })
     await vi.waitFor(() => expect(pty.signals).toEqual(['SIGHUP']))
     expect(finished).toBe(false)
     await capture

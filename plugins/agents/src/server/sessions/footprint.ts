@@ -14,13 +14,15 @@ export type ProcessRow = { pid: number; ppid: number; rssBytes: number }
  *  rather than `-ax`, because both macOS and Linux read it as "every process". RSS is in KiB on both. */
 export async function listProcesses(proc: Pick<CoreProcService, 'runProcess'>): Promise<ProcessRow[] | null> {
   if (process.platform === 'win32') return null
-  const result = await proc.runProcess({
-    file: 'ps',
-    args: ['-A', '-o', 'pid=,ppid=,rss='],
-    cwd: tmpdir(),
-    timeoutMs: 5_000,
-    maxOutputBytes: 8 * 1024 * 1024,
-  }).catch(() => null)
+  const result = await proc
+    .runProcess({
+      file: 'ps',
+      args: ['-A', '-o', 'pid=,ppid=,rss='],
+      cwd: tmpdir(),
+      timeoutMs: 5_000,
+      maxOutputBytes: 8 * 1024 * 1024,
+    })
+    .catch(() => null)
   if (!result || result.code !== 0 || result.truncated) return null
   return parseProcessTable(result.stdout)
 }
@@ -73,7 +75,11 @@ export async function directoryBytes(path: string): Promise<number> {
   for (const entry of entries) {
     const child = join(path, entry.name)
     if (entry.isDirectory()) total += await directoryBytes(child)
-    else if (entry.isFile()) total += await stat(child).then((info) => info.size, () => 0)
+    else if (entry.isFile())
+      total += await stat(child).then(
+        (info) => info.size,
+        () => 0,
+      )
   }
   return total
 }

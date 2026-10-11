@@ -2,7 +2,15 @@ import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest } from './nodeRequest'
-import { MAX_NODE_WS_MESSAGE_BYTES, decodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, wsViewerIdSchema, type WsClientFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
+import {
+  MAX_NODE_WS_MESSAGE_BYTES,
+  decodeIdFrame,
+  WS_PATH,
+  WS_VIEWERS_HEADER,
+  wsViewerIdSchema,
+  type WsClientFrame,
+  type WsSendOptions,
+} from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
@@ -25,7 +33,7 @@ const log = createLogger('broker')
 
 // The connection broker. See docs/shell.md, "Connection broker", for what it owns per node. It has
 // no shell binding, so it can be unit-tested against a real TLS server.
-// `apps/desktop/src/shell/helperServer.ts` exposes it to the renderer.
+// The desktop helper's `startHelperServer` exposes it to the renderer.
 //
 // It must not live in @acorn/client-core. The boundary test classifies that package as client-side,
 // so a node:https import there would fail the client/node split rule and drag Node builtins into the
@@ -50,7 +58,7 @@ const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
 export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 const MAX_NODE_HTTP_SOCKETS = 4
 
-// A node plus the material only main may hold: the bearer, and the certificate to pin against.
+// A node plus the material only the helper may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
 
 export type BrokerEvents = {
@@ -69,7 +77,7 @@ type Connection = {
   agent: HttpAgent | HttpsAgent
   ws: WebSocket | null
   // Frames the renderer sent before the socket was open. Kept here as well as in the renderer's own
-  // outbox, because a reconnect happens inside main and the renderer never learns of it.
+  // outbox, because a reconnect happens inside the helper and the renderer never learns of it.
   viewers: EventViewers
   state: NodeConnectionState
   error: NodeStatus['error']
@@ -133,8 +141,8 @@ export class NodeBroker {
   }
 
   // The version gate runs here rather than at pairing, because pairing checks once and a node
-  // upgrades afterward. A node that drifted past this client used to keep connecting and fail later
-  // as an `undefined` deep inside a component.
+  // upgrades afterward. Without it, a node that drifted past this client would keep connecting and
+  // fail later as an `undefined` deep inside a component.
   //
   // It runs before the socket opens. A client that cannot speak the protocol should not open a
   // WebSocket and start interpreting frames on it.
@@ -181,6 +189,8 @@ export class NodeBroker {
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
       const parsed = nodeInfoSchema.safeParse(payload)
       if (parsed.success) {
+        // A Node that doesn't advertise viewers predates them, so even a multiplexing broker keeps the
+        // single-viewer transport for it. Mixed-version path until 2026-12-30.
         connection.viewers.setTransport(this.viewerMultiplexing && parsed.data.eventTransport?.viewers === 1)
         return parsed.data.protocolVersion === NODE_PROTOCOL_VERSION
       }
@@ -205,7 +215,7 @@ export class NodeBroker {
   }
 
   list(): NodeRecord[] {
-    // Never leak the token out of main, even to the renderer's own projection.
+    // Never leak the token out of the helper, even to the renderer's own projection.
     return [...this.connections.values()].map(({ node: { token: _token, ...record } }) => record)
   }
 
@@ -220,13 +230,22 @@ export class NodeBroker {
 
   // --- HTTP ---
 
-  async fetch(nodeId: string, request: NodeFetchRequest, limits: { maxResponseBytes?: number } = {}): Promise<NodeFetchResponse> {
+  async fetch(
+    nodeId: string,
+    request: NodeFetchRequest,
+    limits: { maxResponseBytes?: number } = {},
+  ): Promise<NodeFetchResponse> {
     const connection = this.connections.get(nodeId)
     if (!connection) throw new Error(`Unknown node ${nodeId}`)
     // Types do not validate a helper message at runtime. In particular `//host/path` is accepted by
     // startsWith('/') but changes the origin when joined with the node endpoint. Never send the
     // paired-node bearer to an authority chosen by a path from the renderer.
-    if (!request.path.startsWith('/') || request.path.startsWith('//') || request.path.includes('\\') || request.path.includes('#')) {
+    if (
+      !request.path.startsWith('/') ||
+      request.path.startsWith('//') ||
+      request.path.includes('\\') ||
+      request.path.includes('#')
+    ) {
       throw new Error('Node request path must stay on the paired node.')
     }
     const target = new URL(request.path, connection.node.endpoint)
@@ -234,13 +253,21 @@ export class NodeBroker {
       throw new Error('Node request path must stay on the paired node.')
     }
 
-    return this.requests.fetch(nodeId, request, connection, {
-      result: (response) => this.noteHttpResult(connection, response),
-      failure: (error) => this.noteHttpFailure(connection, error),
-    }, limits)
+    return this.requests.fetch(
+      nodeId,
+      request,
+      connection,
+      {
+        result: (response) => this.noteHttpResult(connection, response),
+        failure: (error) => this.noteHttpFailure(connection, error),
+      },
+      limits,
+    )
   }
 
-  abort(requestId: string): void { this.requests.abort(requestId) }
+  abort(requestId: string): void {
+    this.requests.abort(requestId)
+  }
 
   // --- WebSocket ---
 
@@ -259,17 +286,21 @@ export class NodeBroker {
   }
 
   openViewer(nodeId: string, viewerId: string): boolean {
-    return this.send(nodeId, { channel: 'ws:viewer-open' }, { viewerId, intent: { key: 'ws:viewer', state: 'attached' } })
+    return this.send(
+      nodeId,
+      { channel: 'ws:viewer-open' },
+      { viewerId, intent: { key: 'ws:viewer', state: 'attached' } },
+    )
   }
 
   closeViewer(nodeId: string, viewerId?: string): void {
     const connection = this.connections.get(nodeId)
     if (!connection) return
     const id = viewerId ?? connection.viewers.defaultId
-    const resetLegacy = connection.viewers.retire(id)
+    const resetSingle = connection.viewers.retire(id)
     if (connection.ws?.readyState !== WebSocket.OPEN) return
     if (connection.viewers.multiplexed) connection.ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: id }))
-    else if (resetLegacy) connection.ws.terminate()
+    else if (resetSingle) connection.ws.terminate()
   }
 
   private openSocket(connection: Connection): void {
@@ -277,9 +308,12 @@ export class NodeBroker {
     const url = new URL(WS_PATH, connection.node.endpoint)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     // The bearer rides the upgrade request's headers, which a browser cannot set. One reason the
-    // socket belongs to main rather than the renderer.
+    // socket belongs to the helper rather than the renderer.
     const ws = new WebSocket(url, {
-      headers: { authorization: `Bearer ${connection.node.token}`, ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) },
+      headers: {
+        authorization: `Bearer ${connection.node.token}`,
+        ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}),
+      },
       agent: connection.agent,
       maxPayload: MAX_NODE_WS_MESSAGE_BYTES,
       perMessageDeflate: false,
@@ -330,7 +364,7 @@ export class NodeBroker {
   //
   // `terminate()` rather than `close()`. `close()` starts a closing handshake, which waits for a
   // reply from a peer already concluded to be not replying: the socket sits closing and the node
-  // still reads `online`, which is the bug this exists to fix, one state further along.
+  // still reads `online`.
   // `terminate()` destroys it, which fires `'close'` and reaches the reconnect machinery.
   private startHeartbeat(connection: Connection, ws: WebSocket): void {
     this.stopHeartbeat(connection)
@@ -340,7 +374,10 @@ export class NodeBroker {
       // Checked before sending, so the count covers pings that already had a full interval to be
       // answered. Incrementing first would condemn the socket on a ping that never had its chance.
       if (connection.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
-        log.warn(`${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`, { 'node.id': connection.node.nodeId })
+        log.warn(
+          `${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`,
+          { 'node.id': connection.node.nodeId },
+        )
         emitEvent('core', 'broker.missed-pong', { 'node.id': connection.node.nodeId, missed: connection.missedPongs })
         ws.terminate()
         return
@@ -368,7 +405,8 @@ export class NodeBroker {
   private receiveBytes(connection: Connection, data: unknown): void {
     connection.lastSeenAt = Date.now()
     const frame = Array.isArray(data) ? Buffer.concat(data as Buffer[]) : (data as Buffer)
-    if (!connection.viewers.multiplexed) return this.events.bytes(connection.node.nodeId, frame, connection.viewers.legacyRecipient())
+    if (!connection.viewers.multiplexed)
+      return this.events.bytes(connection.node.nodeId, frame, connection.viewers.singleRecipient())
     const tagged = decodeIdFrame(frame)
     if (!tagged || !wsViewerIdSchema.safeParse(tagged.id).success) return
     this.events.bytes(connection.node.nodeId, tagged.payload, connection.viewers.externalId(tagged.id))
@@ -396,11 +434,15 @@ export class NodeBroker {
       // to treat it as a reconnect and refetch.
       if (connection.seq !== 0 && seq !== connection.seq + 1) {
         if (!shed) {
-          log.warn(`frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
+          log.warn(`frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`, {
+            'node.id': connection.node.nodeId,
+          })
           connection.ws?.close()
           return
         }
-        log.warn(`${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
+        log.warn(`${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`, {
+          'node.id': connection.node.nodeId,
+        })
         emitEvent('core', 'broker.shed', { 'node.id': connection.node.nodeId, missing: seq - connection.seq - 1 })
       }
       connection.seq = seq
@@ -411,10 +453,24 @@ export class NodeBroker {
       this.events.frame(connection.node.nodeId, routed.frame, connection.viewers.externalId(routed.viewerId))
     } else if (connection.viewers.multiplexed && routed.channel === 'ws:viewer-error') {
       const error = frame as { viewerId?: unknown; code?: unknown; message?: unknown }
-      if (typeof error.viewerId === 'string' && wsViewerIdSchema.safeParse(error.viewerId).success && (error.code === 'viewer_limit' || error.code === 'viewers_unsupported') && typeof error.message === 'string') {
-        this.events.transportError?.(connection.node.nodeId, { code: error.code, message: error.message }, connection.viewers.externalId(error.viewerId))
+      if (
+        typeof error.viewerId === 'string' &&
+        wsViewerIdSchema.safeParse(error.viewerId).success &&
+        (error.code === 'viewer_limit' || error.code === 'viewers_unsupported') &&
+        typeof error.message === 'string'
+      ) {
+        this.events.transportError?.(
+          connection.node.nodeId,
+          { code: error.code, message: error.message },
+          connection.viewers.externalId(error.viewerId),
+        )
       }
-    } else this.events.frame(connection.node.nodeId, frame, connection.viewers.multiplexed ? undefined : connection.viewers.legacyRecipient())
+    } else
+      this.events.frame(
+        connection.node.nodeId,
+        frame,
+        connection.viewers.multiplexed ? undefined : connection.viewers.singleRecipient(),
+      )
   }
 
   private scheduleReconnect(connection: Connection): void {
@@ -427,7 +483,11 @@ export class NodeBroker {
     const delay = base * (1 + (Math.random() * 2 - 1) * JITTER)
     connection.attempt += 1
     if (telemetryEnabled()) {
-      emitEvent('core', 'broker.reconnect', { 'node.id': connection.node.nodeId, attempt: connection.attempt, 'delay.ms': Math.round(delay) })
+      emitEvent('core', 'broker.reconnect', {
+        'node.id': connection.node.nodeId,
+        attempt: connection.attempt,
+        'delay.ms': Math.round(delay),
+      })
     }
     connection.reconnectTimer = setTimeout(() => {
       connection.reconnectTimer = null
@@ -451,10 +511,10 @@ export class NodeBroker {
   // 401 with `unauthenticated`. See server/middleware/requireUser.ts, where a revoked token resolves
   // to no principal.
   //
-  // Reading the status alone was wrong in the direction that matters. Route-level failures reuse both
+  // Reading the status alone is wrong in the direction that matters. Route-level failures reuse both
   // codes for a different credential: `provider_not_connected` is the 403 a fresh node answers for an
   // unconnected GitHub integration, and `linear_reauth` and `provider_needs_auth` are 401s about a
-  // third-party token. The loopback Host guard also 403s. Any of them marked a healthy node
+  // third-party token. The loopback Host guard also 403s. Any of them would mark a healthy node
   // `revoked`, which the fleet UI renders as a security event and which stops the WebSocket being
   // retried.
   private noteHttpResult(connection: Connection, response: NodeFetchResponse): void {
@@ -469,11 +529,7 @@ export class NodeBroker {
 
   private noteHttpFailure(connection: Connection, error: unknown): void {
     const mismatch = isPinMismatch(error)
-    this.setState(
-      connection,
-      'offline',
-      mismatch ? { code: 'identity_mismatch' } : { code: 'unreachable' },
-    )
+    this.setState(connection, 'offline', mismatch ? { code: 'identity_mismatch' } : { code: 'unreachable' })
   }
 
   private noteSocketError(connection: Connection, error: unknown): void {
@@ -483,7 +539,9 @@ export class NodeBroker {
       connection.closed = true
       connection.ws?.terminate()
       this.setState(connection, 'offline', { code: 'unreachable' })
-      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, { 'node.id': connection.node.nodeId })
+      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, {
+        'node.id': connection.node.nodeId,
+      })
       return
     }
     if (isPinMismatch(error)) {
@@ -521,7 +579,11 @@ export class NodeBroker {
 }
 
 type HttpsAgentIdentityCheck = (host: string, cert: { fingerprint256: string }) => Error | undefined
-export type PinnedTlsOptions = { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck }
+export type PinnedTlsOptions = {
+  ca?: string[]
+  rejectUnauthorized: boolean
+  checkServerIdentity?: HttpsAgentIdentityCheck
+}
 
 // Certificate pinning. See docs/security.md, "Transport and auth".
 //
@@ -545,7 +607,7 @@ export function pinnedTlsOptions(fingerprint: string | undefined, certPem: strin
   }
 }
 
-export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
+const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
 export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
 

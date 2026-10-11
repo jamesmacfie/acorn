@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { AgentToolCall } from '../../contract/wire.ts'
 import { RepeatedToolCalls } from './repeatedToolCalls'
 
-const call = (id: string, input: string | undefined, extra: Partial<AgentToolCall> = {}): AgentToolCall =>
-  ({ id, title: 'git status', kind: 'execute', input, ...extra })
+const call = (id: string, input: string | undefined, extra: Partial<AgentToolCall> = {}): AgentToolCall => ({
+  id,
+  title: 'git status',
+  kind: 'execute',
+  input,
+  ...extra,
+})
 
 describe('repeated tool calls', () => {
   it('counts identical calls in a row and starts again after a different one', () => {

@@ -17,15 +17,15 @@ export type BrandMark = {
 export const BRAND = 'brand:'
 
 // Registry rather than a plain map: a loaded plugin's mark arrives and leaves with its roster row,
-// and Registry already gives disposal plus the duplicate-id throw that plugins/chrome/register.ts
+// and Registry already gives disposal plus the duplicate-id throw that the chrome registration pass
 // catches. Its `get` reads a signal, so a mark registering after first paint re-renders the icon.
 export const brandMarkRegistry = new Registry<BrandMark>('brand mark')
 
 // Core's own marks. See docs/ui-design/icons.md § Icons for the "core iff a core surface renders it"
 // rule.
 const CORE: BrandMark[] = [
-  // See docs/ui-design/icons.md § Icons for why this stays core's. Replaces the hand-inlined
-  // ui/GithubMark.tsx. From simple-icons (CC0 artwork; the trademark remains GitHub's).
+  // See docs/ui-design/icons.md § Icons for why this stays core's. From simple-icons (CC0 artwork;
+  // the trademark remains GitHub's).
   {
     id: 'github',
     color: '#24292f',

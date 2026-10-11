@@ -4,11 +4,20 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
-import { archiveTask, restoreTask, taskArchiveTree, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
+import { archiveTask, restoreTask, taskArchiveTree } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
-import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot, toTaskRef } from '../../worktrees/taskWorktree'
+import {
+  computeTaskStatuses,
+  isDir,
+  loadTask,
+  projectForTask,
+  projectSetup,
+  resolveTaskCwd,
+  taskRoot,
+  toTaskRef,
+} from '../../worktrees/taskWorktree'
 import { applyTaskChecks, collectTaskConcerns } from '../../pluginHost/taskChecks'
 import { runHook } from '../../pluginHost/hooks'
 import { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
@@ -29,12 +38,19 @@ export type TaskSessionsBridge = {
   runningCount(taskId: string): number
   killRunning(taskId: string): void
   dropTaskSessions(taskId: string): Promise<void>
-  runTeardown(script: string, cwd: string, env: Record<string, string>, taskId: string, attempt?: { attemptId: string; generation: number }): Promise<TeardownResult>
+  runTeardown(
+    script: string,
+    cwd: string,
+    env: Record<string, string>,
+    taskId: string,
+    attempt?: { attemptId: string; generation: number },
+  ): Promise<TeardownResult>
 }
 
 export const TASK_SESSIONS = routeCapability<TaskSessionsBridge>('terminal.taskSessionsRoute')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
-export const setTaskSessionsBridge = (bridge: TaskSessionsBridge | null): void => setRouteTestCapability(TASK_SESSIONS, bridge)
+export const setTaskSessionsBridge = (bridge: TaskSessionsBridge | null): void =>
+  setRouteTestCapability(TASK_SESSIONS, bridge)
 
 // Fired after a task's worktree is first created. The terminal plugin registers the hook that runs
 // the repo's setup script as a background tab. Set by the runtime capability registry so `on-created`
@@ -74,23 +90,42 @@ async function capturePreviewUrl(
     env: buildSessionEnv({
       taskId,
       cwd,
-      task: task && project
-        ? { projectId: project.id, projectName: project.name, github: project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null, branch: task.branch, title: task.title }
-        : null,
+      task:
+        task && project
+          ? {
+              projectId: project.id,
+              projectName: project.name,
+              github:
+                project.githubOwner && project.githubName
+                  ? { owner: project.githubOwner, name: project.githubName }
+                  : null,
+              branch: task.branch,
+              title: task.title,
+            }
+          : null,
     }),
     timeoutMs: 10_000,
   })
   if (result.spawnError) return { ok: false, reason: result.spawnError }
   if (result.timedOut) return { ok: false, reason: 'script timed out' }
   if (result.code !== 0) return { ok: false, reason: result.stderr.trim().slice(0, 200) || 'script failed' }
-  const url = result.stdout.split('\n').map((line) => line.trim()).filter(Boolean).pop()
+  const url = result.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .pop()
   return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
 }
 
 // Archive is the only path allowed to tear a worktree down, and never automatic. The guard →
 // teardown → stop sessions → remove worktree → mark archived orchestration is server/storage/archive.ts's; the
 // live-session half comes from the slot.
-async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: ArchiveOpts, sessions: TaskSessionsBridge): Promise<ArchiveResult> {
+async function archive(
+  db: ReturnType<typeof getDb>,
+  taskId: string,
+  opts: ArchiveOpts,
+  sessions: TaskSessionsBridge,
+): Promise<ArchiveResult> {
   if (!taskId) return { ok: false, reason: 'Invalid task.' }
   return archiveTask(db, taskId, opts, {
     isDir,
@@ -119,7 +154,10 @@ export const worktree = new Hono<AppEnv>()
   // and no reason to be handed every other active task's id, absolute worktree path and dirty count.
   // The filter also covers the plugin-frame caller, since `core.tasks:read` grants this path.
   .get('/task-statuses', async (c) =>
-    c.json(await computeTaskStatuses(getDb(c.env), isTaskConfined(c) ? (taskId) => mayActOnTask(c, taskId) : undefined)))
+    c.json(
+      await computeTaskStatuses(getDb(c.env), isTaskConfined(c) ? (taskId) => mayActOnTask(c, taskId) : undefined),
+    ),
+  )
   // --- task lifecycle ---
   // Device-only, because it runs the script in the body as the person. The renderer sends the
   // project's own preview script.
@@ -138,7 +176,10 @@ export const worktree = new Hono<AppEnv>()
     let task = await loadTask(db, taskId)
     if (!task) return c.json({ ok: true })
     // Best-effort and independent of worktree setup: seeds PR/ticket context into curatable notes.
-    await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => log.warn(`task-created hook failed: ${describeError(error).message}`))
+    await routeCapabilityFor(
+      c,
+      TASK_CREATED,
+    )?.(taskId).catch((error) => log.warn(`task-created hook failed: ${describeError(error).message}`))
     await recordSetupDecision(db, taskId)
     const project = await projectForTask(db, task)
     if (!project || !task.branch || !project.path) return c.json({ ok: true })
@@ -150,8 +191,9 @@ export const worktree = new Hono<AppEnv>()
     if (!isDir(project.path)) return c.json({ ok: true })
     // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
     // is only to get the setup script in early. The surface that actually needs the cwd will say so.
-    await admitCheckout(db, task.id, () => resolveTaskCwd(db, task, project.path ?? undefined))
-      .catch((e) => log.warn(`pre-create skipped: ${describeError(e).message}`))
+    await admitCheckout(db, task.id, () => resolveTaskCwd(db, task, project.path ?? undefined)).catch((e) =>
+      log.warn(`pre-create skipped: ${describeError(e).message}`),
+    )
     broadcastWorktreeStatusChanged({ taskId }) // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })
@@ -168,7 +210,8 @@ export const worktree = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, TASK_SESSIONS, async (sessions) => {
       await sessions.ready()
-      if (taskArchiveTree(getDb(c.env), c.req.param('id')).some((task) => !mayActOnTask(c, task.id))) throw new BridgeError(404, 'not_found')
+      if (taskArchiveTree(getDb(c.env), c.req.param('id')).some((task) => !mayActOnTask(c, task.id)))
+        throw new BridgeError(404, 'not_found')
       return archive(getDb(c.env), c.req.param('id'), parsed.data, sessions)
     })
   })
@@ -201,5 +244,3 @@ export const worktree = new Hono<AppEnv>()
     })
     return 'busy' in result ? respondError(c, 409, 'task-busy', [result.reason]) : c.json(result)
   })
-
-export { TEARDOWN_TIMEOUT_MS }

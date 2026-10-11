@@ -2,7 +2,7 @@
   "id": "typed-source",
   "name": "Typed source conformance",
   "version": "1.0.0",
-  "apiVersion": "3",
+  "apiVersion": "5",
   "node": "./node.mjs",
   "permissions": {
     "node": {}

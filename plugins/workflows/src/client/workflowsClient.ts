@@ -1,21 +1,27 @@
 import type { AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-// The workflow control client, and the routes it drives.
-//
-// Lives in contract/ rather than client/ because plugins/agents' task sidebar calls it as well as
-// this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin surface
-// (docs/plugins/package-shape.md § Package shape). It reads only client-core and protocol's workflow row types,
-// never this plugin's own client/, so transitive contract purity holds.
-//
-// Commands use HTTP. Workflow notices and step events use the shared WebSocket.
+// The workflow control client, and the routes it drives. Commands use HTTP. Workflow notices and step
+// events use the shared WebSocket.
 
 import type { QueryClient } from '@tanstack/solid-query'
-import { activeNodeId, queryOwner, openRepoConfigTrust, readJson as readWorkflowJson, writeJson as writeWorkflowJson } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  queryOwner,
+  openRepoConfigTrust,
+  readJson as readWorkflowJson,
+  writeJson as writeWorkflowJson,
+} from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowRunProjection, WorkflowStepProjection, WorkflowTaskGroup } from '../shared/api'
+import type {
+  WorkflowGenerateRequest,
+  WorkflowGenerateResult,
+  WorkflowRunProjection,
+  WorkflowStepProjection,
+  WorkflowTaskGroup,
+} from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 import type { WorkflowRecordAttempt, WorkflowRecordFilter, WorkflowRecordPage } from '../shared/workflowProcessing'
 import type {
@@ -24,7 +30,11 @@ import type {
   WorkflowSchedulePreparation,
   WorkflowScheduleView,
 } from '../shared/workflowSchedules'
-import type { WorkflowInvocationApproval, WorkflowInvocationPolicy, WorkflowInvocationReview } from '../shared/workflowInvocation'
+import type {
+  WorkflowInvocationApproval,
+  WorkflowInvocationPolicy,
+  WorkflowInvocationReview,
+} from '../shared/workflowInvocation'
 
 /** How long the generate route may take.
  *
@@ -35,48 +45,49 @@ import type { WorkflowInvocationApproval, WorkflowInvocationPolicy, WorkflowInvo
  *  which one model call already outlives. */
 const GENERATE_TIMEOUT_MS = 240_000
 
-export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
+export type { WorkflowDefSummary } from '../contract/wire.ts'
 
 // Task-scoped defs/start/runs and run-scoped steps/gates.
-export const workflowTaskDefsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
-export const workflowStartRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
-export const workflowRunsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows/runs`
-export const workflowStepsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/steps`
-export const workflowGateRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/gate`
-export const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/cancel`
-export const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
-export const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
-export const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
-export const workflowRecordRoute = (runId: string, recordId: string) => `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
+const workflowTaskDefsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+const workflowStartRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+const workflowRunsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows/runs`
+const workflowStepsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/steps`
+const workflowGateRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/gate`
+const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/cancel`
+const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
+const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
+const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
+const workflowRecordRoute = (runId: string, recordId: string) =>
+  `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
 // Which run a managed agent session belongs to, for the agent pane's chip.
-export const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
+const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
 // Every run on this node, the same route core's merged run list reads.
-export const workflowAllRunsRoute = '/v1/p/workflows/runs'
-export const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
+const workflowAllRunsRoute = '/v1/p/workflows/runs'
+const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
 // Definitions stored as rows (docs/workflows/definitions.md § Database definitions). Device-only on the node, so
 // these answer 403 to anything but the app.
-export const workflowDefsRoute = '/v1/p/workflows/defs'
-export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
-export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
+const workflowDefsRoute = '/v1/p/workflows/defs'
+const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
+const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 // A whole definition written from a description or edited from the current graph
 // (docs/workflows/authoring.md § Authoring).
-export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
+const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // What the owner can generate with — a stored key, or an agent CLI installed on this machine — for
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key
-// ever leaves the node. The path keeps its old spelling, which only this client reads.
-export const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
-export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
+// ever leaves the node. The path says `model-connections`, though it lists backends; only this client
+// reads it.
+const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
-// Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
-export const workflowCatalogRoute = '/v1/p/workflows/catalog'
-export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
-export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
+// Add menu and its inspector are both built from it (`WorkflowCatalog`).
+const workflowCatalogRoute = '/v1/p/workflows/catalog'
+const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
+const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
 // The owner's approvals for agents to start a workflow, device only (../server/routes/invocation.ts).
-export const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
+const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
 // rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
 // agent pane offers (docs/managed-agents/providers.md § Providers).
-export const agentProvidersRoute = '/v1/p/agents/providers'
+const agentProvidersRoute = '/v1/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 
@@ -99,23 +110,41 @@ function workflowApiAt(nodeId?: string | null) {
     schedules: () => readJson<WorkflowScheduleView[]>(workflowSchedulesRoute),
     schedule: (id: string) => readJson<WorkflowScheduleView>(workflowScheduleRoute(id)),
     scheduleDefaults: () => readJson<{ timezone: string }>(`${workflowSchedulesRoute}/defaults`),
-    prepareSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
+    prepareSchedule: (input: WorkflowScheduleDraftInput) =>
+      post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
     saveSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowScheduleView>(workflowSchedulesRoute, input),
     approveSchedule: (id: string, firstCheck: WorkflowScheduleFirstCheck, freshEpoch: boolean) =>
       post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/approve`, { firstCheck, freshEpoch }),
-    pauseSchedule: (id: string, paused: boolean) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
+    pauseSchedule: (id: string, paused: boolean) =>
+      post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
     runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
     deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
     invocationReview: (projectId: string, definitionKey: string) =>
-      readJson<WorkflowInvocationReview>(`${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`),
-    approveInvocation: (approval: WorkflowInvocationApproval) => post<WorkflowInvocationPolicy>(`${workflowInvocationRoute}/approve`, approval),
+      readJson<WorkflowInvocationReview>(
+        `${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`,
+      ),
+    approveInvocation: (approval: WorkflowInvocationApproval) =>
+      post<WorkflowInvocationPolicy>(`${workflowInvocationRoute}/approve`, approval),
     revokeInvocation: (projectId: string, definitionKey: string) =>
       post<WorkflowInvocationPolicy | null>(`${workflowInvocationRoute}/revoke`, { projectId, definitionKey }),
-    files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) => post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
-    preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/prepare`, input),
-    publish: (id: string) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`, {}),
-    discardPublication: (id: string) => post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
-    publications: (workspaceId: string) => readJson<import('../shared/workflowPublication').WorkflowPublication[]>(`${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`),
+    files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) =>
+      post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
+    preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) =>
+      post<import('../shared/workflowPublication').WorkflowPublication>(
+        `${workflowDefsRoute}/publications/prepare`,
+        input,
+      ),
+    publish: (id: string) =>
+      post<import('../shared/workflowPublication').WorkflowPublication>(
+        `${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`,
+        {},
+      ),
+    discardPublication: (id: string) =>
+      post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
+    publications: (workspaceId: string) =>
+      readJson<import('../shared/workflowPublication').WorkflowPublication[]>(
+        `${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`,
+      ),
     defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
     runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
     steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
@@ -128,7 +157,16 @@ function workflowApiAt(nodeId?: string | null) {
     // node: a retry that an agent could ask for is a loop around the rail that stopped it.
     retry: (runId: string, stepId: string, prompt?: string) =>
       post<{ ok: boolean; error?: string }>(workflowRetryRoute(runId), { stepId, ...(prompt ? { prompt } : {}) }),
-    records: (runId: string, input: { selectionId?: string; stepId?: string; after?: number; limit?: number; filter?: WorkflowRecordFilter } = {}) => {
+    records: (
+      runId: string,
+      input: {
+        selectionId?: string
+        stepId?: string
+        after?: number
+        limit?: number
+        filter?: WorkflowRecordFilter
+      } = {},
+    ) => {
       const query = new URLSearchParams()
       if (input.selectionId) query.set('selectionId', input.selectionId)
       if (input.stepId) query.set('stepId', input.stepId)
@@ -139,43 +177,72 @@ function workflowApiAt(nodeId?: string | null) {
       return readJson<WorkflowRecordPage>(`${workflowRecordsRoute(runId)}${suffix}`)
     },
     record: (runId: string, recordId: string) =>
-      readJson<{ snapshot: DataValue; provenance: WorkflowRecordPage['provenance']; record: WorkflowRecordPage['records'][number] | null } | null>(workflowRecordRoute(runId, recordId)),
+      readJson<{
+        snapshot: DataValue
+        provenance: WorkflowRecordPage['provenance']
+        record: WorkflowRecordPage['records'][number] | null
+      } | null>(workflowRecordRoute(runId, recordId)),
     recordAttempts: (runId: string, recordId: string, after?: string) => {
       const query = new URLSearchParams({ limit: '20' })
       if (after) query.set('after', after)
-      return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(`${workflowRecordRoute(runId, recordId)}/attempts?${query}`)
+      return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(
+        `${workflowRecordRoute(runId, recordId)}/attempts?${query}`,
+      )
     },
     prepareReprocess: (runId: string, recordId: string) =>
-      post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(`${workflowRecordRoute(runId, recordId)}/prepare-reprocess`, {}),
+      post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(
+        `${workflowRecordRoute(runId, recordId)}/prepare-reprocess`,
+        {},
+      ),
     reprocess: (runId: string, recordId: string, digest: string, requestId: string) =>
-      post<{ selectionId: string; taskId: string; runId: string; state: string }>(`${workflowRecordRoute(runId, recordId)}/reprocess`, { digest, requestId }),
+      post<{ selectionId: string; taskId: string; runId: string; state: string }>(
+        `${workflowRecordRoute(runId, recordId)}/reprocess`,
+        { digest, requestId },
+      ),
     runForSession: (sessionId: string) =>
       readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
-    // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
+    // Never throws: a failed request comes back as `{ error }`, which is what callers check.
     // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
     // is what lets it apply the repo trust snapshot to a committed file.
-    start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>, onTrusted?: (runId: string) => void, launchId?: string): Promise<{ runId?: string; error?: string }> => {
-      const execute = () => post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), { ...body, ...(inputs ? { inputs } : {}), ...(launchId ? { launchId } : {}) })
+    start: async (
+      taskId: string,
+      body: { def: unknown } | { defId: string },
+      inputs?: Record<string, DataValue>,
+      onTrusted?: (runId: string) => void,
+      launchId?: string,
+    ): Promise<{ runId?: string; error?: string }> => {
+      const execute = () =>
+        post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), {
+          ...body,
+          ...(inputs ? { inputs } : {}),
+          ...(launchId ? { launchId } : {}),
+        })
       try {
         const result = await execute()
-        if (result.error === 'needs-trust') openRepoConfigTrust(taskId, async () => {
-          const trusted = await execute()
-          if (trusted.runId) onTrusted?.(trusted.runId)
-          return trusted
-        })
+        if (result.error === 'needs-trust')
+          openRepoConfigTrust(taskId, async () => {
+            const trusted = await execute()
+            if (trusted.runId) onTrusted?.(trusted.runId)
+            return trusted
+          })
         return result
       } catch (e) {
         return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }
       }
     },
     // The merged list for a workspace: rows, every project's committed files, and the user layer.
-    defsList: (workspaceId: string) => readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
+    defsList: (workspaceId: string) =>
+      readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
     // A row by id, or a committed file addressed as `repo:<fileId>` / `user:<fileId>`. A file answers
     // with `revision: 0`, which is how the editor knows it is read-only.
     def: (id: string, projectId?: string) =>
-      readJson<WorkflowDefRow>(`${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+      readJson<WorkflowDefRow>(
+        `${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
+      ),
     catalog: (projectId?: string) =>
-      readJson<WorkflowCatalog>(`${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+      readJson<WorkflowCatalog>(
+        `${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
+      ),
     providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
     // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
     // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
@@ -184,19 +251,25 @@ function workflowApiAt(nodeId?: string | null) {
     // A select field's own options, from the route its `describe` named. The host substitutes the two
     // placeholders and the contributing plugin answers `{ options }` (docs/workflows/step-kinds.md § Contributed
     // step kinds).
-    fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
-    createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),
-    updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
+    fieldOptions: (route: string) =>
+      readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
+    createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) =>
+      post<WorkflowDefRow>(workflowDefsRoute, input),
+    updateDef: (id: string, def: unknown, revision: number) =>
+      post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
     deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
-    validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
-    saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
+    validateDef: (def: unknown, projectId?: string) =>
+      post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
     authoringTurn: (request: AuthoringTurnRequest, signal: AbortSignal) =>
       writeJson<AuthoringTurnResult>(`${workflowDefsRoute}/authoring/turn`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
-        signal, timeoutMs: 11 * 60_000,
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        signal,
+        timeoutMs: 11 * 60_000,
       }),
     modelBackends: () => readJson<ModelBackend[]>(workflowModelBackendsRoute),
-    // The one call here that says how long it may take, because the broker's default kills it first.
+    // Given its own timeout, because the broker's default kills it first.
     generateDef: (input: WorkflowGenerateRequest) =>
       writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {
         method: 'POST',

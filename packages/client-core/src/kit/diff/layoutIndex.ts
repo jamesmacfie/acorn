@@ -24,9 +24,7 @@
 export type DiffLayoutBlock = { id: string; at: number; height: number }
 
 /** A point in the document: a fixed coordinate inside an item, or an offset into one of its blocks. */
-export type DiffLayoutPoint =
-  | { index: number; fixed: number }
-  | { index: number; block: string; offset: number }
+export type DiffLayoutPoint = { index: number; fixed: number } | { index: number; block: string; offset: number }
 
 export function createDiffLayoutIndex() {
   let count = 0
@@ -170,5 +168,3 @@ export function createDiffLayoutIndex() {
     },
   }
 }
-
-export type DiffLayoutIndex = ReturnType<typeof createDiffLayoutIndex>

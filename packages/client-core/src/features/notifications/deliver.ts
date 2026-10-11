@@ -5,8 +5,8 @@
 // reach anybody. An edge you watched happen — window focused, its task on screen — still lands in
 // the bell, already read, and fires no channel: the history is complete and the pill does not move.
 //
-// Channels beyond the bell row are sinks. Phase 1 registers none; sound, the system notification and
-// the terminal's OSC sequences each add one.
+// Channels beyond the bell row are sinks (`registerNoticeSink`): sound, the system notification and the
+// terminal's OSC sequences each add one.
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { noticeKindContribution } from '../../host/registries/rail/notices'
 import { pluginRowTarget } from '../../host/plugins/rowTargets'
@@ -30,7 +30,9 @@ export type DeliveryContext = {
 // installs its DEC 1004 state (apps/tui/src/main.tsx); nothing else calls this, and a host that does
 // not falls back to the page's own answer.
 let hostFocused: (() => boolean) | null = null
-export const setHostFocused = (answer: (() => boolean) | null): void => { hostFocused = answer }
+export const setHostFocused = (answer: (() => boolean) | null): void => {
+  hostFocused = answer
+}
 
 export const defaultDeliveryContext: DeliveryContext = {
   // Unknown counts as focused, which is the quiet answer: a host that cannot say whether it is on
@@ -80,7 +82,12 @@ export function observeAttention(next: Snapshot[], context: DeliveryContext = de
 }
 
 /** Replace one producer's roster, including sessions that disappeared since its last read. */
-export function replaceAttentionSource(sourceId: string, nodeId: string, next: Snapshot[], context: DeliveryContext = defaultDeliveryContext): void {
+export function replaceAttentionSource(
+  sourceId: string,
+  nodeId: string,
+  next: Snapshot[],
+  context: DeliveryContext = defaultDeliveryContext,
+): void {
   const present = new Set(next.map(snapshotKey))
   for (const [key, snapshot] of latest) {
     if (snapshot.sourceId !== sourceId || snapshot.nodeId !== nodeId || present.has(key)) continue
@@ -103,22 +110,31 @@ export function forgetAttentionSource(sourceId: string, nodeId: string): void {
   }
 }
 
-export function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryContext): void {
+function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryContext): void {
   // Off means off: no row either. A silent row that still counted would contradict the switch.
   if (!context.settings().events[EVENT_OF[edge.kind]]) return
   const key = snapshotKey(edge)
   const previous = held.get(key)
   if (previous) clearTimeout(previous)
-  held.set(key, setTimeout(() => {
-    held.delete(key)
-    if (latest.get(key)?.state !== edge.state) return
-    deliverNotice({ taskId: edge.taskId, kind: edge.kind, title: edge.title, at: context.now(), target: targetFor(edge) }, context)
-  }, HOLD_MS))
+  held.set(
+    key,
+    setTimeout(() => {
+      held.delete(key)
+      if (latest.get(key)?.state !== edge.state) return
+      deliverNotice(
+        { taskId: edge.taskId, kind: edge.kind, title: edge.title, at: context.now(), target: targetFor(edge) },
+        context,
+      )
+    }, HOLD_MS),
+  )
 }
 
 /** The seen rule and the channels, for a notice that did not come from a session edge: a workflow
  *  gate, a run finishing, a plugin asking to be installed. */
-export function deliverNotice(input: Omit<Notice, 'id' | 'read'>, context: DeliveryContext = defaultDeliveryContext): Notice {
+export function deliverNotice(
+  input: Omit<Notice, 'id' | 'read'>,
+  context: DeliveryContext = defaultDeliveryContext,
+): Notice {
   const seen = context.focused() && context.activeTaskId() === input.taskId
   const notice = pushNotice({ ...input, read: seen })
   if (!seen) for (const sink of sinks) sink(notice)
@@ -127,24 +143,6 @@ export function deliverNotice(input: Omit<Notice, 'id' | 'read'>, context: Deliv
   // (docs/telemetry/model.md § What never leaves the machine).
   emitEvent('core', 'notice.delivered', { seam: 'notice.delivered', 'notice.kind': notice.kind, 'notice.seen': seen })
   return notice
-}
-
-/** Managed-agent notices carry no prompt-derived title, response, filename, or path. The durable
- *  notice target provides exact navigation without leaking sensitive content to the OS. */
-export function pushManagedAgentNotice(input: {
-  taskId: string
-  sessionId: string
-  requestId?: string
-  kind: Edge['kind']
-  title: string
-}): Notice {
-  return deliverNotice({
-    taskId: input.taskId,
-    kind: input.kind,
-    title: input.title,
-    at: Date.now(),
-    target: { kind: 'managed-agent', resourceId: input.sessionId, subresourceId: input.requestId },
-  })
 }
 
 /** Node-pushed notices: a workflow gate, a run finishing, a plugin asking to be installed, a memory
@@ -157,16 +155,24 @@ export function pushManagedAgentNotice(input: {
  *  2. The `runId` shorthand, for a node built before `target` existed. A client and the node it talks
  *     to are separately installed, so a remote node can be older than the window in front of you.
  *  3. The raising plugin's own surface, for the loaded tier, which is not allowed to name a target
- *     (host/plugins/rowTargets.ts).
+ *     (`pluginRowTarget`).
  *
  *  Core's own notices — the trust prompt, the install request — name no plugin and no target. They
  *  carry an `action` instead, which the bell answers by opening a dialog rather than navigating. */
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
-    const actionDetail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
-    const target = n.target
-      ?? (n.runId ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) } : undefined)
-      ?? (n.pluginId ? pluginRowTarget(n.pluginId) : undefined)
+    const actionDetail =
+      n.action === 'review-config'
+        ? 'Review & trust'
+        : n.action === 'review-plugin-request'
+          ? 'Review the request'
+          : undefined
+    const target =
+      n.target ??
+      (n.runId
+        ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) }
+        : undefined) ??
+      (n.pluginId ? pluginRowTarget(n.pluginId) : undefined)
     deliverNotice({
       // `''` for a notice that is about the node rather than a task: a plugin whose connection
       // expired, a proposal whose task has been archived. The ring keeps `taskId` required and no real
@@ -185,7 +191,7 @@ export function initWorkflowNotices(): () => void {
 
 /** The system channel: an OS banner for every unseen notice the settings allow, through the
  *  platform seam's `notify` group where a shell installed one and the page's own `Notification`
- *  otherwise (infra/platform/index.ts).
+ *  otherwise.
  *
  *  The body is the notice's `detail` and nothing else. A title is already free of prompt text,
  *  responses, filenames and paths (`pushManagedAgentNotice`), and the notification centre keeps what
@@ -198,10 +204,8 @@ export function initSystemNotices(): () => void {
 /** Exported for the test. Sinks only ever see an unseen notice, so the seen rule is already kept. */
 export function systemSink(notice: Notice): void {
   if (!readNotificationSettings().system) return
-  // `toast` is the kind's own answer to "may this reach the desktop", and until now nothing read it:
-  // every kind declared one, three of them declared `false` with a comment saying why, and the banner
-  // fired anyway. So `background-error` and `disk-unencrypted` stop banner-ing, which is what those
-  // comments always said they did — a standing condition and a swallowed error belong in the bell.
+  // `toast` is the kind's own answer to "may this reach the desktop". `background-error` and
+  // `disk-unencrypted` declare `false`: a swallowed error and a standing condition belong in the bell.
   //
   // An unregistered kind resolves to `plugin`, which is `false`. That is the safe default and the one
   // the tier rule leans on: a loaded plugin's notice is forced to that kind precisely so third-party

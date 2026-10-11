@@ -11,7 +11,7 @@ const kindOf = (step: WorkflowStepDef) => step.kind ?? 'agent'
 const targetName = (step: WorkflowStepDef, catalog: WorkflowCatalog | undefined): string => {
   const ref = step.childWorkflow?.ref
   if (!ref) return 'a child workflow'
-  const target = catalog?.workflows?.find(candidate => {
+  const target = catalog?.workflows?.find((candidate) => {
     if (candidate.ref.source !== ref.source) return false
     if (candidate.ref.source === 'repo' && ref.source === 'repo') return candidate.ref.path === ref.path
     return candidate.ref.source !== 'repo' && ref.source !== 'repo' && candidate.ref.id === ref.id
@@ -27,16 +27,35 @@ const bindingLabel = (binding: DataBinding | undefined, def: WorkflowDef): strin
   if (address.from === 'literal') return JSON.stringify(address.value)
   if (address.from === 'input') return field ?? address.name
   if (address.from === 'item') return field ?? 'current record'
-  if (address.from === 'context') return address.name === 'viewer' ? field ?? 'you'
-    : address.name === 'workspaceLinks' ? 'linked projects' : address.name === 'now' ? 'now' : 'calendar time'
-  return field ?? def.steps.find(step => stepIdentity(step) === address.stepId)?.name ?? 'step result'
+  if (address.from === 'context')
+    return address.name === 'viewer'
+      ? (field ?? 'you')
+      : address.name === 'workspaceLinks'
+        ? 'linked projects'
+        : address.name === 'now'
+          ? 'now'
+          : 'calendar time'
+  return field ?? def.steps.find((step) => stepIdentity(step) === address.stepId)?.name ?? 'step result'
 }
 
 function conditionLabel(condition: DataPredicate | undefined, def: WorkflowDef): string {
   if (!condition) return 'No condition yet.'
-  if (condition.kind !== 'comparison') return `${condition.kind === 'all' ? 'All' : 'Any'} of ${condition.predicates.length} conditions match.`
-  const operator = ({ eq: 'is', ne: 'is not', lt: 'is less than', lte: 'is at most', gt: 'is greater than',
-    gte: 'is at least', contains: 'contains', in: 'is in', missing: 'is missing', present: 'is present' } as const)[condition.operator]
+  if (condition.kind !== 'comparison')
+    return `${condition.kind === 'all' ? 'All' : 'Any'} of ${condition.predicates.length} conditions match.`
+  const operator = (
+    {
+      eq: 'is',
+      ne: 'is not',
+      lt: 'is less than',
+      lte: 'is at most',
+      gt: 'is greater than',
+      gte: 'is at least',
+      contains: 'contains',
+      in: 'is in',
+      missing: 'is missing',
+      present: 'is present',
+    } as const
+  )[condition.operator]
   return `${bindingLabel(condition.left, def)} ${operator}${condition.right ? ` ${bindingLabel(condition.right, def)}` : ''}.`
 }
 
@@ -47,7 +66,9 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
   const kind = kindOf(step)
   if (unavailableCatalogKind(kind, catalog)) {
     const pluginId = stepKindPluginId(kind)
-    return pluginId ? `The ${pluginLabel(pluginId)} plugin isn't on this computer.` : "This kind of step isn't on this computer."
+    return pluginId
+      ? `The ${pluginLabel(pluginId)} plugin isn't on this computer.`
+      : "This kind of step isn't on this computer."
   }
   if (kind === 'find-records') {
     const query = step.query
@@ -56,19 +77,16 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
     return `Find ${pluginLabel(query.content.query.source.pluginId)} records.`
   }
   if (kind === 'workflow-map') {
-    const source = def.steps.find(candidate => stepIdentity(candidate) === step.items?.step)?.name ?? 'chosen records'
-    return step.agent ? `For each result from ${source}, start an agent session.`
+    const source = def.steps.find((candidate) => stepIdentity(candidate) === step.items?.step)?.name ?? 'chosen records'
+    return step.agent
+      ? `For each result from ${source}, start an agent session.`
       : `For each result from ${source}, run ${targetName(step, catalog)}.`
   }
   if (kind === 'workflow') return `Run ${targetName(step, catalog)}.`
-  if (kind === 'if') return step.condition ? `If ${conditionLabel(step.condition, def)}` : conditionLabel(undefined, def)
-  const described = catalog?.kinds.find(entry => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
+  if (kind === 'if')
+    return step.condition ? `If ${conditionLabel(step.condition, def)}` : conditionLabel(undefined, def)
+  const described = catalog?.kinds.find((entry) => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
   return described?.label ?? kind
-}
-
-export function dependencyLabels(step: WorkflowStepDef, def: WorkflowDef): string[] {
-  const index = def.steps.findIndex(candidate => stepIdentity(candidate) === stepIdentity(step))
-  return effectiveAfter(def, index).map(id => def.steps.find(candidate => stepIdentity(candidate) === id)?.name ?? id)
 }
 
 export function branchLabel(step: WorkflowStepDef, def: WorkflowDef): string | undefined {
@@ -92,15 +110,17 @@ export function referencingSteps(id: string, def: WorkflowDef): string[] {
       const address = (binding as DataBinding).address
       return address.from === 'step' && address.stepId === id
     }
-    return (binding as { from?: string; step?: string }).from === 'step'
-      && (binding as { step?: string }).step === id
+    return (binding as { from?: string; step?: string }).from === 'step' && (binding as { step?: string }).step === id
   }
   for (const [index, step] of def.steps.entries()) {
-    if (effectiveAfter(def, index).includes(id)
-      || step.items?.step === id
-      || Object.values(step.childWorkflow?.inputs ?? {}).some(visitsBinding)
-      || Object.values(step.title?.bindings ?? {}).some(visitsBinding)
-      || Object.values(step.branches ?? {}).includes(id)) references.push(step.name)
+    if (
+      effectiveAfter(def, index).includes(id) ||
+      step.items?.step === id ||
+      Object.values(step.childWorkflow?.inputs ?? {}).some(visitsBinding) ||
+      Object.values(step.title?.bindings ?? {}).some(visitsBinding) ||
+      Object.values(step.branches ?? {}).includes(id)
+    )
+      references.push(step.name)
   }
   return [...new Set(references)]
 }

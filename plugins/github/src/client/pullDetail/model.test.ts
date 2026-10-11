@@ -59,16 +59,31 @@ describe('pull detail model', () => {
   it('keys every turn by its kind and id, whatever arrives, changes or ties around it', () => {
     const review = { id: 'x1', author: 'a', state: 'APPROVED', body: null, submittedAt: 20 }
     const comment = { id: 'x1', author: 'c', body: '<p>one</p>', createdAt: 20 }
-    const first = buildConversationEntries(baseDetail({ reviews: [review], comments: [comment], threads: [thread('t1')] }))
+    const first = buildConversationEntries(
+      baseDetail({ reviews: [review], comments: [comment], threads: [thread('t1')] }),
+    )
     // The same id in two kinds is two turns, and a tie keeps the order the kinds are listed in.
     expect(first.map((entry) => entry.key)).toEqual(['review:x1', 'comment:x1', 'thread:t1'])
 
     // An older comment arrives, a body changes, and a reply lands on the thread: every key holds.
-    const next = buildConversationEntries(baseDetail({
-      reviews: [review],
-      comments: [{ id: 'c0', author: 'd', body: '<p>early</p>', createdAt: 1 }, { ...comment, body: '<p>edited</p>' }],
-      threads: [{ ...thread('t1'), comments: [...thread('t1').comments, { id: 't1:c2', databaseId: 2, author: 'b', body: '<p>reply</p>', createdAt: 40 }] }],
-    }))
+    const next = buildConversationEntries(
+      baseDetail({
+        reviews: [review],
+        comments: [
+          { id: 'c0', author: 'd', body: '<p>early</p>', createdAt: 1 },
+          { ...comment, body: '<p>edited</p>' },
+        ],
+        threads: [
+          {
+            ...thread('t1'),
+            comments: [
+              ...thread('t1').comments,
+              { id: 't1:c2', databaseId: 2, author: 'b', body: '<p>reply</p>', createdAt: 40 },
+            ],
+          },
+        ],
+      }),
+    )
     expect(next.map((entry) => entry.key)).toEqual(['comment:c0', 'review:x1', 'comment:x1', 'thread:t1'])
   })
 
@@ -80,9 +95,26 @@ describe('pull detail model', () => {
 
   it('keeps large conversation merging within the speed budget', () => {
     const detail = baseDetail({
-      comments: Array.from({ length: 1000 }, (_, i) => ({ id: `c${i}`, author: 'octo', body: '<p>x</p>', createdAt: i })),
-      reviews: Array.from({ length: 1000 }, (_, i) => ({ id: `r${i}`, author: 'octo', state: 'APPROVED', body: null, submittedAt: i + 1000 })),
-      commits: Array.from({ length: 1000 }, (_, i) => ({ sha: `sha${i}`, message: 'commit', author: 'octo', authorLogin: 'octo', committedAt: i + 2000 })),
+      comments: Array.from({ length: 1000 }, (_, i) => ({
+        id: `c${i}`,
+        author: 'octo',
+        body: '<p>x</p>',
+        createdAt: i,
+      })),
+      reviews: Array.from({ length: 1000 }, (_, i) => ({
+        id: `r${i}`,
+        author: 'octo',
+        state: 'APPROVED',
+        body: null,
+        submittedAt: i + 1000,
+      })),
+      commits: Array.from({ length: 1000 }, (_, i) => ({
+        sha: `sha${i}`,
+        message: 'commit',
+        author: 'octo',
+        authorLogin: 'octo',
+        committedAt: i + 2000,
+      })),
       threads: Array.from({ length: 1000 }, (_, i) => ({
         ...thread(`t${i}`),
         comments: [{ id: `tc${i}`, databaseId: i, author: 'octo', body: '<p>x</p>', createdAt: i + 3000 }],
@@ -99,26 +131,42 @@ describe('pull detail model', () => {
 })
 
 describe('reviewDecision', () => {
-  const review = (author: string, state: string, submittedAt: number) => ({ id: `${author}-${submittedAt}`, author, state, body: null, submittedAt })
-
-  it('counts each author\'s latest verdict, and a change request outweighs approvals', () => {
-    expect(reviewDecision([review('ada', 'APPROVED', 1), review('grace', 'CHANGES_REQUESTED', 2)]))
-      .toEqual({ state: 'changes-requested', reviewers: ['grace'] })
+  const review = (author: string, state: string, submittedAt: number) => ({
+    id: `${author}-${submittedAt}`,
+    author,
+    state,
+    body: null,
+    submittedAt,
   })
 
-  it('lets a later approval replace the same author\'s change request, and ignores plain comments', () => {
-    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'APPROVED', 3), review('ada', 'COMMENTED', 4)]))
-      .toEqual({ state: 'approved', reviewers: ['grace'] })
+  it("counts each author's latest verdict, and a change request outweighs approvals", () => {
+    expect(reviewDecision([review('ada', 'APPROVED', 1), review('grace', 'CHANGES_REQUESTED', 2)])).toEqual({
+      state: 'changes-requested',
+      reviewers: ['grace'],
+    })
+  })
+
+  it("lets a later approval replace the same author's change request, and ignores plain comments", () => {
+    expect(
+      reviewDecision([
+        review('grace', 'CHANGES_REQUESTED', 1),
+        review('grace', 'APPROVED', 3),
+        review('ada', 'COMMENTED', 4),
+      ]),
+    ).toEqual({ state: 'approved', reviewers: ['grace'] })
   })
 
   it('reads the reviews in time order, whatever order they arrive in', () => {
-    expect(reviewDecision([review('grace', 'APPROVED', 5), review('grace', 'CHANGES_REQUESTED', 1)]).state).toBe('approved')
+    expect(reviewDecision([review('grace', 'APPROVED', 5), review('grace', 'CHANGES_REQUESTED', 1)]).state).toBe(
+      'approved',
+    )
   })
 
   it('drops a dismissed review and says when nobody has decided', () => {
-    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'DISMISSED', 2)]))
-      .toEqual({ state: 'none', reviewers: [] })
+    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'DISMISSED', 2)])).toEqual({
+      state: 'none',
+      reviewers: [],
+    })
     expect(reviewDecision([])).toEqual({ state: 'none', reviewers: [] })
   })
 })
-

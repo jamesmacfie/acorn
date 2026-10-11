@@ -38,8 +38,8 @@ export function parseDsn(raw: string): SentryDsn | null {
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
   if (!url.username) return null
-  // `password` is the legacy secret key half. Sentry stopped requiring it in 2016 and ignores it on
-  // ingestion, so a DSN that still carries one parses and the secret is dropped here.
+  // `password` is the legacy secret key half. Sentry ignores it on ingestion, so a DSN that still
+  // carries one parses and the secret is dropped here.
   const segments = url.pathname.split('/').filter(Boolean)
   const projectId = segments.pop()
   // Numeric, because the endpoint below is `/api/<project_id>/envelope/` and a project *slug* there

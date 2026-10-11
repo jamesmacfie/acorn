@@ -19,10 +19,12 @@ export function registerChanges(ctx: Context): () => void {
   // (docs/data-layer/plugin-databases.md § Plugin databases).
   const db = ctx.storage.open()
   ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), { prefix: '/tasks', note: '/:id/review-notes' })
-  registerDeletedTaskPurge(ctx, async (taskIds) =>
-    (await db.delete(reviewNotes).where(inArray(reviewNotes.taskId, [...taskIds]))).changes)
+  registerDeletedTaskPurge(
+    ctx,
+    async (taskIds) => (await db.delete(reviewNotes).where(inArray(reviewNotes.taskId, [...taskIds]))).changes,
+  )
   // The two decisions this plugin opens to other plugins, declared before the bridge that runs them
-  // (./localGit.ts § CHANGES_HOOKS, docs/plugins/hooks.md § Hooks). Declaring is the whole consent: a
+  // (docs/plugins/hooks.md § Hooks). Declaring is the whole consent: a
   // point this plugin did not declare has no chain and no trust line.
   for (const point of CHANGES_HOOKS) ctx.hooks.declare({ ...point, allows: [...point.allows] })
   const bridge = localGitBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)
@@ -32,19 +34,24 @@ export function registerChanges(ctx: Context): () => void {
   })
   ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
     id: 'uncommitted',
-    value: { kind: 'uncommitted', read: async (taskId, path, source) =>
-      (await import('./editorLineMarkers')).uncommittedEditorLineMarkers(ctx.core).read(taskId, path, source) },
+    value: {
+      kind: 'uncommitted',
+      read: async (taskId, path, source) =>
+        (await import('./editorLineMarkers')).uncommittedEditorLineMarkers(ctx.core).read(taskId, path, source),
+    },
   })
   ctx.extensionPoints.handle(EDITOR_FILE_STATUS, {
     id: 'worktree',
     value: changesEditorFileStatus(ctx.core),
   })
   // Task check: warns about uncommitted work the archive would discard
-  // (docs/plugins/task-checks.md § Task checks; details in ./archiveCheck.ts).
-  ctx.taskChecks.register({ id: 'uncommitted', check: async (task) =>
-    (await import('./archiveCheck')).changesArchiveConcern(bridge, task) })
+  // (docs/plugins/task-checks.md § Task checks).
+  ctx.taskChecks.register({
+    id: 'uncommitted',
+    check: async (task) => (await import('./archiveCheck')).changesArchiveConcern(bridge, task),
+  })
   ctx.routes.register(localGit, { prefix: '/tasks', note: '/:id/local/*' })
-  // local_changes, local_diff, and git_log. Same module as the bridge above, so the agent and the
+  // local_changes, local_diff, and git_log. Same reads as the bridge above, so the agent and the
   // Changes tab cannot disagree about the working tree.
   for (const tool of localGitAgentTools(ctx.core)) ctx.tools.register(tool)
   return () => {

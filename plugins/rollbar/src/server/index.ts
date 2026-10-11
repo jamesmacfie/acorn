@@ -1,16 +1,15 @@
-// Rollbar REST client, structured like server/linear/ (docs/integrations/rollbar.md § Rollbar covers the
+// Rollbar REST client, structured like the linear plugin's (docs/integrations/rollbar.md § Rollbar covers the
 // connection model). Items are Rollbar's deduped errors, identified in acorn by their visible
 // `counter` (#142) rather than their internal id. Exported fetch is mocked in route tests, never
 // called live there.
 
 // Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
-// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so a fetch
-// that outlasts it reads to the user as "your machine is down" rather than "this API is slow". Eight
-// seconds did exactly that: the client always gave up first, so the "this provider is unavailable"
-// answer below could never reach anyone. Four, which is what core's own provider routes allow
-// themselves against the same deadline (node-core server/routes/nodeProviders.ts).
-// ponytail: per-request, not per-route. A route that loops over several connections can still add up
-// past the client's 5s; give it a shared budget if anyone hits that with enough workspaces.
+// (client-core's node fan-out) and then draws "unavailable" over the whole node, so a fetch that
+// outlasts it reads to the user as "your machine is down" rather than "this API is slow", and the
+// "this provider is unavailable" answer below never reaches anyone. Four seconds is what core's own
+// provider routes allow themselves against the same deadline (node-core's nodeProviders routes).
+// Per-request, not per-route: a route that loops over several connections can still add up past the
+// client's 5s. Give it a shared budget if anyone hits that with enough workspaces.
 const REQUEST_TIMEOUT_MS = 4_000
 
 const BASE = 'https://api.rollbar.com/api/1'
@@ -52,7 +51,6 @@ export type RollbarApiItem = {
   last_occurrence_timestamp: number
   framework?: string | null
   last_occurrence_id?: number | null
-  last_activated_timestamp?: number | null
   unique_occurrences?: number | null
   resolved_in_version?: string | null
   assigned_user_id?: number | string | null
@@ -72,7 +70,8 @@ export type RollbarApiInstancesPage = { instances?: RollbarApiInstance[] }
 
 // Rollbar's items API reports level as a number on some plans; normalise to the word.
 const LEVELS: Record<number, string> = { 10: 'debug', 20: 'info', 30: 'warning', 40: 'error', 50: 'critical' }
-export const levelName = (level: string | number): string => (typeof level === 'number' ? (LEVELS[level] ?? String(level)) : level)
+export const levelName = (level: string | number): string =>
+  typeof level === 'number' ? (LEVELS[level] ?? String(level)) : level
 
 export const projectPath = '/project'
 export const itemsPath = (page: number) => `/items?status=active&page=${page}`

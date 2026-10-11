@@ -6,9 +6,8 @@ import { tags } from '@lezer/highlight'
 import { editorTheme } from './theme'
 
 // The one thing worth a test here: `basicSetup` registers CodeMirror's own light highlight style,
-// and for a while ours sat behind it as a second fallback, where the facet keeps only the first
-// value. Nothing failed, no colour appeared, and every markdown heading and link came out
-// underlined. This is the check that fails if that comes back.
+// and the fallback facet keeps only the first value. Ours as a second fallback would apply no colour
+// and leave every markdown heading and link underlined, with nothing failing. This check fails then.
 describe('editorTheme', () => {
   const state = EditorState.create({ extensions: [basicSetup, editorTheme()] })
 

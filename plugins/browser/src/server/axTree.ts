@@ -76,17 +76,16 @@ export function resolveRef(snapshot: AxSnapshot | null, ref: string): number {
 export function renderAxTree(tree: AxNode[], depth = 0): string {
   const lines: string[] = []
   for (const node of tree) {
-    const parts = [node.role, node.name ? JSON.stringify(node.name) : null, node.value ? `value=${JSON.stringify(node.value)}` : null, node.ref ? `[${node.ref}]` : null]
+    const parts = [
+      node.role,
+      node.name ? JSON.stringify(node.name) : null,
+      node.value ? `value=${JSON.stringify(node.value)}` : null,
+      node.ref ? `[${node.ref}]` : null,
+    ]
     lines.push(`${'  '.repeat(depth)}- ${parts.filter(Boolean).join(' ')}`)
     if (node.children) lines.push(renderAxTree(node.children, depth + 1))
   }
   return lines.join('\n')
-}
-
-// ERR_ABORTED (-3) on navigation is benign: redirects and SPA transitions produce it.
-export const isBenignNavError = (err: unknown): boolean => {
-  const e = err as { errno?: number; code?: string; message?: string }
-  return e?.errno === -3 || e?.code === 'ERR_ABORTED' || !!e?.message?.includes('ERR_ABORTED')
 }
 
 export const isAllowedBrowserUrl = (url: string): boolean => /^https?:\/\//i.test(url)

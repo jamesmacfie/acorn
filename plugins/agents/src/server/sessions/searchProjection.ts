@@ -36,7 +36,8 @@ export class AgentSearchProjection {
 
   private materialize(tx: Transaction, sessionId: string, fromSeq: number): void {
     // A continuation has null search_text; revisit its head preceding the earliest mutation.
-    const start = tx.get<{ seq: number }>(sql`
+    const start =
+      tx.get<{ seq: number }>(sql`
       SELECT seq FROM agent_events WHERE session_id = ${sessionId} AND seq < ${fromSeq}
         AND search_text IS NOT NULL ORDER BY seq DESC LIMIT 1
     `)?.seq ?? 0
@@ -62,7 +63,12 @@ export class AgentSearchProjection {
           continue
         }
         if (isAppendDelta(event)) {
-          if (previous && previous.seq === row.seq - 1 && continuesStream(previous, { turnId: row.turnId, event }) && head) {
+          if (
+            previous &&
+            previous.seq === row.seq - 1 &&
+            continuesStream(previous, { turnId: row.turnId, event }) &&
+            head
+          ) {
             head.fragments.push(event.text)
             this.write(tx, row, null)
           } else {
@@ -84,12 +90,16 @@ export class AgentSearchProjection {
   }
 
   private write(tx: Transaction, row: Row, text: string | null): void {
-    const indexed = text === null || text !== row.searchText || tx.get(sql`
+    const indexed =
+      text === null ||
+      text !== row.searchText ||
+      tx.get(sql`
       SELECT 1 FROM agent_events_fts f JOIN agent_events e ON e.rowid = f.rowid AND e.id = f.event_id
       WHERE e.id = ${row.id} AND
         CASE WHEN json_extract(e.event_json, '$.type') = 'tool' THEN f.tool ELSE f.content END IS ${text}
     `)
-    if (text !== row.searchText || !indexed) tx.run(sql`UPDATE agent_events SET search_text = ${text} WHERE id = ${row.id}`)
+    if (text !== row.searchText || !indexed)
+      tx.run(sql`UPDATE agent_events SET search_text = ${text} WHERE id = ${row.id}`)
   }
 
   private recover(): void {
@@ -120,7 +130,9 @@ export class AgentSearchProjection {
   private rebuildIndex(): void {
     this.db.transaction((tx) => {
       tx.run(sql`DROP TABLE IF EXISTS agent_events_fts`)
-      tx.run(sql`CREATE VIRTUAL TABLE agent_events_fts USING fts5(event_id UNINDEXED, session_id UNINDEXED, content, tool, tokenize = 'porter unicode61')`)
+      tx.run(
+        sql`CREATE VIRTUAL TABLE agent_events_fts USING fts5(event_id UNINDEXED, session_id UNINDEXED, content, tool, tokenize = 'porter unicode61')`,
+      )
       tx.run(sql`INSERT INTO agent_events_fts (agent_events_fts, rank) VALUES ('rank', 'bm25(0, 0, 1.0, 0.3)')`)
       this.catchUp(tx)
       tx.run(sql`

@@ -2,9 +2,8 @@ import { z } from 'zod'
 import type { ToolRisk } from '../transport/api'
 
 // The node-provider wire shapes: what a plugin's provider answers with, and what the client reads
-// back off `/v1/core/nodes`. The contribution type itself is node-side
-// (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
-// stays a pure sink.
+// back off `/v1/core/nodes`. The contribution type itself is node-side (`NodeProviderContribution`),
+// because a provider is code and this module stays a pure sink.
 //
 // See docs/plugins/node-providers.md § Node providers for the seam and docs/architecture/control-plane.md § The three
 // parties for why a provider is the second door into the fleet.
@@ -19,7 +18,7 @@ export type ProvidedNodeState = z.infer<typeof providedNodeStateSchema>
 //
 // `endpoint` and `fingerprint` are nullable because a node under construction has neither. Adopting
 // one requires both, and the host refuses otherwise rather than pairing against a guess.
-export const providedNodeSchema = z.strictObject({
+const providedNodeSchema = z.strictObject({
   // The control plane's own id for this node, stable no matter which node asked. That stability is
   // what lets two nodes signed into one account list the same cloud nodes, and what makes moving
   // credential custody later renumber nothing.
@@ -28,7 +27,10 @@ export const providedNodeSchema = z.strictObject({
   nodeId: z.string().nullable(),
   label: z.string().min(1),
   endpoint: z.string().url().nullable(),
-  fingerprint: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  fingerprint: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
   state: providedNodeStateSchema,
 })
 export type ProvidedNode = z.infer<typeof providedNodeSchema>
@@ -37,8 +39,8 @@ export type ProvidedNode = z.infer<typeof providedNodeSchema>
 export const NODE_LIFECYCLE_VERBS = ['create', 'destroy', 'start', 'stop'] as const
 export type NodeLifecycleVerb = (typeof NODE_LIFECYCLE_VERBS)[number]
 
-/** How much confirmation each verb is owed, in the vocabulary `nodeActions` already uses (api.ts's
- *  `ToolRisk`). Core's decision, not the provider's: a provider that could call its own destroy
+/** How much confirmation each verb is owed, in the `ToolRisk` vocabulary `nodeActions` already uses.
+ *  Core's decision, not the provider's: a provider that could call its own destroy
  *  `read` would be choosing how loudly acorn warns about it. Destroying a node is the most
  *  consequential button in the product, so it sits at the top tier with nothing above it. */
 export const NODE_LIFECYCLE_RISK: Record<NodeLifecycleVerb, ToolRisk> = {
@@ -71,7 +73,6 @@ export const nodeAdoptBodySchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),
 })
-export type NodeAdoptBody = z.infer<typeof nodeAdoptBodySchema>
 
 // Everything the host needs to remember a node, from the node that listed it. `certPem` is absent:
 // the host probes the endpoint itself and refuses a certificate whose fingerprint is not the one
@@ -92,11 +93,9 @@ export const nodeCreateRequestSchema = z.strictObject({
   label: z.string().min(1).max(120),
   options: z.record(z.string(), z.string()).default({}),
 })
-export type NodeCreateRequest = z.input<typeof nodeCreateRequestSchema>
 
 // `POST /v1/core/nodes/{destroy,start,stop}`.
 export const nodeLifecycleRequestSchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),
 })
-export type NodeLifecycleRequest = z.infer<typeof nodeLifecycleRequestSchema>

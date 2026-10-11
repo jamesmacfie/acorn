@@ -37,32 +37,51 @@ export type TextareaProps = ControlOwn & {
 }
 
 export function Textarea(props: TextareaProps) {
-  const [own] = splitProps(
-    props,
-    ['size', 'invalid', 'width', 'kind', 'label', 'title', 'id', 'name', 'disabled', 'required', 'autofocus', 'assist'],
-  )
+  const [own] = splitProps(props, [
+    'size',
+    'invalid',
+    'width',
+    'kind',
+    'label',
+    'title',
+    'id',
+    'name',
+    'disabled',
+    'required',
+    'autofocus',
+    'assist',
+  ])
   const field = claimField(own.id)
   return (
     <textarea
       {...controlAttrs(own, 'ui-input', field)}
       {...assistAttrs(own)}
-      ref={props.onCommit || props.onToggleExpand ? (element) => {
-        if (typeof props.ref === 'function') props.ref(element)
-        bindIntents(element, [
-          ...(props.onCommit ? ['commit'] as const : []),
-          ...(props.onToggleExpand ? ['maximize'] as const : []),
-        ], (intent) => {
-          if (props.disabled) return false
-          if (intent === 'maximize') {
-            if (!props.onToggleExpand) return false
-            props.onToggleExpand()
-          } else {
-            if (props.readOnly || !props.onCommit) return false
-            props.onCommit()
-          }
-          return true
-        }, { mode: 'focus' })
-      } : props.ref}
+      ref={
+        props.onCommit || props.onToggleExpand
+          ? (element) => {
+              if (typeof props.ref === 'function') props.ref(element)
+              bindIntents(
+                element,
+                [
+                  ...(props.onCommit ? (['commit'] as const) : []),
+                  ...(props.onToggleExpand ? (['maximize'] as const) : []),
+                ],
+                (intent) => {
+                  if (props.disabled) return false
+                  if (intent === 'maximize') {
+                    if (!props.onToggleExpand) return false
+                    props.onToggleExpand()
+                  } else {
+                    if (props.readOnly || !props.onCommit) return false
+                    props.onCommit()
+                  }
+                  return true
+                },
+                { mode: 'focus' },
+              )
+            }
+          : props.ref
+      }
       name={own.name}
       required={own.required}
       autofocus={own.autofocus}

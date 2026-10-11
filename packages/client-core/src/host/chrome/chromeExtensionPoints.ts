@@ -16,7 +16,6 @@ import {
   qualifiedExtensionPointId,
   type ArbitrationMode,
   type DetailRegion,
-  type ExtensionPointKind,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginExtensionDescriptor, PluginExtensionPointDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import {
@@ -31,7 +30,7 @@ import { ownsRoute, readAnnotationMarks, readExtensionItems } from './chromeData
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin's contribution can
  *  never take its place. Same shape a context-menu row's id takes (docs/plugins/menus-and-markers.md § Context menus). */
-export const pluginExtensionId = (pluginId: string, id: string): string => `plugin:${pluginId}:${id}`
+const pluginExtensionId = (pluginId: string, id: string): string => `plugin:${pluginId}:${id}`
 
 export type PluginExtensionBinding = {
   /** The node the surface drawing this is looking at. */
@@ -52,7 +51,7 @@ export type PluginExtensionBinding = {
  * manifest are otherwise only observable as a strip that did or did not appear in a pane, and no test
  * can render one.
  */
-export function pluginExtensionPoint(
+function pluginExtensionPoint(
   pluginId: string,
   descriptor: PluginExtensionPointDescriptor,
   binding: PluginExtensionBinding,
@@ -73,12 +72,16 @@ export function pluginExtensionPoint(
   if (kind === 'annotation' && !descriptor.key) {
     throw new Error(`annotation point '${descriptor.id}' does not say what its items are keyed by`)
   }
-  // Which surface each mount names is checked where it is drawn: register.ts reads mounts only off the
-  // owner's own surfaces, so a point cannot reach another plugin's view.
+  // Which surface each mount names is checked where it is drawn: the frame registration pass reads mounts
+  // only off the owner's own surfaces, so a point cannot reach another plugin's view.
   if (descriptor.mounts && kind !== 'remote') {
-    throw new Error(`extension point '${descriptor.id}' is a '${kind}' point, and only a remote point mounts in a detail region`)
+    throw new Error(
+      `extension point '${descriptor.id}' is a '${kind}' point, and only a remote point mounts in a detail region`,
+    )
   }
-  const unknownRegion = descriptor.mounts?.find((mount) => !(DETAIL_REGIONS as readonly string[]).includes(mount.region))
+  const unknownRegion = descriptor.mounts?.find(
+    (mount) => !(DETAIL_REGIONS as readonly string[]).includes(mount.region),
+  )
   if (unknownRegion) {
     throw new Error(`extension point '${descriptor.id}' names an unknown detail region '${unknownRegion.region}'`)
   }
@@ -93,8 +96,10 @@ export function pluginExtensionPoint(
     // Frozen in the owner's declared order: the lookup string is minted from these fields in this
     // sequence, so a set rather than a list would make two devices disagree about what a key is.
     ...(descriptor.key ? { key: Object.keys(descriptor.key) } : {}),
-    ...(descriptor.mode === 'stack' || descriptor.mode === 'replace' ? { mode: descriptor.mode as ArbitrationMode } : {}),
-    // An older node's roster row carries no ceiling; four is the schema's own default.
+    ...(descriptor.mode === 'stack' || descriptor.mode === 'replace'
+      ? { mode: descriptor.mode as ArbitrationMode }
+      : {}),
+    // Four is the schema's own default, though every `acorn-1` Node's roster row carries a ceiling.
     max: descriptor.max ?? 4,
     // Names the owner declared, kept as declared. Whether a given `Slot` actually bound a handler for
     // one is the owner's business at draw time, and the host checks both before it forwards a request
@@ -108,7 +113,7 @@ export function pluginExtensionPoint(
 }
 
 /** One validated contribution. Throws with a reason if the descriptor is unusable on this device. */
-export function pluginExtension(
+function pluginExtension(
   pluginId: string,
   descriptor: PluginExtensionDescriptor,
   binding: PluginExtensionBinding,
@@ -116,7 +121,9 @@ export function pluginExtension(
   // Checked for shape only, not resolved against the registry: the two manifests register in an order
   // nobody controls (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
   if (!parseExtensionPointRef(descriptor.point)) {
-    throw new Error(`extension '${descriptor.id}' names '${descriptor.point}', which is not a '<pluginId>:<pointId>' reference`)
+    throw new Error(
+      `extension '${descriptor.id}' names '${descriptor.point}', which is not a '<pluginId>:<pointId>' reference`,
+    )
   }
   const base = {
     id: pluginExtensionId(pluginId, descriptor.id),
@@ -129,7 +136,7 @@ export function pluginExtension(
   }
   if (descriptor.items !== undefined) {
     // Confines the contribution to the contributor's own namespace (docs/plugins/cooperative-extension-points.md § Cooperative
-    // extension points; chrome/data.ts for why a roster row is re-checked here at all).
+    // extension points). A roster row is bytes a node sent, so it is checked again here.
     if (!ownsRoute(pluginId, descriptor.items)) {
       throw new Error(`extension '${descriptor.id}' reads '${descriptor.items}', which is not ${pluginId}'s`)
     }
@@ -146,26 +153,34 @@ export function pluginExtension(
       marks: (keys, signal) => readAnnotationMarks(pluginId, items, binding.nodeId(), keys, signal),
       ...(descriptor.onSelect
         ? {
-          // Verb already checked against this manifest's surfaces by the chrome pass. The item passed
-          // here is minted from the row the host drew, not from the point owner or another plugin.
-          run: (item: { id: string; title: string }) => void runChromeAction(descriptor.onSelect!, {
-            pluginId,
-            nodeId: binding.nodeId(),
-            item: { id: item.id, title: item.title },
-          }),
-        }
+            // Verb already checked against this manifest's surfaces by the chrome pass. The item passed
+            // here is minted from the row the host drew, not from the point owner or another plugin.
+            run: (item: { id: string; title: string }) =>
+              void runChromeAction(descriptor.onSelect!, {
+                pluginId,
+                nodeId: binding.nodeId(),
+                item: { id: item.id, title: item.title },
+              }),
+          }
         : {}),
     }
   }
   if (descriptor.remote !== undefined) {
     // A remote entry runs the plugin's own bytes in a worker, so it is gated exactly as a frame is: no
     // accepted bundle on this device, nothing to mount.
-    if (!binding.hash) throw new Error(`extension '${descriptor.id}' draws a tree, but no bundle is trusted on this device`)
+    if (!binding.hash)
+      throw new Error(`extension '${descriptor.id}' draws a tree, but no bundle is trusted on this device`)
     // The companion overlay this descriptor associated, carried through so `RemoteTree` can bind that
     // one name to the mounted slot. The node already refused an `overlay` naming a surface this manifest
     // does not declare (node-core/server/plugins/manifest.ts), which is why there is nothing to re-check
     // here: the host resolves it against this plugin's own registered overlays when the tree asks.
-    return { ...base, carrier: 'remote', entry: descriptor.remote, hash: binding.hash, ...(descriptor.overlay ? { overlay: descriptor.overlay } : {}) }
+    return {
+      ...base,
+      carrier: 'remote',
+      entry: descriptor.remote,
+      hash: binding.hash,
+      ...(descriptor.overlay ? { overlay: descriptor.overlay } : {}),
+    }
   }
   if (descriptor.frame !== undefined) {
     return { ...base, carrier: 'frame', frame: descriptor.frame }
@@ -195,7 +210,3 @@ export const registerPluginExtension = (
   descriptor: PluginExtensionDescriptor,
   binding: PluginExtensionBinding,
 ): Disposable => extensionRegistry.register(pluginExtension(pluginId, descriptor, binding), pluginId)
-
-/** Every kind this shell can draw, for the developer view's own header. Derived rather than typed out,
- *  so a kind added to the protocol shows up here without a second edit. */
-export type { ExtensionPointKind }

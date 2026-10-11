@@ -19,7 +19,10 @@ it('joins merge lanes through divergence, convergence, and the root', () => {
 })
 
 it('keeps boundary continuations and never draws inferred filtered edges', () => {
-  const rows = [{ id: 'tip', parents: ['next'] }, { id: 'next', parents: ['outside'] }]
+  const rows = [
+    { id: 'tip', parents: ['next'] },
+    { id: 'next', parents: ['outside'] },
+  ]
   const page = historyLayout(rows, true, true)
   expect(page[1]?.edges).toContainEqual({ from: 0, to: 0, start: 'center', end: 'bottom', continuation: true })
   const extended = historyLayout([...rows, { id: 'outside', parents: [] }], true, false)

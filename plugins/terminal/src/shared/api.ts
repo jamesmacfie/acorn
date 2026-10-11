@@ -2,7 +2,6 @@
 //
 // In shared/ because Terminal's client and server use the same paths. Other plugins use their
 // narrow Terminal contracts instead of constructing these routes.
-// Moved verbatim out of @acorn/protocol/api.ts.
 
 export const terminalSessionsRoute = '/v1/p/terminal/sessions'
 export const terminalProfilesRoute = '/v1/p/terminal/profiles'

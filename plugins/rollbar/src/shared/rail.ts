@@ -1,7 +1,7 @@
 import { parseRailItemId, railItemId, type PluginRailItem } from '@acorn/protocol/api.ts'
 import type { RollbarItemSummary } from './api'
 
-// The encoding is the host's (protocol/api.ts § railItemId); these two put Rollbar's names on its two
+// The encoding is the host's (protocol's `railItemId`); these two put Rollbar's names on its two
 // halves, because `integrationId` is what every other Rollbar type calls a connection.
 export type RollbarRailTarget = Pick<RollbarItemSummary, 'integrationId' | 'identifier'>
 

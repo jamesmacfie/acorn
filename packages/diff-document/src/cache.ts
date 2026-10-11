@@ -38,5 +38,3 @@ export function documentCache(maxBytes: number) {
     stats: () => ({ entries: entries.size, bytes }),
   }
 }
-
-export type DocumentCache = ReturnType<typeof documentCache>

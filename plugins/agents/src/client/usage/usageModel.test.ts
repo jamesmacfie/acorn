@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
-import { formatEstimateUsd, formatReset, formatTokens, planName, providerMetaLine, providerUsageRows, quotaPace, usageSummaryEntries } from './usageModel'
+import {
+  formatEstimateUsd,
+  formatReset,
+  formatTokens,
+  planName,
+  providerMetaLine,
+  providerUsageRows,
+  quotaPace,
+  usageSummaryEntries,
+} from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -42,8 +51,8 @@ describe('agent usage health and tooltip', () => {
     expect(usageHealth(percent)).toBe(health)
   })
 
-  // The order is the node's, which is the collector registration order (server/usage/collectors.ts).
-  // Reordering here would have to know the whole harness set, which is the thing that is now open.
+  // The order is the node's, which is the collector registration order. Reordering here would have to
+  // know the whole harness set, which the client does not.
   it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
     expect(usageSummaryEntries(snapshot)).toEqual([
@@ -144,8 +153,14 @@ describe('agent usage detail formatting', () => {
 
   describe('the pace mark under a quota bar', () => {
     const quota = (over: Partial<AgentUsageQuota>): AgentUsageQuota => ({
-      id: 'session', label: 'Session', percentRemaining: 50, resetsAt: null, resetText: null,
-      windowSeconds: 5 * 60 * 60, health: 'healthy', ...over,
+      id: 'session',
+      label: 'Session',
+      percentRemaining: 50,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: 5 * 60 * 60,
+      health: 'healthy',
+      ...over,
     })
     const now = 1_700_000_000_000
     const hour = 3_600_000
@@ -198,9 +213,11 @@ describe('agent usage detail formatting', () => {
         },
       },
     }
-    expect(providerUsageRows(claude)).toEqual(expect.arrayContaining([
-      { label: 'Estimated today', value: 'No price for this model' },
-      { label: 'Unpriced models', value: 'claude-new-model' },
-    ]))
+    expect(providerUsageRows(claude)).toEqual(
+      expect.arrayContaining([
+        { label: 'Estimated today', value: 'No price for this model' },
+        { label: 'Unpriced models', value: 'claude-new-model' },
+      ]),
+    )
   })
 })

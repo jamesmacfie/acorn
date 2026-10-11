@@ -5,11 +5,11 @@ import Icon from '../content/Icon'
 // (see styles/copy.css). Shows a brief check on success.
 //
 // `onCopy` exists because a sandboxed plugin frame has no `navigator.clipboard`; it copies through
-// the bridge instead. That was the documented reason two frames could not use this component at all.
+// the bridge instead.
 export default function CopyButton(props: {
   /** The text, or an accessor read at click time so a caller can pass a live value such as a ref's
    *  `textContent`. A plugin tree can only send the string: a function crosses the wire under a kit
-   *  event name and nothing else (protocol/tree/nodes.ts § KIT_EVENTS). */
+   *  event name and nothing else (`KIT_EVENTS`). */
   text: string | (() => string)
   onCopy?: (text: string) => void
   title?: string

@@ -2,21 +2,21 @@
 // chooses one cell of text. Keep the table small and explicit so an added Lucide name cannot quietly
 // turn into a word in a narrow row. Names without a terminal mark draw nothing.
 const GLYPHS: Record<string, string> = {
-  'archive': '▣',
-  'circle': '○',
+  archive: '▣',
+  circle: '○',
   'circle-alert': '!',
   'circle-check': '✓',
   'circle-dashed': '◌',
   'circle-question-mark': '?',
   'circle-stop': '■',
   'clipboard-pen': '✎',
-  'clock': '◷',
+  clock: '◷',
   'list-plus': '+',
   'loader-circle': '⠋',
   'shield-question-mark': '?',
   'triangle-alert': '⚠',
-  'workflow': '◇',
-  'x': '✕',
+  workflow: '◇',
+  x: '✕',
 }
 
 // One shell-owned tick drives both Spinner and spinning Icon instances. A render without a running

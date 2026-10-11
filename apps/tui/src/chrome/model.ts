@@ -12,9 +12,22 @@
 
 import { batch, createEffect, createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { integrationsOptions, projectsOptions, tasksOptions, workspacesOptions, type Project, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
 import {
-  activeTaskId, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, workspaceView,
+  integrationsOptions,
+  projectsOptions,
+  tasksOptions,
+  workspacesOptions,
+  type Project,
+  type Task,
+  type Workspace,
+} from '@acorn/client-core/infra/queries.ts'
+import {
+  activeTaskId,
+  rememberWorkspaceView,
+  selectedSource,
+  setActiveTaskId,
+  setSelectedSource,
+  workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs'
@@ -58,7 +71,9 @@ export function createShellModel(): ShellModel {
   const allTasks = createMemo(() => tasksQuery.data ?? [])
   const workspaces = createMemo(() => workspacesQuery.data ?? [])
   const ready = createMemo(() => !!workspacesQuery.data && !!tasksQuery.data)
-  const task = createMemo(() => (selectedSource() ? null : allTasks().find((row) => row.id === activeTaskId()) ?? null))
+  const task = createMemo(() =>
+    selectedSource() ? null : (allTasks().find((row) => row.id === activeTaskId()) ?? null),
+  )
 
   // An explicit choice wins; otherwise follow the open task, and fall back to the first workspace so
   // the rail has something to draw before anything has been opened. The desktop's derivation is the
@@ -92,22 +107,21 @@ export function createShellModel(): ShellModel {
 
   const scope = createSourceScope(() => workspace()?.id)
 
-  // Do not answer with a partial roster. Docker needs no provider, so mid-load it was briefly the only
-  // source: the Menu drew it, the caret took it, and it stayed the collection's remembered active row
-  // after GitHub arrived above it — so the shell selected GitHub while visibly focusing Docker. Both
+  // Do not answer with a partial roster. Docker needs no provider, so mid-load it can be the only
+  // source: the Menu draws it, the caret takes it, and it stays the collection's remembered active row
+  // after GitHub arrives above it — so the shell selects GitHub while visibly focusing Docker. Both
   // gates load asynchronously, so wait for both and let the first drawn row be the first row the
   // default below picks.
   const sourcesReady = createMemo(() => {
     const scoped = scope()
     return !!integrationsQuery.data && scoped.providers !== undefined && scoped.linked !== undefined
   })
-  const sources = createMemo(() => (sourcesReady()
-    ? availableSources(integrationsQuery.data?.integrations, scope())
-    : []))
+  const sources = createMemo(() =>
+    sourcesReady() ? availableSources(integrationsQuery.data?.integrations, scope()) : [],
+  )
 
-  // Where a workspace starts: the first source the Menu actually draws. One truth rather than two
-  // components agreeing because one of them waited for the other — the Rail used to hold this effect
-  // and the shell used to read its answer back out of the selection.
+  // Where a workspace starts: the first source the Menu actually draws. Decided here, once, rather than
+  // by two components where one waits for the other's answer.
   const defaultSource = createMemo(() => sources()[0] ?? null)
 
   // An explicit task path or source selection wins for that workspace. `chooseWorkspace` clears both,
@@ -126,7 +140,7 @@ export function createShellModel(): ShellModel {
     setSelectedSource(first.id)
     // The Menu's rows arrive with this selection, and nothing else on the screen is mounting to
     // schedule the pass that lands the caret on the first of them. Without this the region holds the
-    // keys on its own frame until some other region happens to mount (../keys/regions.ts § settle).
+    // keys on its own frame until some other region happens to mount (../keys/regions.ts § scheduleSettle).
     scheduleSettle()
   })
 
@@ -158,13 +172,12 @@ export function createShellModel(): ShellModel {
   // In one batch, because there is no coherent intermediate state here: the two effects above both
   // read the workspace and the selection together, and either one seeing "new workspace, old
   // selection" writes the wrong answer. Falling through with nothing selected is not a gap — it is
-  // how an unremembered workspace has always opened, on the first source its Menu draws.
+  // how an unremembered workspace opens, on the first source its Menu draws.
   const chooseWorkspace = (workspaceId: string): void => {
     const entering = workspaces().find((entry) => entry.id === workspaceId)
     const remembered = entering ? workspaceView(entering.id) : undefined
-    const task = remembered && 'taskId' in remembered
-      ? allTasks().find((row) => row.id === remembered.taskId)
-      : undefined
+    const task =
+      remembered && 'taskId' in remembered ? allTasks().find((row) => row.id === remembered.taskId) : undefined
     batch(() => {
       setActiveTaskId(null)
       setSelectedSource(null)
@@ -179,7 +192,15 @@ export function createShellModel(): ShellModel {
   }
 
   return {
-    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady,
-    projects: () => projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined,
+    workspaces,
+    allTasks,
+    workspace,
+    tasks,
+    task,
+    sources,
+    chooseWorkspace,
+    ready,
+    sourcesReady,
+    projects: () => (projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined),
   }
 }

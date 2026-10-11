@@ -16,8 +16,8 @@ const KEY_FILE = 'session.key'
 // The key that encrypts stored credentials at rest (server/secretBox.ts). 32 bytes as 64 hex chars,
 // the size A256GCM requires.
 //
-// Read it from the environment when it is there: the desktop supplies it from safeStorage before any
-// binding reads it, and a service manager may pass one in. Otherwise mint it into the data root, the
+// Read it from the environment when it is there, because a service manager may pass one in. Otherwise
+// mint it into the data root, the
 // same place the TLS private key sits. A headless node has no keychain, and making an operator
 // invent a 64-hex secret before boot buys nothing on a machine where the key lands beside the
 // database anyway.
@@ -79,14 +79,22 @@ export async function checkSessionKey(db: AppDatabase, secrets: SecretService): 
 export type NodeKeyCustody = {
   // The desktop helper delivered the keys in the start message, or this Node read them from files.
   delivery: 'desktop' | 'files'
-  // The session key check from this boot. Null when the Node didn't run one.
-  keyCheck: NodeKeyCheck | null
+  // The session key check from this boot.
+  keyCheck: NodeKeyCheck
   // Plain key files still in the data root, which any process running as this user can read.
   plainFiles: string[]
 }
 
-export function nodeKeyCustody(dataDir: string, delivery: NodeKeyCustody['delivery'], keyCheck: NodeKeyCheck | null = null): { snapshot(): NodeKeyCustody } {
+export function nodeKeyCustody(
+  dataDir: string,
+  delivery: NodeKeyCustody['delivery'],
+  keyCheck: NodeKeyCheck,
+): { snapshot(): NodeKeyCustody } {
   return {
-    snapshot: () => ({ delivery, keyCheck, plainFiles: [KEY_FILE, 'internal-token'].filter((name) => existsSync(join(dataDir, name))) }),
+    snapshot: () => ({
+      delivery,
+      keyCheck,
+      plainFiles: [KEY_FILE, 'internal-token'].filter((name) => existsSync(join(dataDir, name))),
+    }),
   }
 }

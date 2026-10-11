@@ -9,12 +9,9 @@ import { regionFocus } from '../keys/regions'
 // `document-over-frame` and `frame-beside-document`: a host-owned editor and a plugin's region, with
 // the split moved by a key rather than dragged.
 //
-// The written projection said the frame half is absent in a terminal and the document half fills the
-// pane. That was drawn before the `editor` rectangle existed and before it was clear what a `frame`
-// region actually holds here: a frame is a *loaded plugin's* tree, and a tree draws in cells like any
-// other (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels). What cannot
-// cross is an iframe's pixels, and a frame region is not one. So both halves are drawn, and the
-// projection in docs/panes.md now says so.
+// Both halves are drawn. A `frame` region here holds a *loaded plugin's* tree, and a tree draws in
+// cells like any other. What cannot cross is an iframe's pixels, and a frame region is not one
+// (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
 // One component and two names, because the axis is in the name and never in a prop
 // (docs/panes/layout.md § Layout model, on adding a ninth).
@@ -56,15 +53,14 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         measure(element)
         split.attach(element)
       }}
-      onSizeChange={() => { if (box) measure(box) }}
+      onSizeChange={() => {
+        if (box) measure(box)
+      }}
     >
       {/* Two named regions, two frames, no rule between them (../panel.tsx). Only the stacked axis
           can set a row count; across the axis the width is the box's own and the frame takes what it
           is given. */}
-      <box
-        flexDirection="column"
-        {...(axis === 'x' ? { width: split.size() } : {})}
-      >
+      <box flexDirection="column" {...(axis === 'x' ? { width: split.size() } : {})}>
         <Panel
           grow
           scroll
@@ -79,11 +75,7 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         grow
         scroll
         title="Frame"
-        onBox={regionFocus(
-          { paneId: props.stateKey, regionId: 'frame' },
-          1,
-          axis === 'x' ? { x: SECOND_COLUMN } : {},
-        )}
+        onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1, axis === 'x' ? { x: SECOND_COLUMN } : {})}
       >
         {props.regions.frame?.()}
       </Panel>

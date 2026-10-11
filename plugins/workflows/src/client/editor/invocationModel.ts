@@ -1,4 +1,4 @@
-// The review dialog's state, apart from its drawing (./InvocationDialog.tsx).
+// The review dialog's state, apart from its drawing (`InvocationDialog`).
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowInvocationApproval, WorkflowInvocationReview } from '../../shared/workflowInvocation'
 
@@ -31,7 +31,7 @@ export function invocationStatus(review: WorkflowInvocationReview): { tone: 'ok'
   return { tone: 'ok', label: 'Agents can start this' }
 }
 
-const whole = (text: string): number | null => /^\d+$/.test(text.trim()) && Number(text) > 0 ? Number(text) : null
+const whole = (text: string): number | null => (/^\d+$/.test(text.trim()) && Number(text) > 0 ? Number(text) : null)
 
 /** The approval the form describes, or the first thing to fix. */
 export function invocationApproval(
@@ -45,10 +45,13 @@ export function invocationApproval(
   const cost = form.maxCostUsd.trim() ? Number(form.maxCostUsd) : undefined
   if (!maxTurns) return { problem: 'Set the most turns a run may take.' }
   if (!minutes) return { problem: 'Set the longest a run may take, in minutes.' }
-  if (cost !== undefined && !(Number.isFinite(cost) && cost > 0)) return { problem: 'Leave the cost limit empty, or set a positive amount.' }
+  if (cost !== undefined && !(Number.isFinite(cost) && cost > 0))
+    return { problem: 'Leave the cost limit empty, or set a positive amount.' }
   if (!starts) return { problem: 'Set how many runs one agent session may start.' }
   // A fixed value only for an input the agent may not set; the rest keep the workflow's default.
-  const fixedInputs = Object.fromEntries(Object.entries(form.fixedInputs).filter(([name]) => !form.callerInputs.includes(name)))
+  const fixedInputs = Object.fromEntries(
+    Object.entries(form.fixedInputs).filter(([name]) => !form.callerInputs.includes(name)),
+  )
   return {
     approval: {
       projectId,

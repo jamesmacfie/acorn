@@ -10,13 +10,11 @@ import {
 } from '@acorn/plugin-api/testkit/client'
 import { AttachmentSlot } from './AttachmentSlot'
 
-// The composer's one extension point, rendered where it lives (docs/plugins/cooperative-extension-points.md § Cooperative
-// extension points, the `remote` kind). `Slot`'s arbitration is tested in client-core; what this adds
-// is the agents plugin's half — the key it passes is the media type, so a plugin that declared
-// `image/png` draws the `.png` and the composer's own chip draws everything else.
-//
-// The first test in this package's jsdom tier, which is what made it possible to test a region a
-// plugin ships at all (plugins/vitest.shared.ts).
+// The composer's one extension point, rendered where it lives
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `remote` kind).
+// `Slot`'s arbitration is tested in client-core; what this adds is the agents plugin's half: the key it
+// passes is the media type, so a plugin that declared `image/png` draws the `.png` and the composer's
+// own chip draws everything else.
 
 // The one thing a slot reads that needs a shell behind it: the reader's arbitration preference. Every
 // other mock this test could have grown was avoidable, and avoiding them is what keeps the deep
@@ -25,42 +23,48 @@ import { AttachmentSlot } from './AttachmentSlot'
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 // A compiled contributor rather than a worker one, so the tree host stays out of this. Which render
-// path answers is the point's business and client-core's to test (`plugins/tree/Slot.test.tsx`); what
-// is the agents plugin's own is the key it hands the slot, and both paths are keyed the same way.
+// path answers is the point's business and client-core's `Slot` tests'; what is the agents plugin's
+// own is the key it hands the slot, and both paths are keyed the same way.
 const Contributor = () => <span>drawn by images</span>
 
 const registered: Disposable[] = []
 
 const attachment = (filename: string, mediaType: string): AgentAttachment =>
-  ({ id: 'a1', filename, mediaType, byteSize: 2048 } as AgentAttachment)
+  ({ id: 'a1', filename, mediaType, byteSize: 2048 }) as AgentAttachment
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: AGENT_ATTACHMENT_POINT,
-    ownerId: 'agents',
-    label: 'Attachment',
-    kind: 'remote',
-    mode: 'replace',
-    max: 4,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: AGENT_ATTACHMENT_POINT,
+      ownerId: 'agents',
+      label: 'Attachment',
+      kind: 'remote',
+      mode: 'replace',
+      max: 4,
+    }),
+  )
 
 const contributor = (pluginId: string, matches: string[]) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:attachment`,
-    pluginId,
-    point: AGENT_ATTACHMENT_POINT,
-    label: `${pluginId} viewer`,
-    order: 500,
-    carrier: 'component',
-    component: Contributor,
-    matches,
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:attachment`,
+      pluginId,
+      point: AGENT_ATTACHMENT_POINT,
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'component',
+      component: Contributor,
+      matches,
+    } as ExtensionContribution),
+  )
 
 const draw = (file: AgentAttachment): string => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(
-    () => <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />,
+    () => (
+      <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />
+    ),
     host,
   )
   // Each remove control reads as one ✕, whether it is the chip's own or the one outside the slot:

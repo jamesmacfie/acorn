@@ -7,10 +7,15 @@ export function startLinkRequest<T>(request: {
   onError: (error: unknown) => void
 }): () => void {
   let live = true
-  void request.load().then((loaded) => {
-    if (live && request.currentNodeId() === request.nodeId) request.apply(loaded)
-  }).catch((error: unknown) => {
-    if (live && request.currentNodeId() === request.nodeId) request.onError(error)
-  })
-  return () => { live = false }
+  void request
+    .load()
+    .then((loaded) => {
+      if (live && request.currentNodeId() === request.nodeId) request.apply(loaded)
+    })
+    .catch((error: unknown) => {
+      if (live && request.currentNodeId() === request.nodeId) request.onError(error)
+    })
+  return () => {
+    live = false
+  }
 }

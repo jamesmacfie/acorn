@@ -19,7 +19,7 @@ export type SentryValidated = { dsn: SentryDsn; environment: string; release: st
 
 /** What `config` holds on the connection row: non-secret, provider-owned, and read back on every
  *  flush. A staging project is a second row rather than a mode, because these live here. */
-export type SentryConnectionConfig = { host: string; projectId: string; environment: string; release: string }
+type SentryConnectionConfig = { host: string; projectId: string; environment: string; release: string }
 
 const trimmed = (value: string | undefined): string => (value ?? '').trim()
 
@@ -27,11 +27,24 @@ const trimmed = (value: string | undefined): string => (value ?? '').trim()
  *  four codes below are the ones an ingestion endpoint can distinguish. */
 type Health =
   | { ok: true }
-  | { ok: false; error: 'provider_needs_auth' | 'provider_rate_limited' | 'provider_resource_not_found' | 'provider_bad_config' | 'provider_unavailable' }
+  | {
+      ok: false
+      error:
+        | 'provider_needs_auth'
+        | 'provider_rate_limited'
+        | 'provider_resource_not_found'
+        | 'provider_bad_config'
+        | 'provider_unavailable'
+    }
 
 /** Post an envelope with a header and no items. Sentry stores nothing and answers 200, so a
  *  connection test costs the owner no quota and puts no invented event in their issue list. */
-async function probe(fetchImpl: FetchLike, dsn: SentryDsn, client: string, sdk: { name: string; version: string }): Promise<Health> {
+async function probe(
+  fetchImpl: FetchLike,
+  dsn: SentryDsn,
+  client: string,
+  sdk: { name: string; version: string },
+): Promise<Health> {
   const result = await postEnvelope({ fetch: fetchImpl, dsn, envelope: probeEnvelope(), client, sdk, now: Date.now() })
   if (result.status === null) return { ok: false, error: 'provider_unavailable' }
   if (result.status === 401 || result.status === 403) return { ok: false, error: 'provider_needs_auth' }
@@ -97,7 +110,13 @@ export function createSentryTelemetryProvider(options: {
         if (!health.ok) {
           throw new ProviderOperationError(
             health.error,
-            health.error === 'provider_needs_auth' ? 401 : health.error === 'provider_rate_limited' ? 429 : health.error === 'provider_bad_config' ? 400 : 502,
+            health.error === 'provider_needs_auth'
+              ? 401
+              : health.error === 'provider_rate_limited'
+                ? 429
+                : health.error === 'provider_bad_config'
+                  ? 400
+                  : 502,
           )
         }
         return { dsn, environment: trimmed(credentials.environment), release: trimmed(credentials.release) }

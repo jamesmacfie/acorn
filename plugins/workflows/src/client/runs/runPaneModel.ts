@@ -2,12 +2,18 @@
 // tail of each node, and the four things a person can do to a run
 // (docs/workflows/routes-and-ui.md § Routes and UI).
 //
-// Built once per task in the host's own root (client-core registries/panes/paneModels.ts), so the
-// three socket subscriptions below are opened once for the pane and not once per region.
+// Built once per task in the host's own root, so the socket subscriptions below are opened once for
+// the pane and not once per region.
 import { createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
 import {
-  clientEvents, consumePaneIntent, onPluginFrame, type PaneIntent, type Task,
-  wsOnReconnect, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent,
+  clientEvents,
+  consumePaneIntent,
+  onPluginFrame,
+  type PaneIntent,
+  type Task,
+  wsOnReconnect,
+  wsOnWorkflowStepChanged,
+  wsOnWorkflowStepEvent,
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { WorkflowRunRow } from '../../contract/wire.ts'
@@ -24,8 +30,8 @@ import { workflowRefreshQueue } from '../refreshQueue'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
-/** The selected run keeps 200 non-stream events per step and 4,000 output characters. A command that prints a
- *  megabyte is still a step whose tail you want to read; the whole stream is on the row. */
+/** How much of the selected run each step keeps: non-stream events, and output characters. A command
+ *  that prints a megabyte is still a step whose tail you want to read; the whole stream is on the row. */
 const EVENT_CAP = 200
 const TAIL_CHARS = 4000
 
@@ -62,7 +68,9 @@ export function createRunPaneModel(task: Task) {
   const api = createWorkflowApi(queryClient)
   let disposed = false
   const live = () => !disposed && (nodeId === null || activeNodeId() === nodeId)
-  onCleanup(() => { disposed = true })
+  onCleanup(() => {
+    disposed = true
+  })
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [selectedRunId, setSelectedRunId] = createSignal<string>()
@@ -94,7 +102,10 @@ export function createRunPaneModel(task: Task) {
     return pending
   }
   const refetchSteps = () => stepsQueue?.refresh() ?? Promise.resolve()
-  onCleanup(() => { runsQueue.stop(); stepsQueue?.stop() })
+  onCleanup(() => {
+    runsQueue.stop()
+    stepsQueue?.stop()
+  })
   void refetchRuns().catch(() => undefined)
   createEffect(() => {
     const runId = selectedRunId()
@@ -108,16 +119,22 @@ export function createRunPaneModel(task: Task) {
     const queue = workflowRefreshQueue(async () => {
       const version = stepVersion
       const rows = await api.steps(runId)
-      if (current && live()) mutateSteps(rows.map(row => {
-        const edge = statusEdges[row.id]
-        return edge && edge.version > version
-          ? { ...row, status: edge.status as WorkflowStepProjection['status'], updatedAt: edge.at }
-          : row
-      }))
+      if (current && live())
+        mutateSteps(
+          rows.map((row) => {
+            const edge = statusEdges[row.id]
+            return edge && edge.version > version
+              ? { ...row, status: edge.status as WorkflowStepProjection['status'], updatedAt: edge.at }
+              : row
+          }),
+        )
     })
     stepsQueue = queue
     void queue.refresh().catch(() => undefined)
-    onCleanup(() => { current = false; queue.stop() })
+    onCleanup(() => {
+      current = false
+      queue.stop()
+    })
   })
 
   const selectedRun = createMemo(() => runs().find((run) => run.id === selectedRunId()))
@@ -136,10 +153,11 @@ export function createRunPaneModel(task: Task) {
   createEffect(() => {
     const rows = steps()
     if (!rows.length || rows.some((step) => step.id === selectedStepId())) return
-    const focus = rows.find((step) => step.status === 'waiting-gate')
-      ?? rows.find((step) => step.status === 'running')
-      ?? rows.find((step) => step.status === 'failed' || step.status === 'safety-rail')
-      ?? rows[0]
+    const focus =
+      rows.find((step) => step.status === 'waiting-gate') ??
+      rows.find((step) => step.status === 'running') ??
+      rows.find((step) => step.status === 'failed' || step.status === 'safety-rail') ??
+      rows[0]
     setSelectedStepId(focus.id)
   })
 
@@ -162,16 +180,14 @@ export function createRunPaneModel(task: Task) {
   })
 
   // The run's frozen definition is what says which step waits on which, so the pane's indentation is
-  // the editor's: one `graphOrder`, two lists (../editor/graphOrder.ts). A dispatched child is a row
-  // under the step that spawned it, which the definition cannot know.
+  // the editor's: one `graphOrder`, two lists. A dispatched child is a row under the step that spawned
+  // it, which the definition cannot know.
   const nodes = createMemo<RunNode[]>(() => {
     const rows = steps()
     const def = parseDef(selectedRun()?.defJson)
     const top = rows.filter((step) => !step.parentStepId)
     const byName = new Map(top.map((step) => [def ? rowIdentity(def, step) : step.name, step]))
-    const order = def
-      ? graphOrder(def)
-      : top.map((step) => ({ name: step.name, depth: 0, parents: [] as string[] }))
+    const order = def ? graphOrder(def) : top.map((step) => ({ name: step.name, depth: 0, parents: [] as string[] }))
     // A step not yet run has no row to name it, so its name comes from the definition.
     const labelOf = (name: string): string =>
       byName.get(name)?.name ?? def?.steps.find((candidate) => stepIdentity(candidate) === name)?.name ?? name
@@ -182,7 +198,14 @@ export function createRunPaneModel(task: Task) {
       out.push({ ...row, label, parentLabels: row.parents.map(labelOf), step })
       if (!step) continue
       for (const child of rows.filter((candidate) => candidate.parentStepId === step.id)) {
-        out.push({ name: child.name, label: child.name, depth: row.depth + 1, parents: [row.name], parentLabels: [label], step: child })
+        out.push({
+          name: child.name,
+          label: child.name,
+          depth: row.depth + 1,
+          parents: [row.name],
+          parentLabels: [label],
+          step: child,
+        })
       }
     }
     return out
@@ -200,45 +223,60 @@ export function createRunPaneModel(task: Task) {
   //
   // A status edge moves one glyph and reads nothing (`workflow:step-changed`). A run beginning or
   // ending re-reads, because it changes rows this client never saw.
-  onCleanup(wsOnWorkflowStepChanged(({ runId, stepId, status }) => {
-    if (!live() || runId !== selectedRunId()) return
-    statusEdges[stepId] = { version: ++stepVersion, status, at: Date.now() }
-    mutateSteps((current) => current.map((step) =>
-      step.id === stepId ? { ...step, status: status as WorkflowStepProjection['status'], updatedAt: Date.now() } : step))
-  }))
+  onCleanup(
+    wsOnWorkflowStepChanged(({ runId, stepId, status }) => {
+      if (!live() || runId !== selectedRunId()) return
+      statusEdges[stepId] = { version: ++stepVersion, status, at: Date.now() }
+      mutateSteps((current) =>
+        current.map((step) =>
+          step.id === stepId
+            ? { ...step, status: status as WorkflowStepProjection['status'], updatedAt: Date.now() }
+            : step,
+        ),
+      )
+    }),
+  )
 
-  onCleanup(wsOnWorkflowStepEvent(({ runId, stepId, event }) => {
-    if (!live() || runId !== selectedRunId()) return
-    if (!isWorkflowStepEvent(event) || (event.type !== 'stdout' && event.type !== 'stderr')) {
-      if ((events()[stepId]?.length ?? 0) === EVENT_CAP) {
-        setDropped(current => ({ ...current, [stepId]: (current[stepId] ?? 0) + 1 }))
+  onCleanup(
+    wsOnWorkflowStepEvent(({ runId, stepId, event }) => {
+      if (!live() || runId !== selectedRunId()) return
+      if (!isWorkflowStepEvent(event) || (event.type !== 'stdout' && event.type !== 'stderr')) {
+        if ((events()[stepId]?.length ?? 0) === EVENT_CAP) {
+          setDropped((current) => ({ ...current, [stepId]: (current[stepId] ?? 0) + 1 }))
+        }
+        setEvents((current) => ({ ...current, [stepId]: [...(current[stepId] ?? []), event].slice(-EVENT_CAP) }))
+        return
       }
-      setEvents((current) => ({ ...current, [stepId]: [...(current[stepId] ?? []), event].slice(-EVENT_CAP) }))
-      return
-    }
-    const text = event.text
-    setTails((current) => {
-      const next = (current[stepId] ?? '') + text
-      return { ...current, [stepId]: next.length > TAIL_CHARS ? next.slice(-TAIL_CHARS) : next }
-    })
-  }))
+      const text = event.text
+      setTails((current) => {
+        const next = (current[stepId] ?? '') + text
+        return { ...current, [stepId]: next.length > TAIL_CHARS ? next.slice(-TAIL_CHARS) : next }
+      })
+    }),
+  )
 
   const refresh = async (): Promise<void> => {
     if (!live()) return
     await Promise.all([refetchRuns(), refetchSteps()])
   }
-  const invalidate = () => { void refresh().catch(() => undefined) }
+  const invalidate = () => {
+    void refresh().catch(() => undefined)
+  }
 
-  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
-    const changed = payload as Partial<{ taskId: string; runId: string }>
-    if (changed.taskId !== task.id && changed.runId !== selectedRunId()) return
-    invalidate()
-  }))
-  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), (payload) => {
-    const changed = payload as Partial<WorkflowChildRunSummary & { ownerTaskId: string }>
-    if (changed.ownerTaskId !== task.id && changed.ownerTaskId !== selectedRun()?.parentTaskId) return
-    invalidate()
-  }))
+  onCleanup(
+    onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
+      const changed = payload as Partial<{ taskId: string; runId: string }>
+      if (changed.taskId !== task.id && changed.runId !== selectedRunId()) return
+      invalidate()
+    }),
+  )
+  onCleanup(
+    onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), (payload) => {
+      const changed = payload as Partial<WorkflowChildRunSummary & { ownerTaskId: string }>
+      if (changed.ownerTaskId !== task.id && changed.ownerTaskId !== selectedRun()?.parentTaskId) return
+      invalidate()
+    }),
+  )
   // Events announce edges, not history. Re-read both resources after a reconnect or a shed frame.
   onCleanup(wsOnReconnect(invalidate))
 
@@ -257,11 +295,13 @@ export function createRunPaneModel(task: Task) {
     if (intent.stepId) setSelectedStepId(intent.stepId)
   }
   applyIntent(consumePaneIntent(task.id, WORKFLOWS_PANE_ID))
-  onCleanup(clientEvents.on('presentation:pane-intent', (event) => {
-    if (event.taskId !== task.id || event.paneId !== WORKFLOWS_PANE_ID) return
-    consumePaneIntent(event.taskId, event.paneId)
-    applyIntent(event.intent)
-  }))
+  onCleanup(
+    clientEvents.on('presentation:pane-intent', (event) => {
+      if (event.taskId !== task.id || event.paneId !== WORKFLOWS_PANE_ID) return
+      consumePaneIntent(event.taskId, event.paneId)
+      applyIntent(event.intent)
+    }),
+  )
 
   // ── The four verbs ────────────────────────────────────────────────────────────────────────────
   //
@@ -298,8 +338,8 @@ export function createRunPaneModel(task: Task) {
     selectRun,
     selectStep: (stepId: string) => setSelectedStepId(stepId),
     /** The catalog's label for a contributed kind: "Run a command" for `terminal:command`. A view falls
-     *  back to `kindLabel` in ./runDisplay.ts, the built-in table, which stays out of this model so
-     *  registering the pane doesn't load every step kind's fields. */
+     *  back to `kindLabel`, the built-in table, which stays out of this model so registering the pane
+     *  doesn't load every step kind's fields. */
     contributedKindLabel: (kind: string): string | undefined =>
       catalog()?.kinds.find((entry) => entry.id === kind)?.describe?.label,
     now,

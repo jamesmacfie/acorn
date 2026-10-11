@@ -58,11 +58,11 @@ describe('agent delegation service', () => {
   let customAgents: CustomAgent[]
   let defaults: SpawnedAgentDefaults
   let childTasks: Map<string, { parentTaskId: string; title: string; branch: string }>
-  let createChildTask: ReturnType<typeof vi.fn<(
-    parentTaskId: string,
-    seed: { title: string; branch: string },
-    intendedChildId?: string,
-  ) => Promise<string>>>
+  let createChildTask: ReturnType<
+    typeof vi.fn<
+      (parentTaskId: string, seed: { title: string; branch: string }, intendedChildId?: string) => Promise<string>
+    >
+  >
 
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
@@ -70,30 +70,34 @@ describe('agent delegation service', () => {
     sessions = new AgentStore(db, ctx.core)
     terminals = []
     childTasks = new Map()
-    createChildTask = vi.fn(async (
-      parentTaskId: string,
-      seed: { title: string; branch: string },
-      intendedChildId?: string,
-    ) => {
-      if (!intendedChildId) throw new Error('The test task service requires an intended child id.')
-      const existing = childTasks.get(intendedChildId)
-      if (existing && (existing.parentTaskId !== parentTaskId || existing.title !== seed.title || existing.branch !== seed.branch)) {
-        throw new Error('conflicting intended child task')
-      }
-      childTasks.set(intendedChildId, { parentTaskId, ...seed })
-      return intendedChildId
-    })
+    createChildTask = vi.fn(
+      async (parentTaskId: string, seed: { title: string; branch: string }, intendedChildId?: string) => {
+        if (!intendedChildId) throw new Error('The test task service requires an intended child id.')
+        const existing = childTasks.get(intendedChildId)
+        if (
+          existing &&
+          (existing.parentTaskId !== parentTaskId || existing.title !== seed.title || existing.branch !== seed.branch)
+        ) {
+          throw new Error('conflicting intended child task')
+        }
+        childTasks.set(intendedChildId, { parentTaskId, ...seed })
+        return intendedChildId
+      },
+    )
     customAgents = []
     defaults = defaultSpawnedAgentDefaults()
     runtime = {
       store: sessions,
-      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick),
+      providers: { usable: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick) },
       spawnedAgentDefaults: async () => defaults,
       customAgents: async () => customAgents,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) =>
-        sessions.createSession(input, input.providerId === 'claude' ? CLAUDE : PROVIDER)),
-      enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
-        (await sessions.enqueueTurn(sessionId, input)).turn),
+        sessions.createSession(input, input.providerId === 'claude' ? CLAUDE : PROVIDER),
+      ),
+      enqueueTurn: vi.fn(
+        async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
+          (await sessions.enqueueTurn(sessionId, input)).turn,
+      ),
       applyRequestedConfig: vi.fn(async () => undefined),
       wait: vi.fn((sessionId: string, afterSeq: number) => sessions.snapshot(sessionId, afterSeq)),
       cancelTurn: vi.fn(async (sessionId: string, turnId?: string) => {
@@ -101,26 +105,24 @@ describe('agent delegation service', () => {
         if (target?.sessionId === sessionId) await sessions.cancelTurn(target.id)
       }),
     } as unknown as ManagedAgentRuntime
-    service = new AgentDelegationService(
-      runtime,
-      new AgentDelegationStore(db),
-      async () => terminals,
-      { createChild: createChildTask },
-    )
+    service = new AgentDelegationService(runtime, new AgentDelegationStore(db), async () => terminals, {
+      createChild: createChildTask,
+    })
   })
   afterEach(() => ctx.cleanup())
 
-  const managedCaller = async (
-    taskId = '11111111-1111-4111-8111-111111111111',
-    config: Record<string, unknown> = {},
-  ) => sessions.createSession({
-    taskId,
-    providerId: 'codex',
-    profileId: 'codex',
-    title: 'Parent',
-    kind: 'interactive',
-    config,
-  }, PROVIDER)
+  const managedCaller = async (taskId = '11111111-1111-4111-8111-111111111111', config: Record<string, unknown> = {}) =>
+    sessions.createSession(
+      {
+        taskId,
+        providerId: 'codex',
+        profileId: 'codex',
+        title: 'Parent',
+        kind: 'interactive',
+        config,
+      },
+      PROVIDER,
+    )
 
   const context = (taskId: string, sessionId: string, callId = 'call-1'): ToolContext => ({
     taskId,
@@ -150,12 +152,10 @@ describe('agent delegation service', () => {
     toolCeiling: { allow: ['agent_read'], maxRisk: 'execute' as const },
     ...overrides,
   })
-  const reconcileAfterRestart = () => new AgentDelegationService(
-    runtime,
-    service.store,
-    async () => terminals,
-    { createChild: createChildTask },
-  ).reconcile()
+  const reconcileAfterRestart = () =>
+    new AgentDelegationService(runtime, service.store, async () => terminals, {
+      createChild: createChildTask,
+    }).reconcile()
 
   it('creates one durable child and turn for a replayed managed caller call', async () => {
     const parent = await managedCaller()
@@ -167,12 +167,15 @@ describe('agent delegation service', () => {
     })
     await sessions.startTurn(parentTurn.id)
     const caller = context(parent.taskId, parent.id)
-    const first = await service.spawn({
-      title: 'Inspect tests',
-      prompt: 'Read the tests and report.',
-      isolation: 'shared',
-      toolCeiling: { allow: ['agent_read', 'unknown'], maxRisk: 'write' },
-    }, caller)
+    const first = await service.spawn(
+      {
+        title: 'Inspect tests',
+        prompt: 'Read the tests and report.',
+        isolation: 'shared',
+        toolCeiling: { allow: ['agent_read', 'unknown'], maxRisk: 'write' },
+      },
+      caller,
+    )
     const replay = await service.spawn({ title: 'Ignored replay body', prompt: 'ignored', isolation: 'shared' }, caller)
 
     expect(replay).toEqual(first)
@@ -188,79 +191,134 @@ describe('agent delegation service', () => {
     expect((await sessions.turn(first.turnId!))?.source).toBe('delegation')
   })
 
-  it.each(['shared', 'worktree'] as const)('inherits the parent model and effort for %s children without inheriting permission or mode', async (isolation) => {
-    const parent = await managedCaller(undefined, { configOptions: [
-      { id: 'model', category: 'model', currentValue: 'parent-model' },
-      { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
-      { id: 'permissions', category: 'permission', currentValue: 'full' },
-      { id: 'mode', category: 'mode', currentValue: 'plan' },
-    ] })
-    const result = await service.spawn({ title: 'Inherited child', prompt: 'Inspect.', isolation }, context(parent.taskId, parent.id))
-    const child = await sessions.requireSession(result.sessionId!)
-    expect(child.profileId).toBe('codex')
-    expect(child.config.requestedConfigOptions).toEqual({ model: 'parent-model', reasoning: 'high' })
-    expect((await sessions.turn(result.turnId!))?.effectivePolicy.configOptions)
-      .toEqual({ model: 'parent-model', reasoning: 'high' })
-  })
+  it.each(['shared', 'worktree'] as const)(
+    'inherits the parent model and effort for %s children without inheriting permission or mode',
+    async (isolation) => {
+      const parent = await managedCaller(undefined, {
+        configOptions: [
+          { id: 'model', category: 'model', currentValue: 'parent-model' },
+          { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
+          { id: 'permissions', category: 'permission', currentValue: 'full' },
+          { id: 'mode', category: 'mode', currentValue: 'plan' },
+        ],
+      })
+      const result = await service.spawn(
+        { title: 'Inherited child', prompt: 'Inspect.', isolation },
+        context(parent.taskId, parent.id),
+      )
+      const child = await sessions.requireSession(result.sessionId!)
+      expect(child.profileId).toBe('codex')
+      expect(child.config.requestedConfigOptions).toEqual({ model: 'parent-model', reasoning: 'high' })
+      expect((await sessions.turn(result.turnId!))?.effectivePolicy.configOptions).toEqual({
+        model: 'parent-model',
+        reasoning: 'high',
+      })
+    },
+  )
 
   it('uses saved explicit harness options, and lets each spawn override both harness and options', async () => {
-    defaults = { mode: 'explicit', profileId: 'claude-code', pinned: {
-      claude: { model: 'opus', effort: 'high' }, codex: { model: 'saved-codex', reasoning: 'medium' },
-    } }
+    defaults = {
+      mode: 'explicit',
+      profileId: 'claude-code',
+      pinned: {
+        claude: { model: 'opus', effort: 'high' },
+        codex: { model: 'saved-codex', reasoning: 'medium' },
+      },
+    }
     const parent = await managedCaller()
-    const saved = await service.spawn({ title: 'Saved defaults', prompt: 'Inspect.', isolation: 'worktree' }, context(parent.taskId, parent.id, 'saved'))
+    const saved = await service.spawn(
+      { title: 'Saved defaults', prompt: 'Inspect.', isolation: 'worktree' },
+      context(parent.taskId, parent.id, 'saved'),
+    )
     const child = await sessions.requireSession(saved.sessionId!)
     expect(child.profileId).toBe('claude-code')
     expect(child.config.requestedConfigOptions).toEqual({ model: 'opus', effort: 'high' })
 
-    const requested = await service.spawn({ title: 'Override', prompt: 'Inspect.', isolation: 'shared',
-      profileId: 'codex', configOptions: { model: 'requested-codex', reasoning: 'high' },
-    }, context(parent.taskId, parent.id, 'override'))
+    const requested = await service.spawn(
+      {
+        title: 'Override',
+        prompt: 'Inspect.',
+        isolation: 'shared',
+        profileId: 'codex',
+        configOptions: { model: 'requested-codex', reasoning: 'high' },
+      },
+      context(parent.taskId, parent.id, 'override'),
+    )
     const override = await sessions.requireSession(requested.sessionId!)
     expect(override.profileId).toBe('codex')
     expect(override.config.requestedConfigOptions).toEqual({ model: 'requested-codex', reasoning: 'high' })
   })
 
   it('does not carry provider-specific parent options into another harness', async () => {
-    const parent = await managedCaller(undefined, { configOptions: [
-      { id: 'model', category: 'model', currentValue: 'codex-only' },
-      { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
-    ] })
-    const result = await service.spawn({ title: 'Another harness', prompt: 'Inspect.', isolation: 'shared',
-      profileId: 'claude-code', configOptions: { model: 'opus' },
-    }, context(parent.taskId, parent.id))
+    const parent = await managedCaller(undefined, {
+      configOptions: [
+        { id: 'model', category: 'model', currentValue: 'codex-only' },
+        { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
+      ],
+    })
+    const result = await service.spawn(
+      {
+        title: 'Another harness',
+        prompt: 'Inspect.',
+        isolation: 'shared',
+        profileId: 'claude-code',
+        configOptions: { model: 'opus' },
+      },
+      context(parent.taskId, parent.id),
+    )
     expect((await sessions.requireSession(result.sessionId!)).config.requestedConfigOptions).toEqual({ model: 'opus' })
   })
 
   it('starts a custom agent by name, with its options and a ceiling no wider than its own', async () => {
-    defaults = { mode: 'explicit', profileId: 'claude-code', pinned: { codex: { model: 'saved-model', reasoning: 'low' } } }
-    customAgents = [{
-      id: 'agent-1', name: 'Bug reviewer', providerId: 'codex', profileId: 'codex',
-      options: { reasoning: 'high', model: 'gpt-codex' }, maxToolRisk: 'read', source: { kind: 'user' },
-    }]
+    defaults = {
+      mode: 'explicit',
+      profileId: 'claude-code',
+      pinned: { codex: { model: 'saved-model', reasoning: 'low' } },
+    }
+    customAgents = [
+      {
+        id: 'agent-1',
+        name: 'Bug reviewer',
+        providerId: 'codex',
+        profileId: 'codex',
+        options: { reasoning: 'high', model: 'gpt-codex' },
+        maxToolRisk: 'read',
+        source: { kind: 'user' },
+      },
+    ]
     const parent = await managedCaller()
-    const result = await service.spawn({
-      title: 'Review',
-      prompt: 'Review the diff.',
-      isolation: 'shared',
-      agent: 'bug reviewer',
-      configOptions: { model: 'gpt-codex-mini' },
-    }, context(parent.taskId, parent.id, 'custom-agent'))
+    const result = await service.spawn(
+      {
+        title: 'Review',
+        prompt: 'Review the diff.',
+        isolation: 'shared',
+        agent: 'bug reviewer',
+        configOptions: { model: 'gpt-codex-mini' },
+      },
+      context(parent.taskId, parent.id, 'custom-agent'),
+    )
 
-    expect(runtime.acceptSession).toHaveBeenCalledWith(expect.objectContaining({ customAgentId: 'agent-1' }), expect.any(String))
+    expect(runtime.acceptSession).toHaveBeenCalledWith(
+      expect.objectContaining({ customAgentId: 'agent-1' }),
+      expect.any(String),
+    )
     const child = await sessions.requireSession(result.sessionId!)
     // The caller's own choice for this child wins over the agent's.
     expect(child.config.requestedConfigOptions).toEqual({ reasoning: 'high', model: 'gpt-codex-mini' })
     expect(child.config.toolCeiling).toEqual({ allow: ['agent_spawn', 'agent_read', 'task_context'], maxRisk: 'read' })
 
-    await expect(service.spawn(
-      { title: 'Nobody', prompt: 'x', isolation: 'shared', agent: 'Missing' },
-      context(parent.taskId, parent.id, 'missing-agent'),
-    )).rejects.toThrow("No custom agent is called 'Missing'")
-    await expect(service.spawn(
-      { title: 'Clash', prompt: 'x', isolation: 'shared', agent: 'Bug reviewer', profileId: 'claude-code' },
-      context(parent.taskId, parent.id, 'clashing-agent'),
-    )).rejects.toThrow('Leave profileId out')
+    await expect(
+      service.spawn(
+        { title: 'Nobody', prompt: 'x', isolation: 'shared', agent: 'Missing' },
+        context(parent.taskId, parent.id, 'missing-agent'),
+      ),
+    ).rejects.toThrow("No custom agent is called 'Missing'")
+    await expect(
+      service.spawn(
+        { title: 'Clash', prompt: 'x', isolation: 'shared', agent: 'Bug reviewer', profileId: 'claude-code' },
+        context(parent.taskId, parent.id, 'clashing-agent'),
+      ),
+    ).rejects.toThrow('Leave profileId out')
   })
 
   it('does not accept a spawn until restart reconciliation has finished', async () => {
@@ -275,10 +333,12 @@ describe('agent delegation service', () => {
       reconciled,
     )
     let settled = false
-    const spawning = gated.spawn(
-      { title: 'After recovery', prompt: 'Report.', isolation: 'shared' },
-      context(parent.taskId, parent.id, 'after-recovery'),
-    ).finally(() => (settled = true))
+    const spawning = gated
+      .spawn(
+        { title: 'After recovery', prompt: 'Report.', isolation: 'shared' },
+        context(parent.taskId, parent.id, 'after-recovery'),
+      )
+      .finally(() => (settled = true))
 
     await Promise.resolve()
     expect(settled).toBe(false)
@@ -291,38 +351,59 @@ describe('agent delegation service', () => {
   it('accepts a signed terminal caller shape and inherits its managed profile', async () => {
     const taskId = '22222222-2222-4222-8222-222222222222'
     terminals = [terminal('terminal-1', taskId)]
-    const result = await service.spawn({
-      title: 'Terminal child',
-      prompt: 'Report.',
-      isolation: 'shared',
-    }, context(taskId, 'terminal-1'))
+    const result = await service.spawn(
+      {
+        title: 'Terminal child',
+        prompt: 'Report.',
+        isolation: 'shared',
+      },
+      context(taskId, 'terminal-1'),
+    )
     const child = await sessions.requireSession(result.sessionId!)
     expect(child).toMatchObject({ profileId: 'codex', parentSessionId: null, parentTurnId: null })
   })
 
   it('passes the chosen base through worktree provisioning and rejects it for shared children', async () => {
     const parent = await managedCaller()
-    const result = await service.spawn({ title: 'From parent', prompt: 'Continue.', isolation: 'worktree', baseBranch: 'feature/parent' }, context(parent.taskId, parent.id, 'base-spawn'))
+    const result = await service.spawn(
+      { title: 'From parent', prompt: 'Continue.', isolation: 'worktree', baseBranch: 'feature/parent' },
+      context(parent.taskId, parent.id, 'base-spawn'),
+    )
     expect(result.provisioningState).toBe('provisioned')
-    expect(createChildTask).toHaveBeenCalledWith(parent.taskId, { title: 'From parent', branch: 'From parent', baseBranch: 'feature/parent' }, result.taskId)
+    expect(createChildTask).toHaveBeenCalledWith(
+      parent.taskId,
+      { title: 'From parent', branch: 'From parent', baseBranch: 'feature/parent' },
+      result.taskId,
+    )
     createChildTask.mockClear()
-    await expect(service.spawn({ title: 'Shared', prompt: 'Continue.', isolation: 'shared', baseBranch: 'feature/parent' }, context(parent.taskId, parent.id, 'shared-base'))).rejects.toThrow('baseBranch requires worktree isolation')
+    await expect(
+      service.spawn(
+        { title: 'Shared', prompt: 'Continue.', isolation: 'shared', baseBranch: 'feature/parent' },
+        context(parent.taskId, parent.id, 'shared-base'),
+      ),
+    ).rejects.toThrow('baseBranch requires worktree isolation')
     expect(createChildTask).not.toHaveBeenCalled()
   })
 
   it('provisions an owned worktree child task, session, and initial turn exactly once', async () => {
     const parent = await managedCaller()
     const caller = context(parent.taskId, parent.id, 'worktree-spawn')
-    const first = await service.spawn({
-      title: 'Inspect tests',
-      prompt: 'Inspect the branch.',
-      isolation: 'worktree',
-    }, caller)
-    const replay = await service.spawn({
-      title: 'Ignored retry',
-      prompt: 'Ignored retry.',
-      isolation: 'worktree',
-    }, caller)
+    const first = await service.spawn(
+      {
+        title: 'Inspect tests',
+        prompt: 'Inspect the branch.',
+        isolation: 'worktree',
+      },
+      caller,
+    )
+    const replay = await service.spawn(
+      {
+        title: 'Ignored retry',
+        prompt: 'Ignored retry.',
+        isolation: 'worktree',
+      },
+      caller,
+    )
 
     expect(replay).toEqual(first)
     expect(first).toMatchObject({ provisioningState: 'provisioned', depth: 1 })
@@ -358,20 +439,34 @@ describe('agent delegation service', () => {
       await git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'base'])
       const base = await git(['rev-parse', 'HEAD'])
       vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
-      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
-        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+      const checked = new AgentDelegationService(
+        runtime,
+        service.store,
+        async () => terminals,
+        { createChild: createChildTask },
+        Promise.resolve(),
+        undefined,
+        ctx.core,
+      )
       const parent = await managedCaller()
-      const child = await checked.spawn({ title: 'Child', prompt: 'Make a change.', isolation: 'worktree',
-        checks: [{ kind: 'commits-ahead' }] }, context(parent.taskId, parent.id))
+      const child = await checked.spawn(
+        { title: 'Child', prompt: 'Make a change.', isolation: 'worktree', checks: [{ kind: 'commits-ahead' }] },
+        context(parent.taskId, parent.id),
+      )
       expect((await sessions.turn(child.turnId!))?.effectivePolicy).toMatchObject({
-        baseCommit: base, checks: [{ kind: 'commits-ahead' }],
+        baseCommit: base,
+        checks: [{ kind: 'commits-ahead' }],
       })
-    } finally { await rm(path, { recursive: true, force: true }) }
+    } finally {
+      await rm(path, { recursive: true, force: true })
+    }
   })
 
   it('reconciles creating worktree rows from each durable provisioning boundary', async () => {
     const noTask = service.store.reserveWorktree({
-      ownerTaskId: 'parent-a', ownerSessionId: 'owner-a', idempotencyKey: 'agent_spawn:no-task',
+      ownerTaskId: 'parent-a',
+      ownerSessionId: 'owner-a',
+      idempotencyKey: 'agent_spawn:no-task',
       provisioning: provisioningPlan(),
     }).spawn
     await reconcileAfterRestart()
@@ -379,7 +474,9 @@ describe('agent delegation service', () => {
     expect(childTasks.has(noTask.childTaskId)).toBe(true)
 
     const taskOnly = service.store.reserveWorktree({
-      ownerTaskId: 'parent-b', ownerSessionId: 'owner-b', idempotencyKey: 'agent_spawn:task-only',
+      ownerTaskId: 'parent-b',
+      ownerSessionId: 'owner-b',
+      idempotencyKey: 'agent_spawn:task-only',
       provisioning: provisioningPlan({ title: 'Task only', branch: 'Task only' }),
     }).spawn
     childTasks.set(taskOnly.childTaskId, { parentTaskId: 'parent-b', title: 'Task only', branch: 'Task only' })
@@ -387,18 +484,23 @@ describe('agent delegation service', () => {
     expect(await service.store.get(taskOnly.id)).toMatchObject({ provisioningState: 'provisioned' })
 
     const sessionOnly = service.store.reserveWorktree({
-      ownerTaskId: 'parent-c', ownerSessionId: 'owner-c', idempotencyKey: 'agent_spawn:session-only',
+      ownerTaskId: 'parent-c',
+      ownerSessionId: 'owner-c',
+      idempotencyKey: 'agent_spawn:session-only',
       provisioning: provisioningPlan({ title: 'Session only', branch: 'Session only' }),
     }).spawn
     childTasks.set(sessionOnly.childTaskId, { parentTaskId: 'parent-c', title: 'Session only', branch: 'Session only' })
-    const recoveredSession = await sessions.createSession({
-      taskId: sessionOnly.childTaskId,
-      providerId: 'codex',
-      profileId: 'codex',
-      title: 'Session only',
-      kind: 'delegated',
-      config: { delegationSpawnId: sessionOnly.id },
-    }, PROVIDER)
+    const recoveredSession = await sessions.createSession(
+      {
+        taskId: sessionOnly.childTaskId,
+        providerId: 'codex',
+        profileId: 'codex',
+        title: 'Session only',
+        kind: 'delegated',
+        config: { delegationSpawnId: sessionOnly.id },
+      },
+      PROVIDER,
+    )
     await reconcileAfterRestart()
     const repairedSessionOnly = await service.store.get(sessionOnly.id)
     expect(repairedSessionOnly).toMatchObject({
@@ -409,18 +511,23 @@ describe('agent delegation service', () => {
     expect((await sessions.snapshot(recoveredSession.id)).turns).toHaveLength(1)
 
     const turnWritten = service.store.reserveWorktree({
-      ownerTaskId: 'parent-d', ownerSessionId: 'owner-d', idempotencyKey: 'agent_spawn:turn-written',
+      ownerTaskId: 'parent-d',
+      ownerSessionId: 'owner-d',
+      idempotencyKey: 'agent_spawn:turn-written',
       provisioning: provisioningPlan({ title: 'Turn written', branch: 'Turn written' }),
     }).spawn
     childTasks.set(turnWritten.childTaskId, { parentTaskId: 'parent-d', title: 'Turn written', branch: 'Turn written' })
-    const turnSession = await sessions.createSession({
-      taskId: turnWritten.childTaskId,
-      providerId: 'codex',
-      profileId: 'codex',
-      title: 'Turn written',
-      kind: 'delegated',
-      config: { delegationSpawnId: turnWritten.id },
-    }, PROVIDER)
+    const turnSession = await sessions.createSession(
+      {
+        taskId: turnWritten.childTaskId,
+        providerId: 'codex',
+        profileId: 'codex',
+        title: 'Turn written',
+        kind: 'delegated',
+        config: { delegationSpawnId: turnWritten.id },
+      },
+      PROVIDER,
+    )
     const { turn: recoveredTurn } = await sessions.enqueueTurn(turnSession.id, {
       input: [{ type: 'text', text: 'Inspect the branch.' }],
       source: 'delegation',
@@ -439,11 +546,14 @@ describe('agent delegation service', () => {
   it('retains the child task and a bounded failed row when worktree session provisioning fails', async () => {
     const parent = await managedCaller()
     vi.mocked(runtime.acceptSession).mockRejectedValueOnce(new Error(`provider failed\n${'x'.repeat(4_000)}`))
-    const failed = await service.spawn({
-      title: 'Dirty worktree',
-      prompt: 'Make changes.',
-      isolation: 'worktree',
-    }, context(parent.taskId, parent.id, 'failed-worktree'))
+    const failed = await service.spawn(
+      {
+        title: 'Dirty worktree',
+        prompt: 'Make changes.',
+        isolation: 'worktree',
+      },
+      context(parent.taskId, parent.id, 'failed-worktree'),
+    )
 
     expect(failed.provisioningState).toBe('failed')
     expect(failed.error?.length).toBeLessThanOrEqual(2_000)
@@ -460,9 +570,14 @@ describe('agent delegation service', () => {
   it('retains and links a child session when initial-turn provisioning fails', async () => {
     const parent = await managedCaller()
     vi.mocked(runtime.enqueueTurn).mockRejectedValueOnce(new Error('turn hook refused the prompt'))
-    const failed = await service.spawn({
-      title: 'Recoverable session', prompt: 'Report.', isolation: 'worktree',
-    }, context(parent.taskId, parent.id, 'failed-turn'))
+    const failed = await service.spawn(
+      {
+        title: 'Recoverable session',
+        prompt: 'Report.',
+        isolation: 'worktree',
+      },
+      context(parent.taskId, parent.id, 'failed-turn'),
+    )
     const row = await service.store.get(failed.spawnId)
 
     expect(row).toMatchObject({
@@ -477,35 +592,50 @@ describe('agent delegation service', () => {
 
   it('allows only the parent-task owner to control a worktree child session', async () => {
     const parent = await managedCaller()
-    const child = await service.spawn({
-      title: 'Owned worktree', prompt: 'Report.', isolation: 'worktree',
-    }, context(parent.taskId, parent.id, 'owned-worktree'))
+    const child = await service.spawn(
+      {
+        title: 'Owned worktree',
+        prompt: 'Report.',
+        isolation: 'worktree',
+      },
+      context(parent.taskId, parent.id, 'owned-worktree'),
+    )
 
-    await expect(service.read(
-      { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
-      context(child.taskId, parent.id, 'wrong-task'),
-    )).rejects.toMatchObject({ kind: 'not_found' })
-    await expect(service.read(
-      { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
-      context(parent.taskId, parent.id, 'right-task'),
-    )).resolves.toMatchObject({ sessionId: child.sessionId })
+    await expect(
+      service.read(
+        { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
+        context(child.taskId, parent.id, 'wrong-task'),
+      ),
+    ).rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.read(
+        { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
+        context(parent.taskId, parent.id, 'right-task'),
+      ),
+    ).resolves.toMatchObject({ sessionId: child.sessionId })
   })
 
   it('projects bounded managed and terminal ownership metadata onto listed children', async () => {
     const managedParent = await managedCaller()
-    const managedChild = await service.spawn({
-      title: 'Managed child',
-      prompt: 'Report.',
-      isolation: 'shared',
-    }, context(managedParent.taskId, managedParent.id, 'managed-visibility'))
+    const managedChild = await service.spawn(
+      {
+        title: 'Managed child',
+        prompt: 'Report.',
+        isolation: 'shared',
+      },
+      context(managedParent.taskId, managedParent.id, 'managed-visibility'),
+    )
 
     const terminalTaskId = '33333333-3333-4333-8333-333333333333'
     terminals = [terminal('terminal-private-id', terminalTaskId)]
-    const terminalChild = await service.spawn({
-      title: 'Terminal child',
-      prompt: 'Report.',
-      isolation: 'shared',
-    }, context(terminalTaskId, 'terminal-private-id', 'terminal-visibility'))
+    const terminalChild = await service.spawn(
+      {
+        title: 'Terminal child',
+        prompt: 'Report.',
+        isolation: 'shared',
+      },
+      context(terminalTaskId, 'terminal-private-id', 'terminal-visibility'),
+    )
 
     const managedPage = await service.projectSessionList(await sessions.listSessions({ taskId: managedParent.taskId }))
     expect(managedPage.delegations).toContainEqual({
@@ -527,9 +657,14 @@ describe('agent delegation service', () => {
   it('projects a terminal owner from the parent task onto its worktree child task', async () => {
     const parentTaskId = '44444444-4444-4444-8444-444444444444'
     terminals = [terminal('terminal-worktree-owner', parentTaskId)]
-    const child = await service.spawn({
-      title: 'Worktree child', prompt: 'Report.', isolation: 'worktree',
-    }, context(parentTaskId, 'terminal-worktree-owner', 'terminal-worktree'))
+    const child = await service.spawn(
+      {
+        title: 'Worktree child',
+        prompt: 'Report.',
+        isolation: 'worktree',
+      },
+      context(parentTaskId, 'terminal-worktree-owner', 'terminal-worktree'),
+    )
 
     const page = await service.projectSessionList(await sessions.listSessions({ taskId: child.taskId }))
     expect(page.delegations).toContainEqual({
@@ -543,57 +678,101 @@ describe('agent delegation service', () => {
   it('requires an explicit managed profile when a terminal profile has no managed driver', async () => {
     const taskId = '22222222-2222-4222-8222-222222222222'
     terminals = [{ ...terminal('terminal-1', taskId), kind: 'shell', profileId: 'shell', command: '$SHELL' }]
-    await expect(service.spawn({
-      title: 'Unsupported inherited profile',
-      prompt: 'Report.',
-      isolation: 'shared',
-    }, context(taskId, 'terminal-1'))).rejects.toMatchObject({ kind: 'bad_request' })
+    await expect(
+      service.spawn(
+        {
+          title: 'Unsupported inherited profile',
+          prompt: 'Report.',
+          isolation: 'shared',
+        },
+        context(taskId, 'terminal-1'),
+      ),
+    ).rejects.toMatchObject({ kind: 'bad_request' })
 
-    const child = await service.spawn({
-      title: 'Explicit managed profile',
-      prompt: 'Report.',
-      profileId: 'codex',
-      isolation: 'shared',
-    }, context(taskId, 'terminal-1', 'call-2'))
+    const child = await service.spawn(
+      {
+        title: 'Explicit managed profile',
+        prompt: 'Report.',
+        profileId: 'codex',
+        isolation: 'shared',
+      },
+      context(taskId, 'terminal-1', 'call-2'),
+    )
     expect((await sessions.requireSession(child.sessionId!)).profileId).toBe('codex')
   })
 
   it('withholds spawning from workflow-owned callers and rejects absent call ids', async () => {
     const workflow = await managedCaller(undefined, { workflowRunId: 'run-1' })
     expect(await service.canSpawn(context(workflow.taskId, workflow.id))).toBe(false)
-    await expect(service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)))
-      .rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)),
+    ).rejects.toMatchObject({ kind: 'not_found' })
     const ordinary = await managedCaller()
-    await expect(service.spawn(
-      { title: 'No id', prompt: 'No id', isolation: 'shared' },
-      { ...context(ordinary.taskId, ordinary.id), callId: undefined },
-    )).rejects.toMatchObject({ kind: 'bad_request' })
+    await expect(
+      service.spawn(
+        { title: 'No id', prompt: 'No id', isolation: 'shared' },
+        { ...context(ordinary.taskId, ordinary.id), callId: undefined },
+      ),
+    ).rejects.toMatchObject({ kind: 'bad_request' })
   })
 
   it('withholds delegation from durable workflow sessions even without a config marker', async () => {
-    const workflow = await sessions.createSession({
-      taskId: '11111111-1111-4111-8111-111111111111', providerId: 'codex', profileId: 'codex',
-      title: 'Workflow without legacy metadata', kind: 'workflow', config: {},
-    }, PROVIDER)
+    const workflow = await sessions.createSession(
+      {
+        taskId: '11111111-1111-4111-8111-111111111111',
+        providerId: 'codex',
+        profileId: 'codex',
+        title: 'Workflow without legacy metadata',
+        kind: 'workflow',
+        config: {},
+      },
+      PROVIDER,
+    )
     expect(await service.canSpawn(context(workflow.taskId, workflow.id))).toBe(false)
-    await expect(service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)))
-      .rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)),
+    ).rejects.toMatchObject({ kind: 'not_found' })
     expect(runtime.acceptSession).not.toHaveBeenCalled()
   })
 
   it('pages and folds useful output while omitting verbose tool payloads', async () => {
     const parent = await managedCaller()
-    const child = await service.spawn({ title: 'Reader', prompt: 'Report.', isolation: 'shared' }, context(parent.taskId, parent.id))
-    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'assistant_message', text: 'hel', messageId: 'm1', append: true })
-    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'assistant_message', text: 'lo', messageId: 'm1', append: true })
+    const child = await service.spawn(
+      { title: 'Reader', prompt: 'Report.', isolation: 'shared' },
+      context(parent.taskId, parent.id),
+    )
+    await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'assistant_message',
+      text: 'hel',
+      messageId: 'm1',
+      append: true,
+    })
+    await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'assistant_message',
+      text: 'lo',
+      messageId: 'm1',
+      append: true,
+    })
     await sessions.recordEvent(child.sessionId!, child.turnId, {
       type: 'tool',
       tool: { id: 'tool-1', title: 'Huge command', input: 'secret '.repeat(1_000), output: 'bytes '.repeat(1_000) },
     })
-    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'diagnostic', level: 'warning', message: 'Check this.' })
-    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'error', code: 'failed', message: 'Stopped.', retryable: false })
+    await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'diagnostic',
+      level: 'warning',
+      message: 'Check this.',
+    })
+    await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'error',
+      code: 'failed',
+      message: 'Stopped.',
+      retryable: false,
+    })
 
-    const pageOne = await service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 4 }, context(parent.taskId, parent.id, 'read-1'))
+    const pageOne = await service.read(
+      { sessionId: child.sessionId!, afterSeq: 0, limit: 4 },
+      context(parent.taskId, parent.id, 'read-1'),
+    )
     expect(pageOne).toMatchObject({
       items: [
         { type: 'assistant_message', text: 'hello', fromSeq: 1, toSeq: 2 },
@@ -603,7 +782,10 @@ describe('agent delegation service', () => {
       hasMore: true,
     })
     expect(JSON.stringify(pageOne)).not.toContain('secret')
-    const pageTwo = await service.read({ sessionId: child.sessionId!, afterSeq: pageOne.nextCursor, limit: 4 }, context(parent.taskId, parent.id, 'read-2'))
+    const pageTwo = await service.read(
+      { sessionId: child.sessionId!, afterSeq: pageOne.nextCursor, limit: 4 },
+      context(parent.taskId, parent.id, 'read-2'),
+    )
     expect(pageTwo).toMatchObject({
       items: [{ type: 'error', code: 'failed', message: 'Stopped.', seq: 5 }],
       nextCursor: 5,
@@ -613,24 +795,30 @@ describe('agent delegation service', () => {
 
   it('returns structured output only after the declared schema validates it', async () => {
     const parent = await managedCaller()
-    const child = await service.spawn({
-      title: 'Structured reader',
-      prompt: 'Return a verdict.',
-      isolation: 'shared',
-      resultSchema: {
-        type: 'object',
-        properties: { verdict: { type: 'string', enum: ['pass', 'fail'] } },
-        required: ['verdict'],
-        additionalProperties: false,
+    const child = await service.spawn(
+      {
+        title: 'Structured reader',
+        prompt: 'Return a verdict.',
+        isolation: 'shared',
+        resultSchema: {
+          type: 'object',
+          properties: { verdict: { type: 'string', enum: ['pass', 'fail'] } },
+          required: ['verdict'],
+          additionalProperties: false,
+        },
       },
-    }, context(parent.taskId, parent.id))
+      context(parent.taskId, parent.id),
+    )
     await sessions.recordEvent(child.sessionId!, child.turnId, {
       type: 'assistant_message',
       text: '```json\n{"verdict":"pass"}\n```',
     })
     await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'turn_completed', stopReason: 'end_turn' })
 
-    const read = await service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context(parent.taskId, parent.id, 'read'))
+    const read = await service.read(
+      { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
+      context(parent.taskId, parent.id, 'read'),
+    )
     expect(read.items).toContainEqual({
       type: 'structured_output',
       value: { verdict: 'pass' },
@@ -673,10 +861,9 @@ describe('agent delegation service', () => {
       idempotencyKey: 'foreign-turn',
     })
     for (const turnId of [foreignTurn.id, '99999999-9999-4999-8999-999999999999']) {
-      await expect(service.cancel(
-        { sessionId: child.sessionId!, turnId },
-        context(parent.taskId, parent.id, `cancel-${turnId}`),
-      )).rejects.toMatchObject({ kind: 'not_found' })
+      await expect(
+        service.cancel({ sessionId: child.sessionId!, turnId }, context(parent.taskId, parent.id, `cancel-${turnId}`)),
+      ).rejects.toMatchObject({ kind: 'not_found' })
     }
   })
 
@@ -689,45 +876,61 @@ describe('agent delegation service', () => {
       required: ['answer'],
       additionalProperties: false,
     }
-    const result = await service.prompt({
-      sessionId: child.sessionId!,
-      prompt: 'Calculate.',
-      resultSchema: schema,
-      configOptions: { model: 'supported' },
-    }, context(parent.taskId, parent.id, 'configured-prompt'))
+    const result = await service.prompt(
+      {
+        sessionId: child.sessionId!,
+        prompt: 'Calculate.',
+        resultSchema: schema,
+        configOptions: { model: 'supported' },
+      },
+      context(parent.taskId, parent.id, 'configured-prompt'),
+    )
 
     expect(runtime.applyRequestedConfig).toHaveBeenCalledWith(child.sessionId, { model: 'supported' })
     expect(await sessions.turn(result.turnId)).toMatchObject({
       source: 'delegation',
       effectivePolicy: { resultSchema: schema, configOptions: { model: 'supported' } },
     })
-    await expect(service.prompt({
-      sessionId: child.sessionId!,
-      prompt: 'Do not mutate the queued turn.',
-      configOptions: { model: 'other' },
-    }, context(parent.taskId, parent.id, 'conflicting-config'))).rejects.toMatchObject({ kind: 'conflict' })
+    await expect(
+      service.prompt(
+        {
+          sessionId: child.sessionId!,
+          prompt: 'Do not mutate the queued turn.',
+          configOptions: { model: 'other' },
+        },
+        context(parent.taskId, parent.id, 'conflicting-config'),
+      ),
+    ).rejects.toMatchObject({ kind: 'conflict' })
   })
 
   it('rejects invalid result schemas before accepting durable work', async () => {
     const { parent, child } = await spawnChild()
     const before = (await sessions.snapshot(child.sessionId!)).turns.length
-    await expect(service.prompt({
-      sessionId: child.sessionId!,
-      prompt: 'Invalid contract.',
-      resultSchema: { type: 'not-a-json-schema-type' },
-    }, context(parent.taskId, parent.id, 'invalid-schema'))).rejects.toMatchObject({ kind: 'bad_request' })
+    await expect(
+      service.prompt(
+        {
+          sessionId: child.sessionId!,
+          prompt: 'Invalid contract.',
+          resultSchema: { type: 'not-a-json-schema-type' },
+        },
+        context(parent.taskId, parent.id, 'invalid-schema'),
+      ),
+    ).rejects.toMatchObject({ kind: 'bad_request' })
     expect((await sessions.snapshot(child.sessionId!)).turns).toHaveLength(before)
   })
 
   it('returns normal timeout and attention wait results with a stable cursor', async () => {
     const { parent, child } = await spawnChild()
     const caller = context(parent.taskId, parent.id, 'wait')
-    const timedOut = await service.wait({
-      sessionId: child.sessionId!,
-      afterSeq: 0,
-      until: 'turn_completed',
-      timeoutMs: 25,
-    }, caller)
+    const timedOut = await service.wait(
+      {
+        sessionId: child.sessionId!,
+        afterSeq: 0,
+        until: 'turn_completed',
+        timeoutMs: 25,
+      },
+      caller,
+    )
     expect(timedOut).toMatchObject({ matched: false, timedOut: true, lastSeq: 0 })
     expect(runtime.wait).toHaveBeenCalledWith(child.sessionId, 0, 'turn_completed', 25)
 
@@ -737,12 +940,15 @@ describe('agent delegation service', () => {
       kind: 'permission',
       title: 'Approve command',
     })
-    const attention = await service.wait({
-      sessionId: child.sessionId!,
-      afterSeq: 0,
-      until: 'attention',
-      timeoutMs: 30_000,
-    }, context(parent.taskId, parent.id, 'wait-attention'))
+    const attention = await service.wait(
+      {
+        sessionId: child.sessionId!,
+        afterSeq: 0,
+        until: 'attention',
+        timeoutMs: 30_000,
+      },
+      context(parent.taskId, parent.id, 'wait-attention'),
+    )
     expect(attention).toMatchObject({
       matched: true,
       timedOut: false,
@@ -760,29 +966,49 @@ describe('agent delegation service', () => {
       message: 'Provider stopped.',
       retryable: false,
     })
-    const stopped = await service.wait({
-      sessionId: child.sessionId!,
-      afterSeq: 0,
-      until: 'stopped',
-      timeoutMs: 0,
-    }, context(parent.taskId, parent.id, 'terminal-wait'))
+    const stopped = await service.wait(
+      {
+        sessionId: child.sessionId!,
+        afterSeq: 0,
+        until: 'stopped',
+        timeoutMs: 0,
+      },
+      context(parent.taskId, parent.id, 'terminal-wait'),
+    )
     expect(stopped).toMatchObject({ matched: true, timedOut: false, state: 'failed', attention: 'error' })
-    await expect(service.prompt(
-      { sessionId: child.sessionId!, prompt: 'Retry.' },
-      context(parent.taskId, parent.id, 'terminal-prompt'),
-    )).rejects.toMatchObject({ kind: 'conflict' })
+    await expect(
+      service.prompt(
+        { sessionId: child.sessionId!, prompt: 'Retry.' },
+        context(parent.taskId, parent.id, 'terminal-prompt'),
+      ),
+    ).rejects.toMatchObject({ kind: 'conflict' })
   })
 
   it('uses authoritative wait facts when completion falls outside the snapshot prefix', async () => {
     const { parent, child } = await spawnChild()
     vi.mocked(runtime.wait).mockImplementation((id, cursor, until) => sessions.waitSnapshot(id, cursor, until))
-    for (let n = 0; n < 2_001; n++) await sessions.recordEvent(child.sessionId!, child.turnId, {
-      type: 'diagnostic', level: 'info', message: 'progress',
-    })
+    for (let n = 0; n < 2_001; n++)
+      await sessions.recordEvent(child.sessionId!, child.turnId, {
+        type: 'diagnostic',
+        level: 'info',
+        message: 'progress',
+      })
     await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'turn_completed' })
-    const result = await service.wait({ sessionId: child.sessionId!, afterSeq: 0, until: 'turn_completed', timeoutMs: 0 }, context(parent.taskId, parent.id, 'complete-wait'))
-    expect(result).toMatchObject({ matched: true, timedOut: false, lastSeq: 2_002, state: 'ready', attention: 'completed' })
-    const later = await service.wait({ sessionId: child.sessionId!, afterSeq: 2_002, until: 'turn_completed', timeoutMs: 0 }, context(parent.taskId, parent.id, 'later-wait'))
+    const result = await service.wait(
+      { sessionId: child.sessionId!, afterSeq: 0, until: 'turn_completed', timeoutMs: 0 },
+      context(parent.taskId, parent.id, 'complete-wait'),
+    )
+    expect(result).toMatchObject({
+      matched: true,
+      timedOut: false,
+      lastSeq: 2_002,
+      state: 'ready',
+      attention: 'completed',
+    })
+    const later = await service.wait(
+      { sessionId: child.sessionId!, afterSeq: 2_002, until: 'turn_completed', timeoutMs: 0 },
+      context(parent.taskId, parent.id, 'later-wait'),
+    )
     expect(later).toMatchObject({ matched: false, timedOut: true, lastSeq: 2_002 })
   })
 
@@ -809,18 +1035,24 @@ describe('agent delegation service', () => {
 
   it('surfaces malformed structured output as a bounded read diagnostic', async () => {
     const parent = await managedCaller()
-    const child = await service.spawn({
-      title: 'Structured child',
-      prompt: 'Return a verdict.',
-      isolation: 'shared',
-      resultSchema: {
-        type: 'object',
-        properties: { verdict: { type: 'string', enum: ['pass'] } },
-        required: ['verdict'],
-        additionalProperties: false,
+    const child = await service.spawn(
+      {
+        title: 'Structured child',
+        prompt: 'Return a verdict.',
+        isolation: 'shared',
+        resultSchema: {
+          type: 'object',
+          properties: { verdict: { type: 'string', enum: ['pass'] } },
+          required: ['verdict'],
+          additionalProperties: false,
+        },
       },
-    }, context(parent.taskId, parent.id, 'malformed-spawn'))
-    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'assistant_message', text: '{"verdict":"fail"}' })
+      context(parent.taskId, parent.id, 'malformed-spawn'),
+    )
+    await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'assistant_message',
+      text: '{"verdict":"fail"}',
+    })
     await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'turn_completed' })
 
     const read = await service.read(
@@ -839,8 +1071,14 @@ describe('agent delegation service', () => {
   it('hides control operations from siblings, ancestors, descendants, and other tasks', async () => {
     const root = await managedCaller()
     const sibling = await managedCaller(root.taskId)
-    const child = await service.spawn({ title: 'Child', prompt: 'Report.', isolation: 'shared' }, context(root.taskId, root.id, 'owned-child'))
-    const grandchild = await service.spawn({ title: 'Grandchild', prompt: 'Report.', isolation: 'shared' }, context(root.taskId, child.sessionId!, 'owned-grandchild'))
+    const child = await service.spawn(
+      { title: 'Child', prompt: 'Report.', isolation: 'shared' },
+      context(root.taskId, root.id, 'owned-child'),
+    )
+    const grandchild = await service.spawn(
+      { title: 'Grandchild', prompt: 'Report.', isolation: 'shared' },
+      context(root.taskId, child.sessionId!, 'owned-grandchild'),
+    )
     const foreignContexts = [
       context(root.taskId, sibling.id, 'foreign-sibling'),
       context(root.taskId, root.id, 'foreign-grandchild'),
@@ -851,8 +1089,12 @@ describe('agent delegation service', () => {
     for (let index = 0; index < foreignContexts.length; index++) {
       const foreign = foreignContexts[index]!
       const target = targets[index]!
-      await expect(service.prompt({ sessionId: target, prompt: 'Probe.' }, foreign)).rejects.toMatchObject({ kind: 'not_found' })
-      await expect(service.wait({ sessionId: target, afterSeq: 0, until: 'ready', timeoutMs: 0 }, foreign)).rejects.toMatchObject({ kind: 'not_found' })
+      await expect(service.prompt({ sessionId: target, prompt: 'Probe.' }, foreign)).rejects.toMatchObject({
+        kind: 'not_found',
+      })
+      await expect(
+        service.wait({ sessionId: target, afterSeq: 0, until: 'ready', timeoutMs: 0 }, foreign),
+      ).rejects.toMatchObject({ kind: 'not_found' })
       await expect(service.cancel({ sessionId: target }, foreign)).rejects.toMatchObject({ kind: 'not_found' })
     }
   })
@@ -860,17 +1102,33 @@ describe('agent delegation service', () => {
   it('allows only the direct owner to read a delegated child', async () => {
     const root = await managedCaller()
     const sibling = await managedCaller(root.taskId)
-    const child = await service.spawn({ title: 'Child', prompt: 'Report.', isolation: 'shared' }, context(root.taskId, root.id))
-    const grandchild = await service.spawn({ title: 'Grandchild', prompt: 'Report.', isolation: 'shared' }, context(root.taskId, child.sessionId!, 'nested'))
+    const child = await service.spawn(
+      { title: 'Child', prompt: 'Report.', isolation: 'shared' },
+      context(root.taskId, root.id),
+    )
+    const grandchild = await service.spawn(
+      { title: 'Grandchild', prompt: 'Report.', isolation: 'shared' },
+      context(root.taskId, child.sessionId!, 'nested'),
+    )
 
-    await expect(service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context(root.taskId, sibling.id)))
-      .rejects.toMatchObject({ kind: 'not_found' })
-    await expect(service.read({ sessionId: grandchild.sessionId!, afterSeq: 0, limit: 10 }, context(root.taskId, root.id)))
-      .rejects.toMatchObject({ kind: 'not_found' })
-    await expect(service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context(root.taskId, grandchild.sessionId!)))
-      .rejects.toMatchObject({ kind: 'not_found' })
-    await expect(service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context('33333333-3333-4333-8333-333333333333', root.id)))
-      .rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context(root.taskId, sibling.id)),
+    ).rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.read({ sessionId: grandchild.sessionId!, afterSeq: 0, limit: 10 }, context(root.taskId, root.id)),
+    ).rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.read(
+        { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
+        context(root.taskId, grandchild.sessionId!),
+      ),
+    ).rejects.toMatchObject({ kind: 'not_found' })
+    await expect(
+      service.read(
+        { sessionId: child.sessionId!, afterSeq: 0, limit: 10 },
+        context('33333333-3333-4333-8333-333333333333', root.id),
+      ),
+    ).rejects.toMatchObject({ kind: 'not_found' })
   })
 
   describe('reports to the owner', () => {
@@ -890,7 +1148,11 @@ describe('agent delegation service', () => {
     ) => {
       await sessions.startTurn(turnId)
       await sessions.recordEvent(sessionId, turnId, {
-        type: 'request', requestId, kind, title: 'Child needs input', detail,
+        type: 'request',
+        requestId,
+        kind,
+        title: 'Child needs input',
+        detail,
       })
       await service.reports.deliverRequest(sessionId, requestId)
       return (await sessions.request(sessionId, requestId))!
@@ -900,7 +1162,9 @@ describe('agent delegation service', () => {
       const { parent, child } = await spawnChild()
       const turn = await sessions.turn(child.turnId!)
       expect(turn?.effectivePolicy.reportTo).toBe(parent.id)
-      expect(turn?.input).toContainEqual(expect.objectContaining({ type: 'context', source: 'delegation', label: 'Parent' }))
+      expect(turn?.input).toContainEqual(
+        expect.objectContaining({ type: 'context', source: 'delegation', label: 'Parent' }),
+      )
     })
 
     it('queues one report with the final message when the child turn settles', async () => {
@@ -914,9 +1178,14 @@ describe('agent delegation service', () => {
       expect(queued).toHaveLength(1)
       expect(queued[0]!.status).toBe('queued')
       expect(queued[0]!.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('All tests pass.') })
-      expect(queued[0]!.input).toContainEqual(expect.objectContaining({
-        type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
-      }))
+      expect(queued[0]!.input).toContainEqual(
+        expect.objectContaining({
+          type: 'context',
+          source: 'delegation_report',
+          label: 'Child',
+          resourceId: child.sessionId,
+        }),
+      )
     })
 
     it('saves host verdicts once and places them outside the child message after restart', async () => {
@@ -924,16 +1193,31 @@ describe('agent delegation service', () => {
       try {
         await writeFile(join(path, 'output.txt'), 'ready')
         vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
-        const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
-          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        const checked = new AgentDelegationService(
+          runtime,
+          service.store,
+          async () => terminals,
+          { createChild: createChildTask },
+          Promise.resolve(),
+          undefined,
+          ctx.core,
+        )
         const parent = await managedCaller()
-        const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
-          checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(parent.taskId, parent.id))
+        const child = await checked.spawn(
+          {
+            title: 'Child',
+            prompt: 'Write output.',
+            isolation: 'shared',
+            checks: [{ kind: 'file-exists', path: 'output.txt' }],
+          },
+          context(parent.taskId, parent.id),
+        )
         await finish(child.sessionId!, child.turnId!, 'I wrote output.txt.')
         const stale = (await sessions.turn(child.turnId!))!
         const inspect = vi.spyOn(ctx.core.fs, 'confineExistingFile')
         const [first, simultaneous] = await Promise.all([
-          checked.reports.checkResults(stale), checked.reports.checkResults(stale),
+          checked.reports.checkResults(stale),
+          checked.reports.checkResults(stale),
           checked.reports.deliver(child.turnId!).then(() => checked.reports.checkResults(stale)),
         ])
         expect(simultaneous).toEqual(first)
@@ -943,17 +1227,29 @@ describe('agent delegation service', () => {
         expect(await checked.reports.checkResults(stale)).toEqual(first)
         expect(inspect).toHaveBeenCalledTimes(1)
 
-        const restarted = new AgentDelegationService(runtime, service.store, async () => terminals,
-          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        const restarted = new AgentDelegationService(
+          runtime,
+          service.store,
+          async () => terminals,
+          { createChild: createChildTask },
+          Promise.resolve(),
+          undefined,
+          ctx.core,
+        )
         await restarted.reports.deliver(child.turnId!)
         const [report] = await reports(parent.id)
         expect(report?.effectivePolicy.checkResults).toEqual(first)
         const text = (report!.input[0] as { text: string }).text
         expect(text.indexOf('Host checks:')).toBeGreaterThan(text.indexOf('</pasted_content>'))
         expect(text).toContain('file-exists output.txt: holds')
-        const page = await restarted.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 100 }, context(parent.taskId, parent.id, 'read'))
+        const page = await restarted.read(
+          { sessionId: child.sessionId!, afterSeq: 0, limit: 100 },
+          context(parent.taskId, parent.id, 'read'),
+        )
         expect(page.items).toContainEqual(expect.objectContaining({ type: 'checks', results: first }))
-      } finally { await rm(path, { recursive: true, force: true }) }
+      } finally {
+        await rm(path, { recursive: true, force: true })
+      }
     })
 
     it('checks a terminal-owned child at settlement and recovers a missed broadcast at startup', async () => {
@@ -961,30 +1257,71 @@ describe('agent delegation service', () => {
       try {
         await writeFile(join(path, 'output.txt'), 'ready')
         vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
-        const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
-          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        const checked = new AgentDelegationService(
+          runtime,
+          service.store,
+          async () => terminals,
+          { createChild: createChildTask },
+          Promise.resolve(),
+          undefined,
+          ctx.core,
+        )
         const owner = await managedCaller()
         terminals = [terminal('terminal-owner', owner.taskId)]
-        const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
-          checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(owner.taskId, 'terminal-owner'))
+        const child = await checked.spawn(
+          {
+            title: 'Child',
+            prompt: 'Write output.',
+            isolation: 'shared',
+            checks: [{ kind: 'file-exists', path: 'output.txt' }],
+          },
+          context(owner.taskId, 'terminal-owner'),
+        )
         await finish(child.sessionId!, child.turnId!, 'Done.')
         await checked.reports.reconcile()
-        await vi.waitFor(async () => expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toBeDefined())
+        await vi.waitFor(async () =>
+          expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toBeDefined(),
+        )
         await rm(join(path, 'output.txt'))
-        const page = await checked.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 100 }, context(owner.taskId, 'terminal-owner'))
-        expect(page.items).toContainEqual(expect.objectContaining({ type: 'checks', results: expect.objectContaining({
-          outcome: 'completed', verdicts: [expect.objectContaining({ status: 'holds' })],
-        }) }))
-      } finally { await rm(path, { recursive: true, force: true }) }
+        const page = await checked.read(
+          { sessionId: child.sessionId!, afterSeq: 0, limit: 100 },
+          context(owner.taskId, 'terminal-owner'),
+        )
+        expect(page.items).toContainEqual(
+          expect.objectContaining({
+            type: 'checks',
+            results: expect.objectContaining({
+              outcome: 'completed',
+              verdicts: [expect.objectContaining({ status: 'holds' })],
+            }),
+          }),
+        )
+      } finally {
+        await rm(path, { recursive: true, force: true })
+      }
     })
 
     it('persists unverified checks when the child task root is unavailable', async () => {
       vi.spyOn(ctx.core.tasks, 'root').mockRejectedValue(new Error('Task deleted'))
-      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
-        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+      const checked = new AgentDelegationService(
+        runtime,
+        service.store,
+        async () => terminals,
+        { createChild: createChildTask },
+        Promise.resolve(),
+        undefined,
+        ctx.core,
+      )
       const parent = await managedCaller()
-      const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
-        checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(parent.taskId, parent.id))
+      const child = await checked.spawn(
+        {
+          title: 'Child',
+          prompt: 'Write output.',
+          isolation: 'shared',
+          checks: [{ kind: 'file-exists', path: 'output.txt' }],
+        },
+        context(parent.taskId, parent.id),
+      )
       await finish(child.sessionId!, child.turnId!, 'Done.')
       await checked.reports.deliver(child.turnId!)
       expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toMatchObject({
@@ -996,24 +1333,50 @@ describe('agent delegation service', () => {
     it('records an unverified terminal-owned check for a cancelled turn', async () => {
       const owner = await managedCaller()
       terminals = [terminal('terminal-owner', owner.taskId)]
-      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
-        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
-      const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
-        checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(owner.taskId, 'terminal-owner'))
+      const checked = new AgentDelegationService(
+        runtime,
+        service.store,
+        async () => terminals,
+        { createChild: createChildTask },
+        Promise.resolve(),
+        undefined,
+        ctx.core,
+      )
+      const child = await checked.spawn(
+        {
+          title: 'Child',
+          prompt: 'Write output.',
+          isolation: 'shared',
+          checks: [{ kind: 'file-exists', path: 'output.txt' }],
+        },
+        context(owner.taskId, 'terminal-owner'),
+      )
       await sessions.cancelTurn(child.turnId!)
       await checked.reports.deliver(child.turnId!)
       expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toMatchObject({
-        outcome: 'cancelled', verdicts: [{ status: 'unverified', reason: 'Turn cancelled.' }],
+        outcome: 'cancelled',
+        verdicts: [{ status: 'unverified', reason: 'Turn cancelled.' }],
       })
     })
 
     it('refuses commits-ahead on shared isolation at spawn and prompt', async () => {
       const parent = await managedCaller()
-      await expect(service.spawn({ title: 'Child', prompt: 'Do work.', isolation: 'shared',
-        checks: [{ kind: 'commits-ahead' }] }, context(parent.taskId, parent.id))).rejects.toMatchObject({ kind: 'bad_request' })
-      const child = await service.spawn({ title: 'Child', prompt: 'Do work.', isolation: 'shared' }, context(parent.taskId, parent.id, 'second'))
-      await expect(service.prompt({ sessionId: child.sessionId!, prompt: 'Commit.', checks: [{ kind: 'commits-ahead' }] },
-        context(parent.taskId, parent.id, 'third'))).rejects.toMatchObject({ kind: 'bad_request' })
+      await expect(
+        service.spawn(
+          { title: 'Child', prompt: 'Do work.', isolation: 'shared', checks: [{ kind: 'commits-ahead' }] },
+          context(parent.taskId, parent.id),
+        ),
+      ).rejects.toMatchObject({ kind: 'bad_request' })
+      const child = await service.spawn(
+        { title: 'Child', prompt: 'Do work.', isolation: 'shared' },
+        context(parent.taskId, parent.id, 'second'),
+      )
+      await expect(
+        service.prompt(
+          { sessionId: child.sessionId!, prompt: 'Commit.', checks: [{ kind: 'commits-ahead' }] },
+          context(parent.taskId, parent.id, 'third'),
+        ),
+      ).rejects.toMatchObject({ kind: 'bad_request' })
     })
 
     it.each([
@@ -1040,12 +1403,19 @@ describe('agent delegation service', () => {
         type: 'text',
         text: expect.stringContaining('A human must resolve it in the child session'),
       })
-      expect(queued[0]!.input).toContainEqual(expect.objectContaining({
-        type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
-        deepLink: { pane: 'agents', intent: { sessionId: child.sessionId } },
-      }))
+      expect(queued[0]!.input).toContainEqual(
+        expect.objectContaining({
+          type: 'context',
+          source: 'delegation_report',
+          label: 'Child',
+          resourceId: child.sessionId,
+          deepLink: { pane: 'agents', intent: { sessionId: child.sessionId } },
+        }),
+      )
       expect(await sessions.request(child.sessionId!, request.providerRequestId)).toMatchObject({
-        id: request.id, status: 'pending', resolution: null,
+        id: request.id,
+        status: 'pending',
+        resolution: null,
       })
     })
 
@@ -1057,7 +1427,9 @@ describe('agent delegation service', () => {
       const [report] = await reports(parent.id)
       expect(report?.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('s'.repeat(400)) })
       expect((report!.input[0] as { text: string }).text).not.toContain('s'.repeat(501))
-      expect(await sessions.turnForIdempotency(parent.id, `delegation-request:${request.id}`)).toMatchObject({ id: report?.id })
+      expect(await sessions.turnForIdempotency(parent.id, `delegation-request:${request.id}`)).toMatchObject({
+        id: report?.id,
+      })
       expect(await reports(parent.id)).toHaveLength(1)
     })
 
@@ -1065,7 +1437,9 @@ describe('agent delegation service', () => {
       const { parent, child } = await spawnChild()
       const { turn: interactive } = await sessions.enqueueTurn(parent.id, {
         input: [{ type: 'text', text: 'User work first.' }],
-        source: 'interactive', effectivePolicy: {}, idempotencyKey: 'interactive-before-request',
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: 'interactive-before-request',
       })
       await block(child.sessionId!, child.turnId!, 'question')
 
@@ -1078,7 +1452,9 @@ describe('agent delegation service', () => {
       const { parent, child } = await spawnChild()
       const { turn } = await sessions.enqueueTurn(child.sessionId!, {
         input: [{ type: 'text', text: 'Manual follow-up.' }],
-        source: 'interactive', effectivePolicy: {}, idempotencyKey: 'manual-child-turn',
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: 'manual-child-turn',
       })
       await block(child.sessionId!, turn.id, 'permission', 'manual-request')
 
@@ -1089,7 +1465,9 @@ describe('agent delegation service', () => {
       const { parent, child } = await spawnChild()
       const { turn } = await sessions.enqueueTurn(child.sessionId!, {
         input: [{ type: 'text', text: 'Unaddressed delegation.' }],
-        source: 'delegation', effectivePolicy: {}, idempotencyKey: 'unaddressed-delegation',
+        source: 'delegation',
+        effectivePolicy: {},
+        idempotencyKey: 'unaddressed-delegation',
       })
       await block(child.sessionId!, turn.id, 'permission', 'unaddressed-request')
 
@@ -1101,7 +1479,9 @@ describe('agent delegation service', () => {
       const other = await managedCaller(parent.taskId)
       const { turn } = await sessions.enqueueTurn(child.sessionId!, {
         input: [{ type: 'text', text: 'Forged delegated turn.' }],
-        source: 'delegation', effectivePolicy: { reportTo: other.id }, idempotencyKey: 'foreign-report-to',
+        source: 'delegation',
+        effectivePolicy: { reportTo: other.id },
+        idempotencyKey: 'foreign-report-to',
       })
       await block(child.sessionId!, turn.id, 'question', 'foreign-request')
 
@@ -1127,7 +1507,10 @@ describe('agent delegation service', () => {
       const { parent, child } = await spawnChild()
       await sessions.startTurn(child.turnId!)
       await sessions.recordEvent(child.sessionId!, child.turnId, {
-        type: 'request', requestId: 'expired-request', kind: 'permission', title: 'Approval needed',
+        type: 'request',
+        requestId: 'expired-request',
+        kind: 'permission',
+        title: 'Approval needed',
       })
       await sessions.expirePendingRequests(child.sessionId!)
 
@@ -1156,14 +1539,20 @@ describe('agent delegation service', () => {
       await finish(child.sessionId!, child.turnId!, 'Done.')
       await service.reports.deliver(child.turnId!)
 
-      await service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 50 }, context(parent.taskId, parent.id, 'read'))
+      await service.read(
+        { sessionId: child.sessionId!, afterSeq: 0, limit: 50 },
+        context(parent.taskId, parent.id, 'read'),
+      )
 
       expect((await reports(parent.id)).map((turn) => turn.status)).toEqual(['cancelled'])
     })
 
     it('does not report a turn the owner cancelled', async () => {
       const { parent, child } = await spawnChild()
-      await service.cancel({ sessionId: child.sessionId!, turnId: child.turnId! }, context(parent.taskId, parent.id, 'cancel'))
+      await service.cancel(
+        { sessionId: child.sessionId!, turnId: child.turnId! },
+        context(parent.taskId, parent.id, 'cancel'),
+      )
 
       await service.reports.deliver(child.turnId!)
 
@@ -1176,7 +1565,7 @@ describe('agent delegation service', () => {
 
       await reconcileAfterRestart()
 
-      // Boot doesn't wait for it, because a report can wait on a plugin's note (reports.ts).
+      // Boot doesn't wait for it, because a report can wait on a plugin's note.
       await vi.waitFor(async () => expect(await reports(parent.id)).toHaveLength(1))
     })
   })

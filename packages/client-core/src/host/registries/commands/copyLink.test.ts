@@ -22,7 +22,11 @@ describe('copy link', () => {
   it('round trips an encoded plugin path without changing its segments', async () => {
     const route = '/p/project%2Fone/x/example.plugin/items/a%25b/%E2%9C%93'
     const place = projectPlaceFromPath(route)
-    expect(place).toEqual({ kind: 'project', projectId: 'project/one', rest: ['x', 'example.plugin', 'items', 'a%b', '✓'] })
+    expect(place).toEqual({
+      kind: 'project',
+      projectId: 'project/one',
+      rest: ['x', 'example.plugin', 'items', 'a%b', '✓'],
+    })
     await copyLink(nodeId, place!)
     expect(writeText).toHaveBeenCalledWith(`acorn://${nodeId}${route}`)
     expect(parseLink(writeText.mock.calls[0][0])).toEqual({ kind: 'address', address: { nodeId, ...place } })
@@ -32,14 +36,19 @@ describe('copy link', () => {
   it('copies the explicit task row and pane item when supplied', async () => {
     await copyLink(nodeId, { kind: 'task', taskId: 'other-task', pane: 'notes', item: 'draft/one' })
     expect(parseLink(writeText.mock.calls[0][0])).toEqual({
-      kind: 'address', address: { nodeId, kind: 'task', taskId: 'other-task', pane: 'notes', item: 'draft/one' },
+      kind: 'address',
+      address: { nodeId, kind: 'task', taskId: 'other-task', pane: 'notes', item: 'draft/one' },
     })
   })
 
   it('includes an item only when the focused pane reports one', () => {
     const task = { id: 'task-one' } as Task
     const pane = paneRegistry.register({
-      id: 'notes', label: 'Notes', glyph: 'file', order: 1, component: () => null,
+      id: 'notes',
+      label: 'Notes',
+      glyph: 'file',
+      order: 1,
+      component: () => null,
       selectedItem: () => 'draft/one',
     })
     try {
@@ -51,18 +60,36 @@ describe('copy link', () => {
   })
 
   it('keeps a loaded plugin route even when its source is not project-scoped', () => {
-    const source = sourceRegistry.register({ id: 'http-requests', label: 'API', glyph: 'send', order: 1, projectSurfaceId: 'http-project' })
+    const source = sourceRegistry.register({
+      id: 'http-requests',
+      label: 'API',
+      glyph: 'send',
+      order: 1,
+      projectSurfaceId: 'http-project',
+    })
     const surface = projectSurfaceRegistry.register({
-      id: 'http-project', path: '/p/:projectId/x/http/requests/:requestId', item: 'requestId', order: 1,
+      id: 'http-project',
+      path: '/p/:projectId/x/http/requests/:requestId',
+      item: 'requestId',
+      order: 1,
       component: () => null,
     })
     try {
       expect(sourcePlaceFromPath('/p/project/x/http/requests/item%20one', 'http-requests', false)).toEqual({
-        kind: 'project', projectId: 'project', rest: ['x', 'http', 'requests', 'item one'],
+        kind: 'project',
+        projectId: 'project',
+        rest: ['x', 'http', 'requests', 'item one'],
       })
-      expect(sourcePlaceFromPath('/p/project/x/http/requests/item%20one', 'home', false)).toEqual({ kind: 'source', sourceId: 'home' })
+      expect(sourcePlaceFromPath('/p/project/x/http/requests/item%20one', 'home', false)).toEqual({
+        kind: 'source',
+        sourceId: 'home',
+      })
       expect(sourcePlaceFromPath('/p/project', 'home', false)).toEqual({ kind: 'source', sourceId: 'home' })
-      expect(sourcePlaceFromPath('/p/project', 'github', true)).toEqual({ kind: 'project', projectId: 'project', rest: [] })
+      expect(sourcePlaceFromPath('/p/project', 'github', true)).toEqual({
+        kind: 'project',
+        projectId: 'project',
+        rest: [],
+      })
     } finally {
       surface.dispose()
       source.dispose()

@@ -11,7 +11,7 @@ export const NODE_PROTOCOL_VERSION = 1
 //
 // Not a table, and not a second identity. A detached node loses this record and nothing else, which
 // is what makes "a detached node keeps working" true by construction rather than by care.
-export const nodeAttachmentSchema = z.strictObject({
+const nodeAttachmentSchema = z.strictObject({
   controlPlaneUrl: z.string().url(),
   // What the control plane called itself in its acknowledgement, if it said.
   controlPlaneName: z.string().optional(),
@@ -28,7 +28,7 @@ export const nodeAttachmentSchema = z.strictObject({
 export type NodeAttachment = z.infer<typeof nodeAttachmentSchema>
 
 // `node.json` in the data root: a Node's durable identity, written once on first start. See
-// docs/data-layer/data-root.md § `node.json` for why its schema tolerates unknown keys and no longer carries a
+// docs/data-layer/data-root.md § `node.json` for why its schema tolerates unknown keys and carries no
 // protocol version.
 export const nodeIdentitySchema = z.object({
   baseline: z.literal(ACORN_BASELINE),
@@ -37,7 +37,7 @@ export const nodeIdentitySchema = z.object({
   // Absent until the first successful bind. 0 is never persisted: it means "pick an ephemeral port".
   port: z.number().int().min(1).max(65535).optional(),
   // The host(s) this node answers to besides loopback, comma-separated. Set once, when the operator
-  // confirms it on first boot (server/transport/advertise.ts). Its presence is what makes the listener bind
+  // confirms it on first boot (`confirmAdvertiseHost`). Its presence is what makes the listener bind
   // beyond 127.0.0.1, so it records an exposure decision rather than a cached lookup. The empty
   // string is a real answer meaning "loopback only, stop asking".
   advertiseHost: z.string().optional(),
@@ -81,14 +81,13 @@ export const pairRequestSchema = z.strictObject({
   code: z.string().min(1).max(256),
   deviceName: z.string().min(1).max(120),
 })
-export type PairRequest = z.infer<typeof pairRequestSchema>
 
 // A paired device as the owner sees it. Never carries the token or its hash: the raw token is
 // returned exactly once, in `PairResult`. See docs/api-reference/transport.md § Pairing.
 //
 // Not strict for the same reason `pairResultSchema` is not: it is nested inside that response, so a
 // strict device object would break the handshake just as surely as a strict envelope around it.
-export const pairedDeviceSchema = z.object({
+const pairedDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   createdAt: z.number().int(),

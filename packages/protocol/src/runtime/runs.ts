@@ -4,23 +4,19 @@ import { z } from 'zod'
 // a table).
 //
 // Three parts of the system model "a thing that started, took time, cost money, and ended" —
-// `workflow_runs`, agent sessions, `schedule_runs` — in three SQLite files, one per owner, so nothing
-// could list them together. This is the read model that can, and it is deliberately a registry rather
-// than a table: a plugin declares the route that lists its runs and the host merges the answers, the
-// the same owner-bound route registry pattern used by other Node contributions.
+// `workflow_runs`, agent sessions, `schedule_runs` — in three SQLite files, one per owner. This read
+// model lists them together. It is a registry rather than a table: a plugin declares the route that
+// lists its runs and the host merges the answers.
 //
-// **When to build the core table instead.** Written down so it is recognized rather than re-argued:
-// when something *outside* the owning plugin must cancel a run, or charge it against a budget shared
-// with another plugin's runs. Both need a row a stranger can write to and a lock a stranger can take,
-// and neither is expressible as a merged read. Until then, no table and no migration. The cross-plugin
-// resource governor (2026-08-27 extensibility review, finding 11) belongs beside that table when it
-// arrives, modeled on `ProviderRequestScheduler`'s two-level shape — never before this registry has
-// proved the vocabulary.
+// Build a core table instead only when something outside the owning plugin must cancel a run, or
+// charge it against a budget shared with another plugin's runs. Both need a row a stranger can write
+// to and a lock a stranger can take, which a merged read cannot express. A cross-plugin resource
+// governor belongs beside that table, modeled on `ProviderRequestScheduler`'s two-level shape.
 
 /** Five states, which is as many as a merged list can mean across owners. An owner with a richer
- *  vocabulary (an agent session has eleven) maps into this and keeps its own for its own surfaces.
+ *  vocabulary, such as an agent session, maps into this and keeps its own for its own surfaces.
  *  `waiting` is blocked on a person or a gate; `running` is spending. */
-export const RUN_STATUSES = ['running', 'waiting', 'done', 'failed', 'cancelled'] as const
+const RUN_STATUSES = ['running', 'waiting', 'done', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
 export const isTerminalRunStatus = (status: RunStatus): boolean =>
@@ -59,7 +55,4 @@ export type RunRow = RunRowInput & {
   pluginId: string
 }
 
-export type RunsResponse = { runs: RunRow[] }
-
 export const coreRunsRoute = '/v1/core/runs'
-export const runsKey = ['runs'] as const

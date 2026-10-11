@@ -1,4 +1,10 @@
-import type { IntegrationAuthKind, IntegrationConnectionStatus, ProviderAccountRef, ProviderErrorCode, PublicIntegrationProvider } from '../../integrations/providers.ts'
+import type {
+  IntegrationAuthKind,
+  IntegrationConnectionStatus,
+  ProviderAccountRef,
+  ProviderErrorCode,
+  PublicIntegrationProvider,
+} from '../../integrations/providers.ts'
 
 // Integrations allow multiple connections per provider (docs/integrations.md). GitHub appears as a
 // synthesized row while its encrypted token stays with the node's active provider credential.
@@ -33,7 +39,7 @@ export type IntegrationMapping = { workspaceId: string; externalId: string; proj
 export type IntegrationMappingsResponse = { mappings: IntegrationMapping[] }
 // The projects one connection offers, for core's workspace picker. `id` is what a chosen row's
 // `externalId` becomes; `label` is display-only and already bounded by the node
-// (integrations/projectSource.ts). The provider that produced it is not the authority on either.
+// (`boundProviderProjects`). The provider that produced it is not the authority on either.
 export type IntegrationProject = { id: string; label: string }
 export type IntegrationProjectsResponse = { projects: IntegrationProject[] }
 
@@ -43,13 +49,13 @@ export const integrationTestRoute = (id: string) => `/v1/core/integrations/${id}
 export const integrationProjectsRoute = (id: string) => `/v1/core/integrations/${id}/projects`
 export const integrationMappingsRoute = (id: string) => `/v1/core/integrations/${id}/mappings`
 // The read half of the model seam: every backend a Generate control can spend, which is every
-// connected key plus every agent CLI installed on this machine (@acorn/protocol/modelProviders.ts § ModelBackend).
+// connected key plus every agent CLI installed on this machine (`ModelBackend`).
 // Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v1/core/*` has no
 // bridge scope (docs/integrations/model-providers.md § Model providers).
 export const modelBackendsRoute = '/v1/core/models/backends'
 
-// v3 adds descriptor metadata and normalized connection summaries. A distinct key stops a persisted v2
-// `{ provider, connected }` row from hiding registry-driven sources and settings.
+// The version suffix keeps a persisted row of an older shape, such as v2's `{ provider, connected }`,
+// from hiding registry-driven sources and settings. Bump it when the response shape changes.
 export const integrationsKey = ['integrations', 'v3'] as const
 // The suffix gives a future response-shape change its own persisted cache key.
 export const modelBackendsKey = ['model-backends', 'v1'] as const

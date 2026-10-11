@@ -19,7 +19,9 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ invalidateQueries: async () => {} }),
 }))
 vi.mock('../../infra/queries', () => ({
-  projectsKey: ['projects'], workspacesKey: ['workspaces'], tasksKey: ['tasks'],
+  projectsKey: ['projects'],
+  workspacesKey: ['workspaces'],
+  tasksKey: ['tasks'],
   projectsOptions: () => ({ of: 'projects' }),
   workspacesOptions: () => ({ of: 'workspaces' }),
   tasksOptions: () => ({ of: 'tasks' }),
@@ -41,10 +43,22 @@ import type { SettingsPageContext } from '../../host/registries/shell/settings'
 const DEFAULT: Workspace = { id: 'ws-default', name: 'Default', isDefault: true, sort: 0, projects: [] }
 const RUNN: Workspace = { id: 'ws-runn', name: 'Runn', isDefault: false, sort: 1, projects: [] }
 const project = (id: string, workspaceId: string): Project => ({
-  id, name: id, path: `/src/${id}`, workspaceId, sort: 0, hidden: false, color: null, vcs: 'git', defaultBranch: 'main', remoteUrl: null, github: null,
+  id,
+  name: id,
+  path: `/src/${id}`,
+  workspaceId,
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git',
+  defaultBranch: 'main',
+  remoteUrl: null,
+  github: null,
 })
 const context = (workspace: Workspace): SettingsPageContext => ({
-  scope: { nodeId: 'node-a', workspace }, navigate: () => {}, onWorkspaceDeleted: () => {},
+  scope: { nodeId: 'node-a', workspace },
+  navigate: () => {},
+  onWorkspaceDeleted: () => {},
 })
 
 let host: HTMLElement
@@ -62,7 +76,8 @@ afterEach(() => {
 })
 
 const nameField = () => host.querySelector<HTMLInputElement>('input[aria-label="Name"]')!
-const sectionIds = () => [...host.querySelectorAll('[data-settings-section]')].map((section) => section.getAttribute('data-settings-section'))
+const sectionIds = () =>
+  [...host.querySelectorAll('[data-settings-section]')].map((section) => section.getAttribute('data-settings-section'))
 
 describe('the Default workspace', () => {
   it('cannot be renamed or deleted from its own page', async () => {

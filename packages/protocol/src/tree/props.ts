@@ -6,17 +6,25 @@
 // is a function, a `class`, a `style`, or a role prop carrying a raw colour. Those are what this
 // refuses.
 //
-// ponytail: one shared schema for every node rather than one hand-written per node. The per-node
-// allowlist would be defence in depth, not the load-bearing check, and it rots on every kit change.
-// Upgrade path if a node ever does spread its leftovers: give `KIT_NODE_SCHEMAS` real per-node
-// entries — every caller already goes through it.
+// One shared schema for every node rather than one hand-written per node. A per-node allowlist would
+// be defence in depth, not the load-bearing check, and it rots on every kit change. If a node ever
+// spreads its leftovers, give `KIT_NODE_SCHEMAS` real per-node entries; every caller already goes
+// through it.
 import { z } from 'zod'
-import { FORBIDDEN_PROPS, isKitEvent, KIT_NODES, ROLE_PROPS, ROLE_VALUES, TEXT_NODE, type KitNodeName } from './nodes.ts'
+import {
+  FORBIDDEN_PROPS,
+  isKitEvent,
+  KIT_NODES,
+  ROLE_PROPS,
+  ROLE_VALUES,
+  TEXT_NODE,
+  type KitNodeName,
+} from './nodes.ts'
 import { safeContentHref } from '../content/externalUrl.ts'
 
 /** A handler on the wire. Never a function: the sandbox mints an id, the host maps it back to a
  *  closure that posts the event. */
-export const handlerRef = z.object({ $handler: z.number().int().positive() }).strict()
+const handlerRef = z.object({ $handler: z.number().int().positive() }).strict()
 export type HandlerRef = z.infer<typeof handlerRef>
 
 export const isHandlerRef = (value: unknown): value is HandlerRef =>
@@ -86,7 +94,7 @@ export const KIT_NODE_SCHEMAS: Record<KitNodeName | typeof TEXT_NODE, z.ZodType>
 const forbidden: ReadonlySet<string> = new Set<string>(FORBIDDEN_PROPS)
 
 /** How many props one node may carry. A node with more than this is not a node, it is a payload. */
-export const MAX_PROP_KEYS = 64
+const MAX_PROP_KEYS = 64
 
 export type SanitizedProps = { props: Record<string, unknown>; dropped: string[] }
 
@@ -99,7 +107,8 @@ export type SanitizedProps = { props: Record<string, unknown>; dropped: string[]
  */
 export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
   const dropped: string[] = []
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { props: type === TEXT_NODE ? { value: '' } : {}, dropped }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return { props: type === TEXT_NODE ? { value: '' } : {}, dropped }
   // A text run is a string, or a finite number drawn as one, and nothing else. Handled first
   // because everything below is about props a component reads, and a text run has no component.
   if (type === TEXT_NODE) {
@@ -107,7 +116,7 @@ export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
     const value = entries.find(([key]) => key === 'value')?.[1]
     for (const [key] of entries) if (key !== 'value') dropped.push(key)
     if (typeof value === 'string') return { props: { value }, dropped }
-    // A bundle built before the remote root turned numbers into text sends them as numbers. A finite
+    // A bundle whose remote root does not turn numbers into text sends them as numbers. A finite
     // number is drawn as its digits. Nothing else is, so an object still cannot reach the page.
     if (typeof value === 'number' && Number.isFinite(value)) return { props: { value: String(value) }, dropped }
     return { props: { value: '' }, dropped: [...dropped, 'value'] }

@@ -1,8 +1,4 @@
-import type {
-  AgentSession,
-  AgentSessionDelegation,
-  AgentSubagent,
-} from '../../contract/wire.ts'
+import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '../../contract/wire.ts'
 
 export type AgentSessionRosterRow =
   | {
@@ -68,7 +64,7 @@ export function agentSessionRoster(
   for (const session of sessions) {
     const parentId = parentIdFor(session)
     if (!parentId) continue
-    children.set(parentId, [...children.get(parentId) ?? [], session])
+    children.set(parentId, [...(children.get(parentId) ?? []), session])
   }
 
   const rows: AgentSessionRosterRow[] = []
@@ -78,7 +74,7 @@ export function agentSessionRoster(
     visited.add(session.id)
     const delegation = delegationBySession[session.id] ?? null
     const parentId = parentIdFor(session)
-    const managedParent = parentId ? sessionsById.get(parentId) ?? null : null
+    const managedParent = parentId ? (sessionsById.get(parentId) ?? null) : null
     rows.push({
       kind: 'managed',
       key: session.id,
@@ -113,9 +109,12 @@ export function agentSessionRoster(
 export function delegationSummary(row: Extract<AgentSessionRosterRow, { kind: 'managed' }>): string | null {
   const delegation = row.delegation
   if (!delegation) return null
-  const owner = delegation.owner.kind === 'terminal'
-    ? `Delegated by ${delegation.owner.label}${delegation.owner.profileId ? ` (${delegation.owner.profileId})` : ''}`
-    : row.managedParent ? 'Delegated' : 'Delegated · parent unavailable'
+  const owner =
+    delegation.owner.kind === 'terminal'
+      ? `Delegated by ${delegation.owner.label}${delegation.owner.profileId ? ` (${delegation.owner.profileId})` : ''}`
+      : row.managedParent
+        ? 'Delegated'
+        : 'Delegated · parent unavailable'
   return `${owner} · depth ${delegation.depth} · ${delegation.isolation}`
 }
 
@@ -127,7 +126,11 @@ export function liveDelegatedChildren(
 ): AgentSession[] {
   return sessions.filter((session) => {
     const owner = delegationBySession[session.id]?.owner
-    return !session.archivedAt && !['archived', 'stopped', 'failed'].includes(session.runtimeState)
-      && owner?.kind === 'managed' && owner.parentSessionId === parentSessionId
+    return (
+      !session.archivedAt &&
+      !['archived', 'stopped', 'failed'].includes(session.runtimeState) &&
+      owner?.kind === 'managed' &&
+      owner.parentSessionId === parentSessionId
+    )
   })
 }

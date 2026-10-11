@@ -4,11 +4,26 @@ import { join } from 'node:path'
 import { MessageChannel, Worker } from 'node:worker_threads'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-type Adapter = { ready: Promise<void>; postMessage(message: unknown, ports?: unknown[]): void; terminate(): Promise<void>; onerror: ((event: { message: string }) => void) | null }
-const held = vi.hoisted(() => ({ path: '', factory: null as ((url: string) => Adapter) | null, warnings: [] as unknown[] }))
+type Adapter = {
+  ready: Promise<void>
+  postMessage(message: unknown, ports?: unknown[]): void
+  terminate(): Promise<void>
+  onerror: ((event: { message: string }) => void) | null
+}
+const held = vi.hoisted(() => ({
+  path: '',
+  factory: null as ((url: string) => Adapter) | null,
+  warnings: [] as unknown[],
+}))
 vi.mock('./custody', () => ({ bundlePath: () => held.path }))
-vi.mock('@acorn/client-core/host/tree/workerHost.ts', () => ({ _setWorkerFactory: (factory: (url: string) => Adapter) => { held.factory = factory } }))
-vi.mock('@acorn/client-core/infra/telemetry', () => ({ createLogger: () => ({ warn: (...args: unknown[]) => held.warnings.push(args) }) }))
+vi.mock('@acorn/client-core/host/tree/workerHost.ts', () => ({
+  _setWorkerFactory: (factory: (url: string) => Adapter) => {
+    held.factory = factory
+  },
+}))
+vi.mock('@acorn/client-core/infra/telemetry', () => ({
+  createLogger: () => ({ warn: (...args: unknown[]) => held.warnings.push(args) }),
+}))
 import { installPluginWorkers } from './workerFactory'
 
 const adapters: Adapter[] = []
@@ -34,7 +49,8 @@ const bundle = (source: string) => {
 const start = (hash = `factory-${sequence}`) => {
   const adapter = held.factory!(`/plugin-worker/${hash}.js`)
   adapters.push(adapter)
-  const bridge = new MessageChannel(), tree = new MessageChannel()
+  const bridge = new MessageChannel(),
+    tree = new MessageChannel()
   channels.push(bridge, tree)
   bridge.port1.postMessage({ kind: 'ready', context: { nodeId: 'fixture' } })
   adapter.postMessage({ acornBridge: 1 }, [bridge.port2, tree.port2])
@@ -70,7 +86,10 @@ afterEach(async () => {
   // Always terminate native threads even when an injected adapter termination fails.
   await Promise.all(workers.map((worker) => realTerminate.call(worker)))
   await Promise.all(adapters.splice(0).map((adapter) => adapter.terminate()))
-  for (const channel of channels.splice(0)) { channel.port1.close(); channel.port2.close() }
+  for (const channel of channels.splice(0)) {
+    channel.port1.close()
+    channel.port2.close()
+  }
   workers.length = 0
   messages.length = 0
   held.warnings.length = 0
@@ -79,11 +98,16 @@ afterEach(async () => {
 })
 
 it('retains the hello through a delayed import and unrelated first listener, then restores adopted ports', async () => {
-  bundle(`addEventListener('message', () => postMessage({ phase: 'generic' })); await new Promise(resolve => setTimeout(resolve, 80)); ${claimingModule}`)
+  bundle(
+    `addEventListener('message', () => postMessage({ phase: 'generic' })); await new Promise(resolve => setTimeout(resolve, 80)); ${claimingModule}`,
+  )
   const { bridge } = start()
   let requests = 0
   bridge.port1.on('message', (message) => {
-    if (message.id === 1) { requests++; bridge.port1.postMessage({ id: 1, ok: true, body: 'once' }) }
+    if (message.id === 1) {
+      requests++
+      bridge.port1.postMessage({ id: 1, ok: true, body: 'once' })
+    }
   })
   await wait(() => messages.some((message) => message.phase === 'reply'))
   expect(messages.find((message) => message.phase === 'claimed')?.restored).toBe(true)
@@ -93,8 +117,10 @@ it('retains the hello through a delayed import and unrelated first listener, the
 it('retires both unclaimed transferred ports and reports the original module rejection', async () => {
   bundle(`await new Promise(resolve => setTimeout(resolve, 50)); throw new Error('rejected module')`)
   const { adapter, bridge, tree } = start()
-  const closed = vi.fn(), failed = vi.fn()
-  bridge.port1.on('close', closed); tree.port1.on('close', closed)
+  const closed = vi.fn(),
+    failed = vi.fn()
+  bridge.port1.on('close', closed)
+  tree.port1.on('close', closed)
   adapter.onerror = failed
   await wait(() => failed.mock.calls.length > 0)
   await wait(() => closed.mock.calls.length === 2)
@@ -104,8 +130,10 @@ it('retires both unclaimed transferred ports and reports the original module rej
 it('expires an unclaimed hello with a visible worker error and closes its transferred ports', async () => {
   bundle(`addEventListener('message', () => postMessage({ phase: 'generic' })); await new Promise(() => {})`)
   const { adapter, bridge, tree } = start()
-  const closed = vi.fn(), failed = vi.fn()
-  bridge.port1.on('close', closed); tree.port1.on('close', closed)
+  const closed = vi.fn(),
+    failed = vi.fn()
+  bridge.port1.on('close', closed)
+  tree.port1.on('close', closed)
   adapter.onerror = failed
   await wait(() => failed.mock.calls.length > 0, 12_000)
   await wait(() => closed.mock.calls.length === 2)
@@ -135,9 +163,15 @@ it('cancels repeated deferred same-hash adapters without spawning and releases e
   const first = start('barrier')
   await first.adapter.ready
   let release = () => {}
-  const barrier = new Promise<void>((resolve) => { release = resolve; gates.push(resolve) })
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve
+    gates.push(resolve)
+  })
   vi.spyOn(Worker.prototype, 'terminate').mockImplementation(function (this: Worker) {
-    return realTerminate.call(this).then(async (code) => { await barrier; return code })
+    return realTerminate.call(this).then(async (code) => {
+      await barrier
+      return code
+    })
   })
   const retirement = first.adapter.terminate()
   for (let i = 0; i < 100; i++) {
@@ -148,7 +182,9 @@ it('cancels repeated deferred same-hash adapters without spawning and releases e
   }
   const survivor = start('barrier')
   let constructed = false
-  void survivor.adapter.ready.then(() => { constructed = true })
+  void survivor.adapter.ready.then(() => {
+    constructed = true
+  })
   expect(workers).toHaveLength(1)
   expect(constructed).toBe(false)
   release()
@@ -161,7 +197,9 @@ it('observes a rejected termination and waits for actual thread exit before admi
   bundle(claimingModule)
   const first = start('rejected-termination')
   await first.adapter.ready
-  vi.spyOn(Worker.prototype, 'terminate').mockImplementationOnce(() => Promise.reject(new Error('injected termination rejection')))
+  vi.spyOn(Worker.prototype, 'terminate').mockImplementationOnce(() =>
+    Promise.reject(new Error('injected termination rejection')),
+  )
   const retirement = first.adapter.terminate()
   const survivor = start('rejected-termination')
   await wait(() => held.warnings.length === 1)

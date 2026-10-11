@@ -35,7 +35,13 @@ export class SendError extends Error {}
 
 // CLIs emit colour even when their stdout is a pipe.
 const ANSI = /\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g
-const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? null
+const lastLine = (stdout: string): string | null =>
+  stdout
+    .replace(ANSI, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .pop() ?? null
 
 // Only resolves the names a request references (docs/http-client.md § Sending). A command variable's
 // value comes from running its shell command, so precedence must not mean running a lower layer for
@@ -88,7 +94,9 @@ async function resolveVarsWithSensitivity(
     if (!task) throw new SendError('The task used to send this request no longer exists')
     const project = task.projectId ? await checked(core.projects.byId(task.projectId), signal) : null
     if (task.projectId !== projectId) {
-      throw new SendError(`The selected task belongs to ${project?.name ?? task.projectId ?? 'another project'}, not this project`)
+      throw new SendError(
+        `The selected task belongs to ${project?.name ?? task.projectId ?? 'another project'}, not this project`,
+      )
     }
     // taskRoot is null until a worktree exists (and always under dev:node); fall back to the
     // project checkout, exactly as resolveDbUrl and the preview resolver do.
@@ -100,7 +108,14 @@ async function resolveVarsWithSensitivity(
     if (project?.github) vars.repo = `${project.github.owner}/${project.github.name}`
     if (task.branch) vars.branch = task.branch
     vars.taskId = task.id
-    if (project) taskInfo = { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
+    if (project)
+      taskInfo = {
+        projectId: project.id,
+        projectName: project.name,
+        github: project.github,
+        branch: task.branch,
+        title: task.title,
+      }
   }
   if (!cwd) cwd = (await checked(core.projects.byId(projectId), signal))?.path ?? null
   if (cwd) vars.worktree = cwd
@@ -135,37 +150,47 @@ async function resolveVarsWithSensitivity(
     const group = new AbortController()
     const commandSignal = AbortSignal.any([signal, group.signal])
     const pending = commands.map(async (row) => {
-        try {
-          // bash -lc, not /bin/sh -c: a login shell picks up nvm/rbenv/direnv shims, which is what
-          // makes `op read …` or `mise exec …` work the way it does in the user's own terminal.
-          // The host broker runs outside this plugin's permission-scoped worker. A child spawned in
-          // the worker inherits its Node permissions and cannot load a CLI outside the plugin bundle.
-          commandSignal.throwIfAborted()
-          const result = await core.proc.runProcess({
-            file: 'bash', args: ['-lc', opened.get(row.id)!], cwd, env,
-            timeoutMs: COMMAND_TIMEOUT_MS, maxOutputBytes: COMMAND_MAX_BUFFER, signal: commandSignal,
-          })
-          commandSignal.throwIfAborted()
-          if (result.aborted) throw new SendError(`Variable "${row.name}": command canceled`)
-          if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start`)
-          if (result.timedOut) throw new SendError(`Variable "${row.name}": command timed out after ${COMMAND_TIMEOUT_MS / 1000} seconds`)
-          if (result.truncated) throw new SendError(`Variable "${row.name}": command produced more than ${COMMAND_MAX_BUFFER} bytes of output`)
-          if (result.code !== 0) {
-            // Command diagnostics can include private values that have not resolved successfully.
-            throw new SendError(`Variable "${row.name}": command exited ${result.code}`)
-          }
-          const line = lastLine(result.stdout)
-          if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
-          return [row.name, line] as const
-        } catch (err) {
-          commandSignal.throwIfAborted()
-          if (err instanceof SendError) throw err
-          throw new SendError(`Variable "${row.name}": command failed`)
+      try {
+        // bash -lc, not /bin/sh -c: a login shell picks up nvm/rbenv/direnv shims, which is what
+        // makes `op read …` or `mise exec …` work the way it does in the user's own terminal.
+        // The host broker runs outside this plugin's permission-scoped worker. A child spawned in
+        // the worker inherits its Node permissions and cannot load a CLI outside the plugin bundle.
+        commandSignal.throwIfAborted()
+        const result = await core.proc.runProcess({
+          file: 'bash',
+          args: ['-lc', opened.get(row.id)!],
+          cwd,
+          env,
+          timeoutMs: COMMAND_TIMEOUT_MS,
+          maxOutputBytes: COMMAND_MAX_BUFFER,
+          signal: commandSignal,
+        })
+        commandSignal.throwIfAborted()
+        if (result.aborted) throw new SendError(`Variable "${row.name}": command canceled`)
+        if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start`)
+        if (result.timedOut)
+          throw new SendError(`Variable "${row.name}": command timed out after ${COMMAND_TIMEOUT_MS / 1000} seconds`)
+        if (result.truncated)
+          throw new SendError(
+            `Variable "${row.name}": command produced more than ${COMMAND_MAX_BUFFER} bytes of output`,
+          )
+        if (result.code !== 0) {
+          // Command diagnostics can include private values that have not resolved successfully.
+          throw new SendError(`Variable "${row.name}": command exited ${result.code}`)
         }
-      })
+        const line = lastLine(result.stdout)
+        if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
+        return [row.name, line] as const
+      } catch (err) {
+        commandSignal.throwIfAborted()
+        if (err instanceof SendError) throw err
+        throw new SendError(`Variable "${row.name}": command failed`)
+      }
+    })
     let results: (readonly [string, string])[]
-    try { results = await Promise.all(pending) }
-    finally {
+    try {
+      results = await Promise.all(pending)
+    } finally {
       group.abort()
       await Promise.allSettled(pending)
     }
@@ -184,7 +209,10 @@ async function resolveVarsWithSensitivity(
     // Secret variables and command outputs never originated in client state. Track their
     // plaintext only for response redaction; value-kind and per-request overrides are already
     // visible in the editable draft.
-    sensitiveValues: enabled.filter((row) => row.kind !== 'value').map((row) => vars[row.name]).filter(Boolean),
+    sensitiveValues: enabled
+      .filter((row) => row.kind !== 'value')
+      .map((row) => vars[row.name])
+      .filter(Boolean),
   }
 }
 
@@ -206,7 +234,10 @@ export async function resolveVars(
  * Split out from send() so it is testable without a database or a network. This is where the
  * interpolation, the auth compilation and the scheme check all land.
  */
-export function buildRequest(input: HttpSendInput, vars: Record<string, string>): { target: URL; headers: Headers; body: string | undefined } {
+export function buildRequest(
+  input: HttpSendInput,
+  vars: Record<string, string>,
+): { target: URL; headers: Headers; body: string | undefined } {
   // Interpolate per field, never over a serialized request (docs/http-client.md § Sending).
   const applied = applyAuth(interpolateAuth(input.auth, vars))
 
@@ -247,16 +278,28 @@ export function describeFetchFailure(err: unknown, target: URL): Pick<SendFailur
     nodes
       .map((node) => stringField(node, 'message'))
       .find((message) => message && message !== 'fetch failed' && message !== 'request failed') ?? null
-  const timedOut = nodes.some((node) => stringField(node, 'name') === 'TimeoutError') || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT'
+  const timedOut =
+    nodes.some((node) => stringField(node, 'name') === 'TimeoutError') ||
+    code === 'ETIMEDOUT' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT'
 
-  if (timedOut) return { error: `Connection to ${target.host} timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`, code, detail }
+  if (timedOut)
+    return { error: `Connection to ${target.host} timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`, code, detail }
   if (code === 'ECONNREFUSED') {
-    return { error: `Connection refused by ${target.host}. The server may not be running or may be listening on a different port.`, code, detail }
+    return {
+      error: `Connection refused by ${target.host}. The server may not be running or may be listening on a different port.`,
+      code,
+      detail,
+    }
   }
-  if (code === 'ENOTFOUND') return { error: `Could not find ${target.hostname}. Check the host name or DNS.`, code, detail }
-  if (code === 'EAI_AGAIN') return { error: `DNS lookup for ${target.hostname} did not complete. Try again.`, code, detail }
-  if (code === 'ECONNRESET') return { error: `The connection to ${target.host} was reset before a response arrived.`, code, detail }
-  if (code === 'ECONNABORTED') return { error: `The connection to ${target.host} was closed before a response arrived.`, code, detail }
+  if (code === 'ENOTFOUND')
+    return { error: `Could not find ${target.hostname}. Check the host name or DNS.`, code, detail }
+  if (code === 'EAI_AGAIN')
+    return { error: `DNS lookup for ${target.hostname} did not complete. Try again.`, code, detail }
+  if (code === 'ECONNRESET')
+    return { error: `The connection to ${target.host} was reset before a response arrived.`, code, detail }
+  if (code === 'ECONNABORTED')
+    return { error: `The connection to ${target.host} was closed before a response arrived.`, code, detail }
   if (code && /(CERT|SELF_SIGNED|TLS|SSL|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER)/.test(code)) {
     return { error: `TLS certificate validation failed for ${target.host}.`, code, detail }
   }
@@ -276,15 +319,20 @@ export async function send(
   caller = new AbortController().signal,
 ): Promise<SendResult> {
   const deadline = new AbortController()
-  const timer = setTimeout(() => deadline.abort(new DOMException('Request timed out', 'TimeoutError')), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(
+    () => deadline.abort(new DOMException('Request timed out', 'TimeoutError')),
+    REQUEST_TIMEOUT_MS,
+  )
   const signal = AbortSignal.any([caller, deadline.signal])
-  try { return await sendWithinDeadline(db, core, userId, projectId, input, signal, caller) }
-  catch (error) {
+  try {
+    return await sendWithinDeadline(db, core, userId, projectId, input, signal, caller)
+  } catch (error) {
     caller.throwIfAborted()
     if (deadline.signal.aborted) throw new SendError(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`)
     throw error
+  } finally {
+    clearTimeout(timer)
   }
-  finally { clearTimeout(timer) }
 }
 
 async function checked<T>(pending: PromiseLike<T>, signal: AbortSignal): Promise<T> {
@@ -295,8 +343,13 @@ async function checked<T>(pending: PromiseLike<T>, signal: AbortSignal): Promise
 }
 
 async function sendWithinDeadline(
-  db: PluginDatabase, core: SendCoreServices, userId: string, projectId: string,
-  input: HttpSendInput, signal: AbortSignal, caller: AbortSignal,
+  db: PluginDatabase,
+  core: SendCoreServices,
+  userId: string,
+  projectId: string,
+  input: HttpSendInput,
+  signal: AbortSignal,
+  caller: AbortSignal,
 ): Promise<SendResult> {
   const resolved = await resolveVarsWithSensitivity(db, core, userId, projectId, input, signal)
   let prepared: ReturnType<typeof buildRequest>
@@ -334,7 +387,14 @@ async function sendWithinDeadline(
       ...failure,
       url: redactResolved(target.toString(), resolved.sensitiveValues),
       durationMs,
-      timeline: buildFailureTimeline(input.method, target.toString(), headers, failure, durationMs, resolved.sensitiveValues),
+      timeline: buildFailureTimeline(
+        input.method,
+        target.toString(),
+        headers,
+        failure,
+        durationMs,
+        resolved.sensitiveValues,
+      ),
     }
   }
 
@@ -354,12 +414,23 @@ async function sendWithinDeadline(
     size: bytes.byteLength,
     truncated,
     durationMs,
-    timeline: buildTimeline(input.method, target.toString(), headers, res, durationMs, bytes.byteLength, truncated, resolved.sensitiveValues),
+    timeline: buildTimeline(
+      input.method,
+      target.toString(),
+      headers,
+      res,
+      durationMs,
+      bytes.byteLength,
+      truncated,
+      resolved.sensitiveValues,
+    ),
   }
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  (typeof value === 'object' && value !== null) || typeof value === 'function' ? (value as Record<string, unknown>) : null
+  (typeof value === 'object' && value !== null) || typeof value === 'function'
+    ? (value as Record<string, unknown>)
+    : null
 
 const stringField = (value: unknown, field: string): string | null => {
   const record = asRecord(value)
@@ -421,15 +492,23 @@ function buildFailureTimeline(
 }
 
 function buildRequestTimeline(method: string, url: string, sent: Headers, sensitiveValues: string[]): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ label: 'Request', detail: `${method} ${redactResolved(url, sensitiveValues)}`, group: 'sent' }]
-  for (const [k, v] of sent.entries()) out.push({ label: redactResolved(k, sensitiveValues), detail: redact(k, redactResolved(v, sensitiveValues)), group: 'sent' })
+  const out: TimelineEntry[] = [
+    { label: 'Request', detail: `${method} ${redactResolved(url, sensitiveValues)}`, group: 'sent' },
+  ]
+  for (const [k, v] of sent.entries())
+    out.push({
+      label: redactResolved(k, sensitiveValues),
+      detail: redact(k, redactResolved(v, sensitiveValues)),
+      group: 'sent',
+    })
   return out
 }
 
 // The timeline is shown in the UI and copied into bug reports; a resolved secret variable must not
 // ride along in it.
 const SENSITIVE = new Set(['authorization', 'proxy-authorization', 'cookie'])
-const redact = (name: string, value: string): string => (SENSITIVE.has(name.toLowerCase()) ? `${value.split(' ')[0]} ••••••` : value)
+const redact = (name: string, value: string): string =>
+  SENSITIVE.has(name.toLowerCase()) ? `${value.split(' ')[0]} ••••••` : value
 
 function redactResolved(input: string, sensitiveValues: string[]): string {
   let output = input

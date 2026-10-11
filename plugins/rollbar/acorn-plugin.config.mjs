@@ -19,13 +19,12 @@ export default {
     events: [],
     // `secrets: false` for the same reason linear's is: the provider spends the owner's Rollbar token,
     // but never through `ctx.core.secrets` — core resolves the `integrations` row inside its own secret
-    // scope and lends the key for the length of the call. This was `true` for a while, which was a
-    // grant with no call site and a trust-prompt line that overstated.
+    // scope and lends the key for the length of the call.
     node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.rollbar.com'] },
   },
   contributions: {
     // `providerId` marks the pane as a linked-items view: the host hides it on tasks with no rollbar
-    // link (client-core plugins/frames/register.ts).
+    // link (client-core's frame registration).
     frames: [{
       target: 'pane',
       id: 'rollbar',
@@ -39,9 +38,9 @@ export default {
       layout: 'single',
       regions: { body: { kind: 'remote', entry: 'pane' } },
     }, {
-      // The same tree, drawn beside the rail list at `/p/:projectId` with no task anywhere. Without it
-      // a rail row had nowhere to land: `openPane` needs a task, so clicking an item from the sidebar
-      // outside a task drew nothing at all. Linear's `linear-issue` is the same pair for the same
+      // The same tree, drawn beside the rail list at `/p/:projectId` with no task anywhere. A rail row
+      // needs somewhere to land: `openPane` needs a task, so without this surface clicking an item from
+      // the sidebar outside a task draws nothing. Linear's `linear-issue` is the same pair for the same
       // reason. Keep both — a project-scoped task pane would break the keybinding and the command.
       target: 'pane',
       id: 'rollbar-item',

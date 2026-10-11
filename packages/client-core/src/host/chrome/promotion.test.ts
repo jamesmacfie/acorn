@@ -17,9 +17,16 @@ const owned = { ownsConnection: vi.fn(async () => true) }
 describe('descriptor promotion', () => {
   it('derives a host-owned origin and row seed', async () => {
     const promotion = descriptorPromotion('tracker', { create: vi.fn(), link: vi.fn(), ...owned })
-    expect(await Promise.resolve(promotion.prepare(ITEM, {
-      projectId: 'project-1', owner: '', repo: '', branch: 'fallback',
-    }))).toEqual({
+    expect(
+      await Promise.resolve(
+        promotion.prepare(ITEM, {
+          projectId: 'project-1',
+          owner: '',
+          repo: '',
+          branch: 'fallback',
+        }),
+      ),
+    ).toEqual({
       origin: 'tracker:item',
       projectId: 'project-1',
       title: 'Ship portable promotion',
@@ -29,31 +36,36 @@ describe('descriptor promotion', () => {
 
   it('preserves an established provider origin when the row declares one', async () => {
     const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
-    expect(await promotion.prepare(
-      { ...ITEM, task: { ...ITEM.task, origin: 'rollbar' } },
-      { projectId: 'project-1', owner: '', repo: '' },
-    )).toMatchObject({ origin: 'rollbar' })
+    expect(
+      await promotion.prepare(
+        { ...ITEM, task: { ...ITEM.task, origin: 'rollbar' } },
+        { projectId: 'project-1', owner: '', repo: '' },
+      ),
+    ).toMatchObject({ origin: 'rollbar' })
   })
 
   it('replaces an origin owned by another plugin while preserving owned subtypes', async () => {
     const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
     const context = { projectId: 'project-1', owner: '', repo: '' }
 
-    await expect(promotion.prepare(
-      { ...ITEM, task: { ...ITEM.task, origin: 'linear' } },
-      context,
-    )).resolves.toMatchObject({ origin: 'rollbar:item' })
-    await expect(promotion.prepare(
-      { ...ITEM, task: { ...ITEM.task, origin: 'rollbar:error' } },
-      context,
-    )).resolves.toMatchObject({ origin: 'rollbar:error' })
+    await expect(
+      promotion.prepare({ ...ITEM, task: { ...ITEM.task, origin: 'linear' } }, context),
+    ).resolves.toMatchObject({ origin: 'rollbar:item' })
+    await expect(
+      promotion.prepare({ ...ITEM, task: { ...ITEM.task, origin: 'rollbar:error' } }, context),
+    ).resolves.toMatchObject({ origin: 'rollbar:error' })
   })
 
   it('creates first and links second', async () => {
     const order: string[] = []
     const promotion = descriptorPromotion('tracker', {
-      create: async () => { order.push('create'); return TASK },
-      link: async () => { order.push('link') },
+      create: async () => {
+        order.push('create')
+        return TASK
+      },
+      link: async () => {
+        order.push('link')
+      },
       ownsConnection: async () => true,
     })
     const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
@@ -64,13 +76,20 @@ describe('descriptor promotion', () => {
   it('surfaces a failed link after the task has already been created', async () => {
     const order: string[] = []
     const promotion = descriptorPromotion('tracker', {
-      create: async () => { order.push('create'); return TASK },
-      link: async () => { order.push('link'); throw new Error('link failed') },
+      create: async () => {
+        order.push('create')
+        return TASK
+      },
+      link: async () => {
+        order.push('link')
+        throw new Error('link failed')
+      },
       ownsConnection: async () => true,
     })
     const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
-    await expect(promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' }))
-      .rejects.toThrow('link failed')
+    await expect(promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' })).rejects.toThrow(
+      'link failed',
+    )
     expect(order).toEqual(['create', 'link'])
   })
 

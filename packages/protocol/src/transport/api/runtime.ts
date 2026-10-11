@@ -1,12 +1,15 @@
 import type { TelemetryRecord } from '../../runtime/telemetry.ts'
 
-// Run targets (docs/workflows/routes-and-ui.md § Routes and UI): the renderer shares the RunBridge routes the MCP
-// run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
+// Run targets (docs/workflows/routes-and-ui.md § Routes and UI): the renderer shares the `RunBridge`
+// routes the MCP run tools use.
 export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
-export const runStartRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
-export const runStopRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
-export const runStatusRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
+export const runStartRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
+export const runStopRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
+export const runStatusRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
 // Where every runtime that is not the node posts its telemetry (docs/telemetry/runtimes.md § Other runtimes).
 // Device-only, because a record admitted here reaches every sink, and a sink can send it off the
@@ -41,8 +44,8 @@ export type TelemetrySummary = {
   records: Array<{ owner: string; kind: TelemetryRecord['kind']; count: number }>
 }
 
-// Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live in
-// @acorn/protocol/schedules.ts, which needs zod for the cadence parser. This module does not carry that dependency.
+// Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live with
+// `cadenceSchema`, which needs zod for the cadence parser. This module does not carry that dependency.
 //
 // A key contains a colon ('core:audit-prune'), so every builder below encodes it.
 export const schedulesRoute = '/v1/core/schedules'
@@ -58,7 +61,7 @@ export const scheduleTargetsRoute = `${schedulesRoute}/targets`
 export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
 // Dashboards: the measure series behind a stat's trend (docs/dashboards/views.md § Trends). Read-only by
-// design, not by phase: the sampler and the store share a process, so the only writer is the
+// design: the sampler and the store share a process, so the only writer is the
 // `core:sample-measures` schedule and a write route would have nobody to serve.
 //
 // An empty series answers 200 with an empty array, never 404. Absence is data, and a panel given a

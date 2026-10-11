@@ -1,8 +1,7 @@
 // Markdown source to sanitized HTML: the string half of the design system's Markdown surface, beside
-// ui/Markdown.tsx (the component that renders it) and `.ui-markdown` (the styles it targets). It moved
-// here from integrations/, where it started as Linear's ticket-body renderer, once core owned the
-// surface. Zero imports of its own, which is what lets ui/ hold it and a sandboxed frame call it
-// without pulling the shell across.
+// the kit's `Markdown` component (which renders it) and `.ui-markdown` (the styles it targets). Zero
+// imports of its own, which is what lets the kit hold it and a sandboxed frame call it without
+// pulling the shell across.
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c])
 
@@ -16,9 +15,11 @@ const safeImageSrc = (u: string): boolean => {
   const prefix = /^data:image\/(?:png|jpeg|gif|webp|avif);base64,/i.exec(u)
   if (!prefix) return false
   const encoded = u.slice(prefix[0].length)
-  return encoded.length > 0
-    && Math.floor(encoded.length * 3 / 4) <= MAX_INLINE_IMAGE_BYTES
-    && /^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+  return (
+    encoded.length > 0 &&
+    Math.floor((encoded.length * 3) / 4) <= MAX_INLINE_IMAGE_BYTES &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+  )
 }
 
 export type MarkdownOptions = {
@@ -40,11 +41,10 @@ export type MarkdownOptions = {
 // survive escaping and subsequent Markdown transforms can't mutate them.
 //
 // The input decides what is in it, so "real text never contains this" is a wish rather than a fact.
-// A source that spelled the sentinel itself used to forge an index into the `codes` and `images`
-// arrays and reach an entry that was never put there, and the restore then read `.alt` or `.replace`
-// off undefined and threw. renderMarkdown strips the character on the way in, once, which kills the
-// class rather than the two probes that found it: after the strip there is no way to write a sentinel
-// that inline() did not write itself.
+// A source that spells the sentinel itself could forge an index into the `codes` and `images` arrays
+// and reach an entry that was never put there, and the restore would read `.alt` or `.replace` off
+// undefined and throw. renderMarkdown strips the character on the way in, once, which kills the whole
+// class: after the strip there is no way to write a sentinel that inline() did not write itself.
 const S = '\uE000'
 
 // Inline pass on raw text: protect code spans and images, escape, then apply links / bold / italic.
@@ -52,8 +52,10 @@ function inline(raw: string, opts: MarkdownOptions): string {
   const codes: string[] = []
   const images: { alt: string; url: string }[] = []
   let s = raw.replace(/`([^`]+)`/g, (_m, c: string) => `${S}${codes.push(c) - 1}${S}`)
-  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, url: string) =>
-    `${S}i${images.push({ alt, url }) - 1}${S}`)
+  s = s.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)\)/g,
+    (_m, alt: string, url: string) => `${S}i${images.push({ alt, url }) - 1}${S}`,
+  )
   s = esc(s)
   // A rendered link parks its href here and leaves a sentinel in its place, so the autolink pass
   // below cannot see a URL it has already handled. Only the href hides: the link's text stays in the
@@ -67,8 +69,10 @@ function inline(raw: string, opts: MarkdownOptions): string {
   // form, and a model writes one far less often than it writes the bare address, so without this the
   // most common link in the app is the one you cannot click. Trailing punctuation is left out of the
   // match because a sentence ends with a full stop more often than a URL does.
-  s = s.replace(/https?:\/\/[^\s<\uE000]*[^\s<\uE000.,:;!?)\]}'"]/g, (url: string) =>
-    `<a href="${url}" target="_blank" rel="noreferrer">${url}</a>`)
+  s = s.replace(
+    /https?:\/\/[^\s<\uE000]*[^\s<\uE000.,:;!?)\]}'"]/g,
+    (url: string) => `<a href="${url}" target="_blank" rel="noreferrer">${url}</a>`,
+  )
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>')
   s = s.replace(new RegExp(`${S}l(\\d+)${S}`, 'g'), (_m, i: string) => hrefs[Number(i)])
@@ -85,19 +89,24 @@ function inline(raw: string, opts: MarkdownOptions): string {
   return s
 }
 
-const isBlockStart = (l: string) => /^(```|#{1,6}\s|>\s?|\s*([-*+]|\d+\.)\s+)/.test(l) || /^(---+|\*\*\*+)$/.test(l.trim())
+const isBlockStart = (l: string) =>
+  /^(```|#{1,6}\s|>\s?|\s*([-*+]|\d+\.)\s+)/.test(l) || /^(---+|\*\*\*+)$/.test(l.trim())
 
 // A row of cells, minus the optional outer pipes. An escaped `\|` is a literal pipe in a cell, which
 // is the only way to write one inside a table at all, so the split has to skip it.
 const cells = (row: string): string[] =>
-  row.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
+  row
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split(/(?<!\\)\|/)
+    .map((c) => c.trim().replace(/\\\|/g, '|'))
 
 // The `|---|---|` line under the header is what separates a table from a paragraph that happens to
 // contain a pipe, so a table is only a table when the next line is one.
 const isTableSeparator = (l: string | undefined): boolean =>
   !!l && l.includes('|') && l.includes('-') && /^[\s|:-]+$/.test(l)
-const startsTable = (lines: string[], i: number): boolean =>
-  lines[i].includes('|') && isTableSeparator(lines[i + 1])
+const startsTable = (lines: string[], i: number): boolean => lines[i].includes('|') && isTableSeparator(lines[i + 1])
 
 /** One rendered block, with a key that changes only when the block's own source does. `fence` is set
  *  only on a closed code fence: its hint as written (`''` for none) and its source, taken from the
@@ -188,10 +197,10 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       // A bare table, the same markup GitHub's HTML carries, so primitives.css styles both from one
       // `.ui-markdown table` rule.
       emit(
-        '<table>'
-        + `<thead>${row('th', head)}</thead>`
-        + `<tbody>${body.map((r) => row('td', r)).join('')}</tbody>`
-        + '</table>',
+        '<table>' +
+          `<thead>${row('th', head)}</thead>` +
+          `<tbody>${body.map((r) => row('td', r)).join('')}</tbody>` +
+          '</table>',
         start,
       )
       continue
@@ -205,7 +214,8 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
     if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
       const ordered = /^\s*\d+\.\s+/.test(line)
       const items: string[] = []
-      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*+]|\d+\.)\s+/, ''))
+      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i]))
+        items.push(lines[i++].replace(/^\s*([-*+]|\d+\.)\s+/, ''))
       const tag = ordered ? 'ol' : 'ul'
       emit(`<${tag}>${items.map((it) => `<li>${inline(it, opts)}</li>`).join('')}</${tag}>`, start)
       continue
@@ -215,7 +225,8 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       continue
     }
     const buf: string[] = []
-    while (i < lines.length && lines[i].trim() !== '' && !isBlockStart(lines[i]) && !startsTable(lines, i)) buf.push(lines[i++])
+    while (i < lines.length && lines[i].trim() !== '' && !isBlockStart(lines[i]) && !startsTable(lines, i))
+      buf.push(lines[i++])
     emit(`<p>${inline(buf.join('\n'), opts).replace(/\n/g, '<br>')}</p>`, start)
   }
   return out
@@ -238,4 +249,6 @@ export type MarkdownFenceAdapter<View> = (fence: MarkdownFence) => { view: View;
 
 /** Markdown source to sanitized HTML, as one string. */
 export const renderMarkdown = (src: string, opts: MarkdownOptions = {}): string =>
-  renderBlocks(src, opts).map((block) => block.html).join('\n')
+  renderBlocks(src, opts)
+    .map((block) => block.html)
+    .join('\n')

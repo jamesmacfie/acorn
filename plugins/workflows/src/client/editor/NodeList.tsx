@@ -10,11 +10,9 @@ import { branchLabel, stepSummary } from './outlineModel'
 // The list column: the definition, its inputs, and the graph in reading order.
 //
 // One list, not two, because the inspector's subject is whatever is selected here and the definition's
-// own fields need a row to be selected from. A row indents only where the graph forks
-// (./graphOrder.ts), and a node waiting on more than one step says how many. This list stays beside
-// the graph view rather than being replaced by it: it is the one place the definition's own rows can
-// be selected from (./GraphView.tsx). Moving and deleting the selected step live in the inspector's
-// header, beside the step they act on.
+// own fields need a row to be selected from. That is also why it stays beside the graph view rather
+// than being replaced by it. A row indents only where the graph forks, and a node waiting on more than
+// one step says how many. Moving and deleting the selected step live in the inspector's header.
 
 const kindIcon = (kind: string, catalog: WorkflowCatalog | undefined): string | undefined =>
   catalog?.kinds.find((entry) => entry.id === kind)?.describe?.icon ?? BUILTIN_STEP_DESCRIPTIONS[kind]?.icon
@@ -28,7 +26,12 @@ const BUILTIN_GROUPS: readonly { label: string; kinds: readonly string[] }[] = [
 ]
 
 /** Not a catalog kind: two steps the editor adds together (./aiListDraft.ts). */
-const AI_LIST = { id: 'ai-list', label: 'Ask AI for a list, then run each', icon: 'sparkles', description: undefined as string | undefined }
+const AI_LIST = {
+  id: 'ai-list',
+  label: 'Ask AI for a list, then run each',
+  icon: 'sparkles',
+  description: undefined as string | undefined,
+}
 
 type AddItem = { id: string; label: string; icon: string; description?: string }
 
@@ -52,7 +55,7 @@ export default function NodeList(props: {
     { key: DEFINITION_ROW, label: def().name || 'Definition', summary: '', icon: '' },
     { key: INPUTS_ROW, label: 'Inputs', summary: '', icon: '' },
     ...order().map((row) => {
-      const step = def().steps.find(candidate => stepIdentity(candidate) === row.name)!
+      const step = def().steps.find((candidate) => stepIdentity(candidate) === row.name)!
       return {
         key: `node:${row.name}`,
         label: step.name ?? row.name,
@@ -71,8 +74,7 @@ export default function NodeList(props: {
     props.onSelect({ kind: 'node', name: key.slice('node:'.length) })
   }
 
-  // Grouped by what a step is for, then one group per plugin, each sorted by label: the list used to
-  // run in plugin-then-id order, which read as no order at all.
+  // The Add menu, grouped by what a step is for, then one group per plugin, each sorted by label.
   const groups = createMemo(() => {
     const kinds = props.catalog?.kinds ?? []
     const item = (kind: (typeof kinds)[number]): AddItem => ({
@@ -95,7 +97,10 @@ export default function NodeList(props: {
     const plugins = [...new Set(kinds.flatMap((kind) => (kind.pluginId ? [kind.pluginId] : [])))]
       .map((pluginId) => ({
         label: pluginLabel(pluginId),
-        items: kinds.filter((kind) => kind.pluginId === pluginId).map(item).sort(byLabel),
+        items: kinds
+          .filter((kind) => kind.pluginId === pluginId)
+          .map(item)
+          .sort(byLabel),
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
     return [...builtinGroups, ...plugins].filter((group) => group.items.length)
@@ -104,19 +109,23 @@ export default function NodeList(props: {
   return (
     <>
       <SectionHeader
-        actions={(
+        actions={
           <Show when={!props.readOnly}>
             <Menu
               ariaLabel="Add a step"
               trigger={(state) => (
-                <Button size="sm" opens="menu" expanded={state.open()} onPress={state.toggle}><Icon name="plus" /> Add step</Button>
+                <Button size="sm" opens="menu" expanded={state.open()} onPress={state.toggle}>
+                  <Icon name="plus" /> Add step
+                </Button>
               )}
             >
               {(menu) => (
                 <For each={groups()}>
                   {(group, index) => (
                     <>
-                      <Show when={index() > 0}><Menu.Separator /></Show>
+                      <Show when={index() > 0}>
+                        <Menu.Separator />
+                      </Show>
                       <Menu.Label>{group.label}</Menu.Label>
                       <For each={group.items}>
                         {(kind) => (
@@ -136,7 +145,7 @@ export default function NodeList(props: {
               )}
             </Menu>
           </Show>
-        )}
+        }
       >
         Steps
       </SectionHeader>
@@ -152,22 +161,22 @@ export default function NodeList(props: {
         {(item, itemProps, selected) => (
           <Show
             when={rowFor(item.key)}
-            fallback={(
+            fallback={
               <Row
                 item={itemProps}
                 selected={selected()}
                 onPress={() => select(item.key)}
                 density="compact"
                 leading={<Icon name={item.key === DEFINITION_ROW ? 'workflow' : 'list'} />}
-                meta={(
+                meta={
                   <Show when={item.key === INPUTS_ROW}>
                     <Text emphasis="muted">{String((def().inputs ?? []).length)}</Text>
                   </Show>
-                )}
+                }
               >
                 {item.key === DEFINITION_ROW ? 'Definition' : 'Inputs'}
               </Row>
-            )}
+            }
           >
             {(row) => (
               <Row
@@ -177,16 +186,24 @@ export default function NodeList(props: {
                 depth={row().depth + 1}
                 density="compact"
                 variant="stacked"
-                title={row().parents.length > 1 ? `Waits on ${row().parents.map((parent) => stepFor(parent)?.name ?? parent).join(', ')}` : undefined}
+                title={
+                  row().parents.length > 1
+                    ? `Waits on ${row()
+                        .parents.map((parent) => stepFor(parent)?.name ?? parent)
+                        .join(', ')}`
+                    : undefined
+                }
                 leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
-                meta={(
+                meta={
                   <>
-                    <Show when={branchLabel(stepFor(row().name)!, def())}>{label => <Badge size="xs">{label()}</Badge>}</Show>
+                    <Show when={branchLabel(stepFor(row().name)!, def())}>
+                      {(label) => <Badge size="xs">{label()}</Badge>}
+                    </Show>
                     <Show when={row().parents.length > 1}>
                       <Badge size="xs">{`⇐ ${row().parents.length}`}</Badge>
                     </Show>
                   </>
-                )}
+                }
               >
                 <Stack gap="none">
                   <Text>{stepFor(row().name)?.name ?? row().name}</Text>
@@ -201,7 +218,9 @@ export default function NodeList(props: {
           telling that the thing it is missing is a step. */}
       <Show when={!def().steps.length && !props.readOnly}>
         <Row density="compact">
-          <Text emphasis="muted" wrap>No steps yet. Add one to start.</Text>
+          <Text emphasis="muted" wrap>
+            No steps yet. Add one to start.
+          </Text>
         </Row>
       </Show>
     </>

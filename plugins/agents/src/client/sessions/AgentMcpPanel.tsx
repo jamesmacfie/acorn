@@ -31,7 +31,9 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
   const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set())
   const [applying, setApplying] = createSignal(false)
   const [error, setError] = createSignal('')
-  const stored = createMemo(() => new Set((mcp.data?.servers ?? []).filter((server) => server.enabled).map((server) => server.name)))
+  const stored = createMemo(
+    () => new Set((mcp.data?.servers ?? []).filter((server) => server.enabled).map((server) => server.name)),
+  )
   // Reseeded when the stored list changes, not on every poll, so a switch the reader just flipped is not
   // put back by the next read. A memo of the names, because `on()` re-runs whenever its source does and
   // only a memo compares the value.
@@ -59,22 +61,25 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
   const reported = () => mcp.data?.reported ?? null
 
   return (
-    <Section
-      label="MCP servers"
-      actions={<IconButton icon="x" label="Close MCP servers" onPress={props.onClose} />}
-    >
+    <Section label="MCP servers" actions={<IconButton icon="x" label="Close MCP servers" onPress={props.onClose} />}>
       <Stack gap="row">
         <Show when={mcp.error}>
           <Alert>{mcp.error instanceof Error ? mcp.error.message : 'MCP servers could not be loaded.'}</Alert>
         </Show>
         <Show when={mcp.data?.locked}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
-        <Show when={error()}><Alert>{error()}</Alert></Show>
+        <Show when={error()}>
+          <Alert>{error()}</Alert>
+        </Show>
 
         <Card pad="sm">
           <Stack gap="inline">
             <Show
               when={mcp.data?.servers.length}
-              fallback={<Text emphasis="muted" wrap>You have not added any servers in Settings → MCP servers.</Text>}
+              fallback={
+                <Text emphasis="muted" wrap>
+                  You have not added any servers in Settings → MCP servers.
+                </Text>
+              }
             >
               <For each={mcp.data?.servers ?? []}>
                 {(server) => (
@@ -84,12 +89,14 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
                     label={server.name}
                     checked={selected().has(server.name)}
                     disabled={!!mcp.data?.locked || applying()}
-                    onChange={(on) => setSelected((before) => {
-                      const next = new Set(before)
-                      if (on) next.add(server.name)
-                      else next.delete(server.name)
-                      return next
-                    })}
+                    onChange={(on) =>
+                      setSelected((before) => {
+                        const next = new Set(before)
+                        if (on) next.add(server.name)
+                        else next.delete(server.name)
+                        return next
+                      })
+                    }
                   />
                 )}
               </For>
@@ -103,7 +110,14 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
                 Manage servers
               </Button>
               <Show when={changed()}>
-                <Button size="sm" tone="accent" variant="solid" busy={applying()} disabled={!!mcp.data?.locked} onPress={() => void apply()}>
+                <Button
+                  size="sm"
+                  tone="accent"
+                  variant="solid"
+                  busy={applying()}
+                  disabled={!!mcp.data?.locked}
+                  onPress={() => void apply()}
+                >
                   Apply and restart the agent
                 </Button>
               </Show>
@@ -115,17 +129,15 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
           when={reported()}
           fallback={
             <Text emphasis="muted" wrap>
-              This agent does not tell acorn which servers it has connected, so servers from its own config
-              are not listed here. The Config files section of Settings → MCP shows them.
+              This agent does not tell acorn which servers it has connected, so servers from its own config are not
+              listed here. The Config files section of Settings → MCP shows them.
             </Text>
           }
         >
           {(servers) => (
             <Stack gap="inline">
               <Text emphasis="eyebrow">What the agent reports</Text>
-              <For each={servers()}>
-                {(server) => <ReportedRow server={server} acorn={acorns(server.name)} />}
-              </For>
+              <For each={servers()}>{(server) => <ReportedRow server={server} acorn={acorns(server.name)} />}</For>
             </Stack>
           )}
         </Show>
@@ -145,9 +157,17 @@ function ReportedRow(props: { server: AgentMcpReportedServer; acorn: boolean }) 
         <Show when={props.server.toolCount != null}>
           <Text emphasis="muted">{props.server.toolCount === 1 ? '1 tool' : `${props.server.toolCount} tools`}</Text>
         </Show>
-        <Show when={props.acorn}><Text emphasis="muted">acorn's own tools</Text></Show>
+        <Show when={props.acorn}>
+          <Text emphasis="muted">acorn's own tools</Text>
+        </Show>
       </Inline>
-      <Show when={props.server.error}>{(detail) => <Text emphasis="muted" wrap>{detail()}</Text>}</Show>
+      <Show when={props.server.error}>
+        {(detail) => (
+          <Text emphasis="muted" wrap>
+            {detail()}
+          </Text>
+        )}
+      </Show>
     </Stack>
   )
 }

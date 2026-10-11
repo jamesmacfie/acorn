@@ -12,35 +12,38 @@ import { closeWorkflowStart, startRequest, type StartRequest } from './startRequ
 // "Run this workflow": one box per declared input, and a task to run it on.
 //
 // One dialog, one mount point. The editor's Run and the palette's "Run a workflow" both ask for it
-// through ./startRequest.ts and the browse list draws it, because that region is on screen whenever
-// the Workflows source is (../WorkflowsBrowse.tsx). A second mount would be a second dialog.
+// through `requestWorkflowStart`, and the browse list draws it, because that region is on screen
+// whenever the Workflows source is. A second mount would be a second dialog.
 
 /** The one mount point. Draws nothing until something asks. */
 
 export default function StartDialogHost() {
-  return (
-    <Show when={startRequest()}>
-      {(pending) => <StartDialog request={pending()} />}
-    </Show>
-  )
+  return <Show when={startRequest()}>{(pending) => <StartDialog request={pending()} />}</Show>
 }
 
 function StartDialog(props: { request: StartRequest }) {
   const navigate = useNavigate()
   const inputs = () => props.request.inputs ?? []
-  const [values, setValues] = createSignal<Record<string, DataValue>>({
-    ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
-    ...(props.request.prefill ?? {}),
-  })
+  const [values, setValues] = createSignal<Record<string, DataValue>>(
+    Object.fromEntries(
+      inputs()
+        .filter((input) => input.default !== undefined)
+        .map((input) => [input.name, input.default!]),
+    ),
+  )
   const [taskId, setTaskId] = createSignal(props.request.taskId ?? activeTaskId() ?? '')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>()
   const [invalid, setInvalid] = createSignal<Record<string, boolean>>({})
 
   const tasks = createQuery(() => tasksOptions(true))
-  const choices = createMemo(() => (tasks.data ?? [])
-    .filter((task) => task.status === 'active' && (!props.request.projectId || task.projectId === props.request.projectId))
-    .map((task) => ({ value: task.id, label: task.title })))
+  const choices = createMemo(() =>
+    (tasks.data ?? [])
+      .filter(
+        (task) => task.status === 'active' && (!props.request.projectId || task.projectId === props.request.projectId),
+      )
+      .map((task) => ({ value: task.id, label: task.title })),
+  )
 
   const missing = () => inputs().some((input) => input.required && values()[input.name] === undefined)
   const ready = () => !!taskId() && !missing() && !Object.values(invalid()).some(Boolean) && !busy()
@@ -50,7 +53,11 @@ function StartDialog(props: { request: StartRequest }) {
     setBusy(true)
     setError(undefined)
     const filled = Object.fromEntries(Object.entries(values()).filter(([, value]) => value !== ''))
-    const answer = await startWorkflow(taskId(), { defId: props.request.defId }, Object.keys(filled).length ? filled : undefined)
+    const answer = await startWorkflow(
+      taskId(),
+      { defId: props.request.defId },
+      Object.keys(filled).length ? filled : undefined,
+    )
     setBusy(false)
     if (answer.error) {
       setError(answer.error)
@@ -67,7 +74,13 @@ function StartDialog(props: { request: StartRequest }) {
     <Modal onDismiss={closeWorkflowStart} title={`Run ${props.request.name}`} size="md">
       <ModalBody>
         <Stack gap="row">
-          <Show when={error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+          <Show when={error()}>
+            {(message) => (
+              <Text tone="danger" wrap>
+                {message()}
+              </Text>
+            )}
+          </Show>
           <Show when={!props.request.taskId}>
             <Field label="Task" group>
               <Select
@@ -80,30 +93,38 @@ function StartDialog(props: { request: StartRequest }) {
           </Show>
           <For each={inputs()}>
             {(input) => (
-                <TypedValueField
-                  label={input.required ? `${input.label ?? input.name} *` : input.label ?? input.name}
-                  schema={input.schema}
-                  hint={input.description}
-                  value={values()[input.name]}
-                  required={input.required}
-                  onValidity={(valid) => setInvalid(current => ({ ...current, [input.name]: !valid }))}
-                  onChange={(value) => setValues((current) => {
+              <TypedValueField
+                label={input.required ? `${input.label ?? input.name} *` : (input.label ?? input.name)}
+                schema={input.schema}
+                hint={input.description}
+                value={values()[input.name]}
+                required={input.required}
+                onValidity={(valid) => setInvalid((current) => ({ ...current, [input.name]: !valid }))}
+                onChange={(value) =>
+                  setValues((current) => {
                     const next = { ...current }
                     if (value === undefined) delete next[input.name]
                     else next[input.name] = value
                     return next
-                  })}
-                />
+                  })
+                }
+              />
             )}
           </For>
           <Show when={!inputs().length}>
-            <Text emphasis="muted" wrap>This workflow needs no inputs.</Text>
+            <Text emphasis="muted" wrap>
+              This workflow needs no inputs.
+            </Text>
           </Show>
         </Stack>
       </ModalBody>
       <ModalActions>
-        <Button variant="ghost" onPress={closeWorkflowStart}>Cancel</Button>
-        <Button variant="solid" busy={busy()} disabled={!ready()} onPress={() => void start()}>Run</Button>
+        <Button variant="ghost" onPress={closeWorkflowStart}>
+          Cancel
+        </Button>
+        <Button variant="solid" busy={busy()} disabled={!ready()} onPress={() => void start()}>
+          Run
+        </Button>
       </ModalActions>
     </Modal>
   )

@@ -7,14 +7,15 @@ import type { ManagedAgentEngine } from './runtimeEngine'
 // task). ManagedAgentRuntime.purgeDeletedTasks loads it on first use.
 
 export type DeletedTaskPurgeDeps = {
-  engine: Pick<ManagedAgentEngine, 'isStopped' | 'liveSessionIds' | 'emit' | 'revokeSessionCredential'>
+  engine: Pick<ManagedAgentEngine, 'isStopped' | 'liveSessionIds' | 'revokeSessionCredential'>
+  frames: ManagedAgentEngine['frames']
   store: ManagedAgentEngine['store']
   attachments: ManagedAgentEngine['attachments']
   artifacts: ManagedAgentEngine['artifacts']
   db: PluginDatabase
-  // Events per step, the history prune's own step (runtime.ts § removeArchivedHistory).
+  // Events per step, the history prune's own step (removeArchivedHistory).
   batch: number
-  // Passed in rather than imported, so loading this module does not split ./ledgerCompaction.ts out
+  // Passed in rather than imported, so loading this module does not split the ledger compaction module out
   // of the boot chunk it shares with the runtime.
   mergeSearchIndex: (db: PluginDatabase, pages: undefined, signal?: AbortSignal) => Promise<void>
 }
@@ -25,7 +26,11 @@ export type DeletedTaskPurgeDeps = {
  * and webhooks. A session with a provider process or a turn in flight is left for the daily run.
  * Idempotent, and stops early on the signal. Answers how many rows went.
  */
-export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: readonly string[], signal?: AbortSignal): Promise<number> {
+export async function purgeDeletedTasks(
+  deps: DeletedTaskPurgeDeps,
+  taskIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<number> {
   const { engine, store } = deps
   let events = 0
   const sessionIds: string[] = []
@@ -44,13 +49,13 @@ export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: rea
         deps.attachments.collectNow(removed.attachmentIds),
         deps.artifacts.collectRemoved(removed.artifactObjects),
       ])
-      engine.emit({ channel: 'agent:deleted', sessionId })
+      deps.frames.emit({ channel: 'agent:deleted', sessionId })
     }
     await new Promise((resolve) => setImmediate(resolve))
   }
   let rows = events + sessionIds.length
-  if (!stopped()) rows += deleteTaskLedgers(deps.db, taskIds, sessionIds) + await deleteTaskAttachments(deps, taskIds)
-  // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts).
+  if (!stopped()) rows += deleteTaskLedgers(deps.db, taskIds, sessionIds) + (await deleteTaskAttachments(deps, taskIds))
+  // Each deleted event left a tombstone in the search index until a merge.
   if (events && !engine.isStopped) await deps.mergeSearchIndex(deps.db, undefined, signal)
   return rows
 }
@@ -61,18 +66,28 @@ export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: rea
 function deleteTaskLedgers(db: PluginDatabase, taskIds: readonly string[], sessionIds: readonly string[]): number {
   const ids = [...taskIds]
   return db.transaction((tx) => {
-    const webhooks = tx.select({ id: schema.agentWebhooks.id }).from(schema.agentWebhooks)
+    const webhooks = tx
+      .select({ id: schema.agentWebhooks.id })
+      .from(schema.agentWebhooks)
       .where(inArray(schema.agentWebhooks.taskId, ids))
     return [
-      tx.delete(schema.agentSpawns).where(or(
-        inArray(schema.agentSpawns.rootTaskId, ids),
-        inArray(schema.agentSpawns.ownerTaskId, ids),
-        inArray(schema.agentSpawns.childTaskId, ids),
-      )).run(),
+      tx
+        .delete(schema.agentSpawns)
+        .where(
+          or(
+            inArray(schema.agentSpawns.rootTaskId, ids),
+            inArray(schema.agentSpawns.ownerTaskId, ids),
+            inArray(schema.agentSpawns.childTaskId, ids),
+          ),
+        )
+        .run(),
       tx.delete(schema.agentWebhookDeliveries).where(inArray(schema.agentWebhookDeliveries.webhookId, webhooks)).run(),
       tx.delete(schema.agentWebhooks).where(inArray(schema.agentWebhooks.taskId, ids)).run(),
       sessionIds.length
-        ? tx.delete(schema.agentOperations).where(inArray(schema.agentOperations.resourceId, [...sessionIds])).run()
+        ? tx
+            .delete(schema.agentOperations)
+            .where(inArray(schema.agentOperations.resourceId, [...sessionIds]))
+            .run()
         : { changes: 0 },
     ].reduce((count, result) => count + Number(result.changes), 0)
   })
@@ -85,5 +100,8 @@ async function deleteTaskAttachments(deps: DeletedTaskPurgeDeps, taskIds: readon
   const forTasks = inArray(schema.agentAttachments.taskId, [...taskIds])
   const rows = deps.db.select({ id: schema.agentAttachments.id }).from(schema.agentAttachments).where(forTasks).all()
   await deps.attachments.collectNow(rows.map((row) => row.id))
-  return deps.db.delete(schema.agentAttachments).where(and(forTasks, isNotNull(schema.agentAttachments.deletedAt))).run().changes
+  return deps.db
+    .delete(schema.agentAttachments)
+    .where(and(forTasks, isNotNull(schema.agentAttachments.deletedAt)))
+    .run().changes
 }

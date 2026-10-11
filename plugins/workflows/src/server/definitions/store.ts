@@ -6,7 +6,7 @@
 // and needs none. `mergedList` reads both and a repo id wins, because a definition a reviewer can see
 // in a pull request beats a local draft with the same name.
 //
-// Cross-database ids are plain ids, as the runs table already does with `task_id`.
+// Cross-database ids are plain ids, like the runs table's `task_id`.
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
@@ -44,10 +44,15 @@ const toRow = (row: Row): StoredWorkflowDef => ({
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
   def: JSON.parse(row.defJson) as WorkflowDef,
-  agentOrigin: row.agentOriginJson ? JSON.parse(row.agentOriginJson) as WorkflowAgentOrigin : null,
+  agentOrigin: row.agentOriginJson ? (JSON.parse(row.agentOriginJson) as WorkflowAgentOrigin) : null,
 })
 
-const summariseDef = (id: string, source: WorkflowDefSummary['source'], def: WorkflowDef, extra: Partial<WorkflowDefSummary> = {}): WorkflowDefSummary => ({
+const summariseDef = (
+  id: string,
+  source: WorkflowDefSummary['source'],
+  def: WorkflowDef,
+  extra: Partial<WorkflowDefSummary> = {},
+): WorkflowDefSummary => ({
   baseline: def.baseline,
   formatVersion: def.formatVersion,
   id,
@@ -55,22 +60,42 @@ const summariseDef = (id: string, source: WorkflowDefSummary['source'], def: Wor
   source,
   posture: def.posture,
   inputs: def.inputs,
-  steps: def.steps.map((step) => ({ id: step.id, name: step.name, kind: step.kind, after: step.after, isolation: step.isolation, inputs: step.inputs })),
+  steps: def.steps.map((step) => ({
+    id: step.id,
+    name: step.name,
+    kind: step.kind,
+    after: step.after,
+    isolation: step.isolation,
+    inputs: step.inputs,
+  })),
   ...extra,
 })
 
 /** Every row of a workspace, newest edit first. */
 export async function listDefs(db: PluginDatabase, workspaceId: string): Promise<StoredWorkflowDef[]> {
-  const rows = await db.select().from(workflowDefs).where(eq(workflowDefs.workspaceId, workspaceId)).orderBy(desc(workflowDefs.updatedAt))
+  const rows = await db
+    .select()
+    .from(workflowDefs)
+    .where(eq(workflowDefs.workspaceId, workspaceId))
+    .orderBy(desc(workflowDefs.updatedAt))
   return rows.map(toRow)
 }
 
 /** The rows a task may start: its workspace's, bound either to its project or to none. */
-export async function defsForProject(db: PluginDatabase, workspaceId: string, projectId: string): Promise<StoredWorkflowDef[]> {
+export async function defsForProject(
+  db: PluginDatabase,
+  workspaceId: string,
+  projectId: string,
+): Promise<StoredWorkflowDef[]> {
   const rows = await db
     .select()
     .from(workflowDefs)
-    .where(and(eq(workflowDefs.workspaceId, workspaceId), or(isNull(workflowDefs.projectId), eq(workflowDefs.projectId, projectId))))
+    .where(
+      and(
+        eq(workflowDefs.workspaceId, workspaceId),
+        or(isNull(workflowDefs.projectId), eq(workflowDefs.projectId, projectId)),
+      ),
+    )
     .orderBy(desc(workflowDefs.updatedAt))
   return rows.map(toRow)
 }
@@ -82,7 +107,13 @@ export async function getDef(db: PluginDatabase, id: string): Promise<StoredWork
 
 export async function createDef(
   db: PluginDatabase,
-  input: { id?: string; workspaceId: string; projectId?: string | null; def: WorkflowDef; agentOrigin?: WorkflowAgentOrigin },
+  input: {
+    id?: string
+    workspaceId: string
+    projectId?: string | null
+    def: WorkflowDef
+    agentOrigin?: WorkflowAgentOrigin
+  },
 ): Promise<StoredWorkflowDef> {
   const at = now()
   const row: typeof workflowDefs.$inferInsert = {
@@ -116,11 +147,15 @@ export async function updateDef(
   if (!current) return null
   if (current.revision !== revision) return { conflict: current }
   const at = now()
-  const agentOrigin = agentCallId && current.agentOrigin ? { ...current.agentOrigin, lastCallId: agentCallId } : current.agentOrigin
+  const agentOrigin =
+    agentCallId && current.agentOrigin ? { ...current.agentOrigin, lastCallId: agentCallId } : current.agentOrigin
   const changed = await db
     .update(workflowDefs)
     .set({
-      name: def.name, defJson: JSON.stringify(cleanDef(def)), revision: revision + 1, updatedAt: at,
+      name: def.name,
+      defJson: JSON.stringify(cleanDef(def)),
+      revision: revision + 1,
+      updatedAt: at,
       ...(agentOrigin !== current.agentOrigin ? { agentOriginJson: JSON.stringify(agentOrigin) } : {}),
     })
     .where(and(eq(workflowDefs.id, id), eq(workflowDefs.revision, revision)))
@@ -134,9 +169,22 @@ export async function updateDef(
 
 export async function removeDef(db: PluginDatabase, id: string): Promise<void> {
   publicationStore(db).assertAvailable('workflow', id)
-  if (db.select().from(workflowDependencies).where(and(eq(workflowDependencies.targetId, id), eq(workflowDependencies.kind, 'workflow'))).get()) throw new Error('This workflow is referenced by another published workflow')
+  if (
+    db
+      .select()
+      .from(workflowDependencies)
+      .where(and(eq(workflowDependencies.targetId, id), eq(workflowDependencies.kind, 'workflow')))
+      .get()
+  )
+    throw new Error('This workflow is referenced by another published workflow')
   for (const row of db.select().from(workflowDefs).all()) {
-    if (row.id !== id && (JSON.parse(row.defJson) as WorkflowDef).steps.some(step => step.childWorkflow?.ref.source === 'database' && step.childWorkflow.ref.id === id)) throw new Error('This workflow is referenced by a draft')
+    if (
+      row.id !== id &&
+      (JSON.parse(row.defJson) as WorkflowDef).steps.some(
+        (step) => step.childWorkflow?.ref.source === 'database' && step.childWorkflow.ref.id === id,
+      )
+    )
+      throw new Error('This workflow is referenced by a draft')
   }
   await db.delete(workflowDefs).where(eq(workflowDefs.id, id))
 }
@@ -157,12 +205,15 @@ export async function mergedList(
   // before. That is the precedence rule: repo beats user beats database.
   for (const row of await listDefs(db, workspaceId)) {
     const dangling = row.projectId && !known.has(row.projectId)
-    byId.set(row.id, summariseDef(row.id, 'database', row.def, {
-      projectId: row.projectId,
-      publishedRevision: row.publishedRevision,
-      ...(row.agentOrigin ? { agentAuthored: true } : {}),
-      ...(dangling ? { problems: ['The project this workflow was bound to has been removed.'] } : {}),
-    }))
+    byId.set(
+      row.id,
+      summariseDef(row.id, 'database', row.def, {
+        projectId: row.projectId,
+        publishedRevision: row.publishedRevision,
+        ...(row.agentOrigin ? { agentAuthored: true } : {}),
+        ...(dangling ? { problems: ['The project this workflow was bound to has been removed.'] } : {}),
+      }),
+    )
   }
 
   // Each project is read with the user layer beside it, because a committed definition may expand a
@@ -189,15 +240,4 @@ export async function mergedList(
   }
 
   return { workflows: [...byId.values()], errors }
-}
-
-/** Compatibility for callers that have not adopted reviewed published-graph export. */
-export async function saveDefToRepo(
-  db: PluginDatabase,
-  id: string,
-  _options: { checkoutDir: string; keepRow: boolean; resolveInRoot: (root: string, relPath: string) => string | null },
-): Promise<{ path: string } | { error: string }> {
-  const row = await getDef(db, id)
-  if (!row) return { error: 'not_found' }
-  return { error: 'review_published_export_required' }
 }

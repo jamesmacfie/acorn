@@ -16,7 +16,7 @@ import { saveJsonPref } from '../savePref'
 // you want to spend is yours, and it should not follow you to a machine where you were working on
 // somebody else's budget (docs/state-ownership/scope-rules.md § Scope rules). Written through `saveJsonPref`, so
 // `localStorage` is written before the query cache — the other way round, `mergePrefs` recomputes
-// against the old device value and drops the new one, silently (../savePref.ts).
+// against the old device value and drops the new one, silently.
 
 /** Which backend, and which of its models. Written whole: a model id belongs to one backend, so the
  *  two are only meaningful together. `modelId` is `''` for a backend that declares no catalog, which
@@ -26,12 +26,7 @@ export type ModelPick = { backendId: string; modelId: string }
 /** The remembered pick, or `null` when there is none this build can read.
  *
  *  `null` is the same answer as "never picked", which is what `effectiveModelPick` below wants: it
- *  falls back to the first available backend either way.
- *
- *  The commit wand once remembered its own pick under a key of its own, and that key is not
- *  migrated. So on a device holding one, the first dialog opened starts on `backends[0]`, and the
- *  pick made there is remembered for every dialog. That is the reasoning the fallback below applies
- *  to a pick whose backend has gone: a device preference is a stale note, not a decision. */
+ *  falls back to the first available backend either way. */
 export function readGeneratePick(prefs: Record<string, string> | undefined): ModelPick | null {
   const value = parseJson(prefs?.[PrefKeys.generatePick])
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -61,16 +56,17 @@ export const saveGeneratePick = (queryClient: QueryClient, next: ModelPick): Pro
  *  spending the key the owner configured on purpose and reaches for a CLI only when there is no key.
  *
  *  `null` when there is nothing to spend, which is what hides a Generate control. */
-export function effectiveModelPick(
-  backends: readonly ModelBackend[],
-  remembered: ModelPick | null,
-): ModelPick | null {
+export function effectiveModelPick(backends: readonly ModelBackend[], remembered: ModelPick | null): ModelPick | null {
   const held = remembered ? backends.find((candidate) => candidate.id === remembered.backendId) : undefined
   if (remembered && held) {
     // The model is checked against the backend's list too: a provider that dropped a model between
     // releases would otherwise be asked for one it no longer serves.
     const known = held.models.some((model) => model.id === remembered.modelId)
-    return { backendId: remembered.backendId, modelId: known || (held.catalogUnavailable && held.kind === 'harness') ? remembered.modelId : defaultModelIdFor(held) }
+    return {
+      backendId: remembered.backendId,
+      modelId:
+        known || (held.catalogUnavailable && held.kind === 'harness') ? remembered.modelId : defaultModelIdFor(held),
+    }
   }
   const first = backends[0]
   return first ? { backendId: first.id, modelId: defaultModelIdFor(first) } : null
@@ -78,7 +74,10 @@ export function effectiveModelPick(
 
 /** The pick as one line for a tip, such as "Claude Code, Opus". The model's catalog label when it has
  *  one, its id when the catalog no longer lists it, and only the backend for the backend's default. */
-export function modelPickLabel(backends: readonly ModelBackend[], pick: ModelPick | null | undefined): string | undefined {
+export function modelPickLabel(
+  backends: readonly ModelBackend[],
+  pick: ModelPick | null | undefined,
+): string | undefined {
   const backend = pick ? backends.find((candidate) => candidate.id === pick.backendId) : undefined
   if (!pick || !backend) return undefined
   const model = backend.models.find((candidate) => candidate.id === pick.modelId)?.label ?? pick.modelId

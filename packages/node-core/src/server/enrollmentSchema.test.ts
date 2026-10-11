@@ -8,7 +8,7 @@ import { ENROLLMENT_PROTOCOL_VERSION, enrollmentRequestSchema } from '@acorn/pro
 // The published JSON schema for the enrollment payload, pinned against the Zod schema the node
 // actually posts (docs/node-enrollment.md).
 //
-// This is the Headscale lesson made mechanical. The moment a third party can write a control plane the
+// The moment a third party can write a control plane the
 // protocol is a public interface whether or not anyone versioned it, so the document has to be right,
 // and a document nothing checks is a document that drifts. Regenerate with
 // `UPDATE_ENROLLMENT_SCHEMA=1`.

@@ -1,4 +1,12 @@
-import { DIFF_DOCUMENT_VERSION, SEGMENT_MAX_BYTES, SEGMENT_MAX_ROWS, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentDescriptor, type PlainDiffRow } from './model'
+import {
+  DIFF_DOCUMENT_VERSION,
+  SEGMENT_MAX_BYTES,
+  SEGMENT_MAX_ROWS,
+  type DiffDocumentFile,
+  type DiffDocumentTopology,
+  type DiffSegmentDescriptor,
+  type PlainDiffRow,
+} from './model'
 import { parsePatch } from './parse'
 
 /** One file's patch, cut into segments. `bytes` is roughly what the rows weigh as JSON, which is the
@@ -16,8 +24,10 @@ function utf8Length(text: string): number {
     const code = text.charCodeAt(i)
     if (code < 0x80) bytes += 1
     else if (code < 0x800) bytes += 2
-    else if (code >= 0xd800 && code <= 0xdbff) { bytes += 4; i++ }
-    else bytes += 3
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4
+      i++
+    } else bytes += 3
   }
   return bytes
 }
@@ -63,7 +73,7 @@ export function bandCount(rows: readonly PlainDiffRow[]): number {
   return bands
 }
 
-export function describeSegment(rows: readonly PlainDiffRow[], limits: SegmentLimits = LIMITS): DiffSegmentDescriptor {
+function describeSegment(rows: readonly PlainDiffRow[], limits: SegmentLimits = LIMITS): DiffSegmentDescriptor {
   let gaps = 0
   let columns = 0
   let oldFirst = 0
@@ -83,7 +93,13 @@ export function describeSegment(rows: readonly PlainDiffRow[], limits: SegmentLi
       newLast = row.newNo
     }
   }
-  const descriptor: DiffSegmentDescriptor = { rows: rows.length, bands: bandCount(rows), gaps, columns, lines: [oldFirst, oldLast, newFirst, newLast] }
+  const descriptor: DiffSegmentDescriptor = {
+    rows: rows.length,
+    bands: bandCount(rows),
+    gaps,
+    columns,
+    lines: [oldFirst, oldLast, newFirst, newLast],
+  }
   if (rows.length === 1 && rowBytes(rows[0]!) > limits.bytes) descriptor.oversize = true
   return descriptor
 }

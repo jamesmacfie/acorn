@@ -41,7 +41,9 @@ export function Chip(props: {
   const leading = children(() => props.leading)
   const body = (
     <>
-      <Show when={leading()}><span class="ui-chip-leading">{leading()}</span></Show>
+      <Show when={leading()}>
+        <span class="ui-chip-leading">{leading()}</span>
+      </Show>
       <span class="ui-chip-label">{props.children}</span>
     </>
   )
@@ -54,12 +56,16 @@ export function Chip(props: {
           <Show when={props.onRemove}>
             {/* A mark inside the chip's own button, not an IconButton, whose square would make the chip
                 taller than the text it sits beside. */}
-            <button type="button" class="ui-chip-remove" aria-label="Remove" onClick={() => props.onRemove?.()}><Icon name="x" /></button>
+            <button type="button" class="ui-chip-remove" aria-label="Remove" onClick={() => props.onRemove?.()}>
+              <Icon name="x" />
+            </button>
           </Show>
         </span>
       }
     >
-      <button type="button" {...attrs()} onClick={() => props.onPress?.()}>{body}</button>
+      <button type="button" {...attrs()} onClick={() => props.onPress?.()}>
+        {body}
+      </button>
     </Show>
   )
 }

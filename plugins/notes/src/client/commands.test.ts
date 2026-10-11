@@ -8,7 +8,7 @@ vi.mock('./notesClient', async (importOriginal) => {
   return { ...actual, notesApi: () => ({ list: mocks.list, create: mocks.create }) }
 })
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   openPane: mocks.openPane,
 }))
 
@@ -19,12 +19,25 @@ import { notesCommands } from './commands'
 // to be two rows or one of them becomes unreachable.
 
 const note = (slug: string, over: Partial<NoteSummary> = {}): NoteSummary => ({
-  slug, title: slug, author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0, ...over,
+  slug,
+  title: slug,
+  author: 'user',
+  kind: 'scratch',
+  included: true,
+  originTaskId: null,
+  updatedAt: 0,
+  ...over,
 })
 
 const context = (over: Partial<CommandExecutionContext> = {}): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 'task-1',
-  paneId: null, surfaceId: null, ...over,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 'task-1',
+  paneId: null,
+  surfaceId: null,
+  ...over,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -36,9 +49,14 @@ describe('the notes plugin catalogue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.list.mockImplementation((location: { scope: string }) =>
-      Promise.resolve(location.scope === 'task' ? [note('deploy'), note('seed', { author: 'workflow' })]
-        : location.scope === 'workspace' ? [note('standards', { kind: 'plan' })]
-        : [note('deploy')]))
+      Promise.resolve(
+        location.scope === 'task'
+          ? [note('deploy'), note('seed', { author: 'workflow' })]
+          : location.scope === 'workspace'
+            ? [note('standards', { kind: 'plan' })]
+            : [note('deploy')],
+      ),
+    )
   })
 
   it('is a search and an input, both task-scoped and gated on the plugin', () => {
@@ -70,18 +88,28 @@ describe('the notes plugin catalogue', () => {
 
   it('says why a scope is missing rather than leaving a gap', async () => {
     mocks.list.mockImplementation((location: { scope: string }) =>
-      Promise.resolve(location.scope === 'workspace' ? { error: 'device credential required' } : []))
+      Promise.resolve(location.scope === 'workspace' ? { error: 'device credential required' } : []),
+    )
     const rows = await find().query('', context(), signal())
-    expect(rows).toEqual([{ id: 'problem:workspace', title: 'shared notes: device credential required', badge: 'error' }])
+    expect(rows).toEqual([
+      { id: 'problem:workspace', title: 'shared notes: device credential required', badge: 'error' },
+    ])
     // Enter on it restates the message rather than opening nothing.
-    expect(find().select(rows[0], context())).toEqual({ effect: 'stay', status: 'shared notes: device credential required' })
+    expect(find().select(rows[0], context())).toEqual({
+      effect: 'stay',
+      status: 'shared notes: device credential required',
+    })
   })
 
   it('opens the pick through the retained notes intent, in its own scope', async () => {
     const world = context()
     const rows = await find().query('', world, signal())
     expect(find().select(rows[2], world)).toEqual({ effect: 'close' })
-    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'notes', { kind: 'notes:open', slug: 'deploy', scope: 'global' })
+    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'notes', {
+      kind: 'notes:open',
+      slug: 'deploy',
+      scope: 'global',
+    })
   })
 
   it('creates a task note from a title and opens what the node named it', async () => {
@@ -89,7 +117,11 @@ describe('the notes plugin catalogue', () => {
     expect(await create().submit('Ship it', context(), signal())).toEqual({ effect: 'close' })
     // No kind and no slug: the node owns the default kind and the collision rule.
     expect(mocks.create).toHaveBeenCalledWith({ scope: 'task', taskId: 'task-1' }, 'Ship it')
-    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'notes', { kind: 'notes:open', slug: 'ship-it-2', scope: 'task' })
+    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'notes', {
+      kind: 'notes:open',
+      slug: 'ship-it-2',
+      scope: 'task',
+    })
   })
 
   it('keeps the typed title when the node refuses', async () => {

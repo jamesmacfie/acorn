@@ -30,7 +30,9 @@ describe('plugin route registry', () => {
     // The prefix is relative to the namespace: an absolute-looking or namespace-repeating prefix
     // would still mount *inside* /v1/p/<plugin>, i.e. at a URL nothing requests.
     expect(() => registry.register({ plugin: 'github', prefix: 'repos', router })).toThrow("start with '/'")
-    expect(() => registry.register({ plugin: 'github', prefix: '/v1/core/repos', router })).toThrow("must not repeat '/v1'")
+    expect(() => registry.register({ plugin: 'github', prefix: '/v1/core/repos', router })).toThrow(
+      "must not repeat '/v1'",
+    )
     expect(registry.list()).toHaveLength(0)
   })
 })
@@ -77,24 +79,26 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 ]
 
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
-// docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact equality now instead of
-// a representative `some()` check per contribution. The segment doubling is visible here too
+// docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact
+// equality rather than a representative `some()` check per contribution. The segment doubling is visible here too
 // (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
 // under its plugin namespace, e.g. `/v1/p/memory/memory`.
 //
 // Duplicates are kept rather than deduped. A route with its own middleware lists once per handler,
 // and collapsing them would stop the list noticing a gate like requireDevice disappearing.
 //
-// What's not in here, and would be a real change if it appeared: any route from a loaded package.
-// Linear's and http's routes left when those plugins did; a loaded plugin's routes reach the mount
-// table through the loader's fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
+// What's not in here, and would be a real change if it appeared: any route from a loaded package,
+// such as linear's or http's. A loaded plugin's routes reach the mount table through the loader's
+// fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
 // doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
 // drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
 const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
 
 describe('assembled routes', () => {
   let plugins: { dispose(): Promise<void> }
-  beforeAll(async () => { plugins = await initCompiledPlugins() })
+  beforeAll(async () => {
+    plugins = await initCompiledPlugins()
+  })
   afterAll(async () => plugins.dispose())
 
   const routes = () => createApp().routes
@@ -126,15 +130,18 @@ describe('assembled routes', () => {
       ACTIVE_IDENTITY: { get: () => 'james' },
     } as unknown as Env
     const call = (path: string, authorization?: string) =>
-      createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { headers: authorization ? { authorization } : {} }), env)
+      createApp().fetch(
+        new Request(`http://127.0.0.1:4317${path}`, { headers: authorization ? { authorization } : {} }),
+        env,
+      )
     const conflicts = '/v1/p/github/repos/acme/web/pulls/1/conflicts?base=main'
     expect((await call(conflicts)).status).toBe(401)
     // No project maps acme/web here, so the conflicts route answers its own "unavailable" body.
     expect(await (await call(conflicts, 'Bearer d')).json()).toEqual({ available: false, files: [] })
-    expect(((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error)
-      .toMatchObject({ code: 'bad_number' })
-    // A path the mirror doesn't serve falls through to the app's 404, as it did when the routers were
-    // mounted at boot.
+    expect(
+      ((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error,
+    ).toMatchObject({ code: 'bad_number' })
+    // A path the mirror doesn't serve falls through to the app's 404.
     expect((await call('/v1/p/github/repos/acme/web/nothing-here', 'Bearer d')).status).toBe(404)
   })
 
@@ -143,16 +150,31 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    // One left: github is the only provider still compiled in. linear, openai and anthropic all come
+    // One: github is the only compiled provider. linear, openai and anthropic all come
     // from loaded packages, and this suite assembles the compiled list only, so their absence is the
     // assertion; any of them appearing would mean something in the binary had started registering a
     // provider again.
     const expected = ['github']
-    expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
+    expect(
+      connectionProviderRegistry
+        .list()
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(expected)
     // The integration registry holds only providers with mirrored resources (docs/integrations/contributions.md §
     // Connection and integration contributions). github has them, so the two lists coincide. They are
     // asserted separately because a connection provider need not be an integration one.
-    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
+    expect(
+      integrationProviderRegistry
+        .list()
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(expected)
+    expect(
+      modelProviderRegistry
+        .list()
+        .map((a) => a.providerId)
+        .sort(),
+    ).toEqual([])
   })
 })

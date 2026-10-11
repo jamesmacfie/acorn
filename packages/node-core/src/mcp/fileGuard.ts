@@ -4,7 +4,7 @@
 //
 // It checks the real path of every target, including a file that doesn't exist yet, against the
 // session's allowlist. Rules written at start only cover the entries that existed then, so a `.env`
-// created later in the data root had none.
+// created later in the data root would have none.
 //
 // Unlike the loop hook bridge, it fails closed. Claude Code reads exit code 2 as a refusal, so bad input
 // or an internal error refuses the call. The harness runs it only for its file tools.
@@ -30,13 +30,15 @@ const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
 /** The `matcher` a harness's hook entry uses, so the guard runs for exactly the tools it understands. */
 export const FILE_GUARD_MATCHER = [...READ_TOOLS, ...SEARCH_TOOLS, ...WRITE_TOOLS].join('|')
 
-export const encodeFileGuardPolicy = (policy: FileGuardPolicy): string => Buffer.from(JSON.stringify(policy)).toString('base64url')
+export const encodeFileGuardPolicy = (policy: FileGuardPolicy): string =>
+  Buffer.from(JSON.stringify(policy)).toString('base64url')
 
-const within = (path: string, root: string): boolean => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep)
+const within = (path: string, root: string): boolean =>
+  path === root || path.startsWith(root.endsWith(sep) ? root : root + sep)
 
 /** The path with every link resolved. A path that doesn't exist yet resolves through its nearest
  *  existing folder, so a new file is judged by where it would land. */
-export function canonicalPath(path: string): string {
+function canonicalPath(path: string): string {
   try {
     return realpathSync.native(path)
   } catch {
@@ -54,11 +56,17 @@ const globRoot = (pattern: string): string => {
 
 /** The paths a call touches, absolute. */
 function targets(call: FileToolCall): string[] {
-  const input = (call.tool_input && typeof call.tool_input === 'object' ? call.tool_input : {}) as Record<string, unknown>
+  const input = (call.tool_input && typeof call.tool_input === 'object' ? call.tool_input : {}) as Record<
+    string,
+    unknown
+  >
   const cwd = typeof call.cwd === 'string' && isAbsolute(call.cwd) ? call.cwd : process.cwd()
-  const named = [input.file_path, input.notebook_path, input.path].filter((value): value is string => typeof value === 'string' && !!value)
+  const named = [input.file_path, input.notebook_path, input.path].filter(
+    (value): value is string => typeof value === 'string' && !!value,
+  )
   if (SEARCH_TOOLS.has(String(call.tool_name)) && !named.length) named.push(cwd)
-  if (call.tool_name === 'Glob' && typeof input.pattern === 'string' && isAbsolute(input.pattern)) named.push(globRoot(input.pattern))
+  if (call.tool_name === 'Glob' && typeof input.pattern === 'string' && isAbsolute(input.pattern))
+    named.push(globRoot(input.pattern))
   return named.map((path) => resolve(cwd, path))
 }
 
@@ -75,7 +83,8 @@ export function fileToolRefusal(policy: FileGuardPolicy, call: FileToolCall): st
   for (const target of targets(call)) {
     const real = canonicalPath(target)
     for (const path of new Set([target, real])) {
-      if (writes && denied.some((root) => within(path, root))) return `${target} is a git file this session may not write.`
+      if (writes && denied.some((root) => within(path, root)))
+        return `${target} is a git file this session may not write.`
       if (dataDir.some((root) => within(path, root)) && !allowed.some((root) => within(path, root))) {
         return `${target} is in Acorn's data folder, outside what this session may ${writes ? 'write' : 'read'}.`
       }

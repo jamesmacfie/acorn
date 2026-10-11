@@ -34,10 +34,12 @@ describe('managed session title rules', () => {
   })
 
   it('keeps the deterministic fallback behavior', () => {
-    expect(deterministicSessionTitle([
-      { type: 'text', text: '  ' },
-      { type: 'text', text: '  Name\nthis   session  ' },
-    ])).toBe('Name this session')
+    expect(
+      deterministicSessionTitle([
+        { type: 'text', text: '  ' },
+        { type: 'text', text: '  Name\nthis   session  ' },
+      ]),
+    ).toBe('Name this session')
     expect(deterministicSessionTitle([{ type: 'attachment', attachmentId: 'a' }], 'brief.pdf')).toBe('brief.pdf')
     expect(deterministicSessionTitle([{ type: 'attachment', attachmentId: 'a' }])).toBeNull()
   })
@@ -55,10 +57,12 @@ describe('managed session title rules', () => {
   })
 
   it('bounds words and characters and rejects no-op answers', () => {
-    expect(normalizeGeneratedSessionTitle('one two three four five six seven eight nine ten', 'fallback'))
-      .toBe('one two three four five six seven eight')
-    expect(normalizeGeneratedSessionTitle('pneumonoultramicroscopicsilicovolcanoconiosis-and-more', 'fallback'))
-      .toHaveLength(50)
+    expect(normalizeGeneratedSessionTitle('one two three four five six seven eight nine ten', 'fallback')).toBe(
+      'one two three four five six seven eight',
+    )
+    expect(
+      normalizeGeneratedSessionTitle('pneumonoultramicroscopicsilicovolcanoconiosis-and-more', 'fallback'),
+    ).toHaveLength(50)
     expect(normalizeGeneratedSessionTitle('', 'fallback')).toBeNull()
     expect(normalizeGeneratedSessionTitle('New agent session', 'fallback')).toBeNull()
     expect(normalizeGeneratedSessionTitle('fallback', 'fallback')).toBeNull()

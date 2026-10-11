@@ -4,23 +4,54 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { setActiveNode } from '@acorn/plugin-api/client'
 
 vi.mock('./dockerStore', () => ({
-  containers: () => [{ id: 'browse-container', name: 'postgres', image: 'postgres:17', state: 'running', status: 'Up 2 hours', composeProject: null }],
-  dockerInfo: () => ({ available: true }), loadError: () => '', loading: () => false,
-  refreshDocker: async () => {}, wireDockerRefresh: () => {},
+  containers: () => [
+    {
+      id: 'browse-container',
+      name: 'postgres',
+      image: 'postgres:17',
+      state: 'running',
+      status: 'Up 2 hours',
+      composeProject: null,
+    },
+  ],
+  dockerInfo: () => ({ available: true }),
+  loadError: () => '',
+  loading: () => false,
+  refreshDocker: async () => {},
+  wireDockerRefresh: () => {},
 }))
-vi.mock('./dockerClient', () => ({ fetchImages: async () => [], fetchVolumes: async () => [], fetchNetworks: async () => [] }))
+vi.mock('./dockerClient', () => ({
+  fetchImages: async () => [],
+  fetchVolumes: async () => [],
+  fetchNetworks: async () => [],
+}))
 vi.mock('./wsChannel', () => ({ wsOnDockerChanged: () => () => {} }))
 vi.mock('@acorn/plugin-api/ui/host', () => ({ AnnotationMarks: () => null, requestAnnotations: () => {} }))
 vi.mock('./ContainerDetail', () => ({ default: (props: { target: string }) => <div>Inspecting {props.target}</div> }))
 import DockerBrowse from './DockerBrowse'
 
 const stops: (() => void)[] = []
-afterEach(() => { stops.splice(0).forEach(stop => stop()); setActiveNode(null) })
+afterEach(() => {
+  stops.splice(0).forEach((stop) => stop())
+  setActiveNode(null)
+})
 const mount = () => {
-  const host = document.createElement('div'), client = new QueryClient()
+  const host = document.createElement('div'),
+    client = new QueryClient()
   document.body.append(host)
-  const dispose = render(() => <QueryClientProvider client={client}><DockerBrowse /></QueryClientProvider>, host)
-  const stop = () => { dispose(); client.clear(); host.remove() }
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <DockerBrowse />
+      </QueryClientProvider>
+    ),
+    host,
+  )
+  const stop = () => {
+    dispose()
+    client.clear()
+    host.remove()
+  }
   stops.push(stop)
   return { host, stop }
 }

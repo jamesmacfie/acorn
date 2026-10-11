@@ -4,17 +4,17 @@ import type { PanelDefinition } from './model'
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
-const strings = (value: unknown): string[] => Array.isArray(value)
-  ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
-  : []
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0) : []
 
 /** Parse a published dashboard panel. Flat panel definitions have no publication and are refused. */
 export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined {
   if (!isRecord(raw) || !isRecord(raw.publication)) return undefined
   const id = typeof raw.id === 'string' && raw.id ? raw.id : undefined
-  const dashboardId = typeof raw.publication.dashboardId === 'string' && raw.publication.dashboardId
-    ? raw.publication.dashboardId
-    : undefined
+  const dashboardId =
+    typeof raw.publication.dashboardId === 'string' && raw.publication.dashboardId
+      ? raw.publication.dashboardId
+      : undefined
   if (!id || !dashboardId) return undefined
   const view = dashboardViewSchema.safeParse(raw.view)
   const sources = strings(raw.publication.sources)

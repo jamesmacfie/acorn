@@ -50,8 +50,15 @@ export type PluginTelemetry = {
   gauge(name: string, value: number, attrs?: TelemetryAttrs): void
   error(error: TelemetryErrorInput): void
   /** Times synchronous work and returns its result. Use startSpan for asynchronous work. */
-  measure<R extends () => unknown>(name: string, run: R & (ReturnType<R> extends PromiseLike<unknown> ? never : unknown), attrs?: TelemetryAttrs): ReturnType<R>
-  startSpan(name: string, options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string }): TelemetrySpanHandle
+  measure<R extends () => unknown>(
+    name: string,
+    run: R & (ReturnType<R> extends PromiseLike<unknown> ? never : unknown),
+    attrs?: TelemetryAttrs,
+  ): ReturnType<R>
+  startSpan(
+    name: string,
+    options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string },
+  ): TelemetrySpanHandle
 }
 
 /** A stderr line prefixed with your plugin id, and a log record with the owner bound when the owner

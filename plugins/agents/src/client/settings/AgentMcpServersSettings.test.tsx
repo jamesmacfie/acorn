@@ -8,14 +8,29 @@ import type { AgentMcpPendingReview, AgentMcpServer } from '../../shared/mcpServ
 // from its danger zone asks first and names what stays.
 
 const servers: AgentMcpServer[] = [
-  { name: 'linear', transport: 'stdio', command: 'npx', args: ['-y', 'linear-mcp'], url: null, values: [], enabled: true, updatedAt: 1, revision: 'a'.repeat(64), consented: true, reviewTools: false, approvedCatalogueDigest: null },
+  {
+    name: 'linear',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', 'linear-mcp'],
+    url: null,
+    values: [],
+    enabled: true,
+    updatedAt: 1,
+    revision: 'a'.repeat(64),
+    consented: true,
+    reviewTools: false,
+    approvedCatalogueDigest: null,
+  },
 ]
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(async (_question: { title: string; stays?: string }) => false),
   remove: vi.fn(async (_name: string) => ({ ok: true })),
   approve: vi.fn(async (_review: AgentMcpPendingReview) => ({})),
 }))
-vi.mock('@acorn/plugin-api/ui/host', () => ({ confirmAction: (question: { title: string }) => mocks.confirm(question) }))
+vi.mock('@acorn/plugin-api/ui/host', () => ({
+  confirmAction: (question: { title: string }) => mocks.confirm(question),
+}))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: servers, isPending: false }),
   useQueryClient: () => ({ setQueryData: vi.fn() }),
@@ -35,7 +50,8 @@ const { default: AgentMcpServersSettings, CatalogueReview, consentSource } = awa
 let host: HTMLElement
 let dispose: (() => void) | undefined
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
-const button = (label: string) => [...host.querySelectorAll('button')].find((each) => each.textContent?.trim() === label)
+const button = (label: string) =>
+  [...host.querySelectorAll('button')].find((each) => each.textContent?.trim() === label)
 
 beforeEach(() => {
   mocks.confirm.mockReset()
@@ -53,11 +69,19 @@ afterEach(() => {
 describe('the MCP servers page', () => {
   it('hides URL credentials, query values, and command arguments in consent', () => {
     expect(consentSource({ ...servers[0]!, args: ['--token', 'sk_live_example'] })).not.toContain('sk_live_example')
-    expect(consentSource({ ...servers[0]!, transport: 'http', url: 'https://alice:secret@example.test/mcp?token=secret#fragment' })).toBe('https://example.test/… (path and credentials hidden)')
+    expect(
+      consentSource({
+        ...servers[0]!,
+        transport: 'http',
+        url: 'https://alice:secret@example.test/mcp?token=secret#fragment',
+      }),
+    ).toBe('https://example.test/… (path and credentials hidden)')
   })
 
   it('lists servers, says /mcp changes an open session, and opens one in the same pane', () => {
-    expect(host.querySelector('[data-settings-section="servers"]')?.textContent).toContain('type /mcp in its message box')
+    expect(host.querySelector('[data-settings-section="servers"]')?.textContent).toContain(
+      'type /mcp in its message box',
+    )
     expect(host.textContent).toContain('npx (2 arguments hidden)')
     button('Edit')!.click()
     expect(host.querySelector('[data-settings-section="servers"]')).toBeNull()
@@ -71,7 +95,9 @@ describe('the MCP servers page', () => {
     button('Edit')!.click()
     button('Remove server')!.click()
     await settle()
-    expect(mocks.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Remove linear', stays: "Servers set up in a CLI's own config files." }))
+    expect(mocks.confirm).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Remove linear', stays: "Servers set up in a CLI's own config files." }),
+    )
     expect(mocks.remove).not.toHaveBeenCalled()
 
     mocks.confirm.mockResolvedValueOnce(true)
@@ -84,9 +110,14 @@ describe('the MCP servers page', () => {
 
 it('recomputes the displayed catalogue and approval from changed review props', async () => {
   const first: AgentMcpPendingReview = {
-    name: 'fixture', sessionId: 'session', revision: 'a'.repeat(64), digest: 'b'.repeat(64), version: 1,
+    name: 'fixture',
+    sessionId: 'session',
+    revision: 'a'.repeat(64),
+    digest: 'b'.repeat(64),
+    version: 1,
     previousTools: [{ name: 'read', description: 'Old', inputSchema: { type: 'object' } }],
-    tools: [{ name: 'read', description: 'New', inputSchema: { type: 'object' } }], findings: [],
+    tools: [{ name: 'read', description: 'New', inputSchema: { type: 'object' } }],
+    findings: [],
   }
   let change!: (review: AgentMcpPendingReview) => void
   const container = document.createElement('div')
@@ -99,12 +130,28 @@ it('recomputes the displayed catalogue and approval from changed review props', 
   try {
     expect(container.textContent).toContain('New')
     expect(container.textContent).toContain('Start a new managed session')
-    const next = { ...first, digest: 'c'.repeat(64), tools: [{ name: 'read', description: 'New', inputSchema: { type: 'object', properties: { key: { type: 'string' } } }, annotations: { readOnlyHint: true } }] }
+    const next = {
+      ...first,
+      digest: 'c'.repeat(64),
+      tools: [
+        {
+          name: 'read',
+          description: 'New',
+          inputSchema: { type: 'object', properties: { key: { type: 'string' } } },
+          annotations: { readOnlyHint: true },
+        },
+      ],
+    }
     change(next)
     expect(container.textContent).toContain('readOnlyHint')
     expect(container.textContent).toContain(next.digest)
-    ;[...container.querySelectorAll('button')].find((node) => node.textContent?.includes('Approve these tool definitions'))!.click()
+    ;[...container.querySelectorAll('button')]
+      .find((node) => node.textContent?.includes('Approve these tool definitions'))!
+      .click()
     await settle()
     expect(mocks.approve).toHaveBeenLastCalledWith(next)
-  } finally { stop(); container.remove() }
+  } finally {
+    stop()
+    container.remove()
+  }
 })

@@ -7,17 +7,16 @@ import { describe, expect, it } from 'vitest'
 // `window is not defined` in someone else's package the moment that plugin's suite imports it.
 //
 // This file loads every entrypoint in process, under vitest's node environment with no jsdom and no
-// Solid transform, rather than spawning a child the way
-// apps/node/test/integration/mainBarrelLoad.test.ts does. The hazard is what a vitest worker can
-// load, so a vitest worker is the honest place to ask. It doubles as enforcement of
-// "sideEffects": false, since a barrel doing real work at module scope would do it here too.
+// Solid transform, rather than in a child process. The hazard is what a vitest worker can load, so a
+// vitest worker is the honest place to ask. It doubles as enforcement of "sideEffects": false, since
+// a barrel doing real work at module scope would do it here too.
 const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json'), 'utf8')) as {
   exports: Record<string, string>
 }
 
 // Derived from the exports map, not listed by hand: a new entrypoint is covered the day it is added,
-// which is the difference between a property and an allowlist. The three below are excluded because
-// they legitimately need a browser realm, and each says so in its own header:
+// which is the difference between a property and an allowlist. The entries below are excluded
+// because they need a browser realm:
 const BROWSER_REALM = new Set([
   './client/task-draft', // task draft store reaches the TSX icon picker through its client dependencies
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
@@ -41,12 +40,22 @@ describe('plugin-api entrypoints load in a node environment', () => {
     // `./ui/tree` is node-safe: it is the sandbox's own renderer, so it reaches Solid's isomorphic
     // core and the remote root and nothing that touches a document.
     //
-    // `./ui/editor` used to sit in BROWSER_REALM below: it re-exports the editor theme, and Monaco read
-    // `window` at module scope, so importing it here threw. CodeMirror does not, so the entrypoint is
-    // node-safe now and a plugin test that wants an editor theme can have one. It stays a separate
-    // entrypoint for the other reason its header gives — keeping the grammars out of every pane's boot
-    // graph — which is a bundling concern, not a realm one.
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './testkit/ws-client', './ui/diff', './ui/editor', './ui/model-provider-failure', './ui/sdk', './ui/tokens', './ui/tree'])
+    // `./ui/editor` is node-safe: CodeMirror reads no `window` at module scope, so a plugin test that
+    // wants the editor theme can have one. It is a separate entrypoint to keep the grammars out of
+    // every pane's boot graph, which is a bundling concern, not a realm one.
+    expect(nodeSafe.sort()).toEqual([
+      './client',
+      './node',
+      './testkit',
+      './testkit/client',
+      './testkit/ws-client',
+      './ui/diff',
+      './ui/editor',
+      './ui/model-provider-failure',
+      './ui/sdk',
+      './ui/tokens',
+      './ui/tree',
+    ])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

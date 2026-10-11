@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions, PluginContributions } from '@acorn/protocol/api.ts'
-import { inputPermissionLines, providedSourceLines, agentToolGrants, agentToolPermissionLines, contextSectionGrants, contextSectionPermissionLines, extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import {
+  inputPermissionLines,
+  providedSourceLines,
+  agentToolGrants,
+  agentToolPermissionLines,
+  contextSectionGrants,
+  contextSectionPermissionLines,
+  extensionPermissionLine,
+  harnessGrants,
+  harnessPermissionLines,
+  keyClaimGrants,
+  keyClaimPermissionLines,
+  navigationDestinationGrants,
+  navigationDestinationPermissionLines,
+  nodePermissionLines,
+  type PermissionLine,
+  uiPermissionLines,
+  webviewPermissionLines,
+} from './permissions'
 import { EXTENSION_POINT_KINDS, HOOK_MODES } from '@acorn/protocol/extensionPoints.ts'
 
 // The update prompt diffs grant keys, not wording, so the key is what has to stay stable. This is a
@@ -15,7 +33,11 @@ const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermi
   ...over,
 })
 
-const added = (before: NodePluginPermissions, after: NodePluginPermissions, project: (p: NodePluginPermissions) => PermissionLine[]) => {
+const added = (
+  before: NodePluginPermissions,
+  after: NodePluginPermissions,
+  project: (p: NodePluginPermissions) => PermissionLine[],
+) => {
   const had = new Set(project(before).map((line) => line.key))
   return texts(project(after).filter((line) => !had.has(line.key)))
 }
@@ -25,7 +47,14 @@ describe('the two permission groups', () => {
     const all = permissions({
       api: ['core.tasks:read'],
       events: ['runtime:task-archived'],
-      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'], sockets: true },
+      node: {
+        core: ['issues'],
+        capabilities: ['docker.compose'],
+        secrets: true,
+        exec: true,
+        net: ['ntfy.sh'],
+        sockets: true,
+      },
     })
     expect(texts(nodePermissionLines(all))).toEqual([
       'Use your saved credentials to make requests on its behalf',
@@ -39,46 +68,77 @@ describe('the two permission groups', () => {
   })
 
   it('names session control in the host’s words, as high, and keeps other capabilities generic', () => {
-    const lines = nodePermissionLines(permissions({ node: { core: [], capabilities: ['agents.sessionControl', 'agents.activity.v1'], secrets: false, exec: false, net: [], sockets: false } }))
+    const lines = nodePermissionLines(
+      permissions({
+        node: {
+          core: [],
+          capabilities: ['agents.sessionControl', 'agents.activity.v1'],
+          secrets: false,
+          exec: false,
+          net: [],
+          sockets: false,
+        },
+      }),
+    )
     expect(lines.map(({ text, high }) => ({ text, high }))).toEqual([
-      { text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend', high: true },
+      {
+        text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend',
+        high: true,
+      },
       { text: 'Use capability agents.activity.v1', high: false },
     ])
   })
 
   it('marks model generation high, because it spends the owner’s provider usage', () => {
-    const lines = nodePermissionLines(permissions({ node: { core: ['models'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
+    const lines = nodePermissionLines(
+      permissions({
+        node: { core: ['models'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      }),
+    )
     expect(lines.map(({ text, high }) => ({ text, high }))).toEqual([
-      { text: 'Generate text with your model providers and installed agent CLIs, which spends their usage', high: true },
+      {
+        text: 'Generate text with your model providers and installed agent CLIs, which spends their usage',
+        high: true,
+      },
     ])
   })
 
   it('shows an any-host fetch grant explicitly', () => {
-    const all = permissions({ node: { core: [], capabilities: [], secrets: false, exec: false, net: ['*'], sockets: false } })
+    const all = permissions({
+      node: { core: [], capabilities: [], secrets: false, exec: false, net: ['*'], sockets: false },
+    })
     expect(texts(nodePermissionLines(all))).toEqual(['Send requests to any network host'])
   })
 
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
     // that is what checkouts() returns (docs/security/plugin-node-realm.md § Rung 1: permission-shaped context).
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
-      'Read projects, including where every codebase lives on disk',
-    ])
+    expect(
+      texts(
+        nodePermissionLines(
+          permissions({
+            node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+          }),
+        ),
+      ),
+    ).toEqual(['Read projects, including where every codebase lives on disk'])
   })
 
   it('names inherited environment and local-file grants as high risk', () => {
-    const lines = nodePermissionLines(permissions({
-      node: {
-        core: [],
-        capabilities: [],
-        secrets: false,
-        exec: false,
-        net: [],
-        sockets: false,
-        env: ['DATABASE_URL'],
-        files: [{ env: 'ACORN_NODES_FILE', access: 'read-write' }],
-      },
-    }))
+    const lines = nodePermissionLines(
+      permissions({
+        node: {
+          core: [],
+          capabilities: [],
+          secrets: false,
+          exec: false,
+          net: [],
+          sockets: false,
+          env: ['DATABASE_URL'],
+          files: [{ env: 'ACORN_NODES_FILE', access: 'read-write' }],
+        },
+      }),
+    )
     expect(texts(lines)).toEqual([
       'Read the node environment value DATABASE_URL',
       'Read and write the local file configured by ACORN_NODES_FILE',
@@ -90,7 +150,11 @@ describe('the two permission groups', () => {
     // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
     // no token, because a plugin measuring its own work reads nobody else's
     // (docs/security/plugin-node-realm.md § Telemetry sinks).
-    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
+    const lines = nodePermissionLines(
+      permissions({
+        node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      }),
+    )
     expect(texts(lines)).toEqual([
       'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',
     ])
@@ -98,15 +162,30 @@ describe('the two permission groups', () => {
   })
 
   it('names the executable configuration carried by the config grant', () => {
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
-      'Read every project’s build, dev and database scripts',
-    ])
+    expect(
+      texts(
+        nodePermissionLines(
+          permissions({
+            node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+          }),
+        ),
+      ),
+    ).toEqual(['Read every project’s build, dev and database scripts'])
   })
 
   it('draws database writes high and keeps reads ordinary', () => {
-    const lines = nodePermissionLines(permissions({
-      node: { core: ['data:query', 'data:write'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-    }))
+    const lines = nodePermissionLines(
+      permissions({
+        node: {
+          core: ['data:query', 'data:write'],
+          capabilities: [],
+          secrets: false,
+          exec: false,
+          net: [],
+          sockets: false,
+        },
+      }),
+    )
     expect(texts(lines)).toEqual([
       'Query the databases you’ve connected',
       'Change data in the databases you’ve connected',
@@ -114,7 +193,7 @@ describe('the two permission groups', () => {
     expect(lines.map((entry) => entry.high)).toEqual([false, true])
   })
 
-  it('discloses a plugin\'s own live channel without echoing the verb it named', () => {
+  it("discloses a plugin's own live channel without echoing the verb it named", () => {
     // Core cannot enumerate a plugin's verbs, so the channel is admitted by shape
     // (frames/channels.ts). The sentence stays the host's, because a verb is manifest copy.
     const lines = texts(uiPermissionLines(permissions({ events: ['plugin:machine-stats:sample'] })))
@@ -122,7 +201,7 @@ describe('the two permission groups', () => {
     expect(lines.join(' ')).not.toContain('sample')
   })
 
-  it('ignores a channel dressed up as another plugin\'s namespace, and a malformed one', () => {
+  it("ignores a channel dressed up as another plugin's namespace, and a malformed one", () => {
     // frameServices.ts refuses another plugin's channel at subscribe time, so a prompt line for one is
     // honest about what was asked for. A malformed name must not reach the prompt as a grant.
     expect(texts(uiPermissionLines(permissions({ events: ['plugin:Other:sample', 'plugin:a:b:c'] })))).toEqual([
@@ -131,19 +210,23 @@ describe('the two permission groups', () => {
   })
 
   it('never echoes unknown manifest copy as an enforced grant', () => {
-    const lines = texts(uiPermissionLines(permissions({
-      api: ['core.tasks:read', 'read-only access to nothing'],
-      events: ['none-this-plugin-does-not-use-events'],
-    })))
+    const lines = texts(
+      uiPermissionLines(
+        permissions({
+          api: ['core.tasks:read', 'read-only access to nothing'],
+          events: ['none-this-plugin-does-not-use-events'],
+        }),
+      ),
+    )
     expect(lines).toEqual(['Read tasks', '2 requests this version of acorn does not recognise (ignored)'])
     expect(lines.join(' ')).not.toContain('read-only access to nothing')
     expect(lines.join(' ')).not.toContain('none-this-plugin')
   })
 
   it('renders no grant sentence when every UI request is unknown', () => {
-    expect(texts(uiPermissionLines(permissions({ api: ['core.quantum:read'], events: ['runtime:quantum-shift'] })))).toEqual([
-      '2 requests this version of acorn does not recognise (ignored)',
-    ])
+    expect(
+      texts(uiPermissionLines(permissions({ api: ['core.quantum:read'], events: ['runtime:quantum-shift'] }))),
+    ).toEqual(['2 requests this version of acorn does not recognise (ignored)'])
   })
 
   it('says nothing for a plugin that declared nothing', () => {
@@ -154,7 +237,10 @@ describe('the two permission groups', () => {
 
 describe('the update diff', () => {
   it('marks only what is new, so an unchanged set reads as unchanged', () => {
-    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })
+    const before = permissions({
+      api: ['core.tasks:read'],
+      node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    })
     const after = permissions({
       api: ['core.tasks:read', 'core.tasks:write'],
       node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [], sockets: false },
@@ -170,8 +256,8 @@ describe('the update diff', () => {
   })
 
   it('marks nothing when only the wording moved', () => {
-    // The case this record shape exists for. With the sentence as the diff key, a copy edit re-prompted
-    // every owner of every installed plugin. Same grants, different sentence, nothing new.
+    // The case this record shape exists for. With the sentence as the diff key, a copy edit would
+    // re-prompt every owner of every installed plugin. Same grants, different sentence, nothing new.
     const same = permissions({
       api: ['core.tasks:read'],
       node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'], sockets: false },
@@ -195,32 +281,43 @@ describe('the update diff', () => {
   })
 
   it('carries severity with the grant instead of guessing it from the sentence', () => {
-    // The other half of the same idea. Prefix-matching copy against a table rendered any grant whose
+    // The other half of the same idea. Prefix-matching copy against a table would render any grant whose
     // sentence missed the table as harmless.
     const risky = permissions({
       api: ['core.projects:read'],
-      node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'], sockets: false },
+      node: {
+        core: ['fs', 'projects:write'],
+        capabilities: [],
+        secrets: true,
+        exec: true,
+        net: ['ntfy.sh'],
+        sockets: false,
+      },
     })
     const high = (lines: readonly PermissionLine[]) => lines.filter((line) => line.high).map((line) => line.key)
     expect(high(nodePermissionLines(risky))).toEqual(['node.secrets', 'node.exec', 'node.core:projects:write'])
     expect(high(uiPermissionLines(risky))).toEqual(['core.projects:read'])
     // And every line carries an icon, so nothing falls through to a generic default.
-    expect([...nodePermissionLines(risky), ...uiPermissionLines(risky)].every((line) => line.icon.length > 0)).toBe(true)
+    expect([...nodePermissionLines(risky), ...uiPermissionLines(risky)].every((line) => line.icon.length > 0)).toBe(
+      true,
+    )
   })
 
   // A permission the plugin gave up is not marked. The prompt asks whether the new reach is
   // acceptable, and a removal is never the thing to hesitate over.
   it('does not mark a permission that was dropped', () => {
-    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [], sockets: false } })
+    const before = permissions({
+      node: { core: [], capabilities: [], secrets: true, exec: false, net: [], sockets: false },
+    })
     expect(added(before, permissions(), nodePermissionLines)).toEqual([])
   })
 })
 
 describe('webview grants', () => {
   it('renders web pages as their own host-naming permission group', () => {
-    expect(texts(webviewPermissionLines([{ surface: 'docs', label: 'Docs', hosts: ['docs.example.com', '*.example.com'] }]))).toEqual([
-      'Show web pages from *.example.com, docs.example.com in the "Docs" pane',
-    ])
+    expect(
+      texts(webviewPermissionLines([{ surface: 'docs', label: 'Docs', hosts: ['docs.example.com', '*.example.com'] }])),
+    ).toEqual(['Show web pages from *.example.com, docs.example.com in the "Docs" pane'])
     expect(webviewPermissionLines([])).toEqual([])
   })
 
@@ -239,10 +336,17 @@ describe('webview grants', () => {
 describe('frame key claims', () => {
   it('shows only host-recognized claims and names their surface', () => {
     const grants = keyClaimGrants({
-      frames: [{
-        target: 'pane', id: 'editor', label: 'Editor', glyph: 'puzzle', order: 1, formFactor: ['desktop'],
-        claimsKeys: ['meta+f', 'meta+k', 'not a chord'],
-      }],
+      frames: [
+        {
+          target: 'pane',
+          id: 'editor',
+          label: 'Editor',
+          glyph: 'puzzle',
+          order: 1,
+          formFactor: ['desktop'],
+          claimsKeys: ['meta+f', 'meta+k', 'not a chord'],
+        },
+      ],
     })
     expect(grants).toEqual([{ surface: 'editor', label: 'Editor', chords: ['meta+f'] }])
     expect(texts(keyClaimPermissionLines(grants))).toEqual(['Handle ⌘F in the "Editor" surface'])
@@ -250,23 +354,27 @@ describe('frame key claims', () => {
 })
 
 describe('the harness grant', () => {
-  const contributions = (harnesses: unknown[]) => ({ frames: [], harnesses } as never)
+  const contributions = (harnesses: unknown[]) => ({ frames: [], harnesses }) as never
 
   it('names the program acorn will run and what it carries into it', () => {
-    const lines = harnessPermissionLines(harnessGrants(contributions([
-      {
-        id: 'opencode',
-        label: 'OpenCode',
-        spawn: { command: 'opencode', args: ['acp'] },
-        envPassthrough: ['OPENCODE_*'],
-      },
-      {
-        id: 'gemini',
-        label: 'Gemini',
-        spawn: { entry: 'dist/adapter.js', args: [] },
-        envPassthrough: [],
-      },
-    ])))
+    const lines = harnessPermissionLines(
+      harnessGrants(
+        contributions([
+          {
+            id: 'opencode',
+            label: 'OpenCode',
+            spawn: { command: 'opencode', args: ['acp'] },
+            envPassthrough: ['OPENCODE_*'],
+          },
+          {
+            id: 'gemini',
+            label: 'Gemini',
+            spawn: { entry: 'dist/adapter.js', args: [] },
+            envPassthrough: [],
+          },
+        ]),
+      ),
+    )
 
     expect(texts(lines)).toEqual([
       'Run JavaScript this package ships (dist/adapter.js) as the “Gemini” agent',
@@ -277,30 +385,41 @@ describe('the harness grant', () => {
   })
 
   it('reads a changed binary, changed arguments or a widened environment as newly requested', () => {
-    const before = harnessGrants(contributions([
-      { id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
-    ]))
+    const before = harnessGrants(
+      contributions([{ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] }]),
+    )
     const keys = new Set(harnessPermissionLines(before).map((line) => line.key))
     const isNew = (harness: unknown) =>
       harnessPermissionLines(harnessGrants(contributions([harness]))).every((line) => !keys.has(line.key))
 
-    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] })).toBe(false)
+    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] })).toBe(
+      false,
+    )
     // A label edit is a copy edit, not a widening: the sentence changes and the key does not.
-    expect(isNew({ id: 'h', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] })).toBe(false)
+    expect(
+      isNew({ id: 'h', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] }),
+    ).toBe(false)
     expect(isNew({ id: 'h', label: 'H', spawn: { command: 'curl', args: ['acp'] }, envPassthrough: [] })).toBe(true)
-    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp', '--yolo'] }, envPassthrough: [] })).toBe(true)
-    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: ['AWS_*'] })).toBe(true)
+    expect(
+      isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp', '--yolo'] }, envPassthrough: [] }),
+    ).toBe(true)
+    expect(
+      isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: ['AWS_*'] }),
+    ).toBe(true)
   })
 
   it('names the one-shot invocation on its own line, and reads a change to it as newly requested', () => {
-    const withOneShot = (args: string[], modelFlag?: string) => contributions([{
-      id: 'opencode',
-      label: 'OpenCode',
-      spawn: { command: 'opencode', args: ['acp'] },
-      envPassthrough: [],
-      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
-      oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) },
-    }])
+    const withOneShot = (args: string[], modelFlag?: string) =>
+      contributions([
+        {
+          id: 'opencode',
+          label: 'OpenCode',
+          spawn: { command: 'opencode', args: ['acp'] },
+          envPassthrough: [],
+          terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+          oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) },
+        },
+      ])
 
     const lines = harnessPermissionLines(harnessGrants(withOneShot(['run'], '--model')))
     // Two invocations, two lines. The session spawn is not the one a Generate list runs.
@@ -317,22 +436,35 @@ describe('the harness grant', () => {
     expect(isNew(withOneShot(['run', '--agent', 'plan'], '--model'))).toBe(true)
     expect(isNew(withOneShot(['run']))).toBe(true)
     // A harness that drops the block loses the line rather than keeping a stale one.
-    expect(harnessPermissionLines(harnessGrants(contributions([
-      { id: 'opencode', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
-    ])))).toHaveLength(1)
+    expect(
+      harnessPermissionLines(
+        harnessGrants(
+          contributions([
+            { id: 'opencode', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
+          ]),
+        ),
+      ),
+    ).toHaveLength(1)
 
     // A harness with no interactive mode names its own command, and the line reads the same either way,
     // because what an owner consents to is the program and its arguments.
-    expect(texts(harnessPermissionLines(harnessGrants(contributions([{
-      id: 'deepseek',
-      label: 'DeepSeek',
-      spawn: { command: 'dsh', args: ['--profile', 'acp'] },
-      envPassthrough: [],
-      oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
-    }]))))).toEqual([
-      'Run “dsh --profile acp” as the “DeepSeek” agent',
-      'Runs “dsh --profile headless” to generate text',
-    ])
+    expect(
+      texts(
+        harnessPermissionLines(
+          harnessGrants(
+            contributions([
+              {
+                id: 'deepseek',
+                label: 'DeepSeek',
+                spawn: { command: 'dsh', args: ['--profile', 'acp'] },
+                envPassthrough: [],
+                oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+              },
+            ]),
+          ),
+        ),
+      ),
+    ).toEqual(['Run “dsh --profile acp” as the “DeepSeek” agent', 'Runs “dsh --profile headless” to generate text'])
   })
 
   it('discloses nothing for a spawn the node already refused', () => {
@@ -345,7 +477,9 @@ describe('the harness grant', () => {
 describe('manifest runtime contribution grants', () => {
   it('discloses tool risk/session/output and context inclusion/budgets', () => {
     const contributions = {
-      agentTools: [{ id: 'record', description: 'Record a finding.', risk: 'write', requiresSession: true, maxOutputBytes: 4096 }],
+      agentTools: [
+        { id: 'record', description: 'Record a finding.', risk: 'write', requiresSession: true, maxOutputBytes: 4096 },
+      ],
       contextSections: [{ id: 'findings', label: 'Findings', defaultIncluded: true, maxBytes: 8192, maxTokens: 1024 }],
     } as never
     const tools = agentToolPermissionLines(agentToolGrants(contributions))
@@ -361,11 +495,21 @@ describe('manifest runtime contribution grants', () => {
 describe('the cross-plugin grants', () => {
   it('discloses a cooperative destination and keys updates by its exact target', () => {
     const contributions = {
-      frames: [{
-        target: 'pane', id: 'findings', label: 'Findings', destinations: [{
-          id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
-        }],
-      }],
+      frames: [
+        {
+          target: 'pane',
+          id: 'findings',
+          label: 'Findings',
+          destinations: [
+            {
+              id: 'memory-review',
+              label: 'Review in Memory',
+              targetKind: 'findings-candidate',
+              noticeKind: 'memory-proposal',
+            },
+          ],
+        },
+      ],
     } as never
     const lines = navigationDestinationPermissionLines(navigationDestinationGrants(contributions))
     expect(texts(lines)).toEqual(['Open “Review in Memory” in another plugin'])
@@ -389,15 +533,32 @@ describe('the cross-plugin grants', () => {
   })
 
   it('names the package being reached into on the contributor’s side, and not on the owner’s', () => {
-    const extend = extensionPermissionLine({ kind: 'extends', pointKind: 'rows', target: 'changes:card-links', label: 'Linked items' })
+    const extend = extensionPermissionLine({
+      kind: 'extends',
+      pointKind: 'rows',
+      target: 'changes:card-links',
+      label: 'Linked items',
+    })
     expect(extend.text).toBe('Add its own rows to changes’s “Linked items” list')
-    const host = extensionPermissionLine({ kind: 'hosts', pointKind: 'rows', target: 'board:card-links', label: 'Linked items' })
+    const host = extensionPermissionLine({
+      kind: 'hosts',
+      pointKind: 'rows',
+      target: 'board:card-links',
+      label: 'Linked items',
+    })
     expect(host.text).toBe('Let other plugins add rows to its “Linked items” list')
   })
 
   it('says what a hook handler asks to do, and marks the three that change what another plugin does', () => {
     const modes = HOOK_MODES.map((mode) =>
-      extensionPermissionLine({ kind: 'extends', pointKind: 'hook', mode, target: 'changes:before-push', label: 'push' }))
+      extensionPermissionLine({
+        kind: 'extends',
+        pointKind: 'hook',
+        mode,
+        target: 'changes:before-push',
+        label: 'push',
+      }),
+    )
     expect(texts(modes)).toEqual([
       'Watch changes’s “push” decision as it happens',
       'Change how changes will “push”',
@@ -411,7 +572,12 @@ describe('the cross-plugin grants', () => {
   })
 
   it('words a disclosed node point with the host’s fixed, high sentence, whatever the manifest says', () => {
-    const line = extensionPermissionLine({ kind: 'extends', pointKind: 'rows', target: 'agents:session-messenger', label: 'say hello' })
+    const line = extensionPermissionLine({
+      kind: 'extends',
+      pointKind: 'rows',
+      target: 'agents:session-messenger',
+      label: 'say hello',
+    })
     expect(line).toMatchObject({
       text: 'Send notes to your agent sessions, which starts a turn on your agent provider',
       high: true,
@@ -422,7 +588,12 @@ describe('the cross-plugin grants', () => {
   it('still discloses a kind this build cannot name, rather than saying nothing', () => {
     // The version-skew case. A shell that cannot describe the kind must not therefore drop the line:
     // "this package reaches into that one" is the disclosure.
-    const line = extensionPermissionLine({ kind: 'extends', pointKind: 'sculpture' as never, target: 'changes:thing', label: 'Thing' })
+    const line = extensionPermissionLine({
+      kind: 'extends',
+      pointKind: 'sculpture' as never,
+      target: 'changes:thing',
+      label: 'Thing',
+    })
     expect(line.text).toBe('Reach into changes’s “Thing”')
   })
 
@@ -434,7 +605,14 @@ describe('the cross-plugin grants', () => {
 })
 
 describe('inputPermissionLines', () => {
-  const pulls = { sourceId: 'board', name: 'pulls', source: 'github:pull-requests', optional: false, plural: 'Pull requests', provider: 'GitHub' }
+  const pulls = {
+    sourceId: 'board',
+    name: 'pulls',
+    source: 'github:pull-requests',
+    optional: false,
+    plural: 'Pull requests',
+    provider: 'GitHub',
+  }
 
   it('words a read from the input source and its provider, and keys it by source and optional flag', () => {
     const [required] = inputPermissionLines([pulls])
@@ -444,21 +622,47 @@ describe('inputPermissionLines', () => {
       detail: "With the GitHub account you choose for each panel. It can only read, so it can't change anything.",
     })
     const [optional] = inputPermissionLines([{ ...pulls, optional: true }])
-    expect(optional).toMatchObject({ text: 'Read pull requests from GitHub, if you choose an account', detail: 'Optional. Panels work without it.' })
+    expect(optional).toMatchObject({
+      text: 'Read pull requests from GitHub, if you choose an account',
+      detail: 'Optional. Panels work without it.',
+    })
     // Making an input optional or required changes the key, so the update prompt asks again.
     expect(optional!.key).not.toBe(required!.key)
   })
 
   it('falls back to the source id for a source no running plugin registers, and drops "from" for one with no account', () => {
-    expect(texts(inputPermissionLines([{ ...pulls, plural: undefined, provider: 'linear', source: 'linear:issues' }]))).toEqual(['Read linear:issues from linear'])
-    const [local] = inputPermissionLines([{ ...pulls, source: 'core:local-branches', plural: 'Local branches', provider: undefined }])
+    expect(
+      texts(inputPermissionLines([{ ...pulls, plural: undefined, provider: 'linear', source: 'linear:issues' }])),
+    ).toEqual(['Read linear:issues from linear'])
+    const [local] = inputPermissionLines([
+      { ...pulls, source: 'core:local-branches', plural: 'Local branches', provider: undefined },
+    ])
     expect(local).toMatchObject({ text: 'Read local branches', detail: "It can't change anything." })
   })
 })
 
 describe('providedSourceLines', () => {
   it('lists each registered data source by its name', () => {
-    const lines = providedSourceLines({ dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/r/board' }] } as PluginContributions)
-    expect(lines).toEqual([{ key: 'provides:board', text: 'A data source, Release readiness', detail: 'You can use it in panels, workflows, and datasets.', icon: 'table', high: false }])
+    const lines = providedSourceLines({
+      dataSources: [
+        {
+          sourceId: 'board',
+          name: 'Release readiness',
+          singular: 'Issue',
+          plural: 'Issues',
+          identityScope: 'issue',
+          handler: '/v1/p/r/board',
+        },
+      ],
+    } as PluginContributions)
+    expect(lines).toEqual([
+      {
+        key: 'provides:board',
+        text: 'A data source, Release readiness',
+        detail: 'You can use it in panels, workflows, and datasets.',
+        icon: 'table',
+        high: false,
+      },
+    ])
   })
 })

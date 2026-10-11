@@ -37,30 +37,14 @@ Both kinds come from the same reading of a session.
 
 ## Pages
 
-<a id="five-states"></a>
-<a id="three-edges"></a>
-
 [States and edges](./notifications/states-and-edges.md) covers the five states, how the managed and
 terminal adapters map sessions to them, and the three edges that raise a notice.
-
-<a id="what-a-row-points-at"></a>
-<a id="raising-one-from-a-plugin"></a>
-<a id="getting-there-before-the-target-runs"></a>
-<a id="what-a-row-is-drawn-with"></a>
-<a id="archiving-a-task-takes-its-notices-with-it"></a>
 
 [Rows and targets](./notifications/rows-and-targets.md) covers what a row points at, raising a
 notice from a plugin, the order a click navigates in, row glyphs, and what archiving a task removes.
 
-<a id="the-gate"></a>
-<a id="acknowledging-an-attention-row"></a>
-<a id="the-invariants"></a>
-
 [The gate](./notifications/gate.md) covers the hold, the seen rule, acknowledging an attention row,
 and the invariants the tests hold.
-
-<a id="the-channels"></a>
-<a id="settings"></a>
 
 [Channels and settings](./notifications/channels.md) covers sound, the system notification, the
 badge, the terminal sequences, and the settings that switch them.

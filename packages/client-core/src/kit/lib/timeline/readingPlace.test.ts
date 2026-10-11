@@ -6,7 +6,7 @@ const tall = { scrollTop: 40, scrollHeight: 4000, clientHeight: 100 }
 const foot = { scrollTop: 3900, scrollHeight: 4000, clientHeight: 100 }
 
 describe('placeAfterScroll', () => {
-  // The five rules the follow decision has always had, now answered with a place instead of a flag.
+  // The five rules of the follow decision, answered with a place rather than a flag.
   it('goes live when a gesture lands at the foot', () => {
     expect(placeAfterScroll({ place: turn('a', 0), gesture: true, geometry: foot, anchor: () => null })).toEqual(LIVE)
   })
@@ -56,14 +56,18 @@ describe('samePlace', () => {
 
 describe('resolveAnchor', () => {
   it('uses the turn itself when it is still there', () => {
-    expect(resolveAnchor({ at: 'turn', key: 'c', index: 2, offset: 12 }, ['a', 'b', 'c', 'd']))
-      .toEqual({ key: 'c', offset: 12 })
+    expect(resolveAnchor({ at: 'turn', key: 'c', index: 2, offset: 12 }, ['a', 'b', 'c', 'd'])).toEqual({
+      key: 'c',
+      offset: 12,
+    })
   })
 
   it('takes whatever holds that position when the turn has gone', () => {
     // A permission card resolving takes its row out of the middle of the list. One row out is a place.
-    expect(resolveAnchor({ at: 'turn', key: 'c', index: 2, offset: 12 }, ['a', 'b', 'd', 'e']))
-      .toEqual({ key: 'd', offset: 0 })
+    expect(resolveAnchor({ at: 'turn', key: 'c', index: 2, offset: 12 }, ['a', 'b', 'd', 'e'])).toEqual({
+      key: 'd',
+      offset: 0,
+    })
   })
 
   it('gives up when the list is too short to hold that position', () => {

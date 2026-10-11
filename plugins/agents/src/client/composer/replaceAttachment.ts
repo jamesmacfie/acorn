@@ -1,13 +1,13 @@
 import type { AgentAttachment } from '../../contract/wire.ts'
 
 // Whether one attachment in an unsent draft may be swapped for another, and what the draft becomes
-// (docs/managed-agents/attachments.md § Draft attachments, and docs/plugins/remote-points.md § Asking the owner for who asks).
+// (docs/managed-agents/attachments.md § Draft attachments; for who asks,
+// docs/plugins/remote-points.md § Asking the owner).
 //
-// Pure, and its own file, because it is a compare-and-swap between two owners that cannot share a
-// transaction: the draft is an array in the composer and the replacement is a row on the node. The
-// composer does the I/O around this — fetch the replacement's metadata, write the draft, clean up —
-// and every rule about whether the swap is allowed at all is here, where a test can drive the cases
-// that lose a person's attachment if they are wrong.
+// Pure, because it is a compare-and-swap between two owners that cannot share a transaction: the
+// draft is an array in the composer and the replacement is a row on the node. The composer does the
+// I/O around this, and every rule about whether the swap is allowed is here, where a test can drive
+// the cases that lose a person's attachment if they are wrong.
 
 /** The caps the composer applies to a draft, restated here so this decision is complete on its own.
  *  The node re-checks both at enqueue; these exist so a reader is refused before an upload. */
@@ -45,7 +45,8 @@ export function decideReplacement(input: {
   // delete it.
   if (input.replacement.id === input.expectedId) return { kind: 'noop' }
   if (input.replacement.taskId !== input.taskId) return refuse('That attachment belongs to another task.')
-  if (!input.replacement.mediaType.startsWith('image/')) return refuse('An attachment can only be replaced by an image.')
+  if (!input.replacement.mediaType.startsWith('image/'))
+    return refuse('An attachment can only be replaced by an image.')
 
   const at = input.current.findIndex((item) => item.id === input.expectedId)
   // The reader removed it, sent the turn, or switched sessions while an editor was open.

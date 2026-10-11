@@ -43,7 +43,7 @@ export type ClaudeTaskNotification = {
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 
 /**
  * A `task_notification` from the `_claude/sdkMessage` extension notification, read as a command's end.
@@ -110,7 +110,14 @@ export class ClaudeBackgroundCommands {
   launched(toolCallId: string, launch: { taskId: string; outputPath: string }): void {
     if (this.#stopped || this.#launched.has(toolCallId)) return
     this.#launched.set(toolCallId, this.turnId)
-    const tail: Tail = { toolCallId, turnId: this.turnId, path: launch.outputPath, offset: 0, decoder: new StringDecoder('utf8'), shown: '' }
+    const tail: Tail = {
+      toolCallId,
+      turnId: this.turnId,
+      path: launch.outputPath,
+      offset: 0,
+      decoder: new StringDecoder('utf8'),
+      shown: '',
+    }
     // The folder rather than the file, which Claude may not have created yet.
     void this.#inside(dirname(launch.outputPath)).then((folder) => {
       if (this.#stopped) return
@@ -138,7 +145,14 @@ export class ClaudeBackgroundCommands {
     }
     await this.emit({
       type: 'tool',
-      tool: { id: ended.toolUseId, title: '', kind: 'execute', background: true, status: ended.status, ...(ended.exitCode != null ? { exitCode: ended.exitCode } : {}) },
+      tool: {
+        id: ended.toolUseId,
+        title: '',
+        kind: 'execute',
+        background: true,
+        status: ended.status,
+        ...(ended.exitCode != null ? { exitCode: ended.exitCode } : {}),
+      },
       acornTurnId: turnId,
     })
   }
@@ -152,7 +166,11 @@ export class ClaudeBackgroundCommands {
   #schedule(tail: Tail, delay: number): void {
     tail.timer = setTimeout(() => {
       tail.reading = this.#read(tail)
-        .catch((error: unknown) => log.warn(`reading background command output failed: ${error instanceof Error ? error.message : String(error)}`))
+        .catch((error: unknown) =>
+          log.warn(
+            `reading background command output failed: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        )
         .finally(() => {
           if (!this.#stopped && this.#tails.get(tail.toolCallId) === tail) this.#schedule(tail, this.pollMs)
         })

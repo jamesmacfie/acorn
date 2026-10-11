@@ -1,7 +1,7 @@
 import { roleCell, type CellStyle } from '@acorn/client-core/kit/tokens'
 import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens'
 import type { Color } from '../colour'
-import { isCompact, slotColor } from '../appearance'
+import { slotColor } from '../appearance'
 import { ATTRS } from '../paint/buffer'
 
 // Roles as cells: what a role token means to a terminal, as something a renderable can be handed.
@@ -18,13 +18,6 @@ export type Style = {
   /** A `../colour.ts` colour: the terminal's own foreground, one of its sixteen slots, or a triple. */
   fg: Color
   attributes: number
-  /** The same four bits as booleans. Not a second answer: a `span` under the old painter reads its
-   *  colour and its weight out of one object and ignores an `attributes` prop entirely, so a run
-   *  inside a line has to be told both ways (§ Run). */
-  bold?: true
-  dim?: true
-  underline?: true
-  inverse?: true
   transform?: (value: string) => string
 }
 
@@ -43,9 +36,7 @@ function attributes(cell: CellStyle): number {
 /**
  * A run of text: its colour, its weight, and whether the role changes the characters themselves.
  *
- * One answer for a `text` and for a `span`, which used to be two. The shapes differ, not the
- * decision: a `text` takes `fg` and a mask as props and a `span` takes one object with booleans in
- * it, so this returns both and each caller spends the half it needs (§ Run, ./cells.tsx).
+ * One answer for a `text` and for a `span`, which take the same props (§ Run, ./cells.tsx).
  */
 export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   const text = roleCell('text', role ?? 'body')
@@ -57,10 +48,6 @@ export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   return {
     fg: slotColor(colour?.slot ?? text.slot),
     attributes: mask,
-    ...(mask & ATTRS.bold ? { bold: true } : {}),
-    ...(mask & ATTRS.dim ? { dim: true } : {}),
-    ...(mask & ATTRS.underline ? { underline: true } : {}),
-    ...(mask & ATTRS.inverse ? { inverse: true } : {}),
     ...(text.upper ? { transform: (value: string) => value.toUpperCase() } : {}),
   }
 }
@@ -71,20 +58,15 @@ export const styled = (value: string, role?: TextRole, tone?: Tone): { text: str
   return { text: style.transform ? style.transform(value) : value, style }
 }
 
-/** Cells of gap a space role spends along a row, and lines it spends down a column. Density decides
- *  whether the blank line is spent at all: it is the one style axis a terminal keeps. */
+/** Cells of gap a space role spends along a row, and lines it spends down a column. */
 export const spaceCells = (space: Space | undefined): number => roleCell('space', space ?? 'inline').cells ?? 0
-export const spaceLines = (space: Space | undefined): number => {
-  const lines = roleCell('space', space ?? 'stack').lines ?? 0
-  return isCompact() ? 0 : lines
-}
+export const spaceLines = (space: Space | undefined): number => roleCell('space', space ?? 'stack').lines ?? 0
 
-/** The border props for a box drawing a border role, and no colour at all where it draws no box.
- *
- *  Two things about OpenTUI a caller has to answer for. Its own border colour is opaque white, the
- *  same trap a run of text has; and a `borderColor` handed to a box with no border switches the border
- *  back on, so the colour has to be absent exactly when the box is. */
-export const boxBorder = (border: Border, opts: { when?: boolean; tone?: Tone } = {}): {
+/** The border props for a box drawing a border role, and no colour at all where it draws no box. */
+export const boxBorder = (
+  border: Border,
+  opts: { when?: boolean; tone?: Tone } = {},
+): {
   border: boolean
   borderStyle: 'single'
   borderColor: Style['fg'] | undefined
@@ -103,9 +85,8 @@ export function borderCell(border: Border): { box: boolean; glyph: string; attri
   return { box: cell.box === true, glyph: cell.glyph ?? '', attributes: attributes(cell) }
 }
 
-/** A rule across a box, which is the `divider` role repeated. Compact density spends nothing, which
- *  is what the role's own sentence says. */
-export const rule = (width: number): string => (isCompact() ? '' : borderCell('divider').glyph.repeat(Math.max(0, width)))
+/** A rule across a box, which is the `divider` role repeated. */
+export const rule = (width: number): string => borderCell('divider').glyph.repeat(Math.max(0, width))
 
 /**
  * How a control draws its state: the role and the tone a `Line` inside it takes.

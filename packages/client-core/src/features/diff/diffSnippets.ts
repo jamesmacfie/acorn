@@ -1,6 +1,11 @@
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { segmentContentKey, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import { isCodeRow } from '../../kit/diff/diffModel'
 import { segmentOfLine, type SegmentRef } from './documentView'
 import { segmentCacheFor } from './segmentCache'
@@ -10,7 +15,7 @@ import { createSegmentLoader } from './segmentLoader'
 // thread in a pull request's conversation (docs/github-integration/surfaces.md § Conversation).
 //
 // Read from the one segment that holds the line, through the same loader and node cache the diff
-// viewer uses (./segmentLoader.ts, ./segmentCache.ts), so a segment the reader has already seen in the
+// viewer uses (`createSegmentLoader`, `segmentCacheFor`), so a segment the reader has already seen in the
 // diff costs nothing and a snippet read here is there when they open it. Nothing parses a whole patch:
 // the document's descriptors say which segment holds a line before any segment is read.
 //
@@ -21,7 +26,12 @@ import { createSegmentLoader } from './segmentLoader'
 
 /** A line on one side of a file's diff. `old` is GitHub's LEFT. */
 export type DiffSnippetAnchor = { path: string; side: 'old' | 'new'; line: number }
-export type DiffSnippetLine = { kind: 'normal' | 'insert' | 'delete'; oldNo: number | null; newNo: number | null; text: string }
+export type DiffSnippetLine = {
+  kind: 'normal' | 'insert' | 'delete'
+  oldNo: number | null
+  newNo: number | null
+  text: string
+}
 /** `unavailable` is a file the document does not hold (capped, binary, or with no patch), a line in
  *  no segment, or a segment that failed to load. It never causes anything else to load. */
 export type DiffSnippet = { state: 'loading' } | { state: 'unavailable' } | { state: 'ready'; lines: DiffSnippetLine[] }
@@ -82,7 +92,8 @@ export function createDiffSnippets(options: {
       if (at < 0) return UNAVAILABLE
       return {
         state: 'ready',
-        lines: code.slice(Math.max(0, at - CONTEXT), at + CONTEXT + 1)
+        lines: code
+          .slice(Math.max(0, at - CONTEXT), at + CONTEXT + 1)
           .map((row) => ({ kind: row.kind, oldNo: row.oldNo, newNo: row.newNo, text: row.raw })),
       }
     },

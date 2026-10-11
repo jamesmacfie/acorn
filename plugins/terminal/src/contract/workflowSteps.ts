@@ -26,14 +26,14 @@ export type StepField = {
 }
 
 /** As much of the runner's handler context as these two kinds read. */
-export type StepContext = {
+type StepContext = {
   run: { taskId: string }
   def: { with?: Record<string, unknown> }
   signal: AbortSignal
   emit(event: { at: number; event: Record<string, unknown> }): void
 }
 
-export type StepOutcome =
+type StepOutcome =
   | { status: 'done'; result?: unknown; structured?: unknown; handoff?: string }
   | { status: 'failed'; error: string; result?: unknown; structured?: unknown }
   | { status: 'cancelled'; error?: string }

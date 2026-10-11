@@ -6,7 +6,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 
 // The providers answer is served from memory and probed again behind the caller once it is old
-// (runtimeEngine.ts § providers). A probe starts CLI binaries, which is why the pane must not wait on one.
+// (ProviderCatalogue). A probe starts CLI binaries, which is why the pane must not wait on one.
 
 /** A fake whose probes are counted and answered by hand, so a case can hold one open. */
 class CountedDriver extends FakeAgentDriver {
@@ -55,15 +55,15 @@ describe('the providers answer', () => {
 
   /** One read, answered, for a case that needs a cached answer to start from. */
   const warm = async (): Promise<AgentProviderDescriptor[]> => {
-    const read = runtime.providers()
+    const read = runtime.providers.list()
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
     return read
   }
 
   it('waits for the first probe and shares it between callers', async () => {
-    const first = runtime.providers()
-    const second = runtime.providers()
+    const first = runtime.providers.list()
+    const second = runtime.providers.list()
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
     expect(await first).toBe(await second)
@@ -73,7 +73,7 @@ describe('the providers answer', () => {
   it('answers a second call inside the window without probing', async () => {
     const answered = await warm()
     vi.advanceTimersByTime(10_000)
-    expect(await runtime.providers()).toBe(answered)
+    expect(await runtime.providers.list()).toBe(answered)
     expect(driver.pending).toHaveLength(0)
   })
 
@@ -81,18 +81,42 @@ describe('the providers answer', () => {
     const descriptors = await warm()
     const olderOptions = [{ id: 'model', label: 'Model', category: 'model' as const, currentValue: 'old', values: [] }]
     const latestOptions = [
-      { id: 'model', label: 'Model', category: 'model' as const, currentValue: 'new', values: [{ value: 'new', label: 'New' }] },
-      { id: 'reasoning', label: 'Effort', category: 'reasoning' as const, currentValue: 'high', values: [{ value: 'high', label: 'High' }] },
+      {
+        id: 'model',
+        label: 'Model',
+        category: 'model' as const,
+        currentValue: 'new',
+        values: [{ value: 'new', label: 'New' }],
+      },
+      {
+        id: 'reasoning',
+        label: 'Effort',
+        category: 'reasoning' as const,
+        currentValue: 'high',
+        values: [{ value: 'high', label: 'High' }],
+      },
     ]
-    const makeSession = (configOptions: typeof latestOptions) => runtime.store.createSession({
-      taskId: 'task-options', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions },
-    }, descriptors[0]!)
+    const makeSession = (configOptions: typeof latestOptions) =>
+      runtime.store.createSession(
+        {
+          taskId: 'task-options',
+          providerId: 'fake',
+          profileId: 'fake',
+          kind: 'interactive',
+          config: { configOptions },
+        },
+        descriptors[0]!,
+      )
     const older = await makeSession(olderOptions)
     const latest = await makeSession(latestOptions)
     const connecting = await makeSession([])
-    vi.spyOn(runtime.store, 'listSessions').mockResolvedValue({ sessions: [connecting, latest, older], delegations: [], nextCursor: null })
+    vi.spyOn(runtime.store, 'listSessions').mockResolvedValue({
+      sessions: [connecting, latest, older],
+      delegations: [],
+      nextCursor: null,
+    })
 
-    expect((await runtime.providers())[0]?.configOptions).toEqual(latestOptions)
+    expect((await runtime.providers.list())[0]?.configOptions).toEqual(latestOptions)
     expect(driver.pending).toHaveLength(0)
     expect(descriptors[0]?.configOptions).toEqual([])
   })
@@ -102,11 +126,11 @@ describe('the providers answer', () => {
     driver.installed = false
     vi.advanceTimersByTime(60_000)
     // Served at once, although the only probe that could answer is still open.
-    expect(await runtime.providers()).toBe(old)
-    expect(await runtime.providers()).toBe(old)
+    expect(await runtime.providers.list()).toBe(old)
+    expect(await runtime.providers.list()).toBe(old)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
-    await vi.waitFor(async () => expect((await runtime.providers())[0]?.installed).toBe(false))
+    await vi.waitFor(async () => expect((await runtime.providers.list())[0]?.installed).toBe(false))
     expect(driver.pending).toHaveLength(0)
   })
 
@@ -114,7 +138,10 @@ describe('the providers answer', () => {
     await warm()
     driver.installed = false
     let settled = false
-    const forced = runtime.providers(true).then((answer) => { settled = true; return answer })
+    const forced = runtime.providers.list(true).then((answer) => {
+      settled = true
+      return answer
+    })
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     expect(settled).toBe(false)
     driver.answer()
@@ -124,7 +151,7 @@ describe('the providers answer', () => {
   it('probes again at once when a harness is added or removed', async () => {
     await warm()
     const release = registry.registerNative('second', () => new FakeAgentDriver())
-    const read = runtime.providers()
+    const read = runtime.providers.list()
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
     expect(await read).toHaveLength(2)
@@ -132,53 +159,57 @@ describe('the providers answer', () => {
   })
 
   it('invalidates same-ID replacement and does not join or cache its superseded wave', async () => {
-    const old = runtime.providers()
+    const old = runtime.providers.list()
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     registry.clear()
     const replacement = new CountedDriver()
     replacement.installed = false
     registry.registerNative('fake', () => replacement)
-    const fresh = runtime.providers()
+    const fresh = runtime.providers.list()
     await vi.waitFor(() => expect(replacement.pending).toHaveLength(1))
     replacement.answer()
     const descriptors = await fresh
     expect(descriptors[0]?.installed).toBe(false)
     driver.answer()
     expect((await old)[0]?.installed).toBe(true)
-    expect(await runtime.providers()).toBe(descriptors)
+    expect(await runtime.providers.list()).toBe(descriptors)
   })
 
   it('only caches the latest forced wave when both start in the same millisecond', async () => {
     const timestamp = Date.now()
-    const old = runtime.providers(true)
+    const old = runtime.providers.list(true)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.installed = false
     vi.setSystemTime(timestamp)
-    const fresh = runtime.providers(true)
+    const fresh = runtime.providers.list(true)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(2))
-    const first = driver.pending.shift()!, second = driver.pending.shift()!
+    const first = driver.pending.shift()!,
+      second = driver.pending.shift()!
     second(undefined as never)
     const descriptors = await fresh
     first(undefined as never)
     expect((await old)[0]?.installed).toBe(true)
-    expect(await runtime.providers()).toBe(descriptors)
+    expect(await runtime.providers.list()).toBe(descriptors)
     expect(descriptors[0]?.installed).toBe(false)
   })
 
   it('does not restore discovery after shutdown with a probe still pending', async () => {
-    const pending = runtime.providers()
+    const pending = runtime.providers.list()
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     await runtime.stop()
     driver.answer()
     await pending
-    await expect(runtime.providers()).rejects.toThrow('shutting down')
+    await expect(runtime.providers.list()).rejects.toThrow('shutting down')
   })
 
   it('returns provider diagnostics after a rejected probe and permits a forced retry', async () => {
     vi.spyOn(driver, 'probe').mockRejectedValueOnce(new Error('Synthetic probe failure'))
-    expect((await runtime.providers())[0]).toMatchObject({ installed: false, authenticated: null,
-      diagnostics: ['Synthetic probe failure'] })
-    const retry = runtime.providers(true)
+    expect((await runtime.providers.list())[0]).toMatchObject({
+      installed: false,
+      authenticated: null,
+      diagnostics: ['Synthetic probe failure'],
+    })
+    const retry = runtime.providers.list(true)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
     expect((await retry)[0]?.installed).toBe(true)
@@ -188,7 +219,7 @@ describe('the providers answer', () => {
     driver.installed = false
     await warm()
     driver.installed = true
-    const found = runtime.usableProvider((provider) => provider.id === 'fake')
+    const found = runtime.providers.usable((provider) => provider.id === 'fake')
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()
     expect((await found)?.installed).toBe(true)

@@ -3,9 +3,8 @@ import * as api from '@acorn/protocol/api.ts'
 import * as workspaceAppearance from '@acorn/protocol/workspaceAppearance.ts'
 import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scopes'
 
-// The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
-// phase doc calls out by name (docs/plugins.md
-// checklist); the sweep is what makes a new core route fail the build until someone decides whether a
+// The exhaustive sweep is the point of this file. Everything else here is a spot check on a case worth
+// naming; the sweep is what makes a new core route fail the build until someone decides whether a
 // sandboxed plugin frame may reach it.
 
 const ID = 'x'
@@ -107,7 +106,6 @@ describe('the route table covers every core route', () => {
       api.projectMcpRoute(ID),
       api.projectMcpStarterRoute(ID),
       api.projectRunTargetsRoute(ID),
-      api.workspaceBootstrapRoute,
       api.integrationsRoute,
       api.integrationRoute(ID),
       api.integrationTestRoute(ID),
@@ -174,18 +172,19 @@ describe('scope checking', () => {
   })
 
   it('denies the write half of a scope it only declared read for', () => {
-    expect(allowApi(board, 'POST', api.tasksRoute)).toEqual({ allowed: false, reason: 'missing scope core.tasks:write' })
+    expect(allowApi(board, 'POST', api.tasksRoute)).toEqual({
+      allowed: false,
+      reason: 'missing scope core.tasks:write',
+    })
   })
 
-  it('allows adding a task link with task write, but never allows unlinking', () => {
+  it('allows adding a task link with task write', () => {
     const writer = { pluginId: 'board', api: ['core.tasks:write'] }
     expect(allowApi(writer, 'POST', api.taskLinksRoute(ID)).allowed).toBe(true)
     expect(allowApi(board, 'POST', api.taskLinksRoute(ID))).toEqual({
       allowed: false,
       reason: 'missing scope core.tasks:write',
     })
-    expect(allowApi(writer, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
-    expect(allowApi(board, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
   })
 
   it('does not let a read on the task or project collection leak MCP config or preview credentials', () => {
@@ -214,7 +213,10 @@ describe('plugin namespaces', () => {
   })
 
   it('denies another plugin’s namespace', () => {
-    expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({ allowed: false, reason: 'another plugin’s namespace' })
+    expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({
+      allowed: false,
+      reason: 'another plugin’s namespace',
+    })
   })
 
   it('does not treat a prefix of its own id as its own', () => {

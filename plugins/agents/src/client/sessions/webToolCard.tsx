@@ -85,7 +85,13 @@ const WebResultRow: Component<{ result: AgentWebResult }> = (props) => {
         </Show>
         <Show when={resultHost(props.result)}>{(host) => <Text emphasis="muted">{host()}</Text>}</Show>
       </Inline>
-      <Show when={props.result.snippet}>{(snippet) => <Text emphasis="muted" wrap>{snippet()}</Text>}</Show>
+      <Show when={props.result.snippet}>
+        {(snippet) => (
+          <Text emphasis="muted" wrap>
+            {snippet()}
+          </Text>
+        )}
+      </Show>
     </Stack>
   )
 }
@@ -155,7 +161,13 @@ export const WebToolBody: Component<{ web: AgentWebActivity; output?: string }> 
       </Show>
       {/* The provider's own words, kept because a structured mapping is never the whole answer: this
           is where Claude Code's summary of what it read lives, and where a failed call's error is. */}
-      <Show when={props.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
+      <Show when={props.output}>
+        {(output) => (
+          <CodeBlock wrap maxHeight="block">
+            {output()}
+          </CodeBlock>
+        )}
+      </Show>
     </Stack>
   )
 }

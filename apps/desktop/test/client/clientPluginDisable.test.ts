@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/host/registries/sources'
-import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail'
 import { commandRegistry } from '@acorn/client-core/host/registries/commands'
 import { nodeStatRegistry } from '@acorn/client-core/host/registries/rail'
@@ -21,7 +24,7 @@ import { readGolden, writeGolden } from './golden'
 
 const REGISTRIES = {
   panes: paneRegistry,
-  // The command graph, from 2026-09-03. A plugin's commands are the one contribution kind that can
+  // The command graph. A plugin's commands are the one contribution kind that can
   // hold each other: a group and the searches under it are registered together, and a disable has to
   // take the whole subtree, not the parent and a set of orphans
   // (docs/plugins/commands.md § Command kinds).
@@ -30,7 +33,7 @@ const REGISTRIES = {
   settingsPages: settingsRegistry,
   slots: uiSlotRegistry,
   // Both halves of the cooperative seam, so a plugin's point and a plugin's contribution to somebody
-  // else's both have to come back after a disable (registries/extensionPoints.ts).
+  // else's both have to come back after a disable.
   extensionPoints: extensionPointRegistry,
   extensions: extensionRegistry,
   refPanels: refPanelRegistry,
@@ -91,7 +94,8 @@ const without = (base: Snapshot, owned: Partial<Snapshot>): Snapshot =>
     // A hand-edited golden claiming an id the full activation never produced would otherwise pass silently:
     // subtracting a ghost removes nothing, so the equality still holds. Only reachable by hand-editing, since
     // the derivation below can only record ids it saw.
-    if (unmatched.length) throw new Error(`golden names ${name} entries the full activation never produced: ${unmatched.join(', ')}`)
+    if (unmatched.length)
+      throw new Error(`golden names ${name} entries the full activation never produced: ${unmatched.join(', ')}`)
     return rest
   })
 
@@ -106,18 +110,12 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 
 // The complete contribution set, plus what each optional plugin owns: the entries that must vanish
 // when it is disabled and, by omission, the ones that must not. A golden list in
-// `clientPluginDisable.snapshot.json` now, derived by the loop below and regenerated with the one
-// command in ./golden.ts.
+// `clientPluginDisable.snapshot.json`, derived by the loop below and regenerated with the one command
+// in ./golden.ts.
 //
 // `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the
-// parity assertion for the compiled graph. Loaded packages are covered through their manifest adapters
-// and do not belong in this static ownership ledger. `refPanels` held exactly one compiled entry, none,
-// when this was written, and the note here said that a compiled panel reappearing would be a real
-// change. It did: `github-pull` is github's own pull-request panel, so a PR link clicked inside
-// someone else's content can be glanced at instead of leaving the app. Linear's panel is still absent
-// from this ledger and still correct, because linear is a loaded package and its panel reaches the
-// registry through the manifest adapter in client-core/host/frames/register.ts rather than through
-// a compiled roster line.
+// parity assertion for the compiled graph. Loaded packages, such as linear and its ref panel, reach
+// the registries through their manifest adapters and do not belong in this static ownership ledger.
 //
 // Derived, but not therefore toothless: a snapshot you can regenerate looks like one you can launder a
 // regression past. What regeneration cannot hide:
@@ -159,7 +157,7 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    // Down one per plugin that ships loaded instead of compiled: linear, then http, then database.
+    // Plugins that ship loaded instead of compiled (linear, http, database) are not in this roster.
     expect(NAMES.length).toBeGreaterThanOrEqual(12)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(8)
@@ -173,7 +171,10 @@ describe('disabling a client plugin', () => {
     expect(NAMES).not.toContain('browser')
     for (const name of OPTIONAL) {
       const owned = OWNED[name]
-      expect(REGISTRY_NAMES.reduce((sum, key) => sum + (owned[key]?.length ?? 0), 0), name).toBeGreaterThan(0)
+      expect(
+        REGISTRY_NAMES.reduce((sum, key) => sum + (owned[key]?.length ?? 0), 0),
+        name,
+      ).toBeGreaterThan(0)
     }
   })
 
@@ -187,7 +188,7 @@ describe('disabling a client plugin', () => {
   it('re-activation is idempotent rather than a duplicate-id throw', () => {
     // The registries throw on a duplicate id, so this is the property that makes the whole cycle
     // possible, and the reason the host disposes a plugin's prior contributions before re-registering.
-    // The same inputs twice is now a pass the host skips; the disable cases below are the re-runs.
+    // The same inputs twice is a pass the host skips; the disable cases below are the re-runs.
     expect(() => activate()).not.toThrow()
     expect(snapshot()).toEqual(FULL)
   })

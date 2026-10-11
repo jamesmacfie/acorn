@@ -9,7 +9,9 @@ import { Alert, Button, Field, Heading, Inline, Input, Select, Stack, Textarea, 
 // format hint, because save() makes it file-safe itself.
 export default function MemoryAddForm(props: { task?: Task; projectId: string }) {
   let active = true
-  onCleanup(() => { active = false })
+  onCleanup(() => {
+    active = false
+  })
   const [name, setName] = createSignal('')
   const [description, setDescription] = createSignal('')
   const [type, setType] = createSignal<MemoryType>('project')
@@ -20,7 +22,10 @@ export default function MemoryAddForm(props: { task?: Task; projectId: string })
   async function save() {
     setError('')
     setSaving(true)
-    const fileName = name().trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-')
+    const fileName = name()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
     try {
       const result = await memoryApi().add({
         taskId: props.task?.id,
@@ -42,22 +47,44 @@ export default function MemoryAddForm(props: { task?: Task; projectId: string })
     }
   }
 
-  return <>
-    <Toolbar ariaLabel="New memory"><Heading level={2}>New memory</Heading></Toolbar>
-    <Stack gap="stack">
-      <Field label="Name"><Input value={name()} onInput={setName} /></Field>
-      <Field label="Description">
-        <Input value={description()} placeholder="What the agent should know, in one line" onInput={setDescription} />
-      </Field>
-      <Field label="Type"><Select value={type()} onChange={(value) => setType(value as MemoryType)} options={MEMORY_TYPE_OPTIONS} /></Field>
-      <Field label="Body">
-        <Textarea mono rows={12} placeholder="The details. Say why, so the agent knows when it applies." value={body()} onInput={setBody} />
-      </Field>
-      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-      <Inline gap="row">
-        <Button variant="solid" disabled={saving() || !name().trim() || !description().trim()} onPress={() => void save()}>Save memory</Button>
-        <Button variant="ghost" onPress={() => setAddingMemory(undefined)}>Cancel</Button>
-      </Inline>
-    </Stack>
-  </>
+  return (
+    <>
+      <Toolbar ariaLabel="New memory">
+        <Heading level={2}>New memory</Heading>
+      </Toolbar>
+      <Stack gap="stack">
+        <Field label="Name">
+          <Input value={name()} onInput={setName} />
+        </Field>
+        <Field label="Description">
+          <Input value={description()} placeholder="What the agent should know, in one line" onInput={setDescription} />
+        </Field>
+        <Field label="Type">
+          <Select value={type()} onChange={(value) => setType(value as MemoryType)} options={MEMORY_TYPE_OPTIONS} />
+        </Field>
+        <Field label="Body">
+          <Textarea
+            mono
+            rows={12}
+            placeholder="The details. Say why, so the agent knows when it applies."
+            value={body()}
+            onInput={setBody}
+          />
+        </Field>
+        <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        <Inline gap="row">
+          <Button
+            variant="solid"
+            disabled={saving() || !name().trim() || !description().trim()}
+            onPress={() => void save()}
+          >
+            Save memory
+          </Button>
+          <Button variant="ghost" onPress={() => setAddingMemory(undefined)}>
+            Cancel
+          </Button>
+        </Inline>
+      </Stack>
+    </>
+  )
 }

@@ -1,5 +1,15 @@
 // The preview plugin's client part (docs/plugins/plugin-api.md § The plugin API).
-import { activeNodeId, activeTaskId, clientEvents, openPane, previewViews, readJson, toast, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  activeTaskId,
+  clientEvents,
+  openPane,
+  previewViews,
+  readJson,
+  toast,
+  type ClientPlugin,
+  writeJson,
+} from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
 import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
 import { previewPaneContribution } from './paneContribution'
@@ -23,16 +33,26 @@ export const previewClientPlugin: ClientPlugin = {
     // Other plugins' controls in the address bar (./PreviewPane.tsx). One action, Reload, and no
     // navigation: a contributor never gets the page (docs/plugins/toolbar-actions.md).
     ctx.extensionPoints.register({
-      id: 'toolbar-actions', label: 'Preview toolbar', kind: 'remote', mode: 'stack', max: PREVIEW_TOOLBAR_ACTIONS_MAX,
+      id: 'toolbar-actions',
+      label: 'Preview toolbar',
+      kind: 'remote',
+      mode: 'stack',
+      max: PREVIEW_TOOLBAR_ACTIONS_MAX,
       actions: ['reload'],
     })
     ctx.contextMenus.register({
-      id: 'preview.copy-url', location: 'rail.pane', surface: 'preview',
-      label: 'Copy URL', icon: 'copy', order: 130,
+      id: 'preview.copy-url',
+      location: 'rail.pane',
+      surface: 'preview',
+      label: 'Copy URL',
+      icon: 'copy',
+      order: 130,
       run: async (target) => {
         if (target.location !== 'rail.pane') return
         try {
-          const address = readJson<PreviewUrlState | null>(previewUrlRoute(target.taskId), { nodeId: target.nodeId }).then((state) => {
+          const address = readJson<PreviewUrlState | null>(previewUrlRoute(target.taskId), {
+            nodeId: target.nodeId,
+          }).then((state) => {
             if (!state?.url || state.taskId !== target.taskId) throw new Error('No preview URL available')
             return new Blob([state.url], { type: 'text/plain' })
           })
@@ -46,7 +66,7 @@ export const previewClientPlugin: ClientPlugin = {
     })
     ctx.schedules.register(previewConfiguredSchedule)
     // One row, gated on the same seam the pane is: a terminal installs no preview seam, so this is
-    // absent there rather than present and useless (docs/tui/plugin-losses.md § What a plugin loses here). URL rules
+    // absent there rather than present and useless (docs/tui/plugin-losses.md § What a plugin loses here). URL settings
     // are repository configuration and reloading needs a mounted preview, so neither is a command
     // (docs/command-palette-and-shortcuts.md).
     ctx.commands.register({
@@ -67,11 +87,11 @@ export const previewClientPlugin: ClientPlugin = {
         if (context.taskId) openPane(context.taskId, 'preview')
       },
     })
-    // Drop an archived task's preview view. Every archive path raises this event.
     clientEvents.on('runtime:node-switched', () => previewViews()?.evictAll())
     clientEvents.on('runtime:node-removed', ({ nodeId }) => {
       if (nodeId === activeNodeId()) previewViews()?.evictAll()
     })
+    // Drop an archived task's preview view. Every archive path raises this event.
     clientEvents.on('runtime:task-archived', ({ taskId }) => previewViews()?.evict(taskId))
   },
 }

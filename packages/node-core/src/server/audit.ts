@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { desc, lt } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
+import type { Disposable } from './pluginHost/capabilities'
 import { emitEvent } from './telemetry/collector'
 import { createLogger, describeError } from './telemetry/logger'
 
@@ -13,7 +14,7 @@ const log = createLogger('audit')
 // union rather than free-form strings, because the settings surface groups and filters on it, and an
 // action nobody can enumerate is one nobody reviews. Same argument as the error-code set in
 // docs/api-reference/transport.md § Errors.
-export type CoreAuditAction =
+type CoreAuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
   // the one moment this node will hand full owner authority to a stranger who knows a code.
   | 'pairing.window.opened'
@@ -81,39 +82,43 @@ export type CoreAuditAction =
 // call), the host qualifies each with the plugin id, and `recordAudit` refuses an action nobody
 // declared. So the vocabulary is still enumerable — `auditVocabulary()` below is the enumeration — and
 // the settings surface can name every verb it might draw. It is the same trade the harness registry
-// already makes.
+// makes.
 //
-// Why it had to open at all: nothing a plugin does was on the trail, and for an agent-driven product
-// the interesting events (a run cost money, a workflow pushed a branch, a schedule made an outbound
-// request with the owner's credentials) are exactly the ones the one surface built for review could
-// not see (2026-08-27 extensibility review, finding 9).
+// Why it is open at all: for an agent-driven product the interesting events (a run cost money, a
+// workflow pushed a branch, a schedule made an outbound request with the owner's credentials) are
+// plugin events, and the trail is the one surface built for review.
 //
 // `<pluginId>:<actionId>`. No core action contains a colon, so a plugin can never take a core verb's
 // place, and the id is minted here rather than read off a descriptor — the same rule a plugin theme's
 // id, a qualified harness id and an extension point's id follow.
 export type PluginAuditAction = `${string}:${string}`
 
-export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction =>
-  `${pluginId}:${actionId}`
+export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction => `${pluginId}:${actionId}`
 
-export type AuditAction = CoreAuditAction | PluginAuditAction
+type AuditAction = CoreAuditAction | PluginAuditAction
 
 /** One declared plugin verb, as the registry holds it. */
 export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string; label: string }
 
 // A module singleton, like the route, source, node-action and task-check registries beside it, with
-// the same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/pluginHost/host.ts § clearRegistrations).
+// the same lifecycle answer: each declaration hands back its own undo, and the plugin host runs it on
+// teardown (server/pluginHost/host.ts § clearRegistrations).
 const declared = new Map<string, DeclaredAuditAction>()
 
 /** Declare one verb for a plugin. The host binds `pluginId`; a plugin never passes it. */
-export function declareAuditAction(pluginId: string, action: { id: string; label: string }): void {
+export function declareAuditAction(pluginId: string, action: { id: string; label: string }): Disposable {
   const qualified = qualifiedAuditAction(pluginId, action.id)
   const clash = declared.get(qualified)
   if (clash && clash.label !== action.label) {
     throw new Error(`Duplicate audit action '${qualified}': already declared as '${clash.label}'.`)
   }
-  declared.set(qualified, { action: qualified, pluginId, label: action.label })
+  const entry = { action: qualified, pluginId, label: action.label }
+  declared.set(qualified, entry)
+  return {
+    dispose: () => {
+      if (declared.get(qualified) === entry) declared.delete(qualified)
+    },
+  }
 }
 
 export function clearAuditActions(pluginId: string): void {
@@ -130,8 +135,7 @@ export const auditVocabulary = (): DeclaredAuditAction[] =>
  *  literal in this binary — and a qualified one has to have been declared. Fail closed: an undeclared
  *  action writes nothing, because a trail that accepts arbitrary verbs is one nobody can enumerate,
  *  and enumerability is the whole point of the closed set. */
-export const isKnownAuditAction = (action: string): boolean =>
-  action.includes(':') ? declared.has(action) : true
+const isKnownAuditAction = (action: string): boolean => (action.includes(':') ? declared.has(action) : true)
 
 /** Whose verb this is. A plugin's actions are `<pluginId>:<actionId>` and no core action contains a
  *  colon, which is the same split `isKnownAuditAction` reads. */
@@ -205,11 +209,19 @@ export type AuditRow = {
 // The read side: most recent first, one page at a time. `before` is a timestamp cursor rather than an
 // offset, because rows are only ever appended and pruned from the far end. An offset would skip or
 // repeat rows as the prune runs underneath a paging reader.
-export async function readAudit(db: AppDatabase, options: { before?: number; limit?: number } = {}): Promise<AuditRow[]> {
+export async function readAudit(
+  db: AppDatabase,
+  options: { before?: number; limit?: number } = {},
+): Promise<AuditRow[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500)
   const rows = await (options.before === undefined
     ? db.select().from(schema.audit).orderBy(desc(schema.audit.at)).limit(limit)
-    : db.select().from(schema.audit).where(lt(schema.audit.at, options.before)).orderBy(desc(schema.audit.at)).limit(limit))
+    : db
+        .select()
+        .from(schema.audit)
+        .where(lt(schema.audit.at, options.before))
+        .orderBy(desc(schema.audit.at))
+        .limit(limit))
   return rows.map((row) => ({
     id: row.id,
     at: row.at,

@@ -1,22 +1,23 @@
 // Focus traps: the Tab containment a `Modal` or an open `Menu` needs, plus the restore that goes
 // with it.
 //
-// The containment half was `ui/focus.ts`'s `trapOverlayFocus` and moves here unchanged; the restore
-// is new. An overlay that traps focus and then drops it on the body leaves the next Tab starting at
-// the top of the page, which is the bug every one of these grew separately
+// The containment is `trapTab` and the restore is `restoreFocusOnCleanup`. An overlay that traps
+// focus and then drops it on the body leaves the next Tab starting at the top of the page
 // (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing: focus returns to the
 // opener on dismiss).
 
 import { anchoredSurfacesWithin } from '../lib/controls/anchor'
 import { onCleanup } from 'solid-js'
 
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
 /** The elements Tab reaches inside `root`, in order. Leaves out anything hidden from assistive tech,
  *  such as the native select a custom one keeps for forms. */
 export const focusableIn = (root: HTMLElement): HTMLElement[] =>
-  [...root.querySelectorAll<HTMLElement>(FOCUSABLE)]
-    .filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
+  [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true',
+  )
 
 /** Cycle Tab within `root`. Does nothing for any other key. */
 export function trapTab(event: KeyboardEvent, root: HTMLElement): void {

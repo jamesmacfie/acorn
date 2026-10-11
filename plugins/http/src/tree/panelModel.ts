@@ -6,7 +6,7 @@
 // either of them.
 //
 // A compiled plugin's regions are components in the shell's realm and get this from the host, as a
-// `model` on the pane contribution (client-core registries/paneModels.ts). A loaded plugin needs no
+// `model` on the pane contribution (client-core's `paneModel`). A loaded plugin needs no
 // such seam, and this file is why: both regions are entries in one bundle running in one worker, so
 // module scope already is the shared thing. That is the whole of the loaded half — one `createRoot`
 // keyed by the subject the host mounted.
@@ -22,7 +22,6 @@ import { clearDraftRecovery, draftRecovery } from './draftRecovery'
 export type Selection = { kind: 'saved'; id: string } | { kind: 'new' } | { kind: 'variables' }
 
 export { groupByFolder } from './requestGroups'
-export type { Group } from './requestGroups'
 
 export type PanelSubject = {
   bridge: AcornBridge
@@ -36,16 +35,33 @@ export type PanelSubject = {
 
 export type HttpPanelModel = ReturnType<typeof buildPanel>
 
+// A host without bridge authority sends no `context.authority`, so each bridge keys its own panel.
+// Mixed-version path until 2026-12-30.
 const bridgeIds = new WeakMap<AcornBridge, number>()
 let bridgeSequence = 0
 const affinity = (bridge: AcornBridge): string => {
   if (bridge.context.authority) return bridge.context.authority
   let id = bridgeIds.get(bridge)
-  if (id === undefined) { id = ++bridgeSequence; bridgeIds.set(bridge, id) }
+  if (id === undefined) {
+    id = ++bridgeSequence
+    bridgeIds.set(bridge, id)
+  }
   return `legacy-bridge:${id}`
 }
-const subjectKey = (subject: PanelSubject): string => JSON.stringify([subject.bridge.context.nodeId ?? null, affinity(subject.bridge), subject.projectId, subject.taskId ?? null])
-type Held = { key: string; model: HttpPanelModel; views: WeakMap<AcornBridge, HttpPanelModel>; dispose(): void; bridges: Map<AcornBridge, { refs: number; detach: () => void }> }
+const subjectKey = (subject: PanelSubject): string =>
+  JSON.stringify([
+    subject.bridge.context.nodeId ?? null,
+    affinity(subject.bridge),
+    subject.projectId,
+    subject.taskId ?? null,
+  ])
+type Held = {
+  key: string
+  model: HttpPanelModel
+  views: WeakMap<AcornBridge, HttpPanelModel>
+  dispose(): void
+  bridges: Map<AcornBridge, { refs: number; detach: () => void }>
+}
 const live = new Map<string, Held>()
 let idle: Held | null = null
 
@@ -53,7 +69,10 @@ export function httpPanelModel(subject: PanelSubject): HttpPanelModel {
   const key = subjectKey(subject)
   let entry = live.get(key)
   const revived = !entry && idle?.key === key
-  if (revived) { entry = idle!; idle = null }
+  if (revived) {
+    entry = idle!
+    idle = null
+  }
   if (!entry) {
     idle?.dispose()
     idle = null
@@ -66,7 +85,13 @@ export function httpPanelModel(subject: PanelSubject): HttpPanelModel {
     }
     entry = createRoot((dispose) => {
       try {
-        return { key, bridges, views: new WeakMap<AcornBridge, HttpPanelModel>(), model: buildPanel(subject, currentBridge, (bridge) => bridges.has(bridge), draftRecovery(key)), dispose }
+        return {
+          key,
+          bridges,
+          views: new WeakMap<AcornBridge, HttpPanelModel>(),
+          model: buildPanel(subject, currentBridge, (bridge) => bridges.has(bridge), draftRecovery(key)),
+          dispose,
+        }
       } catch (error) {
         bridges.clear()
         dispose()
@@ -79,24 +104,33 @@ export function httpPanelModel(subject: PanelSubject): HttpPanelModel {
   let lease = owner.bridges.get(subject.bridge)
   if (!lease || !lease.refs) {
     const unselect = subject.bridge.onSelect(owner.model.requestSelection)
-    const unaction = subject.bridge.onSurfaceAction((command) => { if (command === 'new-request') owner.model.startNew() })
-    lease = { refs: 0, detach: () => { unselect(); unaction() } }
+    const unaction = subject.bridge.onSurfaceAction((command) => {
+      if (command === 'new-request') owner.model.startNew()
+    })
+    lease = {
+      refs: 0,
+      detach: () => {
+        unselect()
+        unaction()
+      },
+    }
     owner.bridges.set(subject.bridge, lease)
   }
   lease.refs++
   if (revived) owner.model.refresh()
   const bridge = subject.bridge
-  if (getOwner()) onCleanup(() => {
-    const current = owner.bridges.get(bridge)
-    if (!current || --current.refs > 0) return
-    current.detach()
-    owner.bridges.delete(bridge)
-    owner.model.retireBridge(bridge)
-    if (owner.bridges.size) return
-    live.delete(key)
-    if (idle && idle !== owner) idle.dispose()
-    idle = owner
-  })
+  if (getOwner())
+    onCleanup(() => {
+      const current = owner.bridges.get(bridge)
+      if (!current || --current.refs > 0) return
+      current.detach()
+      owner.bridges.delete(bridge)
+      owner.model.retireBridge(bridge)
+      if (owner.bridges.size) return
+      live.delete(key)
+      if (idle && idle !== owner) idle.dispose()
+      idle = owner
+    })
   let view = owner.views.get(bridge)
   if (!view) {
     const origin = (): AcornBridge => {

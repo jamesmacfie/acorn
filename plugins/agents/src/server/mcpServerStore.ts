@@ -11,7 +11,13 @@ import { isAbsolute, join, relative, sep } from 'node:path'
 import type { PluginDatabase, SecretService } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type { AgentDriverMcpServer } from './drivers/types'
-import type { AgentMcpManagedPackage, AgentMcpPair, AgentMcpServer, AgentMcpServerInput, AgentMcpTransport } from '../shared/mcpServers'
+import type {
+  AgentMcpManagedPackage,
+  AgentMcpPair,
+  AgentMcpServer,
+  AgentMcpServerInput,
+  AgentMcpTransport,
+} from '../shared/mcpServers'
 import type { McpInstalledPackage } from './mcpPackageInstall'
 
 // Exactly one of `value` and `sealed` is set: `sealed` when the pair is a secret.
@@ -47,7 +53,10 @@ function storedConfig(row: Row): StoredConfig | null {
       managed: parsed.managed && typeof parsed.managed.lockDigest === 'string' ? parsed.managed : undefined,
       consentRevision: typeof parsed.consentRevision === 'string' ? parsed.consentRevision : undefined,
       reviewTools: parsed.reviewTools === true,
-      approvedCatalogue: parsed.approvedCatalogue && typeof parsed.approvedCatalogue.digest === 'string' ? parsed.approvedCatalogue : undefined,
+      approvedCatalogue:
+        parsed.approvedCatalogue && typeof parsed.approvedCatalogue.digest === 'string'
+          ? parsed.approvedCatalogue
+          : undefined,
     }
   } catch {
     return null
@@ -70,7 +79,7 @@ function publicServer(row: Row, config: StoredConfig): AgentMcpServer {
     values: config.values.map((pair): AgentMcpPair => ({
       name: pair.name,
       secret: pair.secret,
-      value: pair.secret ? null : pair.value ?? '',
+      value: pair.secret ? null : (pair.value ?? ''),
     })),
     enabled: row.enabled,
     updatedAt: row.updatedAt,
@@ -91,7 +100,9 @@ export class AgentMcpServerStore {
   holdManagedRoots(roots: readonly string[]): () => void {
     const held = new Set(roots)
     this.#activeManagedRoots.add(held)
-    return () => { this.#activeManagedRoots.delete(held) }
+    return () => {
+      this.#activeManagedRoots.delete(held)
+    }
   }
 
   activeManagedRoots(): ReadonlySet<string> {
@@ -130,10 +141,15 @@ export class AgentMcpServerStore {
   async save(name: string, input: AgentMcpServerInput): Promise<AgentMcpServer> {
     const before = await this.#row(name)
     const priorConfig = before && storedConfig(before)
-    if (priorConfig?.managed && (input.transport !== 'stdio' || input.command !== priorConfig.command || JSON.stringify(input.args ?? []) !== JSON.stringify(priorConfig.args))) {
+    if (
+      priorConfig?.managed &&
+      (input.transport !== 'stdio' ||
+        input.command !== priorConfig.command ||
+        JSON.stringify(input.args ?? []) !== JSON.stringify(priorConfig.args))
+    ) {
       throw new Error('Remove the managed server before changing its installed command.')
     }
-    const previous = new Map((before && storedConfig(before)?.values || []).map((pair) => [pair.name, pair]))
+    const previous = new Map(((before && storedConfig(before)?.values) || []).map((pair) => [pair.name, pair]))
     const values: StoredPair[] = []
     for (const pair of input.values ?? []) {
       if (!pair.secret) {
@@ -148,9 +164,9 @@ export class AgentMcpServerStore {
     }
     const config: StoredConfig = {
       transport: input.transport,
-      command: input.transport === 'stdio' ? input.command ?? null : null,
-      args: input.transport === 'stdio' ? input.args ?? [] : [],
-      url: input.transport === 'http' ? input.url ?? null : null,
+      command: input.transport === 'stdio' ? (input.command ?? null) : null,
+      args: input.transport === 'stdio' ? (input.args ?? []) : [],
+      url: input.transport === 'http' ? (input.url ?? null) : null,
       values,
       managed: priorConfig?.managed,
       reviewTools: input.reviewTools === true,
@@ -175,35 +191,57 @@ export class AgentMcpServerStore {
     const row = await this.#row(name)
     const config = row && storedConfig(row)
     if (!row || !config) return null
-    if (configRevision(config, row.enabled) !== expectedRevision) throw new Error('The MCP server changed. Review its configuration again.')
+    if (configRevision(config, row.enabled) !== expectedRevision)
+      throw new Error('The MCP server changed. Review its configuration again.')
     config.consentRevision = expectedRevision
-    const changed = await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config) })
+    const changed = await this.#db
+      .update(schema.agentMcpServers)
+      .set({ configJson: JSON.stringify(config) })
       .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
       .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The MCP server changed. Review its configuration again.')
     return publicServer(row, config)
   }
 
-  async approvedCatalogue(name: string, revision: string): Promise<NonNullable<StoredConfig['approvedCatalogue']> | null> {
+  async approvedCatalogue(
+    name: string,
+    revision: string,
+  ): Promise<NonNullable<StoredConfig['approvedCatalogue']> | null> {
     const row = await this.#row(name)
     const config = row && storedConfig(row)
-    return row && config && configRevision(config, row.enabled) === revision && config.approvedCatalogue?.revision === revision
-      ? config.approvedCatalogue ?? null : null
+    return row &&
+      config &&
+      configRevision(config, row.enabled) === revision &&
+      config.approvedCatalogue?.revision === revision
+      ? (config.approvedCatalogue ?? null)
+      : null
   }
 
   async previousCatalogue(name: string): Promise<StoredConfig['approvedCatalogue'] | null> {
     const row = await this.#row(name)
-    return row ? storedConfig(row)?.approvedCatalogue ?? null : null
+    return row ? (storedConfig(row)?.approvedCatalogue ?? null) : null
   }
 
-  async approveCatalogue(name: string, revision: string, catalogue: { digest: string; version: number; tools: Record<string, unknown>[] }): Promise<AgentMcpServer> {
+  async approveCatalogue(
+    name: string,
+    revision: string,
+    catalogue: { digest: string; version: number; tools: Record<string, unknown>[] },
+  ): Promise<AgentMcpServer> {
     const row = await this.#row(name)
     const config = row && storedConfig(row)
-    if (!row || !config || configRevision(config, row.enabled) !== revision || !config.reviewTools || config.consentRevision !== revision) {
+    if (
+      !row ||
+      !config ||
+      configRevision(config, row.enabled) !== revision ||
+      !config.reviewTools ||
+      config.consentRevision !== revision
+    ) {
       throw new Error('The MCP server configuration changed before approval.')
     }
     config.approvedCatalogue = { revision, ...catalogue }
-    const changed = await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config) })
+    const changed = await this.#db
+      .update(schema.agentMcpServers)
+      .set({ configJson: JSON.stringify(config) })
       .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
       .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The MCP server configuration changed before approval.')
@@ -213,26 +251,45 @@ export class AgentMcpServerStore {
   async revokeCatalogue(name: string, revision: string, digest: string): Promise<void> {
     const row = await this.#row(name)
     const config = row && storedConfig(row)
-    if (!row || !config || config.approvedCatalogue?.revision !== revision || config.approvedCatalogue.digest !== digest) return
+    if (
+      !row ||
+      !config ||
+      config.approvedCatalogue?.revision !== revision ||
+      config.approvedCatalogue.digest !== digest
+    )
+      return
     delete config.approvedCatalogue
-    await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config) })
+    await this.#db
+      .update(schema.agentMcpServers)
+      .set({ configJson: JSON.stringify(config) })
       .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
   }
 
   /** The package was fully installed and checked before this row is changed. A failed save leaves the
    *  previous row selected; the unreferenced package is removed by the bounded orphan sweep. */
-  async saveManaged(name: string, installed: McpInstalledPackage, values: AgentMcpServerInput['values'], enabled: boolean, expectedRevision: string | null, signal?: AbortSignal): Promise<AgentMcpServer> {
+  async saveManaged(
+    name: string,
+    installed: McpInstalledPackage,
+    values: AgentMcpServerInput['values'],
+    enabled: boolean,
+    expectedRevision: string | null,
+    signal?: AbortSignal,
+  ): Promise<AgentMcpServer> {
     signal?.throwIfAborted()
     const before = await this.#row(name)
     const beforeConfig = before && storedConfig(before)
-    if ((before && (!beforeConfig || configRevision(beforeConfig, before.enabled) !== expectedRevision)) || (!before && expectedRevision !== null)) {
+    if (
+      (before && (!beforeConfig || configRevision(beforeConfig, before.enabled) !== expectedRevision)) ||
+      (!before && expectedRevision !== null)
+    ) {
       throw new Error('The managed server changed before activation.')
     }
-    const previous = new Map((before && storedConfig(before)?.values || []).map((pair) => [pair.name, pair]))
+    const previous = new Map(((before && storedConfig(before)?.values) || []).map((pair) => [pair.name, pair]))
     const stored: StoredPair[] = []
     for (const pair of values ?? []) {
       if (!pair.secret) stored.push({ name: pair.name, secret: false, value: pair.value ?? '' })
-      else if (pair.value !== undefined) stored.push({ name: pair.name, secret: true, sealed: await this.#secrets.seal(pair.value) })
+      else if (pair.value !== undefined)
+        stored.push({ name: pair.name, secret: true, sealed: await this.#secrets.seal(pair.value) })
       else {
         const kept = previous.get(pair.name)
         if (!kept?.secret || !kept.sealed) throw new Error(`${pair.name} needs a value.`)
@@ -240,17 +297,27 @@ export class AgentMcpServerStore {
       }
     }
     const managed: AgentMcpManagedPackage = {
-      package: installed.coordinate.name, version: installed.coordinate.version, bin: installed.bin,
-      lockDigest: installed.lockDigest, registry: installed.registry, graph: installed.graph,
+      package: installed.coordinate.name,
+      version: installed.coordinate.version,
+      bin: installed.bin,
+      lockDigest: installed.lockDigest,
+      registry: installed.registry,
+      graph: installed.graph,
       treeDigest: installed.treeDigest,
       installationId: installed.installationId,
       entryDigest: installed.entryDigest,
-      runtime: installed.runtime, policyVersion: installed.policyVersion,
+      runtime: installed.runtime,
+      policyVersion: installed.policyVersion,
       installer: installed.installer,
       exceptions: installed.exceptions,
     }
     const config: StoredConfig = {
-      transport: 'stdio', command: process.execPath, args: [installed.entry], url: null, values: stored, managed,
+      transport: 'stdio',
+      command: process.execPath,
+      args: [installed.entry],
+      url: null,
+      values: stored,
+      managed,
       reviewTools: before ? storedConfig(before)?.reviewTools === true : false,
       approvedCatalogue: before ? storedConfig(before)?.approvedCatalogue : undefined,
     }
@@ -259,12 +326,22 @@ export class AgentMcpServerStore {
     signal?.throwIfAborted()
     const now = Date.now()
     const changed = before
-      ? await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config), enabled, updatedAt: now })
-        .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, before.configJson), eq(schema.agentMcpServers.enabled, before.enabled)))
-        .returning({ name: schema.agentMcpServers.name })
-      : await this.#db.insert(schema.agentMcpServers)
-        .values({ name, configJson: JSON.stringify(config), enabled, createdAt: now, updatedAt: now })
-        .onConflictDoNothing().returning({ name: schema.agentMcpServers.name })
+      ? await this.#db
+          .update(schema.agentMcpServers)
+          .set({ configJson: JSON.stringify(config), enabled, updatedAt: now })
+          .where(
+            and(
+              eq(schema.agentMcpServers.name, name),
+              eq(schema.agentMcpServers.configJson, before.configJson),
+              eq(schema.agentMcpServers.enabled, before.enabled),
+            ),
+          )
+          .returning({ name: schema.agentMcpServers.name })
+      : await this.#db
+          .insert(schema.agentMcpServers)
+          .values({ name, configJson: JSON.stringify(config), enabled, createdAt: now, updatedAt: now })
+          .onConflictDoNothing()
+          .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The managed server changed before activation.')
     const saved = await this.get(name)
     if (!saved) throw new Error('The managed MCP package was installed but its server was not saved.')
@@ -289,7 +366,13 @@ export class AgentMcpServerStore {
     names: readonly string[],
     purpose: string,
     signal?: AbortSignal,
-  ): Promise<{ servers: AgentDriverMcpServer[]; secrets: string[]; unavailable: string[]; managedRoots: string[]; revisions: Record<string, { revision: string; reviewTools: boolean }> }> {
+  ): Promise<{
+    servers: AgentDriverMcpServer[]
+    secrets: string[]
+    unavailable: string[]
+    managedRoots: string[]
+    revisions: Record<string, { revision: string; reviewTools: boolean }>
+  }> {
     const servers: AgentDriverMcpServer[] = []
     const secrets: string[] = []
     const unavailable: string[] = []
@@ -301,23 +384,36 @@ export class AgentMcpServerStore {
       signal?.throwIfAborted()
       const config = row && storedConfig(row)
       if (!config) continue
-      if (config.consentRevision !== configRevision(config, row!.enabled)) { unavailable.push(name); continue }
+      if (config.consentRevision !== configRevision(config, row!.enabled)) {
+        unavailable.push(name)
+        continue
+      }
       let managedRoot: string | null = null
       if (config.managed) {
         try {
-          if (!this.#managedRoot || config.command !== process.execPath || config.args.length !== 1) throw new Error('Invalid managed launch.')
-          if (!/^[0-9a-f-]{36}$/.test(config.managed.installationId)) throw new Error('Invalid managed installation identity.')
-          const root = await realpath(join(this.#managedRoot, `${config.managed.lockDigest}-${config.managed.installationId}`))
+          if (!this.#managedRoot || config.command !== process.execPath || config.args.length !== 1)
+            throw new Error('Invalid managed launch.')
+          if (!/^[0-9a-f-]{36}$/.test(config.managed.installationId))
+            throw new Error('Invalid managed installation identity.')
+          const root = await realpath(
+            join(this.#managedRoot, `${config.managed.lockDigest}-${config.managed.installationId}`),
+          )
           const packageChecks = await import('./mcpPackageInstall')
-          if (await packageChecks.mcpTreeDigest(root, signal) !== config.managed.treeDigest) throw new Error('Managed package files changed after installation.')
-          if (await packageChecks.mcpRuntimeIdentity(signal) !== config.managed.runtime) throw new Error('Managed Node runtime changed after installation.')
+          if ((await packageChecks.mcpTreeDigest(root, signal)) !== config.managed.treeDigest)
+            throw new Error('Managed package files changed after installation.')
+          if ((await packageChecks.mcpRuntimeIdentity(signal)) !== config.managed.runtime)
+            throw new Error('Managed Node runtime changed after installation.')
           const entry = await realpath(config.args[0]!)
           const rel = relative(root, entry)
-          if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('Managed executable escapes its installation.')
+          if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
+            throw new Error('Managed executable escapes its installation.')
           const digest = (await packageChecks.mcpFileDigest(entry, 64 * 1024 * 1024, signal)).digest
           if (digest !== config.managed.entryDigest) throw new Error('Managed executable changed after installation.')
           managedRoot = root
-        } catch { unavailable.push(name); continue }
+        } catch {
+          unavailable.push(name)
+          continue
+        }
       }
       const values: Record<string, string> = {}
       const revealed: string[] = []

@@ -3,17 +3,17 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 
-// Where the scroller sits in the DOM.
-//
-// The followed timeline is the scroller, and it sizes itself against the region that mounts the
-// conversation: `.layout-region-detail` is the flex column with `min-height: 0`, and two rules in
-// client-core's shell.css name `.ui-timeline-scroll` as a *direct child* of it — the measure cap and
-// the padding hand-off. So the conversation has to reach the region as a fragment, and a box put
-// around any of it breaks the pane's scroll with nothing failing anywhere else. That is the claim this
-// file holds, because it is invisible to every other test and to tsc.
+// Where the scroller sits in the DOM. Two rules in client-core's shell.css name `.ui-timeline-scroll`
+// as a *direct child* of `.layout-region-detail`, so the conversation has to reach the region as a
+// fragment. A box around any of it breaks the pane's scroll, and no other test or tsc notices.
 
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ data: [{ id: 't1', title: 'Parent task' }, { id: 't2', title: 'Child task' }] }),
+  createQuery: () => ({
+    data: [
+      { id: 't1', title: 'Parent task' },
+      { id: 't2', title: 'Child task' },
+    ],
+  }),
   useQueryClient: () => ({ setQueryData: () => {} }),
 }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
@@ -22,7 +22,9 @@ vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 // about, and both would need a node.
 vi.mock('../composer/AgentComposer', () => ({ default: () => <textarea aria-label="Prompt" /> }))
 vi.mock('../composer/QueuedAgentTurns', () => ({ default: () => null }))
-vi.mock('./AgentEventCard', () => ({ default: (props: { item: { event: { text?: string } } }) => <div>{props.item.event.text}</div> }))
+vi.mock('./AgentEventCard', () => ({
+  default: (props: { item: { event: { text?: string } } }) => <div>{props.item.event.text}</div>,
+}))
 
 const SESSION = 's1'
 const session = {
@@ -46,16 +48,18 @@ const session = {
 const snapshot = {
   session,
   turns: [],
-  events: [{
-    id: 'e1',
-    sessionId: SESSION,
-    turnId: null,
-    seq: 1,
-    schemaVersion: 1,
-    event: { type: 'assistant_message', text: 'hello', messageId: 'm1' },
-    searchText: null,
-    createdAt: 1,
-  }],
+  events: [
+    {
+      id: 'e1',
+      sessionId: SESSION,
+      turnId: null,
+      seq: 1,
+      schemaVersion: 1,
+      event: { type: 'assistant_message', text: 'hello', messageId: 'm1' },
+      searchText: null,
+      createdAt: 1,
+    },
+  ],
   requests: [],
 } as unknown as AgentSessionSnapshot
 
@@ -93,7 +97,10 @@ const draw = () => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentConversation sessionId={SESSION} viewKeyPrefix="test" />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
@@ -110,11 +117,18 @@ describe('the conversation in a pane region', () => {
   })
 
   it('keeps the composer node, focus, draft and selection while a child changes', async () => {
-    const child = { ...session, id: 'child', taskId: 't2', title: 'Child', kind: 'delegated' as const,
-      runtimeState: 'working' as const }
+    const child = {
+      ...session,
+      id: 'child',
+      taskId: 't2',
+      title: 'Child',
+      kind: 'delegated' as const,
+      runtimeState: 'working' as const,
+    }
     listedSessions = [session, child]
-    listedDelegations = [{ sessionId: child.id, depth: 1, isolation: 'shared',
-      owner: { kind: 'managed', parentSessionId: SESSION } }]
+    listedDelegations = [
+      { sessionId: child.id, depth: 1, isolation: 'shared', owner: { kind: 'managed', parentSessionId: SESSION } },
+    ]
     managedAgentStore.upsertSession(session)
     const host = draw()
     await managedAgentStore.loadSnapshot(SESSION)
@@ -138,8 +152,14 @@ describe('the conversation in a pane region', () => {
     snapshotsById[other.id] = {
       ...snapshot,
       session: other,
-      events: [{ ...snapshot.events[0], id: 'e2', sessionId: other.id,
-        event: { type: 'assistant_message', text: 'second conversation', messageId: 'm2' } }],
+      events: [
+        {
+          ...snapshot.events[0],
+          id: 'e2',
+          sessionId: other.id,
+          event: { type: 'assistant_message', text: 'second conversation', messageId: 'm2' },
+        },
+      ],
     }
     listedSessions = [session, other]
     managedAgentStore.upsertSession(session)
@@ -149,7 +169,10 @@ describe('the conversation in a pane region', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <AgentConversation sessionId={selected()} viewKeyPrefix="test" />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
 
     await managedAgentStore.loadSnapshot(SESSION)
     expect(host.textContent).toContain('hello')
@@ -168,8 +191,14 @@ describe('the conversation in a pane region', () => {
     snapshotsById[second.id] = {
       ...snapshot,
       session: second,
-      events: [{ ...snapshot.events[0], id: 'e2', sessionId: second.id,
-        event: { type: 'assistant_message', text: 'step two', messageId: 'm2' } }],
+      events: [
+        {
+          ...snapshot.events[0],
+          id: 'e2',
+          sessionId: second.id,
+          event: { type: 'assistant_message', text: 'step two', messageId: 'm2' },
+        },
+      ],
     }
     managedAgentStore.upsertSession(first)
     managedAgentStore.upsertSession(second)
@@ -178,7 +207,10 @@ describe('the conversation in a pane region', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <AgentConversation workflowStepId={step()} viewKeyPrefix="workflow" />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
 
     await vi.waitFor(() => expect(host.textContent).toContain('hello'))
     setStep('step-2')

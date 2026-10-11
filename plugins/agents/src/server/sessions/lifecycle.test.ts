@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestCoreServices, makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import {
+  makeTestCoreServices,
+  makeTestDb,
+  makeTestPluginDb,
+  schema,
+  type TestDb,
+  type TestPluginDb,
+} from '@acorn/plugin-api/testkit'
 import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   MAX_REVIEW_FINAL_TEXT_BYTES,
@@ -99,23 +106,29 @@ describe('managed-agent lifecycle events and read models', () => {
     coreDb.cleanup()
   })
 
-  const createSession = (ownerTaskId = taskId) => store.createSession({
-    taskId: ownerTaskId,
-    providerId: provider.id,
-    profileId: provider.profileId,
-    kind: 'interactive',
-    config: {},
-  }, provider)
+  const createSession = (ownerTaskId = taskId) =>
+    store.createSession(
+      {
+        taskId: ownerTaskId,
+        providerId: provider.id,
+        profileId: provider.profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      provider,
+    )
 
   it('announces creation, generated fallback, and idempotent insertion state without content', async () => {
     const session = await createSession()
-    expect(frames).toEqual([expect.objectContaining({
-      channel: 'plugin:agents:sessions-changed',
-      sessionId: session.id,
-      changes: ['created'],
-      present: true,
-      archived: false,
-    })])
+    expect(frames).toEqual([
+      expect.objectContaining({
+        channel: 'plugin:agents:sessions-changed',
+        sessionId: session.id,
+        changes: ['created'],
+        present: true,
+        archived: false,
+      }),
+    ])
 
     const key = randomUUID()
     const first = await store.enqueueTurn(session.id, {
@@ -170,27 +183,32 @@ describe('managed-agent lifecycle events and read models', () => {
     const changed = await store.patchSession(session.id, { title: '  Owner title  ', archived: true })
     expect(changed.title).toBe('Owner title')
     expect(changed.archivedAt).not.toBeNull()
-    expect(frames).toEqual([{
-      channel: 'plugin:agents:sessions-changed',
-      taskId: session.taskId,
-      sessionId: session.id,
-      present: true,
-      archived: true,
-      changes: ['renamed', 'archived'],
-      renameSource: 'user',
-    }])
+    expect(frames).toEqual([
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId: session.taskId,
+        sessionId: session.id,
+        present: true,
+        archived: true,
+        changes: ['renamed', 'archived'],
+        renameSource: 'user',
+      },
+    ])
     expect((await store.lifecycleSessions(session.taskId))[0]?.title).toBe('Owner title')
   })
 
   it('does not replace a title authored before the first turn', async () => {
-    const session = await store.createSession({
-      taskId,
-      providerId: provider.id,
-      profileId: provider.profileId,
-      kind: 'interactive',
-      config: {},
-      title: 'Owner title',
-    }, provider)
+    const session = await store.createSession(
+      {
+        taskId,
+        providerId: provider.id,
+        profileId: provider.profileId,
+        kind: 'interactive',
+        config: {},
+        title: 'Owner title',
+      },
+      provider,
+    )
     frames = []
     const outcome = await store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Please implement generated session naming now' }],
@@ -239,28 +257,93 @@ describe('managed-agent lifecycle events and read models', () => {
     })
 
     expect(frames.filter((frame) => frame.channel === 'plugin:agents:turn-changed')).toEqual([
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'queued', attempt: 0 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'dispatching', attempt: 1 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'active', attempt: 1 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'queued', attempt: 1 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'dispatching', attempt: 2 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'active', attempt: 2 },
-      { channel: 'plugin:agents:turn-changed', taskId, sessionId: session.id, turnId: turn.id, source: 'delegation', status: 'failed', attempt: 2 },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'queued',
+        attempt: 0,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'dispatching',
+        attempt: 1,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'active',
+        attempt: 1,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'queued',
+        attempt: 1,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'dispatching',
+        attempt: 2,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'active',
+        attempt: 2,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'failed',
+        attempt: 2,
+      },
     ])
-    expect(await store.lifecycleTurns({ taskId })).toMatchObject([{
-      taskId,
-      sessionId: session.id,
-      turnId: turn.id,
-      source: 'delegation',
-      status: 'failed',
-      attempt: 2,
-    }])
+    expect(await store.lifecycleTurns({ taskId })).toMatchObject([
+      {
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'delegation',
+        status: 'failed',
+        attempt: 2,
+      },
+    ])
     expect(await store.lifecycleTurns({ taskId: otherTaskId })).toEqual([])
   })
 
   it('reads one completed turn for review, bounded, with provenance, and only within its task', async () => {
     const session = await createSession()
-    const context = { type: 'context' as const, contextId: 'c1', label: 'Issue', content: 'Fix the parser.', source: 'plugin:github', capturedAt: 1 }
+    const context = {
+      type: 'context' as const,
+      contextId: 'c1',
+      label: 'Issue',
+      content: 'Fix the parser.',
+      source: 'plugin:github',
+      capturedAt: 1,
+    }
     const { turn } = await store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Please fix it.' }, { type: 'file', path: '/private/secret.txt' }, context],
       source: 'interactive',
@@ -272,10 +355,29 @@ describe('managed-agent lifecycle events and read models', () => {
     await store.dispatchTurn(turn.id)
     await store.startTurn(turn.id)
     await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Looking.', messageId: 'm1' })
-    await store.recordEvent(session.id, turn.id, { type: 'reasoning', text: 'hidden reasoning stays private', messageId: 'r1' })
-    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Done', messageId: 'm2', append: true })
-    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: ': fixed.', messageId: 'm2', append: true })
-    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'a subagent aside', messageId: 's1', subagentId: 'sub' })
+    await store.recordEvent(session.id, turn.id, {
+      type: 'reasoning',
+      text: 'hidden reasoning stays private',
+      messageId: 'r1',
+    })
+    await store.recordEvent(session.id, turn.id, {
+      type: 'assistant_message',
+      text: 'Done',
+      messageId: 'm2',
+      append: true,
+    })
+    await store.recordEvent(session.id, turn.id, {
+      type: 'assistant_message',
+      text: ': fixed.',
+      messageId: 'm2',
+      append: true,
+    })
+    await store.recordEvent(session.id, turn.id, {
+      type: 'assistant_message',
+      text: 'a subagent aside',
+      messageId: 's1',
+      subagentId: 'sub',
+    })
     await store.recordEvent(session.id, turn.id, { type: 'turn_completed', stopReason: 'end_turn' })
 
     const read = await store.lifecycleReviewInput(ref)
@@ -287,7 +389,11 @@ describe('managed-agent lifecycle events and read models', () => {
         completedAt: expect.any(Number),
         userText: [
           { text: 'Please fix it.', provenance: { kind: 'person' }, truncated: false },
-          { text: 'Fix the parser.', provenance: { kind: 'context', source: 'plugin:github', label: 'Issue' }, truncated: false },
+          {
+            text: 'Fix the parser.',
+            provenance: { kind: 'context', source: 'plugin:github', label: 'Issue' },
+            truncated: false,
+          },
         ],
         userTextTruncated: false,
         finalText: 'Done: fixed.',
@@ -296,7 +402,11 @@ describe('managed-agent lifecycle events and read models', () => {
     })
     expect(JSON.stringify(read)).not.toMatch(/secret\.txt|hidden reasoning/)
     // Another task, another session, or an unknown turn all read the same.
-    for (const other of [{ ...ref, taskId: otherTaskId }, { ...ref, sessionId: (await createSession(otherTaskId)).id }, { ...ref, turnId: 'nope' }]) {
+    for (const other of [
+      { ...ref, taskId: otherTaskId },
+      { ...ref, sessionId: (await createSession(otherTaskId)).id },
+      { ...ref, turnId: 'nope' },
+    ]) {
       expect(await store.lifecycleReviewInput(other)).toEqual({ available: false, reason: 'not-found' })
     }
   })
@@ -305,14 +415,21 @@ describe('managed-agent lifecycle events and read models', () => {
     const session = await createSession()
     const big = 'é'.repeat(MAX_REVIEW_USER_TEXT_BYTES)
     const { turn } = await store.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: big }, { type: 'text', text: 'dropped' }],
+      input: [
+        { type: 'text', text: big },
+        { type: 'text', text: 'dropped' },
+      ],
       source: 'plugin',
       effectivePolicy: {},
       idempotencyKey: 'review-big',
     })
     await store.dispatchTurn(turn.id)
     await store.startTurn(turn.id)
-    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'x'.repeat(MAX_REVIEW_FINAL_TEXT_BYTES + 10), messageId: 'm' })
+    await store.recordEvent(session.id, turn.id, {
+      type: 'assistant_message',
+      text: 'x'.repeat(MAX_REVIEW_FINAL_TEXT_BYTES + 10),
+      messageId: 'm',
+    })
     await store.recordEvent(session.id, turn.id, { type: 'turn_completed', stopReason: 'end_turn' })
     const read = await store.lifecycleReviewInput({ taskId, sessionId: session.id, turnId: turn.id })
     if (!read.available) throw new Error('expected a completed turn')
@@ -363,11 +480,46 @@ describe('managed-agent lifecycle events and read models', () => {
     await store.expirePendingRequests(session.id)
 
     expect(frames.filter((frame) => frame.channel === 'plugin:agents:request-changed')).toEqual([
-      { channel: 'plugin:agents:request-changed', taskId, sessionId: session.id, requestId: 'permission-one', kind: 'permission', status: 'pending' },
-      { channel: 'plugin:agents:request-changed', taskId, sessionId: session.id, requestId: 'permission-one', kind: 'permission', status: 'resolving' },
-      { channel: 'plugin:agents:request-changed', taskId, sessionId: session.id, requestId: 'permission-one', kind: 'permission', status: 'resolved' },
-      { channel: 'plugin:agents:request-changed', taskId, sessionId: session.id, requestId: 'question-two', kind: 'question', status: 'pending' },
-      { channel: 'plugin:agents:request-changed', taskId, sessionId: session.id, requestId: 'question-two', kind: 'question', status: 'expired' },
+      {
+        channel: 'plugin:agents:request-changed',
+        taskId,
+        sessionId: session.id,
+        requestId: 'permission-one',
+        kind: 'permission',
+        status: 'pending',
+      },
+      {
+        channel: 'plugin:agents:request-changed',
+        taskId,
+        sessionId: session.id,
+        requestId: 'permission-one',
+        kind: 'permission',
+        status: 'resolving',
+      },
+      {
+        channel: 'plugin:agents:request-changed',
+        taskId,
+        sessionId: session.id,
+        requestId: 'permission-one',
+        kind: 'permission',
+        status: 'resolved',
+      },
+      {
+        channel: 'plugin:agents:request-changed',
+        taskId,
+        sessionId: session.id,
+        requestId: 'question-two',
+        kind: 'question',
+        status: 'pending',
+      },
+      {
+        channel: 'plugin:agents:request-changed',
+        taskId,
+        sessionId: session.id,
+        requestId: 'question-two',
+        kind: 'question',
+        status: 'expired',
+      },
     ])
     const requests = await store.lifecycleRequests({ taskId, sessionId: session.id })
     expect(requests.map((request) => ({ id: request.requestId, status: request.status }))).toEqual([
@@ -382,23 +534,55 @@ describe('managed-agent lifecycle events and read models', () => {
   const applyActivity = (state: AgentActivityState, frame: AgentActivityEvent): AgentActivityState => {
     if (frame.kind === 'usage') return { ...state, usage: frame.usage }
     if (frame.kind === 'tool') {
-      return { ...state, tools: [...state.tools.filter((tool) => tool.toolCallId !== frame.tool.toolCallId), frame.tool] }
+      return {
+        ...state,
+        tools: [...state.tools.filter((tool) => tool.toolCallId !== frame.tool.toolCallId), frame.tool],
+      }
     }
-    return { ...state, subagents: [...state.subagents.filter((item) => item.subagentId !== frame.subagent.subagentId), frame.subagent] }
+    return {
+      ...state,
+      subagents: [...state.subagents.filter((item) => item.subagentId !== frame.subagent.subagentId), frame.subagent],
+    }
   }
 
   it('publishes tool, subagent, and context edges that rebuild to the same state, with no command or output', async () => {
     const session = await createSession()
-    const turn = (await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'go' }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })).turn
+    const turn = (
+      await store.enqueueTurn(session.id, {
+        input: [{ type: 'text', text: 'go' }],
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
+      })
+    ).turn
     const first: AgentNormalizedEvent[] = [
       { type: 'usage', usage: { contextUsed: 1_000, contextSize: 200_000, cost: { amount: 0.01, currency: 'USD' } } },
-      { type: 'tool', tool: { id: 'bash-1', title: 'rm -rf /tmp/secret-dir', kind: 'execute', status: 'pending', input: 'rm -rf /tmp/secret-dir' } },
+      {
+        type: 'tool',
+        tool: {
+          id: 'bash-1',
+          title: 'rm -rf /tmp/secret-dir',
+          kind: 'execute',
+          status: 'pending',
+          input: 'rm -rf /tmp/secret-dir',
+        },
+      },
       { type: 'tool', tool: { id: 'bash-1', title: '', output: 'SECRET OUTPUT', outputAppend: true } },
       { type: 'usage', usage: { contextUsed: 1_000, contextSize: 200_000 } },
       { type: 'subagent', subagent: { id: 'agent-1', title: 'Explore the repo', status: 'running', role: 'Explore' } },
     ]
     const second: AgentNormalizedEvent[] = [
-      { type: 'tool', tool: { id: 'read-1', title: 'Read src/a.ts', kind: 'read', status: 'running', paths: ['/w/src/a.ts'], subagentId: 'agent-1' } },
+      {
+        type: 'tool',
+        tool: {
+          id: 'read-1',
+          title: 'Read src/a.ts',
+          kind: 'read',
+          status: 'running',
+          paths: ['/w/src/a.ts'],
+          subagentId: 'agent-1',
+        },
+      },
       { type: 'tool', tool: { id: 'read-1', title: '', status: 'completed', output: 'file body' } },
       { type: 'tool', tool: { id: 'bash-1', title: '', status: 'completed', output: 'more SECRET OUTPUT' } },
       { type: 'subagent', subagent: { id: 'agent-1', status: 'completed' } },
@@ -406,7 +590,7 @@ describe('managed-agent lifecycle events and read models', () => {
       { type: 'assistant_message', text: 'private reply' },
     ]
     frames = []
-    const activityFrames = () => frames.flatMap((frame) => frame.channel === 'plugin:agents:activity' ? [frame] : [])
+    const activityFrames = () => frames.flatMap((frame) => (frame.channel === 'plugin:agents:activity' ? [frame] : []))
     // Frames go out once the projection module has loaded, after the commit.
     for (const event of first) await store.recordEvent(session.id, turn.id, event)
     await vi.waitFor(() => expect(activityFrames()).toHaveLength(3))
@@ -415,31 +599,55 @@ describe('managed-agent lifecycle events and read models', () => {
     await vi.waitFor(() => expect(activityFrames()).toHaveLength(8))
 
     const activity = activityFrames()
-    expect(activity.map((frame) => frame.kind === 'tool'
-      ? `tool ${frame.tool.toolCallId} ${frame.tool.status}`
-      : frame.kind === 'subagent' ? `subagent ${frame.subagent.subagentId} ${frame.subagent.status}` : `usage ${frame.usage.contextUsed}`)).toEqual([
-      'usage 1000', 'tool bash-1 pending', 'subagent agent-1 running',
-      'tool read-1 running', 'tool read-1 completed', 'tool bash-1 completed', 'subagent agent-1 completed', 'usage 5000',
+    expect(
+      activity.map((frame) =>
+        frame.kind === 'tool'
+          ? `tool ${frame.tool.toolCallId} ${frame.tool.status}`
+          : frame.kind === 'subagent'
+            ? `subagent ${frame.subagent.subagentId} ${frame.subagent.status}`
+            : `usage ${frame.usage.contextUsed}`,
+      ),
+    ).toEqual([
+      'usage 1000',
+      'tool bash-1 pending',
+      'subagent agent-1 running',
+      'tool read-1 running',
+      'tool read-1 completed',
+      'tool bash-1 completed',
+      'subagent agent-1 completed',
+      'usage 5000',
     ])
     const sent = JSON.stringify(activity)
-    for (const secret of ['rm -rf', 'secret-dir', 'SECRET OUTPUT', 'file body', 'private reply']) expect(sent).not.toContain(secret)
+    for (const secret of ['rm -rf', 'secret-dir', 'SECRET OUTPUT', 'file body', 'private reply'])
+      expect(sent).not.toContain(secret)
     expect(activity[1]).toMatchObject({ kind: 'tool', tool: { title: 'Command', kind: 'execute', turnId: turn.id } })
     expect(activity.at(-1)).toMatchObject({ kind: 'usage', usage: { contextUsed: 5_000, contextSize: 200_000 } })
 
     // A view opened midway reads the first half, then applies the frames sent after it.
-    const live = activity.slice(3).reduce(
-      (state, { channel: _channel, ...frame }) => applyActivity(state, frame),
-      midway!,
-    )
+    const live = activity
+      .slice(3)
+      .reduce((state, { channel: _channel, ...frame }) => applyActivity(state, frame), midway!)
     const rebuilt = await store.lifecycleActivity({ taskId, sessionId: session.id })
     // The same items by id. Order is a display hint: an output chunk moves a call's stored row unannounced.
-    const keyed = (state: AgentActivityState) => ({ ...state, tools: state.tools.toSorted((a, b) => a.toolCallId.localeCompare(b.toolCallId)) })
+    const keyed = (state: AgentActivityState) => ({
+      ...state,
+      tools: state.tools.toSorted((a, b) => a.toolCallId.localeCompare(b.toolCallId)),
+    })
     expect(keyed(rebuilt!)).toEqual(keyed(live))
     expect(rebuilt!.tools.map((tool) => [tool.toolCallId, tool.status, tool.subagentId])).toEqual([
       ['read-1', 'completed', 'agent-1'],
       ['bash-1', 'completed', null],
     ])
-    expect(rebuilt!.subagents).toEqual([{ subagentId: 'agent-1', turnId: turn.id, title: 'Explore the repo', role: 'Explore', status: 'completed', background: false }])
+    expect(rebuilt!.subagents).toEqual([
+      {
+        subagentId: 'agent-1',
+        turnId: turn.id,
+        title: 'Explore the repo',
+        role: 'Explore',
+        status: 'completed',
+        background: false,
+      },
+    ])
 
     // After a restart, the read comes from the ledger alone.
     const restarted = new AgentStore(pluginDb.db, core, () => undefined)
@@ -455,22 +663,60 @@ describe('managed-agent lifecycle events and read models', () => {
     await store.patchSession(session.id, { archived: true })
     await store.patchSession(session.id, { archived: false })
 
-    expect(await store.lifecycleSessions(taskId)).toMatchObject([{
-      taskId,
-      sessionId: session.id,
-      present: true,
-      archived: false,
-      title: 'Renamed',
-    }])
+    expect(await store.lifecycleSessions(taskId)).toMatchObject([
+      {
+        taskId,
+        sessionId: session.id,
+        present: true,
+        archived: false,
+        title: 'Renamed',
+      },
+    ])
     await store.deleteSession(session.id)
     await store.deleteSession(session.id)
 
     expect(frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')).toEqual([
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['created'] },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['renamed'], renameSource: 'user' },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: true, changes: ['archived'] },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['restored'] },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: false, archived: false, changes: ['deleted'] },
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId,
+        sessionId: session.id,
+        present: true,
+        archived: false,
+        changes: ['created'],
+      },
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId,
+        sessionId: session.id,
+        present: true,
+        archived: false,
+        changes: ['renamed'],
+        renameSource: 'user',
+      },
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId,
+        sessionId: session.id,
+        present: true,
+        archived: true,
+        changes: ['archived'],
+      },
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId,
+        sessionId: session.id,
+        present: true,
+        archived: false,
+        changes: ['restored'],
+      },
+      {
+        channel: 'plugin:agents:sessions-changed',
+        taskId,
+        sessionId: session.id,
+        present: false,
+        archived: false,
+        changes: ['deleted'],
+      },
     ])
     expect(await store.lifecycleSessions(taskId)).toEqual([])
   })

@@ -62,8 +62,8 @@ describe('RuntimeService over real processes', () => {
         return { ok: false, reason: e instanceof Error ? e.message : 'failed' }
       }
     },
-    // Required by RuntimeDeps rather than optional, which is the point: a deps object that omitted the
-    // gate used to compile, and a cloned repository's committed command then ran with no review.
+    // Required by RuntimeDeps rather than optional, which is the point: a deps object that omits the
+    // gate does not compile, so a cloned repository's committed command cannot run with no review.
     authorizeRepoConfig: async () => {},
   }
 
@@ -186,7 +186,10 @@ describe('RuntimeService over real processes', () => {
     expect(res.ok).toBe(false)
     expect(res.reason).toBe('secret-scan: a secret is in the environment')
     expect(asked).toEqual([
-      { id: 'before-run-target', payload: { taskId: 't1', targetId: 'dev', command: 'touch started.marker && sleep 30', cwd: dir } },
+      {
+        id: 'before-run-target',
+        payload: { taskId: 't1', targetId: 'dev', command: 'touch started.marker && sleep 30', cwd: dir },
+      },
     ])
     // Nothing spawned, and nothing recorded: a vetoed start must leave no instance behind for `stop`
     // to find.
@@ -206,12 +209,17 @@ describe('RuntimeService over real processes', () => {
   })
 
   it('authorizes only targets whose winning layer is repo-authored', async () => {
-    targets = [{ id: 'repo', command: 'true' }, { id: 'user', command: 'true' }]
+    targets = [
+      { id: 'repo', command: 'true' },
+      { id: 'user', command: 'true' },
+    ]
     const authorized: string[] = []
     const svc = new RuntimeService({
       ...deps,
       loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: ['repo'], repoConfigHash: 'selected-hash' }),
-      authorizeRepoConfig: async (taskId) => { authorized.push(taskId) },
+      authorizeRepoConfig: async (taskId) => {
+        authorized.push(taskId)
+      },
     })
     await svc.start('t1', 'user')
     expect(authorized).toEqual([])

@@ -6,7 +6,11 @@ import { layoutForTask } from './tasks'
 import { createTaskDeepLink } from './taskDeepLink'
 
 const pane = paneRegistry.register({
-  id: 'test.deep-link', label: 'Deep link', glyph: 'x', order: 1, component: () => null,
+  id: 'test.deep-link',
+  label: 'Deep link',
+  glyph: 'x',
+  order: 1,
+  component: () => null,
 })
 afterAll(() => pane.dispose())
 

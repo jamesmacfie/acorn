@@ -11,8 +11,7 @@ import { databaseQuery, generateStep, queryStep } from '../server/workflowSteps'
 //
 //   ctx.storage.open()  the plugin database, with the id bound from the manifest and the DDL chain
 //                       confined to the installed package. `<dataRoot>/plugins/database.sqlite` is
-//                       still the file, since the id did not change; renaming it would orphan every
-//                       saved query on the machine.
+//                       the file; renaming the id would orphan every saved query on the machine.
 //
 //   ctx.routes.fetch()  the portable route carrier. A Hono instance cannot cross a process boundary and
 //                       a (Request) → Response function can.
@@ -31,10 +30,15 @@ export const databasePlugin = (): NodePlugin => {
       const db = ctx.storage.open()
       const data = databaseBridge(ctx.core, ctx.events.send)
       bridge = data
-      ctx.routes.fetch(createDatabaseFetch(db, ctx.core, data, ctx.events.send), { prefix: '', note: '/tasks/:taskId/*' })
+      ctx.routes.fetch(createDatabaseFetch(db, ctx.core, data, ctx.events.send), {
+        prefix: '',
+        note: '/tasks/:taskId/*',
+      })
       // The task's scratch buffer. Saved queries are the project's and stay.
-      registerDeletedTaskPurge(ctx, async (taskIds) =>
-        (await db.delete(dbScratch).where(inArray(dbScratch.taskId, [...taskIds]))).changes)
+      registerDeletedTaskPurge(
+        ctx,
+        async (taskIds) => (await db.delete(dbScratch).where(inArray(dbScratch.taskId, [...taskIds]))).changes,
+      )
       // One read path for the two workflow steps and for anything later that wants a repo's data, so
       // the row cap and the read-only refusal are written once (docs/database/palette-and-workflows.md § Workflow steps).
       const query = databaseQuery(data)

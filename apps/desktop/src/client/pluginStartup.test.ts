@@ -3,7 +3,9 @@ import { createPluginStartup } from './pluginStartup'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -15,8 +17,27 @@ const setup = () => {
   const refresh = vi.fn(async (_nodeId: string): Promise<readonly string[] | null> => [])
   const onReady = vi.fn()
   const onFailed = vi.fn()
-  const startup = createPluginStartup({ load, register, refresh, onReady, onFailed, activeNode: () => active, disabled: () => [] })
-  return { ...startup, plugins, load, register, refresh, onReady, onFailed, select: (id: string) => { active = id } }
+  const startup = createPluginStartup({
+    load,
+    register,
+    refresh,
+    onReady,
+    onFailed,
+    activeNode: () => active,
+    disabled: () => [],
+  })
+  return {
+    ...startup,
+    plugins,
+    load,
+    register,
+    refresh,
+    onReady,
+    onFailed,
+    select: (id: string) => {
+      active = id
+    },
+  }
 }
 
 describe('post-paint compiled plugin startup', () => {
@@ -43,7 +64,10 @@ describe('post-paint compiled plugin startup', () => {
     const old = deferred<readonly string[]>()
     const requested = deferred<void>()
     host.refresh.mockImplementation(async (id) => {
-      if (id === 'A') { requested.resolve(); return await old.promise }
+      if (id === 'A') {
+        requested.resolve()
+        return await old.promise
+      }
       return ['docker']
     })
     await host.initialize()
@@ -77,7 +101,9 @@ describe('post-paint compiled plugin startup', () => {
 
   it('does not release restoration when registration fails, and leaves the node unapplied', async () => {
     const host = setup()
-    host.register.mockImplementation(() => { throw new Error('duplicate pane') })
+    host.register.mockImplementation(() => {
+      throw new Error('duplicate pane')
+    })
     const apply = host.apply('A')
     await expect(host.initialize()).rejects.toThrow('duplicate pane')
     await apply

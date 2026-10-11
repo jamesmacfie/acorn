@@ -35,18 +35,33 @@ async function mountProbe(source: string) {
   installPluginWorkers()
   const refusals: string[] = []
   const worker = acquireTreeWorker({
-    pluginId: 'probe', hash, onRefused: (reason) => refusals.push(reason),
+    pluginId: 'probe',
+    hash,
+    onRefused: (reason) => refusals.push(reason),
     connect: () => ({ dispose: () => {} }),
   })
   const ops: TreeMutation[] = []
   const transport = worker.transport('fixture-slot')
   const seen = new Promise<void>((done) => {
-    transport.onBatch((batch) => { ops.push(...batch); done() })
-    transport.onFailed((message) => { refusals.push(message); done() })
+    transport.onBatch((batch) => {
+      ops.push(...batch)
+      done()
+    })
+    transport.onFailed((message) => {
+      refusals.push(message)
+      done()
+    })
   })
   worker.mount('fixture-slot', 'main', {})
   await Promise.race([seen, new Promise((done) => setTimeout(done, 10_000))])
-  return { ops, refusals, release: () => { worker.unmount('fixture-slot'); worker.release() } }
+  return {
+    ops,
+    refusals,
+    release: () => {
+      worker.unmount('fixture-slot')
+      worker.release()
+    },
+  }
 }
 
 /** Return bounded fixture data through the same ready/mount/tree path as a loaded client. */
@@ -85,14 +100,16 @@ test('loaded client workers receive no parent environment before bundle evaluati
   const original = process.env[key]
   process.env[key] = 'dummy-parent-value'
   try {
-    expect(await workerReport(`
+    expect(
+      await workerReport(`
       const importedProcess = (await import('node:process')).default
       return {
         sentinel: process.env.${key} ?? null,
         importedSentinel: importedProcess.env.${key} ?? null,
         keys: Object.keys(process.env),
       }
-    `)).toEqual({ sentinel: null, importedSentinel: null, keys: [] })
+    `),
+    ).toEqual({ sentinel: null, importedSentinel: null, keys: [] })
   } finally {
     if (original === undefined) delete process.env[key]
     else process.env[key] = original
@@ -105,35 +122,70 @@ test('cached process ESM namespace receives the guarded accessor before client e
   const bundle = join(realpathSync(config), 'identity-probe.mjs')
   // Simulate trusted bootstrap load order without acquiring a denied module or performing native
   // effects. A cached ESM namespace's live binding must agree with the new process property.
-  writeFileSync(wrapper, `globalThis.cachedProcess = await import('node:process'); await import(${JSON.stringify(pathToFileURL(bootstrap).href)})`)
-  writeFileSync(bundle, `import { getBuiltinModule } from 'node:process'; postMessage({
+  writeFileSync(
+    wrapper,
+    `globalThis.cachedProcess = await import('node:process'); await import(${JSON.stringify(pathToFileURL(bootstrap).href)})`,
+  )
+  writeFileSync(
+    bundle,
+    `import { getBuiltinModule } from 'node:process'; postMessage({
     cachedMatches: globalThis.cachedProcess.getBuiltinModule === process.getBuiltinModule,
     freshMatches: getBuiltinModule === process.getBuiltinModule,
     harmless: getBuiltinModule('node:path').basename('/synthetic/file'),
-  })`)
+  })`,
+  )
   const worker = new NodeWorker(wrapper, {
-    workerData: { bundle, builtins: builtinModules
-      .filter(name => pluginBuiltinAllowed(name, { sockets: false, exec: false }))
-      .map(name => name.replace(/^node:/, '')) },
-    env: {}, stdout: true, stderr: true,
-    execArgv: ['--permission', ...[wrapper, bootstrap, bundle].map(path => `--allow-fs-read=${path}`)],
+    workerData: {
+      bundle,
+      builtins: builtinModules
+        .filter((name) => pluginBuiltinAllowed(name, { sockets: false, exec: false }))
+        .map((name) => name.replace(/^node:/, '')),
+    },
+    env: {},
+    stdout: true,
+    stderr: true,
+    execArgv: ['--permission', ...[wrapper, bootstrap, bundle].map((path) => `--allow-fs-read=${path}`)],
   })
   try {
     const report = await new Promise<unknown>((resolve, reject) => {
       worker.once('message', resolve)
       worker.once('error', reject)
-      worker.once('exit', code => reject(new Error(`Fixture worker exited before reporting (${code})`)))
+      worker.once('exit', (code) => reject(new Error(`Fixture worker exited before reporting (${code})`)))
     })
     expect(report).toEqual({ cachedMatches: true, freshMatches: true, harmless: 'file' })
-  } finally { await worker.terminate() }
+  } finally {
+    await worker.terminate()
+  }
 }, 30_000)
 
 test('loaded client builtin imports and synchronous accessors share the restrictive policy', async () => {
   // Acquiring the module is refused. No network, subprocess, inspector or native effect is attempted.
-  const denied = ['net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'dns/promises', 'quic',
-    'child_process', 'worker_threads', 'cluster', 'module', 'vm', 'inspector', 'inspector/promises',
-    'repl', '_http_server', 'internal/fs/utils', 'test', 'sqlite', 'ffi']
-  expect(await workerReport(`
+  const denied = [
+    'net',
+    'http',
+    'https',
+    'http2',
+    'tls',
+    'dgram',
+    'dns',
+    'dns/promises',
+    'quic',
+    'child_process',
+    'worker_threads',
+    'cluster',
+    'module',
+    'vm',
+    'inspector',
+    'inspector/promises',
+    'repl',
+    '_http_server',
+    'internal/fs/utils',
+    'test',
+    'sqlite',
+    'ffi',
+  ]
+  expect(
+    await workerReport(`
     const failures = []
     const importedProcess = (await import('node:process')).default
     const { getBuiltinModule: importedAccessor } = await import('node:process')
@@ -161,11 +213,21 @@ test('loaded client builtin imports and synchronous accessors share the restrict
       mainModule: typeof process.mainModule,
       networkGlobals: ['fetch', 'WebSocket', 'XMLHttpRequest', 'EventSource', 'navigator'].filter((name) => name in globalThis),
     }
-  `)).toEqual({ failures: [], harmless: true, safeSubpath: true, require: 'undefined', mainModule: 'undefined', networkGlobals: [] })
+  `),
+  ).toEqual({
+    failures: [],
+    harmless: true,
+    safeSubpath: true,
+    require: 'undefined',
+    mainModule: 'undefined',
+    networkGlobals: [],
+  })
 }, 30_000)
 
 test('CommonJS-shaped cached clients cannot acquire privileged builtin families through require', async () => {
-  expect(await workerReport(`
+  expect(
+    await workerReport(
+      `
     const failures = []
     for (const name of ['net', 'dns/promises', 'inspector/promises', 'module', 'child_process',
       'worker_threads', '_http_server', 'internal/fs/utils', 'sqlite']) {
@@ -177,5 +239,8 @@ test('CommonJS-shaped cached clients cannot acquire privileged builtin families 
       }
     }
     return { failures, require: typeof require, harmless: require('node:path').basename('/dummy/file') }
-  `, true)).toEqual({ failures: [], require: 'function', harmless: 'file' })
+  `,
+      true,
+    ),
+  ).toEqual({ failures: [], require: 'function', harmless: 'file' })
 }, 30_000)

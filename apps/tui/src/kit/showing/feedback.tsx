@@ -16,9 +16,17 @@ export function Alert(props: {
   const glyph = () => (tone() === 'ok' ? '✓' : tone() === 'warn' ? '!' : tone() === 'accent' ? 'i' : '✕')
   return (
     <box flexDirection="row" gap={1}>
-      <Line role="strong" tone={tone()}>{glyph()}</Line>
-      <Show when={props.title}><Line role="strong" tone={tone()}>{props.title!}</Line></Show>
-      <Line tone={tone()} wrap>{props.children}</Line>
+      <Line role="strong" tone={tone()}>
+        {glyph()}
+      </Line>
+      <Show when={props.title}>
+        <Line role="strong" tone={tone()}>
+          {props.title!}
+        </Line>
+      </Show>
+      <Line tone={tone()} wrap>
+        {props.children}
+      </Line>
       {slot(props.actions)}
     </box>
   )
@@ -37,8 +45,12 @@ export function EmptyState(props: {
 }) {
   return (
     <box flexDirection="column" paddingTop={1} paddingLeft={2}>
-      <Show when={props.title}><Line role="strong">{props.title!}</Line></Show>
-      <Line role="muted" wrap>{props.busy ? 'loading…' : flatten(props.children)}</Line>
+      <Show when={props.title}>
+        <Line role="strong">{props.title!}</Line>
+      </Show>
+      <Line role="muted" wrap>
+        {props.busy ? 'loading…' : flatten(props.children)}
+      </Line>
       {slot(props.action)}
     </box>
   )

@@ -42,9 +42,23 @@ export type WorkflowInvocationReview = {
     path: string[]
     name: string
     provenance: WorkflowDefinitionProvenance
-    steps: { id: string; name: string; kind: string; profileId?: string; model?: string; configOptions?: Record<string, string> }[]
+    steps: {
+      id: string
+      name: string
+      kind: string
+      profileId?: string
+      model?: string
+      configOptions?: Record<string, string>
+    }[]
   }[]
-  inputs: { name: string; label?: string; description?: string; required?: boolean; schema?: DataSchema; hasDefault: boolean }[]
+  inputs: {
+    name: string
+    label?: string
+    description?: string
+    required?: boolean
+    schema?: DataSchema
+    hasDefault: boolean
+  }[]
   /** Root step fields whose text or bindings read an input, so a caller's value can change them. */
   inputUses: { step: string; field: string; inputs: string[] }[]
   defaults: { limits: WorkflowInvocationLimits; startsPerSession: number }

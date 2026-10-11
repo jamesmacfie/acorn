@@ -30,7 +30,7 @@ import './link-preview.css'
 
 /** Open is the same host action as a click: an in-app destination when one claims the URL, else the
  *  browser. A preview never navigates on its own. */
-export function openPreviewedLink(request: LinkPreviewRequest): void {
+function openPreviewedLink(request: LinkPreviewRequest): void {
   if (openInAppUrl(request.url, { taskId: request.scope.taskId ?? null })) return
   window.open(request.url, '_blank', 'noopener,noreferrer')
 }
@@ -42,28 +42,45 @@ export function LinkPreviewHost() {
     anchor: () => linkPreview()?.anchor,
     placement: () => 'bottom-start',
     open: () => !!linkPreview(),
-    onOpenChange: (open) => { if (!open) closeLinkPreview() },
+    onOpenChange: (open) => {
+      if (!open) closeLinkPreview()
+    },
   })
   // Measured again for every link, because pointer transfer keeps the surface open.
-  createEffect(on(() => linkPreview()?.anchor, (anchor) => { if (anchor) popover.show() }))
+  createEffect(
+    on(
+      () => linkPreview()?.anchor,
+      (anchor) => {
+        if (anchor) popover.show()
+      },
+    ),
+  )
 
   // A link that leaves the page takes its preview with it. Watched only while one is open.
   createEffect(() => {
     const anchor = linkPreview()?.anchor
     if (!anchor) return
-    const observer = new MutationObserver(() => { if (!anchor.isConnected) closeLinkPreview() })
+    const observer = new MutationObserver(() => {
+      if (!anchor.isConnected) closeLinkPreview()
+    })
     observer.observe(document.body, { childList: true, subtree: true })
     onCleanup(() => observer.disconnect())
   })
 
   // A preview opened from the menu holds focus while it is up and hands it back when it closes. One
   // opened by hovering never takes it.
-  createEffect(on(linkPreview, (request, previous) => {
-    if (request?.focus && request !== previous) queueMicrotask(() => surface?.focus())
-    if (!previous?.focus || request?.focus) return
-    const focused = document.activeElement
-    if (!focused || focused === document.body || surface?.contains(focused)) previous.returnFocus?.focus()
-  }, { defer: true }))
+  createEffect(
+    on(
+      linkPreview,
+      (request, previous) => {
+        if (request?.focus && request !== previous) queueMicrotask(() => surface?.focus())
+        if (!previous?.focus || request?.focus) return
+        const focused = document.activeElement
+        if (!focused || focused === document.body || surface?.contains(focused)) previous.returnFocus?.focus()
+      },
+      { defer: true },
+    ),
+  )
 
   // The tree is bound to the task or project it was opened in, so a new scope is a new mount. A new URL
   // in the same scope is a props update, and the contributor's worker stays.
@@ -83,7 +100,10 @@ export function LinkPreviewHost() {
           return (
             <Portal>
               <div
-                ref={(element) => { surface = element; popover.setSurface(element) }}
+                ref={(element) => {
+                  surface = element
+                  popover.setSurface(element)
+                }}
                 class="ui-popover link-preview"
                 role="dialog"
                 aria-label={`Preview of ${request().label ?? request().url}`}
@@ -101,17 +121,31 @@ export function LinkPreviewHost() {
                   occupied={(occupied, pluginId) => setBy(occupied ? pluginId : undefined)}
                 >
                   <Stack gap="inline">
-                    <Show when={request().label}>{(label) => <Text emphasis="strong" wrap>{label()}</Text>}</Show>
-                    <Text tone="muted" wrap>{request().url}</Text>
+                    <Show when={request().label}>
+                      {(label) => (
+                        <Text emphasis="strong" wrap>
+                          {label()}
+                        </Text>
+                      )}
+                    </Show>
+                    <Text tone="muted" wrap>
+                      {request().url}
+                    </Text>
                   </Stack>
                 </Slot>
                 <div class="link-preview-footer">
                   <Show when={by()}>{(pluginId) => <Text tone="muted">From {pluginLabel(pluginId())}</Text>}</Show>
-                  <Button size="sm" variant="ghost" onPress={() => {
-                    const opened = request()
-                    closeLinkPreview()
-                    openPreviewedLink(opened)
-                  }}>Open</Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => {
+                      const opened = request()
+                      closeLinkPreview()
+                      openPreviewedLink(opened)
+                    }}
+                  >
+                    Open
+                  </Button>
                 </div>
               </div>
             </Portal>
@@ -129,12 +163,23 @@ export function LinkPreviewHost() {
           <Show when={linkMenu()?.request} keyed>
             {(request) => (
               <>
-                <Menu.Item context={menu} onSelect={() => openLinkPreview(request)}>Preview</Menu.Item>
-                <Menu.Item context={menu} onSelect={() => openPreviewedLink(request)}>Open link</Menu.Item>
-                <Menu.Item context={menu} onSelect={() => {
-                  const url = request.url
-                  void copyText(url).then((copied) => { if (!copied) toast(`Could not copy ${url}`, { tone: 'danger' }) })
-                }}>Copy link</Menu.Item>
+                <Menu.Item context={menu} onSelect={() => openLinkPreview(request)}>
+                  Preview
+                </Menu.Item>
+                <Menu.Item context={menu} onSelect={() => openPreviewedLink(request)}>
+                  Open link
+                </Menu.Item>
+                <Menu.Item
+                  context={menu}
+                  onSelect={() => {
+                    const url = request.url
+                    void copyText(url).then((copied) => {
+                      if (!copied) toast(`Could not copy ${url}`, { tone: 'danger' })
+                    })
+                  }}
+                >
+                  Copy link
+                </Menu.Item>
               </>
             )}
           </Show>

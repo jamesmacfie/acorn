@@ -17,14 +17,18 @@ describe('a failed GitHub action', () => {
     expect(actionFailure(coded('something_new')).text).toBe("GitHub didn't accept that. Try again.")
   })
 
-  it('keeps GitHub\'s own words when the route sent them', () => {
+  it("keeps GitHub's own words when the route sent them", () => {
     expect(actionFailure(coded('merge_failed', 'Head branch was modified.')).text).toBe('Head branch was modified.')
     expect(actionFailure(new Error('409')).text).toBe("GitHub didn't accept that. Try again.")
   })
 
   it('says what failed for a write that has its own sentence', async () => {
-    await expect(sayOnFailure(Promise.reject(coded('github_unavailable')), "Couldn't save your reply.")).rejects.toThrow("Couldn't save your reply.")
-    await expect(sayOnFailure(Promise.reject(coded('forbidden', 'Not a collaborator.')), "Couldn't save your reply.")).rejects.toThrow('Not a collaborator.')
+    await expect(
+      sayOnFailure(Promise.reject(coded('github_unavailable')), "Couldn't save your reply."),
+    ).rejects.toThrow("Couldn't save your reply.")
+    await expect(
+      sayOnFailure(Promise.reject(coded('forbidden', 'Not a collaborator.')), "Couldn't save your reply."),
+    ).rejects.toThrow('Not a collaborator.')
   })
 })
 

@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import {
-  commandSettingOptionSchema, MAX_COMMAND_SEARCH_MIN_QUERY, MAX_COMMAND_SEARCH_DEBOUNCE_MS,
-  MAX_COMMAND_SETTING_OPTIONS, MIN_COMMAND_SEARCH_DEBOUNCE_MS, MIN_COMMAND_SETTING_OPTIONS,
+  commandSettingOptionSchema,
+  MAX_COMMAND_SEARCH_MIN_QUERY,
+  MAX_COMMAND_SEARCH_DEBOUNCE_MS,
+  MAX_COMMAND_SETTING_OPTIONS,
+  MIN_COMMAND_SEARCH_DEBOUNCE_MS,
+  MIN_COMMAND_SETTING_OPTIONS,
 } from '../../chrome/commands.ts'
 import { isNormalizedChord, isPluginShortcutChord } from '../../chrome/keybindings.ts'
 import { contextFreeAction, selectedRowAction } from './chromeDescriptors.ts'
@@ -9,8 +13,8 @@ import { pluginRoute } from './manifestFields.ts'
 
 export const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
 
-// What every kind of command declares. Ids are local: `chromeRegister.ts` qualifies both this one and
-// `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
+// What every kind of command declares. Ids are local: client-core's `pluginCommand` qualifies both this
+// one and `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
 // plugin's group as its parent or claim another plugin's id
 // (docs/command-palette-and-shortcuts.md).
 const commandCommon = {
@@ -34,7 +38,7 @@ const commandCommon = {
 // purpose. Fanning a manifest's route out over every paired node multiplies somebody else's network,
 // rate limits and error noise on a declaration nobody reviewed per node, and the two scopes a loaded
 // plugin actually needs — the open task and the routed project — are here. Core commands may still be
-// fleet-scoped (@acorn/protocol/commands.ts).
+// fleet-scoped (`COMMAND_SCOPES`).
 const loadedCommandScope = z.enum(['none', 'task', 'project', 'workspace', 'node']).default('node')
 
 export const actionCommandDescriptor = z.object({
@@ -53,7 +57,7 @@ export const groupCommandDescriptor = z.object({
  * A live query against one of this plugin's own routes.
  *
  * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
- * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
+ * comes back as display facts (`CommandSearchItem`). A result cannot
  * choose what picking it does: `onSelect` is one static verb from a closed set, declared here and
  * reviewed with the rest of the manifest (docs/command-palette-and-shortcuts/palette-data.md § What the palette
  * refuses). The set is a command's own plus `navigate`, because a picked row is a selected row and a
@@ -109,7 +113,7 @@ export const settingCommandDescriptor = z.object({
   // PUT { value, taskId?, projectId?, workspaceId? } → { value }
   writeRoute: pluginRoute,
   // Two is the fewest that is a choice; a list long enough to need scrolling is a settings page
-  // (@acorn/protocol/commands.ts).
+  // (`MIN_COMMAND_SETTING_OPTIONS`, `MAX_COMMAND_SETTING_OPTIONS`).
   options: z.array(commandSettingOptionSchema).min(MIN_COMMAND_SETTING_OPTIONS).max(MAX_COMMAND_SETTING_OPTIONS),
 })
 
@@ -123,13 +127,17 @@ export const commandDescriptor = z.discriminatedUnion('kind', [
 
 export const keybindingDescriptor = z.object({
   command: z.string().min(1).max(64),
-  defaultChord: z.string().min(1).max(64).superRefine((value, ctx) => {
-    if (!isNormalizedChord(value)) {
-      ctx.addIssue({ code: 'custom', message: 'shortcut must use canonical meta+ctrl+alt+shift+key order' })
-    } else if (!isPluginShortcutChord(value)) {
-      ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
-    }
-  }),
+  defaultChord: z
+    .string()
+    .min(1)
+    .max(64)
+    .superRefine((value, ctx) => {
+      if (!isNormalizedChord(value)) {
+        ctx.addIssue({ code: 'custom', message: 'shortcut must use canonical meta+ctrl+alt+shift+key order' })
+      } else if (!isPluginShortcutChord(value)) {
+        ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
+      }
+    }),
   when: z.enum(['global', 'task', 'surface']),
   surface: z.string().min(1).max(64).optional(),
 })

@@ -4,9 +4,8 @@ import { formatLastSeen, freshnessOf, FRESHNESS_LABELS, type FreshnessQuery } fr
 import { StatusDot } from '../../kit/components/primitives'
 import './nodes.css'
 
-// The chip's six-value freshness vocabulary, in StatusDot's terms. NodeChip was the one designed status
-// indicator in the codebase, so it keeps its chip shape and its vocabulary; only the dot is the shared
-// primitive.
+// The chip's six-value freshness vocabulary, in StatusDot's terms. The chip keeps its own shape and
+// vocabulary; only the dot is the shared primitive.
 const FRESHNESS_TONE = {
   live: 'ok',
   refreshing: 'accent',
@@ -39,7 +38,7 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
   // covers this interval (docs/frontend/data-and-startup.md § Startup readiness), but the chip can also draw in host
   // chrome outside that gate. "Offline" is the wrong word for a process that is coming up. Only the
   // wording changes: the freshness value stays `offline`, because nothing on screen is live yet, and
-  // the six-value vocabulary in node/freshness.ts is not the place to say "not yet".
+  // the `Freshness` vocabulary is not the place to say "not yet".
   //
   // A REMOTE node with no status is genuinely offline — nothing has tried to reach it, and only the
   // Reconnect button will.

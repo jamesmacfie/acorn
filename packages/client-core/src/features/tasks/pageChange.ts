@@ -11,7 +11,7 @@ import {
 // (docs/frontend/shell-state.md § Telemetry).
 //
 // A page change here is a signal write, not a navigation. Routes mount a no-op component and
-// `App.tsx` draws from `selectedSource()` and `activeTaskId()`, so there is no router event to hang
+// the shell draws from `selectedSource()` and `activeTaskId()`, so there is no router event to hang
 // this on and no `onLoad` to end it. It starts where the signal is written and ends on the second
 // `requestAnimationFrame`, which is the same pattern the boot marks use: the first frame is the one
 // the browser was already going to paint, and the second is the first one with the new content in
@@ -49,10 +49,12 @@ export function markPageChange(owner: string, attrs: TelemetryAttrs): void {
   const render = startRenderTransition(owner, 'navigation', attrs)
   const change = { span, render, attrs: { seam: 'nav.change', ...attrs } }
   open = change
-  nextFrame(() => nextFrame(() => {
-    open = null
-    change.span.end('ok', change.attrs)
-  }))
+  nextFrame(() =>
+    nextFrame(() => {
+      open = null
+      change.span.end('ok', change.attrs)
+    }),
+  )
 }
 
 /** Test seam: forget a change that is still waiting for its second frame. */

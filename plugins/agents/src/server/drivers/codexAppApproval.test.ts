@@ -7,7 +7,10 @@ import fixture from './__fixtures__/codexComputerUseApproval.json' with { type: 
 // (./__fixtures__/codexComputerUseApproval.json). Every case below that bends it is synthetic.
 
 type Meta = Record<string, unknown>
-const request = (meta: (base: Meta) => Meta = (base) => base, params: Record<string, unknown> = {}): JsonRpcServerRequest => ({
+const request = (
+  meta: (base: Meta) => Meta = (base) => base,
+  params: Record<string, unknown> = {},
+): JsonRpcServerRequest => ({
   ...fixture.request,
   params: { ...fixture.request.params, _meta: meta({ ...fixture.request.params._meta }), ...params },
 })
@@ -39,10 +42,16 @@ describe('Computer Use app-access approval', () => {
   })
 
   it('answers each choice with the scope the integration reads', () => {
-    expect(codexServerRequestResponse(request(), { optionId: 'accept' }))
-      .toEqual({ action: 'accept', content: {}, _meta: { persist: 'session' } })
-    expect(codexServerRequestResponse(request(), { optionId: 'acceptAlways' }))
-      .toEqual({ action: 'accept', content: {}, _meta: { persist: 'always' } })
+    expect(codexServerRequestResponse(request(), { optionId: 'accept' })).toEqual({
+      action: 'accept',
+      content: {},
+      _meta: { persist: 'session' },
+    })
+    expect(codexServerRequestResponse(request(), { optionId: 'acceptAlways' })).toEqual({
+      action: 'accept',
+      content: {},
+      _meta: { persist: 'always' },
+    })
     expect(codexServerRequestResponse(request(), { optionId: 'decline' })).toEqual({ action: 'decline' })
     expect(codexServerRequestResponse(request(), null)).toEqual({ action: 'cancel' })
   })
@@ -50,8 +59,9 @@ describe('Computer Use app-access approval', () => {
   it('offers no persistent choice when the integration only allows a session, and refuses one sent anyway', () => {
     const sessionOnly = request((base) => ({ ...base, persist: ['session'] }))
     expect(optionIds(sessionOnly)).toEqual(['accept', 'decline'])
-    expect(() => codexServerRequestResponse(sessionOnly, { optionId: 'acceptAlways' }))
-      .toThrow('Computer Use did not offer that approval for Acorn Agent Test.')
+    expect(() => codexServerRequestResponse(sessionOnly, { optionId: 'acceptAlways' })).toThrow(
+      'Computer Use did not offer that approval for Acorn Agent Test.',
+    )
   })
 
   it('refuses an answer the request never offered rather than guessing at it', () => {
@@ -59,7 +69,9 @@ describe('Computer Use app-access approval', () => {
   })
 
   it('shows the warning the integration attached', () => {
-    const event = normalizeCodexServerRequest(request((base) => ({ ...base, subtitle: 'This app can read your messages.' })))
+    const event = normalizeCodexServerRequest(
+      request((base) => ({ ...base, subtitle: 'This app can read your messages.' })),
+    )
     expect(event?.type === 'request' ? event.approval?.warning : undefined).toBe('This app can read your messages.')
   })
 
@@ -68,7 +80,7 @@ describe('Computer Use app-access approval', () => {
     expect(event?.type === 'request' ? event.approval?.scopes : undefined).toEqual(['session'])
   })
 
-  // Anything short of the full shape is the consent form it was before, with its plain Allow.
+  // Anything short of the full shape falls back to the plain consent form, with its plain Allow.
   it.each([
     ['no metadata', request(() => ({}))],
     ['another connector', request((base) => ({ ...base, connector_id: 'node_repl' }))],
@@ -90,13 +102,17 @@ describe('Computer Use app-access approval', () => {
       requestedSchema: { type: 'object', properties: { reason: { type: 'string', title: 'Why?' } } },
     })
     expect(normalizeCodexServerRequest(form)).toMatchObject({ kind: 'question', options: [{ id: 'decline' }] })
-    expect(codexServerRequestResponse(form, { answers: { reason: 'testing' } }))
-      .toEqual({ action: 'accept', content: { reason: 'testing' } })
+    expect(codexServerRequestResponse(form, { answers: { reason: 'testing' } })).toEqual({
+      action: 'accept',
+      content: { reason: 'testing' },
+    })
   })
 
   it('falls back to the identifier when the integration gives no display name', () => {
     const event = normalizeCodexServerRequest(request((base) => ({ ...base, tool_params_display: [] })))
-    expect(event?.type === 'request' ? event.approval?.app : undefined)
-      .toEqual({ id: 'com.acorn.desktop.agent-test', name: 'com.acorn.desktop.agent-test' })
+    expect(event?.type === 'request' ? event.approval?.app : undefined).toEqual({
+      id: 'com.acorn.desktop.agent-test',
+      name: 'com.acorn.desktop.agent-test',
+    })
   })
 })

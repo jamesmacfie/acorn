@@ -19,8 +19,8 @@ import type { LayoutProps } from './regions'
 //
 // The body takes focus on open and on every step change, so a screen reader reads the new step.
 // It also takes it back whenever a change inside it drops focus to the page, because the button
-// pressed there has just unmounted. Before this a keyboard user started again from the top. The
-// second watch covers a detour that shares its step's place, such as onboarding's GitHub screen.
+// pressed there has just unmounted; otherwise a keyboard user starts again from the top. The second
+// watch covers a detour that shares its step's place, such as onboarding's GitHub screen.
 //
 // Narrow and terminal: unchanged.
 export function Wizard(props: LayoutProps) {
@@ -32,7 +32,13 @@ export function Wizard(props: LayoutProps) {
     const active = document.activeElement
     if (!active || active === document.body) body?.focus({ preventScroll: true })
   }
-  createEffect(on(() => props.current, () => body?.focus({ preventScroll: true }), { defer: true }))
+  createEffect(
+    on(
+      () => props.current,
+      () => body?.focus({ preventScroll: true }),
+      { defer: true },
+    ),
+  )
   onMount(() => {
     body?.focus({ preventScroll: true })
     const watch = new MutationObserver(reclaim)
@@ -48,27 +54,37 @@ export function Wizard(props: LayoutProps) {
   return (
     <div class="pane layout-wizard">
       <ol class="layout-wizard-steps" aria-label={`${props.label} steps`}>
-        <For each={steps()}>{(entry, index) => (
-          <li
-            class="layout-wizard-step"
-            data-state={index() === at() ? 'current' : index() < at() ? 'done' : 'todo'}
-            aria-current={index() === at() ? 'step' : undefined}
-          >{entry.label}</li>
-        )}</For>
+        <For each={steps()}>
+          {(entry, index) => (
+            <li
+              class="layout-wizard-step"
+              data-state={index() === at() ? 'current' : index() < at() ? 'done' : 'todo'}
+              aria-current={index() === at() ? 'step' : undefined}
+            >
+              {entry.label}
+            </li>
+          )}
+        </For>
       </ol>
       <div
         ref={body}
         class="layout-wizard-body"
         tabindex="-1"
         use:regionFocus={{ paneId: props.stateKey, regionId: 'step' }}
-      >{props.regions.step?.()}</div>
+      >
+        {props.regions.step?.()}
+      </div>
       <div class="layout-wizard-actions">
         <Show when={props.onSkip && !last()}>
-          <Button variant="ghost" tip={props.skipTip} onPress={() => props.onSkip?.()}>{props.skipLabel ?? 'Skip'}</Button>
+          <Button variant="ghost" tip={props.skipTip} onPress={() => props.onSkip?.()}>
+            {props.skipLabel ?? 'Skip'}
+          </Button>
         </Show>
         <span class="layout-wizard-spacer" />
         <Show when={at() > 0}>
-          <Button variant="ghost" onPress={() => step(-1)}>Back</Button>
+          <Button variant="ghost" onPress={() => step(-1)}>
+            Back
+          </Button>
         </Show>
         <Show when={at() >= 0 && !last()}>
           <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>
@@ -76,7 +92,12 @@ export function Wizard(props: LayoutProps) {
           </Button>
         </Show>
         <Show when={last() && props.onFinish}>
-          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => props.onFinish?.()}>
+          <Button
+            variant="solid"
+            tone="accent"
+            disabled={props.canAdvance === false}
+            onPress={() => props.onFinish?.()}
+          >
             {props.finishLabel ?? 'Finish'}
           </Button>
         </Show>

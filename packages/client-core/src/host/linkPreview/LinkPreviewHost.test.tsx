@@ -11,11 +11,25 @@ import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 const prefs = vi.hoisted(() => ({ data: {} as Record<string, string> }))
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ get data() { return prefs.data } }) }))
+vi.mock('@tanstack/solid-query', () => ({
+  createQuery: () => ({
+    get data() {
+      return prefs.data
+    },
+  }),
+}))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 
-type TreeProps = { contribution: { pluginId: string }; props: () => { url: string; label?: string }; onFailed?: (reason: string) => void }
-const trees = vi.hoisted(() => ({ mounts: [] as string[], urls: [] as string[], fail: undefined as undefined | (() => void) }))
+type TreeProps = {
+  contribution: { pluginId: string }
+  props: () => { url: string; label?: string }
+  onFailed?: (reason: string) => void
+}
+const trees = vi.hoisted(() => ({
+  mounts: [] as string[],
+  urls: [] as string[],
+  fail: undefined as undefined | (() => void),
+}))
 vi.mock('../tree/RemoteTree', () => ({
   RemoteTree: (props: TreeProps) => {
     trees.mounts.push(props.contribution.pluginId)
@@ -26,7 +40,8 @@ vi.mock('../tree/RemoteTree', () => ({
 }))
 
 const { LinkPreviewHost } = await import('./LinkPreviewHost')
-const { closeLinkPreview, createLinkPreviewBoundary, HOVER_DWELL_MS, LEAVE_GRACE_MS, linkPreview } = await import('./linkPreview')
+const { closeLinkPreview, createLinkPreviewBoundary, HOVER_DWELL_MS, LEAVE_GRACE_MS, linkPreview } =
+  await import('./linkPreview')
 const { default: Markdown } = await import('../../kit/components/content/Markdown')
 const { default: ProviderHtml } = await import('../components/ProviderHtml')
 const { Link } = await import('../../kit/components/content/Link')
@@ -34,10 +49,19 @@ const { setActiveNode } = await import('../../infra/node/activeNode')
 
 const registered: Disposable[] = []
 const contributor = (pluginId: string, matches: string[]) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:preview`, pluginId, point: CORE_LINK_PREVIEW_POINT, label: `${pluginId} preview`,
-    order: 500, carrier: 'remote', entry: 'preview', hash: 'abc', matches,
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:preview`,
+      pluginId,
+      point: CORE_LINK_PREVIEW_POINT,
+      label: `${pluginId} preview`,
+      order: 500,
+      carrier: 'remote',
+      entry: 'preview',
+      hash: 'abc',
+      matches,
+    } as ExtensionContribution),
+  )
 
 let dispose: (() => void) | undefined
 const [taskId, setTaskId] = createSignal('task-1')
@@ -46,7 +70,14 @@ const mount = (content: () => JSX.Element) => {
   document.body.append(host)
   dispose = render(() => {
     const boundary = createLinkPreviewBoundary(() => ({ taskId: taskId(), projectId: 'project-1' }))
-    return <><div class="content" {...boundary}>{content()}</div><LinkPreviewHost /></>
+    return (
+      <>
+        <div class="content" {...boundary}>
+          {content()}
+        </div>
+        <LinkPreviewHost />
+      </>
+    )
   }, host)
   return host
 }
@@ -109,7 +140,11 @@ describe('link previews', () => {
     contributor('other', ['https://other.example.com/*'])
     mount(links)
     hover(link('the guide'))
-    expect(linkPreview()).toMatchObject({ url: 'https://docs.example.com/guide', label: 'the guide', scope: { taskId: 'task-1', projectId: 'project-1' } })
+    expect(linkPreview()).toMatchObject({
+      url: 'https://docs.example.com/guide',
+      label: 'the guide',
+      scope: { taskId: 'task-1', projectId: 'project-1' },
+    })
     hover(link('the API'))
     expect(linkPreview()?.url).toBe('https://docs.example.com/api')
     hover(link('a tree link'))
@@ -234,17 +269,24 @@ describe('link previews', () => {
     const [shown, setShown] = createSignal(true)
     const host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <>
-        <Show when={shown()}>
-          {(() => {
-            const boundary = createLinkPreviewBoundary(() => ({ taskId: 'task-1' }))
-            return <div class="content" {...boundary}><Link href="https://docs.example.com/x">owned</Link></div>
-          })()}
-        </Show>
-        <LinkPreviewHost />
-      </>
-    ), host)
+    dispose = render(
+      () => (
+        <>
+          <Show when={shown()}>
+            {(() => {
+              const boundary = createLinkPreviewBoundary(() => ({ taskId: 'task-1' }))
+              return (
+                <div class="content" {...boundary}>
+                  <Link href="https://docs.example.com/x">owned</Link>
+                </div>
+              )
+            })()}
+          </Show>
+          <LinkPreviewHost />
+        </>
+      ),
+      host,
+    )
     hover(link('owned'))
     expect(surface()).not.toBeNull()
     setShown(false)

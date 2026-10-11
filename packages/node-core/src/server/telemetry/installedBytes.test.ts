@@ -20,7 +20,10 @@ const report = {
   platform: 'darwin',
   arch: 'arm64',
   buildMode: 'production',
-  startup: [{ runtime: 'renderer', phase: 'startup', bytes: 800 }, { runtime: 'renderer', phase: 'registration', bytes: 200 }],
+  startup: [
+    { runtime: 'renderer', phase: 'startup', bytes: 800 },
+    { runtime: 'renderer', phase: 'registration', bytes: 200 },
+  ],
   components: [
     { component: 'renderer', path: 'client', bytes: 30 },
     { component: 'node-service', path: 'helper', bytes: 10 },
@@ -33,9 +36,12 @@ const report = {
 
 const gauges = (): TelemetryMetric[] => {
   flushTelemetry()
-  return batches.flatMap((batch) => batch.records).filter((record): record is TelemetryMetric => record.kind === 'metric' && record.name.startsWith('app.'))
+  return batches
+    .flatMap((batch) => batch.records)
+    .filter((record): record is TelemetryMetric => record.kind === 'metric' && record.name.startsWith('app.'))
 }
-const walked = (component: string) => gauges().find((metric) => metric.attrs.method === 'walk' && metric.attrs.component === component)
+const walked = (component: string) =>
+  gauges().find((metric) => metric.attrs.method === 'walk' && metric.attrs.component === component)
 
 const enable = async () => {
   startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
@@ -80,19 +86,29 @@ it('sends the build numbers as they were written and measures each installed com
   await enable()
   expect(await reportInstalledBytes(options())).toBe(true)
   const all = gauges()
-  expect(all.filter((metric) => metric.name === 'app.startup.bytes').map((metric) => [metric.value, metric.attrs.phase, metric.attrs.method])).toEqual([
+  expect(
+    all
+      .filter((metric) => metric.name === 'app.startup.bytes')
+      .map((metric) => [metric.value, metric.attrs.phase, metric.attrs.method]),
+  ).toEqual([
     [800, 'startup', 'build'],
     [200, 'registration', 'build'],
   ])
-  for (const metric of all) expect(metric).toMatchObject({ type: 'gauge', unit: 'byte', attrs: { release: '1.2.3', installation: 'packaged' } })
+  for (const metric of all)
+    expect(metric).toMatchObject({ type: 'gauge', unit: 'byte', attrs: { release: '1.2.3', installation: 'packaged' } })
   // The map, the symlink's target, the repository, and the data root are all left out.
-  expect(walked('renderer')).toMatchObject({ value: 30, attrs: { artifact: 'installed', complete: true, platform: process.platform } })
+  expect(walked('renderer')).toMatchObject({
+    value: 30,
+    attrs: { artifact: 'installed', complete: true, platform: process.platform },
+  })
   // The nested component is measured on its own rather than inside the service.
   expect(walked('node-service')?.value).toBe(10)
   expect(walked('runtime-dependencies')?.value).toBe(5)
   // A component path that leaves the resource root is never walked.
   expect(walked('escaping')).toBeUndefined()
-  expect(all.find((metric) => metric.attrs.component === 'native-runtime' && metric.attrs.method === 'stat')?.value).toBe(64)
+  expect(
+    all.find((metric) => metric.attrs.component === 'native-runtime' && metric.attrs.method === 'stat')?.value,
+  ).toBe(64)
 })
 
 it('labels a development build and a walk cut short by its limit', async () => {
@@ -102,7 +118,9 @@ it('labels a development build and a walk cut short by its limit', async () => {
   expect(walked('renderer')).toMatchObject({ value: 30, attrs: { installation: 'development', complete: false } })
   expect(walked('node-service')).toMatchObject({ value: 0, attrs: { complete: false } })
   // A development build's Node is the developer's own, so it is not counted as the app's.
-  expect(gauges().some((metric) => metric.attrs.component === 'native-runtime' && metric.attrs.method === 'stat')).toBe(false)
+  expect(gauges().some((metric) => metric.attrs.component === 'native-runtime' && metric.attrs.method === 'stat')).toBe(
+    false,
+  )
 })
 
 it('does nothing with telemetry off, and the schedule tries again later until it reports once', async () => {

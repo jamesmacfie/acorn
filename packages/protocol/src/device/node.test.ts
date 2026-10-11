@@ -10,8 +10,8 @@ import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, nodeInfoSchema, pairRequestS
 const FINGERPRINT = 'a'.repeat(64)
 
 describe('the handshake tolerates a newer node', () => {
-  // The case that broke: all three of these were strictObject, so the first field a future node added to
-  // any of them made every older client report "did not answer like an acorn node".
+  // If any of these were strictObject, the first field a future node added to it would make every
+  // older client report "did not answer like an acorn node".
   it('parses a node info response carrying fields it has never heard of', () => {
     const parsed = nodeInfoSchema.safeParse({
       baseline: 'acorn-1',
@@ -37,15 +37,28 @@ describe('the handshake tolerates a newer node', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it.each([null, 'unknown', { viewers: '1' }, { viewers: -1 }, { viewers: 1.5 }])('ignores malformed optional event transport without changing identity (%j)', (eventTransport) => {
-    const parsed = nodeInfoSchema.parse({ baseline: 'acorn-1', protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport })
-    expect(parsed.eventTransport).toBeUndefined()
-    expect(parsed.protocolVersion).toBe(NODE_PROTOCOL_VERSION)
-    expect(parsed.fingerprint).toBe(FINGERPRINT)
-  })
+  it.each([null, 'unknown', { viewers: '1' }, { viewers: -1 }, { viewers: 1.5 }])(
+    'ignores malformed optional event transport without changing identity (%j)',
+    (eventTransport) => {
+      const parsed = nodeInfoSchema.parse({
+        baseline: 'acorn-1',
+        protocolVersion: NODE_PROTOCOL_VERSION,
+        fingerprint: FINGERPRINT,
+        eventTransport,
+      })
+      expect(parsed.eventTransport).toBeUndefined()
+      expect(parsed.protocolVersion).toBe(NODE_PROTOCOL_VERSION)
+      expect(parsed.fingerprint).toBe(FINGERPRINT)
+    },
+  )
 
   it('tolerates a later event feature version without making it version 1', () => {
-    const parsed = nodeInfoSchema.parse({ baseline: 'acorn-1', protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport: { viewers: 2, future: true } })
+    const parsed = nodeInfoSchema.parse({
+      baseline: 'acorn-1',
+      protocolVersion: NODE_PROTOCOL_VERSION,
+      fingerprint: FINGERPRINT,
+      eventTransport: { viewers: 2, future: true },
+    })
     expect(parsed.eventTransport?.viewers).toBe(2)
   })
 

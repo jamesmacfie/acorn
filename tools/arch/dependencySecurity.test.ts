@@ -24,7 +24,9 @@ it('pnpm and the standalone npm manifest use the same runtime security floors', 
 })
 
 it('standalone provider pins match the workspace version and optional peers reference its direct dependencies', () => {
-  const tui = JSON.parse(readFileSync(new URL('apps/tui/package.json', root), 'utf8')) as { dependencies: Record<string, string> }
+  const tui = JSON.parse(readFileSync(new URL('apps/tui/package.json', root), 'utf8')) as {
+    dependencies: Record<string, string>
+  }
   const lock = readFileSync(new URL('pnpm-lock.yaml', root), 'utf8')
   for (const [name, version] of Object.entries(manifest.acornStandalone.dependencyPins)) {
     expect(tui.dependencies[name], name).toBe(`^${version}`)

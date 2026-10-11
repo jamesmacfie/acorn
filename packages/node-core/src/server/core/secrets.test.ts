@@ -72,9 +72,11 @@ describe('non-disclosure through the failure path', () => {
       }
     }
     const ref = await sealed()
-    const failure = await service.use(ref, 'github', () => {
-      throw new ProviderError(403)
-    }).catch((e: unknown) => e)
+    const failure = await service
+      .use(ref, 'github', () => {
+        throw new ProviderError(403)
+      })
+      .catch((e: unknown) => e)
     expect(failure).toBeInstanceOf(ProviderError)
     expect((failure as ProviderError).status).toBe(403)
     expect((failure as ProviderError).message).not.toContain(TOKEN)
@@ -82,9 +84,11 @@ describe('non-disclosure through the failure path', () => {
 
   it('scrubs a thrown string', async () => {
     const ref = await sealed()
-    const failure = await service.use(ref, 'github', () => {
-      throw `raw ${TOKEN}`
-    }).catch((e: unknown) => e)
+    const failure = await service
+      .use(ref, 'github', () => {
+        throw `raw ${TOKEN}`
+      })
+      .catch((e: unknown) => e)
     expect(String(failure)).not.toContain(TOKEN)
   })
 })
@@ -131,7 +135,7 @@ describe('seal', () => {
   })
 })
 
-// Two edge cases an adversarial review confirmed by probe. Both matter more than they look: this is the
+// Two edge cases. Both matter more than they look: this is the
 // one function whose entire job is non-disclosure, so a failure mode that leaks is worse than the leak
 // it was preventing.
 describe('scrub cannot become the leak', () => {

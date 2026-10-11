@@ -46,7 +46,10 @@ async function fixture(): Promise<{ root: string; probeDir: string; configFile: 
   await mkdir(claudeDir, { recursive: true })
   await writeFile(
     configFile,
-    JSON.stringify({ theme: 'dark', oauthAccount: { emailAddress: 'person@example.test', displayName: 'Example Org' } }),
+    JSON.stringify({
+      theme: 'dark',
+      oauthAccount: { emailAddress: 'person@example.test', displayName: 'Example Org' },
+    }),
     { mode: 0o600 },
   )
   return { root, probeDir, configFile, claudeDir }
@@ -54,7 +57,10 @@ async function fixture(): Promise<{ root: string; probeDir: string; configFile: 
 
 describe('Claude usage parsing', () => {
   it('normalizes used/left percentages, model limits, resets, plan, and extra usage', () => {
-    const provider = parseClaudeUsageOutput(usageOutput, capturedAt, { email: 'person@example.test', organization: 'Org' })
+    const provider = parseClaudeUsageOutput(usageOutput, capturedAt, {
+      email: 'person@example.test',
+      organization: 'Org',
+    })
     expect(provider).toMatchObject({
       availability: 'available',
       health: 'healthy',
@@ -62,9 +68,19 @@ describe('Claude usage parsing', () => {
       account: { email: 'person@example.test', organization: 'Org' },
     })
     expect(provider.quotas).toEqual([
-      expect.objectContaining({ id: 'session', percentRemaining: 88, health: 'healthy', resetText: 'Resets in 2h 15m' }),
+      expect.objectContaining({
+        id: 'session',
+        percentRemaining: 88,
+        health: 'healthy',
+        resetText: 'Resets in 2h 15m',
+      }),
       expect.objectContaining({ id: 'weekly', percentRemaining: 63, health: 'healthy' }),
-      expect.objectContaining({ id: 'model:fable', label: 'Fable', percentRemaining: 73, resetText: 'Resets in 1d 3h' }),
+      expect.objectContaining({
+        id: 'model:fable',
+        label: 'Fable',
+        percentRemaining: 73,
+        resetText: 'Resets in 1d 3h',
+      }),
     ])
     expect(provider.quotas[0].resetsAt).toBe(capturedAt + (2 * 60 + 15) * 60_000)
     expect(provider.cost).toMatchObject({
@@ -82,20 +98,31 @@ describe('Claude usage parsing', () => {
   })
 
   it('classifies authentication, update, trust, and malformed output', () => {
-    expect(() => parseClaudeUsageOutput('token_expired')).toThrowError(expect.objectContaining({ code: 'authentication_required' }))
-    expect(() => parseClaudeUsageOutput('Please update Claude')).toThrowError(expect.objectContaining({ code: 'update_required' }))
-    expect(() => parseClaudeUsageOutput('Do you trust the files in this folder?')).toThrowError(expect.objectContaining({ code: 'trust_failure' }))
-    expect(() => parseClaudeUsageOutput('nothing useful')).toThrowError(expect.objectContaining({ code: 'parse_failure' }))
+    expect(() => parseClaudeUsageOutput('token_expired')).toThrowError(
+      expect.objectContaining({ code: 'authentication_required' }),
+    )
+    expect(() => parseClaudeUsageOutput('Please update Claude')).toThrowError(
+      expect.objectContaining({ code: 'update_required' }),
+    )
+    expect(() => parseClaudeUsageOutput('Do you trust the files in this folder?')).toThrowError(
+      expect.objectContaining({ code: 'trust_failure' }),
+    )
+    expect(() => parseClaudeUsageOutput('nothing useful')).toThrowError(
+      expect.objectContaining({ code: 'parse_failure' }),
+    )
   })
 
   it('reads the absolute reset forms the CLI prints, and keeps the words when it cannot', () => {
     // Noon on 24 July 2026 is `capturedAt`.
-    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', capturedAt)).toBe(new Date(2026, 6, 24, 16, 59).getTime())
+    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', capturedAt)).toBe(
+      new Date(2026, 6, 24, 16, 59).getTime(),
+    )
     // The CLI prints no seconds. Reading a reset during that same minute waits for the minute to end
     // instead of incorrectly scheduling it for tomorrow.
     const withinResetMinute = new Date(2026, 6, 24, 16, 59, 5).getTime()
-    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', withinResetMinute))
-      .toBe(new Date(2026, 6, 24, 17, 0).getTime())
+    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', withinResetMinute)).toBe(
+      new Date(2026, 6, 24, 17, 0).getTime(),
+    )
     // A time already gone today is tomorrow's.
     expect(parseClaudeReset('Resets 9am', capturedAt)).toBe(new Date(2026, 6, 25, 9).getTime())
     expect(parseClaudeReset('Resets Sep 24 at 11:59pm', capturedAt)).toBe(new Date(2026, 8, 24, 23, 59).getTime())

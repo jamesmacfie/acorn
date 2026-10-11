@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forgetLayout, forgetNodeInLayout, layoutKey, readLayout, renameInLayout, writeLayout } from './layoutPrefs'
+import { forgetLayout, forgetNodeInLayout, layoutKey, readLayout, writeLayout } from './layoutPrefs'
 
 // Where the graph view's cards sit, per device (docs/workflows/editor-details.md § Where positions live).
 //
@@ -15,12 +15,6 @@ describe('node positions', () => {
   it('keeps and reads back what was put down', () => {
     writeLayout(DEF, { investigate: { x: 44, y: 22 } })
     expect(readLayout(DEF)).toEqual({ investigate: { x: 44, y: 22 } })
-  })
-
-  it('survives a rename, because the card did not move — its name did', () => {
-    writeLayout(DEF, { investigate: { x: 44, y: 22 }, review: { x: 0, y: 152 } })
-    renameInLayout(DEF, 'investigate', 'reproduce')
-    expect(readLayout(DEF)).toEqual({ review: { x: 0, y: 152 }, reproduce: { x: 44, y: 22 } })
   })
 
   it('drops a node with the node, and a layout with the definition', () => {

@@ -1,8 +1,26 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import { featureUsable, fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
-  paneCollapseKey, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  DiffPane,
+  EmptyState,
+  Fold,
+  Icon,
+  IconButton,
+  Inline,
+  Menu,
+  paneCollapseKey,
+  Row,
+  Rows,
+  SectionHeader,
+  sidebarCollapsed,
+  Stack,
+  Text,
+  Toolbar,
+  TreeRow,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import type { SecretCheckReport, SecretFinding } from '@acorn/protocol/secretChecks.ts'
@@ -14,7 +32,13 @@ import { FileTools } from './fileTools'
 import { GenerateButton } from './GenerateButton'
 import { RemoteBar } from './RemoteBar'
 import {
-  filesUnder, folderState, stagedState, unstagedPathsOf, visibleNodes, type ChangeView, type FileRow,
+  filesUnder,
+  folderState,
+  stagedState,
+  unstagedPathsOf,
+  visibleNodes,
+  type ChangeView,
+  type FileRow,
   type TreeNode,
 } from './model'
 import { DIFF_LINE_POINT } from './extensionPoints'
@@ -22,7 +46,7 @@ import { GIT_PANE } from '../gitPane'
 
 // The four regions of the Git pane's Changes tab: a PR-style "Files changed" view over the task worktree's
 // uncommitted changes (docs/diff-rendering.md). The host draws the split, the divider and the drag
-// handle; everything the regions share is in ./changesModel.tsx.
+// handle; everything the regions share is in the model.
 //
 // The list is a navigator, not a selector: every file's hunks are stacked in one scroller and clicking
 // a row scrolls to it, the way the pull-request pane's file list works. Staging is a checkbox per row
@@ -50,7 +74,7 @@ const changedCount = (model: ChangesModel): number => {
 
 // Every section the list can draw, in the order it draws them. Conflicts first because a conflict
 // blocks everything; then whichever pair or single run the grouping asks for, of which only one set
-// is ever present at a time (model.ts § groupSections).
+// is ever present at a time (`groupSections`).
 //
 // A static list rather than a loop over the sections the model returns: the components below stay
 // mounted across a refetch, so roving focus and an open row menu survive one, where a `<For>` over
@@ -75,12 +99,7 @@ type MenuContext = Parameters<Parameters<typeof Menu>[0]['children']>[0]
 function ViewMenu(props: { model: ChangesModel }) {
   const view = () => props.model.view()
   const Choice = (own: { menu: MenuContext; chosen: boolean; patch: Partial<ChangeView>; children: string }) => (
-    <Menu.Item
-      context={own.menu}
-      kind="radio"
-      checked={own.chosen}
-      onSelect={() => props.model.setView(own.patch)}
-    >
+    <Menu.Item context={own.menu} kind="radio" checked={own.chosen} onSelect={() => props.model.setView(own.patch)}>
       {own.children}
     </Menu.Item>
   )
@@ -89,26 +108,30 @@ function ViewMenu(props: { model: ChangesModel }) {
       ariaLabel="Changes view"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <IconButton
-          icon="sliders-horizontal"
-          label="View options"
-          opens="menu"
-          expanded={open()}
-          onPress={toggle}
-        />
+        <IconButton icon="sliders-horizontal" label="View options" opens="menu" expanded={open()} onPress={toggle} />
       )}
     >
       {(menu) => (
         <>
-          <Choice menu={menu} chosen={view().mode === 'list'} patch={{ mode: 'list' }}>List</Choice>
-          <Choice menu={menu} chosen={view().mode === 'tree'} patch={{ mode: 'tree' }}>Tree</Choice>
+          <Choice menu={menu} chosen={view().mode === 'list'} patch={{ mode: 'list' }}>
+            List
+          </Choice>
+          <Choice menu={menu} chosen={view().mode === 'tree'} patch={{ mode: 'tree' }}>
+            Tree
+          </Choice>
           {/* Absent in tree view, as it is in Zed's: a tree is ordered by its folders, and inside one
               folder sorting by name and sorting by path are the same order. */}
           <Show when={view().mode === 'list'}>
-            <Choice menu={menu} chosen={view().sort === 'path'} patch={{ sort: 'path' }}>Sort by path</Choice>
-            <Choice menu={menu} chosen={view().sort === 'name'} patch={{ sort: 'name' }}>Sort by name</Choice>
+            <Choice menu={menu} chosen={view().sort === 'path'} patch={{ sort: 'path' }}>
+              Sort by path
+            </Choice>
+            <Choice menu={menu} chosen={view().sort === 'name'} patch={{ sort: 'name' }}>
+              Sort by name
+            </Choice>
           </Show>
-          <Choice menu={menu} chosen={view().groupBy === 'none'} patch={{ groupBy: 'none' }}>No groups</Choice>
+          <Choice menu={menu} chosen={view().groupBy === 'none'} patch={{ groupBy: 'none' }}>
+            No groups
+          </Choice>
           <Choice menu={menu} chosen={view().groupBy === 'tracked'} patch={{ groupBy: 'tracked' }}>
             Group tracked and untracked
           </Choice>
@@ -121,9 +144,9 @@ function ViewMenu(props: { model: ChangesModel }) {
   )
 }
 
-// The house list header: the label and its count, then the list's own controls. The line totals
-// are gone, because every row already carries its own, and Send moved into a banner at the top of
-// the list, where it has room to say whether the send worked.
+// The house list header: the label and its count, then the list's own controls. No line totals,
+// because every row carries its own. Send is a banner at the top of the list, where it has room to
+// say whether the send worked.
 export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   return (
@@ -155,12 +178,24 @@ export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
           {/* One button, not two: there is nothing to stage once everything is staged, and nothing to
               do either way on a clean tree. */}
           <Show when={model().headerStage() === 'stage'}>
-            <Button variant="ghost" size="sm" tip="Stage every change" tipSub="git add -A" onPress={() => void model().stageAll()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              tip="Stage every change"
+              tipSub="git add -A"
+              onPress={() => void model().stageAll()}
+            >
               Stage all
             </Button>
           </Show>
           <Show when={model().headerStage() === 'unstage'}>
-            <Button variant="ghost" size="sm" tip="Unstage everything" tipSub="git reset" onPress={() => void model().unstageAll()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              tip="Unstage everything"
+              tipSub="git reset"
+              onPress={() => void model().unstageAll()}
+            >
               Unstage all
             </Button>
           </Show>
@@ -205,25 +240,56 @@ function NotesBanner(props: { model: ChangesModel }) {
 
 function DependencySummary(props: { model: ChangesModel }) {
   const [open, setOpen] = createSignal(false)
-  const review = () => !props.model.dependencies || props.model.dependencies.loading || props.model.dependencies.error ? undefined : props.model.dependencies()
-  return <><Show when={props.model.dependencies?.error}><Text>Dependency review failed. Refresh Changes to retry.</Text></Show><Show when={review()}>
-    {(answer) => <Stack gap="none">
-      <Button variant="ghost" size="sm" onPress={() => setOpen(!open())}>
-        Dependencies: {answer().packageCount} package{answer().packageCount === 1 ? '' : 's'}, {answer().findings.length} finding{answer().findings.length === 1 ? '' : 's'} · {answer().coverage} · {answer().scope}
-      </Button>
-      <Show when={open()}>
-        <Text>{answer().manager}{answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory review; integrity is not provenance.</Text>
-        <For each={answer().findings}>{(finding) =>
-          <Stack gap="none">
-            <Text>{finding.warning ? 'Warning · ' : ''}{finding.kind}: {finding.name} {finding.before ?? 'absent'} → {finding.after ?? 'absent'}</Text>
-            <Show when={finding.detail}><Text>{finding.detail}</Text></Show>
-            <Button variant="ghost" size="sm" onPress={() => props.model.select({ path: finding.path, staged: answer().scope === 'staged' })}>{finding.path}</Button>
-          </Stack>
-        }</For>
-        <For each={answer().limits}>{(limit) => <Text>{limit}</Text>}</For>
+  const review = () =>
+    !props.model.dependencies || props.model.dependencies.loading || props.model.dependencies.error
+      ? undefined
+      : props.model.dependencies()
+  return (
+    <>
+      <Show when={props.model.dependencies?.error}>
+        <Text>Dependency review failed. Refresh Changes to retry.</Text>
       </Show>
-    </Stack>}
-  </Show></>
+      <Show when={review()}>
+        {(answer) => (
+          <Stack gap="none">
+            <Button variant="ghost" size="sm" onPress={() => setOpen(!open())}>
+              Dependencies: {answer().packageCount} package{answer().packageCount === 1 ? '' : 's'},{' '}
+              {answer().findings.length} finding{answer().findings.length === 1 ? '' : 's'} · {answer().coverage} ·{' '}
+              {answer().scope}
+            </Button>
+            <Show when={open()}>
+              <Text>
+                {answer().manager}
+                {answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory review; integrity is not
+                provenance.
+              </Text>
+              <For each={answer().findings}>
+                {(finding) => (
+                  <Stack gap="none">
+                    <Text>
+                      {finding.warning ? 'Warning · ' : ''}
+                      {finding.kind}: {finding.name} {finding.before ?? 'absent'} → {finding.after ?? 'absent'}
+                    </Text>
+                    <Show when={finding.detail}>
+                      <Text>{finding.detail}</Text>
+                    </Show>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => props.model.select({ path: finding.path, staged: answer().scope === 'staged' })}
+                    >
+                      {finding.path}
+                    </Button>
+                  </Stack>
+                )}
+              </For>
+              <For each={answer().limits}>{(limit) => <Text>{limit}</Text>}</For>
+            </Show>
+          </Stack>
+        )}
+      </Show>
+    </>
+  )
 }
 
 // Check for secrets in what the next commit takes, or in what a push would send. Rule ids and
@@ -234,57 +300,108 @@ function DependencySummary(props: { model: ChangesModel }) {
 // editor at the line and column the check reported.
 function SecretCheckSummary(props: { model: ChangesModel; taskId: string }) {
   const result = () => props.model.secretCheck()
-  const failure = () => { const value = result(); return value && 'error' in value ? value.error : null }
-  const check = () => { const value = result(); return value && !('error' in value) ? value : null }
+  const failure = () => {
+    const value = result()
+    return value && 'error' in value ? value.error : null
+  }
+  const check = () => {
+    const value = result()
+    return value && !('error' in value) ? value : null
+  }
   const dismiss = () => props.model.clearSecretCheck()
-  return <>
-    <Show when={props.model.checkingSecrets()}>
-      <Alert variant="banner" tone="muted">Checking for secrets…</Alert>
-    </Show>
-    <Show when={!props.model.checkingSecrets() && failure()}>
-      {(message) => <Alert variant="banner" tone="warn" onDismiss={dismiss}>{message()}</Alert>}
-    </Show>
-    <Show when={!props.model.checkingSecrets() && check()}>
-      {(answer) => {
-        const report = () => answer().report
-        const high = () => report().findings.filter((finding) => finding.confidence === 'high')
-        const review = () => report().findings.filter((finding) => finding.confidence === 'heuristic')
-        return <>
-          <Alert variant="banner" tone={secretTone(report())} title={secretHeadline(report())} onDismiss={dismiss}>
-            {secretScope(answer())}
+  return (
+    <>
+      <Show when={props.model.checkingSecrets()}>
+        <Alert variant="banner" tone="muted">
+          Checking for secrets…
+        </Alert>
+      </Show>
+      <Show when={!props.model.checkingSecrets() && failure()}>
+        {(message) => (
+          <Alert variant="banner" tone="warn" onDismiss={dismiss}>
+            {message()}
           </Alert>
-          <SecretFindings taskId={props.taskId} kind="high" title="Likely secrets" findings={high()} model={props.model} />
-          <SecretFindings taskId={props.taskId} kind="review" title="To review" findings={review()} model={props.model} />
-          <Show when={report().unscanned.length}>
-            <Fold label="Not checked" count={report().unscanned.length} contentIndent="none" persistKey="changes.secrets.unscanned" defaultOpen>
-              <Rows
-                id={`changes.${props.taskId}.secrets.unscanned`}
-                ariaLabel="Not checked"
-                items={report().unscanned.map((item, index) => ({ key: String(index), label: item.location, item }))}
-              >
-                {(entry, item) => (
-                  <Row item={item} density="compact" label={entry.label} title={`${entry.item.location}: ${entry.item.reason}`}
-                    meta={<Text emphasis="muted">{entry.item.reason}</Text>}>
-                    <Text emphasis="mono">{entry.item.location}</Text>
-                  </Row>
-                )}
-              </Rows>
-            </Fold>
-          </Show>
-          {/* The fine print, folded away so the banner stays one glance: where a push check
-              looked, and what any check cannot see. */}
-          <Fold label="About this check" persistKey="changes.secrets.about">
-            <Stack gap="none">
-              <Show when={answer().operation === 'push'}>
-                <Text emphasis="muted" wrap>Destination: {answer().destination}</Text>
+        )}
+      </Show>
+      <Show when={!props.model.checkingSecrets() && check()}>
+        {(answer) => {
+          const report = () => answer().report
+          const high = () => report().findings.filter((finding) => finding.confidence === 'high')
+          const review = () => report().findings.filter((finding) => finding.confidence === 'heuristic')
+          return (
+            <>
+              <Alert variant="banner" tone={secretTone(report())} title={secretHeadline(report())} onDismiss={dismiss}>
+                {secretScope(answer())}
+              </Alert>
+              <SecretFindings
+                taskId={props.taskId}
+                kind="high"
+                title="Likely secrets"
+                findings={high()}
+                model={props.model}
+              />
+              <SecretFindings
+                taskId={props.taskId}
+                kind="review"
+                title="To review"
+                findings={review()}
+                model={props.model}
+              />
+              <Show when={report().unscanned.length}>
+                <Fold
+                  label="Not checked"
+                  count={report().unscanned.length}
+                  contentIndent="none"
+                  persistKey="changes.secrets.unscanned"
+                  defaultOpen
+                >
+                  <Rows
+                    id={`changes.${props.taskId}.secrets.unscanned`}
+                    ariaLabel="Not checked"
+                    items={report().unscanned.map((item, index) => ({
+                      key: String(index),
+                      label: item.location,
+                      item,
+                    }))}
+                  >
+                    {(entry, item) => (
+                      <Row
+                        item={item}
+                        density="compact"
+                        label={entry.label}
+                        title={`${entry.item.location}: ${entry.item.reason}`}
+                        meta={<Text emphasis="muted">{entry.item.reason}</Text>}
+                      >
+                        <Text emphasis="mono">{entry.item.location}</Text>
+                      </Row>
+                    )}
+                  </Rows>
+                </Fold>
               </Show>
-              <For each={report().limits}>{(limit) => <Text emphasis="muted" wrap>{limit}</Text>}</For>
-            </Stack>
-          </Fold>
-        </>
-      }}
-    </Show>
-  </>
+              {/* The fine print, folded away so the banner stays one glance: where a push check
+              looked, and what any check cannot see. */}
+              <Fold label="About this check" persistKey="changes.secrets.about">
+                <Stack gap="none">
+                  <Show when={answer().operation === 'push'}>
+                    <Text emphasis="muted" wrap>
+                      Destination: {answer().destination}
+                    </Text>
+                  </Show>
+                  <For each={report().limits}>
+                    {(limit) => (
+                      <Text emphasis="muted" wrap>
+                        {limit}
+                      </Text>
+                    )}
+                  </For>
+                </Stack>
+              </Fold>
+            </>
+          )
+        }}
+      </Show>
+    </>
+  )
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
@@ -292,32 +409,59 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 // Red for a likely secret, amber for anything a person should still look at, including a check that
 // could not read everything, and green only when the check read it all and found nothing.
 const secretTone = (report: SecretCheckReport) =>
-  report.counts.high ? 'danger' as const : report.counts.heuristic || !report.complete ? 'warn' as const : 'ok' as const
+  report.counts.high
+    ? ('danger' as const)
+    : report.counts.heuristic || !report.complete
+      ? ('warn' as const)
+      : ('ok' as const)
 
 const secretHeadline = (report: SecretCheckReport) => {
-  if (!report.counts.high && !report.counts.heuristic) return report.complete ? 'No secrets found' : 'No secrets found so far'
-  const parts = [report.counts.high ? plural(report.counts.high, 'likely secret') : '', report.counts.heuristic ? `${report.counts.heuristic} to review` : '']
+  if (!report.counts.high && !report.counts.heuristic)
+    return report.complete ? 'No secrets found' : 'No secrets found so far'
+  const parts = [
+    report.counts.high ? plural(report.counts.high, 'likely secret') : '',
+    report.counts.heuristic ? `${report.counts.heuristic} to review` : '',
+  ]
   return parts.filter(Boolean).join(', ')
 }
 
-const secretScope = (answer: GitSecretCheckResult) => [
-  answer.operation === 'commit' ? 'Checked the next commit.' : 'Checked the outgoing commits.',
-  answer.report.complete ? '' : "Some files weren't checked.",
-  answer.report.truncated ? `Showing the first ${answer.report.findings.length} findings.` : '',
-].filter(Boolean).join(' ')
+const secretScope = (answer: GitSecretCheckResult) =>
+  [
+    answer.operation === 'commit' ? 'Checked the next commit.' : 'Checked the outgoing commits.',
+    answer.report.complete ? '' : "Some files weren't checked.",
+    answer.report.truncated ? `Showing the first ${answer.report.findings.length} findings.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
 // One kind of finding as a fold of two-line rows: the file name and line on top, where a narrow
 // column cannot cut the line off, and the rule and folder under it.
-function SecretFindings(props: { taskId: string; kind: 'high' | 'review'; title: string; findings: SecretFinding[]; model: ChangesModel }) {
+function SecretFindings(props: {
+  taskId: string
+  kind: 'high' | 'review'
+  title: string
+  findings: SecretFinding[]
+  model: ChangesModel
+}) {
   return (
     <Show when={props.findings.length}>
-      <Fold label={props.title} count={props.findings.length} contentIndent="none" persistKey={`changes.secrets.${props.kind}`} defaultOpen={props.kind === 'high'}>
+      <Fold
+        label={props.title}
+        count={props.findings.length}
+        contentIndent="none"
+        persistKey={`changes.secrets.${props.kind}`}
+        defaultOpen={props.kind === 'high'}
+      >
         <Rows
           id={`changes.${props.taskId}.secrets.${props.kind}`}
           ariaLabel={props.title}
           // Keyed by position: a push check can report the same place twice, once for each commit
           // that holds the file.
-          items={props.findings.map((finding, index) => ({ key: String(index), label: `${finding.location}:${finding.line}`, finding }))}
+          items={props.findings.map((finding, index) => ({
+            key: String(index),
+            label: `${finding.location}:${finding.line}`,
+            finding,
+          }))}
         >
           {(entry, item) => (
             <Row
@@ -327,8 +471,13 @@ function SecretFindings(props: { taskId: string; kind: 'high' | 'review'; title:
               title={`${entry.finding.location}:${entry.finding.line}:${entry.finding.column} · ${entry.finding.rule}`}
               onPress={() => props.model.openFinding(entry.finding)}
             >
-              <Text emphasis="mono">{fileName(entry.finding.location)}:{entry.finding.line}</Text>
-              <Text emphasis="muted">{entry.finding.rule}{directory(entry.finding.location) ? ` · ${directory(entry.finding.location)}` : ''}</Text>
+              <Text emphasis="mono">
+                {fileName(entry.finding.location)}:{entry.finding.line}
+              </Text>
+              <Text emphasis="muted">
+                {entry.finding.rule}
+                {directory(entry.finding.location) ? ` · ${directory(entry.finding.location)}` : ''}
+              </Text>
             </Row>
           )}
         </Rows>
@@ -344,9 +493,9 @@ type RowItem = Parameters<Parameters<typeof Rows>[0]['children']>[1]
 type Section = ReturnType<ChangesModel['sections']>[number]
 
 export function ChangesList(props: { task: Task; model: ChangesModel }) {
-  // Collapsed, the row is the git status letter it already leads with. That badge was always the
-  // fastest read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and
-  // the path in the tooltip (client-core kit/lib/layout/collapseState.ts).
+  // Collapsed, the row is the git status letter it already leads with. That badge is the fastest
+  // read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and the path
+  // in the tooltip.
   const collapsed = sidebarCollapsed(paneCollapseKey(GIT_PANE))
   const model = () => props.model
   // Usable once the first status read has answered, with changes or a clean tree, or once it is
@@ -361,17 +510,15 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
   // One call for a group's checkbox and a folder's, which want the same two things: stage what is not
   // staged yet, or unstage the lot. Unstaging a path that was never staged is a no-op in git, so the
   // second half does not have to filter.
-  const setStaged = (rows: readonly FileRow[], staged: boolean) => void (staged
-    ? model().stage(unstagedPathsOf(rows))
-    : model().unstage(rows.map((row) => row.path)))
+  const setStaged = (rows: readonly FileRow[], staged: boolean) =>
+    void (staged ? model().stage(unstagedPathsOf(rows)) : model().unstage(rows.map((row) => row.path)))
 
   // `depth` is passed straight to the kit row, which is how the tree view nests the same row rather
   // than shipping a second one.
   //
-  // No `reveal` on the row, which the hover buttons before it had: `reveal` hides the whole trailing
-  // slot until the pointer is over the row, and a checkbox that only appears on hover is a checkbox
-  // that cannot say whether the file is staged. `RowActions` brings its own reveal for the verbs,
-  // which is what that prop is for (kit/components/layout/RowActions.tsx).
+  // No `reveal` on the row: it hides the whole trailing slot until the pointer is over the row, and a
+  // checkbox that only appears on hover cannot say whether the file is staged. `RowActions` brings its
+  // own reveal for the verbs.
   const FileEntry = (rowProps: {
     row: FileRow
     item: RowItem
@@ -384,7 +531,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
     const conflicted = () => row().group === 'conflicted'
     // The name stays put and the tooltip moves: a checkbox announces its own checked state, and a name
     // that flips to "Unstage" while the box reads checked says the opposite thing twice.
-    const stageHint = () => (row().partial ? 'Partly staged. Tick to stage the rest.' : row().staged ? 'Unstage this file' : 'Stage this file')
+    const stageHint = () =>
+      row().partial ? 'Partly staged. Tick to stage the rest.' : row().staged ? 'Unstage this file' : 'Stage this file'
     return (
       <Row
         item={rowProps.item}
@@ -392,15 +540,31 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
         density="compact"
         selected={model().isSelected(row().change)}
         onPress={() => model().select(row().change)}
-        title={conflicted()
-          ? `${row().path} has conflicts. Staging it marks them resolved.`
-          : row().oldPath ? `${row().oldPath} → ${row().path}` : row().path}
+        title={
+          conflicted()
+            ? `${row().path} has conflicts. Staging it marks them resolved.`
+            : row().oldPath
+              ? `${row().oldPath} → ${row().path}`
+              : row().path
+        }
         label={row().path}
-        collapsed={collapsed() ? <Badge size="xs" tone={meta().tone}>{meta().letter}</Badge> : undefined}
-        leading={<Badge size="xs" tone={meta().tone}>{meta().letter}</Badge>}
+        collapsed={
+          collapsed() ? (
+            <Badge size="xs" tone={meta().tone}>
+              {meta().letter}
+            </Badge>
+          ) : undefined
+        }
+        leading={
+          <Badge size="xs" tone={meta().tone}>
+            {meta().letter}
+          </Badge>
+        }
         meta={
           <Show when={row().additions != null}>
-            <Text emphasis="muted">+{row().additions} −{row().deletions ?? 0}</Text>
+            <Text emphasis="muted">
+              +{row().additions} −{row().deletions ?? 0}
+            </Text>
           </Show>
         }
         trailing={
@@ -458,7 +622,9 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
             <Checkbox
               size="sm"
               ariaLabel={`Stage all ${rowProps.node.path} files`}
-              title={state() === 'all' ? `Unstage all ${rowProps.node.path} files` : `Stage all ${rowProps.node.path} files`}
+              title={
+                state() === 'all' ? `Unstage all ${rowProps.node.path} files` : `Stage all ${rowProps.node.path} files`
+              }
               checked={state() === 'all'}
               indeterminate={state() === 'some'}
               onChange={(checked) => setStaged(files(), checked)}
@@ -481,19 +647,29 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
           id={`changes.${props.task.id}.${own.section.key}`}
           ariaLabel={own.section.title ?? 'Changes'}
           tree={mode === 'tree'}
-          items={visibleNodes(own.section.nodes, model().closedFolders())
-            .map((node) => ({ key: node.key, label: node.label, node }))}
+          items={visibleNodes(own.section.nodes, model().closedFolders()).map((node) => ({
+            key: node.key,
+            label: node.label,
+            node,
+          }))}
           onExpand={(key, expand) => model().foldFolder(key, expand)}
         >
-          {(entry, item) => (entry.node.kind === 'folder'
-            ? <FolderEntry node={entry.node} item={item} staging={own.staging} />
-            : <FileEntry row={entry.node.row!} item={item} depth={entry.node.depth} showDirectory={mode === 'list'} />)}
+          {(entry, item) =>
+            entry.node.kind === 'folder' ? (
+              <FolderEntry node={entry.node} item={item} staging={own.staging} />
+            ) : (
+              <FileEntry row={entry.node.row!} item={item} depth={entry.node.depth} showDirectory={mode === 'list'} />
+            )
+          }
         </Rows>
       )}
     </Show>
   )
 
-  const sectionOf = (key: string): Section | undefined => model().sections().find((section) => section.key === key)
+  const sectionOf = (key: string): Section | undefined =>
+    model()
+      .sections()
+      .find((section) => section.key === key)
 
   return (
     // Nothing in the list when the folder is not Git: the detail column says so, once.
@@ -511,36 +687,42 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
               const state = () => stagedState(section().rows)
               // No fold when the grouping is none. One run of rows needs no header to tell it from
               // the run above, and the control over all of it is the header's Stage all button.
-              return title === null
-                ? <SectionRows section={section()} staging={staging} />
-                : (
-                  <Fold
-                    label={title}
-                    count={section().rows.length}
-                    contentIndent="none"
-                    persistKey={`changes.${key}`}
-                    defaultOpen
-                    actions={
-                      <Show when={staging}>
-                        <Checkbox
-                          size="sm"
-                          ariaLabel={`Stage all ${title.toLowerCase()} files`}
-                          title={state() === 'all' ? `Unstage all ${title.toLowerCase()} files` : `Stage all ${title.toLowerCase()} files`}
-                          checked={state() === 'all'}
-                          indeterminate={state() === 'some'}
-                          onChange={(checked) => setStaged(section().rows, checked)}
-                        />
-                      </Show>
-                    }
-                  >
-                    <SectionRows section={section()} staging={staging} />
-                  </Fold>
-                )
+              return title === null ? (
+                <SectionRows section={section()} staging={staging} />
+              ) : (
+                <Fold
+                  label={title}
+                  count={section().rows.length}
+                  contentIndent="none"
+                  persistKey={`changes.${key}`}
+                  defaultOpen
+                  actions={
+                    <Show when={staging}>
+                      <Checkbox
+                        size="sm"
+                        ariaLabel={`Stage all ${title.toLowerCase()} files`}
+                        title={
+                          state() === 'all'
+                            ? `Unstage all ${title.toLowerCase()} files`
+                            : `Stage all ${title.toLowerCase()} files`
+                        }
+                        checked={state() === 'all'}
+                        indeterminate={state() === 'some'}
+                        onChange={(checked) => setStaged(section().rows, checked)}
+                      />
+                    </Show>
+                  }
+                >
+                  <SectionRows section={section()} staging={staging} />
+                </Fold>
+              )
             }}
           </Show>
         ))}
         <Show when={model().loaded() && !model().sections().length}>
-          <EmptyState align="start" size="sm">No changes</EmptyState>
+          <EmptyState align="start" size="sm">
+            No changes
+          </EmptyState>
         </Show>
       </Stack>
     </Show>
@@ -552,9 +734,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
 // went wrong, land the commit — and the reason the bar is drawn above the editor rather than beside
 // the commit button.
 //
-// The editor is always drawn on a git tree, where the one-line field before it appeared only once
-// something was staged: with nothing staged the button reads Commit tracked and commits every tracked
-// change, which is one fewer click and the rule Zed follows.
+// The editor is always drawn on a git tree: with nothing staged the button reads Commit tracked and
+// commits every tracked change, which is the rule Zed follows.
 export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   const [expanded, setExpanded] = createSignal(false)
@@ -569,7 +750,7 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
         <CommitField model={model()} rows={3} />
         <Toolbar variant="actions" size="sm">
           {/* At the left of the row, where Zed's is. Draws nothing until a model provider is
-              connected (./GenerateButton.tsx). */}
+              connected. */}
           <GenerateButton model={model()} />
           <IconButton
             icon="square-pen"
@@ -618,7 +799,8 @@ export function ChangesDiff(props: { task: Task; model: ChangesModel }) {
         fallback={<EmptyState title="No changes">Everything is committed.</EmptyState>}
       >
         {/* Marks from other plugins land under the same lines this pane's own review notes do
-            (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind). */}
+            (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the
+            `annotation` kind). */}
         <DiffPane source={model().source} annotations={DIFF_LINE_POINT} />
       </Show>
     </Show>

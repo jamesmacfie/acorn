@@ -3,7 +3,14 @@ import { parseConflictNames } from './pullConflicts'
 
 describe('parseConflictNames', () => {
   it('takes the conflicting paths between the tree oid and the blank line', () => {
-    const stdout = ['a1b2c3treeoid', 'src/app.ts', 'README.md', '', 'Auto-merging src/app.ts', 'CONFLICT (content): ...'].join('\n')
+    const stdout = [
+      'a1b2c3treeoid',
+      'src/app.ts',
+      'README.md',
+      '',
+      'Auto-merging src/app.ts',
+      'CONFLICT (content): ...',
+    ].join('\n')
     expect(parseConflictNames(stdout)).toEqual(['src/app.ts', 'README.md'])
   })
 

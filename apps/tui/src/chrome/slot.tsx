@@ -6,7 +6,10 @@ import type { CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import {
-  CORE_SLOT_PROVIDER, exclusiveSlotChoices, noteExclusiveSlotFailure, resolveExclusiveSlot,
+  CORE_SLOT_PROVIDER,
+  exclusiveSlotChoices,
+  noteExclusiveSlotFailure,
+  resolveExclusiveSlot,
 } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The terminal host's `ExclusiveSlotHost`: where a plugin draws in place of one of core's own

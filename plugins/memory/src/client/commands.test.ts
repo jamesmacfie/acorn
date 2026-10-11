@@ -2,10 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 import type { MemoryRow } from './memoryClient'
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn(), projectPath: vi.fn((id: string) => `/p/${id}`) }))
-vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ search: mocks.search }) }))
+const mocks = vi.hoisted(() => ({
+  search: vi.fn(),
+  openPane: vi.fn(),
+  setSelectedSource: vi.fn(),
+  projectPath: vi.fn((id: string) => `/p/${id}`),
+}))
+vi.mock('./memoryClient', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  memoryApi: () => ({ search: mocks.search }),
+}))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   openPane: mocks.openPane,
   setSelectedSource: mocks.setSelectedSource,
   projectPath: mocks.projectPath,
@@ -17,15 +25,32 @@ import { memoryCommands } from './commands'
 // Search opens the Memory page. Selection uses the scope and filename identity.
 
 const memory = (over: Partial<MemoryRow> = {}): MemoryRow & { rank: number } => ({
-  id: 'm1', scope: 'project', projectId: 'p-1', name: 'no-ponytail-comments', type: 'convention',
-  description: 'strip the marker before committing', body: '', path: 'x.md',
-  originSessionId: null, commitSha: null, supersededBy: null, createdAt: 0, updatedAt: 0, rank: -1,
+  id: 'm1',
+  scope: 'project',
+  projectId: 'p-1',
+  name: 'no-ponytail-comments',
+  type: 'convention',
+  description: 'strip the marker before committing',
+  body: '',
+  path: 'x.md',
+  originSessionId: null,
+  commitSha: null,
+  supersededBy: null,
+  createdAt: 0,
+  updatedAt: 0,
+  rank: -1,
   ...over,
 })
 
 const context = (over: Partial<CommandExecutionContext> = {}): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 'task-1',
-  paneId: null, surfaceId: null, ...over,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 'task-1',
+  paneId: null,
+  surfaceId: null,
+  ...over,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -36,10 +61,25 @@ describe('the memory plugin catalogue', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('asks about the captured project and badges each row with its type', async () => {
-    mocks.search.mockResolvedValue([memory(), memory({ id: 'm2', name: 'rtk-grep', type: 'fix', description: 're-run through rtk proxy' })])
+    mocks.search.mockResolvedValue([
+      memory(),
+      memory({ id: 'm2', name: 'rtk-grep', type: 'fix', description: 're-run through rtk proxy' }),
+    ])
     expect(await find().query('grep', context(), signal())).toEqual([
-      { id: 'm1', title: 'no-ponytail-comments', subtitle: 'strip the marker before committing', badge: 'Convention', ref: '{"name":"no-ponytail-comments","scope":"project"}' },
-      { id: 'm2', title: 'rtk-grep', subtitle: 're-run through rtk proxy', badge: 'Fix', ref: '{"name":"rtk-grep","scope":"project"}' },
+      {
+        id: 'm1',
+        title: 'no-ponytail-comments',
+        subtitle: 'strip the marker before committing',
+        badge: 'Convention',
+        ref: '{"name":"no-ponytail-comments","scope":"project"}',
+      },
+      {
+        id: 'm2',
+        title: 'rtk-grep',
+        subtitle: 're-run through rtk proxy',
+        badge: 'Fix',
+        ref: '{"name":"rtk-grep","scope":"project"}',
+      },
     ])
     expect(mocks.search).toHaveBeenCalledWith('grep', 'p-1')
   })
@@ -59,5 +99,4 @@ describe('the memory plugin catalogue', () => {
     expect(navigate).toHaveBeenCalledWith('/p/p-1')
     expect(selectedMemory()).toEqual({ name: 'no-ponytail-comments', scope: 'project', projectId: 'p-1' })
   })
-
 })

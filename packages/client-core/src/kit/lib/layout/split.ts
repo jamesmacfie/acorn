@@ -90,11 +90,16 @@ export function createSplitDrag(opts: SplitDragOptions): SplitDrag {
     // A big number rather than Infinity: the caller clamps, and Infinity through a px arithmetic
     // path produces NaN widths rather than a pinned pane.
     const FULL = 10_000
-    const delta = event.key === forward ? step()
-      : event.key === back ? -step()
-      : event.key === 'End' ? FULL
-      : event.key === 'Home' ? -FULL
-      : 0
+    const delta =
+      event.key === forward
+        ? step()
+        : event.key === back
+          ? -step()
+          : event.key === 'End'
+            ? FULL
+            : event.key === 'Home'
+              ? -FULL
+              : 0
     if (!delta) return
     event.preventDefault()
     opts.onDelta(opts.invert ? -delta : delta)

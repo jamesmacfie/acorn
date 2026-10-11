@@ -63,7 +63,11 @@ export class AgentArtifactStore {
     const path = join(directory, hash)
     await mkdir(directory, { recursive: true, mode: 0o700 })
     try {
-      const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
+      const handle = await open(
+        path,
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+        0o600,
+      )
       try {
         await handle.writeFile(bytes)
       } finally {
@@ -73,7 +77,11 @@ export class AgentArtifactStore {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       const stat = await lstat(path)
       if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Artifact object path is not a regular file.')
-      if (createHash('sha256').update(await readFile(path)).digest('hex') !== hash) {
+      if (
+        createHash('sha256')
+          .update(await readFile(path))
+          .digest('hex') !== hash
+      ) {
         throw new Error('Artifact object failed its integrity check.')
       }
     }

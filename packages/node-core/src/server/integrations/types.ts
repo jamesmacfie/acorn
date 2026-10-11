@@ -20,14 +20,14 @@ import type { ExternalItemStore } from './itemStore'
 import type { Cached, RefreshResult, RouteResult } from '../sync/engine'
 import type { PluginFetchHandler } from '../pluginHost/types'
 
-export type ProviderCredentials = Record<string, string>
-export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
+type ProviderCredentials = Record<string, string>
+type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
 export type ProviderRequestBudgets = Pick<
   ProviderBudgets,
   'maxConcurrentRequests' | 'maxConcurrentRequestsPerConnection'
 >
 
-export type NormalizedConnection = {
+type NormalizedConnection = {
   secret: string
   label: string
   account: ProviderAccountRef | null
@@ -36,7 +36,7 @@ export type NormalizedConnection = {
   capabilities: Record<string, 'available' | 'missing-scope' | 'degraded'>
 }
 
-export type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorCode }
+type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorCode }
 
 export type TypedConnectionContract<TValidated> = {
   authKind: IntegrationAuthKind
@@ -64,7 +64,7 @@ export type CachedExternalItem<TSummary = unknown, TDetail = unknown> = {
   truncated?: boolean
 }
 
-export type CodecResult<T> = { ok: true; value: T; migrated: boolean } | { ok: false; error: string }
+export type CodecResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unknown> = {
   schemaVersion: number
@@ -75,12 +75,17 @@ export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unk
     summary: TSummary,
     fetchedAt: number,
   ): CachedExternalItem<TSummary, TDetail>
-  withDetail(ref: ExternalRef, summary: TSummary, detail: TDetail, fetchedAt: number): CachedExternalItem<TSummary, TDetail>
+  withDetail(
+    ref: ExternalRef,
+    summary: TSummary,
+    detail: TDetail,
+    fetchedAt: number,
+  ): CachedExternalItem<TSummary, TDetail>
   toPublic(item: CachedExternalItem<TSummary, TDetail>): TPublic
   summary(item: CachedExternalItem<TSummary, TDetail>): TSummary
 }
 
-export type LinkContextFormatter = {
+type LinkContextFormatter = {
   summarize(ref: ExternalRef, item: CachedExternalItem | null, state: CacheState): ContextItem
 }
 
@@ -101,7 +106,7 @@ export type ProviderItemDetail = (context: ProviderDetailContext, identifier: st
 
 // What core lends a provider for a write on one item. The resource method is there so the provider
 // can turn a display id into whatever its API keys a write off, reading its own cache to do it.
-export type ProviderWriteContext = ProviderDetailContext & {
+type ProviderWriteContext = ProviderDetailContext & {
   secret: string
   // A UUID, one per agent tool call. Send it as the write's own id where the tracker accepts one, so
   // a call the agent's side retries after a lost reply cannot write twice.
@@ -124,14 +129,14 @@ export type ProviderItemImage = (
   url: string,
 ) => Promise<{ mimeType: string; data: string } | null>
 
-export type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
-export type ReferenceResolver = {
+type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
+type ReferenceResolver = {
   detectRefs(text: string): ReferenceCandidate[]
   toRef(connectionId: string, candidate: ReferenceCandidate): ExternalRef
   canAutoLink(ref: ExternalRef): 'attach' | 'suggest' | 'linkify-only'
 }
 
-export type ExternalIdContract = {
+type ExternalIdContract = {
   fromDisplay(connectionId: string, displayId: string): ExternalRef
   parse(raw: unknown, fallback: ExternalRef): ExternalRef | null
 }
@@ -162,7 +167,7 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
 // Project sources for how the host bounds and re-checks the list before it is offered for selection.
 export type ProviderProject = { id: string; label: string }
 
-export type ProviderProjectContext = { connection: StoredConnection; secret: string }
+type ProviderProjectContext = { connection: StoredConnection; secret: string }
 
 /**
 /** How the host enumerates a connection's projects for its own workspace-mapping picker; see
@@ -258,8 +263,8 @@ export class ProviderOperationError extends Error {
  * node_modules to resolve against (apps/node/scripts/build-plugin.mjs). So a provider error thrown
  * inside a plugin bundle and caught by a host route is an instance of the plugin's copy of the
  * class, never the host's, and the reverse holds for a host error caught inside a plugin. Every
- * `instanceof` across that boundary was false, which sent typed failures like `provider_needs_auth`
- * to the catch-all and told the owner a working provider was unavailable.
+ * `instanceof` across that boundary is false, which would send typed failures like
+ * `provider_needs_auth` to the catch-all and tell the owner a working provider was unavailable.
  *
  * The shape is checked rather than a brand, because a brand only reaches a plugin package that has
  * been rebuilt since, and a plugin installed from a folder is rebuilt when its author says so.
@@ -267,7 +272,9 @@ export class ProviderOperationError extends Error {
 export const isProviderOperationError = (error: unknown): error is ProviderOperationError => {
   if (!(error instanceof Error)) return false
   const failure = error as Partial<ProviderOperationError>
-  return typeof failure.status === 'number'
-    && typeof failure.code === 'string'
-    && (PROVIDER_ERROR_CODES as readonly string[]).includes(failure.code)
+  return (
+    typeof failure.status === 'number' &&
+    typeof failure.code === 'string' &&
+    (PROVIDER_ERROR_CODES as readonly string[]).includes(failure.code)
+  )
 }

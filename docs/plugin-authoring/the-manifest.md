@@ -44,8 +44,8 @@ hostile through a link fails at load time.
 Any other top-level key is stripped and reported as unrecognized, so a manifest written for a newer
 acorn still loads ([forward compatibility](../plugins/forward-compatibility.md)). That doesn't cover
 closed lists inside a known key. A release older than a menu location, a point field such as `mounts`,
-or a `documentServices` language may refuse the entry or ignore the field. API major 3 alone doesn't
-promise that an older release draws it.
+or a `documentServices` language may refuse the entry or ignore the field. The API major alone
+doesn't promise that an older release draws it.
 
 ### Requiring another plugin
 
@@ -79,7 +79,7 @@ they're yours:
 | `id` | The plugin's directory name in `plugins/` | Write it, and match the `name` your node entrypoint exports |
 | `version` | Read from the plugin's `package.json` | Write it |
 | `baseline` | `ACORN_BASELINE` | `"acorn-1"` |
-| `apiVersion` | `PLUGIN_API_MAJOR` | `"3"`, or a range covering it |
+| `apiVersion` | `PLUGIN_API_MAJOR` | `"5"`, or a range covering it |
 | `node` | `./dist/node.js` | Your own path, such as `./node/index.js` |
 | `client` | `./dist/client.js`, when a client is declared | Your own path, such as `./client.js` |
 | `migrations` | `./migrations`, when the config declares a chain | Wherever your chain is |

@@ -1,7 +1,6 @@
 # WebSocket
 
-This page covers `/v1/events`, the one authenticated socket a client holds to each Node, and the
-preview tunnel beside it. It's part of the [API reference](../api-reference.md). The hub is
+This page covers `/v1/events`, the one authenticated socket a client holds to each Node. It's part of the [API reference](../api-reference.md). The hub is
 `packages/node-core/src/server/transport/wsHub.ts`, and the wire shapes are in
 `@acorn/protocol/ws.ts` and `@acorn/protocol/nodeEvents.ts`.
 
@@ -11,10 +10,10 @@ preview tunnel beside it. It's part of the [API reference](../api-reference.md).
 not a durable replication log. After a reconnect or a sequence gap, the client marks the Node stale
 and fetches again. Durable agent and workflow history is read from plugin tables over HTTP.
 
-PTY output, Docker logs, stats, and exec, workflow notices, agent streams, and preview tunnels use the
-same socket, with feature-specific frames and bounded backpressure and replay.
+PTY output, Docker logs, stats, and exec, workflow notices, and agent streams use the same socket, with feature-specific frames and bounded backpressure and replay.
 
 The upgrade checks the exact Node `Host` and a device bearer or internal token before it completes.
+The hub is the listener's only upgrade handler, so it destroys an upgrade to any other path.
 A browser can't set that header, which is why the desktop's socket belongs to the helper. The Node
 and custody each refuse an incoming message over 8 MiB before parsing or dispatch, and close with
 code 1009. The channel envelope is plugin-owned, and the transport keeps a handler's synchronous or
@@ -22,7 +21,7 @@ asynchronous failure inside its connection.
 
 ## Logical event viewers
 
-Legacy upgrades keep raw JSON channel frames and the terminal binary layout: 36 ASCII session UUID
+A single-viewer upgrade keeps raw JSON channel frames and the terminal binary layout: 36 ASCII session UUID
 bytes, then the payload. `NodeBroker` uses this transport by default, the terminal client included.
 The desktop helper opts in to viewers when the Node advertises viewer version 1
 ([versioning](./transport.md#versioning)).
@@ -49,7 +48,7 @@ Removing a viewer, removing a Node, or disposing the connection clears their own
 
 The helper declares the selected Node with a nested `ws:viewer-open` lease. Selecting another Node
 closes the old lease, and returning from cached UI state opens a fresh one. Fleet HTTP reads never
-open leases. On a legacy Node only one viewer can hold the events lease. Another gets
+open leases. On a Node that predates viewers, only one viewer can hold the events lease. Another gets
 `viewers_unsupported` through the client's transport-error seam, and the first keeps working. Closing
 that lease reconnects the physical socket to retire resources the old Node can't close one by one.
 
@@ -58,26 +57,6 @@ opaque frames. Custody compacts each viewer and key between command barriers, ke
 state for reconnect, and sends the most recent intent before it asks for a fresh restore. Input, actions,
 and unknown channel frames keep their order and aren't compacted. Disposing a viewer ends its queued
 commands and removes its desired state.
-
-## Preview tunnel
-
-The preview tunnel is a separate upgrade on the same listener, at `/v1/tunnel`
-(`packages/node-core/src/server/transport/tunnel.ts`). It resolves `?task=<uuid>&port=<n>` and uses
-the same device and task-token authorization as `/v1/events`. It forwards raw bytes to `127.0.0.1` on
-the named port only, never to a resolved hostname. Only declared ports are tunnellable, and there's no
-general proxy to whatever else listens on the Node's loopback.
-
-Both ends refuse a message over 64 KiB. Both senders split TCP reads into ordered slices, wait for each
-write before sending the next, and resume reading after the whole chunk, so an HTTP stream larger than
-the ceiling arrives complete and in order. An oversized message closes with code 1009 and closes its
-TCP pipe.
-
-A port counts as declared when the task's run bridge names it as a run target's URL, or when the
-project's `previewMode` is `'port'` or `'url'`. `'script'` isn't a source, because its value is a shell
-command that would have to run on every tunnel attempt. `'url'` counts because without it a remote
-task configured with `http://localhost:8025` would fall back to loading the URL as given, which draws
-whatever sits on the owner's own port 8025. A URL that names a host other than loopback adds nothing,
-because the client can reach it directly.
 
 ## Channels
 

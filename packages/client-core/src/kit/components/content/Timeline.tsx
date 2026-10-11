@@ -1,29 +1,42 @@
-import { batch, createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type Context, type JSX } from 'solid-js'
+import {
+  batch,
+  createContext,
+  createEffect,
+  createSignal,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  untrack,
+  useContext,
+  type Accessor,
+  type Context,
+  type JSX,
+} from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/timeline/readingPlace'
 import { createScrollAuthor } from '../../lib/timeline/scrollAuthor'
 import { reportScrollPlace } from '../../lib/telemetry/scrollPlace'
 import { registerSurfaceHealth } from '../../lib/telemetry/surfaceHealth'
 import { TIMELINE_PAGE } from '../../lib/timeline/timelineWindow'
+import { latestSignal } from '../../lib/state/latestSignal'
 import { Button } from '../inputs/Button'
 
-/* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
-   shape, and both drew it themselves.
+/* Timeline: a sequence of turns, the shape the agents transcript and github's PR conversation share.
 
    An ordered list, because the order is the meaning: a screen reader announces "3 of 40" and a
    terminal draws a rule between turns. Children are Cards.
 
    One stop with roving focus over the turns that are interactive, so a long transcript is walkable
-   without tabbing through every control inside every card (../keys/collection.ts).
+   without tabbing through every control inside every card (`createCollection`).
 
-   Deliberately not virtualised, and the guardrail is the kit's rather than a pane's: the virtualizer
-   the agents transcript used to run called `measure()` on every new event, which clears the item size
-   cache, so every row fell back to the estimate, the canvas jumped, and the rows re-measured — on
-   every event. It also rebuilt its rows from `getVirtualItems()`, which returns fresh objects on each
-   scroll, replacing the DOM under any selection. A long list is instead drawn as its newest turns
-   behind a "Show earlier" control (../../lib/timeline/timelineWindow.ts): a fixed window counts turns, measures
-   none, and has no feedback loop. The caller decides which turns exist in the DOM; this component
-   keeps the reader's place by identity while that changes.
+   Deliberately not virtualised, and the guardrail is the kit's rather than a pane's. A virtualizer
+   that calls `measure()` on every new event clears its item size cache, so every row falls back to
+   the estimate and the canvas jumps on every event; one that rebuilds rows from `getVirtualItems()`
+   gets fresh objects on each scroll and replaces the DOM under any selection. A long list is instead
+   drawn as its newest turns behind a "Show earlier" control (`TIMELINE_PAGE`): a fixed window counts
+   turns, measures none, and has no feedback loop. The caller decides which turns exist in the DOM;
+   this component keeps the reader's place by identity while that changes.
 
    At 80×24: the cards in sequence, a dim rule between turns. */
 
@@ -89,7 +102,7 @@ export function Timeline(props: {
    */
   place?: () => ReadingPlace
   /** The reader's place changed, and only ever because the reader moved. Named `onChange` because a
-   *  callback prop only crosses to a sandboxed host under one of the kit's eleven semantic events. */
+   *  callback prop only crosses to a sandboxed host under one of the kit's semantic events. */
   onChange?: (place: ReadingPlace) => void
   /** Handed the scroll jumps once the scroller exists, for a control that lives outside this element.
    *  Only called on a followed timeline; a plain run of cards has no scroll of its own to drive. */
@@ -132,8 +145,16 @@ export function Timeline(props: {
   // sees the observers disconnected and the frames cancelled. Observers count up when constructed and
   // down when disconnected, which is how a teardown check sees them go without waiting on the collector.
   const counts = {
-    observers: 0, observed: 0, corrections: 0, failed: 0, substituted: 0, maxPixels: 0, drift: 0,
-    expansions: 0, trims: 0, pinned: 0,
+    observers: 0,
+    observed: 0,
+    corrections: 0,
+    failed: 0,
+    substituted: 0,
+    maxPixels: 0,
+    drift: 0,
+    expansions: 0,
+    trims: 0,
+    pinned: 0,
   }
   let scheduledFrames = () => 0
   let bodies = 0
@@ -150,10 +171,18 @@ export function Timeline(props: {
       work: { scheduledFrames: scheduledFrames() },
       measurement: { activeObservers: counts.observers, observedElements: counts.observed },
       correction: {
-        count: counts.corrections, failed: counts.failed, substituted: counts.substituted,
-        maxPixels: counts.maxPixels, maxAnchorDrift: counts.drift,
+        count: counts.corrections,
+        failed: counts.failed,
+        substituted: counts.substituted,
+        maxPixels: counts.maxPixels,
+        maxAnchorDrift: counts.drift,
       },
-      window: { hiddenEarlier: props.hidden ?? 0, expansions: counts.expansions, trims: counts.trims, pinned: counts.pinned },
+      window: {
+        hiddenEarlier: props.hidden ?? 0,
+        expansions: counts.expansions,
+        trims: counts.trims,
+        pinned: counts.pinned,
+      },
     }
   })
   onCleanup(health.dispose)
@@ -169,16 +198,20 @@ export function Timeline(props: {
     if (!near) {
       // One batch per callback, so a screenful of turns arriving together is one update and whatever
       // they ask for is asked for once.
-      near = new IntersectionObserver((entries) => batch(() => {
-        for (const entry of entries) {
-          const run = entry.isIntersecting ? waiting.get(entry.target) : undefined
-          if (!run) continue
-          waiting.delete(entry.target)
-          near?.unobserve(entry.target)
-          counts.observed -= 1
-          run()
-        }
-      }), { root: props.follow ? scroller ?? null : scrollParent(list), rootMargin: NEAR_MARGIN })
+      near = new IntersectionObserver(
+        (entries) =>
+          batch(() => {
+            for (const entry of entries) {
+              const run = entry.isIntersecting ? waiting.get(entry.target) : undefined
+              if (!run) continue
+              waiting.delete(entry.target)
+              near?.unobserve(entry.target)
+              counts.observed -= 1
+              run()
+            }
+          }),
+        { root: props.follow ? (scroller ?? null) : scrollParent(list), rootMargin: NEAR_MARGIN },
+      )
       counts.observers += 1
     }
     near.observe(element)
@@ -225,9 +258,14 @@ export function Timeline(props: {
   ) as HTMLOListElement
 
   // The window growing, whatever grew it: "Show earlier", a reveal, or the caller showing everything.
-  createEffect(on(() => props.hidden ?? 0, (next, previous) => {
-    if (previous !== undefined && next < previous) counts.expansions += 1
-  }))
+  createEffect(
+    on(
+      () => props.hidden ?? 0,
+      (next, previous) => {
+        if (previous !== undefined && next < previous) counts.expansions += 1
+      },
+    ),
+  )
 
   if (!props.follow) return list
 
@@ -235,16 +273,16 @@ export function Timeline(props: {
   // the corrections below are aimed at.
   let place: ReadingPlace = LIVE
   let opened = false
-  // Bumped when the caller hands over a different place, so a frame the outgoing list scheduled cannot
+  // Aborted when the caller hands over a different place, so a frame the outgoing list scheduled cannot
   // move the incoming one.
-  let generation = 0
+  const placeShown = latestSignal()
   let frame = 0
   let corrections = 0
   // Our own writes, marked until the frame after them, and when the reader last touched this
-  // (../../lib/timeline/scrollAuthor.ts). A scroll event arrives after the write that caused it. The
-  // mark alone is not enough: a reader who scrolls in the frame after a pin gets one scroll event,
-  // inside the mark, and it used to be thrown away as ours. So an event only counts as ours if the view
-  // is still where our write left it (`moved`).
+  // (`createScrollAuthor`). A scroll event arrives after the write that caused it. The mark alone is
+  // not enough: a reader who scrolls in the frame after a pin gets one scroll event, inside the mark,
+  // which would be thrown away as ours. So an event only counts as ours if the view is still where our
+  // write left it (`moved`).
   const author = createScrollAuthor()
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
@@ -269,8 +307,7 @@ export function Timeline(props: {
 
   /** This timeline's own turns, in order. `:scope >` because a timeline drawn inside a card of another
    *  one must not have its turns harvested by the outer scroller. */
-  const turns = (): HTMLElement[] =>
-    [...list.querySelectorAll<HTMLElement>(':scope > .ui-timeline-turn[data-turn]')]
+  const turns = (): HTMLElement[] => [...list.querySelectorAll<HTMLElement>(':scope > .ui-timeline-turn[data-turn]')]
 
   /**
    * The turn the viewport starts in, and how far into it.
@@ -283,9 +320,8 @@ export function Timeline(props: {
    * replay. It is the input to a correction that is measured again every time it is applied, which is
    * why content growing above the reader cannot invalidate it.
    *
-   * Ceiling: a linear scan, one rect read per turn. A transcript is a few hundred cards and the reads
-   * share one layout, so this is microseconds; walk out from the last known index if a list ever holds
-   * thousands.
+   * Ceiling: a linear scan, one rect read per turn, all sharing one layout. Walk out from the last known
+   * index if a list ever holds thousands.
    */
   const measure = (): ReadingPlace | null => {
     if (!scroller) return null
@@ -293,7 +329,9 @@ export function Timeline(props: {
     const rows = turns()
     const index = rows.findIndex((row) => row.getBoundingClientRect().bottom > top)
     const row = rows[index]
-    return row ? { at: 'turn', key: row.dataset.turn ?? '', index, offset: top - row.getBoundingClientRect().top } : null
+    return row
+      ? { at: 'turn', key: row.dataset.turn ?? '', index, offset: top - row.getBoundingClientRect().top }
+      : null
   }
 
   /** The earliest drawn turn holding the reader's selection or focus, or -1. Those are the turns a
@@ -338,7 +376,9 @@ export function Timeline(props: {
     author.write(scroller, top)
     at = scroller.scrollTop
   }
-  const pin = () => { if (scroller) write(scroller.scrollHeight) }
+  const pin = () => {
+    if (scroller) write(scroller.scrollHeight)
+  }
 
   /** Tell the caller where the reader is, when it has changed. */
   const adopt = (next: ReadingPlace) => {
@@ -349,10 +389,10 @@ export function Timeline(props: {
 
   const schedule = () => {
     if (frame || !scroller) return
-    const era = generation
+    const shown = placeShown.signal
     frame = requestAnimationFrame(() => {
       frame = 0
-      if (era === generation) correct()
+      if (!shown.aborted) correct()
     })
   }
 
@@ -360,19 +400,21 @@ export function Timeline(props: {
    * Put the anchor turn back where the reader left it, and keep asking until it is there or the list
    * refuses to move any further.
    *
-   * "Is the turn where I asked for it" is a question that can be answered. The old code asked "did the
-   * browser accept my pixel", which answers no for ever whenever the list is shorter than the number,
-   * and that is what parked a reader at the top. "The list would not move" is the second way to be
-   * done, for an anchor that cannot be brought any higher because it is the last turn of a short list;
-   * the budget below would end that case anyway, a couple of dozen frames later.
+   * "Is the turn where I asked for it" is a question that can be answered. "Did the browser accept my
+   * pixel" answers no for ever whenever the list is shorter than the number, and parks a reader at the
+   * top. "The list would not move" is the second way to be done, for an anchor that cannot be brought
+   * any higher because it is the last turn of a short list; the budget below would end that case
+   * anyway, a couple of dozen frames later.
    */
   const correct = () => {
     if (!scroller) return
-    // Following: the reader's place is the foot, so putting them back is pinning them there. This used
-    // to return, which left `noteScroll`'s undertaking that "the next frame puts them back" false for
-    // the one reader who had asked to be held on the newest turn. The resizes a live list produces hid
-    // it, right up until the agent stopped and there were none.
-    if (place.at !== 'turn') { pin(); return }
+    // Following: the reader's place is the foot, so putting them back is pinning them there. Returning
+    // here would break `noteScroll`'s undertaking that "the next frame puts them back" for a reader held
+    // on the newest turn once the agent stops and no more resizes arrive.
+    if (place.at !== 'turn') {
+      pin()
+      return
+    }
     const rows = turns()
     // Nothing drawn yet. The resizes that follow re-arm this, so a list still arriving gets another go
     // without a frame budget of its own.
@@ -417,11 +459,11 @@ export function Timeline(props: {
       return
     }
     corrections = 0
-    // Settling does not redefine where the reader wants to be. It used to: it re-measured and adopted
-    // whatever was under the viewport, so a settle that happened while the list was still short adopted
-    // the top and wrote it to the caller's store, and every later visit opened there. The one thing
-    // worth adopting is a substitute, because the turn the reader chose has left the list for good and
-    // chasing its key would cost a correction on every resize from here on.
+    // Settling does not redefine where the reader wants to be. Adopting whatever is under the viewport would
+    // let a settle while the list is still short adopt the top and write it to the caller's store, so every
+    // later visit would open there. The one thing worth adopting is a substitute, because the turn the reader
+    // chose has left the list for good and chasing its key would cost a correction on every resize from here
+    // on.
     if (found.key === place.key) return
     counts.substituted += 1
     report('took', scroller.scrollTop)
@@ -483,7 +525,10 @@ export function Timeline(props: {
     if (first) adopt({ at: 'turn', key: first.dataset.turn ?? '', index: 0, offset: 0 })
     write(0)
   }
-  const toBottom = () => { adopt(LIVE); pin() }
+  const toBottom = () => {
+    adopt(LIVE)
+    pin()
+  }
   props.controls?.({ toTop, toBottom })
 
   // The reader's own press, so the turn they are looking at becomes their place, and the older turns
@@ -528,17 +573,14 @@ export function Timeline(props: {
    *
    * A scroller that was detached comes back at the top, and the browser reports neither a scroll
    * event nor a resize for it, so every other signal in this file misses it: the reader opens a
-   * transcript, watches it land on the newest turn, and then watches it jump to the first one.
-   *
-   * What produced it was the `Suspense` around every pane region (host/registries/panes/panes.ts):
-   * a query in the region reading an empty cache suspended that boundary after the region had drawn,
-   * and every child left the document for the length of the fetch. The solid-js patch closed that off
-   * — a boundary that has drawn never swaps back to its fallback (patches/README.md) — and this stays
-   * because re-parenting is not only that boundary's to do. It costs one observer on a parent whose
-   * children are its bar, its body and its composer, and the answer is the correction the rest of
-   * this file already runs.
+   * transcript, watches it land on the newest turn, and then watches it jump to the first one. Anything
+   * that re-parents the list does this, such as a `Suspense` boundary that swaps back to its fallback.
+   * It costs one observer on a parent whose children are its bar, its body and its composer, and the
+   * answer is the correction the rest of this file already runs.
    */
-  const replaced = new MutationObserver(() => { if (scroller?.isConnected) schedule() })
+  const replaced = new MutationObserver(() => {
+    if (scroller?.isConnected) schedule()
+  })
   counts.observers += 1
   onMount(() => {
     if (!scroller?.parentElement) return
@@ -565,26 +607,31 @@ export function Timeline(props: {
   //
   // An equal place is nothing to do, with one exception. Two live places are equal by value but they
   // are the foot of two different lists, and a caller only hands one over when the view it belongs to
-  // has changed — it has no other reason to read its store again. Skipping that left a reader who was
-  // following one session sitting at that session's offset, partway down a transcript they had never
-  // seen, until some later resize happened to pin them.
-  createEffect(on(() => props.place?.() ?? LIVE, (next) => {
-    if (opened && next.at !== 'live' && samePlace(next, place)) return
-    opened = true
-    generation += 1
-    corrections = 0
-    // The click that changed the view armed this on the way out of the old one. Left armed, it is
-    // spent on the first scroll event the new view produces. Whose input it was does not survive the
-    // view it was made in.
-    userDriven = false
-    place = next
-    if (next.at === 'live') pin()
-    else correct()
-    // A remount lands here and nowhere else: a fresh scroll element starts at zero and fires no scroll
-    // event, so this is the only record that the reader was put somewhere by a list opening rather
-    // than by anything they did.
-    report('opened', scroller?.scrollTop ?? 0)
-  }))
+  // has changed — it has no other reason to read its store again. Skipping it would leave a reader who
+  // was following one session sitting at that session's offset, partway down a transcript they had
+  // never seen, until some later resize happened to pin them.
+  createEffect(
+    on(
+      () => props.place?.() ?? LIVE,
+      (next) => {
+        if (opened && next.at !== 'live' && samePlace(next, place)) return
+        opened = true
+        placeShown.next()
+        corrections = 0
+        // The click that changed the view armed this on the way out of the old one. Left armed, it is
+        // spent on the first scroll event the new view produces. Whose input it was does not survive the
+        // view it was made in.
+        userDriven = false
+        place = next
+        if (next.at === 'live') pin()
+        else correct()
+        // A remount lands here and nowhere else: a fresh scroll element starts at zero and fires no scroll
+        // event, so this is the only record that the reader was put somewhere by a list opening rather
+        // than by anything they did.
+        report('opened', scroller?.scrollTop ?? 0)
+      },
+    ),
+  )
 
   return (
     <div
@@ -602,8 +649,8 @@ export function Timeline(props: {
       // Focus counts as the reader's input, but only when it lands on a turn in this list: revealing a
       // card scrolls it into view and then focuses it, and focus is delivered before the scroll event,
       // so the scroll that follows is the reveal rather than a move to be undone. Focus arriving
-      // anywhere else inside the scroller is not a scroll, and treating it as one let a rebuilt pane
-      // hand its own focus restoration to the next scroll event as if the reader had made it.
+      // anywhere else inside the scroller is not a scroll, and treating it as one would let a rebuilt
+      // pane hand its own focus restoration to the next scroll event as if the reader had made it.
       onFocusIn={(event) => {
         if ((event.target as HTMLElement | null)?.closest('.ui-timeline-turn')) noteInput()
       }}
@@ -655,7 +702,13 @@ Timeline.Turn = (props: {
     return untrack(() => (child as (near: Accessor<boolean>) => JSX.Element)(near))
   }
   return (
-    <li ref={item} class="ui-timeline-turn" data-turn={props.key} aria-posinset={props.position} aria-setsize={props.setSize}>
+    <li
+      ref={item}
+      class="ui-timeline-turn"
+      data-turn={props.key}
+      aria-posinset={props.position}
+      aria-setsize={props.setSize}
+    >
       {content()}
     </li>
   )

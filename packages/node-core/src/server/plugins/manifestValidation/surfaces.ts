@@ -38,7 +38,11 @@ export function validateFrames(refs: ManifestReferences): void {
           })
         }
       } else if (frame.target !== 'pane') {
-        ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane, a reference panel or a settings page' })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'layout'],
+          message: 'layout is only valid on a pane, a reference panel or a settings page',
+        })
       }
       for (const [name, region] of Object.entries(frame.regions ?? {})) {
         // Frame and remote regions refer to the client bundle, not a node route.
@@ -62,7 +66,11 @@ export function validateFrames(refs: ManifestReferences): void {
     if (frame.availability) route(frame.availability, [...at, 'availability'])
     if (frame.target !== 'webview') {
       if (frame.url !== undefined || frame.urlSource !== undefined || frame.hosts !== undefined) {
-        ctx.addIssue({ code: 'custom', path: at, message: 'url, urlSource and hosts are only valid on a webview surface' })
+        ctx.addIssue({
+          code: 'custom',
+          path: at,
+          message: 'url, urlSource and hosts are only valid on a webview surface',
+        })
       }
       return
     }
@@ -74,7 +82,11 @@ export function validateFrames(refs: ManifestReferences): void {
     }
     // The client bundle controls the webview and triggers the host grant prompt.
     if (!manifest.client) {
-      ctx.addIssue({ code: 'custom', path: at, message: 'a webview surface needs a client bundle; declare `client` in the manifest' })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: 'a webview surface needs a client bundle; declare `client` in the manifest',
+      })
     }
     if (frame.urlSource) route(frame.urlSource, [...at, 'urlSource'])
     if (frame.url && frame.hosts?.length && !isAllowedWebviewUrl(frame.url, frame.hosts)) {
@@ -96,13 +108,25 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
     const at = ['contributions', 'frames', i] as (string | number)[]
     if (frame.target === 'coreSlot') {
       if (!frame.coreSlot) {
-        ctx.addIssue({ code: 'custom', path: [...at, 'coreSlot'], message: 'a coreSlot surface must name which core surface it replaces' })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'coreSlot'],
+          message: 'a coreSlot surface must name which core surface it replaces',
+        })
       }
       if (!manifest.client) {
-        ctx.addIssue({ code: 'custom', path: at, message: 'a coreSlot surface needs a client bundle; declare `client` in the manifest' })
+        ctx.addIssue({
+          code: 'custom',
+          path: at,
+          message: 'a coreSlot surface needs a client bundle; declare `client` in the manifest',
+        })
       }
     } else if (frame.coreSlot !== undefined) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'coreSlot'], message: 'coreSlot is only valid on a coreSlot surface' })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'coreSlot'],
+        message: 'coreSlot is only valid on a coreSlot surface',
+      })
     }
   })
   // A project pane needs a route and a navigation source to make it reachable.
@@ -111,19 +135,31 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
     const at = ['contributions', 'routes', i] as (string | number)[]
     confine(entry.path, ownPath, [...at, 'path'])
     if (!projectPanes.has(entry.surface)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `route names '${entry.surface}', which this manifest does not declare as a project-scoped pane` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'surface'],
+        message: `route names '${entry.surface}', which this manifest does not declare as a project-scoped pane`,
+      })
     } else {
       routedSurfaces.add(entry.surface)
     }
-    const params = new Set(entry.path.split('/').flatMap((segment) => segment.startsWith(':') ? [segment.slice(1)] : []))
+    const params = new Set(
+      entry.path.split('/').flatMap((segment) => (segment.startsWith(':') ? [segment.slice(1)] : [])),
+    )
     if (entry.item === 'projectId' || !params.has(entry.item)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'item'], message: `route item '${entry.item}' must be a :param of its path other than projectId` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'item'],
+        message: `route item '${entry.item}' must be a :param of its path other than projectId`,
+      })
     }
   })
   // Source rows and search results can both navigate to project panes.
   const navigatedSurfaces = new Set([
-    ...sources.flatMap((entry) => entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : []),
-    ...commands.flatMap((entry) => entry.kind === 'search' && entry.onSelect.verb === 'navigate' ? [entry.onSelect.surface] : []),
+    ...sources.flatMap((entry) => (entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : [])),
+    ...commands.flatMap((entry) =>
+      entry.kind === 'search' && entry.onSelect.verb === 'navigate' ? [entry.onSelect.surface] : [],
+    ),
   ])
   frames.forEach((frame, i) => {
     if (frame.target === 'overlay' && !openedOverlays.has(frame.id)) {
@@ -136,10 +172,18 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
     if (frame.target !== 'pane' || frame.scope !== 'project') return
     const at = ['contributions', 'frames', i] as (string | number)[]
     if (!routedSurfaces.has(frame.id)) {
-      ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a routes entry; it has no other address` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `project-scoped pane '${frame.id}' needs a routes entry; it has no other address`,
+      })
     }
     if (!navigatedSurfaces.has(frame.id)) {
-      ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a source whose onSelect navigates to it; it has nowhere else to mount` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `project-scoped pane '${frame.id}' needs a source whose onSelect navigates to it; it has nowhere else to mount`,
+      })
     }
   })
   // A content link may target any reference panel declared by its own plugin.
@@ -154,8 +198,15 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
         message: `content link names '${entry.openPane}', which this manifest does not declare as a task-scoped pane`,
       })
     }
-    if (entry.openOverlay !== undefined && !frames.some(frame => frame.target === 'overlay' && frame.id === entry.openOverlay)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'openOverlay'], message: `content link names an undeclared overlay '${entry.openOverlay}'` })
+    if (
+      entry.openOverlay !== undefined &&
+      !frames.some((frame) => frame.target === 'overlay' && frame.id === entry.openOverlay)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'openOverlay'],
+        message: `content link names an undeclared overlay '${entry.openOverlay}'`,
+      })
     }
     // Without a pane or reference panel, the link has nowhere to open.
     if (entry.openPane === undefined && entry.openOverlay === undefined && !declaresRefPanel) {

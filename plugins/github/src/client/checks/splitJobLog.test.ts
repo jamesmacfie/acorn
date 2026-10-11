@@ -9,7 +9,14 @@ describe('splitJobLog', () => {
   })
 
   it('slices per step when group count matches step count', () => {
-    const log = [ts('##[group]Set up job'), ts('a'), ts('##[endgroup]'), ts('##[group]Run tests'), ts('b'), ts('##[endgroup]')].join('\n')
+    const log = [
+      ts('##[group]Set up job'),
+      ts('a'),
+      ts('##[endgroup]'),
+      ts('##[group]Run tests'),
+      ts('b'),
+      ts('##[endgroup]'),
+    ].join('\n')
     const { byStep } = splitJobLog(log, [{ number: 1 }, { number: 2 }])
     expect(byStep.get(1)).toBe('##[group]Set up job\na\n##[endgroup]')
     expect(byStep.get(2)).toBe('##[group]Run tests\nb\n##[endgroup]')

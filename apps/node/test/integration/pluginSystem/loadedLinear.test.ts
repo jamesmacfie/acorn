@@ -32,13 +32,12 @@ describe('loading production plugin bundles from disk', () => {
     const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
 
     expect(failures).toEqual([])
-    expect(loaded.map(entry => entry.manifest.id).sort()).toEqual(['database', 'linear'])
-    const linear = loaded.find(entry => entry.manifest.id === 'linear')
+    expect(loaded.map((entry) => entry.manifest.id).sort()).toEqual(['database', 'linear'])
+    const linear = loaded.find((entry) => entry.manifest.id === 'linear')
     expect(linear?.plugin.name).toBe('linear')
     expect(linear?.manifest.permissions.node.net).toEqual(['api.linear.app', 'uploads.linear.app'])
     dispose = async () => {
-      for (const entry of loaded)
-        await entry.plugin.dispose?.()
+      for (const entry of loaded) await entry.plugin.dispose?.()
     }
   })
 })

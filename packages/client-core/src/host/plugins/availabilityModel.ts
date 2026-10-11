@@ -13,7 +13,7 @@ export type NodePluginRuntimeState =
   | { kind: 'waiting-for-restart'; candidate: InstalledPluginRow }
   | { kind: 'active'; runtime: PluginRuntimeIdentity; pendingCandidate?: InstalledPluginRow; warning?: string }
 
-export type LoadedSelectionState =
+type LoadedSelectionState =
   | { kind: 'accepted'; hash: string }
   | { kind: 'pending-trust'; hash: string }
   | { kind: 'rejected'; hash: string }
@@ -32,7 +32,8 @@ export type ContributionAvailability = {
 /** The roster is the only running proof for a compiled built-in, which has no bundle declaration. */
 export const compiledServiceActive = (row: NodePluginRow): boolean =>
   (row.active === null || (!row.installed && row.active === undefined)) &&
-  row.running && (row.state === 'active' || row.state === 'pending-restart')
+  row.running &&
+  (row.state === 'active' || row.state === 'pending-restart')
 
 export function nodePluginRuntime(
   snapshot: PluginDistributionSnapshot,
@@ -49,11 +50,15 @@ export function nodePluginRuntime(
   if (!row) return { kind: 'absent' }
   const runtime = runtimeIdentityForRow(row)
   if (runtime) {
-    const pendingCandidate = !row.pendingReview && row.installed &&
+    const pendingCandidate =
+      !row.pendingReview &&
+      row.installed &&
       (row.installed.version !== runtime.version || row.installed.client?.hash !== runtime.client?.hash)
-      ? row.installed : undefined
+        ? row.installed
+        : undefined
     return {
-      kind: 'active', runtime,
+      kind: 'active',
+      runtime,
       ...(pendingCandidate ? { pendingCandidate } : {}),
       ...(row.state === 'failed' && row.reason ? { warning: row.reason } : {}),
     }
@@ -64,14 +69,19 @@ export function nodePluginRuntime(
   if (compiledServiceActive(row)) {
     return { kind: 'compiled-active' }
   }
-  if (row.state === 'failed') return { kind: 'failed', ...(row.stage ? { stage: row.stage } : {}), ...(row.reason ? { reason: row.reason } : {}) }
+  if (row.state === 'failed')
+    return { kind: 'failed', ...(row.stage ? { stage: row.stage } : {}), ...(row.reason ? { reason: row.reason } : {}) }
   if (row.disabled || row.state === 'disabled') return { kind: 'disabled' }
   if (row.installed) return { kind: 'waiting-for-restart', candidate: row.installed }
   return { kind: 'absent' }
 }
 
 /** The shared node-runtime gate for compiled contributions with `{ plugin: id }`. */
-export const nodePluginServiceAvailable = (snapshot: PluginDistributionSnapshot, nodeId: string, pluginId: string): boolean => {
+export const nodePluginServiceAvailable = (
+  snapshot: PluginDistributionSnapshot,
+  nodeId: string,
+  pluginId: string,
+): boolean => {
   const state = nodePluginRuntime(snapshot, nodeId, pluginId)
   return state.kind === 'compiled-active' || (state.kind === 'active' && state.runtime.activation === 'node')
 }
@@ -90,13 +100,21 @@ export function contributionAvailability(
   const hash = runtime.runtime.client?.hash ?? ''
   const key = decisionKey(pluginId, hash)
   if (snapshot.conflictingKeys.has(key)) {
-    return { available: false, runtime, selection: { kind: 'declaration-conflict', hash }, reason: 'declaration-conflict' }
+    return {
+      available: false,
+      runtime,
+      selection: { kind: 'declaration-conflict', hash },
+      reason: 'declaration-conflict',
+    }
   }
   const selection = snapshot.selectionsByNode.get(nodeId)?.get(pluginId)
-  if (selection?.hash === hash) return { available: true, runtime, selection: { kind: 'accepted', hash }, reason: 'accepted' }
+  if (selection?.hash === hash)
+    return { available: true, runtime, selection: { kind: 'accepted', hash }, reason: 'accepted' }
   if (!hash) return { available: false, runtime, selection: { kind: 'none' }, reason: 'none' }
-  if (!snapshot.cachedHashes.has(hash)) return { available: false, runtime, selection: { kind: 'bundle-missing', hash }, reason: 'bundle-missing' }
+  if (!snapshot.cachedHashes.has(hash))
+    return { available: false, runtime, selection: { kind: 'bundle-missing', hash }, reason: 'bundle-missing' }
   const decision = snapshot.decisionsByKey.get(key)
-  if (decision === 'rejected') return { available: false, runtime, selection: { kind: 'rejected', hash }, reason: 'rejected' }
+  if (decision === 'rejected')
+    return { available: false, runtime, selection: { kind: 'rejected', hash }, reason: 'rejected' }
   return { available: false, runtime, selection: { kind: 'pending-trust', hash }, reason: 'pending-trust' }
 }

@@ -12,9 +12,9 @@ import { describe, expect, it } from 'vitest'
 // column is checked too, because it is a second copy of `focusRoles.ts` and a second copy with no
 // test is a second copy that goes wrong.
 //
-// And, since the terminal host started drawing the kit, both component tables are checked against the
-// same list. A node cannot join with a sentence and no component, or with a component on one host and
-// nothing on the other: the two hosts draw the same kit or the kit is not closed.
+// And both hosts' component tables are checked against the same list. A node cannot join with a sentence and no
+// component, or with a component on one host and nothing on the other: the two hosts draw the same kit or the kit is
+// not closed.
 
 const ROOT = (() => {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -80,7 +80,10 @@ const DOC = (() => {
   if (start === -1) throw new Error('docs/ui-design/every-node.md has no § Every node at 80 by 24')
   const body = page.slice(start)
   return new Map(
-    [...body.matchAll(/^\| `([A-Za-z][A-Za-z0-9]*)` \| ([a-z-]+) \| (.+?) \|$/gm)].map((m) => [m[1], { focus: m[2], at: m[3] }]),
+    [...body.matchAll(/^\| `([A-Za-z][A-Za-z0-9]*)` \| ([a-z-]+) \| (.+?) \|$/gm)].map((m) => [
+      m[1],
+      { focus: m[2], at: m[3] },
+    ]),
   )
 })()
 

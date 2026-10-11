@@ -1,10 +1,5 @@
 // `ctx.events.notice`: one bell row, two tiers, and the tier is what decides how much of the row the
 // caller gets to write (./types.ts § PluginBroadcast).
-//
-// This exists because the seam it replaces had no tier question at all. The bell had left `ctx.events`
-// for the `workflows.notices` capability, and the plugins that wanted a row borrowed that capability —
-// which can only say "a run, at this node". So the memory-proposal gate raised a row with no
-// destination, and clicking it, in the bell or on the desktop banner, did nothing.
 import { describe, expect, it, vi } from 'vitest'
 
 const broadcasts: Record<string, unknown>[] = []
@@ -29,13 +24,15 @@ describe('a compiled plugin', () => {
         kind: 'memory-proposal',
         target: { kind: 'source', resourceId: 'memory' },
       })
-      expect(sent()).toEqual([{
-        pluginId: 'testkit-probe',
-        taskId: 't1',
-        title: '2 memory proposals await review',
-        kind: 'memory-proposal',
-        target: { kind: 'source', resourceId: 'memory' },
-      }])
+      expect(sent()).toEqual([
+        {
+          pluginId: 'testkit-probe',
+          taskId: 't1',
+          title: '2 memory proposals await review',
+          kind: 'memory-proposal',
+          target: { kind: 'source', resourceId: 'memory' },
+        },
+      ])
     } finally {
       ctx.cleanup()
     }
@@ -59,7 +56,7 @@ describe('a loaded plugin', () => {
   // Dropped rather than refused, unlike `send`, because the row still lands somewhere: the client
   // stamps this plugin's own rail source (client-core host/plugins/rowTargets.ts). Nothing is
   // invisible, so there is nothing for the author to debug.
-  it('cannot name a target, because a target names another plugin\'s handler and resource', () => {
+  it("cannot name a target, because a target names another plugin's handler and resource", () => {
     broadcasts.length = 0
     const ctx = makeTestNodeContext({ plugin, permissions: {} })
     try {
@@ -68,7 +65,9 @@ describe('a loaded plugin', () => {
         title: 'Look at this',
         target: { kind: 'workflow-run', resourceId: 'a-run-it-does-not-own' },
       })
-      expect(sent()).toEqual([{ pluginId: 'testkit-probe', taskId: 't1', title: 'Look at this', detail: undefined, kind: 'plugin' }])
+      expect(sent()).toEqual([
+        { pluginId: 'testkit-probe', taskId: 't1', title: 'Look at this', detail: undefined, kind: 'plugin' },
+      ])
     } finally {
       ctx.cleanup()
     }
@@ -92,7 +91,14 @@ describe('a loaded plugin', () => {
     const ctx = makeTestNodeContext({
       plugin,
       permissions: {},
-      destinations: [{ id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' }],
+      destinations: [
+        {
+          id: 'memory-review',
+          label: 'Review in Memory',
+          targetKind: 'findings-candidate',
+          noticeKind: 'memory-proposal',
+        },
+      ],
     })
     try {
       ctx.events.notice({
@@ -115,7 +121,14 @@ describe('a loaded plugin', () => {
     const ctx = makeTestNodeContext({
       plugin,
       permissions: {},
-      destinations: [{ id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' }],
+      destinations: [
+        {
+          id: 'memory-review',
+          label: 'Review in Memory',
+          targetKind: 'findings-candidate',
+          noticeKind: 'memory-proposal',
+        },
+      ],
     })
     try {
       ctx.events.notice({
@@ -124,7 +137,13 @@ describe('a loaded plugin', () => {
         kind: 'agent-error',
         target: { kind: 'findings-candidate', resourceId: 'candidate-1' },
       })
-      expect(sent()[0]).toEqual({ pluginId: 'testkit-probe', taskId: 't1', title: 'Spoofed failure', detail: undefined, kind: 'plugin' })
+      expect(sent()[0]).toEqual({
+        pluginId: 'testkit-probe',
+        taskId: 't1',
+        title: 'Spoofed failure',
+        detail: undefined,
+        kind: 'plugin',
+      })
     } finally {
       ctx.cleanup()
     }

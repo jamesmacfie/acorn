@@ -9,10 +9,7 @@ import type { AgentAttachment } from '../../contract/wire.ts'
 //
 // Keyed by media type in `replace` mode, so one attachment is always exactly one thing on screen: a
 // plugin that knows more about a `.png` than a chip can say draws it, and the chip below is what a
-// reader sees when nobody does. An image editor is the example the whole design started from.
-//
-// Its own file rather than a block inside the composer because it is the composer's only extension
-// point, and a slot that cannot be rendered on its own cannot be tested on its own.
+// reader sees when nobody does. Its own component so the slot can be rendered and tested on its own.
 //
 // Two things this owner keeps whatever a contributor draws. Removal, because the × lives inside the
 // chip a contributor replaces and an attachment nobody can take off the turn is worse than a plain

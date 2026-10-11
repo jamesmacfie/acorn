@@ -5,9 +5,15 @@ import type { PlanRecordItem } from './plan'
 
 /** Dashboard-only projection types. Source plugins never register or return these shapes. */
 export type DashboardDisplayFieldType = 'text' | 'number' | 'boolean' | 'datetime' | 'enum' | 'person' | 'link'
-export type DashboardDisplayFieldRole = 'title' | 'status' | 'assignee' | 'url' | 'updated'
-export type DashboardDisplayTone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
-export type DashboardDisplayChoice = { id: string; label: string; tone?: DashboardDisplayTone; rank?: number; icon?: string }
+type DashboardDisplayFieldRole = 'title' | 'status' | 'assignee' | 'url' | 'updated'
+type DashboardDisplayTone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
+export type DashboardDisplayChoice = {
+  id: string
+  label: string
+  tone?: DashboardDisplayTone
+  rank?: number
+  icon?: string
+}
 export type DashboardDisplayField = {
   id: string
   name: string

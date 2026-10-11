@@ -10,7 +10,7 @@ const DRIVER_VERSION = 'codex-app-server-v2'
 export class CodexAgentDriver implements AgentDriver {
   readonly providerId = 'codex'
   readonly profileId = 'codex'
-  // `skills/extraRoots/set` (./codexStart.ts).
+  // Delivered through `skills/extraRoots/set` in `startCodexSession`.
   readonly nativeSkills = true
 
   async probe(): Promise<AgentProviderDescriptor> {
@@ -79,7 +79,12 @@ export class CodexAgentDriver implements AgentDriver {
     }
     try {
       cancellation.signal.throwIfAborted()
-      const handle = await awaitWithSignal(this.startSession(scoped, (stop) => { cleanup = stop }), cancellation.signal)
+      const handle = await awaitWithSignal(
+        this.startSession(scoped, (stop) => {
+          cleanup = stop
+        }),
+        cancellation.signal,
+      )
       cancellation.signal.throwIfAborted()
       return handle
     } catch (error) {

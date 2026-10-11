@@ -78,6 +78,23 @@ export function intentKeys(primary: 'super' | 'ctrl'): Record<Intent, readonly s
 
 /** Bare-key intent bindings must not fire while something is being typed into. */
 export const BARE_KEYS: ReadonlySet<string> = new Set([
-  'j', 'k', 'h', 'l', 'g', 'shift+g', '/', 'space', 'return',
-  'down', 'up', 'left', 'right', 'home', 'end', 'pagedown', 'pageup', 'delete', 'backspace',
+  'j',
+  'k',
+  'h',
+  'l',
+  'g',
+  'shift+g',
+  '/',
+  'space',
+  'return',
+  'down',
+  'up',
+  'left',
+  'right',
+  'home',
+  'end',
+  'pagedown',
+  'pageup',
+  'delete',
+  'backspace',
 ])

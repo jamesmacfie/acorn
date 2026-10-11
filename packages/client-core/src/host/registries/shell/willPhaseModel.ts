@@ -31,8 +31,13 @@ export type WillEventMap = {
 }
 
 type WillEventKind = keyof WillEventMap
-type WillHandler<K extends WillEventKind> = (payload: WillEventMap[K]) => Concern | Concern[] | null | Promise<Concern | Concern[] | null>
-type RegisteredHandler = { feature: string; run: (payload: never) => Concern | Concern[] | null | Promise<Concern | Concern[] | null> }
+type WillHandler<K extends WillEventKind> = (
+  payload: WillEventMap[K],
+) => Concern | Concern[] | null | Promise<Concern | Concern[] | null>
+type RegisteredHandler = {
+  feature: string
+  run: (payload: never) => Concern | Concern[] | null | Promise<Concern | Concern[] | null>
+}
 
 // How long each kind's handlers get. Per kind, because the budget is a property of what is being
 // asked. `app:quit` and `workspace:remove` are answered from state the client holds, so 250ms is
@@ -50,7 +55,6 @@ const BUDGET_MS: Record<WillEventKind, number> = {
 const handlers = new Map<WillEventKind, RegisteredHandler[]>()
 
 /**
-/**
  * A client-side concern producer.
  *
  * Not the plugin seam (docs/plugins/task-checks.md § Task checks, the `registerWillHandler` paragraph). A plugin
@@ -58,50 +62,68 @@ const handlers = new Map<WillEventKind, RegisteredHandler[]>()
  * `taskChecks` entry. What is left here is core's use for the two events with no node meaning: the app
  * quitting, and a workspace being removed.
  */
-export function registerWillHandler<K extends WillEventKind>(kind: K, feature: string, handler: WillHandler<K>): () => void {
+export function registerWillHandler<K extends WillEventKind>(
+  kind: K,
+  feature: string,
+  handler: WillHandler<K>,
+): () => void {
   const entry: RegisteredHandler = { feature, run: handler as RegisteredHandler['run'] }
   const list = handlers.get(kind) ?? []
   list.push(entry)
   handlers.set(kind, list)
   return () => {
     const current = handlers.get(kind)
-    if (current) handlers.set(kind, current.filter((candidate) => candidate !== entry))
+    if (current)
+      handlers.set(
+        kind,
+        current.filter((candidate) => candidate !== entry),
+      )
   }
 }
 
-export async function collectConcerns<K extends WillEventKind>(kind: K, payload: WillEventMap[K], timeoutMs = BUDGET_MS[kind]): Promise<Concern[]> {
-  const collect = (entry: RegisteredHandler) => new Promise<Concern[]>((resolve) => {
-    let settled = false
-    const timer = setTimeout(() => {
-      if (settled) return
-      settled = true
-      log.warn(`${kind}: dropped slow concern handler ${entry.feature}`, undefined, { 'will.kind': kind, 'will.feature': entry.feature })
-      resolve([])
-    }, timeoutMs)
-    // `Promise.try`-shaped. `Promise.resolve(entry.run(...))` evaluates the call first, so a handler
-    // that throws synchronously throws out of this executor and rejects the whole fan-out.
-    new Promise<Concern | Concern[] | null>((ok) => ok(entry.run(payload as never))).then((result) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve(result ? (Array.isArray(result) ? result : [result]) : [])
-    }).catch((error) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      log.error(`${kind}: ${entry.feature}`, error, { 'will.kind': kind, 'will.feature': entry.feature })
-      resolve([])
+export async function collectConcerns<K extends WillEventKind>(
+  kind: K,
+  payload: WillEventMap[K],
+  timeoutMs = BUDGET_MS[kind],
+): Promise<Concern[]> {
+  const collect = (entry: RegisteredHandler) =>
+    new Promise<Concern[]>((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        log.warn(`${kind}: dropped slow concern handler ${entry.feature}`, undefined, {
+          'will.kind': kind,
+          'will.feature': entry.feature,
+        })
+        resolve([])
+      }, timeoutMs)
+      // `Promise.try`-shaped. `Promise.resolve(entry.run(...))` evaluates the call first, so a handler
+      // that throws synchronously throws out of this executor and rejects the whole fan-out.
+      new Promise<Concern | Concern[] | null>((ok) => ok(entry.run(payload as never)))
+        .then((result) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve(result ? (Array.isArray(result) ? result : [result]) : [])
+        })
+        .catch((error) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          log.error(`${kind}: ${entry.feature}`, error, { 'will.kind': kind, 'will.feature': entry.feature })
+          resolve([])
+        })
     })
-  })
   return dedupe((await Promise.all((handlers.get(kind) ?? []).map(collect))).flat())
 }
 
 /**
-/**
  * One row per (feature, id) (docs/plugins/task-checks.md § Task checks, the `registerWillHandler` paragraph).
  *
- * Belt to the disposal braces, not a substitute. A handler registered twice showed two identical rows
- * sharing one checkbox, because the state map is keyed on `id`, and confirming ran the teardown twice.
+ * Belt to the disposal braces, not a substitute. A handler registered twice would show two identical
+ * rows sharing one checkbox, because the state map is keyed on `id`, and confirming would run the
+ * teardown twice.
  */
 const dedupe = (concerns: readonly Concern[]): Concern[] => {
   const seen = new Set<string>()

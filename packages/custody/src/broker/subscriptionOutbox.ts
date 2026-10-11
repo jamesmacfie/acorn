@@ -42,15 +42,23 @@ export class SubscriptionOutbox {
   drain(): OutgoingFrame[] {
     const attached = new Set<string>()
     const result: OutgoingFrame[] = []
-    for (const part of this.segments) for (const entry of part.entries) {
-      if (!entry.intent) { result.push(entry); continue }
-      const key = identity(entry)
-      if (entry.intent.state === 'attached') { attached.add(key); result.push(entry) }
-      else if (attached.delete(key)) result.push(entry)
-    }
+    for (const part of this.segments)
+      for (const entry of part.entries) {
+        if (!entry.intent) {
+          result.push(entry)
+          continue
+        }
+        const key = identity(entry)
+        if (entry.intent.state === 'attached') {
+          attached.add(key)
+          result.push(entry)
+        } else if (attached.delete(key)) result.push(entry)
+      }
     this.segments = [segment()]
     return result
   }
 
-  clear(): void { this.segments = [segment()] }
+  clear(): void {
+    this.segments = [segment()]
+  }
 }

@@ -26,7 +26,12 @@ const target = (over: Partial<TaskRowTarget> = {}): TaskRowTarget => ({
 })
 
 const item = (over: Partial<ContextMenuContribution<'task.row'>> = {}): ContextMenuContribution<'task.row'> => ({
-  id: 'x', location: 'task.row', label: 'X', order: 500, run: () => {}, ...over,
+  id: 'x',
+  location: 'task.row',
+  label: 'X',
+  order: 500,
+  run: () => {},
+  ...over,
 })
 
 // A row in a tracker's list: the second location, added when three lists needed one menu
@@ -56,11 +61,7 @@ describe('what a location offers', () => {
   it('sorts by declared order and breaks ties on id', () => {
     // Never on registration sequence: core registers at mount and plugins register whenever a roster
     // arrives, so an order derived from arrival would move a menu row under the user.
-    register([
-      item({ id: 'zebra', order: 10 }),
-      item({ id: 'apple', order: 10 }),
-      item({ id: 'first', order: 1 }),
-    ])
+    register([item({ id: 'zebra', order: 10 }), item({ id: 'apple', order: 10 }), item({ id: 'first', order: 1 })])
     expect(contextMenuItems('task.row', target()).map((entry) => entry.id)).toEqual(['first', 'apple', 'zebra'])
   })
 
@@ -98,7 +99,14 @@ describe('an item row', () => {
   // so the question every one of them asks is "what does this provider's row get".
   it('offers a row keyed to one provider on that provider and nowhere else', () => {
     register([
-      { id: 'rollbar.only', location: 'item.row', label: 'Investigate', order: 10, when: compileWhen({ providerId: 'rollbar' }), run: () => {} },
+      {
+        id: 'rollbar.only',
+        location: 'item.row',
+        label: 'Investigate',
+        order: 10,
+        when: compileWhen({ providerId: 'rollbar' }),
+        run: () => {},
+      },
       { id: 'anywhere', location: 'item.row', label: 'Start workflow…', order: 20, run: () => {} },
     ])
     expect(contextMenuItems('item.row', rowTarget()).map((row) => row.id)).toEqual(['rollbar.only', 'anywhere'])
@@ -115,7 +123,12 @@ describe('an item row', () => {
     const run = vi.fn()
     const pull = { number: 42, headRef: 'james/fix' }
     register([{ id: 'workflows.start', location: 'item.row', label: 'Start workflow…', order: 20, run }])
-    const target = rowTarget({ providerId: 'github', item: pull, body: 'the description', link: 'https://example.test/42' })
+    const target = rowTarget({
+      providerId: 'github',
+      item: pull,
+      body: 'the description',
+      link: 'https://example.test/42',
+    })
     runContextMenuItem(contextMenuItems('item.row', target)[0], target)
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ item: pull, body: 'the description' }))
   })
@@ -148,7 +161,14 @@ describe('running a row', () => {
     // The menu has already closed by the time this runs, so the alternative to swallowing is an
     // unhandled error from a component that's no longer on screen.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    register([item({ id: 'boom', run: () => { throw new Error('nope') } })])
+    register([
+      item({
+        id: 'boom',
+        run: () => {
+          throw new Error('nope')
+        },
+      }),
+    ])
     expect(() => runContextMenuItem(contextMenuItems('task.row', target())[0], target())).not.toThrow()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()

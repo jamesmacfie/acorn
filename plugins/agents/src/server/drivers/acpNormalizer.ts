@@ -60,7 +60,10 @@ const SUBJECT_KINDS: Record<string, AgentPermissionSubject['kind']> = {
 
 /** The parts of a tool call a permission subject reads. A permission request's `toolCall` is an update to
  *  a call the agent may have announced earlier, so the driver merges the two before reading it. */
-export type AcpToolCallFacts = Pick<RequestPermissionRequest['toolCall'], 'toolCallId' | 'kind' | 'rawInput' | 'locations'>
+export type AcpToolCallFacts = Pick<
+  RequestPermissionRequest['toolCall'],
+  'toolCallId' | 'kind' | 'rawInput' | 'locations'
+>
 
 // What `agents:before-permission` reads. `command` is taken only when the harness sent it as a string,
 // which is Claude Code's and DeepSeek's shell input; anything else stays empty rather than rebuilt from
@@ -72,14 +75,11 @@ export function acpPermissionSubject(toolCall: AcpToolCallFacts): AgentPermissio
     toolCallId: toolCall.toolCallId ?? '',
     kind: SUBJECT_KINDS[toolCall.kind ?? ''] ?? 'other',
     command: typeof command === 'string' ? command : '',
-    paths: (toolCall.locations ?? []).flatMap((location) => typeof location.path === 'string' ? [location.path] : []),
+    paths: (toolCall.locations ?? []).flatMap((location) => (typeof location.path === 'string' ? [location.path] : [])),
   }
 }
 
-export function normalizeAcpElicitation(
-  requestId: string,
-  request: CreateElicitationRequest,
-): AgentNormalizedEvent {
+export function normalizeAcpElicitation(requestId: string, request: CreateElicitationRequest): AgentNormalizedEvent {
   return normalizeFormElicitation(requestId, {
     message: request.message,
     requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
@@ -90,10 +90,13 @@ export function acpElicitationResponse(
   request: CreateElicitationRequest,
   resolution: unknown,
 ): CreateElicitationResponse {
-  return formElicitationResponse({
-    message: request.message,
-    requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
-  }, resolution)
+  return formElicitationResponse(
+    {
+      message: request.message,
+      requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
+    },
+    resolution,
+  )
 }
 
 const configCategory = (category: string | null | undefined): AgentConfigOption['category'] => {
@@ -125,11 +128,13 @@ export function normalizeAcpConfig(options: readonly SessionConfigOption[] | nul
           description: value.description ?? undefined,
         }))
       }
-      return [{
-        value: entry.value,
-        label: entry.name,
-        description: entry.description ?? undefined,
-      }]
+      return [
+        {
+          value: entry.value,
+          label: entry.name,
+          description: entry.description ?? undefined,
+        },
+      ]
     })
     return {
       id: option.id,
@@ -141,9 +146,7 @@ export function normalizeAcpConfig(options: readonly SessionConfigOption[] | nul
   })
 }
 
-export const normalizeAcpCommands = (
-  commands: readonly AvailableCommand[] | null | undefined,
-): AgentCommandDescriptor[] =>
+const normalizeAcpCommands = (commands: readonly AvailableCommand[] | null | undefined): AgentCommandDescriptor[] =>
   (commands ?? []).map((command) => ({
     name: command.name,
     description: command.description || undefined,
@@ -163,12 +166,12 @@ function unfenced(text: string): string {
 }
 
 // ACP's `_meta` is an open extension bag, typed `{[key: string]: unknown}`, and `claudeCode` is Claude
-// Code's namespace inside it. Read here in the shared normalizer rather than behind a harness quirk on
-// purpose: another harness's namespace is simply absent, so the branches below cost nothing, and
-// HarnessQuirks says a quirk joins that list when a SECOND harness needs one.
+// Code's namespace inside it. It is read here in the shared normalizer rather than behind a harness quirk:
+// another harness's namespace is simply absent, so the branches below cost nothing, and a quirk joins
+// HarnessQuirks only when a second harness needs one.
 //
-// What the adapter puts there, confirmed against a live capture on Claude Code 2.1.241 with adapter
-// 0.54.1 (drivers/__fixtures__/claudeSubagentWire.json):
+// What the adapter puts there, as captured from Claude Code 2.1.241 with adapter 0.54.1 in
+// __fixtures__/claudeSubagentWire.json:
 //   toolName          the CLI's own name for the tool, on every tool_call and most updates
 //   parentToolUseId   the spawning `Agent` call, on everything a subagent did
 //   toolResponse      the structured result; for a subagent it names the agent and reports its usage,
@@ -192,9 +195,9 @@ type ClaudeToolMeta = {
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as Record<string, unknown> : null
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 
-const str = (value: unknown): string | undefined => typeof value === 'string' && value ? value : undefined
+const str = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined)
 const num = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
@@ -214,29 +217,27 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
     heartbeat: agentId == null && num(response?.elapsedTimeSeconds) != null,
     subagent: agentId
       ? {
-        agentId,
-        agentType: str(response?.agentType),
-        resolvedModel: str(response?.resolvedModel),
-        status: str(response?.status),
-        totalTokens: num(response?.totalTokens),
-        totalToolUseCount: num(response?.totalToolUseCount),
-        totalDurationMs: num(response?.totalDurationMs),
-      }
+          agentId,
+          agentType: str(response?.agentType),
+          resolvedModel: str(response?.resolvedModel),
+          status: str(response?.status),
+          totalTokens: num(response?.totalTokens),
+          totalToolUseCount: num(response?.totalToolUseCount),
+          totalDurationMs: num(response?.totalDurationMs),
+        }
       : undefined,
   }
 }
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
-// Claude Code's two web tools, read into the provider-neutral shape
-// (@acorn/plugin-agents/contract/wire § AgentWebActivity) so a search reads the same here as it does
-// on the Codex path. Held to `_meta.claudeCode.toolName` and `rawInput`, never to ACP's `kind`:
-// WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository grep
-// `search`. A harness whose tool identity this file does not know keeps the generic card.
+// Claude Code's two web tools, read into the provider-neutral `AgentWebActivity` so a search reads the
+// same here as on the Codex path. Keyed on `_meta.claudeCode.toolName` and `rawInput`, never on ACP's
+// `kind`: WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository
+// grep `search`. A harness whose tool identity this file does not know keeps the generic card.
 //
-// Captured on Claude Code 2.1.241 with adapter 0.54.1
-// (./__fixtures__/claudeWebSearchWire.json). Three updates make up one call: the opening `tool_call`
-// with an empty rawInput, a refining update carrying the request, and a later one carrying the
-// result. Each maps only what it holds, and the transcript's fold puts them back together.
+// Three updates make up one call (see __fixtures__/claudeWebSearchWire.json): the opening `tool_call`
+// with an empty rawInput, a refining update carrying the request, and a later one carrying the result.
+// Each maps only what it holds, and the transcript's fold puts them back together.
 
 const strings = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) return undefined
@@ -281,11 +282,11 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     // is what keeps the fold from blanking what an earlier update reported.
     const action: AgentWebActivity['action'] | undefined = input
       ? {
-        type: 'search',
-        queries: query ? [query] : [],
-        ...(allowedDomains ? { allowedDomains } : {}),
-        ...(blockedDomains ? { blockedDomains } : {}),
-      }
+          type: 'search',
+          queries: query ? [query] : [],
+          ...(allowedDomains ? { allowedDomains } : {}),
+          ...(blockedDomains ? { blockedDomains } : {}),
+        }
       : undefined
     const results = claudeWebResults(meta.response)
     return action || results ? { ...(action ? { action } : {}), ...(results ? { results } : {}) } : undefined
@@ -294,16 +295,18 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     const url = str(input?.url)
     const prompt = str(input?.prompt)
     // The status rides the response update, which carries no request. A 404 still arrives as a
-    // completed call, with `code: 404` and a note in place of the page (checked against Claude Code's
-    // own structured result on 2026-09-28), so this is the only thing that says the page was missing.
+    // completed call, with `code: 404` and a note in place of the page, so this is the only thing that
+    // says the page was missing.
     const code = num(meta.response?.code)
     const text = str(meta.response?.codeText)
     const status = code != null ? { code, ...(text ? { text } : {}) } : undefined
     return input || status
       ? {
-        ...(input ? { action: { type: 'fetch_page' as const, ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } } : {}),
-        ...(status ? { status } : {}),
-      }
+          ...(input
+            ? { action: { type: 'fetch_page' as const, ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } }
+            : {}),
+          ...(status ? { status } : {}),
+        }
       : undefined
   }
   return undefined
@@ -323,11 +326,11 @@ const CLAUDE_WEB_TOOLS = new Map<string, AgentWebAction['type']>([
  * The row for Claude Code loading a deferred tool, which it does before the first use of any tool
  * it has not described to the model yet.
  *
- * The adapter titles it `ToolSearch`, sends `{ "query": "select:WebFetch", "max_results": 1 }` as its
- * input and `Tool: WebFetch` as its output, so the card opened onto two restatements of one name. The
- * names are on the response as `matches`, and they become the title; input and output are dropped
- * unless the call failed, so the row renders flat. The completion update names the tool too, and it
- * returns '' here so the fold keeps the title the response set.
+ * The adapter titles it `ToolSearch`, with `{ "query": "select:WebFetch", "max_results": 1 }` as input
+ * and `Tool: WebFetch` as output: two restatements of one name. The names are on the response as
+ * `matches`, and they become the title; input and output are dropped unless the call failed, so the
+ * row renders flat. The completion update names the tool too, and it returns '' here so the fold keeps
+ * the title the response set.
  */
 function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | undefined {
   if (meta.toolName !== 'ToolSearch') return undefined
@@ -348,9 +351,14 @@ function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | 
  */
 export function claudeBashLaunch(update: SessionUpdate): { taskId: string; outputPath: string } | undefined {
   if (update.sessionUpdate !== 'tool_call_update' || claudeToolMeta(update._meta).toolName !== 'Bash') return undefined
-  const text = typeof update.rawOutput === 'string'
-    ? update.rawOutput
-    : (update.content ?? []).flatMap((block) => block.type === 'content' && block.content.type === 'text' ? [unfenced(block.content.text)] : []).join('\n')
+  const text =
+    typeof update.rawOutput === 'string'
+      ? update.rawOutput
+      : (update.content ?? [])
+          .flatMap((block) =>
+            block.type === 'content' && block.content.type === 'text' ? [unfenced(block.content.text)] : [],
+          )
+          .join('\n')
   return claudeBackgroundLaunch(text)
 }
 
@@ -359,22 +367,15 @@ export function claudeBashLaunch(update: SessionUpdate): { taskId: string; outpu
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /**
- * Four calls whose parameters are a document rather than arguments, and which field of each holds it.
+ * Calls whose parameters are one markdown document rather than arguments, and which field holds it:
+ * the plan Claude hands over when it leaves plan mode, the brief a subagent is spawned with, and the
+ * report that subagent hands back. `toolInput` would render each as JSON with every line break spelled
+ * out as `\n`, so the document is posted as a message instead. It renders as markdown, stays in view
+ * when the reader asks for chat only, and is searchable as prose. The call keeps its title and outcome
+ * and drops its parameters.
  *
- * `toolInput` below argues against reading parameters per tool, and it is right about the general
- * case. These are not it. Each carries one markdown document as its whole payload — the plan
- * Claude hands over when it leaves plan mode, the brief a subagent is spawned with, the report that
- * subagent hands back — and `toolInput` renders each as pretty-printed JSON with every line break
- * spelled out as `\n`. Unreadable, and in each of them the document is the one thing anybody opened the
- * call to read.
- *
- * So it comes back out as somebody talking, which renders as markdown, stays in view when the reader
- * has asked for chat only, and is searchable as prose. The call keeps its title and its outcome and
- * loses its parameters, because the document is now above it.
- *
- * A brief is posted as a `user_message` because that is the role the parent plays for its child: the
- * child's stream then reads as a conversation, brief in and report out, the same shape as the
- * session's own. Both of the subagent ones carry the subagent's id, so they land in its stream.
+ * A brief is a `user_message` because the parent plays the user for its child, so the child's stream
+ * reads as brief in, report out. Both subagent entries carry the subagent's id, so they land in its stream.
  */
 const PROSE_TOOLS = new Map<string, { field: string; as: 'user_message' | 'assistant_message' }>([
   ['ExitPlanMode', { field: 'plan', as: 'assistant_message' }],
@@ -384,16 +385,14 @@ const PROSE_TOOLS = new Map<string, { field: string; as: 'user_message' | 'assis
 ])
 
 /**
- * The document this call is carrying, if it is one of the four.
+ * The document this call carries, if it is one of the PROSE_TOOLS.
  *
- * From whichever update carries the parameters rather than from the `tool_call` alone, which is what
- * this used to read. The capture in `__fixtures__/claudeSubagentWire.json` settles it: an `Agent`
- * call arrives with an empty parameter bag and a placeholder title, and the first update after it
- * carries both the real title and the whole brief. Reading only the call found nothing.
+ * Read from whichever update carries the parameters, not from the `tool_call` alone: in
+ * `__fixtures__/claudeSubagentWire.json` an `Agent` call arrives with an empty parameter bag and a
+ * placeholder title, and the next update carries the real title and the whole brief.
  *
- * The CLI sends a call's parameters once, so nothing posts twice. If one ever repeated them
- * the reader would see the same document again; dedupe in the driver, which is the only layer that
- * sees more than one update, rather than here, which is pure.
+ * The CLI sends a call's parameters once, so nothing posts twice. If that changes, dedupe in the
+ * driver, the only layer that sees more than one update, rather than here, which is pure.
  */
 const toolProse = (
   update: SessionUpdate,
@@ -407,15 +406,13 @@ const toolProse = (
 }
 
 /**
- * A call's own parameters, so a card has something to show before its output arrives. Without this the
- * only thing the ACP path ever filled in was output, which lands on the completion update, so a
- * running call had nothing to disclose and its card could not honour the reader's fold setting until
- * it had finished.
+ * A call's own parameters, so a running card has something to disclose before its output arrives on the
+ * completion update, and can honour the reader's fold setting while it runs.
  *
  * Pretty-printed JSON rather than a per-tool reading of it: every tool names its parameters
  * differently, and a table of which field to pull for which tool name would need an entry for every
- * tool a harness adds. The bounds are the materializer's, which promotes anything past 64 KiB to an
- * artifact, so a call that carries a whole file in its parameters does not land in SQLite.
+ * tool a harness adds. The materializer promotes anything past 64 KiB to an artifact, so a call that
+ * carries a whole file in its parameters does not land in SQLite.
  */
 const toolInput = (rawInput: unknown): string | undefined => {
   if (rawInput == null || typeof rawInput !== 'object' || Array.isArray(rawInput)) return undefined
@@ -462,9 +459,10 @@ function acpFileChanges(
     files.set(block.path, file)
     const location = locations[at]
     const line = locations.length === blocks.length && location?.path === block.path ? location.line : null
-    const hunks = line == null
-      ? diffHunks(block.oldText ?? '', block.newText)
-      : diffHunks(block.oldText ?? '', block.newText, { old: line - 1 - file.added, new: line - 1 })
+    const hunks =
+      line == null
+        ? diffHunks(block.oldText ?? '', block.newText)
+        : diffHunks(block.oldText ?? '', block.newText, { old: line - 1 - file.added, new: line - 1 })
     file.hunks.push(...hunks)
     file.added += hunks.reduce((sum, hunk) => sum + hunk.newLines - hunk.oldLines, 0)
     if (line == null && block.oldText != null) file.snippet = true
@@ -479,8 +477,8 @@ function acpFileChanges(
 }
 
 // `harness` is the label of the agent whose events these are. A parameter, not a constant, because
-// this file is the shared half of the generic driver (./acpDriver.ts) and it writes the
-// label into three user-visible strings.
+// this file is the shared half of the generic ACP driver and it writes the label into three
+// user-visible strings.
 export function normalizeAcpUpdate(update: SessionUpdate, harness: string): AgentNormalizedEvent[] {
   switch (update.sessionUpdate) {
     case 'user_message_chunk':
@@ -490,23 +488,27 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
     // field costs nothing against the day the CLI starts using it.
     case 'agent_message_chunk':
       return update.content.type === 'text'
-        ? [{
-          type: 'assistant_message',
-          text: update.content.text,
-          messageId: update.messageId ?? undefined,
-          append: true,
-          subagentId: claudeToolMeta(update._meta).parentToolUseId,
-        }]
+        ? [
+            {
+              type: 'assistant_message',
+              text: update.content.text,
+              messageId: update.messageId ?? undefined,
+              append: true,
+              subagentId: claudeToolMeta(update._meta).parentToolUseId,
+            },
+          ]
         : []
     case 'agent_thought_chunk':
       return update.content.type === 'text'
-        ? [{
-          type: 'reasoning',
-          text: update.content.text,
-          messageId: update.messageId ?? undefined,
-          append: true,
-          subagentId: claudeToolMeta(update._meta).parentToolUseId,
-        }]
+        ? [
+            {
+              type: 'reasoning',
+              text: update.content.text,
+              messageId: update.messageId ?? undefined,
+              append: true,
+              subagentId: claudeToolMeta(update._meta).parentToolUseId,
+            },
+          ]
         : []
     case 'tool_call':
     case 'tool_call_update': {
@@ -524,17 +526,19 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // capability, so this is the only place it can be picked up. The card renders it behind a
       // disclosure toggle. `content` replaces rather than appends in ACP, hence no outputAppend.
       const text = blocks
-        .flatMap((content) => content.type === 'content' && content.content.type === 'text'
-          ? [unfenced(content.content.text)]
-          : [])
+        .flatMap((content) =>
+          content.type === 'content' && content.content.type === 'text' ? [unfenced(content.content.text)] : [],
+        )
         .join('\n')
       // A background command's launch receipt is not its end. It stays running until the harness
       // reports the exit, and the receipt's own text gives way to the command's output.
       const launch = claudeBashLaunch(update)
-      const backgroundCommand = meta.toolName === 'Bash'
-        && (asRecord(update.rawInput)?.run_in_background === true || meta.response?.backgroundTaskId != null || launch != null)
-      const reported = toolStatus(update.status)
-        ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
+      const backgroundCommand =
+        meta.toolName === 'Bash' &&
+        (asRecord(update.rawInput)?.run_in_background === true ||
+          meta.response?.backgroundTaskId != null ||
+          launch != null)
+      const reported = toolStatus(update.status) ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
       const status = launch && reported === 'completed' ? 'running' : reported
       // A spawning call belongs to the subagent it starts, not to the parent. That is what makes the
       // transcript nest it inside the subagent's card, so the prompt and the final report read as the
@@ -545,70 +549,86 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // call's input; `subagentFromToolCall` also reads it off the `async_launched` summary.
       const background = asRecord(update.rawInput)?.run_in_background === true
       const roster: AgentNormalizedEvent[] = spawn
-        ? [{ type: 'subagent', subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta, background) }]
+        ? [
+            {
+              type: 'subagent',
+              subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta, background),
+            },
+          ]
         : []
-      // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
-      // it rendered in the parent's stream while the Edit call that produced it sat inside the
-      // subagent's, so a subagent's run showed the tool and not what it changed.
-      const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId)
-        .map((change) => ({ ...change, summary: `${harness} updated a file.`, subagentId }))
+      // A diff belongs to whoever made the edit, the same as the call it arrived on. Unattributed, a
+      // subagent's diff renders in the parent's stream, apart from the Edit call that produced it.
+      const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId).map((change) => ({
+        ...change,
+        summary: `${harness} updated a file.`,
+        subagentId,
+      }))
       const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
       const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
       const prose = toolProse(update, meta)
       const toolSearch = toolSearchTitle(update, meta)
       // After the roster, so a brief lands in the stream the subagent card has just opened.
-      const said: AgentNormalizedEvent[] = prose
-        ? [{ type: prose.as, text: prose.text, subagentId }]
-        : []
-      return [...roster, ...said, {
-        type: 'tool',
-        tool: {
-          id: update.toolCallId,
-          ...(meta.toolName?.startsWith('mcp__') ? { name: meta.toolName.split('__').at(-1) } : {}),
-          // Empty rather than a made-up name: a tool_call always names itself, an update need not,
-          // and the fold keeps the name the call arrived with. A web call is the exception: its row
-          // is named after what it did, so the adapter's `"query" (allowed: host)` title never
-          // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
-          title: webAction ? webToolTitle(webAction) : toolSearch ?? update.title ?? '',
-          kind: update.kind ?? undefined,
-          status,
-          input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
-          // A failed load keeps its output, because that is where the error is.
-          output: launch ? '' : toolSearch != null && status !== 'failed' ? undefined : text || undefined,
-          subagentId,
-          ...(backgroundCommand ? { background: true } : {}),
-          ...(web ? { web } : {}),
+      const said: AgentNormalizedEvent[] = prose ? [{ type: prose.as, text: prose.text, subagentId }] : []
+      return [
+        ...roster,
+        ...said,
+        {
+          type: 'tool',
+          tool: {
+            id: update.toolCallId,
+            ...(meta.toolName?.startsWith('mcp__') ? { name: meta.toolName.split('__').at(-1) } : {}),
+            // Empty rather than a made-up name: a tool_call always names itself, an update need not,
+            // and the fold keeps the name the call arrived with. A web call is the exception: its row
+            // is named after what it did, so the adapter's `"query" (allowed: host)` title never
+            // reaches a card and a Claude row reads like a Codex one.
+            title: webAction ? webToolTitle(webAction) : (toolSearch ?? update.title ?? ''),
+            kind: update.kind ?? undefined,
+            status,
+            input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
+            // A failed load keeps its output, because that is where the error is.
+            output: launch ? '' : toolSearch != null && status !== 'failed' ? undefined : text || undefined,
+            subagentId,
+            ...(backgroundCommand ? { background: true } : {}),
+            ...(web ? { web } : {}),
+          },
         },
-      }, ...diffs]
+        ...diffs,
+      ]
     }
     case 'plan':
-      return [{
-        type: 'plan',
-        entries: update.entries.map((entry, index) => ({
-          id: `plan-${index}`,
-          text: entry.content,
-          status: entry.status,
-        })),
-      }]
+      return [
+        {
+          type: 'plan',
+          entries: update.entries.map((entry, index) => ({
+            id: `plan-${index}`,
+            text: entry.content,
+            status: entry.status,
+          })),
+        },
+      ]
     case 'available_commands_update':
       return [{ type: 'session_metadata', commands: normalizeAcpCommands(update.availableCommands) }]
     case 'config_option_update':
       return [{ type: 'session_metadata', configOptions: normalizeAcpConfig(update.configOptions) }]
     case 'usage_update':
-      return [{
-        type: 'usage',
-        usage: {
-          contextUsed: update.used,
-          contextSize: update.size,
-          cost: update.cost ? { amount: update.cost.amount, currency: update.cost.currency } : undefined,
+      return [
+        {
+          type: 'usage',
+          usage: {
+            contextUsed: update.used,
+            contextSize: update.size,
+            cost: update.cost ? { amount: update.cost.amount, currency: update.cost.currency } : undefined,
+          },
         },
-      }]
+      ]
     case 'current_mode_update':
-      return [{
-        type: 'diagnostic',
-        level: 'info',
-        message: `${harness} switched to mode ${update.currentModeId}.`,
-      }]
+      return [
+        {
+          type: 'diagnostic',
+          level: 'info',
+          message: `${harness} switched to mode ${update.currentModeId}.`,
+        },
+      ]
     case 'session_info_update':
       return update.title
         ? [{ type: 'diagnostic', level: 'info', message: `${harness} session title: ${update.title}` }]
@@ -632,18 +652,20 @@ function subagentFromToolCall(
   const summary = meta.subagent
   // `contextUsed` rather than input/output tokens: the summary reports one total, and splitting a
   // total across two fields would invent a breakdown the wire never gave us.
-  const usage: AgentUsage | undefined = summary?.totalTokens == null
-    ? undefined
-    : { contextUsed: summary.totalTokens }
+  const usage: AgentUsage | undefined = summary?.totalTokens == null ? undefined : { contextUsed: summary.totalTokens }
   // `async_launched` is the launch receipt of a backgrounded `Agent` call: a summary arrives at the
   // moment the child starts, so reading it as a finish marks the child done before it has done
-  // anything. It means running. Any other summary status is a genuine end, so keep the earlier rule.
+  // anything. It means running. Any other summary status is a genuine end.
   const launched = summary?.status === 'async_launched'
   return {
     id: toolCallId,
     title: title != null && !SUBAGENT_TOOLS.has(title) ? title : undefined,
     status: summary
-      ? launched ? 'running' : summary.status == null || summary.status === 'completed' ? 'completed' : 'failed'
+      ? launched
+        ? 'running'
+        : summary.status == null || summary.status === 'completed'
+          ? 'completed'
+          : 'failed'
       : status,
     background: background || launched || undefined,
     role: summary?.agentType,

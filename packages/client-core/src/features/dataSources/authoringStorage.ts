@@ -12,7 +12,13 @@ export const authoringStorageKey = (cacheId: string, target: Target, targetId: s
 
 /** Moves a conversation to the id its target was saved under, such as a new panel's draft id, so it
  *  isn't left behind under the id the target had before it was saved. */
-export function moveAuthoringConversation(storage: Storage | undefined, cacheId: string, target: Target, from: string, to: string): void {
+export function moveAuthoringConversation(
+  storage: Storage | undefined,
+  cacheId: string,
+  target: Target,
+  from: string,
+  to: string,
+): void {
   const saved = storage?.getItem(authoringStorageKey(cacheId, target, from))
   if (!storage || saved == null) return
   storage.setItem(authoringStorageKey(cacheId, target, to), saved)

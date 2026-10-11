@@ -22,7 +22,9 @@ const CHILD: WorkflowDef = {
 }
 
 const deps = (): RunnerDeps => ({
-  runStep: vi.fn(async () => { throw new Error('The gate-only fixture must not run an agent.') }),
+  runStep: vi.fn(async () => {
+    throw new Error('The gate-only fixture must not run an agent.')
+  }),
   writeHandoff: vi.fn(async () => undefined),
   assembleContext: vi.fn(async () => ''),
   evaluatePolicy: vi.fn(async () => ({ pass: true })),
@@ -42,30 +44,75 @@ describe('durable workflow dispatch', () => {
     runner = new WorkflowRunner(workflows.db, deps())
     tasks = makeTestCoreServices(core).tasks
     await core.db.insert(coreSchema.workspaces).values({
-      id: 'workspace-one', name: 'Workspace', isDefault: true, sort: 0, createdAt: at, updatedAt: at,
+      id: 'workspace-one',
+      name: 'Workspace',
+      isDefault: true,
+      sort: 0,
+      createdAt: at,
+      updatedAt: at,
     })
     await core.db.insert(coreSchema.projects).values({
-      id: 'project-one', name: 'Project', path: null, workspaceId: 'workspace-one', sort: 0,
-      hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null,
-      githubName: null, githubRepoId: null, createdAt: at, updatedAt: at,
+      id: 'project-one',
+      name: 'Project',
+      path: null,
+      workspaceId: 'workspace-one',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await core.db.insert(coreSchema.tasks).values({
-      id: 'parent-task', title: 'Parent', origin: 'local', projectId: 'project-one', branch: 'parent',
-      worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0,
-      createdAt: at, updatedAt: at,
+      id: 'parent-task',
+      title: 'Parent',
+      origin: 'local',
+      projectId: 'project-one',
+      branch: 'parent',
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: at,
+      updatedAt: at,
     })
     await workflows.db.insert(schema.workflowRuns).values({
-      id: 'parent-run', taskId: 'parent-task', name: 'Parent workflow', status: 'gated',
-      posture: 'gated', trigger: 'manual', defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
+      id: 'parent-run',
+      taskId: 'parent-task',
+      name: 'Parent workflow',
+      status: 'gated',
+      posture: 'gated',
+      trigger: 'manual',
+      defJson: JSON.stringify({
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
         name: 'Parent workflow',
         steps: [{ name: 'dispatch', kind: 'workflow' }],
       }),
-      rootRunId: 'parent-run', parentRunId: null, parentStepId: null, depth: 0,
-      invocationKey: null, payloadFingerprint: null, createdAt: at, updatedAt: at,
+      rootRunId: 'parent-run',
+      parentRunId: null,
+      parentStepId: null,
+      depth: 0,
+      invocationKey: null,
+      payloadFingerprint: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await workflows.db.insert(schema.workflowSteps).values({
-      id: 'dispatch-step', runId: 'parent-run', idx: 0, name: 'dispatch', kind: 'workflow',
-      mode: 'headless', status: 'running', createdAt: at, updatedAt: at,
+      id: 'dispatch-step',
+      runId: 'parent-run',
+      idx: 0,
+      name: 'dispatch',
+      kind: 'workflow',
+      mode: 'headless',
+      status: 'running',
+      createdAt: at,
+      updatedAt: at,
     })
   })
 
@@ -97,13 +144,18 @@ describe('durable workflow dispatch', () => {
 
     expect(left).toEqual(right)
     expect(left.state).toBe('run-started')
-    expect((await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.parentId, 'parent-task')))).toHaveLength(1)
-    expect((await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, left.runId)))).toHaveLength(1)
+    expect(
+      await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.parentId, 'parent-task')),
+    ).toHaveLength(1)
+    expect(
+      await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, left.runId)),
+    ).toHaveLength(1)
     expect(await runner.steps(left.runId)).toHaveLength(1)
     expect(await dispatcher.dispatch(request())).toEqual(left)
 
-    await expect(dispatcher.dispatch(request({ task: { title: 'A different task', branch: 'different' } })))
-      .rejects.toThrow(/reused with a different payload/)
+    await expect(
+      dispatcher.dispatch(request({ task: { title: 'A different task', branch: 'different' } })),
+    ).rejects.toThrow(/reused with a different payload/)
   })
 
   it('starts an intended run and its roster atomically, then verifies replays', async () => {
@@ -123,7 +175,10 @@ describe('durable workflow dispatch', () => {
     const firstDeadline = (await runner.run('reserved-run'))?.deadlineAt
     expect(await runner.start('parent-task', workflow, options)).toBe('reserved-run')
 
-    const [run] = await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, 'reserved-run'))
+    const [run] = await workflows.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.id, 'reserved-run'))
     expect(run).toMatchObject({
       rootRunId: 'reserved-run',
       depth: 0,
@@ -131,10 +186,12 @@ describe('durable workflow dispatch', () => {
       deadlineAt: firstDeadline,
     })
     expect(await runner.steps('reserved-run')).toHaveLength(1)
-    await expect(runner.start('parent-task', workflow, {
-      ...options,
-      invocation: { ...options.invocation, payloadFingerprint: 'fingerprint-two' },
-    })).rejects.toThrow(/conflicts with an existing run/)
+    await expect(
+      runner.start('parent-task', workflow, {
+        ...options,
+        invocation: { ...options.invocation, payloadFingerprint: 'fingerprint-two' },
+      }),
+    ).rejects.toThrow(/conflicts with an existing run/)
   })
 
   it('recovers an ambiguous task-creation response with the reserved task ID', async () => {
@@ -157,8 +214,12 @@ describe('durable workflow dispatch', () => {
 
     const restarted = new WorkflowDispatcher(workflows.db, runner, tasks)
     expect(await restarted.reconcile()).toEqual({ reconciled: 1, errors: [] })
-    expect((await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.id, reserved.taskId)))).toHaveLength(1)
-    expect((await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, reserved.runId)))).toHaveLength(1)
+    expect(await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.id, reserved.taskId))).toHaveLength(
+      1,
+    )
+    expect(
+      await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, reserved.runId)),
+    ).toHaveLength(1)
     expect(await runner.steps(reserved.runId)).toHaveLength(1)
   })
 
@@ -183,35 +244,55 @@ describe('durable workflow dispatch', () => {
     expect(await firstRestart.reconcile()).toEqual({ reconciled: 1, errors: [] })
     const secondRestart = new WorkflowDispatcher(workflows.db, runner, tasks)
     expect(await secondRestart.reconcile()).toEqual({ reconciled: 0, errors: [] })
-    expect((await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.id, partial.taskId)))).toHaveLength(1)
-    expect((await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, partial.runId)))).toHaveLength(1)
+    expect(await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.id, partial.taskId))).toHaveLength(1)
+    expect(
+      await workflows.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, partial.runId)),
+    ).toHaveLength(1)
     expect(await runner.steps(partial.runId)).toHaveLength(1)
   })
 
   it('keeps a reservation after a failure before task creation', async () => {
-    const unavailableTasks = { createChild: vi.fn(async () => { throw new Error('core unavailable') }) }
+    const unavailableTasks = {
+      createChild: vi.fn(async () => {
+        throw new Error('core unavailable')
+      }),
+    }
     const crashed = new WorkflowDispatcher(workflows.db, runner, unavailableTasks)
     await expect(crashed.dispatch(request())).rejects.toThrow(/core unavailable/)
 
     const [reserved] = await workflows.db.select().from(schema.workflowDispatches)
     expect(reserved).toMatchObject({ state: 'reserved', error: 'core unavailable' })
-    expect(await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.parentId, 'parent-task'))).toEqual([])
+    expect(await core.db.select().from(coreSchema.tasks).where(eq(coreSchema.tasks.parentId, 'parent-task'))).toEqual(
+      [],
+    )
   })
 
   it('atomically reserves only the final descendant task across dispatch steps', async () => {
-    await workflows.db.update(schema.workflowRuns).set({
-      defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
-        name: 'Parent workflow',
-        steps: [
-          { name: 'dispatch', kind: 'workflow' },
-          { name: 'dispatch-two', kind: 'workflow', after: [] },
-        ],
-        maxDescendants: 12,
-      }),
-    }).where(eq(schema.workflowRuns.id, 'parent-run'))
+    await workflows.db
+      .update(schema.workflowRuns)
+      .set({
+        defJson: JSON.stringify({
+          baseline: 'acorn-1' as const,
+          formatVersion: 1 as const,
+          name: 'Parent workflow',
+          steps: [
+            { name: 'dispatch', kind: 'workflow' },
+            { name: 'dispatch-two', kind: 'workflow', after: [] },
+          ],
+          maxDescendants: 12,
+        }),
+      })
+      .where(eq(schema.workflowRuns.id, 'parent-run'))
     await workflows.db.insert(schema.workflowSteps).values({
-      id: 'dispatch-step-two', runId: 'parent-run', idx: 1, name: 'dispatch-two', kind: 'workflow',
-      mode: 'headless', status: 'running', createdAt: at, updatedAt: at,
+      id: 'dispatch-step-two',
+      runId: 'parent-run',
+      idx: 1,
+      name: 'dispatch-two',
+      kind: 'workflow',
+      mode: 'headless',
+      status: 'running',
+      createdAt: at,
+      updatedAt: at,
     })
     for (let index = 0; index < 11; index += 1) {
       await workflows.db.insert(schema.workflowDispatches).values({
@@ -233,12 +314,14 @@ describe('durable workflow dispatch', () => {
     const dispatcher = new WorkflowDispatcher(workflows.db, runner, tasks)
     const outcomes = await Promise.allSettled([
       dispatcher.dispatch(request({ callerKey: 'final-left', itemKey: 'left' })),
-      dispatcher.dispatch(request({
-        callerKey: 'final-right',
-        parentStepId: 'dispatch-step-two',
-        itemKey: 'right',
-        task: { title: 'Review right', branch: 'review-right' },
-      })),
+      dispatcher.dispatch(
+        request({
+          callerKey: 'final-right',
+          parentStepId: 'dispatch-step-two',
+          itemKey: 'right',
+          task: { title: 'Review right', branch: 'review-right' },
+        }),
+      ),
     ])
 
     expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
@@ -247,12 +330,21 @@ describe('durable workflow dispatch', () => {
   })
 
   it('fails closed when repository trust is revoked before child task creation', async () => {
-    await workflows.db.update(schema.workflowRuns).set({ requiresRepoTrust: true })
+    await workflows.db
+      .update(schema.workflowRuns)
+      .set({ requiresRepoTrust: true })
       .where(eq(schema.workflowRuns.id, 'parent-run'))
     const createChild = vi.fn(async () => 'child-task')
-    const dispatcher = new WorkflowDispatcher(workflows.db, runner, { createChild }, {
-      authorizeRepoConfig: async () => { throw new Error('repository trust revoked') },
-    })
+    const dispatcher = new WorkflowDispatcher(
+      workflows.db,
+      runner,
+      { createChild },
+      {
+        authorizeRepoConfig: async () => {
+          throw new Error('repository trust revoked')
+        },
+      },
+    )
 
     await expect(dispatcher.dispatch(request())).rejects.toThrow('repository trust revoked')
     expect(createChild).not.toHaveBeenCalled()
@@ -263,12 +355,15 @@ describe('durable workflow dispatch', () => {
   })
 
   it('rejects dispatch below the fourth child level', async () => {
-    await workflows.db.update(schema.workflowRuns).set({
-      rootRunId: 'root-run',
-      parentRunId: 'root-run',
-      parentStepId: 'root-step',
-      depth: 4,
-    }).where(eq(schema.workflowRuns.id, 'parent-run'))
+    await workflows.db
+      .update(schema.workflowRuns)
+      .set({
+        rootRunId: 'root-run',
+        parentRunId: 'root-run',
+        parentStepId: 'root-step',
+        depth: 4,
+      })
+      .where(eq(schema.workflowRuns.id, 'parent-run'))
     const dispatcher = new WorkflowDispatcher(workflows.db, runner, tasks)
 
     await expect(dispatcher.dispatch(request())).rejects.toThrow('exceeds 4 child levels')

@@ -71,8 +71,6 @@ requiredness. Raw pointers and JSON Schema remain available in **Code**, but the
 not require them. Session or task title templates, ordinary-array identity keys, and execution limits remain
 under **Advanced** until validation requires them.
 
-<a id="scheduling-a-published-workflow"></a>
-
 [Scheduled roots](./scheduled-roots.md#schedule-a-published-workflow) covers **Schedule…**.
 
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
@@ -178,18 +176,10 @@ draft, then reports each problem beside the field and in validation. Saving the 
 it runnable. The start path validates and resolves every child before it creates a task.
 
 Renaming a step preserves map sources, structured bindings, graph edges, and prompt references.
-The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
+The JSON tab, TOML import and export, **Export to repository**, undo, and redo use the same
 child workflow contract.
 
-<a id="generating-and-editing-with-ai"></a>
-
 [AI authoring](./ai-authoring.md) covers generating and editing a workflow with a model.
-
-<a id="the-draft-rules"></a>
-<a id="the-graph-view"></a>
-<a id="the-json-tab"></a>
-<a id="saving"></a>
-<a id="where-positions-live"></a>
 
 [Editor details](./editor-details.md) covers the draft rules, the graph view, the JSON tab, saving, and
 where positions live.

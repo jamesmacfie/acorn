@@ -13,12 +13,11 @@ import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
 // Images are asked for as `placeholder`, which is the policy's own way of saying "do not fetch this",
 // and in cells there is nothing to fetch with.
 
-export type Run = { text: string; role?: TextRole; tone?: Tone }
+type Run = { text: string; role?: TextRole; tone?: Tone }
 export type Line = { runs: Run[]; indent?: number; rule?: true }
 
 const TAG = /<\/?([a-z0-9-]+)((?:\s+[a-z-]+="[^"]*")*)\s*\/?>/gi
-const attr = (raw: string, name: string): string | undefined =>
-  new RegExp(`${name}="([^"]*)"`).exec(raw)?.[1]
+const attr = (raw: string, name: string): string | undefined => new RegExp(`${name}="([^"]*)"`).exec(raw)?.[1]
 
 /** Rendered HTML as lines of runs. Headings bold, lists as `•`, code as its own block, links as their
  *  text with the URL beside them, images gone.
@@ -63,18 +62,29 @@ export function htmlLines(html: string): Line[] {
     const name = tag[1].toLowerCase()
     const closing = tag[0].startsWith('</')
     switch (name) {
-      case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+      case 'h1':
+      case 'h2':
+      case 'h3':
+      case 'h4':
+      case 'h5':
+      case 'h6':
         flush()
         role = closing ? undefined : 'strong'
         break
-      case 'p': case 'div': case 'tr': case 'table': case 'thead': case 'tbody':
+      case 'p':
+      case 'div':
+      case 'tr':
+      case 'table':
+      case 'thead':
+      case 'tbody':
         flush()
         break
       case 'li':
         flush()
         if (!closing) push('• ')
         break
-      case 'ul': case 'ol':
+      case 'ul':
+      case 'ol':
         flush()
         indent = closing ? Math.max(0, indent - 2) : indent + 2
         break
@@ -92,10 +102,12 @@ export function htmlLines(html: string): Line[] {
       case 'code':
         if (!inCode) role = closing ? undefined : 'mono'
         break
-      case 'strong': case 'b':
+      case 'strong':
+      case 'b':
         role = closing ? undefined : 'strong'
         break
-      case 'em': case 'i':
+      case 'em':
+      case 'i':
         role = closing ? undefined : 'muted'
         break
       case 'a':
@@ -111,7 +123,8 @@ export function htmlLines(html: string): Line[] {
         flush()
         lines.push({ runs: [], rule: true })
         break
-      case 'th': case 'td':
+      case 'th':
+      case 'td':
         if (!closing && runs.length) push(' │ ')
         break
       case 'img':

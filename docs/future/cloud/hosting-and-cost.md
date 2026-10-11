@@ -30,8 +30,6 @@ possible later, and both cost little now:
   [isolation](./isolation.md) needs. The orchestrator and the client read the declaration and say
   what a task cannot do, instead of assuming every provider matches the first one.
 
-<a id="candidates-as-of-2026-09-11"></a>
-
 ## Candidates, as of 2026-10-08
 
 The requirements that sort these: a region the team chooses in the US, EU, or APAC; a full Node that

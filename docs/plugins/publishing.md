@@ -30,7 +30,7 @@ bundler.
 The loaded-plugin promise covers the published SDK, the published declarations, and the manifest and
 runtime contract. A plugin tested against a supported major can declare it in its `apiVersion`
 range. A breaking removal or shape change needs a new major. Changes to the private facade alone
-don't. The npm package versions are independent of `PLUGIN_API_MAJOR`, which is `3`
+don't. The npm package versions are independent of `PLUGIN_API_MAJOR`, which is `5`
 (`packages/protocol/src/plugin/apiVersion.ts`).
 
 A manifest's `apiVersion` is a range over majors: `"3"`, `"2 || 3"`, or an inclusive span such as
@@ -45,8 +45,10 @@ package speaks, and `requires` says which other packages it needs on the Node. T
 at load and uses it to order init ([requiring another plugin](../plugin-authoring/the-manifest.md#requiring-another-plugin)).
 
 The majors 2 through 13 in older history described a wider compiled facade before the `acorn-1`
-reset. The reset began at major 1. Major 2 changed the diff source port to a topology, segments,
-and search.
+reset. The reset began at major 1. Major 2 changed the diff source port to a topology, segments, and
+search. Major 4 removed `open`, `contribute`, and `entries` from `ctx.extensionPoints`, the names
+`declare`, `handle`, and `handlers` replaced on August 31, 2026. Major 5 removed browser rules: the
+`BrowserRule` type, `ProjectConfig.browserRules`, and the `preview.rules` capability.
 
 ## How the published surface is guarded
 

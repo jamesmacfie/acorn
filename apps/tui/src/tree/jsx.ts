@@ -22,7 +22,7 @@ type Extent = number | `${number}%` | 'auto'
 type Ref<T> = T | ((node: T) => void)
 
 /** The flex props, which is every prop with a Yoga setter behind it. */
-export type FlexProps = {
+type FlexProps = {
   flexDirection?: 'row' | 'column' | 'row-reverse' | 'column-reverse'
   flexGrow?: number
   flexShrink?: number
@@ -55,11 +55,10 @@ export type FlexProps = {
   visible?: boolean
 }
 
-/** A wheel event over a box, as `./hit.ts § wheelAt` delivers one. The later slice that wires the
- *  input parser's mouse events to the same walk changes where it comes from and not its shape. */
+/** A wheel event over a box, as `./hit.ts § wheelAt` delivers one. */
 type Scroll = Wheel
 
-export type BoxProps = FlexProps & {
+type BoxProps = FlexProps & {
   ref?: Ref<Renderable>
   /** `true` is every side; an array is the sides a `Rule` asks for. Costs a cell of layout where it
    *  draws, which is why it is Yoga's business as well as paint's. */
@@ -81,7 +80,7 @@ export type BoxProps = FlexProps & {
 }
 
 /** A run of text. `wrapMode` is an input to the measure function rather than a Yoga style. */
-export type TextProps = FlexProps & {
+type TextProps = FlexProps & {
   ref?: Ref<Renderable>
   wrapMode?: 'word' | 'none'
   fg?: Color
@@ -94,10 +93,10 @@ export type TextProps = FlexProps & {
 }
 
 /** A styled stretch inside one `text`. Takes the same props a `text` does, because it is the same
- *  thing at a different size — which is the `spanStyle` special case made unnecessary. */
-export type SpanProps = TextProps
+ *  thing at a different size. */
+type SpanProps = TextProps
 
-export type ScrollBoxProps = FlexProps & {
+type ScrollBoxProps = FlexProps & {
   ref?: Ref<Renderable>
   onSizeChange?: () => void
   /** How many rows the viewport has scrolled its content by. The component owns the number and this
@@ -112,9 +111,8 @@ export type ScrollBoxProps = FlexProps & {
   children?: SolidJSX.Element
 }
 
-/** The two editable widgets and the PTY rectangle, whose content props phase 3 owns. To layout they
- *  are boxes, which is all this slice needs them to be. */
-export type InputProps = FlexProps & {
+/** The two editable widgets and the PTY rectangle. To layout they are boxes. */
+type InputProps = FlexProps & {
   ref?: Ref<Renderable>
   value?: string
   placeholder?: string
@@ -124,7 +122,7 @@ export type InputProps = FlexProps & {
   onSubmit?: (value: string) => void
 }
 
-export type TextareaProps = FlexProps & {
+type TextareaProps = FlexProps & {
   ref?: Ref<Renderable>
   initialValue?: string
   placeholder?: string
@@ -133,7 +131,7 @@ export type TextareaProps = FlexProps & {
   onContentChange?: (value: string) => void
 }
 
-export type PtyProps = FlexProps & { ref?: Ref<Renderable> }
+type PtyProps = FlexProps & { ref?: Ref<Renderable> }
 
 export namespace JSX {
   export type Element = SolidJSX.Element

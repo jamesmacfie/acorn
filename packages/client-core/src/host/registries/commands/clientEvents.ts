@@ -2,7 +2,17 @@ import { dispatchLayout } from '../../../features/tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type {
+  AgentSessionChangedEvent,
+  ConnectionChangedEvent,
+  HeadChangedEvent,
+  ProjectChangedEvent,
+  RunTargetChangedEvent,
+  TaskChangedEvent,
+  WorkspaceChangedEvent,
+  WorkspaceProjectsChangedEvent,
+  WorkspacesModeChangedEvent,
+} from '@acorn/protocol/nodeEvents.ts'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('client-event')
@@ -28,7 +38,7 @@ export type PaneIntent =
   // is mounted.
   | { kind: 'workflows:show-run'; runId: string; stepId?: string }
 
-export type ClientEventMap = {
+type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }
   'presentation:pane-intent': { taskId: string; paneId: string; intent: PaneIntent }
   'presentation:terminal-focus': { taskId: string; sessionId: string }
@@ -55,9 +65,9 @@ export type ClientEventMap = {
   //
   // It exists because the per-node QueryClient partition covers cached queries only. Feature state
   // that lives in module-level Solid signals, such as the managed-agent roster, terminal sessions, the
-  // notice feed, and per-workspace view memory, sat outside it, so switching nodes showed node A's
-  // agent sessions and notices under node B, keyed by ids that may collide across nodes by
-  // construction.
+  // notice feed, and per-workspace view memory, sits outside it, so without this event switching nodes
+  // shows node A's agent sessions and notices under node B, keyed by ids that may collide across nodes
+  // by construction.
   'runtime:node-switched': { from: string | null; to: string | null }
   // Focus moved to another region of another pane. Renderer-local like the rest of this family, and
   // for a stronger reason than the others: focus is a fact about one window, so the node has nothing
@@ -65,12 +75,12 @@ export type ClientEventMap = {
   // — because a per-keystroke feed is on the refused list
   // (docs/plugins/events.md § What is not an event).
   //
-  // The one emit point is the region focus store (keys/regions.ts); the full contract lives in
+  // The one emit point is the region focus store (keys/focusRegions.ts); the full contract lives in
   // docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
   'runtime:focus-changed': { taskId: string | null; paneId: string; regionId: string }
   // ── Node-emitted facts ──────────────────────────────────────────────────────────────────────────
   //
-  // The other family (plugins/frames/channels.ts explains the split). Everything above is emitted in
+  // The other family (frames/channels.ts explains the split). Everything above is emitted in
   // the renderer that caused it and means "something you were displaying is gone or moved". These
   // arrive over the socket from the node and mean "something happened there you may want to act on",
   // so they reach every window, not just the one that acted.
@@ -156,7 +166,7 @@ export function evictPendingIntents(taskId: string): void {
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// clears it are one edit apart (`onScopeEvicted` states the full argument).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictPendingIntents(e.taskId)
 })

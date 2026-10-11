@@ -1,6 +1,17 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import {
+  pluginAgentToolGrants,
+  pluginContextSectionGrants,
+  pluginCustomAgentGrants,
+  pluginExtensionGrants,
+  pluginHarnessGrants,
+  pluginKeyClaimGrants,
+  pluginNavigationDestinationGrants,
+  pluginScheduleGrants,
+  pluginTaskCheckGrants,
+  pluginWebviewGrants,
+} from '@acorn/protocol/plugin/grants.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
@@ -27,12 +38,12 @@ export const BUNDLED_TRUST_OPT_OUT = 'ACORN_PROMPT_BUNDLED_PLUGIN_TRUST'
 
 /** Whether to auto-accept the application's own bundled client bundles on this launch.
  *
- * Not `app.isPackaged`. This grant covers the bytes the build produced from the first-party roster,
+ * Not whether the app is packaged. This grant covers the bytes the build produced from the first-party roster,
  * `apps/desktop/scripts/build-bundled-plugins.mjs`, into this application's own resource directory:
  * bundle resources when packaged, `dist/bundled-plugins` in a development build, and in both cases a
- * directory the build owns and nothing else writes to. Gating on packaging made every dev boot answer
- * four dialogs about the developer's own build output, which taught people to click Trust without
- * reading.
+ * directory the build owns and nothing else writes to. Gating on packaging would make every dev boot
+ * answer a dialog per bundled plugin about the developer's own build output, which teaches people to
+ * click Trust without reading.
  *
  * It says nothing about packages in the data root. A hand-installed or third-party package, and
  * anything a node serves this device, still prompts. */
@@ -56,14 +67,20 @@ export function trustBundledClientPlugins(
   }
   if (!packages.size) return []
   try {
-    const cached = cache.putBundledBatch(Array.from(packages, ([pluginId, { manifest, dir }]) => ({
-      pluginId, version: manifest.version, read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
-    })))
+    const cached = cache.putBundledBatch(
+      Array.from(packages, ([pluginId, { manifest, dir }]) => ({
+        pluginId,
+        version: manifest.version,
+        read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
+      })),
+    )
     const acks: PluginAck[] = []
     for (const result of cached) {
       const id = result.pluginId
       if ('error' in result) {
-        log.error(`bundled client for ${id} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': id })
+        log.error(`bundled client for ${id} could not be trusted: ${describeError(result.error).message}`, {
+          'plugin.id': id,
+        })
         continue
       }
       try {
@@ -95,7 +112,10 @@ export function trustBundledClientPlugins(
     const accepted: string[] = []
     for (const result of trust.recordBatch(acks)) {
       if ('error' in result) {
-        log.error(`bundled client for ${result.ack.pluginId} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': result.ack.pluginId })
+        log.error(
+          `bundled client for ${result.ack.pluginId} could not be trusted: ${describeError(result.error).message}`,
+          { 'plugin.id': result.ack.pluginId },
+        )
       } else accepted.push(result.ack.pluginId)
     }
     return accepted

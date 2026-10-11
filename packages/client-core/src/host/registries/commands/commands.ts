@@ -1,4 +1,9 @@
-import { DEFAULT_COMMAND_SCOPE, type CommandScope, type CommandSearchItem, type CommandSettingOption } from '@acorn/protocol/commands.ts'
+import {
+  DEFAULT_COMMAND_SCOPE,
+  type CommandScope,
+  type CommandSearchItem,
+  type CommandSettingOption,
+} from '@acorn/protocol/commands.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
 import { startInteraction } from '../../../infra/telemetry/emitter'
@@ -8,24 +13,23 @@ import { presentCommand } from './presenter'
 // The command vocabulary: what a contributor declares, what a command runs in, and what running one
 // says happened (docs/command-palette-and-shortcuts.md).
 //
-// A command was a flat runnable row until 2026-09-03. It is now a discriminated union, because the
-// next contributors are not leaves: a group has children, a search takes a query, an input is
-// submitted, and a setting shows its current value
-// (docs/command-palette-and-shortcuts.md). The compatibility member carries no
-// `kind` at all, so every registration written against the old shape is still exactly the same
-// object, and a zero-argument `run` is still assignable to one that is handed a context.
+// A command is a discriminated union, because not every contributor is a leaf: a group has children, a
+// search takes a query, an input is submitted, and a setting shows its current value. The leaf member
+// is the default, and its `kind` is optional: a registration with a `run` and no `kind` is an action,
+// so a plain runnable registration stays a plain object. A zero-argument `run` is still assignable to
+// one that is handed a context.
 //
 // The graph itself — parents, breadcrumbs, inherited availability, root search — is ./graph.ts. This
 // file holds the registry, the gates and the executor, and nothing that walks.
 
-export type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
+type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
 
 /** Where a sibling with no stated `order` sorts. The number every registry in the repo uses for
  *  "middle", so a contributor who wants to come first or last says so and nobody else has to. */
 export const DEFAULT_COMMAND_ORDER = 500
 
 /** Which client captured the context. Absent when nothing did — see `DETACHED_COMMAND_CONTEXT`. */
-export type CommandHostKind = 'desktop' | 'tui'
+type CommandHostKind = 'desktop' | 'tui'
 
 /**
  * The identity a command runs against, captured once when a session opens and never re-read.
@@ -77,13 +81,11 @@ export const DETACHED_COMMAND_CONTEXT: CommandExecutionContext = Object.freeze({
  * line to show, which is how a setting reports its new value without throwing the reader out of the
  * list. A throw or a rejected promise is neither: it is an error, and the frame stays open with it.
  */
-export type CommandOutcome =
-  | { effect: 'close' }
-  | { effect: 'stay'; status?: string }
+export type CommandOutcome = { effect: 'close' } | { effect: 'stay'; status?: string }
 
 export const COMMAND_CLOSED: CommandOutcome = Object.freeze({ effect: 'close' })
 
-/** What an executor may answer with. `void` is the compatibility case and means `close`. */
+/** What an executor may answer with. `void` means `close`. */
 type CommandResult = void | CommandOutcome | Promise<void | CommandOutcome>
 
 type CommandCommon = {
@@ -109,14 +111,14 @@ type CommandCommon = {
   ownerId?: string
 }
 
-/** A leaf. The compatibility member, so an existing registration with no `kind` is one of these. */
+/** A leaf, and the default member: a registration with no `kind` is one of these. */
 export type ActionCommand = CommandCommon & {
   kind?: 'action'
   run: (context: CommandExecutionContext) => CommandResult
 }
 
 /** A parent. No executor: its children are the commands naming it as their `parentId`. */
-export type GroupCommand = CommandCommon & { kind: 'group' }
+type GroupCommand = CommandCommon & { kind: 'group' }
 
 /** A live query. `query` is debounced and cancellable; `select` owns what picking a row does. */
 export type SearchCommand = CommandCommon & {
@@ -185,18 +187,21 @@ export const commandScope = (command: CommandContribution): CommandScope => comm
  * workspace has nothing to address when there is none, so the palette hides it rather than offering a
  * row that can only fail (docs/command-palette-and-shortcuts.md).
  *
- * The other three are not. `none` needs nothing. `node` is the default every command written before
- * scopes existed already carries, and it says where a request goes rather than whether the command
- * exists — a client serving its own origin has no node id at all (infra/node/activeNode.ts), and
- * hiding the whole catalogue there would be this gate emptying the palette. `fleet` degrades to the
- * captured node when the host supplies no fan-out, which is what a single-node client is.
+ * The other three are not. `none` needs nothing. `node` is the default, and it says where a request goes rather than
+ * whether the command exists — a client serving its own origin has no node id at all (infra/node/activeNode.ts), and
+ * hiding the whole catalogue there would be this gate emptying the palette. `fleet` degrades to the captured node when
+ * the host supplies no fan-out, which is what a single-node client is.
  */
 export const commandScopeSatisfied = (command: CommandContribution, context: CommandExecutionContext): boolean => {
   switch (commandScope(command)) {
-    case 'task': return context.taskId !== null
-    case 'project': return context.projectId !== null
-    case 'workspace': return context.workspaceId !== null
-    default: return true
+    case 'task':
+      return context.taskId !== null
+    case 'project':
+      return context.projectId !== null
+    case 'workspace':
+      return context.workspaceId !== null
+    default:
+      return true
   }
 }
 
@@ -206,8 +211,10 @@ export const isActionCommand = (command: CommandContribution): command is Action
 
 /** The owner is the host's word, never the contributor's: a plugin that could state one could claim
  *  another plugin's group as its parent. */
-export const stampCommandOwner = (command: ContributedCommand, ownerId: string): CommandContribution =>
-  ({ ...command, ownerId })
+export const stampCommandOwner = (command: ContributedCommand, ownerId: string): CommandContribution => ({
+  ...command,
+  ownerId,
+})
 
 /**
  * Run a leaf action and say what happened.
@@ -215,13 +222,11 @@ export const stampCommandOwner = (command: ContributedCommand, ownerId: string):
  * The context is optional because most callers have none — a shortcut, a frame binding, an editor
  * chord — and they get `DETACHED_COMMAND_CONTEXT`, which states that rather than pretending.
  *
- * A `void` answer normalises to `close`, so every registration written before there was an outcome
- * still means what it meant. An absent or unavailable command also answers `close`: nothing ran, and
- * a palette that opened over it has nothing to keep itself open for.
+ * A `void` answer normalises to `close`, so a leaf that returns nothing closes the palette. An absent or unavailable
+ * command also answers `close`: nothing ran, and a palette that opened over it has nothing to keep itself open for.
  *
- * A throw becomes a rejection rather than escaping synchronously. Every caller already writes
- * `.catch`, and before this a command that threw on its way in went past all of them and into the key
- * dispatcher.
+ * A throw becomes a rejection rather than escaping synchronously. Every caller writes `.catch`, and a
+ * synchronous throw would go past all of them and into the key dispatcher.
  */
 export function executeCommand(id: string, context?: CommandExecutionContext): Promise<CommandOutcome> {
   const command = commandRegistry.get(id)
@@ -242,14 +247,16 @@ export function executeCommand(id: string, context?: CommandExecutionContext): P
     attrs: { seam: COMMAND_SPAN, 'command.id': command.id, 'command.category': command.category },
   })
   try {
-    return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT))
-      .then((outcome) => {
+    return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT)).then(
+      (outcome) => {
         span.end('ok')
         return outcome ?? COMMAND_CLOSED
-      }, (error: unknown) => {
+      },
+      (error: unknown) => {
         span.end('error')
         throw error
-      })
+      },
+    )
   } catch (error) {
     span.end('error')
     return Promise.reject(error)

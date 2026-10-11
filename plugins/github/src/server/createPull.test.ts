@@ -31,36 +31,58 @@ describe('createPullRequest events', () => {
   afterEach(() => plugin.cleanup())
 
   it('announces the repository after GitHub accepts the pull and the open-list mirror is invalidated', async () => {
-    vi.mocked(gh).mockResolvedValue(new Response(JSON.stringify({ number: 73 }), {
-      headers: { 'content-type': 'application/json' },
-    }))
+    vi.mocked(gh).mockResolvedValue(
+      new Response(JSON.stringify({ number: 73 }), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
 
-    const result = await createPullRequest('token', plugin.db, 'james', 'acme', 'widget', {
-      title: 'Ship it',
-      base: 'main',
-      head: 'feature',
-    }, emit)
+    const result = await createPullRequest(
+      'token',
+      plugin.db,
+      'james',
+      'acme',
+      'widget',
+      {
+        title: 'Ship it',
+        base: 'main',
+        head: 'feature',
+      },
+      emit,
+    )
 
     expect(result).toEqual({ ok: true, number: 73 })
-    expect(await plugin.db.select().from(syncState).where(and(
-      eq(syncState.userId, 'james'),
-      eq(syncState.resource, pullsResource(7, 'open')),
-    ))).toEqual([])
+    expect(
+      await plugin.db
+        .select()
+        .from(syncState)
+        .where(and(eq(syncState.userId, 'james'), eq(syncState.resource, pullsResource(7, 'open')))),
+    ).toEqual([])
     expect(emit).toHaveBeenCalledOnce()
     expect(emit).toHaveBeenCalledWith('pulls-changed', { repoOwner: 'acme', repoName: 'widget' })
   })
 
   it('does not invalidate or announce a pull GitHub rejects', async () => {
-    vi.mocked(gh).mockResolvedValue(new Response(JSON.stringify({ message: 'Validation Failed' }), {
-      status: 422,
-      headers: { 'content-type': 'application/json' },
-    }))
+    vi.mocked(gh).mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Validation Failed' }), {
+        status: 422,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
 
-    const result = await createPullRequest('token', plugin.db, 'james', 'acme', 'widget', {
-      title: 'Ship it',
-      base: 'main',
-      head: 'feature',
-    }, emit)
+    const result = await createPullRequest(
+      'token',
+      plugin.db,
+      'james',
+      'acme',
+      'widget',
+      {
+        title: 'Ship it',
+        base: 'main',
+        head: 'feature',
+      },
+      emit,
+    )
 
     expect(result).toMatchObject({ ok: false })
     expect(await plugin.db.select().from(syncState)).toHaveLength(1)

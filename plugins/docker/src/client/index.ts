@@ -15,7 +15,10 @@ const DockerProjectSettings = lazy(() => import('./DockerProjectSettings'))
 
 export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
-  activate: () => () => { retireDockerClient(); disposeDockerStore() },
+  activate: () => () => {
+    retireDockerClient()
+    disposeDockerStore()
+  },
   init: (ctx) => {
     // The other feeder (docs/ui-design/icons.md § Icons): a loaded plugin declares its mark in the manifest
     // and the host registers it, so every `brand:docker` glyph string below reads the same either
@@ -35,12 +38,20 @@ export const dockerClientPlugin: ClientPlugin = {
     // Beside the live numbers on a container's Stats tab. `stack` with a low ceiling: the tab is a
     // readout, and a third guest in it would be somebody else's pane.
     ctx.extensionPoints.register({
-      id: 'stats-beside', label: 'Container stats', kind: 'remote', mode: 'stack', max: 2,
+      id: 'stats-beside',
+      label: 'Container stats',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
     })
     // What another plugin knows about a container the browse list is already drawing: an image scan,
     // a cost, a policy warning.
     ctx.extensionPoints.register({
-      id: 'container', label: 'Docker container', kind: 'annotation', key: [...CONTAINER_KEY], max: 3,
+      id: 'container',
+      label: 'Docker container',
+      kind: 'annotation',
+      key: [...CONTAINER_KEY],
+      max: 3,
     })
     // A local source: no providerId, so no integration row gates it and it's always in the rail.
     ctx.sources.register(dockerSourceContribution)
@@ -52,22 +63,42 @@ export const dockerClientPlugin: ClientPlugin = {
     ctx.agentContexts.register(dockerAgentContextContribution)
     ctx.persistedStateSlices.register(dockerPrefsSlice)
     ctx.settingsPages.register({
-      id: 'docker', label: 'Docker', category: 'features', scope: 'device', icon: 'container', order: 20,
+      id: 'docker',
+      label: 'Docker',
+      category: 'features',
+      scope: 'device',
+      icon: 'container',
+      order: 20,
       // The host draws the rail icon's switch in the plugin strip above the page.
       railSourceVisibility: ['docker'],
       // The page's sections and rows, for search (DockerSettings.tsx draws the same ones).
       keywords: ['containers', 'compose', 'daemon', 'engine'],
       sections: [
         { id: 'daemon', label: 'Status', rows: ['Docker engine'], keywords: ['daemon'] },
-        { id: 'behaviour', label: 'Behaviour', rows: ['Ask twice before destructive actions', 'Show stopped containers in the Docker list'], keywords: ['confirm', 'prune', 'stopped'] },
-        { id: 'linking', label: 'Task linking', rows: ['Project rules'], keywords: ['config.toml', 'labels', 'compose project', 'matcher'] },
+        {
+          id: 'behaviour',
+          label: 'Behaviour',
+          rows: ['Ask twice before destructive actions', 'Show stopped containers in the Docker list'],
+          keywords: ['confirm', 'prune', 'stopped'],
+        },
+        {
+          id: 'linking',
+          label: 'Task linking',
+          rows: ['Project rules'],
+          keywords: ['config.toml', 'labels', 'compose project', 'matcher'],
+        },
       ],
       component: DockerSettings,
     })
     // The per-project half: a Docker tab on every project's settings page, for the `[docker]` keys
     // each project's checkout sets. A project page draws it, so it has no rail row of its own.
     ctx.settingsPages.register({
-      id: 'docker.project', label: 'Docker', category: 'features', scope: 'project', icon: 'container', order: 20,
+      id: 'docker.project',
+      label: 'Docker',
+      category: 'features',
+      scope: 'project',
+      icon: 'container',
+      order: 20,
       component: DockerProjectSettings,
     })
   },

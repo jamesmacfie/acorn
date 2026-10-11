@@ -54,7 +54,10 @@ const projectsFor = (
   // ownership lazily, because providers register during the plugin's init, after this scoped context
   // is built.
   ...(keys.includes('externalProjects')
-    ? { externalProjects: (workspaceId: string) => projects.externalProjects(workspaceId, providers.idsForOwner(pluginId)) }
+    ? {
+        externalProjects: (workspaceId: string) =>
+          projects.externalProjects(workspaceId, providers.idsForOwner(pluginId)),
+      }
     : {}),
 })
 
@@ -79,7 +82,11 @@ export function scopeCore(
       // existing task facet without gaining the ability to mint arbitrary top-level work. The archive
       // dates are first-party too, and the worker refuses any method it has no call mode for, so
       // leaving one here fails the loaded plugin's init.
-      const { createRoot: _createRoot, archivedBefore: _archivedBefore, ...tasks } = core.tasks as CompiledCoreServices['tasks']
+      const {
+        createRoot: _createRoot,
+        archivedBefore: _archivedBefore,
+        ...tasks
+      } = core.tasks as CompiledCoreServices['tasks']
       granted.tasks = tasks as CoreServices['tasks']
       continue
     }
@@ -104,12 +111,16 @@ export function scopeCore(
     // Both wider project grants imply the reads. A caller that may create or update a project, or
     // read its config, but cannot resolve one by id can do nothing useful.
     if (token === 'projects:read' || token === 'projects:config' || token === 'projects:write') {
-      const keys: readonly (keyof ProjectService)[] = token === 'projects:config'
-        ? [...PROJECT_READS, ...PROJECT_CONFIG]
-        : token === 'projects:write'
-          ? [...PROJECT_READS, ...PROJECT_WRITES]
-          : PROJECT_READS
-      granted.projects = { ...granted.projects, ...projectsFor(core.projects, keys, pluginId, providers) } as ProjectService
+      const keys: readonly (keyof ProjectService)[] =
+        token === 'projects:config'
+          ? [...PROJECT_READS, ...PROJECT_CONFIG]
+          : token === 'projects:write'
+            ? [...PROJECT_READS, ...PROJECT_WRITES]
+            : PROJECT_READS
+      granted.projects = {
+        ...granted.projects,
+        ...projectsFor(core.projects, keys, pluginId, providers),
+      } as ProjectService
     }
     // Anything else is a facet this acorn does not have. Ignored rather than rejected, so a manifest
     // naming a facet from a later build loses that one grant instead of failing to load.
@@ -124,7 +135,7 @@ export function scopeCore(
 // The one id the host declares itself, which is an invitation rather than any plugin's property:
 // `agents.harnessRegistry` (server/pluginHost/harnesses.ts). Whoever owns agent sessions on a given node
 // fills it, so it is exempt from the namespace rule below. Held to the real constants by
-// pluginPermissions.test.ts, because a literal list is only safe if something checks it.
+// permissions.test.ts, because a literal list is only safe if something checks it.
 export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegistry']
 
 // An undeclared capability id reads as absent, the same as the providing plugin being disabled,
@@ -133,7 +144,7 @@ export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegi
 //
 // `provide` is bound to the plugin's own namespace, the same binding the host already applies to its
 // routes, schedules, data sources, integration flows and extension points (docs/extensibility.md § The
-// host binds every namespace). Without it a package could publish `github.mirror` or `preview.rules`
+// host binds every namespace). Without it a package could publish `github.mirror` or `terminal.sessions`
 // while the real plugin is disabled, and the composition root would resolve the impostor: a
 // capability is a typed function another plugin calls, so squatting one is not a name clash, it is a
 // substitution nothing announces.
@@ -143,7 +154,8 @@ export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegi
 // A provider that has to know who called, such as `agents.sessionControl` naming the plugin that
 // changed a session's model, gets the caller's id from the host rather than from an argument.
 const boundToCaller = <T>(impl: T | undefined, pluginId: string): T | undefined =>
-  (impl as { [BIND_CAPABILITY_CALLER]?: (caller: string) => T } | undefined)?.[BIND_CAPABILITY_CALLER]?.(pluginId) ?? impl
+  (impl as { [BIND_CAPABILITY_CALLER]?: (caller: string) => T } | undefined)?.[BIND_CAPABILITY_CALLER]?.(pluginId) ??
+  impl
 
 export function scopeCapabilities(
   registry: CapabilityRegistry,
@@ -154,9 +166,7 @@ export function scopeCapabilities(
   return {
     provide: (id, impl) => {
       if (!id.startsWith(`${pluginId}.`) && !HOST_OWNED_CAPABILITY_IDS.includes(id)) {
-        throw new Error(
-          `plugin '${pluginId}' may only provide capabilities under '${pluginId}.', not '${id}'`,
-        )
+        throw new Error(`plugin '${pluginId}' may only provide capabilities under '${pluginId}.', not '${id}'`)
       }
       return registry.provide(id, impl)
     },

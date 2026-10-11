@@ -1,11 +1,18 @@
-import { SEARCH_PAGE_MATCHES, SEARCH_PAGE_SEGMENTS, type DiffSearchMatch, type DiffSearchPage, type DiffSearchRequest, type PlainDiffRow } from './model'
+import {
+  SEARCH_PAGE_MATCHES,
+  SEARCH_PAGE_SEGMENTS,
+  type DiffSearchMatch,
+  type DiffSearchPage,
+  type DiffSearchRequest,
+  type PlainDiffRow,
+} from './model'
 
 // Find across a whole document without the renderer holding it. The provider runs this over the
 // segments it can produce and answers a page of matches by segment and row; the viewer loads only the
 // segment it takes the reader to.
 //
 // Code rows only, the text a line shows, and occurrences in one line never overlap because the scan
-// steps past each hit. That is what the in-pane find always did over the rows it had.
+// steps past each hit.
 //
 // A page stops at its match limit or its segment budget, whichever comes first, so a page can be
 // empty and still carry a cursor. The caller keeps reading until it has matches or the cursor ends.
@@ -14,9 +21,9 @@ import { SEARCH_PAGE_MATCHES, SEARCH_PAGE_SEGMENTS, type DiffSearchMatch, type D
  *  into that row's text. */
 type Cursor = { file: number; ordinal: number; row: number; offset: number }
 
-export const encodeSearchCursor = (cursor: Cursor): string => `${cursor.file}.${cursor.ordinal}.${cursor.row}.${cursor.offset}`
+const encodeSearchCursor = (cursor: Cursor): string => `${cursor.file}.${cursor.ordinal}.${cursor.row}.${cursor.offset}`
 
-export function decodeSearchCursor(text: string | null): Cursor | null {
+function decodeSearchCursor(text: string | null): Cursor | null {
   if (text == null) return { file: 0, ordinal: 0, row: 0, offset: 0 }
   const parts = text.split('.').map(Number)
   if (parts.length !== 4 || !parts.every((part) => Number.isInteger(part) && part >= 0)) return null
@@ -53,7 +60,16 @@ export async function searchDocument(
     const first = f === from.file
     for (let ordinal = first ? from.ordinal : 0; ordinal < segments.length; ordinal++) {
       const resumed = first && ordinal === from.ordinal
-      if (read === budget) return { matches, nextCursor: encodeSearchCursor({ file: f, ordinal, row: resumed ? from.row : 0, offset: resumed ? from.offset : 0 }) }
+      if (read === budget)
+        return {
+          matches,
+          nextCursor: encodeSearchCursor({
+            file: f,
+            ordinal,
+            row: resumed ? from.row : 0,
+            offset: resumed ? from.offset : 0,
+          }),
+        }
       read++
       const rows = segments[ordinal]!
       for (let row = resumed ? from.row : 0; row < rows.length; row++) {
@@ -78,7 +94,10 @@ export async function searchDocument(
 /** The next occurrence at or after `at`, as offsets into the line itself. Ignoring case goes through
  *  a regular expression rather than lowercasing the line, because lowercasing can change a line's
  *  length (`İ` becomes two characters) and move every offset after it. */
-function finder(query: string, caseSensitive: boolean): (text: string, at: number) => { start: number; end: number } | null {
+function finder(
+  query: string,
+  caseSensitive: boolean,
+): (text: string, at: number) => { start: number; end: number } | null {
   if (caseSensitive) {
     return (text, at) => {
       const start = text.indexOf(query, at)

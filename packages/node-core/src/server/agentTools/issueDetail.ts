@@ -21,7 +21,10 @@ export type IssueDetailDeps = ItemDetailDeps
 
 const input = z.object({
   identifier: z.string().min(1).describe("the item's own id, such as 'ENG-42' for Linear or '142' for Rollbar"),
-  provider: z.string().optional().describe("which provider to ask, such as 'linear' or 'rollbar'. Default: every connected one that can answer"),
+  provider: z
+    .string()
+    .optional()
+    .describe("which provider to ask, such as 'linear' or 'rollbar'. Default: every connected one that can answer"),
   refresh: z.boolean().optional().describe('read from the provider instead of serving the cached copy'),
 })
 
@@ -61,7 +64,8 @@ export function issueDetailTool(deps: IssueDetailDeps): AgentToolContribution {
           const context = providerDetailContext(deps, ctx.userLogin, provider.id, connection.id, args.refresh)
           try {
             const detail = await provider.detail!(context, args.identifier)
-            if (detail) return { provider: provider.id, connectionId: connection.id, identifier: args.identifier, detail }
+            if (detail)
+              return { provider: provider.id, connectionId: connection.id, identifier: args.identifier, detail }
           } catch (error) {
             // "Not in this workspace" is the expected answer from every connection but one, so a real
             // failure from any of them is the more useful thing to report if nothing answers at all.
@@ -71,7 +75,8 @@ export function issueDetailTool(deps: IssueDetailDeps): AgentToolContribution {
       }
       throw new ToolError(
         'not_found',
-        refused ?? `No connected ${providers.map((provider) => provider.label).join(' or ')} account has '${args.identifier}'.`,
+        refused ??
+          `No connected ${providers.map((provider) => provider.label).join(' or ')} account has '${args.identifier}'.`,
       )
     },
   }

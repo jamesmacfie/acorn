@@ -9,10 +9,11 @@ import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { ListDetail } from '../layouts/ListDetail'
 import { ScrollViewport } from './scrolling'
 
-const items = (count: number) => Array.from({ length: count }, (_, index) => ({
-  key: `row-${index + 1}`,
-  label: `Row ${index + 1}`,
-}))
+const items = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    key: `row-${index + 1}`,
+    label: `Row ${index + 1}`,
+  }))
 
 /** Which line the caret is on. The caret is where the keys are, so a caret nobody can find is the
  *  whole of what this file is about. */
@@ -20,29 +21,57 @@ const caret = (screen: { lines: string[] }): string => screen.lines.find((line) 
 
 /** What has the keys, read off the frame: `litControl` draws a focused control `strong` in the accent
  *  slot, and accent is the one slot whose red channel sits below its green (../appearance.ts). */
-const lit = (screen: { runs: () => { text: string; fg: { r: number; g: number; b: number }; attributes: number }[] }): string[] =>
-  screen.runs().filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1).map((run) => run.text)
+const lit = (screen: {
+  runs: () => { text: string; fg: { r: number; g: number; b: number }; attributes: number }[]
+}): string[] =>
+  screen
+    .runs()
+    .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
+    .map((run) => run.text)
 
 describe('scrolling detail viewports', () => {
   it('keeps wrapped text clear of the scrollbar', async () => {
-    const screen = await renderCells(() => <ScrollViewport>
-      <Text wrap>abcdefghijklmnopqrst</Text>
-      {items(10).map((row) => <Text>{row.label}</Text>)}
-    </ScrollViewport>, { width: 12, height: 4 })
+    const screen = await renderCells(
+      () => (
+        <ScrollViewport>
+          <Text wrap>abcdefghijklmnopqrst</Text>
+          {items(10).map((row) => (
+            <Text>{row.label}</Text>
+          ))}
+        </ScrollViewport>
+      ),
+      { width: 12, height: 4 },
+    )
     try {
-      expect(screen.lines.slice(0, 3).join('').replace(/[^a-z]/g, '')).toContain('abcdefghijklmnopqrst')
-    } finally { screen.done() }
+      expect(
+        screen.lines
+          .slice(0, 3)
+          .join('')
+          .replace(/[^a-z]/g, ''),
+      ).toContain('abcdefghijklmnopqrst')
+    } finally {
+      screen.done()
+    }
   })
 
   it('restores a panel reading place after remote offset and content arrive', async () => {
     const [offset, setOffset] = createSignal<number>()
     const [ready, setReady] = createSignal(false)
-    const screen = await renderCells(() => <box flexDirection="column" flexGrow={1}>
-      <Button>Outside the results</Button>
-      <TabPanel idPrefix="retained" id="results" active="results" scrollOffset={offset()}>
-        <Show when={ready()}>{items(40).map((row) => <Text>{row.label}</Text>)}</Show>
-      </TabPanel>
-    </box>, { width: 44, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <box flexDirection="column" flexGrow={1}>
+          <Button>Outside the results</Button>
+          <TabPanel idPrefix="retained" id="results" active="results" scrollOffset={offset()}>
+            <Show when={ready()}>
+              {items(40).map((row) => (
+                <Text>{row.label}</Text>
+              ))}
+            </Show>
+          </TabPanel>
+        </box>
+      ),
+      { width: 44, height: 10 },
+    )
     try {
       setOffset(20)
       await screen.frame()
@@ -50,51 +79,75 @@ describe('scrolling detail viewports', () => {
       const restored = await screen.frame()
       expect(restored.text).toContain('Row 21')
       expect(restored.lines.some((line) => line.trim() === 'Row 1')).toBe(false)
-    } finally { screen.done() }
+    } finally {
+      screen.done()
+    }
   })
 
   it('clamps a scrolled viewport when an action menu disappears above surviving rows', async () => {
     const [menuOpen, setMenuOpen] = createSignal(true)
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter stateKey="shrinking-menu" label="Files" regions={{ body: () => <>
-        <Button onPress={() => setMenuOpen(false)}>Dismiss menu</Button>
-        <Show when={menuOpen()}>{items(24).map((row) => <Text>{row.label}</Text>)}</Show>
-        <Text>Surviving file row</Text>
-      </> }} />
-    ), { width: 44, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="shrinking-menu"
+          label="Files"
+          regions={{
+            body: () => (
+              <>
+                <Button onPress={() => setMenuOpen(false)}>Dismiss menu</Button>
+                <Show when={menuOpen()}>
+                  {items(24).map((row) => (
+                    <Text>{row.label}</Text>
+                  ))}
+                </Show>
+                <Text>Surviving file row</Text>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 10 },
+    )
     try {
       await screen.press('END')
       const dismissed = await screen.press('RETURN')
       expect(dismissed.text).toContain('Surviving file row')
-    } finally { screen.done() }
+    } finally {
+      screen.done()
+    }
   }, 30_000)
 
   it('enters a selected tab with Down, reveals keyboard rows, and returns with Escape', async () => {
     const rows = items(18)
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="detail"
-        label="Detail"
-        regions={{
-          body: () => (
-            <Sections
-              id="test-sections"
-              header={{ id: 'summary', label: 'Summary', render: () => <Text>Summary body</Text> }}
-              sections={[{
-                id: 'comments',
-                label: 'Comments',
-                count: rows.length,
-                render: () => (
-                  <Rows id="comments" items={rows}>
-                    {(row, item) => <Row item={item}>{row.label}</Row>}
-                  </Rows>
-                ),
-              }]}
-            />
-          ),
-        }}
-      />
-    ), { width: 44, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="detail"
+          label="Detail"
+          regions={{
+            body: () => (
+              <Sections
+                id="test-sections"
+                header={{ id: 'summary', label: 'Summary', render: () => <Text>Summary body</Text> }}
+                sections={[
+                  {
+                    id: 'comments',
+                    label: 'Comments',
+                    count: rows.length,
+                    render: () => (
+                      <Rows id="comments" items={rows}>
+                        {(row, item) => <Row item={item}>{row.label}</Row>}
+                      </Rows>
+                    ),
+                  },
+                ]}
+              />
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 10 },
+    )
 
     try {
       const comments = await screen.press('ARROW_RIGHT')
@@ -120,21 +173,26 @@ describe('scrolling detail viewports', () => {
     // The rule the footer has to be able to say in two words: arrows move, page keys scroll. The
     // paragraph between the two buttons is skipped by `↓` and read with `pgup`/`pgdn`
     // (docs/tui/scrolling.md § Scrolling viewports).
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="document"
-        label="Document"
-        regions={{
-          body: () => (
-            <>
-              <Button onPress={() => {}}>Top</Button>
-              {items(24).map((row) => <Text>{row.label}</Text>)}
-              <Button onPress={() => {}}>Bottom</Button>
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="document"
+          label="Document"
+          regions={{
+            body: () => (
+              <>
+                <Button onPress={() => {}}>Top</Button>
+                {items(24).map((row) => (
+                  <Text>{row.label}</Text>
+                ))}
+                <Button onPress={() => {}}>Bottom</Button>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 10 },
+    )
 
     try {
       // The region opens on the first stop, and the second one is off the bottom of the viewport.
@@ -163,15 +221,24 @@ describe('scrolling detail viewports', () => {
   }, 30_000)
 
   it('uses OpenTUI wheel scrolling for a non-virtual document viewport', async () => {
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="document"
-        label="Document"
-        regions={{
-          body: () => <>{items(24).map((row) => <Text>{row.label}</Text>)}</>,
-        }}
-      />
-    ), { width: 36, height: 9 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="document"
+          label="Document"
+          regions={{
+            body: () => (
+              <>
+                {items(24).map((row) => (
+                  <Text>{row.label}</Text>
+                ))}
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 36, height: 9 },
+    )
 
     try {
       expect(screen.text).toContain('Row 1')
@@ -191,20 +258,25 @@ describe('scrolling detail viewports', () => {
     // presses it. Nothing pulls the offset back either — the reveal only runs where the keys moved,
     // and they did not (../keys/regions.ts § The reveal).
     const pressed: string[] = []
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="wheeled"
-        label="Wheeled"
-        regions={{
-          body: () => (
-            <>
-              <Button onPress={() => pressed.push('press')}>Top</Button>
-              {items(24).map((row) => <Text>{row.label}</Text>)}
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="wheeled"
+          label="Wheeled"
+          regions={{
+            body: () => (
+              <>
+                <Button onPress={() => pressed.push('press')}>Top</Button>
+                {items(24).map((row) => (
+                  <Text>{row.label}</Text>
+                ))}
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 10 },
+    )
 
     try {
       expect(lit(screen)).toContain('[Top]')
@@ -225,19 +297,22 @@ describe('scrolling detail viewports', () => {
 
   it('moves a virtual list window with the wheel without changing its active item', async () => {
     const rows = items(30)
-    const screen = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="virtual"
-        label="Virtual"
-        regions={{
-          body: () => (
-            <Rows virtual id="virtual-rows" items={rows}>
-              {(row, item) => <Row item={item}>{row.label}</Row>}
-            </Rows>
-          ),
-        }}
-      />
-    ), { width: 36, height: 10 })
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="virtual"
+          label="Virtual"
+          regions={{
+            body: () => (
+              <Rows virtual id="virtual-rows" items={rows}>
+                {(row, item) => <Row item={item}>{row.label}</Row>}
+              </Rows>
+            ),
+          }}
+        />
+      ),
+      { width: 36, height: 10 },
+    )
 
     try {
       let wheeled = screen
@@ -256,29 +331,32 @@ describe('scrolling detail viewports', () => {
 
   // ── A list longer than the region it is drawn in ─────────────────────────────────────────────
   //
-  // The three cases below are one reported fault with two causes in it, and both are fixed: the List
-  // region of every `list-detail` was a yoga clip rather than a viewport, and the page keys moved
-  // modulo the list length (docs/tui/scrolling.md § Scrolling viewports).
+  // The three cases below guard two causes of one fault: the List region of a `list-detail` has to be
+  // a viewport rather than a Yoga clip, and the page keys have to clamp rather than move modulo the
+  // list length (docs/tui/scrolling.md § Scrolling viewports).
 
   it('follows the caret down a list longer than its list-detail region', async () => {
-    // A non-virtual `Rows` of 30 in a region eight rows tall. This is the shape eight of the nine
-    // plugin lists are, and until the List region became a viewport the caret simply walked off the
-    // bottom of the panel: the clip round it hid the rows below the fold and owned no offset for the
-    // reveal to move (./scrolling.tsx, docs/tui/scrolling.md § Scrolling viewports).
-    const screen = await renderCells(() => (
-      <ListDetail
-        stateKey="long-list"
-        label="Long"
-        regions={{
-          list: () => (
-            <Rows id="long-list-rows" items={items(30)}>
-              {(row, item) => <Row item={item}>{row.label}</Row>}
-            </Rows>
-          ),
-          detail: () => <Text>a detail</Text>,
-        }}
-      />
-    ), { width: 40, height: 12 })
+    // A non-virtual `Rows` of 30 in a region eight rows tall, which is the shape most plugin lists
+    // are. Behind a clip rather than a viewport the caret walks off the bottom of the panel: the clip
+    // hides the rows below the fold and owns no offset for the reveal to move (./scrolling.tsx,
+    // docs/tui/scrolling.md § Scrolling viewports).
+    const screen = await renderCells(
+      () => (
+        <ListDetail
+          stateKey="long-list"
+          label="Long"
+          regions={{
+            list: () => (
+              <Rows id="long-list-rows" items={items(30)}>
+                {(row, item) => <Row item={item}>{row.label}</Row>}
+              </Rows>
+            ),
+            detail: () => <Text>a detail</Text>,
+          }}
+        />
+      ),
+      { width: 40, height: 12 },
+    )
 
     try {
       expect(caret(screen)).toContain('Row 1')
@@ -295,28 +373,33 @@ describe('scrolling detail viewports', () => {
   }, 30_000)
 
   it('lands a page key on the last row of a short list and hands the next one to the viewport', async () => {
-    // `PAGE` is ten rows, and it used to move modulo the list length: PageDown in a three-row list
-    // moved one row and in a ten-row list moved nowhere, which a reader cannot tell from a dead key.
-    // It clamps now, and once the caret is on the last row the collection hands the key back, so the
+    // `PAGE` is ten rows, and it clamps rather than moving modulo the list length, which in a
+    // three-row list would move one row and in a ten-row list nowhere — a reader cannot tell that
+    // from a dead key. Once the caret is on the last row the collection hands the key back, so the
     // document viewport around the list scrolls it. That is the sentence the footer promises: arrows
     // move, page keys scroll (client-core kit/keys/collectionIntents.ts).
     for (const count of [3, 10]) {
-      const screen = await renderCells(() => (
-        <HeaderBodyFooter
-          stateKey={`paged-${count}`}
-          label="Paged"
-          regions={{
-            body: () => (
-              <>
-                <Rows id={`paged-rows-${count}`} items={items(count)}>
-                  {(row, item) => <Row item={item}>{row.label}</Row>}
-                </Rows>
-                {items(24).map((row) => <Text>Tail {row.label}</Text>)}
-              </>
-            ),
-          }}
-        />
-      ), { width: 44, height: 10 })
+      const screen = await renderCells(
+        () => (
+          <HeaderBodyFooter
+            stateKey={`paged-${count}`}
+            label="Paged"
+            regions={{
+              body: () => (
+                <>
+                  <Rows id={`paged-rows-${count}`} items={items(count)}>
+                    {(row, item) => <Row item={item}>{row.label}</Row>}
+                  </Rows>
+                  {items(24).map((row) => (
+                    <Text>Tail {row.label}</Text>
+                  ))}
+                </>
+              ),
+            }}
+          />
+        ),
+        { width: 44, height: 10 },
+      )
 
       try {
         expect(caret(screen), `a list of ${count} rows`).toContain('Row 1')
@@ -337,12 +420,11 @@ describe('scrolling detail viewports', () => {
   }, 60_000)
 
   it('reveals the caret in a list that has only just mounted', async () => {
-    // The reveal reads a child's laid-out `y`, and a row built in this tick still carries last
-    // tick's geometry or none at all. So entering a region whose rows have only just arrived
-    // scrolled by the wrong delta and nothing corrected it: with the reveal's second half taken out
-    // this case leaves the caret on row 30 and the viewport showing rows 1 to 10, which is a lit
-    // border, no caret and dead-looking arrows. The store reveals on the renderer's next frame,
-    // which is the first moment the numbers are real (../keys/regions.ts § The reveal).
+    // The reveal reads a child's laid-out `y`, and a row built in this tick still carries last tick's
+    // geometry or none at all. Revealed in the same tick, entering a region whose rows have only just arrived
+    // scrolls by the wrong delta: the caret is on row 30 and the viewport shows rows 1 to 10, which is a lit
+    // border, no caret and dead-looking arrows. The store reveals on the renderer's next frame, which is the
+    // first moment the numbers are real (../keys/regions.ts § The reveal).
     //
     // Built the way a reader meets it. They read to the end of a list, look at the detail beside it,
     // the list is replaced under them by a refresh, and they Tab back: the region remembers the row
@@ -350,22 +432,25 @@ describe('scrolling detail viewports', () => {
     // `ready` unmounts the rows and not the frame around them, because the region's memory lives on
     // the region and a region that unregisters takes it with it.
     const [ready, setReady] = createSignal(true)
-    const screen = await renderCells(() => (
-      <ListDetail
-        stateKey="fresh-list"
-        label="Fresh"
-        regions={{
-          list: () => (
-            <Show when={ready()}>
-              <Rows id="fresh-list-rows" items={items(30)}>
-                {(row, item) => <Row item={item}>{row.label}</Row>}
-              </Rows>
-            </Show>
-          ),
-          detail: () => <Text>a detail</Text>,
-        }}
-      />
-    ), { width: 100, height: 12 })
+    const screen = await renderCells(
+      () => (
+        <ListDetail
+          stateKey="fresh-list"
+          label="Fresh"
+          regions={{
+            list: () => (
+              <Show when={ready()}>
+                <Rows id="fresh-list-rows" items={items(30)}>
+                  {(row, item) => <Row item={item}>{row.label}</Row>}
+                </Rows>
+              </Show>
+            ),
+            detail: () => <Text>a detail</Text>,
+          }}
+        />
+      ),
+      { width: 100, height: 12 },
+    )
 
     try {
       const end = await screen.press('END')
@@ -393,26 +478,28 @@ describe('scrolling detail viewports', () => {
     // also manage: scroll too far and the row is still drawn, just not where the reader is looking.
     // This one is the same scenario judged by where the row landed. The reveal runs between the
     // layout and the paint of one frame, so a row revealed from below lands exactly at the bottom
-    // edge it came in from: Row 30 is the last row drawn, and no row is drawn twice. That is the
-    // promise one reveal makes and two never could, because the second was correcting the first
+    // edge it came in from: Row 30 is the last row drawn, and no row is drawn twice
     // (../keys/regions.ts § The reveal).
     const [ready, setReady] = createSignal(true)
-    const screen = await renderCells(() => (
-      <ListDetail
-        stateKey="fresh-geometry"
-        label="Fresh"
-        regions={{
-          list: () => (
-            <Show when={ready()}>
-              <Rows id="fresh-geometry-rows" items={items(30)}>
-                {(row, item) => <Row item={item}>{row.label}</Row>}
-              </Rows>
-            </Show>
-          ),
-          detail: () => <Text>a detail</Text>,
-        }}
-      />
-    ), { width: 100, height: 12 })
+    const screen = await renderCells(
+      () => (
+        <ListDetail
+          stateKey="fresh-geometry"
+          label="Fresh"
+          regions={{
+            list: () => (
+              <Show when={ready()}>
+                <Rows id="fresh-geometry-rows" items={items(30)}>
+                  {(row, item) => <Row item={item}>{row.label}</Row>}
+                </Rows>
+              </Show>
+            ),
+            detail: () => <Text>a detail</Text>,
+          }}
+        />
+      ),
+      { width: 100, height: 12 },
+    )
 
     try {
       const end = await screen.press('END')

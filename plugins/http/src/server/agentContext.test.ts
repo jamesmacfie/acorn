@@ -56,7 +56,11 @@ describe('agent context snapshots', () => {
   })
 
   it('describes an option by method and URL', () => {
-    expect(requestOption(request())).toEqual({ id: 'req-1', label: 'Login', description: 'POST https://api.example.com/login' })
+    expect(requestOption(request())).toEqual({
+      id: 'req-1',
+      label: 'Login',
+      description: 'POST https://api.example.com/login',
+    })
   })
 })
 
@@ -67,8 +71,9 @@ describe('redactUrl', () => {
   })
 
   it('keeps query keys and drops literal values', () => {
-    expect(redactUrl('https://api.example.com/items?token=sk-live-DEADBEEF&page=2'))
-      .toBe('https://api.example.com/items?token=•••&page=•••')
+    expect(redactUrl('https://api.example.com/items?token=sk-live-DEADBEEF&page=2')).toBe(
+      'https://api.example.com/items?token=•••&page=•••',
+    )
   })
 
   it('keeps a value that is only a variable reference, because that is shape not data', () => {

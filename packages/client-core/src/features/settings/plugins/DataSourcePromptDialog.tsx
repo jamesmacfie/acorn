@@ -9,13 +9,17 @@ import { Text } from '../../../kit/components/content/Text'
 type Picked = { source: string; name: string }
 
 /** The two questions behind "Build a data source from your connections": what one row is, and which
- *  of the node's sources it reads. The answers become the agent prompt in ./PluginsSettings.tsx. */
-export function DataSourcePromptDialog(props: { nodeId: string; onDismiss: () => void; onStart: (row: string, inputs: Picked[]) => void }) {
+ *  of the node's sources it reads. The answers become the agent prompt in `PluginsSettings`. */
+export function DataSourcePromptDialog(props: {
+  nodeId: string
+  onDismiss: () => void
+  onStart: (row: string, inputs: Picked[]) => void
+}) {
   const catalog = createQuery(() => dataSourceCatalogOptions(props.nodeId, { parameters: {} }))
   const [row, setRow] = createSignal('')
   const [picked, setPicked] = createSignal<Picked[]>([])
   const toggle = (input: Picked, on: boolean) =>
-    setPicked(current => on ? [...current, input] : current.filter(entry => entry.source !== input.source))
+    setPicked((current) => (on ? [...current, input] : current.filter((entry) => entry.source !== input.source)))
   const ready = () => row().trim() !== '' && picked().length > 0
 
   return (
@@ -35,8 +39,8 @@ export function DataSourcePromptDialog(props: { nodeId: string; onDismiss: () =>
                       <Checkbox
                         label={source.name}
                         hint={input.source}
-                        checked={picked().some(entry => entry.source === input.source)}
-                        onChange={on => toggle(input, on)}
+                        checked={picked().some((entry) => entry.source === input.source)}
+                        onChange={(on) => toggle(input, on)}
                       />
                     )
                   }}
@@ -47,8 +51,12 @@ export function DataSourcePromptDialog(props: { nodeId: string; onDismiss: () =>
         </Stack>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onPress={props.onDismiss}>Cancel</Button>
-        <Button variant="solid" disabled={!ready()} onPress={() => props.onStart(row().trim(), picked())}>Start</Button>
+        <Button variant="ghost" onPress={props.onDismiss}>
+          Cancel
+        </Button>
+        <Button variant="solid" disabled={!ready()} onPress={() => props.onStart(row().trim(), picked())}>
+          Start
+        </Button>
       </Modal.Actions>
     </Modal>
   )

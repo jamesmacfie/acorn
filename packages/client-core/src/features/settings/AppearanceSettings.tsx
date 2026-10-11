@@ -30,10 +30,8 @@ import { createWorkspaceWords } from '../workspaces/words'
 // Theme additionally has a follow-the-OS mode with one pick per mode; style has no OS signal, so it
 // is a single value.
 //
-// The reads, the writes and the two lists are `./appearancePrefs.ts`, not this file: the same five
-// choices are also palette commands, and a setting with two persistence paths is a setting that starts
-// disagreeing with itself. What is left here is the arrangement. The file those choices are written
-// to has its own page under Advanced (./DeviceConfigSettings.tsx).
+// The reads, the writes and the two lists live in appearancePrefs, not here, because the same five
+// choices are also palette commands. What is left here is the arrangement.
 export default function AppearanceSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -52,15 +50,23 @@ export default function AppearanceSettings() {
     <>
       <SettingsSection id="navigation" label="Navigation">
         <SettingRow label={railLabel()} scope="device" error={workspaceRail.error()}>
-          <Checkbox switch ariaLabel={railLabel()} checked={workspaceRailShown(prefs.data)}
-            onChange={(shown) => workspaceRail.run(() => saveWorkspaceRailShown(qc, shown))} />
+          <Checkbox
+            switch
+            ariaLabel={railLabel()}
+            checked={workspaceRailShown(prefs.data)}
+            onChange={(shown) => workspaceRail.run(() => saveWorkspaceRailShown(qc, shown))}
+          />
         </SettingRow>
       </SettingsSection>
       <SettingsSection id="style" label="Style" help="Style sets shapes, fonts, and spacing. Theme sets the colours.">
         <SettingRow
           label="Style"
           error={style.error()}
-          onReset={appearanceStyle(prefs.data) === DEFAULT_STYLE ? undefined : () => void style.run(() => saveAppearanceStyle(qc, DEFAULT_STYLE))}
+          onReset={
+            appearanceStyle(prefs.data) === DEFAULT_STYLE
+              ? undefined
+              : () => void style.run(() => saveAppearanceStyle(qc, DEFAULT_STYLE))
+          }
         >
           <Select
             label="Style"
@@ -83,15 +89,30 @@ export default function AppearanceSettings() {
           when={themeFollowsSystem(prefs.data)}
           fallback={
             <SettingRow label="Theme" error={theme.error()}>
-              <Select label="Theme" value={fixedTheme(prefs.data)} options={themeChoices()} onChange={(value) => void theme.run(() => saveFixedTheme(qc, value))} />
+              <Select
+                label="Theme"
+                value={fixedTheme(prefs.data)}
+                options={themeChoices()}
+                onChange={(value) => void theme.run(() => saveFixedTheme(qc, value))}
+              />
             </SettingRow>
           }
         >
           <SettingRow label="Light theme" error={light.error()}>
-            <Select label="Light theme" value={lightTheme(prefs.data)} options={themeChoices()} onChange={(value) => void light.run(() => saveLightTheme(qc, value))} />
+            <Select
+              label="Light theme"
+              value={lightTheme(prefs.data)}
+              options={themeChoices()}
+              onChange={(value) => void light.run(() => saveLightTheme(qc, value))}
+            />
           </SettingRow>
           <SettingRow label="Dark theme" error={dark.error()}>
-            <Select label="Dark theme" value={darkTheme(prefs.data)} options={themeChoices()} onChange={(value) => void dark.run(() => saveDarkTheme(qc, value))} />
+            <Select
+              label="Dark theme"
+              value={darkTheme(prefs.data)}
+              options={themeChoices()}
+              onChange={(value) => void dark.run(() => saveDarkTheme(qc, value))}
+            />
           </SettingRow>
         </Show>
       </SettingsSection>

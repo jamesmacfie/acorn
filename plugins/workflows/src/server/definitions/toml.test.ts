@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseWorkflowToml } from './files'
-import { uniqueWorkflowSlug, workflowSlug, writeWorkflowToml } from './toml'
+import { workflowSlug, writeWorkflowToml } from './toml'
 
 // The writer's contract is a round trip, not a shape: whatever the loader read out of a file, writing
 // it and reading it again must give the same definition back (docs/workflows/definitions.md § Database
@@ -19,7 +19,14 @@ const roundTrip = (text: string) => {
 
 it('rejects a numeric-1 workflow without the baseline marker', () => {
   const errors: { source: string; message: string }[] = []
-  expect(parseWorkflowToml('format_version = 1\n[[steps]]\nid = "work"\nname = "Work"\nprompt = "Do it"\n', 'old', 'user', errors)).toBeNull()
+  expect(
+    parseWorkflowToml(
+      'format_version = 1\n[[steps]]\nid = "work"\nname = "Work"\nprompt = "Do it"\n',
+      'old',
+      'user',
+      errors,
+    ),
+  ).toBeNull()
   expect(errors[0]?.message).toMatch(/baseline/)
 })
 
@@ -47,13 +54,20 @@ goal = "Its tests pass."
 `)
     expect(parsed.steps[0]?.goal).toBe('The login tests pass and the fix is committed.')
     expect(parsed.steps[1]?.agent?.goal).toBe('Its tests pass.')
-    expect(again.steps.map((step) => [step.goal, step.agent?.goal])).toEqual(parsed.steps.map((step) => [step.goal, step.agent?.goal]))
+    expect(again.steps.map((step) => [step.goal, step.agent?.goal])).toEqual(
+      parsed.steps.map((step) => [step.goal, step.agent?.goal]),
+    )
     expect(written).toContain('goal = "Its tests pass."')
   })
 
   it('keeps a blank goal so validation can name it', () => {
     const errors: { source: string; message: string }[] = []
-    const parsed = parseWorkflowToml('format_version = 1\nbaseline = "acorn-1"\nname = "w"\n[[steps]]\nid = "fix"\nname = "fix"\ngoal = "  "\n', 'w', 'repo', errors)
+    const parsed = parseWorkflowToml(
+      'format_version = 1\nbaseline = "acorn-1"\nname = "w"\n[[steps]]\nid = "fix"\nname = "fix"\ngoal = "  "\n',
+      'w',
+      'repo',
+      errors,
+    )
     expect(parsed?.steps[0]?.goal).toBe('')
   })
 
@@ -187,7 +201,12 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
     expect(written).not.toContain('\nworkflow = "review-row"')
 
     const staticErrors: { source: string; message: string }[] = []
-    const staticStep = parseWorkflowToml('format_version = 1\nbaseline = "acorn-1"\n[[steps]]\nid = "review"\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
+    const staticStep = parseWorkflowToml(
+      'format_version = 1\nbaseline = "acorn-1"\n[[steps]]\nid = "review"\nworkflow = "review-block"\n',
+      'parent',
+      'repo',
+      staticErrors,
+    )
     expect(staticErrors).toEqual([])
     expect(staticStep?.steps[0]).toMatchObject({ workflowRef: 'review-block' })
     expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
@@ -218,8 +237,13 @@ on_failure = "stop"
 schema_json = '{"type":"object","properties":{"fixed":{"type":"boolean"}}}'
 `)
     expect(again).toEqual(parsed)
-    expect(again.steps[1].agent).toMatchObject({ prompt: 'Fix the current item.', profileId: 'codex',
-      configOptions: { model: 'code-model', reasoning: 'high' }, onFailure: 'stop', schema: { type: 'object' } })
+    expect(again.steps[1].agent).toMatchObject({
+      prompt: 'Fix the current item.',
+      profileId: 'codex',
+      configOptions: { model: 'code-model', reasoning: 'high' },
+      onFailure: 'stop',
+      schema: { type: 'object' },
+    })
     expect(again.steps[1].childWorkflow).toBeUndefined()
   })
 
@@ -304,7 +328,12 @@ second line
   })
 
   it('falls back to a quoted string when a literal block cannot hold the text', () => {
-    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'edge', steps: [{ id: 'a', name: 'a', prompt: "one\ntwo '''" }] }
+    const def = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'edge',
+      steps: [{ id: 'a', name: 'a', prompt: "one\ntwo '''" }],
+    }
     const text = writeWorkflowToml(def)
     expect(text).toContain('prompt = "one\\ntwo')
     const errors: { source: string; message: string }[] = []
@@ -318,11 +347,5 @@ describe('the file id a saved row gets', () => {
     expect(workflowSlug('Investigate an issue')).toBe('investigate-an-issue')
     expect(workflowSlug('../../etc/passwd')).toBe('etc-passwd')
     expect(workflowSlug('///')).toBe('workflow')
-  })
-
-  it('deduplicates against what the folder already holds', () => {
-    expect(uniqueWorkflowSlug('Ship it', new Set())).toBe('ship-it')
-    expect(uniqueWorkflowSlug('Ship it', new Set(['ship-it']))).toBe('ship-it-2')
-    expect(uniqueWorkflowSlug('Ship it', new Set(['ship-it', 'ship-it-2']))).toBe('ship-it-3')
   })
 })

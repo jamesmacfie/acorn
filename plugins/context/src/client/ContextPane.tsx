@@ -1,10 +1,33 @@
 import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
-import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task, type SessionSummary } from '@acorn/plugin-api/client'
+import {
+  bytesOf,
+  clientEvents,
+  consumePaneIntent,
+  formatSize,
+  type PaneIntent,
+  type Task,
+  type SessionSummary,
+} from '@acorn/plugin-api/client'
 import type { ContextItem, TaskContext } from '@acorn/protocol/api.ts'
 import { NOTE_AUTHOR_LABEL, NOTE_SCOPE_LABEL, type NoteScope } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, IconButton, Inline, Meter, Picker,
-  Rows, Stack, Text, Toolbar, TreeRow,
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  CodeBlock,
+  EmptyState,
+  Fold,
+  Heading,
+  IconButton,
+  Inline,
+  Meter,
+  Picker,
+  Rows,
+  Stack,
+  Text,
+  Toolbar,
+  TreeRow,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { collectionId, pillText, sessionLabel, type ContextModel } from './contextModel'
@@ -75,7 +98,12 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
           }
           trailing={
             <Show when={rowProps.item.jump?.pane === 'notes'}>
-              <IconButton icon="pencil" title="Edit in Notes" label="Edit in Notes" onPress={() => model().followJump(rowProps.item)} />
+              <IconButton
+                icon="pencil"
+                title="Edit in Notes"
+                label="Edit in Notes"
+                onPress={() => model().followJump(rowProps.item)}
+              />
             </Show>
           }
         >
@@ -83,10 +111,22 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
         </TreeRow>
         <Show when={open()}>
           <Stack gap="row">
-            <Show when={rowProps.item.body}>{(body) => <Text emphasis="muted" wrap>{body()}</Text>}</Show>
+            <Show when={rowProps.item.body}>
+              {(body) => (
+                <Text emphasis="muted" wrap>
+                  {body()}
+                </Text>
+              )}
+            </Show>
             <Show when={rowProps.item.details?.length}>
               <Stack gap="none">
-                <For each={rowProps.item.details}>{(detail) => <Text emphasis="mono" tone="muted">{detail}</Text>}</For>
+                <For each={rowProps.item.details}>
+                  {(detail) => (
+                    <Text emphasis="mono" tone="muted">
+                      {detail}
+                    </Text>
+                  )}
+                </For>
               </Stack>
             </Show>
           </Stack>
@@ -126,9 +166,7 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
           />
         }
       >
-        <Show when={section().absent}>
-          {(absent) => <Alert tone="warn">{absent().detail}</Alert>}
-        </Show>
+        <Show when={section().absent}>{(absent) => <Alert tone="warn">{absent().detail}</Alert>}</Show>
         {/* Extra UI a plugin draws under its own section: memory's add form and proposal queue today,
             anybody's tree tomorrow. `stack`, so context's own rows stay and the contributor's tree
             joins them. The pane asks the host and never learns who answered. */}
@@ -168,8 +206,14 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
   const model = () => props.model
   return (
     <Stack gap="none">
-      <Fold label="What the agent gets" persistKey="context.preview" meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}>
-        <CodeBlock size="xs" maxHeight="block" wrap>{model().assembled()?.block}</CodeBlock>
+      <Fold
+        label="What the agent gets"
+        persistKey="context.preview"
+        meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}
+      >
+        <CodeBlock size="xs" maxHeight="block" wrap>
+          {model().assembled()?.block}
+        </CodeBlock>
       </Fold>
       <Toolbar ariaLabel="Context sync">
         <Picker<SessionSummary>
@@ -179,19 +223,23 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
           emptyText="No agent is running for this task."
           results={(query) => model().sessions(query)}
           rowLabel={(session) => sessionLabel(session)}
-          isActive={(session) => session.sourceId === model().target()?.sourceId && session.sessionId === model().target()?.sessionId && session.nodeId === model().target()?.nodeId}
+          isActive={(session) =>
+            session.sourceId === model().target()?.sourceId &&
+            session.sessionId === model().target()?.sessionId &&
+            session.nodeId === model().target()?.nodeId
+          }
           onSelect={(session) => model().pickTarget(session)}
         />
         <Show when={model().status()}>
           {(status) => (
-            <Badge
-              tone={status().kind === 'stale' ? 'warn' : 'neutral'}
-              shape="pill"
-              size="xs"
-            >{pillText(status())}</Badge>
+            <Badge tone={status().kind === 'stale' ? 'warn' : 'neutral'} shape="pill" size="xs">
+              {pillText(status())}
+            </Badge>
           )}
         </Show>
-        <Button size="sm" onPress={() => void model().syncContext()}>Send context</Button>
+        <Button size="sm" onPress={() => void model().syncContext()}>
+          Send context
+        </Button>
       </Toolbar>
     </Stack>
   )

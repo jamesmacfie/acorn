@@ -18,9 +18,20 @@ const fakeProvider = (
     label: 'Tracker',
     glyph: 'brand:linear',
     kind: 'issue-tracker',
-    connection: { authKind: 'api-key', connectable: true, disconnectable: true, fields: [], validate: async () => ({}), normalize: () => ({}), test: async () => ({ ok: true }) },
+    connection: {
+      authKind: 'api-key',
+      connectable: true,
+      disconnectable: true,
+      fields: [],
+      validate: async () => ({}),
+      normalize: () => ({}),
+      test: async () => ({ ok: true }),
+    },
     capabilities,
-    externalIds: { fromDisplay: (connectionId: string, displayId: string) => ({ providerId: 'tracker', connectionId, displayId }), parse: () => null },
+    externalIds: {
+      fromDisplay: (connectionId: string, displayId: string) => ({ providerId: 'tracker', connectionId, displayId }),
+      parse: () => null,
+    },
     resources: [],
     budgets: defaultBudgets,
     memory: {},
@@ -36,9 +47,18 @@ describe('issue tools', () => {
   beforeEach(async () => {
     db = makeTestDb()
     await db.db.insert(schema.integrations).values({
-      id: 'conn-a', userId: 'owner', provider: 'tracker', status: 'connected', encryptedCredentials: await db.secrets.seal('the-key'), label: 'a', createdAt: 1, updatedAt: 1,
+      id: 'conn-a',
+      userId: 'owner',
+      provider: 'tracker',
+      status: 'connected',
+      encryptedCredentials: await db.secrets.seal('the-key'),
+      label: 'a',
+      createdAt: 1,
+      updatedAt: 1,
     } as never)
-    await db.db.insert(schema.taskLinks).values({ taskId: 'task-1', integrationId: 'conn-a', provider: 'tracker', identifier: 'ENG-42', createdAt: 1 })
+    await db.db
+      .insert(schema.taskLinks)
+      .values({ taskId: 'task-1', integrationId: 'conn-a', provider: 'tracker', identifier: 'ENG-42', createdAt: 1 })
   })
 
   afterEach(() => {
@@ -55,15 +75,19 @@ describe('issue tools', () => {
 
   it('posts on the linked item with the connection key and the call id', async () => {
     const posted: unknown[] = []
-    register(fakeProvider({
-      comment: async (context, identifier, body) => {
-        posted.push({ secret: context.secret, key: context.idempotencyKey, identifier, body })
-        return { url: 'https://tracker.test/ENG-42#c1' }
-      },
-    }))
+    register(
+      fakeProvider({
+        comment: async (context, identifier, body) => {
+          posted.push({ secret: context.secret, key: context.idempotencyKey, identifier, body })
+          return { url: 'https://tracker.test/ENG-42#c1' }
+        },
+      }),
+    )
 
     await expect(issueCommentTool(deps()).handler({ identifier: 'ENG-42', body: ' Done. ' }, ctx)).resolves.toEqual({
-      provider: 'tracker', identifier: 'ENG-42', url: 'https://tracker.test/ENG-42#c1',
+      provider: 'tracker',
+      identifier: 'ENG-42',
+      url: 'https://tracker.test/ENG-42#c1',
     })
     expect(posted).toEqual([{ secret: 'the-key', key: ctx.callId, identifier: 'ENG-42', body: 'Done.' }])
   })
@@ -78,29 +102,48 @@ describe('issue tools', () => {
   })
 
   it('returns an image the item references', async () => {
-    register(fakeProvider({
-      detail: async () => ({ description: '![shot](https://files.test/a.png)' }),
-      image: async ({ secret }, url) => (secret === 'the-key' && url === 'https://files.test/a.png' ? { mimeType: 'image/png; charset=binary', data: PNG } : null),
-    }))
+    register(
+      fakeProvider({
+        detail: async () => ({ description: '![shot](https://files.test/a.png)' }),
+        image: async ({ secret }, url) =>
+          secret === 'the-key' && url === 'https://files.test/a.png'
+            ? { mimeType: 'image/png; charset=binary', data: PNG }
+            : null,
+      }),
+    )
 
-    await expect(issueImageTool(deps()).handler({ identifier: 'ENG-42', url: 'https://files.test/a.png' }, ctx)).resolves.toEqual({
-      type: 'image', mimeType: 'image/png', data: PNG,
+    await expect(
+      issueImageTool(deps()).handler({ identifier: 'ENG-42', url: 'https://files.test/a.png' }, ctx),
+    ).resolves.toEqual({
+      type: 'image',
+      mimeType: 'image/png',
+      data: PNG,
     })
   })
 
   it('refuses a URL the item does not contain, and a file that is not an image', async () => {
-    register(fakeProvider({
-      detail: async () => ({ description: 'see https://files.test/clip.mp4' }),
-      image: async () => ({ mimeType: 'video/mp4', data: '' }),
-    }))
+    register(
+      fakeProvider({
+        detail: async () => ({ description: 'see https://files.test/clip.mp4' }),
+        image: async () => ({ mimeType: 'video/mp4', data: '' }),
+      }),
+    )
     const tool = issueImageTool(deps())
 
-    await expect(tool.handler({ identifier: 'ENG-42', url: 'https://files.test/other.png' }, ctx)).rejects.toThrow(/does not appear in 'ENG-42'/)
-    await expect(tool.handler({ identifier: 'ENG-42', url: 'https://files.test/clip.mp4' }, ctx)).rejects.toThrow(/video\/mp4/)
+    await expect(tool.handler({ identifier: 'ENG-42', url: 'https://files.test/other.png' }, ctx)).rejects.toThrow(
+      /does not appear in 'ENG-42'/,
+    )
+    await expect(tool.handler({ identifier: 'ENG-42', url: 'https://files.test/clip.mp4' }, ctx)).rejects.toThrow(
+      /video\/mp4/,
+    )
   })
 
   it('will not register writable comments without the hook, or images without detail', () => {
-    expect(() => integrationProviderRegistry.register(fakeProvider({}, { comments: 'write' }), 'test')).toThrow(/comments: 'write'/)
-    expect(() => integrationProviderRegistry.register(fakeProvider({ image: async () => null }), 'test')).toThrow(/without `detail`/)
+    expect(() => integrationProviderRegistry.register(fakeProvider({}, { comments: 'write' }), 'test')).toThrow(
+      /comments: 'write'/,
+    )
+    expect(() => integrationProviderRegistry.register(fakeProvider({ image: async () => null }), 'test')).toThrow(
+      /without `detail`/,
+    )
   })
 })

@@ -6,7 +6,7 @@ import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { AgentCheck } from '../../shared/delegationSchemas'
 import * as schema from '../../node/schema'
 
-export type AgentSpawnState = 'creating' | 'provisioned' | 'failed'
+type AgentSpawnState = 'creating' | 'provisioned' | 'failed'
 export type AgentSpawnIsolation = 'shared' | 'worktree'
 
 export type AgentSpawn = {
@@ -84,17 +84,18 @@ const parseProvisioning = (value: string | null): AgentSpawnProvisioning | null 
   try {
     const parsed = JSON.parse(value) as Partial<AgentSpawnProvisioning>
     if (
-      typeof parsed.title !== 'string'
-      || typeof parsed.prompt !== 'string'
-      || typeof parsed.branch !== 'string'
-      || (parsed.baseBranch !== undefined && typeof parsed.baseBranch !== 'string')
-      || typeof parsed.providerId !== 'string'
-      || typeof parsed.profileId !== 'string'
-      || (parsed.parentSessionId !== null && typeof parsed.parentSessionId !== 'string')
-      || (parsed.parentTurnId !== null && typeof parsed.parentTurnId !== 'string')
-      || !parsed.toolCeiling
-      || typeof parsed.toolCeiling !== 'object'
-    ) return null
+      typeof parsed.title !== 'string' ||
+      typeof parsed.prompt !== 'string' ||
+      typeof parsed.branch !== 'string' ||
+      (parsed.baseBranch !== undefined && typeof parsed.baseBranch !== 'string') ||
+      typeof parsed.providerId !== 'string' ||
+      typeof parsed.profileId !== 'string' ||
+      (parsed.parentSessionId !== null && typeof parsed.parentSessionId !== 'string') ||
+      (parsed.parentTurnId !== null && typeof parsed.parentTurnId !== 'string') ||
+      !parsed.toolCeiling ||
+      typeof parsed.toolCeiling !== 'object'
+    )
+      return null
     return parsed as AgentSpawnProvisioning
   } catch {
     return null
@@ -102,7 +103,10 @@ const parseProvisioning = (value: string | null): AgentSpawnProvisioning | null 
 }
 
 export class DelegationLimitError extends Error {
-  constructor(public readonly code: 'max_depth' | 'live_limit', message: string) {
+  constructor(
+    public readonly code: 'max_depth' | 'live_limit',
+    message: string,
+  ) {
     super(message)
     this.name = 'DelegationLimitError'
   }
@@ -118,11 +122,10 @@ export class DelegationLimitError extends Error {
 export class AgentDelegationStore {
   constructor(private readonly db: PluginDatabase) {}
 
-  reserveShared(input: {
-    ownerTaskId: string
-    ownerSessionId: string
-    idempotencyKey: string
-  }): { spawn: AgentSpawn; created: boolean } {
+  reserveShared(input: { ownerTaskId: string; ownerSessionId: string; idempotencyKey: string }): {
+    spawn: AgentSpawn
+    created: boolean
+  } {
     return this.reserve({ ...input, isolation: 'shared', childTaskId: input.ownerTaskId, provisioning: null })
   }
 
@@ -153,22 +156,26 @@ export class AgentDelegationStore {
       const existing = tx
         .select()
         .from(schema.agentSpawns)
-        .where(and(
-          eq(schema.agentSpawns.ownerTaskId, input.ownerTaskId),
-          eq(schema.agentSpawns.ownerSessionId, input.ownerSessionId),
-          eq(schema.agentSpawns.idempotencyKey, input.idempotencyKey),
-        ))
+        .where(
+          and(
+            eq(schema.agentSpawns.ownerTaskId, input.ownerTaskId),
+            eq(schema.agentSpawns.ownerSessionId, input.ownerSessionId),
+            eq(schema.agentSpawns.idempotencyKey, input.idempotencyKey),
+          ),
+        )
         .get()
       if (existing) return { spawn: mapSpawn(existing), created: false }
 
       const parent = tx
         .select()
         .from(schema.agentSpawns)
-        .where(and(
-          eq(schema.agentSpawns.childTaskId, input.ownerTaskId),
-          eq(schema.agentSpawns.childSessionId, input.ownerSessionId),
-          eq(schema.agentSpawns.provisioningState, 'provisioned'),
-        ))
+        .where(
+          and(
+            eq(schema.agentSpawns.childTaskId, input.ownerTaskId),
+            eq(schema.agentSpawns.childSessionId, input.ownerSessionId),
+            eq(schema.agentSpawns.provisioningState, 'provisioned'),
+          ),
+        )
         .orderBy(desc(schema.agentSpawns.createdAt))
         .get()
       const depth = parent ? parent.depth + 1 : 1
@@ -185,16 +192,14 @@ export class AgentDelegationStore {
         })
         .from(schema.agentSpawns)
         .leftJoin(schema.agentSessions, eq(schema.agentSessions.id, schema.agentSpawns.childSessionId))
-        .where(and(
-          eq(schema.agentSpawns.rootTaskId, rootTaskId),
-          eq(schema.agentSpawns.rootSessionId, rootSessionId),
-        ))
+        .where(and(eq(schema.agentSpawns.rootTaskId, rootTaskId), eq(schema.agentSpawns.rootSessionId, rootSessionId)))
         .all()
-      const liveCount = descendants.filter((row) =>
-        row.provisioningState === 'creating'
-        || (row.provisioningState === 'provisioned'
-          && row.runtimeState != null
-          && !TERMINAL_SESSION_STATES.has(row.runtimeState)),
+      const liveCount = descendants.filter(
+        (row) =>
+          row.provisioningState === 'creating' ||
+          (row.provisioningState === 'provisioned' &&
+            row.runtimeState != null &&
+            !TERMINAL_SESSION_STATES.has(row.runtimeState)),
       ).length
       if (liveCount >= MAX_LIVE_DESCENDANTS) {
         throw new DelegationLimitError(
@@ -233,10 +238,7 @@ export class AgentDelegationStore {
     const rows = await this.db
       .select()
       .from(schema.agentSpawns)
-      .where(and(
-        eq(schema.agentSpawns.isolation, 'worktree'),
-        eq(schema.agentSpawns.provisioningState, 'creating'),
-      ))
+      .where(and(eq(schema.agentSpawns.isolation, 'worktree'), eq(schema.agentSpawns.provisioningState, 'creating')))
       .orderBy(schema.agentSpawns.createdAt)
     return rows.map(mapSpawn)
   }
@@ -250,11 +252,13 @@ export class AgentDelegationStore {
     const [row] = await this.db
       .select()
       .from(schema.agentSpawns)
-      .where(and(
-        eq(schema.agentSpawns.ownerTaskId, ownerTaskId),
-        eq(schema.agentSpawns.ownerSessionId, ownerSessionId),
-        eq(schema.agentSpawns.idempotencyKey, idempotencyKey),
-      ))
+      .where(
+        and(
+          eq(schema.agentSpawns.ownerTaskId, ownerTaskId),
+          eq(schema.agentSpawns.ownerSessionId, ownerSessionId),
+          eq(schema.agentSpawns.idempotencyKey, idempotencyKey),
+        ),
+      )
       .limit(1)
     return row ? mapSpawn(row) : null
   }
@@ -275,17 +279,10 @@ export class AgentDelegationStore {
     await this.db
       .update(schema.agentSpawns)
       .set({ childSessionId, updatedAt: Date.now() })
-      .where(and(
-        eq(schema.agentSpawns.id, id),
-        eq(schema.agentSpawns.provisioningState, 'creating'),
-      ))
+      .where(and(eq(schema.agentSpawns.id, id), eq(schema.agentSpawns.provisioningState, 'creating')))
   }
 
-  async fail(
-    id: string,
-    error: unknown,
-    child: { sessionId?: string; turnId?: string } = {},
-  ): Promise<AgentSpawn> {
+  async fail(id: string, error: unknown, child: { sessionId?: string; turnId?: string } = {}): Promise<AgentSpawn> {
     const detail = (error instanceof Error ? error.message : 'Agent spawn provisioning failed.')
       .replace(/[\r\n\t]+/g, ' ')
       .slice(0, MAX_PROVISIONING_ERROR_CHARS)
@@ -308,12 +305,14 @@ export class AgentDelegationStore {
     const [row] = await this.db
       .select()
       .from(schema.agentSpawns)
-      .where(and(
-        eq(schema.agentSpawns.ownerTaskId, ownerTaskId),
-        eq(schema.agentSpawns.ownerSessionId, ownerSessionId),
-        eq(schema.agentSpawns.childSessionId, childSessionId),
-        eq(schema.agentSpawns.provisioningState, 'provisioned'),
-      ))
+      .where(
+        and(
+          eq(schema.agentSpawns.ownerTaskId, ownerTaskId),
+          eq(schema.agentSpawns.ownerSessionId, ownerSessionId),
+          eq(schema.agentSpawns.childSessionId, childSessionId),
+          eq(schema.agentSpawns.provisioningState, 'provisioned'),
+        ),
+      )
       .limit(1)
     return row ? mapSpawn(row) : null
   }
@@ -331,30 +330,33 @@ export class AgentDelegationStore {
     if (!sessions.length) return []
     const sessionIds = sessions.map((session) => session.id)
     const spawnIds = sessions.flatMap((session) =>
-      typeof session.config.delegationSpawnId === 'string' ? [session.config.delegationSpawnId] : [])
+      typeof session.config.delegationSpawnId === 'string' ? [session.config.delegationSpawnId] : [],
+    )
     const rows = await this.db
       .select()
       .from(schema.agentSpawns)
-      .where(or(
-        inArray(schema.agentSpawns.childSessionId, sessionIds),
-        ...(spawnIds.length ? [inArray(schema.agentSpawns.id, spawnIds)] : []),
-      ))
-    const byChild = new Map(rows.flatMap((row) => row.childSessionId ? [[row.childSessionId, row]] : []))
+      .where(
+        or(
+          inArray(schema.agentSpawns.childSessionId, sessionIds),
+          ...(spawnIds.length ? [inArray(schema.agentSpawns.id, spawnIds)] : []),
+        ),
+      )
+    const byChild = new Map(rows.flatMap((row) => (row.childSessionId ? [[row.childSessionId, row]] : [])))
     const bySpawn = new Map(rows.map((row) => [row.id, row]))
     return sessions.flatMap((session) => {
-      const spawnId = typeof session.config.delegationSpawnId === 'string'
-        ? session.config.delegationSpawnId
-        : null
+      const spawnId = typeof session.config.delegationSpawnId === 'string' ? session.config.delegationSpawnId : null
       const row = byChild.get(session.id) ?? (spawnId ? bySpawn.get(spawnId) : undefined)
       if (!row || row.childTaskId !== session.taskId) return []
-      return [{
-        sessionId: session.id,
-        ownerTaskId: row.ownerTaskId,
-        ownerSessionId: row.ownerSessionId,
-        managedParentSessionId: session.parentSessionId === row.ownerSessionId ? row.ownerSessionId : null,
-        depth: row.depth,
-        isolation: row.isolation as AgentSpawnIsolation,
-      }]
+      return [
+        {
+          sessionId: session.id,
+          ownerTaskId: row.ownerTaskId,
+          ownerSessionId: row.ownerSessionId,
+          managedParentSessionId: session.parentSessionId === row.ownerSessionId ? row.ownerSessionId : null,
+          depth: row.depth,
+          isolation: row.isolation as AgentSpawnIsolation,
+        },
+      ]
     })
   }
 }

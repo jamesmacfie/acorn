@@ -10,7 +10,7 @@ export const agentSessionDefaultsRoute = '/v1/p/agents/session-defaults'
 export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 
 /** providerId to optionId to the value that option is set to. */
-export type AgentDefaultValues = Record<string, Record<string, string>>
+type AgentDefaultValues = Record<string, Record<string, string>>
 
 export type SpawnedAgentDefaults = {
   mode: 'inherit' | 'explicit'
@@ -20,7 +20,9 @@ export type SpawnedAgentDefaults = {
 }
 
 export const defaultSpawnedAgentDefaults = (): SpawnedAgentDefaults => ({
-  mode: 'inherit', profileId: null, pinned: {},
+  mode: 'inherit',
+  profileId: null,
+  pinned: {},
 })
 
 /**
@@ -36,7 +38,8 @@ export const AGENT_IDLE_STOP_CHOICES = [
 
 /**
  * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
- * schedule removes the transcripts of that task's sessions for good (docs/data-layer/backup-and-retention.md § Retention).
+ * schedule removes the transcripts of that task's sessions for good
+ * (docs/data-layer/backup-and-retention.md § Retention).
  */
 export const AGENT_ARCHIVED_HISTORY_CHOICES = [
   { days: 30, label: '30 days' },
@@ -48,7 +51,7 @@ export const AGENT_ARCHIVED_HISTORY_CHOICES = [
 /**
  * "Warn when an agent repeats a tool call", as the number of identical calls in a row, where 0 is Off.
  * Waiting tools such as `task_scripts_wait` repeat on purpose, which is why the warning stops nothing
- * (../server/sessions/repeatedToolCalls.ts).
+ * (`RepeatedToolCallWarnings`).
  */
 export const AGENT_REPEATED_TOOL_CALL_CHOICES = [
   { calls: 3, label: '3 times in a row' },
@@ -67,7 +70,7 @@ export type AgentSessionDefaults = {
   /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
   keepArchivedHistoryDays: number
   /** Refuse a turn while an instruction file or skill the harness reads holds hidden characters
-   *  (../server/sessions/instructionCheck.ts). Drawn on Settings > Security and backup. */
+   *  (`hiddenCharactersIn`). Drawn on Settings > Security and backup. */
   checkInstructionFiles: boolean
   /** Require an owner-approved snapshot of discovered instruction and skill files. */
   reviewChangedInstructions: boolean
@@ -101,7 +104,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   checkInstructionFiles: false,
   reviewChangedInstructions: false,
   // Off, because the harness's sandbox also refuses writes outside the worktree, which breaks package
-  // installs and SSH pushes that work today.
+  // installs and SSH pushes that otherwise work.
   blockDataRootReads: false,
   followLastSession: true,
   pinned: {},
@@ -177,17 +180,29 @@ export function validateAgentSessionDefaults(
   if (record.continueAfterUsageLimit != null && typeof record.continueAfterUsageLimit !== 'boolean') {
     errors.push('continueAfterUsageLimit must be true or false.')
   }
-  if (record.stopIdleAfterMinutes != null
-    && !AGENT_IDLE_STOP_CHOICES.some((choice) => choice.minutes === record.stopIdleAfterMinutes)) {
-    errors.push(`stopIdleAfterMinutes must be one of ${AGENT_IDLE_STOP_CHOICES.map((choice) => choice.minutes).join(', ')}.`)
+  if (
+    record.stopIdleAfterMinutes != null &&
+    !AGENT_IDLE_STOP_CHOICES.some((choice) => choice.minutes === record.stopIdleAfterMinutes)
+  ) {
+    errors.push(
+      `stopIdleAfterMinutes must be one of ${AGENT_IDLE_STOP_CHOICES.map((choice) => choice.minutes).join(', ')}.`,
+    )
   }
-  if (record.warnRepeatedToolCallsAfter != null
-    && !AGENT_REPEATED_TOOL_CALL_CHOICES.some((choice) => choice.calls === record.warnRepeatedToolCallsAfter)) {
-    errors.push(`warnRepeatedToolCallsAfter must be one of ${AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => choice.calls).join(', ')}.`)
+  if (
+    record.warnRepeatedToolCallsAfter != null &&
+    !AGENT_REPEATED_TOOL_CALL_CHOICES.some((choice) => choice.calls === record.warnRepeatedToolCallsAfter)
+  ) {
+    errors.push(
+      `warnRepeatedToolCallsAfter must be one of ${AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => choice.calls).join(', ')}.`,
+    )
   }
-  if (record.keepArchivedHistoryDays != null
-    && !AGENT_ARCHIVED_HISTORY_CHOICES.some((choice) => choice.days === record.keepArchivedHistoryDays)) {
-    errors.push(`keepArchivedHistoryDays must be one of ${AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => choice.days).join(', ')}.`)
+  if (
+    record.keepArchivedHistoryDays != null &&
+    !AGENT_ARCHIVED_HISTORY_CHOICES.some((choice) => choice.days === record.keepArchivedHistoryDays)
+  ) {
+    errors.push(
+      `keepArchivedHistoryDays must be one of ${AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => choice.days).join(', ')}.`,
+    )
   }
   if (record.followLastSession != null && typeof record.followLastSession !== 'boolean') {
     errors.push('followLastSession must be true or false.')
@@ -209,16 +224,18 @@ export function validateAgentSessionDefaults(
     if (typeof record.spawned !== 'object' || Array.isArray(record.spawned)) errors.push('spawned must be an object.')
     else {
       const fields = record.spawned as Record<string, unknown>
-      if (fields.mode !== 'inherit' && fields.mode !== 'explicit') errors.push('spawned.mode must be inherit or explicit.')
+      if (fields.mode !== 'inherit' && fields.mode !== 'explicit')
+        errors.push('spawned.mode must be inherit or explicit.')
       if (fields.profileId != null && (typeof fields.profileId !== 'string' || fields.profileId.length > MAX_ID)) {
         errors.push('spawned.profileId must be a harness profile id.')
       }
       const pinnedSpawned = values(fields.pinned, 'spawned.pinned', errors)
-      if (pinnedSpawned && (fields.mode === 'inherit' || fields.mode === 'explicit')) spawned = {
-        mode: fields.mode,
-        profileId: typeof fields.profileId === 'string' && fields.profileId ? fields.profileId : null,
-        pinned: pinnedSpawned,
-      }
+      if (pinnedSpawned && (fields.mode === 'inherit' || fields.mode === 'explicit'))
+        spawned = {
+          mode: fields.mode,
+          profileId: typeof fields.profileId === 'string' && fields.profileId ? fields.profileId : null,
+          pinned: pinnedSpawned,
+        }
     }
   }
   let inline: AgentSessionDefaults['inline'] | undefined
@@ -230,10 +247,11 @@ export function validateAgentSessionDefaults(
         errors.push('inline.providerId must be a provider id.')
       }
       const pinnedInline = values(fields.pinned, 'inline.pinned', errors)
-      if (pinnedInline) inline = {
-        providerId: typeof fields.providerId === 'string' && fields.providerId ? fields.providerId : null,
-        pinned: pinnedInline,
-      }
+      if (pinnedInline)
+        inline = {
+          providerId: typeof fields.providerId === 'string' && fields.providerId ? fields.providerId : null,
+          pinned: pinnedInline,
+        }
     }
   }
   if (errors.length) return { ok: false, errors }
@@ -247,10 +265,16 @@ export function validateAgentSessionDefaults(
       ...(typeof record.warnRepeatedToolCallsAfter === 'number'
         ? { warnRepeatedToolCallsAfter: record.warnRepeatedToolCallsAfter }
         : {}),
-      ...(typeof record.keepArchivedHistoryDays === 'number' ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays } : {}),
+      ...(typeof record.keepArchivedHistoryDays === 'number'
+        ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays }
+        : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
-      ...(typeof record.checkInstructionFiles === 'boolean' ? { checkInstructionFiles: record.checkInstructionFiles } : {}),
-      ...(typeof record.reviewChangedInstructions === 'boolean' ? { reviewChangedInstructions: record.reviewChangedInstructions } : {}),
+      ...(typeof record.checkInstructionFiles === 'boolean'
+        ? { checkInstructionFiles: record.checkInstructionFiles }
+        : {}),
+      ...(typeof record.reviewChangedInstructions === 'boolean'
+        ? { reviewChangedInstructions: record.reviewChangedInstructions }
+        : {}),
       ...(typeof record.blockDataRootReads === 'boolean' ? { blockDataRootReads: record.blockDataRootReads } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
@@ -272,10 +296,7 @@ export function parseAgentSessionDefaults(raw: string | null | undefined): Agent
 }
 
 /** The values a new session of this provider starts with. */
-export const effectiveAgentDefaults = (
-  defaults: AgentSessionDefaults,
-  providerId: string,
-): Record<string, string> =>
+export const effectiveAgentDefaults = (defaults: AgentSessionDefaults, providerId: string): Record<string, string> =>
   (defaults.followLastSession ? defaults.last : defaults.pinned)[providerId] ?? {}
 
 export function rememberAgentDefaults(
@@ -310,5 +331,5 @@ export function optionsWithDefaults(
     changed = true
     return { ...option, currentValue: value }
   })
-  return changed ? next : options as AgentConfigOption[]
+  return changed ? next : (options as AgentConfigOption[])
 }

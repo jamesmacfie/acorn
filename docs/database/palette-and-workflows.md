@@ -8,7 +8,7 @@ read-only `database.query` capability behind them.
 Four commands in the manifest, three of them visible and hanging under a **Database** group. The two
 rows that need a route are served by this plugin's own node half.
 [Command palette and shortcuts](../command-palette-and-shortcuts.md) covers how the palette runs a
-search, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
+search, and [command kinds](../plugins/commands.md#command-kinds) holds the vocabulary.
 
 | Row | Kind | What it does |
 | --- | --- | --- |

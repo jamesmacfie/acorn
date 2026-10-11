@@ -21,12 +21,14 @@ export async function settleAutonomousRequest(
   if (ports.attendance !== 'autonomous') return false
   const parked = event.type === 'request' ? null : event
   if (parked && !parked.open()) return true
-  const request = parked ? parked.request : event as RequestEvent
+  const request = parked ? parked.request : (event as RequestEvent)
   const [recorded] = await ports.materialize({
-    ...request, blocked: { by: 'Unattended policy', reason: AUTONOMOUS_REQUEST_MESSAGE },
+    ...request,
+    blocked: { by: 'Unattended policy', reason: AUTONOMOUS_REQUEST_MESSAGE },
   })
   if (!recorded || !ports.owned()) return true
-  const reject = request.kind === 'permission' ? request.options?.find((option) => option.kind === 'reject_once') : undefined
+  const reject =
+    request.kind === 'permission' ? request.options?.find((option) => option.kind === 'reject_once') : undefined
   const resolution = reject ? { optionId: reject.id } : { cancelled: true, reason: AUTONOMOUS_REQUEST_MESSAGE }
   // Enqueue before replying: the provider may immediately continue with output or completion.
   await ports.accept(recorded)
@@ -35,8 +37,11 @@ export async function settleAutonomousRequest(
     if (parked) parked.respond(resolution)
     else await ports.respond(request.requestId, resolution)
   } catch {
-    await ports.accept({ type: 'diagnostic', level: 'warning',
-      message: 'The unattended request was cancelled, but the provider did not acknowledge the response.' })
+    await ports.accept({
+      type: 'diagnostic',
+      level: 'warning',
+      message: 'The unattended request was cancelled, but the provider did not acknowledge the response.',
+    })
   }
   return true
 }

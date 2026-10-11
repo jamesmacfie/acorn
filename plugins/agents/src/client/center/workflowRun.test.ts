@@ -13,15 +13,21 @@ const session = (fields: Partial<AgentSession>): AgentSession =>
 
 describe('the run behind a session', () => {
   it('names the run and the step a workflow started it for', () => {
-    expect(workflowRunOf(session({
-      kind: 'workflow',
-      config: { workflowRunId: 'run-1', workflowStepId: 'st-2' },
-    }))).toEqual({ runId: 'run-1', stepId: 'st-2' })
+    expect(
+      workflowRunOf(
+        session({
+          kind: 'workflow',
+          config: { workflowRunId: 'run-1', workflowStepId: 'st-2' },
+        }),
+      ),
+    ).toEqual({ runId: 'run-1', stepId: 'st-2' })
   })
 
   it('names the run alone when there is no step', () => {
-    expect(workflowRunOf(session({ kind: 'workflow', config: { workflowRunId: 'run-1' } })))
-      .toEqual({ runId: 'run-1', stepId: undefined })
+    expect(workflowRunOf(session({ kind: 'workflow', config: { workflowRunId: 'run-1' } }))).toEqual({
+      runId: 'run-1',
+      stepId: undefined,
+    })
   })
 
   it('is nothing for a session a person started', () => {

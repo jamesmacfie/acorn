@@ -8,9 +8,6 @@ state are disposable and never prove that a mutation succeeded.
 
 ## Pages
 
-<a id="scope-rules"></a>
-<a id="which-mechanism-holds-a-given-fact"></a>
-
 [Scope rules](./state-ownership/scope-rules.md) covers where client state is stored: the scope table,
 the three mechanisms, `DEVICE_KEYS`, eviction on a Node switch, drafts, and the device and Node
 decisions behind particular keys.

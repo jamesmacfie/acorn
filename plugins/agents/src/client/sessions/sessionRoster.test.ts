@@ -20,7 +20,8 @@ const session = (id: string, over: Partial<AgentSession> = {}): AgentSession => 
   config: {},
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [], queuedTurns: 0,
+  subagents: [],
+  queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,
@@ -38,13 +39,10 @@ const managed = (sessionId: string, parentSessionId: string, depth: number): Age
 
 describe('managed session roster', () => {
   it('nests delegated sessions beneath managed parents while preserving sibling order', () => {
-    const rows = agentSessionRoster(
-      [session('child-2'), session('root'), session('child-1'), session('other')],
-      {
-        'child-1': managed('child-1', 'root', 1),
-        'child-2': managed('child-2', 'root', 1),
-      },
-    )
+    const rows = agentSessionRoster([session('child-2'), session('root'), session('child-1'), session('other')], {
+      'child-1': managed('child-1', 'root', 1),
+      'child-2': managed('child-2', 'root', 1),
+    })
     expect(rows.map((row) => [row.key, row.depth])).toEqual([
       ['root', 0],
       ['child-2', 1],
@@ -54,28 +52,27 @@ describe('managed session roster', () => {
   })
 
   it('keeps terminal-owned and orphaned children visible without inventing parent rows', () => {
-    const rows = agentSessionRoster(
-      [session('terminal-child'), session('orphan')],
-      {
-        'terminal-child': {
-          sessionId: 'terminal-child',
-          depth: 1,
-          isolation: 'shared',
-          owner: { kind: 'terminal', label: 'Codex terminal', profileId: 'codex' },
-        },
-        orphan: managed('orphan', 'missing', 2),
+    const rows = agentSessionRoster([session('terminal-child'), session('orphan')], {
+      'terminal-child': {
+        sessionId: 'terminal-child',
+        depth: 1,
+        isolation: 'shared',
+        owner: { kind: 'terminal', label: 'Codex terminal', profileId: 'codex' },
       },
-    )
+      orphan: managed('orphan', 'missing', 2),
+    })
     expect(rows.map((row) => [row.key, row.depth])).toEqual([
       ['terminal-child', 0],
       ['orphan', 0],
     ])
     const terminal = rows[0]
     const orphan = rows[1]
-    expect(terminal?.kind === 'managed' ? delegationSummary(terminal) : null)
-      .toBe('Delegated by Codex terminal (codex) · depth 1 · shared')
-    expect(orphan?.kind === 'managed' ? delegationSummary(orphan) : null)
-      .toBe('Delegated · parent unavailable · depth 2 · shared')
+    expect(terminal?.kind === 'managed' ? delegationSummary(terminal) : null).toBe(
+      'Delegated by Codex terminal (codex) · depth 1 · shared',
+    )
+    expect(orphan?.kind === 'managed' ? delegationSummary(orphan) : null).toBe(
+      'Delegated · parent unavailable · depth 2 · shared',
+    )
   })
 
   it('keeps provider-native subagents directly beneath their provider session', () => {
@@ -87,10 +84,9 @@ describe('managed session roster', () => {
       startedAt: 1,
       updatedAt: 2,
     }
-    const rows = agentSessionRoster(
-      [session('managed-child', { subagents: [native] }), session('root')],
-      { 'managed-child': managed('managed-child', 'root', 1) },
-    )
+    const rows = agentSessionRoster([session('managed-child', { subagents: [native] }), session('root')], {
+      'managed-child': managed('managed-child', 'root', 1),
+    })
     expect(rows.map((row) => [row.kind, row.key, row.depth])).toEqual([
       ['managed', 'root', 0],
       ['managed', 'managed-child', 1],
@@ -99,11 +95,11 @@ describe('managed session roster', () => {
   })
 
   it('does not lose malformed cyclic rows', () => {
-    const rows = agentSessionRoster(
-      [session('a'), session('b')],
-      { a: managed('a', 'b', 1), b: managed('b', 'a', 2) },
-    )
-    expect(rows.map((row) => [row.key, row.depth])).toEqual([['a', 0], ['b', 0]])
+    const rows = agentSessionRoster([session('a'), session('b')], { a: managed('a', 'b', 1), b: managed('b', 'a', 2) })
+    expect(rows.map((row) => [row.key, row.depth])).toEqual([
+      ['a', 0],
+      ['b', 0],
+    ])
     expect(rows.every((row) => row.kind !== 'managed' || row.managedParent === null)).toBe(true)
   })
 
@@ -116,9 +112,11 @@ describe('managed session roster', () => {
       session('archived', { archivedAt: 2 }),
     ]
     const lineage = {
-      one: managed('one', 'parent', 1), two: managed('two', 'parent', 1),
+      one: managed('one', 'parent', 1),
+      two: managed('two', 'parent', 1),
       unrelated: managed('unrelated', 'another-parent', 1),
-      stopped: managed('stopped', 'parent', 1), archived: managed('archived', 'parent', 1),
+      stopped: managed('stopped', 'parent', 1),
+      archived: managed('archived', 'parent', 1),
     }
     expect(liveDelegatedChildren('parent', sessions, lineage).map((child) => child.id)).toEqual(['one', 'two'])
   })

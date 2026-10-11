@@ -1,9 +1,5 @@
-import {
-  type CommandExecutionContext,
-} from '@acorn/client-core/host/registries/commands'
-import {
-  createCommandSession, type CommandSession,
-} from '@acorn/client-core/host/registries/commands'
+import { type CommandExecutionContext } from '@acorn/client-core/host/registries/commands'
+import { createCommandSession, type CommandSession } from '@acorn/client-core/host/registries/commands'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
 import { useNavigate } from '../kit/router'
@@ -19,9 +15,8 @@ import { focusedCollectionTarget } from '../keys/regions'
 // invocation. What the shell owns is what a terminal answers differently: the overlay stack is where
 // "open" and "closed" live, because there is no window to float a dialog over.
 //
-// This host handed the session row providers until 2026-09-03 — go-to-task and switch-workspace, then
-// the `paletteRows` contributions after those two became commands (./navigationCommands.ts). There is
-// no such seam left on either host: every row in the palette comes from the command registry.
+// Neither host hands the session row providers: every row in the palette comes from the command
+// registry, go-to-task and switch-workspace included (./navigation.ts).
 
 /**
  * The shell's one session, built where the shell is and handed to `./Palette.tsx` to draw.

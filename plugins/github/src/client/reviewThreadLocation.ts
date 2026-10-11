@@ -2,8 +2,13 @@ import type { PullDetail, PullDiffResponse, Thread } from '../shared/api'
 
 /** Provider status is the authority for location; historical and unknown locations stay in history. */
 export function reviewThreadLocation(thread: Thread): { path: string; side: 'old' | 'new'; line: number } | null {
-  if (thread.outdated !== false || !thread.path || thread.line == null ||
-      (thread.side !== 'LEFT' && thread.side !== 'RIGHT')) return null
+  if (
+    thread.outdated !== false ||
+    !thread.path ||
+    thread.line == null ||
+    (thread.side !== 'LEFT' && thread.side !== 'RIGHT')
+  )
+    return null
   return { path: thread.path, side: thread.side === 'LEFT' ? 'old' : 'new', line: thread.line }
 }
 

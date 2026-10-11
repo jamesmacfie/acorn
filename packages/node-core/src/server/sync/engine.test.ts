@@ -38,14 +38,26 @@ const makeResource = (initial: Cached<string> | null, refreshResult: RefreshResu
 describe('serveThenRevalidate', () => {
   it('fresh: serves the cache without refreshing', async () => {
     const r = makeResource({ data: 'cached', fetchedAt: Date.now() })
-    const result = await serveThenRevalidate({ resource: 'st-fresh', userId: 'u1', ttlMs: TTL, read: r.read, refresh: r.refresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-fresh',
+      userId: 'u1',
+      ttlMs: TTL,
+      read: r.read,
+      refresh: r.refresh,
+    })
     expect(result).toEqual({ ok: true, value: 'cached' })
     expect(r.refresh).not.toHaveBeenCalled()
   })
 
   it('stale: serves the cache immediately and revalidates in the background', async () => {
     const r = makeResource({ data: 'stale', fetchedAt: Date.now() - TTL - 1 })
-    const result = await serveThenRevalidate({ resource: 'st-stale', userId: 'u1', ttlMs: TTL, read: r.read, refresh: r.refresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-stale',
+      userId: 'u1',
+      ttlMs: TTL,
+      read: r.read,
+      refresh: r.refresh,
+    })
     expect(result).toEqual({ ok: true, value: 'stale' })
     await settleBackground()
     expect(r.refresh).toHaveBeenCalledTimes(1)
@@ -53,7 +65,13 @@ describe('serveThenRevalidate', () => {
 
   it('cold: blocks on a refresh, then serves the freshly-mirrored read', async () => {
     const r = makeResource(null)
-    const result = await serveThenRevalidate({ resource: 'st-cold', userId: 'u1', ttlMs: TTL, read: r.read, refresh: r.refresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-cold',
+      userId: 'u1',
+      ttlMs: TTL,
+      read: r.read,
+      refresh: r.refresh,
+    })
     expect(result).toEqual({ ok: true, value: 'fresh' })
     expect(r.refresh).toHaveBeenCalledTimes(1)
   })
@@ -61,13 +79,26 @@ describe('serveThenRevalidate', () => {
   it('cold refresh failure propagates the RouteFailure', async () => {
     const failure = { ok: false, failure: { error: 'reauth', status: 401 } } as const
     const r = makeResource(null, failure)
-    const result = await serveThenRevalidate({ resource: 'st-cold-fail', userId: 'u1', ttlMs: TTL, read: r.read, refresh: r.refresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-cold-fail',
+      userId: 'u1',
+      ttlMs: TTL,
+      read: r.read,
+      refresh: r.refresh,
+    })
     expect(result).toEqual(failure)
   })
 
   it('force: blocks on a refresh even when the cache is fresh', async () => {
     const r = makeResource({ data: 'cached', fetchedAt: Date.now() })
-    const result = await serveThenRevalidate({ resource: 'st-force', userId: 'u1', ttlMs: TTL, force: true, read: r.read, refresh: r.refresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-force',
+      userId: 'u1',
+      ttlMs: TTL,
+      force: true,
+      read: r.read,
+      refresh: r.refresh,
+    })
     expect(result).toEqual({ ok: true, value: 'fresh' })
     expect(r.refresh).toHaveBeenCalledTimes(1)
   })
@@ -127,7 +158,14 @@ describe('serveThenRevalidate', () => {
 
     // …and a forced request while it is in-flight must still perform its own fetch.
     const forcedRefresh = vi.fn(async (): Promise<RefreshResult> => ({ ok: true }))
-    const result = await serveThenRevalidate({ resource: 'st-force-own', userId: 'u1', ttlMs: TTL, force: true, read, refresh: forcedRefresh })
+    const result = await serveThenRevalidate({
+      resource: 'st-force-own',
+      userId: 'u1',
+      ttlMs: TTL,
+      force: true,
+      read,
+      refresh: forcedRefresh,
+    })
     expect(result).toEqual({ ok: true, value: 'stale' })
     expect(forcedRefresh).toHaveBeenCalledTimes(1)
 
@@ -137,7 +175,10 @@ describe('serveThenRevalidate', () => {
 
   it('rate-limit backoff: a 429 background refresh suppresses the next background refresh', async () => {
     const resource = 'st-backoff'
-    const refresh = vi.fn(async (): Promise<RefreshResult> => ({ ok: false, failure: { error: 'rate_limited', status: 429 } }))
+    const refresh = vi.fn(async (): Promise<RefreshResult> => ({
+      ok: false,
+      failure: { error: 'rate_limited', status: 429 },
+    }))
     const read = async () => ({ data: 'stale', fetchedAt: Date.now() - TTL - 1 })
 
     await serveThenRevalidate({ resource, userId: 'u1', ttlMs: TTL, read, refresh })

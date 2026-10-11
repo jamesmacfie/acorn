@@ -18,8 +18,7 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 // It runs the real thing — the staged helper bundle under the bundled Node runtime, spawning the real
 // `service.js` over the fd-3 service protocol against a fresh data root — and then asks it the first
 // two questions the renderer asks: which nodes are there, and can a `/v1` request reach one. That is
-// the exit criterion minus the window, and it is what catches "the shell cannot load its world"
-// the way `apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel poisoning.
+// the shell's launch minus the window, and it is what catches "the shell cannot load its world".
 //
 // It also holds the boot ORDER, which is the thing a reader is most likely to undo by accident. The
 // ready line goes out when the helper is listening, not when the node is up
@@ -86,27 +85,42 @@ beforeAll(async () => {
   const cacheDir = join(dataDir, 'shell', `${ACORN_BASELINE}-plugin-cache`)
   mkdirSync(cacheDir, { recursive: true })
   writeFileSync(join(cacheDir, `${deviceHash}.js`), deviceBundle)
-  writeFileSync(join(cacheDir, 'index.json'), JSON.stringify({ version: 1, entries: {
-    [deviceHash]: {
-      pluginId: devicePluginId, version: '1.0.0', bytes: Buffer.byteLength(deviceBundle),
-      nodeIds: [], source: { kind: 'device' }, sourceLabel: 'https://example.com/boot-probe.tgz',
-      manifest: {
-        id: devicePluginId, name: 'Boot Probe', version: '1.0.0', baseline: ACORN_BASELINE,
-        apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
+  writeFileSync(
+    join(cacheDir, 'index.json'),
+    JSON.stringify({
+      version: 1,
+      entries: {
+        [deviceHash]: {
+          pluginId: devicePluginId,
+          version: '1.0.0',
+          bytes: Buffer.byteLength(deviceBundle),
+          nodeIds: [],
+          source: { kind: 'device' },
+          sourceLabel: 'https://example.com/boot-probe.tgz',
+          manifest: {
+            id: devicePluginId,
+            name: 'Boot Probe',
+            version: '1.0.0',
+            baseline: ACORN_BASELINE,
+            apiVersion: PLUGIN_API_MAJOR,
+            client: 'client.js',
+          },
+          firstSeen: Date.now(),
+          lastSeen: Date.now(),
+        },
       },
-      firstSeen: Date.now(), lastSeen: Date.now(),
-    },
-  } }))
+    }),
+  )
 
-  // stderr piped rather than inherited, because that is where the boot marks are and the order of
-  // them is an assertion below. They are still echoed, so a failing run reads the same as before.
-  // First-run boot must work without host tools such as OpenSSL. Remove every spelling of PATH
-  // because Windows treats environment variable names as case-insensitive.
   // A developer's pinned key and a secret-shaped variable, from a `.env` file the way `pnpm dev` loads
   // them. Neither may reach the node's environment.
   const envFile = join(dataDir, 'boot.env')
   writeFileSync(envFile, `SESSION_ENC_KEY=${PINNED_SESSION_KEY}\nBOOT_TEST_API_TOKEN=boot-test-leak\n`)
+  // First-run boot must work without host tools such as OpenSSL. Remove every spelling of PATH
+  // because Windows treats environment variable names as case-insensitive.
   const bootEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== 'PATH'))
+  // stderr piped rather than inherited, because that is where the boot marks are and the order of
+  // them is an assertion below. They are still echoed, so a failing run reads the same either way.
   helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
     cwd: dataDir,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -161,13 +175,20 @@ beforeAll(async () => {
   // The node boots behind the ready line, so the fleet is empty for a moment after this socket opens.
   // The renderer lives with that by drawing its persisted cache; a test that wants to ask the node
   // something has to wait, which is also how it observes that adoption happened at all.
-  await waitFor(async () => (await call<{ nodes: { local: boolean }[] }>('fleet-list')).nodes.some((node) => node.local), 'the local node was never adopted')
+  await waitFor(
+    async () => (await call<{ nodes: { local: boolean }[] }>('fleet-list')).nodes.some((node) => node.local),
+    'the local node was never adopted',
+  )
   await waitFor(() => markIndex('service.start') !== -1, 'the helper never recorded starting the node')
 }, 180_000)
 
 // Poll until it is true, or say what never happened. No fake timers: everything here is a real
 // process coming up.
-async function waitFor(condition: () => boolean | Promise<boolean>, complaint: string, timeoutMs = 60_000): Promise<void> {
+async function waitFor(
+  condition: () => boolean | Promise<boolean>,
+  complaint: string,
+  timeoutMs = 60_000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (await condition()) return
@@ -192,7 +213,10 @@ afterAll(async () => {
 
 describe('the Tauri shell boots its world', () => {
   it('keeps a cached device bundle untrusted for the renderer to prompt', async () => {
-    const state = await call<{ cached: Record<string, { source?: { kind: string }; manifest?: { id: string } }>; acks: { pluginId: string }[] }>('plugins-state')
+    const state = await call<{
+      cached: Record<string, { source?: { kind: string }; manifest?: { id: string } }>
+      acks: { pluginId: string }[]
+    }>('plugins-state')
     expect(state.cached[deviceHash]).toMatchObject({ source: { kind: 'device' }, manifest: { id: devicePluginId } })
     expect(state.acks.some((ack) => ack.pluginId === devicePluginId)).toBe(false)
   })
@@ -206,7 +230,7 @@ describe('the Tauri shell boots its world', () => {
   })
 
   it('says it is ready when it is listening, not when the node is up', () => {
-    // The whole of phase 2's desktop half, in three offsets. Rust blocks on the ready line and opens
+    // The boot order, in three offsets. Rust blocks on the ready line and opens
     // the window on it, so anything the helper does after that mark is behind the first paint. The
     // node's boot is `service.start`, and it has to be one of those things.
     expect(bootMarks).toContain('ready line')
@@ -218,9 +242,10 @@ describe('the Tauri shell boots its world', () => {
 
   it('starts the node within a generous bound', () => {
     // From the ready line to the node answering `service.start`: spawning it, evaluating the service
-    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro, but Windows CI
-    // measured 2,705-5,126 ms on 2026-10-01. Run this separately from the unit suites and leave
-    // room for shared-runner variation while catching startup regressions.
+    // bundle, and its whole boot to a bound listener. The line below logs the figure. Windows CI
+    // runners take several times longer than a developer machine, so their bound is wider. Run this
+    // separately from the unit suites and leave room for shared-runner variation while catching
+    // startup regressions.
     const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
     console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
     expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 1_500)
@@ -242,7 +267,9 @@ describe('the Tauri shell boots its world', () => {
     if (process.platform === 'win32') return
     // `ps eww` shows a process's start environment to anything running as the same user, which is
     // exactly what an agent can run.
-    const environments = execFileSync('pgrep', ['-P', String(helper.pid)], { encoding: 'utf8' }).trim().split('\n')
+    const environments = execFileSync('pgrep', ['-P', String(helper.pid)], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
       .map((pid) => execFileSync('ps', ['eww', '-o', 'command=', '-p', pid], { encoding: 'utf8' }))
     const node = environments.find((line) => line.includes('service.js'))
     expect(node).toContain('ACORN_PERF=1')
@@ -267,28 +294,54 @@ describe('the Tauri shell boots its world', () => {
   it('saves glyphs and normalizes image uploads through the packaged workspace routes', async () => {
     const fleet = await call<{ nodes: { nodeId: string; local: boolean }[] }>('fleet-list')
     const nodeId = fleet.nodes.find((node) => node.local)!.nodeId
-    const request = (path: string, method = 'GET', body?: WireFetchBody) => call<WireFetchResponse>('node-fetch', {
-      nodeId, request: { requestId: `workspace-boot-${nextId}`, path, method, headers: body?.kind === 'bytes' ? { 'content-type': 'application/json' } : {}, body },
+    const request = (path: string, method = 'GET', body?: WireFetchBody) =>
+      call<WireFetchResponse>('node-fetch', {
+        nodeId,
+        request: {
+          requestId: `workspace-boot-${nextId}`,
+          path,
+          method,
+          headers: body?.kind === 'bytes' ? { 'content-type': 'application/json' } : {},
+          body,
+        },
+      })
+    const jsonBody = (value: unknown): WireFetchBody => ({
+      kind: 'bytes',
+      bytes: Buffer.from(JSON.stringify(value)).toString('base64'),
     })
-    const jsonBody = (value: unknown): WireFetchBody => ({ kind: 'bytes', bytes: Buffer.from(JSON.stringify(value)).toString('base64') })
     const grouped = await request('/v1/core/prefs', 'PUT', jsonBody({ key: 'core.workspaces', value: 'on' }))
     expect(grouped.status).toBe(200)
-    const bootstrap = await request('/v1/core/workspaces/bootstrap', 'POST')
-    expect(bootstrap.status).toBe(200)
-    const [workspace] = JSON.parse(Buffer.from(bootstrap.body, 'base64').toString()) as { id: string }[]
+    const created = await request('/v1/core/workspaces', 'POST', jsonBody({ name: 'Boot' }))
+    expect(created.status).toBe(200)
+    const workspace = JSON.parse(Buffer.from(created.body, 'base64').toString()) as { id: string }
     const path = `/v1/core/workspaces/${workspace.id}`
-    const glyph = await request(path, 'PATCH', jsonBody({ appearance: {
-      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'solid', color: 'blue' },
-    } }))
+    const glyph = await request(
+      path,
+      'PATCH',
+      jsonBody({
+        appearance: {
+          version: 1,
+          kind: 'icon',
+          icon: 'rocket',
+          background: { kind: 'solid', color: 'blue' },
+        },
+      }),
+    )
     expect([glyph.status, Buffer.from(glyph.body, 'base64').toString()]).toEqual([200, '{"ok":true}'])
     // An 8×8 PNG fixture. The staged native decoder must be loadable without the checkout's packages.
-    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNQSruLFTEMLQkAsQZZQb/FUPIAAAAASUVORK5CYII='
-    const upload = await request(`${path}/icon-image`, 'POST', { kind: 'form', parts: [
-      { name: 'image', filename: 'icon.png', type: 'image/png', bytes: png },
-      { name: 'crop', value: JSON.stringify({ x: 0.5, y: 0.5, size: 1 }) },
-    ] })
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNQSruLFTEMLQkAsQZZQb/FUPIAAAAASUVORK5CYII='
+    const upload = await request(`${path}/icon-image`, 'POST', {
+      kind: 'form',
+      parts: [
+        { name: 'image', filename: 'icon.png', type: 'image/png', bytes: png },
+        { name: 'crop', value: JSON.stringify({ x: 0.5, y: 0.5, size: 1 }) },
+      ],
+    })
     expect(upload.status, Buffer.from(upload.body, 'base64').toString()).toBe(200)
-    const { appearance } = JSON.parse(Buffer.from(upload.body, 'base64').toString()) as { appearance: { imageId: string } }
+    const { appearance } = JSON.parse(Buffer.from(upload.body, 'base64').toString()) as {
+      appearance: { imageId: string }
+    }
     const image = await request(`/v1/core/workspaces/icon-images/${appearance.imageId}`)
     expect(image.status).toBe(200)
     const thumbnail = Buffer.from(image.body, 'base64')
@@ -298,18 +351,24 @@ describe('the Tauri shell boots its world', () => {
 
   it('refuses a socket without the secret', async () => {
     const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=wrong`, { origin: appOrigin })
-    await expect(new Promise((done, fail) => {
-      refused.once('open', () => done('opened'))
-      refused.once('error', fail)
-    })).rejects.toThrow()
+    await expect(
+      new Promise((done, fail) => {
+        refused.once('open', () => done('opened'))
+        refused.once('error', fail)
+      }),
+    ).rejects.toThrow()
   })
 
   it('refuses a different origin even with the correct secret', async () => {
-    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: 'http://example.com' })
-    await expect(new Promise((done, fail) => {
-      refused.once('open', () => done('opened'))
-      refused.once('error', fail)
-    })).rejects.toThrow()
+    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, {
+      origin: 'http://example.com',
+    })
+    await expect(
+      new Promise((done, fail) => {
+        refused.once('open', () => done('opened'))
+        refused.once('error', fail)
+      }),
+    ).rejects.toThrow()
   })
 
   it('answers a method it does not have instead of leaving the caller waiting', async () => {

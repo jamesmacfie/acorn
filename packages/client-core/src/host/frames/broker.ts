@@ -6,11 +6,9 @@
 // is why this module has no ambient reads at all.
 //
 // Effects arrive as `services` rather than being imported. This module is the security choke point and
-// has to be exhaustively tested, and client-core's suite runs in plain Node with no DOM
-// (packages/client-core/vitest.config.ts says so). Importing the notification ring, the prefs writer and
-// the query client here would make the one module that most needs testing the one that cannot be.
-// PluginFrame.tsx supplies the real implementations; the tests supply spies. One implementation, but the
-// seam pays for itself.
+// has to be exhaustively tested in a plain-Node suite with no DOM. Importing the notification ring, the
+// prefs writer and the query client here would make the one module that most needs testing the one that
+// cannot be. PluginFrame.tsx supplies the real implementations; the tests supply spies.
 import type {
   PluginBridgeAppearance,
   PluginBridgeEvent,
@@ -20,7 +18,12 @@ import type {
   PluginBridgeSurfaceAction,
   PluginFrameContext,
 } from '@acorn/protocol/plugin/bridge.ts'
-import { MAX_DOCUMENT_BYTES, MAX_OVERLAY_INPUT_BYTES, MAX_PLUGIN_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import {
+  MAX_DOCUMENT_BYTES,
+  MAX_OVERLAY_INPUT_BYTES,
+  MAX_PLUGIN_BYTES,
+  PLUGIN_BRIDGE_DENIED,
+} from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
@@ -133,7 +136,17 @@ const WINDOW_MS = 10_000
 // seam name built from attacker-controlled text is an unbounded map: anything else lands in `other`
 // and the switch below answers it with `unknown bridge message`.
 const MEASURED_KINDS: ReadonlySet<string> = new Set([
-  'api', 'api.bytes', 'subscribe', 'state.get', 'state.set', 'ui', 'document', 'webview', 'cancel', 'keydown', 'telemetry',
+  'api',
+  'api.bytes',
+  'subscribe',
+  'state.get',
+  'state.set',
+  'ui',
+  'document',
+  'webview',
+  'cancel',
+  'keydown',
+  'telemetry',
 ])
 
 // A navigation is a person's act, so one per second is generous: a real reader clicks one link and then
@@ -172,7 +185,7 @@ const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteL
 /** Does this value fit the overlay conversation's ceiling, and is it something structured clone would
  *  have carried anyway? A cycle or a BigInt fails both questions at once, which is why one `try` answers
  *  them together. */
-export const withinOverlayBudget = (value: unknown): boolean => {
+const withinOverlayBudget = (value: unknown): boolean => {
   try {
     return utf8Bytes(JSON.stringify(value ?? null) ?? 'null') <= MAX_OVERLAY_INPUT_BYTES
   } catch {
@@ -192,7 +205,8 @@ export function createFrameBridge(input: {
   // request from a bundle built before that ack existed. It is the host's only evidence that the bundle
   // evaluated, and it cancels the handshake deadline in PluginFrame.
   onConnected?(): void
-  /** The bundle bootstrap port has no tree authority until a single legacy slot is mounted. */
+  /** The bundle bootstrap port has no tree authority until a single legacy slot is mounted.
+   *  Mixed-version path until 2026-12-30. */
   authorize?(): boolean
 }): FrameBridge {
   const { port, binding, services, onMisbehaving } = input
@@ -227,7 +241,11 @@ export function createFrameBridge(input: {
     activeWork.clear()
     inFlight.clear()
     for (const detach of detachers.splice(0)) {
-      try { detach() } catch { /* One failed subscriber cannot retain the port and other owners. */ }
+      try {
+        detach()
+      } catch {
+        /* One failed subscriber cannot retain the port and other owners. */
+      }
     }
     subscribed.clear()
     port.onmessage = null
@@ -275,7 +293,12 @@ export function createFrameBridge(input: {
       })
   }
 
-  const handleApi = async (id: number, data: Record<string, unknown>, controller: AbortController, reply: typeof post): Promise<void> => {
+  const handleApi = async (
+    id: number,
+    data: Record<string, unknown>,
+    controller: AbortController,
+    reply: typeof post,
+  ): Promise<void> => {
     const { method, path, body } = data as { method?: unknown; path?: unknown; body?: unknown }
     if (typeof path !== 'string' || !isApiMethod(method)) {
       reply(failed(id, 'bad_request', 'an api request needs a method and a path'))
@@ -283,8 +306,8 @@ export function createFrameBridge(input: {
     }
     const decision = allowApi(binding, method, path)
     if (!decision.allowed) {
-      // Never reaches services.fetch. The e2e suite asserts exactly this by spying at the broker: a denied
-      // path must not produce a request, not merely a discarded response.
+      // Never reaches services.fetch. The broker suite asserts exactly this by spying at the broker: a
+      // denied path must not produce a request, not merely a discarded response.
       reply(denied(id, decision.reason))
       return
     }
@@ -295,7 +318,12 @@ export function createFrameBridge(input: {
         reply({
           id,
           ok: false,
-          error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
+          error: result.error ?? {
+            code: 'internal',
+            message: `${method} failed with ${result.status}`,
+            requestId: '',
+            retryable: result.status >= 500,
+          },
         })
       }
     } catch (error) {
@@ -306,9 +334,18 @@ export function createFrameBridge(input: {
   // The same call as `handleApi`, for a route whose body is bytes (docs/plugins/frames.md § Binary bridge
   // calls). The two share one thing and it is the important one: `allowApi` decides before either looks
   // at a body, so the byte path cannot be used to reach a path the JSON path would refuse.
-  const handleApiBytes = async (id: number, data: Record<string, unknown>, controller: AbortController, reply: typeof post): Promise<void> => {
+  const handleApiBytes = async (
+    id: number,
+    data: Record<string, unknown>,
+    controller: AbortController,
+    reply: typeof post,
+  ): Promise<void> => {
     const { method, path, bytes, type, filename } = data as {
-      method?: unknown; path?: unknown; bytes?: unknown; type?: unknown; filename?: unknown
+      method?: unknown
+      path?: unknown
+      bytes?: unknown
+      type?: unknown
+      filename?: unknown
     }
     if (typeof path !== 'string' || (method !== 'GET' && method !== 'POST')) {
       reply(failed(id, 'bad_request', 'a byte request needs GET or POST and a path'))
@@ -354,7 +391,12 @@ export function createFrameBridge(input: {
         reply({
           id,
           ok: false,
-          error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
+          error: result.error ?? {
+            code: 'internal',
+            message: `${method} failed with ${result.status}`,
+            requestId: '',
+            retryable: result.status >= 500,
+          },
         })
         return
       }
@@ -362,7 +404,12 @@ export function createFrameBridge(input: {
         reply(failed(id, 'too_large', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
         return
       }
-      reply({ id, ok: true, status: result.status, body: { bytes: result.bytes, type: result.type, filename: result.filename } })
+      reply({
+        id,
+        ok: true,
+        status: result.status,
+        body: { bytes: result.bytes, type: result.type, filename: result.filename },
+      })
     } catch (error) {
       reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
@@ -386,7 +433,9 @@ export function createFrameBridge(input: {
     }
     let detach: () => void
     try {
-      detach = services.subscribe(channel, (payload) => post({ kind: 'event', channel, payload } satisfies PluginBridgeEvent))
+      detach = services.subscribe(channel, (payload) =>
+        post({ kind: 'event', channel, payload } satisfies PluginBridgeEvent),
+      )
     } catch (error) {
       post(failed(id, 'bad_request', error instanceof Error ? error.message : String(error)))
       return
@@ -396,7 +445,12 @@ export function createFrameBridge(input: {
     post({ id, ok: true, status: 200, body: null })
   }
 
-  const handleState = async (id: number, kind: string, data: Record<string, unknown>, reply: typeof post): Promise<void> => {
+  const handleState = async (
+    id: number,
+    kind: string,
+    data: Record<string, unknown>,
+    reply: typeof post,
+  ): Promise<void> => {
     const key = data.key
     if (typeof key !== 'string' || !key) {
       reply(failed(id, 'bad_request', 'a state operation needs a key'))
@@ -448,14 +502,24 @@ export function createFrameBridge(input: {
         const destinationId = data.destinationId
         const resourceId = data.resourceId
         const subresourceId = data.subresourceId
-        const destination = typeof destinationId === 'string'
-          ? binding.destinations?.find((entry) => entry.id === destinationId)
-          : undefined
-        if (!destination || typeof resourceId !== 'string' || !resourceId || resourceId.length > 300
-          || (subresourceId !== undefined && (typeof subresourceId !== 'string' || subresourceId.length > 300))) {
+        const destination =
+          typeof destinationId === 'string'
+            ? binding.destinations?.find((entry) => entry.id === destinationId)
+            : undefined
+        if (
+          !destination ||
+          typeof resourceId !== 'string' ||
+          !resourceId ||
+          resourceId.length > 300 ||
+          (subresourceId !== undefined && (typeof subresourceId !== 'string' || subresourceId.length > 300))
+        ) {
           return void post(denied(id, 'openDestination must name a declared destination and bounded resource'))
         }
-        services.openTarget?.({ kind: destination.targetKind, resourceId, ...(subresourceId === undefined ? {} : { subresourceId }) })
+        services.openTarget?.({
+          kind: destination.targetKind,
+          resourceId,
+          ...(subresourceId === undefined ? {} : { subresourceId }),
+        })
         return void post({ id, ok: true, status: 200, body: null })
       }
       case 'openTask': {
@@ -544,7 +608,9 @@ export function createFrameBridge(input: {
             return void post(denied(id, 'only an overlay closes with a result'))
           }
           if (result !== undefined && !withinOverlayBudget(result)) {
-            return void post(failed(id, 'bad_request', `an overlay result is capped at ${MAX_OVERLAY_INPUT_BYTES} bytes`))
+            return void post(
+              failed(id, 'bad_request', `an overlay result is capped at ${MAX_OVERLAY_INPUT_BYTES} bytes`),
+            )
           }
           services.importerClose(result)
         }

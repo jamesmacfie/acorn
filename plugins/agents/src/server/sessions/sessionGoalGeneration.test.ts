@@ -8,12 +8,20 @@ import { AgentStore } from './store'
 import { SessionGoalGeneration } from './sessionGoalGeneration'
 import { SessionGoalStore } from './sessionGoalStore'
 
-const answer = (blocker: string) => JSON.stringify({ satisfied: blocker === 'none', blocker,
-  reason: 'More work remains.', evidence_summary: 'The tests have not run.', relied_on_assumption: false })
+const answer = (blocker: string) =>
+  JSON.stringify({
+    satisfied: blocker === 'none',
+    blocker,
+    reason: 'More work remains.',
+    evidence_summary: 'The tests have not run.',
+    relied_on_assumption: false,
+  })
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -33,27 +41,55 @@ describe('session goal generation', () => {
     const db = ctx.storage.open()
     store = new AgentStore(db, ctx.core)
     goals = new SessionGoalStore(db, store)
-    disposeProfile = agentProfileRegistry.register({ id: 'goal-test', label: 'Goal test', kind: 'agent',
-      command: '/bin/true', backendPreference: 'node-pty', transport: 'pty',
-      aiArgv: (command, options) => ({ file: command, args: [options.prompt] }) })
+    disposeProfile = agentProfileRegistry.register({
+      id: 'goal-test',
+      label: 'Goal test',
+      kind: 'agent',
+      command: '/bin/true',
+      backendPreference: 'node-pty',
+      transport: 'pty',
+      aiArgv: (command, options) => ({ file: command, args: [options.prompt] }),
+    })
     enqueued = []
     published = []
-    generateText = vi.fn(async () => ({ text: answer('goal_not_met_yet'), modelId: 'cheap',
-      providerId: 'fake', backendId: 'harness:goal-test' }))
+    generateText = vi.fn(async () => ({
+      text: answer('goal_not_met_yet'),
+      modelId: 'cheap',
+      providerId: 'fake',
+      backendId: 'harness:goal-test',
+    }))
     ctx.core.models.generateText = generateText as CoreServices['models']['generateText']
-    enqueue = vi.fn(async (sessionId: string, _prompt: string, key: string) => { enqueued.push({ sessionId, key }) })
-    generation = new SessionGoalGeneration({ store, db, models: ctx.core.models,
-      currentUserId: () => 'owner', publish: (session) => published.push(session),
-      enqueue })
+    enqueue = vi.fn(async (sessionId: string, _prompt: string, key: string) => {
+      enqueued.push({ sessionId, key })
+    })
+    generation = new SessionGoalGeneration({
+      store,
+      db,
+      models: ctx.core.models,
+      currentUserId: () => 'owner',
+      publish: (session) => published.push(session),
+      enqueue,
+    })
   })
-  afterEach(async () => { await generation.stop(); disposeProfile(); ctx.cleanup(); vi.restoreAllMocks() })
+  afterEach(async () => {
+    await generation.stop()
+    disposeProfile()
+    ctx.cleanup()
+    vi.restoreAllMocks()
+  })
 
   const settled = async () => {
-    const session = await store.createSession({ taskId: randomUUID(), providerId: 'fake',
-      profileId: 'goal-test', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    const session = await store.createSession(
+      { taskId: randomUUID(), providerId: 'fake', profileId: 'goal-test', kind: 'interactive', config: {} },
+      await new FakeAgentDriver().probe(),
+    )
     await goals.set(session.id, 'Finish the migration')
-    const { turn } = await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'Start' }],
-      source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })
+    const { turn } = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Start' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
     await store.dispatchTurn(turn.id)
     await store.startTurn(turn.id)
     await store.recordEvent(session.id, turn.id, { type: 'user_message', text: 'Finish the migration' })
@@ -69,15 +105,22 @@ describe('session goal generation', () => {
     await vi.waitFor(() => expect(enqueued).toHaveLength(1))
     expect(enqueued[0]?.key).toBe(`goal:${turn.id}`)
     expect(generateText).toHaveBeenCalledTimes(1)
-    expect((await store.requireSession(session.id)).goal).toMatchObject({ status: 'active', continuations: 1,
-      verdict: { turnId: turn.id } })
+    expect((await store.requireSession(session.id)).goal).toMatchObject({
+      status: 'active',
+      continuations: 1,
+      verdict: { turnId: turn.id },
+    })
     expect(published).toHaveLength(1)
   })
 
   it('waits for a queued person turn', async () => {
     const { session, turn } = await settled()
-    await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'One more request' }],
-      source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })
+    await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'One more request' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
     generation.check(session.id, turn.id)
     await new Promise((resolve) => setImmediate(resolve))
     expect(generateText).not.toHaveBeenCalled()
@@ -98,11 +141,20 @@ describe('session goal generation', () => {
   it('does not enqueue behind a person turn accepted during judgment', async () => {
     const { session, turn } = await settled()
     let resolve!: (value: unknown) => void
-    generateText.mockImplementation(() => new Promise((done) => { resolve = done }))
+    generateText.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
     generation.check(session.id, turn.id)
     await vi.waitFor(() => expect(generateText).toHaveBeenCalledOnce())
-    await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'Check one more thing' }],
-      source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })
+    await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Check one more thing' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
     resolve({ text: answer('goal_not_met_yet') })
     await new Promise((done) => setImmediate(done))
     expect((await store.requireSession(session.id)).goal?.verdict).toBeNull()
@@ -112,11 +164,20 @@ describe('session goal generation', () => {
   it('checks the latest settled turn when a person replies during judgment', async () => {
     const { session, turn } = await settled()
     let resolve!: (value: unknown) => void
-    generateText.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    generateText.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
     generation.check(session.id, turn.id)
     await vi.waitFor(() => expect(generateText).toHaveBeenCalledOnce())
-    const { turn: next } = await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'Also check the schema' }],
-      source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })
+    const { turn: next } = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Also check the schema' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
     await store.dispatchTurn(next.id)
     await store.startTurn(next.id)
     await store.recordEvent(session.id, next.id, { type: 'turn_completed' })
@@ -129,9 +190,21 @@ describe('session goal generation', () => {
 
   it('recovers a completed check and reuses its continuation key', async () => {
     const { session, turn } = await settled()
-    await goals.apply(session.id, 'Finish the migration', { turnId: turn.id, satisfied: false,
-      blocker: 'goal_not_met_yet', reason: 'Tests remain.', evidence_summary: 'No test result.',
-      relied_on_assumption: false }, 'active', 1, 0)
+    await goals.apply(
+      session.id,
+      'Finish the migration',
+      {
+        turnId: turn.id,
+        satisfied: false,
+        blocker: 'goal_not_met_yet',
+        reason: 'Tests remain.',
+        evidence_summary: 'No test result.',
+        relied_on_assumption: false,
+      },
+      'active',
+      1,
+      0,
+    )
     await generation.recover()
     await vi.waitFor(() => expect(enqueued).toEqual([{ sessionId: session.id, key: `goal:${turn.id}` }]))
     expect(generateText).not.toHaveBeenCalled()
@@ -140,7 +213,12 @@ describe('session goal generation', () => {
   it('pauses on cancellation and ignores a late verdict', async () => {
     const { session, turn } = await settled()
     let resolve!: (value: unknown) => void
-    generateText.mockImplementation(() => new Promise((done) => { resolve = done }))
+    generateText.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
     generation.check(session.id, turn.id)
     await vi.waitFor(() => expect(generateText).toHaveBeenCalledOnce())
     const pausing = generation.pause(session.id)
@@ -181,7 +259,7 @@ describe('session goal generation', () => {
     const readSnapshot = store.snapshot.bind(store)
     const held = deferred<Awaited<ReturnType<typeof store.snapshot>>>()
     let reads = 0
-    vi.spyOn(store, 'snapshot').mockImplementation((id) => ++reads === 2 ? held.promise : readSnapshot(id))
+    vi.spyOn(store, 'snapshot').mockImplementation((id) => (++reads === 2 ? held.promise : readSnapshot(id)))
     generation.check(session.id, turn.id)
     await vi.waitFor(() => expect(reads).toBe(2))
     const pausing = generation.pause(session.id)

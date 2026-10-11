@@ -19,7 +19,7 @@ vi.mock('./TreeHost', () => ({ TreeHost: () => <button type="button">tree</butto
 vi.mock('../frames/frameServices', () => ({ createFrameServices: () => ({}) }))
 vi.mock('../frames/broker', () => ({ createFrameBridge: () => ({}), postSelect: vi.fn(), postSurfaceAction: vi.fn() }))
 vi.mock('./workerHost', async (original) => ({
-  ...await original<typeof import('./workerHost')>(),
+  ...(await original<typeof import('./workerHost')>()),
   acquireTreeWorker: () => ({
     transport: () => ({}),
     mount: () => {},
@@ -31,29 +31,38 @@ vi.mock('./workerHost', async (original) => ({
     appearance: () => {},
     onHostRequest: (_slot: string, bound: (request: TreeHostRequest) => Promise<TreeHostResult>) => {
       handler = bound
-      return () => { handler = null }
+      return () => {
+        handler = null
+      }
     },
   }),
 }))
 // The roster row this device resolved, which is where the host looks up whether a named overlay is a
 // surface this plugin actually declared.
 vi.mock('../plugins/contributions', () => ({
-  eligiblePlugins: () => [{
-    pluginId: 'markup',
-    installed: {
-      permissions: { api: [], events: [] },
-      // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read. The
-      // fixture used to spell it bare, which is why the mismatch below shipped.
-      contributions: { frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup' }] },
+  eligiblePlugins: () => [
+    {
+      pluginId: 'markup',
+      installed: {
+        permissions: { api: [], events: [] },
+        // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read.
+        contributions: { frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup' }] },
+      },
     },
-  }],
+  ],
   isTaskPane: () => false,
 }))
 
 const { RemoteTree } = await import('./RemoteTree')
 const { pluginOverlayInvocation, closePluginOverlayWith, closePluginOverlay } = await import('../frames/overlays')
 
-const CONTRIBUTION = { id: 'markup:preview', pluginId: 'markup', hash: 'a'.repeat(64), entry: 'attachmentPreview', overlay: 'markup.editor' }
+const CONTRIBUTION = {
+  id: 'markup:preview',
+  pluginId: 'markup',
+  hash: 'a'.repeat(64),
+  entry: 'attachmentPreview',
+  overlay: 'markup.editor',
+}
 
 let dispose: (() => void) | null = null
 let host: HTMLDivElement
@@ -101,22 +110,28 @@ afterEach(() => {
 describe('invoking an owner action', () => {
   it('calls the handler this slot bound and hands back its answer', async () => {
     mount()
-    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: 'a2' }))
-      .resolves.toEqual({ ok: true, body: { replaced: 'a2' } })
+    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: 'a2' })).resolves.toEqual({
+      ok: true,
+      body: { replaced: 'a2' },
+    })
   })
 
   // The point's declaration is the owner plugin's published contract. A `Slot` that binds something the
   // point never declared has bound nothing, or the narrower of the two lists would be decorative.
   it('refuses an action the extension point does not declare, even when the slot bound one', async () => {
     mount({ declaredActions: () => [] })
-    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'unknown_action' } })
+    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'unknown_action' },
+    })
   })
 
   it('refuses an action the point declares but this slot did not bind', async () => {
     mount({ actions: () => ({}), declaredActions: () => ['replace'] })
-    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'unknown_action' } })
+    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'unknown_action' },
+    })
   })
 
   // An owner whose action is a person's act needs to know one pressed something in this tree. Focus
@@ -124,7 +139,14 @@ describe('invoking an owner action', () => {
   it('tells the owner whether a person pressed inside this tree just now', async () => {
     const registered = vi.spyOn(HTMLElement.prototype, 'addEventListener')
     const seen: boolean[] = []
-    mount({ actions: () => ({ replace: (_payload: unknown, invocation: { byPerson: boolean }) => { seen.push(invocation.byPerson); return null } }) })
+    mount({
+      actions: () => ({
+        replace: (_payload: unknown, invocation: { byPerson: boolean }) => {
+          seen.push(invocation.byPerson)
+          return null
+        },
+      }),
+    })
     const listener = registered.mock.calls.find(([type]) => type === 'pointerdown')?.[1] as EventListener
     registered.mockRestore()
 
@@ -142,8 +164,10 @@ describe('invoking an owner action', () => {
 
   it('measures the owner’s answer too, so an action cannot become a data channel', async () => {
     mount({ actions: () => ({ replace: async () => 'x'.repeat(70_000) }) })
-    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'too_large' } })
+    await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
   })
 })
 
@@ -151,15 +175,19 @@ describe('opening a companion overlay', () => {
   it('refuses any overlay but the one this contribution declared', async () => {
     mount()
     focusInside()
-    await expect(ask({ op: 'overlay.open', name: 'settings', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'unknown_overlay' } })
+    await expect(ask({ op: 'overlay.open', name: 'settings', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'unknown_overlay' },
+    })
   })
 
   it('refuses a contribution that declared none at all', async () => {
     mount({ contribution: { ...CONTRIBUTION, overlay: undefined } })
     focusInside()
-    await expect(ask({ op: 'overlay.open', name: 'editor', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'unknown_overlay' } })
+    await expect(ask({ op: 'overlay.open', name: 'editor', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'unknown_overlay' },
+    })
   })
 
   // A modal is a person's act, so a bundle cannot put one in front of a reader from a timer. Neither
@@ -167,19 +195,22 @@ describe('opening a companion overlay', () => {
   it('refuses when nobody has focused or pressed anything in this tree', async () => {
     mount()
     document.body.focus()
-    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'needs_focus' } })
+    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'needs_focus' },
+    })
   })
 
-  // The regression this pair exists for. WebKit does not focus a button when it is clicked, which is
-  // the platform the desktop shell runs on, so a focus-only gate meant a tree could never open its
-  // companion overlay from a click at all.
+  // The case this pair exists for. WebKit does not focus a button when it is clicked, and the desktop
+  // shell runs on WebKit, so a focus-only gate would never let a click open a companion overlay.
   it('refuses a synthetic press that never received a trusted gesture', async () => {
     mount()
     document.body.focus()
     pressInside()
-    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'needs_focus' } })
+    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'needs_focus' },
+    })
     expect(pluginOverlayInvocation()).toBeNull()
   })
 
@@ -201,7 +232,7 @@ describe('opening a companion overlay', () => {
     await asked
   })
 
-  // The other half of the same bug: the device rewrites a frame id outside the plugin's namespace and
+  // The other half of the overlay grant: the device rewrites a frame id outside the plugin's namespace and
   // rewrites the manifest's reference with it, but not the name the running tree passes.
   it('takes the name the plugin\u2019s own manifest spelled, not the one the device rewrote it to', async () => {
     mount()
@@ -231,7 +262,11 @@ describe('opening a companion overlay', () => {
     const asked = ask({ op: 'overlay.open', name: 'markup.editor', payload: { attachmentId: 'a1' } })
     await Promise.resolve()
 
-    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'markup.editor', input: { attachmentId: 'a1' } })
+    expect(pluginOverlayInvocation()).toMatchObject({
+      pluginId: 'markup',
+      surface: 'markup.editor',
+      input: { attachmentId: 'a1' },
+    })
     closePluginOverlayWith({ replacementAttachmentId: 'a2' })
 
     await expect(asked).resolves.toEqual({ ok: true, body: { replacementAttachmentId: 'a2' } })
@@ -254,8 +289,10 @@ describe('opening a companion overlay', () => {
     closePluginOverlay()
     await first
 
-    await expect(ask({ op: 'overlay.open', name: 'editor', payload: null }))
-      .resolves.toMatchObject({ ok: false, error: { code: 'throttled' } })
+    await expect(ask({ op: 'overlay.open', name: 'editor', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'throttled' },
+    })
   })
 
   // An overlay outliving the tree that asked for it is a modal nobody can answer: the composer has gone.

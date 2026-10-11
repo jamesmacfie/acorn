@@ -3,12 +3,14 @@ import { parseDockerConfig } from './dockerConfig'
 
 describe('parseDockerConfig', () => {
   it('reads the [docker] table', () => {
-    expect(parseDockerConfig(`
+    expect(
+      parseDockerConfig(`
 [docker]
 compose_project = "runn"
 match_labels = ["acorn.task", 42]
 match_name = false
-`)).toEqual({ composeProject: 'runn', matchLabels: ['acorn.task'], matchName: false })
+`),
+    ).toEqual({ composeProject: 'runn', matchLabels: ['acorn.task'], matchName: false })
   })
 
   it('ignores missing/foreign tables, bad types, and unparseable toml', () => {

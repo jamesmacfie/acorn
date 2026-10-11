@@ -1,9 +1,9 @@
 // The installed keymap, and the one thing a kit node does with it: bind a run of intents to a
 // target.
 //
-// Split from `install.ts` so the kit can reach it. `ui/` is pure presentation, props in and DOM out,
-// and the arch rule in `tools/arch/boundaries.test.ts` holds it to that. Everything here is the
-// engine and the key table; the installer, which reads the command and keybinding registries, and
+// Apart from the host's installer so the kit can reach it. `kit/` is pure presentation, props in and
+// DOM out, and the arch rule in `tools/arch/boundaries.test.ts` holds it to that. Everything here is
+// the engine and the key table; the installer, which reads the command and keybinding registries, and
 // the region store, which reads the task state, stay on the other side of that line.
 //
 // A target is whatever the host's adapter focuses. The DOM's is an `HTMLElement` and the terminal's
@@ -19,10 +19,10 @@ import type { Intent } from './intents'
 
 /** The engine, at a host's pair of type parameters. The DOM's pair is the default, because it is
  *  what every caller in this package means. */
-export type AcornKeymap<
-  Target extends object = HTMLElement,
-  Event extends KeymapEvent = HtmlKeymapEvent,
-> = Keymap<Target, Event>
+export type AcornKeymap<Target extends object = HTMLElement, Event extends KeymapEvent = HtmlKeymapEvent> = Keymap<
+  Target,
+  Event
+>
 
 // Held at the widest pair the engine allows, because there is one engine per process and the host
 // that installed it is the only thing that knows which pair it is.
@@ -45,18 +45,16 @@ let primary: 'super' | 'ctrl' | null = null
 // binding carries a runtime matcher, and the counter is global, so one such binding turns the cache
 // off for the whole process — and this function installs one per bare key per control on screen. A
 // host that says it shadows typing takes the gate off every one of them and expresses it once, as a
-// layer that is registered while a field has the keys and unregistered when it loses them.
-//
-// The terminal says so (`apps/tui/src/keys/install.ts`). The desktop does not yet, and the same win
-// is there for it: the shadow needs a `focusin`/`focusout` pair and a tier above the intent layers,
-// which is a change to the DOM installer rather than to this file.
+// layer that is registered while a field has the keys and unregistered when it loses them. The
+// terminal says so (`apps/tui/src/keys/install.ts`); the desktop does not. On the DOM the shadow
+// would need a `focusin`/`focusout` pair and a tier above the intent layers in the DOM installer.
 let shadowsTyping = false
 
 /** The installed keymap, or null before the host's root exists. */
-export const keymap = <
-  Target extends object = HTMLElement,
-  Event extends KeymapEvent = HtmlKeymapEvent,
->(): AcornKeymap<Target, Event> | null => installed as AcornKeymap<Target, Event> | null
+export const keymap = <Target extends object = HTMLElement, Event extends KeymapEvent = HtmlKeymapEvent>(): AcornKeymap<
+  Target,
+  Event
+> | null => installed as AcornKeymap<Target, Event> | null
 
 /** Called by a host's installer only. Returns the teardown that clears the singleton again. */
 export function setKeymap<Target extends object, Event extends KeymapEvent>(
@@ -98,7 +96,7 @@ type DomTarget = {
 const domTarget = (target: object | undefined): DomTarget | null => {
   if (!target || typeof (target as Partial<DomTarget>).isConnected !== 'boolean') return null
   const ownerDocument = (target as Partial<DomTarget>).ownerDocument
-  return ownerDocument ? target as DomTarget : null
+  return ownerDocument ? (target as DomTarget) : null
 }
 
 /**
@@ -177,10 +175,12 @@ export function registerIntentLayer<Target extends object>(
       })
     }
   }
-  return installed ? registerLayerWhenConnected(installed, {
-    target,
-    targetMode: options.mode ?? 'focus-within',
-    priority: options.priority ?? 40,
-    bindings,
-  }) : () => {}
+  return installed
+    ? registerLayerWhenConnected(installed, {
+        target,
+        targetMode: options.mode ?? 'focus-within',
+        priority: options.priority ?? 40,
+        bindings,
+      })
+    : () => {}
 }

@@ -5,8 +5,11 @@ import type { Size, Tone } from '../../tokens/tokens'
  *  nothing may take focus from on its own account. */
 const isTyping = (doc: Document): boolean => {
   const active = doc.activeElement
-  return active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement
-    || (active instanceof HTMLElement && active.isContentEditable)
+  return (
+    active instanceof HTMLTextAreaElement ||
+    active instanceof HTMLInputElement ||
+    (active instanceof HTMLElement && active.isContentEditable)
+  )
 }
 
 /* Card: a bordered grouping surface. No mandated Header/Body/Footer slots; acorn's cards are small
@@ -50,7 +53,10 @@ export function Card(props: {
   // typing. Reveal once when it turns true; act again only after it has gone false and true again.
   let revealed = false
   createEffect(() => {
-    if (!props.focus || !element) { revealed = false; return }
+    if (!props.focus || !element) {
+      revealed = false
+      return
+    }
     if (revealed) return
     revealed = true
     // And never out of a box someone is typing in. The rising edge above only holds while this card
@@ -64,16 +70,24 @@ export function Card(props: {
   return (
     <Show
       when={props.interactive || props.onPress}
-      fallback={(
+      fallback={
         // `tabindex` only on the plain card: an interactive one is already a stop, and taking it out
         // of the tab order to make it focusable by script would be the opposite of the ask.
-        <div ref={(el) => { element = el }} {...attrs()} tabindex={props.focus === undefined ? undefined : -1}>
+        <div
+          ref={(el) => {
+            element = el
+          }}
+          {...attrs()}
+          tabindex={props.focus === undefined ? undefined : -1}
+        >
           {props.children}
         </div>
-      )}
+      }
     >
       <button
-        ref={(el) => { element = el }}
+        ref={(el) => {
+          element = el
+        }}
         type="button"
         {...attrs()}
         data-interactive=""

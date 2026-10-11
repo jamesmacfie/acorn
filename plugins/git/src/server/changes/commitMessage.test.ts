@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
-  buildCommitPrompt, cleanCommitMessage, commitDiffScope, commitFiles, splitByBudget, splitPatch,
+  buildCommitPrompt,
+  cleanCommitMessage,
+  commitDiffScope,
+  commitFiles,
+  splitByBudget,
+  splitPatch,
 } from './commitMessage'
 
 // The prompt behind the commit editor's wand, entirely without a provider. Every function here is
@@ -92,14 +97,26 @@ describe('one git diff, back apart per file', () => {
 })
 
 describe('the prompt', () => {
-  const files = commitFiles([change('a.ts', { additions: 3, deletions: 1 }), change('b.ts', { additions: 2, deletions: 0 })], 'tracked')
-  const patches = new Map([['a.ts', 'diff --git a/a.ts b/a.ts\n@@\n+three'], ['b.ts', 'diff --git a/b.ts b/b.ts\n@@\n+two']])
+  const files = commitFiles(
+    [change('a.ts', { additions: 3, deletions: 1 }), change('b.ts', { additions: 2, deletions: 0 })],
+    'tracked',
+  )
+  const patches = new Map([
+    ['a.ts', 'diff --git a/a.ts b/a.ts\n@@\n+three'],
+    ['b.ts', 'diff --git a/b.ts b/b.ts\n@@\n+two'],
+  ])
   // Smallest first, so `b.ts` leads. Named rather than indexed, because the order is the thing under
   // test two blocks up.
   const only = (path: string) => files.filter((file) => file.path === path)
 
   it('names the branch, which is usually the only sentence of intent anybody wrote down', () => {
-    const prompt = buildCommitPrompt({ branch: 'james/fix-empty-header', scope: 'tracked', include: files, omit: [], patches })
+    const prompt = buildCommitPrompt({
+      branch: 'james/fix-empty-header',
+      scope: 'tracked',
+      include: files,
+      omit: [],
+      patches,
+    })
     expect(prompt).toContain('Branch: james/fix-empty-header')
     expect(prompt).toContain('Nothing is staged')
     expect(prompt).toContain('- a.ts +3 -1')
@@ -118,7 +135,11 @@ describe('the prompt', () => {
 
   it('lists the files whose patches did not fit, so the model knows they moved', () => {
     const prompt = buildCommitPrompt({
-      branch: 'main', scope: 'tracked', include: only('a.ts'), omit: only('b.ts'), patches,
+      branch: 'main',
+      scope: 'tracked',
+      include: only('a.ts'),
+      omit: only('b.ts'),
+      patches,
     })
     expect(prompt).toContain('- b.ts +2 -0')
     expect(prompt).toContain('their patches did not fit')
@@ -127,7 +148,14 @@ describe('the prompt', () => {
 
   it('trims a patch that turns out longer than its line count suggested, and says so', () => {
     const long = new Map([['a.ts', `diff --git a/a.ts b/a.ts\n${'+x'.repeat(500)}`]])
-    const prompt = buildCommitPrompt({ branch: 'main', scope: 'tracked', include: only('a.ts'), omit: [], patches: long, budget: 120 })
+    const prompt = buildCommitPrompt({
+      branch: 'main',
+      scope: 'tracked',
+      include: only('a.ts'),
+      omit: [],
+      patches: long,
+      budget: 120,
+    })
     expect(prompt).toContain('… patch truncated')
     expect(prompt.length).toBeLessThan(400)
   })

@@ -34,25 +34,15 @@ export type AgentSessionProjection = {
   configJson?: string
 }
 
-export const initialAgentMachineState = (): AgentMachineState => ({
-  runtimeState: 'creating',
-  attention: 'none',
-  activeTurnId: null,
-  pendingRequestIds: [],
-})
-
-// The database projection and the richer in-memory reducer share this one pure transition map.
-// Provider adapters produce facts; neither persistence nor process supervision invents state.
+// The session's state as the database projects it from one event. Provider adapters produce facts;
+// neither persistence nor process supervision invents state.
 //
 // `turnId` is null for an event that belongs to no turn Acorn dispatched, which is why it gates the
 // turn-scoped cases below. A harness can stream after the prompt call it was answering has already
-// returned: Claude Code did, five minutes past an `end_turn`, and the trailing message projected
-// 'working' onto a session with no turn left to complete it. `turn_completed` is the only event that
-// clears 'working', and it only fires as sendTurn's return value, so nothing was coming.
-export function projectAgentEvent(
-  event: AgentNormalizedEvent,
-  turnId: string | null,
-): AgentSessionProjection {
+// returned, as Claude Code does minutes past an `end_turn`. Projecting 'working' from that trailing
+// message strands the session: `turn_completed` is the only event that clears 'working', and it only
+// fires as sendTurn's return value, so nothing is coming.
+export function projectAgentEvent(event: AgentNormalizedEvent, turnId: string | null): AgentSessionProjection {
   switch (event.type) {
     case 'session_state':
       return {
@@ -88,11 +78,8 @@ export function projectAgentEvent(
       if (event.blocked) return turnId ? { runtimeState: 'working', attention: 'unread' } : { attention: 'unread' }
       return {
         runtimeState: 'waiting',
-        attention: event.kind === 'permission'
-          ? 'permission'
-          : event.kind === 'workflow_gate'
-            ? 'workflow_gate'
-            : 'question',
+        attention:
+          event.kind === 'permission' ? 'permission' : event.kind === 'workflow_gate' ? 'workflow_gate' : 'question',
       }
     case 'request_resolved':
       return { runtimeState: 'working', attention: 'none' }
@@ -114,17 +101,14 @@ export function projectAgentEvent(
 // child at rest is resumable rather than finished, which is a display distinction, not a lifecycle one.
 const ACTIVE_SUBAGENT_STATUSES: readonly AgentSubagentStatus[] = ['pending', 'running']
 
-export const isActiveSubagent = (entry: AgentSubagent): boolean =>
-  ACTIVE_SUBAGENT_STATUSES.includes(entry.status)
+export const isActiveSubagent = (entry: AgentSubagent): boolean => ACTIVE_SUBAGENT_STATUSES.includes(entry.status)
 
 /**
  * How long a background child may go quiet before its row stops claiming to be running.
  *
  * A background child never reports that it finished, so the end of a row is always inferred from
- * silence. The number comes from a captured Claude Code run on Sonnet: across two children and 126
- * events, the longest pause between two events from a child that was still working was 16 seconds.
- * A minute is about four times that. Raise it if a child that runs one long command starts flipping
- * to `idle` and back.
+ * silence. A minute is several times the longest pause seen between events from a child that was still
+ * working. Raise it if a child that runs one long command starts flipping to `idle` and back.
  */
 export const SUBAGENT_QUIET_MS = 60_000
 
@@ -161,9 +145,11 @@ export function touchSubagentRoster(
 ): AgentSubagent[] | undefined {
   const existing = current.find((entry) => entry.id === subagentId)
   if (!existing || existing.status === 'completed' || existing.status === 'failed') return undefined
-  return current.map((entry) => entry.id === subagentId
-    ? { ...entry, status: entry.status === 'idle' ? 'running' : entry.status, updatedAt: timestamp }
-    : entry)
+  return current.map((entry) =>
+    entry.id === subagentId
+      ? { ...entry, status: entry.status === 'idle' ? 'running' : entry.status, updatedAt: timestamp }
+      : entry,
+  )
 }
 
 /**
@@ -177,10 +163,10 @@ export const quietedSubagents = (roster: AgentSubagent[], quietBefore: number): 
     .filter((entry) => entry.background && isActiveSubagent(entry) && entry.updatedAt <= quietBefore)
     .map((entry) => entry.id)
 
-// ponytail: keep every in-flight entry plus the last 20 settled ones. The session row is re-serialised
-// and broadcast whenever the roster changes, so an unbounded roster would grow every frame; the full
-// history stays in the event ledger, which is what the transcript reads. Give the roster its own table and
-// route if a session ever needs more than this at a glance.
+// Keeps every in-flight entry plus the last 20 settled ones. The session row is re-serialised and
+// broadcast whenever the roster changes, so an unbounded roster would grow every frame; the full history
+// stays in the event ledger, which is what the transcript reads. Give the roster its own table and route
+// if a session ever needs more than this at a glance.
 const RETAINED_SETTLED_SUBAGENTS = 20
 
 function capSubagentRoster(roster: AgentSubagent[]): AgentSubagent[] {
@@ -219,16 +205,13 @@ export function foldSubagentRoster(
   // finish, and the child's own tool calls stream on well past it. Only a real completion summary
   // settles such a row, and a summary is the one update that carries the harness handle, so a terminal
   // status with no `providerAgentRef` on it is the launch receipt and must not settle the row.
-  const settlingFromLaunch = background
-    && (update.status === 'completed' || update.status === 'failed')
-    && update.providerAgentRef == null
+  const settlingFromLaunch =
+    background && (update.status === 'completed' || update.status === 'failed') && update.providerAgentRef == null
   const merged: AgentSubagent = {
     id: update.id,
     turnId: existing?.turnId ?? turnId,
     title: update.title || existing?.title || 'Subagent',
-    status: settlingFromLaunch
-      ? existing?.status ?? 'running'
-      : update.status ?? existing?.status ?? 'running',
+    status: settlingFromLaunch ? (existing?.status ?? 'running') : (update.status ?? existing?.status ?? 'running'),
     background: background || undefined,
     role: update.role ?? existing?.role,
     model: update.model ?? existing?.model,
@@ -239,9 +222,9 @@ export function foldSubagentRoster(
     startedAt: existing?.startedAt ?? timestamp,
     updatedAt: timestamp,
   }
-  return capSubagentRoster(existing
-    ? current.map((entry) => entry.id === update.id ? merged : entry)
-    : [...current, merged])
+  return capSubagentRoster(
+    existing ? current.map((entry) => (entry.id === update.id ? merged : entry)) : [...current, merged],
+  )
 }
 
 export function decideAgentCommand(state: AgentMachineState, command: AgentMachineCommand): AgentMachineDecision {
@@ -264,95 +247,15 @@ export function decideAgentCommand(state: AgentMachineState, command: AgentMachi
         : { ok: false, code: 'request_not_pending', message: 'The request is no longer pending.' }
     case 'handoff_terminal':
       return state.activeTurnId || state.runtimeState === 'connecting' || state.runtimeState === 'replaying'
-        ? { ok: false, code: 'controller_busy', message: 'Finish or cancel the active provider operation before terminal handoff.' }
+        ? {
+            ok: false,
+            code: 'controller_busy',
+            message: 'Finish or cancel the active provider operation before terminal handoff.',
+          }
         : { ok: true }
     case 'resume_managed':
       return state.runtimeState === 'working' || state.runtimeState === 'waiting'
         ? { ok: false, code: 'controller_busy', message: 'The terminal-owned session still has active work.' }
         : { ok: true }
-  }
-}
-
-export function evolveAgentState(
-  state: AgentMachineState,
-  event: AgentNormalizedEvent,
-  turnId: string | null,
-): AgentMachineState {
-  switch (event.type) {
-    case 'session_state':
-      return {
-        ...state,
-        runtimeState: event.state,
-        attention: event.state === 'failed' ? 'error' : state.attention,
-        activeTurnId: event.state === 'ready' || event.state === 'stopped' || event.state === 'failed'
-          ? null
-          : state.activeTurnId,
-      }
-    case 'user_message': {
-      const active = turnId ?? state.activeTurnId
-      if (!active) return state
-      return { ...state, runtimeState: 'working', attention: 'none', activeTurnId: active }
-    }
-    case 'assistant_message':
-    case 'reasoning':
-    case 'tool':
-    case 'plan':
-    case 'plan_proposal':
-    case 'file_change':
-    case 'terminal':
-    case 'artifact': {
-      // Same turn gate as projectAgentEvent, for the same reason. The reducer knows more than the
-      // projection does, so it asks whether any turn is in flight rather than just this event's.
-      const active = turnId ?? state.activeTurnId
-      if (!active) return { ...state, attention: 'unread' }
-      return { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
-    }
-    case 'request': {
-      if (event.blocked) {
-        const active = turnId ?? state.activeTurnId
-        return active ? { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active } : { ...state, attention: 'unread' }
-      }
-      return {
-        ...state,
-        runtimeState: 'waiting',
-        attention: event.kind === 'permission'
-          ? 'permission'
-          : event.kind === 'workflow_gate'
-            ? 'workflow_gate'
-            : 'question',
-        pendingRequestIds: state.pendingRequestIds.includes(event.requestId)
-          ? state.pendingRequestIds
-          : [...state.pendingRequestIds, event.requestId],
-      }
-    }
-    case 'request_resolved': {
-      const pendingRequestIds = state.pendingRequestIds.filter((id) => id !== event.requestId)
-      return {
-        ...state,
-        runtimeState: pendingRequestIds.length === 0 ? 'working' : 'waiting',
-        attention: pendingRequestIds.length === 0 ? 'none' : state.attention,
-        pendingRequestIds,
-      }
-    }
-    case 'turn_completed':
-      return {
-        ...state,
-        runtimeState: 'ready',
-        attention: 'completed',
-        activeTurnId: null,
-        pendingRequestIds: [],
-      }
-    case 'error':
-      return {
-        ...state,
-        runtimeState: event.retryable ? 'reconnecting' : 'failed',
-        attention: 'error',
-        activeTurnId: null,
-      }
-    case 'session_metadata':
-    case 'subagent':
-    case 'usage':
-    case 'diagnostic':
-      return state
   }
 }

@@ -17,8 +17,12 @@ describe('the terminal preferences', () => {
   it('opens the drawer empty until somebody picks a profile, and offers exactly the four it can open', () => {
     expect(terminalRailDefault(undefined)).toBe('empty')
     expect(terminalRailDefault({ [PrefKeys.terminalRailDefault]: 'codex' })).toBe('codex')
-    expect(TERMINAL_RAIL_DEFAULT_CHOICES.map((choice) => choice.value))
-      .toEqual(['empty', 'shell', 'claude-code', 'codex'])
+    expect(TERMINAL_RAIL_DEFAULT_CHOICES.map((choice) => choice.value)).toEqual([
+      'empty',
+      'shell',
+      'claude-code',
+      'codex',
+    ])
   })
 
   it('falls back rather than letting a corrupt size reach xterm’s measurement', () => {
@@ -29,5 +33,4 @@ describe('the terminal preferences', () => {
     expect(terminalFontSize(undefined)).toBe(15)
     expect(terminalFontSizeChoices().map((choice) => choice.value)).toEqual(['13', '15', '17', '19', '21'])
   })
-
 })

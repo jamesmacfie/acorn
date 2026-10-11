@@ -88,9 +88,7 @@ export class AcpDriver implements AgentDriver {
       driverKind: 'acp',
       driverVersion: DRIVER_VERSION,
       installed: launch.diagnostics.length === 0,
-      authenticated: launch.executable && this.spec.probeAuth
-        ? await this.spec.probeAuth(launch.executable)
-        : null,
+      authenticated: launch.executable && this.spec.probeAuth ? await this.spec.probeAuth(launch.executable) : null,
       ...(launch.executable ? { executable: launch.executable } : {}),
       statusAuthority: 'protocol',
       capabilities: [
@@ -122,7 +120,12 @@ export class AcpDriver implements AgentDriver {
       if (launch.diagnostics.length) throw new Error(launch.diagnostics[0])
       const { startAcpSession } = await measure('driver.load', () => import('./acpSession'))
       cancellation.signal.throwIfAborted()
-      const handle = await awaitWithSignal(startAcpSession(scoped, this.spec, launch, (stop) => { cleanup = stop }), cancellation.signal)
+      const handle = await awaitWithSignal(
+        startAcpSession(scoped, this.spec, launch, (stop) => {
+          cleanup = stop
+        }),
+        cancellation.signal,
+      )
       cancellation.signal.throwIfAborted()
       return handle
     } catch (error) {
@@ -132,5 +135,4 @@ export class AcpDriver implements AgentDriver {
       cancellation.dispose()
     }
   }
-
 }

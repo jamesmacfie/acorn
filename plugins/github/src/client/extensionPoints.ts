@@ -1,6 +1,6 @@
 // The two places another plugin may say something inside github's pull-request surfaces
-// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The host mints the qualified ids from the bare
-// ones below.
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The host mints the
+// qualified ids from the bare ones below.
 //
 // Its own module, with no Solid in it, so both the pane and a bare-Node test can reach it.
 
@@ -8,9 +8,8 @@
  *  blame note. The same shape the changes pane opens over the working tree. */
 export const DIFF_LINE_POINT = 'github:diff-line'
 
-// The fields the shared viewer mints per row, in the order it mints them
-// (client-core/src/host/annotations/annotationKey.ts). A key declared in any other order looks up under a string
-// nothing ever wrote.
+// The fields the shared viewer mints per row, in the order it mints them (`annotationKey` in
+// client-core). A key declared in any other order looks up under a string nothing ever wrote.
 export const DIFF_LINE_KEY = ['file', 'line', 'side'] as const
 
 /** Room beside the state, checks and stats on a pull request's overview: a deploy, a stack, a

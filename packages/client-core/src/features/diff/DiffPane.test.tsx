@@ -27,7 +27,13 @@ vi.mock('../../infra/highlight/worker', () => {
     if (tokenizer.hold) await new Promise<void>((resolve) => tokenizer.waiting.push(resolve))
     return code.split('\n').map((line) => [{ content: line, light: '#111', dark: '#eee' }])
   }
-  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: tokenizer.timedOut }) }
+  return {
+    tokenizeDocument,
+    highlightDocument: async (path: string, code: string) => ({
+      lines: await tokenizeDocument(path, code),
+      timedOut: tokenizer.timedOut,
+    }),
+  }
 })
 
 const { DiffPane } = await import('./DiffPane')
@@ -39,7 +45,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanups.splice(0).reverse().forEach((dispose) => dispose())
+  cleanups
+    .splice(0)
+    .reverse()
+    .forEach((dispose) => dispose())
   tokenizer.calls = 0
   tokenizer.hold = false
   tokenizer.timedOut = false
@@ -52,9 +61,14 @@ const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: fa
 const mount = (source: DiffSource, client = newClient()) => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => (
-    <QueryClientProvider client={client}><DiffPane source={source} /></QueryClientProvider>
-  ), host)
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <DiffPane source={source} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
   let mounted = true
   const unmount = () => {
     if (!mounted) return
@@ -70,7 +84,12 @@ const settle = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const recorded = () => {
   const requests: DiffSegmentRequest[] = []
-  return { requests, onLoad: (batch: DiffSegmentRequest[]) => { requests.push(...batch) } }
+  return {
+    requests,
+    onLoad: (batch: DiffSegmentRequest[]) => {
+      requests.push(...batch)
+    },
+  }
 }
 
 describe('a segmented diff', () => {
@@ -78,14 +97,23 @@ describe('a segmented diff', () => {
     tokenizer.hold = true
     const files = [...largeDiffFiles('small', 1)]
     const host = mount(largeDiffSource(files))
-    await vi.waitFor(() => expect(host.querySelectorAll('.diff-item .diff-row .diff-code').length).toBeGreaterThan(10), { timeout: 5_000 })
+    await vi.waitFor(
+      () => expect(host.querySelectorAll('.diff-item .diff-row .diff-code').length).toBeGreaterThan(10),
+      { timeout: 5_000 },
+    )
     // The rows are on screen with their text and no token colour, and the tokenizer is still waiting.
     expect(tokenizer.waiting.length).toBeGreaterThan(0)
     const first = host.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')!
     expect(first.style.getPropertyValue('--l')).toBe('')
     tokenizer.hold = false
     tokenizer.waiting.splice(0).forEach((resolve) => resolve())
-    await vi.waitFor(() => expect(host.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l')).toBe('#111'), { timeout: 5_000 })
+    await vi.waitFor(
+      () =>
+        expect(
+          host.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l'),
+        ).toBe('#111'),
+      { timeout: 5_000 },
+    )
   })
 
   it('left open without scrolling, loads and colours only the segments near the viewport', async () => {
@@ -119,7 +147,15 @@ describe('a segmented diff', () => {
     requests.length = 0
     clientEvents.emit('presentation:file-scroll', { routeKey: 'large-diff', path: last.path })
     host.querySelector('.diff')!.dispatchEvent(new Event('scroll'))
-    await vi.waitFor(() => expect(requests.some((request) => request.path === last.path || files.slice(-5).some((file) => file.path === request.path))).toBe(true), { timeout: 5_000 })
+    await vi.waitFor(
+      () =>
+        expect(
+          requests.some(
+            (request) => request.path === last.path || files.slice(-5).some((file) => file.path === request.path),
+          ),
+        ).toBe(true),
+      { timeout: 5_000 },
+    )
     expect(requests.filter((request) => middle.has(request.path))).toEqual([])
   }, 30_000)
 
@@ -140,7 +176,10 @@ describe('a segmented diff', () => {
     await vi.waitFor(() => expect(host.textContent).toContain('compute'), { timeout: 5_000 })
     await settle()
     const cache = segmentCacheFor(host.client)
-    const held = (file: DiffDocumentFile) => file.segments.filter((_, ordinal) => cache.has(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha))).length
+    const held = (file: DiffDocumentFile) =>
+      file.segments.filter((_, ordinal) =>
+        cache.has(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)),
+      ).length
     const [before, other] = current().topology()!.files
     expect(held(before!)).toBeGreaterThan(0)
     const otherHeld = held(other!)
@@ -167,7 +206,9 @@ describe('a segmented diff', () => {
     // A word only the last file has, so every match is far from anything loaded.
     const target = files.filter((file) => file.patch).at(-1)!
     const word = 'needleAtTheEnd'
-    const patched = files.map((file) => (file === target ? { ...file, patch: file.patch!.replace(/compute/g, word) } : file))
+    const patched = files.map((file) =>
+      file === target ? { ...file, patch: file.patch!.replace(/compute/g, word) } : file,
+    )
     const withNeedle = largeDiffSource(patched, { onLoad })
     const host = mount({ ...source, ...withNeedle })
     await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0), { timeout: 5_000 })
@@ -176,7 +217,9 @@ describe('a segmented diff', () => {
     const input = host.querySelector<HTMLInputElement>('[role="search"] input')!
     input.value = word
     input.dispatchEvent(new Event('input', { bubbles: true }))
-    await vi.waitFor(() => expect(requests.some((request) => request.path === target.path)).toBe(true), { timeout: 5_000 })
+    await vi.waitFor(() => expect(requests.some((request) => request.path === target.path)).toBe(true), {
+      timeout: 5_000,
+    })
     host.querySelector('.diff')!.dispatchEvent(new Event('scroll'))
     await vi.waitFor(() => expect(host.querySelector('.ui-find-mark')?.textContent).toBe(word), { timeout: 5_000 })
   }, 30_000)
@@ -187,7 +230,8 @@ describe('a segmented diff', () => {
     // open filtered.
     const source = () => largeDiffSource(files, { scope: 'file-filter' })
     const host = mount(source())
-    const headsIn = (root: HTMLElement) => [...root.querySelectorAll('.diff-item .diff-file-path')].map((head) => head.textContent)
+    const headsIn = (root: HTMLElement) =>
+      [...root.querySelectorAll('.diff-item .diff-file-path')].map((head) => head.textContent)
     const heads = () => headsIn(host)
     await vi.waitFor(() => expect(heads()[0]).toBe(files[0]!.path), { timeout: 5_000 })
     // The last file, so it is the first header only if the two before it were filtered out.
@@ -210,11 +254,16 @@ describe('a segmented diff', () => {
     const host = mount(largeDiffSource(files))
     await vi.waitFor(() => expect(host.querySelector('.diff-gap')).not.toBeNull(), { timeout: 5_000 })
     host.querySelector<HTMLButtonElement>('.diff-gap:not(:disabled)')!.click()
-    await vi.waitFor(() => expect(host.querySelector('.diff-item[data-kind="overlay"] .diff-row')).not.toBeNull(), { timeout: 5_000 })
+    await vi.waitFor(() => expect(host.querySelector('.diff-item[data-kind="overlay"] .diff-row')).not.toBeNull(), {
+      timeout: 5_000,
+    })
 
     const collapse = host.querySelector<HTMLButtonElement>('.diff-item .diff-file-collapse')!
     collapse.click()
-    await vi.waitFor(() => expect(host.querySelector('.diff-item .diff-file-collapse')?.getAttribute('aria-expanded')).toBe('false'), { timeout: 5_000 })
+    await vi.waitFor(
+      () => expect(host.querySelector('.diff-item .diff-file-collapse')?.getAttribute('aria-expanded')).toBe('false'),
+      { timeout: 5_000 },
+    )
     const firstFile = files[0]!.path
     const items = [...host.querySelectorAll<HTMLElement>('.diff-item')]
     const headers = items.filter((item) => item.querySelector('.diff-file-head'))
@@ -231,7 +280,13 @@ describe('resident segments', () => {
   it('paints a revisited diff from memory, coloured, before any segment request answers', async () => {
     const files = [...largeDiffFiles('small', 1)]
     const first = mount(largeDiffSource(files))
-    await vi.waitFor(() => expect(first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l')).toBe('#111'), { timeout: 5_000 })
+    await vi.waitFor(
+      () =>
+        expect(
+          first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l'),
+        ).toBe('#111'),
+      { timeout: 5_000 },
+    )
     await settle()
     first.unmount()
 
@@ -239,15 +294,22 @@ describe('resident segments', () => {
     const { requests, onLoad } = recorded()
     const calls = tokenizer.calls
     const again = mount(largeDiffSource(files, { onLoad, delay: () => new Promise(() => {}) }), first.client)
-    await vi.waitFor(() => expect(again.querySelectorAll('.diff-item .diff-row .diff-code').length).toBeGreaterThan(10), { timeout: 5_000 })
-    expect(again.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')!.style.getPropertyValue('--l')).toBe('#111')
+    await vi.waitFor(
+      () => expect(again.querySelectorAll('.diff-item .diff-row .diff-code').length).toBeGreaterThan(10),
+      { timeout: 5_000 },
+    )
+    expect(
+      again.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')!.style.getPropertyValue('--l'),
+    ).toBe('#111')
     expect(tokenizer.calls).toBe(calls)
     const reading = diff()!
     expect(reading.resident.hits).toBeGreaterThan(0)
     expect(reading.resident.rows).toBeLessThanOrEqual(reading.resident.rowCeiling)
     expect(reading.resident.estimatedBytes).toBeLessThanOrEqual(reading.resident.byteCeiling)
     // Anything it did ask for is beyond what it had held, never a segment it drew.
-    const drawn = new Set([...again.querySelectorAll<HTMLElement>('.diff-item[data-kind="segment"]')].map((item) => item.dataset.key))
+    const drawn = new Set(
+      [...again.querySelectorAll<HTMLElement>('.diff-item[data-kind="segment"]')].map((item) => item.dataset.key),
+    )
     expect(requests.filter((request) => drawn.has(`s:${request.path}:${request.ordinal}`))).toEqual([])
   }, 20_000)
 
@@ -255,7 +317,13 @@ describe('resident segments', () => {
     const files = [...largeDiffFiles('small', 1)]
     tokenizer.timedOut = true
     const first = mount(largeDiffSource(files))
-    await vi.waitFor(() => expect(first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l')).toBe('#111'), { timeout: 5_000 })
+    await vi.waitFor(
+      () =>
+        expect(
+          first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l'),
+        ).toBe('#111'),
+      { timeout: 5_000 },
+    )
     await settle()
     // The pane that fell back does not try again while it is open.
     const stalled = tokenizer.calls
@@ -266,19 +334,33 @@ describe('resident segments', () => {
     tokenizer.timedOut = false
     const again = mount(largeDiffSource(files), first.client)
     await vi.waitFor(() => expect(tokenizer.calls).toBeGreaterThan(stalled), { timeout: 5_000 })
-    await settle()
     const cache = segmentCacheFor(again.client)
-    const coloured = largeDiffSource(files).topology()!.files.flatMap((file) => file.segments
-      .map((_, ordinal) => cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)))
-      .filter((entry) => entry?.enriched))
-    expect(coloured.length).toBeGreaterThan(0)
-    expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
+    // Waited for rather than read after one settle: under a loaded test run, the segments the
+    // fallback coloured are still being re-tokenized when the first new call lands.
+    await vi.waitFor(
+      () => {
+        const coloured = largeDiffSource(files)
+          .topology()!
+          .files.flatMap((file) =>
+            file.segments
+              .map((_, ordinal) =>
+                cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)),
+              )
+              .filter((entry) => entry?.enriched),
+          )
+        expect(coloured.length).toBeGreaterThan(0)
+        expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
+      },
+      { timeout: 10_000 },
+    )
   }, 20_000)
 
   it('shares nothing between two nodes', async () => {
     const files = [...largeDiffFiles('small', 1)]
     const first = mount(largeDiffSource(files))
-    await vi.waitFor(() => expect(first.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), { timeout: 5_000 })
+    await vi.waitFor(() => expect(first.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), {
+      timeout: 5_000,
+    })
     first.unmount()
     const { requests, onLoad } = recorded()
     mount(largeDiffSource(files, { onLoad }))
@@ -291,7 +373,9 @@ describe('resident segments', () => {
     const [threads, setThreads] = createSignal<DiffThread[]>(own)
     const { requests, onLoad } = recorded()
     const host = mount(largeDiffSource(files, { onLoad, threads }))
-    await vi.waitFor(() => expect(host.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), { timeout: 5_000 })
+    await vi.waitFor(() => expect(host.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), {
+      timeout: 5_000,
+    })
     await settle()
     const cache = segmentCacheFor(host.client)
     const { inserts, evictions } = cache.stats()
@@ -304,7 +388,10 @@ describe('resident segments', () => {
 
   it('never puts a segment into the persisted query snapshot', async () => {
     const CANARY = 'CANARY9d2e'
-    const files = [...largeDiffFiles('small', 1)].map((file): LargeDiffFile => ({ ...file, patch: file.patch?.replace(/compute/g, `compute_${CANARY}`) ?? null }))
+    const files = [...largeDiffFiles('small', 1)].map((file): LargeDiffFile => ({
+      ...file,
+      patch: file.patch?.replace(/compute/g, `compute_${CANARY}`) ?? null,
+    }))
     const host = mount(largeDiffSource(files))
     await vi.waitFor(() => expect(host.textContent).toContain(CANARY), { timeout: 5_000 })
     host.client.setQueryData(['tasks'], [{ id: 'kept' }])

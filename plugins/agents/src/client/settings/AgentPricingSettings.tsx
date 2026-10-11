@@ -1,19 +1,13 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createSignal, For, Index, onMount, Show } from 'solid-js'
-import {
-  createSettingSave, createTextSetting, useUnsavedChanges, type SettingSave,
-} from '@acorn/plugin-api/client'
+import { createSettingSave, createTextSetting, useUnsavedChanges, type SettingSave } from '@acorn/plugin-api/client'
 import {
   claudePriceCatalog,
   codexPriceCatalog,
   type AgentPriceCatalogEntry,
   type AgentPricingPreferences,
 } from '../../shared/pricing'
-import {
-  agentPricingOptions,
-  agentPricingQueryKey,
-  saveAgentPricing,
-} from '../pricingClient'
+import { agentPricingOptions, agentPricingQueryKey, saveAgentPricing } from '../pricingClient'
 import {
   blankAgentPriceDraft,
   preferencesFromPricingDraft,
@@ -25,7 +19,18 @@ import {
 } from './pricingDraft'
 import { agentUsageStore } from '../usage/usageStore'
 import {
-  Alert, Button, Inline, Input, SettingRow, SettingsSection, Stack, Table, TableCell, TableHead, TableRow, Text,
+  Alert,
+  Button,
+  Inline,
+  Input,
+  SettingRow,
+  SettingsSection,
+  Stack,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+  Text,
 } from '@acorn/plugin-api/ui'
 
 const PRICE_FIELDS: Array<{ id: AgentPriceField; label: string }> = [
@@ -55,8 +60,8 @@ const complete = (row: PendingModel) =>
 // Settings → Agents → Limits and cost, the pricing sections. Every price saves when its field is
 // committed, on blur or Enter. The route takes the whole pricing record, so each commit writes the
 // stored record with that one change, and the writes run one after another so a second commit starts
-// from what the first one stored. The sections match the ones `../index.ts` declares for search;
-// ./AgentLimitsSettings.tsx puts them on the page after the concurrency ceilings.
+// from what the first one stored. The sections match the ones the plugin's registration declares for
+// search.
 export default function AgentPricingSettings() {
   const queryClient = useQueryClient()
   const pricing = createQuery(() => agentPricingOptions())
@@ -66,8 +71,11 @@ export default function AgentPricingSettings() {
   onMount(() => void agentUsageStore.ensure())
 
   // A half-typed exact model is the one thing on this page that nothing has written yet.
-  useUnsavedChanges(() => Object.values(pending()).some((rows) =>
-    rows.some((row) => row.model.trim() || Object.values(row.price).some((value) => value.trim()))))
+  useUnsavedChanges(() =>
+    Object.values(pending()).some((rows) =>
+      rows.some((row) => row.model.trim() || Object.values(row.price).some((value) => value.trim())),
+    ),
+  )
 
   let queue: Promise<unknown> = Promise.resolve()
   const write = (change: (draft: AgentPricingDraft) => void): Promise<void> => {
@@ -87,13 +95,21 @@ export default function AgentPricingSettings() {
     return run
   }
 
-  const tables = Object.fromEntries(PROVIDERS.map((provider) => [provider.id, {
-    builtIn: createSettingSave(),
-    exact: createSettingSave(),
-  }])) as Record<AgentPricingProvider, { builtIn: SettingSave; exact: SettingSave }>
+  const tables = Object.fromEntries(
+    PROVIDERS.map((provider) => [
+      provider.id,
+      {
+        builtIn: createSettingSave(),
+        exact: createSettingSave(),
+      },
+    ]),
+  ) as Record<AgentPricingProvider, { builtIn: SettingSave; exact: SettingSave }>
 
   const editPending = (provider: AgentPricingProvider, index: number, patch: Partial<PendingModel>) =>
-    setPending((all) => ({ ...all, [provider]: all[provider].map((row, i) => (i === index ? { ...row, ...patch } : row)) }))
+    setPending((all) => ({
+      ...all,
+      [provider]: all[provider].map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    }))
 
   const dropPending = (provider: AgentPricingProvider, id: string) =>
     setPending((all) => ({ ...all, [provider]: all[provider].filter((row) => row.id !== id) }))
@@ -104,7 +120,10 @@ export default function AgentPricingSettings() {
     if (taken.some((entry) => entry.model.toLowerCase() === normalized)) return
     setPending((all) => ({
       ...all,
-      [provider]: [...all[provider], { id: `new:${nextPendingId++}`, model, price: blankAgentPriceDraft(), saving: false }],
+      [provider]: [
+        ...all[provider],
+        { id: `new:${nextPendingId++}`, model, price: blankAgentPriceDraft(), saving: false },
+      ],
     }))
   }
 
@@ -114,16 +133,22 @@ export default function AgentPricingSettings() {
     const row = pending()[provider][index]
     if (!row || row.saving || !complete(row)) return
     editPending(provider, index, { saving: true })
-    const ok = await tables[provider].exact.run(() => write((draft) => {
-      draft[provider].customModels.push({ id: row.id, model: row.model, price: row.price })
-    }))
+    const ok = await tables[provider].exact.run(() =>
+      write((draft) => {
+        draft[provider].customModels.push({ id: row.id, model: row.model, price: row.price })
+      }),
+    )
     if (ok) dropPending(provider, row.id)
-    else setPending((all) => ({ ...all, [provider]: all[provider].map((each) => (each.id === row.id ? { ...each, saving: false } : each)) }))
+    else
+      setPending((all) => ({
+        ...all,
+        [provider]: all[provider].map((each) => (each.id === row.id ? { ...each, saving: false } : each)),
+      }))
   }
 
   const unpricedModels = createMemo(() => {
     // The one `'claude'` left on the client, and it is not a branch on a closed harness set. The whole
-    // pricing table is Anthropic's model catalogue (shared/pricing.ts) and the preferences it edits are
+    // pricing table is Anthropic's model catalogue and the preferences it edits are
     // keyed `claude`, so the id names the pricing namespace rather than the harness.
     const claude = agentUsageStore.snapshot()?.providers.find((provider) => provider.provider === 'claude')
     const observed = [
@@ -139,16 +164,18 @@ export default function AgentPricingSettings() {
   return (
     <>
       <Show when={pricing.error}>
-        <Alert>
-          {pricing.error instanceof Error ? pricing.error.message : 'Agent pricing could not be loaded.'}
-        </Alert>
+        <Alert>{pricing.error instanceof Error ? pricing.error.message : 'Agent pricing could not be loaded.'}</Alert>
       </Show>
       <Show when={!stored() && pricing.isPending}>
         <Text emphasis="muted">Loading prices…</Text>
       </Show>
 
       <Show when={unpricedModels().length}>
-        <SettingsSection id="unpriced" label="Unpriced models" description="Claude models you used recently that have no price. Add a price so acorn can estimate their cost.">
+        <SettingsSection
+          id="unpriced"
+          label="Unpriced models"
+          description="Claude models you used recently that have no price. Add a price so acorn can estimate their cost."
+        >
           <SettingRow label="Seen recently" layout="stacked">
             <Inline wrap>
               <For each={unpricedModels()}>
@@ -174,7 +201,12 @@ export default function AgentPricingSettings() {
                   label={`${provider.label} prices`}
                   help="acorn uses these for cost estimates, in US dollars per million tokens. They don't change what you're billed."
                 >
-                  <SettingRow label="Built-in models" layout="stacked" savedAt={table.builtIn.savedAt()} error={table.builtIn.error()}>
+                  <SettingRow
+                    label="Built-in models"
+                    layout="stacked"
+                    savedAt={table.builtIn.savedAt()}
+                    error={table.builtIn.error()}
+                  >
                     <Table size="sm" minWidth={620}>
                       <TableRow head>
                         <TableHead priority="high">Model</TableHead>
@@ -192,7 +224,9 @@ export default function AgentPricingSettings() {
                               <TableCell header>
                                 <Stack gap="none">
                                   <Text>{name()}</Text>
-                                  <Text emphasis="mono" tone="muted">{definition()?.models}</Text>
+                                  <Text emphasis="mono" tone="muted">
+                                    {definition()?.models}
+                                  </Text>
                                 </Stack>
                               </TableCell>
                               <For each={PRICE_FIELDS}>
@@ -205,7 +239,9 @@ export default function AgentPricingSettings() {
                                       save={(value) => {
                                         const catalogId = row().catalogId
                                         return write((draft) => {
-                                          const entry = draft[provider.id].catalog.find((each) => each.catalogId === catalogId)
+                                          const entry = draft[provider.id].catalog.find(
+                                            (each) => each.catalogId === catalogId,
+                                          )
                                           if (!entry) throw new Error(`${name()} is no longer a built-in model.`)
                                           entry.overridden = true
                                           entry.price[field.id] = value
@@ -218,20 +254,24 @@ export default function AgentPricingSettings() {
                               <TableCell>
                                 {/* Only on a changed row, like a setting row's own Reset. */}
                                 <Show when={row().overridden}>
-                                <Button
-                                  variant="ghost"
-                                  size="xs"
-                                  label={`Reset ${name()}`}
-                                  onPress={() => {
-                                    const catalogId = row().catalogId
-                                    void table.builtIn.run(() => write((draft) => {
-                                      const entry = draft[provider.id].catalog.find((each) => each.catalogId === catalogId)
-                                      if (entry) entry.overridden = false
-                                    }))
-                                  }}
-                                >
-                                  Reset
-                                </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    label={`Reset ${name()}`}
+                                    onPress={() => {
+                                      const catalogId = row().catalogId
+                                      void table.builtIn.run(() =>
+                                        write((draft) => {
+                                          const entry = draft[provider.id].catalog.find(
+                                            (each) => each.catalogId === catalogId,
+                                          )
+                                          if (entry) entry.overridden = false
+                                        }),
+                                      )
+                                    }}
+                                  >
+                                    Reset
+                                  </Button>
                                 </Show>
                               </TableCell>
                             </TableRow>
@@ -261,8 +301,13 @@ export default function AgentPricingSettings() {
                           </TableRow>
                           <Index each={current()[provider.id].customModels}>
                             {(row) => {
-                              // Found by the model id it was stored under, because an edit to the id itself changes it.
-                              const edit = (change: (entry: AgentPricingDraft[AgentPricingProvider]['customModels'][number]) => void) => {
+                              // Found by the model id it was stored under, because an edit to the id itself
+                              // changes it.
+                              const edit = (
+                                change: (
+                                  entry: AgentPricingDraft[AgentPricingProvider]['customModels'][number],
+                                ) => void,
+                              ) => {
                                 const model = row().model
                                 return write((draft) => {
                                   const entry = draft[provider.id].customModels.find((each) => each.model === model)
@@ -271,8 +316,9 @@ export default function AgentPricingSettings() {
                                 })
                               }
                               return (
-                                // Keyed by the entry, so a field's kept draft never outlives its row: after a Remove above it,
-                                // this slot holds the next model, and a blur must not write the old text into that one.
+                                // Keyed by the entry, so a field's kept draft never outlives its row: after a
+                                // Remove above it, this slot holds the next model, and a blur must not write the
+                                // old text into that one.
                                 <Show when={row().id} keyed>
                                   {(_entry) => (
                                     <TableRow>
@@ -283,7 +329,11 @@ export default function AgentPricingSettings() {
                                           label={`Exact ${provider.label} model id`}
                                           value={row().model}
                                           table={table.exact}
-                                          save={(value) => edit((entry) => { entry.model = value })}
+                                          save={(value) =>
+                                            edit((entry) => {
+                                              entry.model = value
+                                            })
+                                          }
                                         />
                                       </TableCell>
                                       <For each={PRICE_FIELDS}>
@@ -293,7 +343,11 @@ export default function AgentPricingSettings() {
                                               label={`${row().model} ${field.label}`}
                                               value={row().price[field.id]}
                                               table={table.exact}
-                                              save={(value) => edit((entry) => { entry.price[field.id] = value })}
+                                              save={(value) =>
+                                                edit((entry) => {
+                                                  entry.price[field.id] = value
+                                                })
+                                              }
                                             />
                                           </TableCell>
                                         )}
@@ -304,9 +358,13 @@ export default function AgentPricingSettings() {
                                           size="xs"
                                           onPress={() => {
                                             const model = row().model
-                                            void table.exact.run(() => write((draft) => {
-                                              draft[provider.id].customModels = draft[provider.id].customModels.filter((each) => each.model !== model)
-                                            }))
+                                            void table.exact.run(() =>
+                                              write((draft) => {
+                                                draft[provider.id].customModels = draft[
+                                                  provider.id
+                                                ].customModels.filter((each) => each.model !== model)
+                                              }),
+                                            )
                                           }}
                                         >
                                           Remove
@@ -346,14 +404,20 @@ export default function AgentPricingSettings() {
                                         size="sm"
                                         label={`${row().model || 'Custom model'} ${field.label}`}
                                         value={row().price[field.id]}
-                                        onInput={(value) => editPending(provider.id, index, { price: { ...row().price, [field.id]: value } })}
+                                        onInput={(value) =>
+                                          editPending(provider.id, index, {
+                                            price: { ...row().price, [field.id]: value },
+                                          })
+                                        }
                                         onChange={() => void storePending(provider.id, index)}
                                       />
                                     </TableCell>
                                   )}
                                 </For>
                                 <TableCell>
-                                  <Button variant="ghost" size="xs" onPress={() => dropPending(provider.id, row().id)}>Remove</Button>
+                                  <Button variant="ghost" size="xs" onPress={() => dropPending(provider.id, row().id)}>
+                                    Remove
+                                  </Button>
                                 </TableCell>
                               </TableRow>
                             )}

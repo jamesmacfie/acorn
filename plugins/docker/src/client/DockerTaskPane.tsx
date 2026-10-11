@@ -1,4 +1,4 @@
-// The Docker task pane: containers linked to this task (matched main-side by worktree/slug), a chip
+// The Docker task pane: containers linked to this task (matched on the node by worktree/slug), a chip
 // per container switching the shared ContainerDetail, the same shape as RollbarPane.
 //
 // A `header-body` pane: the chips are the header and do not scroll, the detail is the body and does
@@ -27,18 +27,25 @@ const roots = new Map<string, { model: TaskContainers; dispose: () => void }>()
 type TaskContainers = ReturnType<typeof linkedContainers>
 
 function linkedContainers(taskId: string, nodeId: string | null) {
-  const [linked, { refetch }] = createResource(() => taskId, id => fetchTaskContainers(id, nodeId))
+  const [linked, { refetch }] = createResource(
+    () => taskId,
+    (id) => fetchTaskContainers(id, nodeId),
+  )
   const [selected, setSelected] = createSignal<string | null>(dockerSelection(taskId) ?? null)
 
   // Land selection on the first container (and heal it when the selected one disappears).
-  createEffect(on(linked, (list) => {
-    if (!list?.length) return setSelected(null)
-    if (!selected() || !list.some((c) => c.id === selected())) setSelected(list[0].id)
-  }))
+  createEffect(
+    on(linked, (list) => {
+      if (!list?.length) return setSelected(null)
+      if (!selected() || !list.some((c) => c.id === selected())) setSelected(list[0].id)
+    }),
+  )
   // Session-only: revisiting the pane lands on the same container.
-  createEffect(on(selected, (id) => {
-    if (id) rememberDockerSelection(taskId, id)
-  }))
+  createEffect(
+    on(selected, (id) => {
+      if (id) rememberDockerSelection(taskId, id)
+    }),
+  )
 
   return { linked, refetch, selected, setSelected }
 }
@@ -48,7 +55,11 @@ const model = (taskId: string, nodeId: string | null): TaskContainers => {
   const held = roots.get(key)
   if (held) return held.model
   // One task is on screen at a time; anything else here is a task somebody navigated away from.
-  for (const [id, entry] of roots) if (id !== key) { entry.dispose(); roots.delete(id) }
+  for (const [id, entry] of roots)
+    if (id !== key) {
+      entry.dispose()
+      roots.delete(id)
+    }
   const entry = createRoot((dispose) => ({ model: linkedContainers(taskId, nodeId), dispose }))
   roots.set(key, entry)
   return entry.model
@@ -105,7 +116,15 @@ export function DockerTaskDetail(props: { task: Task }) {
         </EmptyState>
       }
     >
-      {(id) => <ContainerDetail target={id()} taskId={props.task.id} onRemoved={() => { if (owner.current()) void state().refetch() }} />}
+      {(id) => (
+        <ContainerDetail
+          target={id()}
+          taskId={props.task.id}
+          onRemoved={() => {
+            if (owner.current()) void state().refetch()
+          }}
+        />
+      )}
     </Show>
   )
 }

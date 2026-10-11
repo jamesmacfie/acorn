@@ -23,10 +23,14 @@ export function Alert(props: {
       role={tone() === 'danger' ? 'alert' : 'status'}
     >
       <span class="ui-alert-body">
-        <Show when={props.title}><strong class="ui-alert-title">{props.title}</strong></Show>
+        <Show when={props.title}>
+          <strong class="ui-alert-title">{props.title}</strong>
+        </Show>
         {props.children}
       </span>
-      <Show when={props.actions}><span class="ui-alert-actions">{props.actions}</span></Show>
+      <Show when={props.actions}>
+        <span class="ui-alert-actions">{props.actions}</span>
+      </Show>
       <Show when={props.onDismiss}>
         <IconButton icon="x" label="Dismiss" onPress={() => props.onDismiss?.()} />
       </Show>

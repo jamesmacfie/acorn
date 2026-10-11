@@ -34,26 +34,39 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 //     "No renderer found" from inside a component that is plainly under the provider.
 //
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
-const isReactiveRuntime = (id: string) =>
-  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
+const isReactiveRuntime = (id: string) => id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
 // Validation stays on the client boundary. Bundle it so unused Zod exports and locales can be
 // removed instead of making Node load the entire package before the first frame.
 const isValidationRuntime = (id: string) => id === 'zod' || id.startsWith('zod/')
 // Aliased to something local, and therefore not externalisable — see `externalizeBareImports` below.
 // The `@codemirror`, `@xterm` and `shiki` entries are the packages this host has no way to run and
-// no longer installs; every one of them is matched by a pattern in `resolve.alias`, so the list here
+// does not install; every one of them is matched by a pattern in `resolve.alias`, so the list here
 // and the list there have to say the same thing.
-const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
-  || id.startsWith('@acorn/plugin-api/ui')
-  || id === '@acorn/client-core/features/dataSources/kit.ts'
-  || id.startsWith('@codemirror/lang-') || id.startsWith('@codemirror/legacy-modes')
-  || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
-  || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
-  || id === 'shiki' || id.startsWith('shiki/')
+const isAliased = (id: string) =>
+  id === '@solidjs/router' ||
+  id === 'lucide-static/icon-nodes.json' ||
+  id.startsWith('@acorn/plugin-api/ui') ||
+  id === '@acorn/client-core/features/dataSources/kit.ts' ||
+  id.startsWith('@codemirror/lang-') ||
+  id.startsWith('@codemirror/legacy-modes') ||
+  id === '@xterm/xterm' ||
+  id.startsWith('@xterm/xterm/') ||
+  id === '@xterm/addon-fit' ||
+  id === '@xterm/addon-webgl' ||
+  id === 'shiki' ||
+  id.startsWith('shiki/')
 // Archive-only entry bundles its parser closure; none of these packages enters startup.
-const isArchivePackage = (id: string) => ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some((name) => id === name || id.startsWith(`${name}/`))
+const isArchivePackage = (id: string) =>
+  ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some(
+    (name) => id === name || id.startsWith(`${name}/`),
+  )
 const externalizeBareImports = (id: string) =>
-  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isValidationRuntime(id) && !isAliased(id)
+  !id.startsWith('.') &&
+  !isAbsolute(id) &&
+  !isWorkspacePackage(id) &&
+  !isReactiveRuntime(id) &&
+  !isValidationRuntime(id) &&
+  !isAliased(id)
 
 export default defineConfig({
   resolve: {
@@ -62,8 +75,14 @@ export default defineConfig({
     // `solid-js/dist/solid.js` again, forever.
     alias: [
       { find: /^@acorn\/plugin-api\/ui$/, replacement: resolve(import.meta.dirname, 'src/kit/ui.ts') },
-      { find: /^@acorn\/plugin-api\/ui\/data-sources$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts') },
-      { find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts') },
+      {
+        find: /^@acorn\/plugin-api\/ui\/data-sources$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts'),
+      },
+      {
+        find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts'),
+      },
       // …and the host's own surfaces beside it. `ui/host` is the palette chrome, the drawer, the
       // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
       // portals and `<ul>`s (src/kit/host.tsx).
@@ -71,15 +90,15 @@ export default defineConfig({
       // …and the editor surface, which on this host is a stub. The facade's real half is CodeMirror's
       // theme and a grammar per language, and cells have neither: the `editor` rectangle draws the
       // file read-only and hands `$EDITOR` a PTY (src/kit/rectangle.tsx). Left unaliased, the editor
-      // pane pulled seventeen grammars into a process that never highlights (src/kit/editor.ts).
+      // pane would pull every grammar into a process that never highlights (src/kit/editor.ts).
       { find: /^@acorn\/plugin-api\/ui\/editor$/, replacement: resolve(import.meta.dirname, 'src/kit/editor.ts') },
-      // lucide's icon geometry, removed rather than replaced: 706 KB of SVG paths, and this host has
-      // no SVG. Left alone it is externalised, and Node's loader refuses a JSON module with no import
+      // lucide's icon geometry, removed rather than replaced: hundreds of kilobytes of SVG paths, and
+      // this host has no SVG. Left alone it is externalised, and Node's loader refuses a JSON module with no import
       // attribute on it (src/kit/iconNodes.ts).
       //
       // Both halves of it, because client-core splits the set: the census's eager map is a relative
-      // JSON import and would be inlined into this bundle rather than externalised, which is the same
-      // 16 KB of paths nobody here can draw (client-core kit/tokens/iconNodes.ts).
+      // JSON import and would be inlined into this bundle rather than externalised, which is more paths
+      // nobody here can draw (client-core kit/tokens/iconNodes.ts).
       { find: /^lucide-static\/icon-nodes\.json$/, replacement: resolve(import.meta.dirname, 'src/kit/iconNodes.ts') },
       { find: /^\.\/iconNodes\.eager\.json$/, replacement: resolve(import.meta.dirname, 'src/kit/iconNodes.ts') },
       // The router, removed rather than replaced. `@solidjs/router` reads `window.history.state` at
@@ -99,29 +118,29 @@ export default defineConfig({
       // `div`, a `<canvas>` terminal in a drawer slot this host does not have, and a highlighter that
       // answers in hex when the kit answers in the terminal's own sixteen slots.
       //
-      // They were left externalised while the packages were installed, so the imports resolved and
-      // the surface simply did not draw. Dropping the packages changed that: an unresolved bare import
-      // in a lazily loaded chunk is a crash the moment a reader opens that surface rather than a
-      // surface that quietly cannot draw. So the specifiers are answered here, by stubs that throw
-      // with the host's name on them (src/kit/codemirrorGrammars.ts, src/kit/xterm.ts,
-      // src/kit/shiki.ts, docs/tui/host-switch.md § The host switch).
+      // An unresolved bare import in a lazily loaded chunk is a crash the moment a reader opens that
+      // surface, so the specifiers are answered here, by stubs that throw with the host's name on them
+      // (src/kit/codemirrorGrammars.ts, src/kit/xterm.ts, src/kit/shiki.ts,
+      // docs/tui/host-switch.md § The host switch).
       //
       // Patterns rather than one line each, because the grammar and theme sets are open: a language
       // added to `client-core/src/features/editor/language.ts` or a theme added to
       // `client-core/src/infra/highlight/langs.ts` must not become a package this host has to install
       // again.
       //
-      // Two packages are deliberately NOT matched, and both are the same mistake caught twice.
-      // `@xterm/headless` is the emulator behind the `pty` rectangle (src/kit/rectangle.tsx).
-      // `@codemirror/language` is a dependency of `codemirror`, which the `editor` pane really does
-      // import — so aliasing it by name reaches inside a package this host uses, and under vitest,
-      // where `ssr.noExternal` inlines node_modules too, `basicSetup` then threw and the editor pane
-      // drew nothing. A stub may only stand in front of a specifier no working surface reaches.
+      // Two packages are deliberately NOT matched. `@xterm/headless` is the emulator behind the `pty`
+      // rectangle (src/kit/rectangle.tsx). `@codemirror/language` is a dependency of `codemirror`, which the
+      // `editor` pane really does import — so aliasing it by name reaches inside a package this host uses,
+      // and under vitest, where `ssr.noExternal` inlines node_modules too, `basicSetup` throws and the editor
+      // pane draws nothing. A stub may only stand in front of a specifier no working surface reaches.
       {
         find: /^@codemirror\/(?:lang-[^/]+|legacy-modes(?:\/.*)?)$/,
         replacement: resolve(import.meta.dirname, 'src/kit/codemirrorGrammars.ts'),
       },
-      { find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/, replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts') },
+      {
+        find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts'),
+      },
       { find: /^shiki(?:\/.*)?$/, replacement: resolve(import.meta.dirname, 'src/kit/shiki.ts') },
     ],
   },
@@ -148,7 +167,8 @@ export default defineConfig({
         'archive-worker': resolve(import.meta.dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
-      external: (id: string) => (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
+      external: (id: string) =>
+        (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
       output: {
         format: 'es',
         entryFileNames: '[name].js',

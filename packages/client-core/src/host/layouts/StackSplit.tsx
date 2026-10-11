@@ -25,17 +25,34 @@ export function StackSplit(props: LayoutProps) {
     // Dragging the handle down shrinks `bottom`, so the arrow keys have to run the other way.
     invert: true,
     label: `Resize ${props.label}`,
-    onStart: () => { dragStart = height() },
+    onStart: () => {
+      dragStart = height()
+    },
     onDelta: (deltaPx) =>
-      setHeight(Math.min(Math.max((dragStart ?? height()) - deltaPx, MIN_BOTTOM_HEIGHT), window.innerHeight * MAX_BOTTOM_FRACTION)),
-    onCommit: () => { dragStart = null },
+      setHeight(
+        Math.min(
+          Math.max((dragStart ?? height()) - deltaPx, MIN_BOTTOM_HEIGHT),
+          window.innerHeight * MAX_BOTTOM_FRACTION,
+        ),
+      ),
+    onCommit: () => {
+      dragStart = null
+    },
   })
 
   return (
     <div class="pane layout-stack-split">
-      <div class="layout-region-top" use:regionFocus={{ paneId: props.stateKey, regionId: 'top' }}>{props.regions.top?.()}</div>
+      <div class="layout-region-top" use:regionFocus={{ paneId: props.stateKey, regionId: 'top' }}>
+        {props.regions.top?.()}
+      </div>
       <div {...drag.handleProps} class="ui-split-handle" data-axis="y" />
-      <div class="layout-region-bottom" style={{ height: `${height()}px` }} use:regionFocus={{ paneId: props.stateKey, regionId: 'bottom' }}>{props.regions.bottom?.()}</div>
+      <div
+        class="layout-region-bottom"
+        style={{ height: `${height()}px` }}
+        use:regionFocus={{ paneId: props.stateKey, regionId: 'bottom' }}
+      >
+        {props.regions.bottom?.()}
+      </div>
     </div>
   )
 }

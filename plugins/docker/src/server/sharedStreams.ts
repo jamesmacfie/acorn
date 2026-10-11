@@ -27,25 +27,35 @@ export class SharedDockerStreams {
       producer = { subscribers: new Set([subscriber]), ...(kind === 'logs' ? { replay: new LogReplay() } : {}) }
       const owned = producer
       this.producers.set(key, owned)
-      try { owned.handle = this.service.openStream(kind, id, (line) => {
-        if (this.producers.get(key) !== owned) return
-        let frame: WsServerFrame
-        if (kind === 'logs') {
-          owned.replay!.append(line)
-          frame = { channel: 'docker:log', id, data: line }
-        } else {
-          const sample = parseStatsLine(line)
-          if (!sample) return
-          frame = { channel: 'docker:stats', id, sample }
-          owned.sample = frame
-        }
-        for (const sub of owned.subscribers) sub.send(frame)
-      }, () => {
-        if (this.producers.get(key) !== owned) return
-        this.producers.delete(key)
-        for (const sub of owned.subscribers) { sub.send({ channel: 'docker:stream-end', id, kind }); sub.end() }
-        owned.subscribers.clear()
-      }) } catch (error) {
+      try {
+        owned.handle = this.service.openStream(
+          kind,
+          id,
+          (line) => {
+            if (this.producers.get(key) !== owned) return
+            let frame: WsServerFrame
+            if (kind === 'logs') {
+              owned.replay!.append(line)
+              frame = { channel: 'docker:log', id, data: line }
+            } else {
+              const sample = parseStatsLine(line)
+              if (!sample) return
+              frame = { channel: 'docker:stats', id, sample }
+              owned.sample = frame
+            }
+            for (const sub of owned.subscribers) sub.send(frame)
+          },
+          () => {
+            if (this.producers.get(key) !== owned) return
+            this.producers.delete(key)
+            for (const sub of owned.subscribers) {
+              sub.send({ channel: 'docker:stream-end', id, kind })
+              sub.end()
+            }
+            owned.subscribers.clear()
+          },
+        )
+      } catch (error) {
         if (this.producers.get(key) === owned) this.producers.delete(key)
         owned.subscribers.clear()
         throw error
@@ -54,11 +64,16 @@ export class SharedDockerStreams {
       if (!owned.subscribers.size) owned.handle.stop()
     }
     const owned = producer
-    return { get active() { return owned.subscribers.has(subscriber) }, stop: () => {
-      if (!owned.subscribers.delete(subscriber)) return
-      if (owned.subscribers.size) return
-      if (this.producers.get(key) === owned) this.producers.delete(key)
-      owned.handle?.stop()
-    } }
+    return {
+      get active() {
+        return owned.subscribers.has(subscriber)
+      },
+      stop: () => {
+        if (!owned.subscribers.delete(subscriber)) return
+        if (owned.subscribers.size) return
+        if (this.producers.get(key) === owned) this.producers.delete(key)
+        owned.handle?.stop()
+      },
+    }
   }
 }

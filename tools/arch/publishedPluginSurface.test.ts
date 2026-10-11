@@ -40,19 +40,32 @@ function surface(entry: string, file: string): Surface {
   }
 
   const reexportedMembers = (from: ts.ExportDeclaration, name: string): void => {
-    if (!from.moduleSpecifier || !ts.isStringLiteral(from.moduleSpecifier) || !from.moduleSpecifier.text.startsWith('.')) return
+    if (
+      !from.moduleSpecifier ||
+      !ts.isStringLiteral(from.moduleSpecifier) ||
+      !from.moduleSpecifier.text.startsWith('.')
+    )
+      return
     const target = join(dirname(file), from.moduleSpecifier.text.replace(/\.js$/, '.ts'))
-    const targetSource = ts.createSourceFile(target, readFileSync(join(ROOT, target), 'utf8'), ts.ScriptTarget.Latest, true)
-    const declaration = targetSource.statements.find((statement): statement is ts.TypeAliasDeclaration | ts.InterfaceDeclaration =>
-      (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) && statement.name.text === name)
+    const targetSource = ts.createSourceFile(
+      target,
+      readFileSync(join(ROOT, target), 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    )
+    const declaration = targetSource.statements.find(
+      (statement): statement is ts.TypeAliasDeclaration | ts.InterfaceDeclaration =>
+        (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) && statement.name.text === name,
+    )
     if (!declaration) throw new Error(`${file} reexports ${name} without a matching local declaration`)
     if (ts.isTypeAliasDeclaration(declaration)) members(declaration.type, name, targetSource)
-    else for (const member of declaration.members) {
-      if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
-      const path = `${name}.${member.name.getText(targetSource)}`
-      names.push(`${entry}: member ${path}`)
-      if (ts.isPropertySignature(member)) members(member.type, path, targetSource)
-    }
+    else
+      for (const member of declaration.members) {
+        if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
+        const path = `${name}.${member.name.getText(targetSource)}`
+        names.push(`${entry}: member ${path}`)
+        if (ts.isPropertySignature(member)) members(member.type, path, targetSource)
+      }
   }
 
   for (const statement of source.statements) {
@@ -62,29 +75,36 @@ function surface(entry: string, file: string): Surface {
       }
       for (const specifier of statement.exportClause.elements) {
         add(statement.isTypeOnly || specifier.isTypeOnly ? 'type' : 'value', specifier.name.text)
-        if (statement.isTypeOnly || specifier.isTypeOnly) reexportedMembers(statement, specifier.propertyName?.text ?? specifier.name.text)
+        if (statement.isTypeOnly || specifier.isTypeOnly)
+          reexportedMembers(statement, specifier.propertyName?.text ?? specifier.name.text)
       }
       continue
     }
 
-    if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue
+    if (
+      !ts.canHaveModifiers(statement) ||
+      !ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    )
+      continue
     if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) {
       add('type', statement.name.text)
       if (ts.isTypeAliasDeclaration(statement)) members(statement.type, statement.name.text)
-      else for (const member of statement.members) {
-        if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
-        const path = `${statement.name.text}.${member.name.getText(source)}`
-        names.push(`${entry}: member ${path}`)
-        if (ts.isPropertySignature(member)) members(member.type, path)
-      }
+      else
+        for (const member of statement.members) {
+          if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
+          const path = `${statement.name.text}.${member.name.getText(source)}`
+          names.push(`${entry}: member ${path}`)
+          if (ts.isPropertySignature(member)) members(member.type, path)
+        }
     } else if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
       if (!statement.name) throw new Error(`${file} has an unnamed export`)
       add('value', statement.name.text)
-      if (ts.isClassDeclaration(statement)) for (const member of statement.members) {
-        if (!ts.isPropertyDeclaration(member) && !ts.isMethodDeclaration(member)) continue
-        if (!member.name) continue
-        names.push(`${entry}: member ${statement.name.text}.${member.name.getText(source)}`)
-      }
+      if (ts.isClassDeclaration(statement))
+        for (const member of statement.members) {
+          if (!ts.isPropertyDeclaration(member) && !ts.isMethodDeclaration(member)) continue
+          if (!member.name) continue
+          names.push(`${entry}: member ${statement.name.text}.${member.name.getText(source)}`)
+        }
     } else if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         if (!ts.isIdentifier(declaration.name)) throw new Error(`${file} has a destructured export`)
@@ -98,8 +118,12 @@ function surface(entry: string, file: string): Surface {
 }
 
 function publishedSurface(): string[] {
-  const sdkExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-sdk/package.json'), 'utf8')) as { exports: Record<string, unknown> }
-  const typesExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-types/package.json'), 'utf8')) as { exports: Record<string, unknown> }
+  const sdkExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-sdk/package.json'), 'utf8')) as {
+    exports: Record<string, unknown>
+  }
+  const typesExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-types/package.json'), 'utf8')) as {
+    exports: Record<string, unknown>
+  }
   expect(Object.keys(sdkExports.exports).sort()).toEqual(['.', './data', './remote', './testing'])
   expect(Object.keys(typesExports.exports)).toEqual(['.'])
 
@@ -122,8 +146,17 @@ function publishedSurface(): string[] {
   expect(sdkTypes.names).toContain('acorn-plugin-sdk: member AcornBridge.api.get')
   expect(nodeTypes.names).toContain('acorn-plugin-types: member NodePluginContext.routes')
 
-  const names = [...sdk.names, ...sdkTypes.names, ...remote.names, ...remoteTypes.names,
-    ...data.names, ...dataTypes.names, ...testing.names, ...testingTypes.names, ...nodeTypes.names]
+  const names = [
+    ...sdk.names,
+    ...sdkTypes.names,
+    ...remote.names,
+    ...remoteTypes.names,
+    ...data.names,
+    ...dataTypes.names,
+    ...testing.names,
+    ...testingTypes.names,
+    ...nodeTypes.names,
+  ]
   expect(names.length).toBeGreaterThan(300)
   return [...new Set(names)].sort()
 }
@@ -142,7 +175,9 @@ it('pins published plugin names and declared members to the loaded-plugin major'
   if (process.env.UPDATE_PUBLISHED_PLUGIN_SURFACE) {
     const removed = committed.names.filter((name) => !actual.includes(name))
     if (removed.length && committed.major === PLUGIN_API_MAJOR) {
-      throw new Error(`Removing published plugin names or declared members under API major ${PLUGIN_API_MAJOR} requires a major bump or restoring them:\n${removed.join('\n')}`)
+      throw new Error(
+        `Removing published plugin names or declared members under API major ${PLUGIN_API_MAJOR} requires a major bump or restoring them:\n${removed.join('\n')}`,
+      )
     }
     writeFileSync(SNAPSHOT, [HEADER(PLUGIN_API_MAJOR), ...actual].join('\n') + '\n')
   }

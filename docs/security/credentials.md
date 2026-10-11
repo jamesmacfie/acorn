@@ -116,7 +116,7 @@ it fails, and the first start after the upgrade gives each session file a new to
 A service token never leaves the Node's process, so it carries no ID.
 
 The agent-tool route reads session identity and tool limits from the verified principal only. The
-`x-acorn-session-id` and `x-acorn-tool-ceiling` headers grant nothing. Session-required tools drop
+`x-acorn-session-id` header grants nothing. Session-required tools drop
 out of `tools/list` without a signed session claim. A per-call UUID is used only after the signed
 owner and tool name scope it as an idempotency key.
 
@@ -160,7 +160,8 @@ The first desktop start after the upgrade migrates the plain files:
    when its process starts, so no live session needs the old key. Nothing re-signs with it, so a key
    an agent writes into `internal-token` can't sign a token file the Node then trusts.
 3. The Node tries the session key on its stored credentials and reports `ok`, `none`, or `failed` in
-   its start result.
+   its start result. A standalone Node runs the same check on the key it read, and security
+   diagnostics shows the answer.
 4. The helper deletes `internal-token`. It deletes `session.key` only when that file holds the key
    the Node used and the check answered `ok` or `none`. On `failed`, the file stays and the Node
    records `keys.check.failed` in the audit trail.
@@ -181,7 +182,7 @@ refuses to mint a session key on a root that has a sealed file but no plain `ses
 
 The node-owner identity is opaque, explicit, and persisted at first boot. It's independent of
 provider connections, and internal auth fails closed if it's unset. A task token can't use another
-task's routes, terminal streams, preview tunnel, or worktree operations.
+task's routes, terminal streams, or worktree operations.
 
 A task token can't spend a stored provider credential. Core's `providerCredential`
 (`server/integrations/credential.ts`) returns the credential only to a device or the Node's own

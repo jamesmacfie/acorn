@@ -36,7 +36,11 @@ describe('terminal file paths', () => {
     await writeFile(file, 'old')
     const screen = await renderFixture({ width: 120, height: 40 })
     try {
-      const saved = saveLocalFile({ bytes: new TextEncoder().encode('new'), suggestedName: 'export.txt', mimeType: 'text/plain' })
+      const saved = saveLocalFile({
+        bytes: new TextEncoder().encode('new'),
+        suggestedName: 'export.txt',
+        mimeType: 'text/plain',
+      })
       await screen.until('Save to local file')
       expect(await screen.reach('/absolute/path/to/file')).toBe(true)
       await type(screen, file)

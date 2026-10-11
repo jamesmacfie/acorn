@@ -19,12 +19,12 @@ const log = createLogger('node-keys')
 // The protection is only as good as where the data key lives. A dev build, or a machine where the
 // keychain refused the item, keeps it in a plain `data.key` file (apps/desktop/src-tauri/src/keychain.rs).
 //
-// A Node that ran before this wrote both keys in plain form. The first start after upgrade seals the
-// session key as it is, because a new one would make every stored credential unreadable, and mints a
+// A data root from an older Node holds both keys in plain form. The first start seals the session
+// key as it is, because a new one would make every stored credential unreadable, and mints a
 // new signing key, because any agent that ran before could have read the old one. Nothing re-signs
 // with the old key: the Node writes fresh token files for the terminal sessions it reattaches, and an
 // agent session gets one when its process starts. A plain `internal-token` is never read, so one an
-// agent writes can't sign a token file the Node then trusts.
+// agent writes can't sign a token file the Node then trusts. Mixed-version path until 2027-01-09.
 
 const PLAIN_SESSION_KEY = 'session.key'
 const PLAIN_SIGNING_KEY = 'internal-token'
@@ -35,12 +35,12 @@ type SealedKeys = { sessionKey: string; signingKey: string }
 export type NodeKeyCustody = {
   // The keys for the next start, sealing them first when the data root has no sealed file.
   prepare(): NodeKeys
-  // After the Node started with `keys`: delete the plain files it has shown it no longer needs.
+  // After the Node started with `keys`: delete the plain files it has shown it doesn't need.
   settle(keys: NodeKeys, check: NodeKeyCheck): void
 }
 
 // `envSessionKey` is SESSION_ENC_KEY from the helper's environment or a `.env` file. It wins over the
-// sealed key, as it won over session.key before, so a developer's pinned key keeps working.
+// sealed key, so a developer's pinned key keeps working.
 export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionKey?: string): NodeKeyCustody {
   const sealedPath = join(dataDir, SEALED_NODE_KEYS_FILE)
 
@@ -63,7 +63,12 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
     }
     try {
       const keys = JSON.parse(cipher.decrypt(Buffer.from(body, 'base64'))) as Partial<SealedKeys>
-      if (typeof keys.sessionKey === 'string' && HEX_KEY.test(keys.sessionKey) && typeof keys.signingKey === 'string' && keys.signingKey) {
+      if (
+        typeof keys.sessionKey === 'string' &&
+        HEX_KEY.test(keys.sessionKey) &&
+        typeof keys.signingKey === 'string' &&
+        keys.signingKey
+      ) {
         return { sessionKey: keys.sessionKey, signingKey: keys.signingKey }
       }
     } catch {
@@ -98,17 +103,24 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
       // The same refusal as the Node's own (node-core server/sessionKey.ts): sealing a damaged key
       // would turn a broken file into credentials nobody can read.
       if (plainSession && !HEX_KEY.test(plainSession)) {
-        throw new Error(`${join(dataDir, PLAIN_SESSION_KEY)} does not hold a 64-hex key. Fix or remove it. Minting a second key would orphan every secret encrypted under the first.`)
+        throw new Error(
+          `${join(dataDir, PLAIN_SESSION_KEY)} does not hold a 64-hex key. Fix or remove it. Minting a second key would orphan every secret encrypted under the first.`,
+        )
       }
 
       let sealed = unseal()
       // Never rebuilt from plain files. An agent can damage this file and plant its own session.key,
       // and a rebuild would seal the agent's key. Deleting the file is the person's decision.
       if (sealed === 'unreadable') {
-        throw new Error(`${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`)
+        throw new Error(
+          `${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`,
+        )
       }
       if (!sealed) {
-        sealed = { sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'), signingKey: randomBytes(32).toString('hex') }
+        sealed = {
+          sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'),
+          signingKey: randomBytes(32).toString('hex'),
+        }
         seal(sealed)
       }
       return { sessionKey: envSessionKey ?? sealed.sessionKey, signingKey: sealed.signingKey }

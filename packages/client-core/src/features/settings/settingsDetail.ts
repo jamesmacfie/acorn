@@ -4,12 +4,12 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 // A page that holds a list, such as custom agents or MCP servers, opens one item as a detail page in
 // the same pane. The header is the settings view's, not the page's, so the view needs to know a detail
 // is open: it names the item in the title and the breadcrumb, draws the back link to the list, and
-// binds ⌘[ to it, the way it does for a workspace or a project (./SettingsView.tsx § back).
+// binds ⌘[ to it, the way it does for a workspace or a project.
 //
-// A context like ./unsavedChanges.ts, so the same page drawn outside settings registers with nothing
+// A context like `UnsavedChangesContext`, so the same page drawn outside settings registers with nothing
 // and draws its own back link instead.
 
-export type SettingsDetail = {
+type SettingsDetail = {
   /** The item's name, which the header shows as the page title. */
   title: Accessor<string>
   /** Back to the list. The view runs it after asking about unsaved changes. */

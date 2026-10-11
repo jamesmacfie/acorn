@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
-import {
-  annotationsFor,
-  clearAnnotations,
-  requestAnnotations,
-} from './annotations'
+import { annotationsFor, clearAnnotations, requestAnnotations } from './annotations'
 import {
   extensionPointRegistry,
   extensionRegistry,
@@ -25,14 +21,16 @@ const POINT = 'changes:diff-line'
 const registered: Disposable[] = []
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: POINT,
-    ownerId: 'changes',
-    label: 'Diff line',
-    kind: 'annotation',
-    key: ['file', 'line', 'side'],
-    max: 4,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: POINT,
+      ownerId: 'changes',
+      label: 'Diff line',
+      kind: 'annotation',
+      key: ['file', 'line', 'side'],
+      max: 4,
+    }),
+  )
 
 type ContributorOptions = {
   id?: string
@@ -138,9 +136,7 @@ describe('requestAnnotations', () => {
 
   it('keys a mark by the owner’s declared fields, so a stray field on a mark changes nothing', async () => {
     point()
-    contributor('coverage', async () => [
-      { key: { ...key(42), extra: 'ignored' }, severity: 'info', text: 'Covered' },
-    ])
+    contributor('coverage', async () => [{ key: { ...key(42), extra: 'ignored' }, severity: 'info', text: 'Covered' }])
     requestAnnotations(POINT, [key(42)])
     await vi.waitFor(() => expect(annotationsFor(POINT, key(42))).toHaveLength(1))
   })
@@ -165,11 +161,9 @@ describe('requestAnnotations', () => {
   it('removes, disables and re-enables one contributor without clearing another', async () => {
     point()
     let coverageEnabled = true
-    const coverage = contributor(
-      'coverage',
-      async () => [{ key: key(1), severity: 'warn', text: 'Not covered' }],
-      { enabled: () => coverageEnabled },
-    )
+    const coverage = contributor('coverage', async () => [{ key: key(1), severity: 'warn', text: 'Not covered' }], {
+      enabled: () => coverageEnabled,
+    })
     contributor('lint', async () => [{ key: key(1), severity: 'danger', text: 'Unused import' }])
 
     requestAnnotations(POINT, [key(1)])
@@ -182,7 +176,9 @@ describe('requestAnnotations', () => {
     coverageEnabled = true
     requestAnnotations(POINT, [key(1)])
     await vi.waitFor(() => expect(coverage.calls).toHaveLength(2))
-    await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['coverage', 'lint']))
+    await vi.waitFor(() =>
+      expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['coverage', 'lint']),
+    )
 
     coverage.disposable.dispose()
     requestAnnotations(POINT, [key(1)])
@@ -245,9 +241,10 @@ describe('requestAnnotations', () => {
     let revision = 0
     const coverage = contributor(
       'coverage',
-      async () => revision === 0
-        ? [{ key: key(1), severity: 'info', text: 'Covered' }]
-        : Promise.reject(new Error('node unreachable')),
+      async () =>
+        revision === 0
+          ? [{ key: key(1), severity: 'info', text: 'Covered' }]
+          : Promise.reject(new Error('node unreachable')),
       { revision: () => revision },
     )
     contributor('lint', async () => [{ key: key(1), severity: 'danger', text: 'Unused import' }])
@@ -272,6 +269,8 @@ describe('requestAnnotations', () => {
     fast.resolve([{ key: key(1), severity: 'warn', text: 'Second' }])
     await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['second']))
     slow.resolve([{ key: key(1), severity: 'info', text: 'First' }])
-    await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['first', 'second']))
+    await vi.waitFor(() =>
+      expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['first', 'second']),
+    )
   })
 })

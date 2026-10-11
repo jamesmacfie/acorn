@@ -12,9 +12,15 @@ export function SectionHeader(props: SectionHeaderProps) {
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1} flexShrink={0}>
         <Line role="strong">{flatten(props.children)}</Line>
-        <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
+        <Show when={props.count !== undefined}>
+          <Line role="muted">{String(props.count)}</Line>
+        </Show>
       </box>
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
       <Show when={props.actions}>{slot(props.actions)}</Show>
     </box>
   )
@@ -57,7 +63,7 @@ export function Sections(props: {
   const [chosen, setChosen] = createSignal('')
   // Falls back rather than storing a default, so a surface whose section set changes under it lands
   // on its first tab instead of on nothing. The same rule the `tabs` layout keeps.
-  const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : tabs()[0]?.id ?? '')
+  const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : (tabs()[0]?.id ?? ''))
   return (
     <box
       flexDirection="row"
@@ -68,18 +74,21 @@ export function Sections(props: {
       }}
       onSizeChange={() => setCells(box?.width ?? MAIN_COLUMN_AT)}
     >
-      <box
-        flexDirection="column"
-        flexGrow={1}
-        minWidth={0}
-      >
+      <box flexDirection="column" flexGrow={1} minWidth={0}>
         <Tabs
-          tabs={tabs().map((tab) => ({ id: tab.id, label: tab.label, ...(tab.count === undefined ? {} : { count: tab.count }) }))}
+          tabs={tabs().map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            ...(tab.count === undefined ? {} : { count: tab.count }),
+          }))}
           active={active()}
           onChange={setChosen}
           idPrefix={props.id}
           ariaLabel={props.ariaLabel ?? 'Sections'}
-          {...(() => { const found = tabs().find((tab) => tab.id === active())?.actions; return found ? { actions: found() } : {} })()}
+          {...(() => {
+            const found = tabs().find((tab) => tab.id === active())?.actions
+            return found ? { actions: found() } : {}
+          })()}
         />
         <For each={tabs()}>
           {(tab) => (
@@ -90,7 +99,7 @@ export function Sections(props: {
         </For>
       </box>
       {/* `minWidth={0}` on both halves, because a flex child's floor is its own content and a diff is
-          routinely wider than its share (../layouts/ListDetail.tsx). */}
+          routinely wider than its share (the `list-detail` layout). */}
       <Show when={wide() && props.main}>
         {(main) => (
           <box flexDirection="column" flexGrow={1} minWidth={0}>

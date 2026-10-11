@@ -1,9 +1,7 @@
 import { createSignal } from 'solid-js'
 import type { PickedFile, SaveRequest } from '@acorn/client-core/infra/platform'
 
-export type FilePrompt =
-  | { kind: 'pick'; accept: readonly string[] }
-  | { kind: 'save'; request: SaveRequest }
+export type FilePrompt = { kind: 'pick'; accept: readonly string[] } | { kind: 'save'; request: SaveRequest }
 
 type Queued = { prompt: FilePrompt; resolve: (result: PickedFile[] | boolean) => void }
 const queue: Queued[] = []

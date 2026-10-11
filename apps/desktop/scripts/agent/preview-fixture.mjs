@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 
 // An isolated page for child-webview acceptance. Reports contain only this fixture's synthetic
 // state. Main-document requests are counted separately from activity and application data reads.
-export function previewFixture() {
+function previewFixture() {
   const documents = []
   const activity = []
   const dataReads = []

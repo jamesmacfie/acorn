@@ -4,9 +4,8 @@
 // and teaches the icon. Pure; callers resolve the reactive inputs.
 //
 // "An agent is working here" is not in this list. That belongs to the agents plugin, which knows about
-// both managed sessions and terminal harnesses, and it publishes it through the same marker registry
-// (plugins/agents/src/client/railMarkerContribution.ts). Uncommitted changes are not here either: the
-// git plugin publishes its added/removed dot (plugins/git/src/client/changes/railMarker.ts).
+// both managed sessions and terminal harnesses, and it publishes it through the same marker registry.
+// Uncommitted changes are not here either: the git plugin publishes its added/removed dot.
 //
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
@@ -15,7 +14,7 @@ import type { TaskStatus } from '@acorn/protocol/task.ts'
 import { CHECK_TONE } from '../../kit/lib/rendering/displayMeta'
 import type { RailMarker } from '../tabs/railMarkers'
 
-export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
+type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
 
 export type RailStatusInputs = {
   checks: RailChecks | null // null when the task has no PR / no checks
@@ -33,25 +32,74 @@ const CHECKS_LABEL: Record<RailChecks, string> = {
   mixed: 'CI checks: some failed, some still running',
 }
 
-export function railStatusMarkers({ checks, unread, status, archiving, settingUp, pinned }: RailStatusInputs): RailMarker[] {
+export function railStatusMarkers({
+  checks,
+  unread,
+  status,
+  archiving,
+  settingUp,
+  pinned,
+}: RailStatusInputs): RailMarker[] {
   const markers: RailMarker[] = []
-  // Teardown owns the slot under the task's glyph on its own. It used to blank every other marker
-  // while it ran; now anything it outranks stays in the tooltip rather than vanishing.
+  // Teardown owns the slot under the task's glyph on its own. Anything it outranks stays in the
+  // tooltip rather than vanishing.
   if (archiving)
-    markers.push({ id: 'archiving', label: 'Archiving — removing the worktree', icon: 'loader-circle', tone: 'danger', busy: true, placements: ['bottom-center'], priority: 300 })
+    markers.push({
+      id: 'archiving',
+      label: 'Archiving — removing the worktree',
+      icon: 'loader-circle',
+      tone: 'danger',
+      busy: true,
+      placements: ['bottom-center'],
+      priority: 300,
+    })
   // The other end of the same life cycle, in the same slot: a worktree being prepared rather than
   // removed. A pulsing dot rather than a spinner, because setup is the task's own first job and not
   // something being done to it. Ranked under teardown, which is the allocator's job to settle if the
   // two ever overlap.
   if (settingUp)
-    markers.push({ id: 'setup', label: 'Setup script running', dotTone: 'ok', busy: true, placements: ['bottom-center'], priority: 290 })
+    markers.push({
+      id: 'setup',
+      label: 'Setup script running',
+      dotTone: 'ok',
+      busy: true,
+      placements: ['bottom-center'],
+      priority: 290,
+    })
   if (unread)
-    markers.push({ id: 'needs', label: 'Unread notifications', icon: 'circle-alert', tone: 'warn', placements: ['top-end', 'bottom-start'], priority: 280 })
+    markers.push({
+      id: 'needs',
+      label: 'Unread notifications',
+      icon: 'circle-alert',
+      tone: 'warn',
+      placements: ['top-end', 'bottom-start'],
+      priority: 280,
+    })
   if (status?.missing)
-    markers.push({ id: 'repair', label: 'Worktree missing — needs repair', icon: 'triangle-alert', tone: 'danger', placements: ['bottom-end', 'bottom-start'], priority: 260 })
+    markers.push({
+      id: 'repair',
+      label: 'Worktree missing — needs repair',
+      icon: 'triangle-alert',
+      tone: 'danger',
+      placements: ['bottom-end', 'bottom-start'],
+      priority: 260,
+    })
   if (pinned)
-    markers.push({ id: 'pinned', label: 'Pinned to top', icon: 'pin', tone: 'warn', placements: ['top-start', 'bottom-start'], priority: 240 })
+    markers.push({
+      id: 'pinned',
+      label: 'Pinned to top',
+      icon: 'pin',
+      tone: 'warn',
+      placements: ['top-start', 'bottom-start'],
+      priority: 240,
+    })
   if (checks)
-    markers.push({ id: 'checks', label: CHECKS_LABEL[checks], dotTone: CHECK_TONE[checks], placements: ['top-end', 'bottom-end'], priority: 200 })
+    markers.push({
+      id: 'checks',
+      label: CHECKS_LABEL[checks],
+      dotTone: CHECK_TONE[checks],
+      placements: ['top-end', 'bottom-end'],
+      priority: 200,
+    })
   return markers
 }

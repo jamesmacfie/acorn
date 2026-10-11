@@ -1,10 +1,10 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Disposable } from '../../../kit/lib/state/registry'
-import type { UiSlotContext, UiSlotContribution } from './slots'
-import { SlotHost, TaskSlotHost, uiSlotRegistry } from './uiSlots'
+import { uiSlotRegistry, type UiSlotContext, type UiSlotContribution } from './slots'
+import { SlotHost, TaskSlotHost } from './uiSlots'
 
-// The first tests in this repo that render a component. The suite next door is bare Node with no
+// The slot hosts, rendered. The suite next door is bare Node with no
 // Solid transform, so nothing it asserts says whether a contribution reaches the screen
 // (docs/testing/layers.md § Test layers).
 //
@@ -71,7 +71,13 @@ describe('SlotHost', () => {
 
   it('drops a contribution the host cannot satisfy', () => {
     capabilities.desktop = false
-    register({ id: 'native', slot: 'topbar.left', order: 0, requires: 'desktop', component: () => <span data-mark="native" /> })
+    register({
+      id: 'native',
+      slot: 'topbar.left',
+      order: 0,
+      requires: 'desktop',
+      component: () => <span data-mark="native" />,
+    })
     register({ id: 'portable', slot: 'topbar.left', order: 1, component: () => <span data-mark="portable" /> })
 
     mount(() => <SlotHost slot="topbar.left" context={context()} />)

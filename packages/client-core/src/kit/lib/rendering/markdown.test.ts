@@ -3,22 +3,26 @@ import { renderBlocks, renderMarkdown } from './markdown'
 
 describe('renderMarkdown', () => {
   it('renders common markdown', () => {
-    expect(renderMarkdown('**bold** and *em* and `code`')).toBe('<p><strong>bold</strong> and <em>em</em> and <code>code</code></p>')
+    expect(renderMarkdown('**bold** and *em* and `code`')).toBe(
+      '<p><strong>bold</strong> and <em>em</em> and <code>code</code></p>',
+    )
     expect(renderMarkdown('# Title')).toBe('<h1>Title</h1>')
     expect(renderMarkdown('- a\n- b')).toBe('<ul><li>a</li><li>b</li></ul>')
-    expect(renderMarkdown('[link](https://x.com)')).toBe('<p><a href="https://x.com" target="_blank" rel="noreferrer">link</a></p>')
+    expect(renderMarkdown('[link](https://x.com)')).toBe(
+      '<p><a href="https://x.com" target="_blank" rel="noreferrer">link</a></p>',
+    )
     expect(renderMarkdown('![image.png](https://uploads.linear.app/image.png)')).toBe('<p>image.png</p>')
   })
 
   it('links a bare URL, once, and leaves the trailing punctuation out of it', () => {
     expect(renderMarkdown('PR is up: https://github.com/a/b/pull/1.')).toBe(
-      '<p>PR is up: <a href="https://github.com/a/b/pull/1" target="_blank" rel="noreferrer">'
-      + 'https://github.com/a/b/pull/1</a>.</p>',
+      '<p>PR is up: <a href="https://github.com/a/b/pull/1" target="_blank" rel="noreferrer">' +
+        'https://github.com/a/b/pull/1</a>.</p>',
     )
     // A link already written in the bracket form keeps its own text and gains no second anchor.
     expect(renderMarkdown('[the PR](https://x.com/1) and **[bold](https://x.com/2)**')).toBe(
-      '<p><a href="https://x.com/1" target="_blank" rel="noreferrer">the PR</a> and '
-      + '<strong><a href="https://x.com/2" target="_blank" rel="noreferrer">bold</a></strong></p>',
+      '<p><a href="https://x.com/1" target="_blank" rel="noreferrer">the PR</a> and ' +
+        '<strong><a href="https://x.com/2" target="_blank" rel="noreferrer">bold</a></strong></p>',
     )
     // A URL inside a code span is text somebody meant to read, not a destination.
     expect(renderMarkdown('`curl https://x.com`')).toBe('<p><code>curl https://x.com</code></p>')
@@ -51,10 +55,10 @@ describe('renderMarkdown', () => {
   it('renders a GFM table as a bare table, the markup GitHub sends', () => {
     const html = renderMarkdown('| a | b |\n| --- | :-: |\n| 1 | 2 |')
     expect(html).toBe(
-      '<table>'
-      + '<thead><tr><th>a</th><th>b</th></tr></thead>'
-      + '<tbody><tr><td>1</td><td>2</td></tr></tbody>'
-      + '</table>',
+      '<table>' +
+        '<thead><tr><th>a</th><th>b</th></tr></thead>' +
+        '<tbody><tr><td>1</td><td>2</td></tr></tbody>' +
+        '</table>',
     )
   })
 
@@ -69,8 +73,7 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('run `a | b` first')).toBe('<p>run <code>a | b</code> first</p>')
     // No blank line above it: the paragraph still has to stop at the table.
     expect(renderMarkdown('Results:\n| a |\n| --- |\n| 1 |')).toBe(
-      '<p>Results:</p>\n<table>'
-      + '<thead><tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>',
+      '<p>Results:</p>\n<table>' + '<thead><tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>',
     )
   })
 
@@ -92,13 +95,14 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('src=')
     // A data: image is inert either way, but placeholder mode is about not rendering what the model
     // pointed at, so it stands in for that one too.
-    expect(renderMarkdown('![shot](data:image/png;base64,iVBORw0KGgo=)', { images: 'placeholder' })).not.toContain('<img')
+    expect(renderMarkdown('![shot](data:image/png;base64,iVBORw0KGgo=)', { images: 'placeholder' })).not.toContain(
+      '<img',
+    )
     expect(renderMarkdown('![](https://example.com/x.png)', { images: 'placeholder' })).toContain('[image: omitted]')
   })
 
-  // The three probes from the 2026-08-27 security review. Two of them threw before the strip landed,
-  // on a forged index into the code-span and image tables; the third is the same trick spelled with a
-  // real index, which would have restored a token the source never wrote.
+  // Three probes. Two forge an index into the code-span and image tables, which would throw; the third
+  // is the same trick spelled with a real index, which would restore a token the source never wrote.
   it('escapes a source that spells the sentinel instead of throwing on it', () => {
     const S = '\uE000'
     expect(renderMarkdown(`${S}i0${S}`)).toBe('<p>i0</p>')
@@ -115,8 +119,13 @@ describe('renderBlocks', () => {
   const keys = (src: string, opts = {}) => renderBlocks(src, opts).map((block) => block.key)
 
   it('joins back to exactly what renderMarkdown returns', () => {
-    const src = '# Title\n\nA para.\n\n- one\n- two\n\n```ts\nconst a = 1\n```\n\n> quoted\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |'
-    expect(renderBlocks(src).map((block) => block.html).join('\n')).toBe(renderMarkdown(src))
+    const src =
+      '# Title\n\nA para.\n\n- one\n- two\n\n```ts\nconst a = 1\n```\n\n> quoted\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |'
+    expect(
+      renderBlocks(src)
+        .map((block) => block.html)
+        .join('\n'),
+    ).toBe(renderMarkdown(src))
   })
 
   it('changes exactly one key when a character is appended', () => {

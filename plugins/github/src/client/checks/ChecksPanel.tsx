@@ -10,10 +10,8 @@ import { splitJobLog } from './splitJobLog'
 // failed ones open, each step's log sliced from the one job-log fetch that fires when the first step
 // opens.
 //
-// A `Modal` rather than the hand-drawn right-hand drawer it used to be. Accepted difference: the
-// step logs are the kit's `Log` and no longer carry ANSI colour, because a log is text and the kit
-// draws text in one place. Everything else — lazy fetch, one request for every step, failed steps
-// open — is unchanged.
+// The step logs are the kit's `Log` and carry no ANSI colour, because a log is text and the kit draws
+// text in one place.
 export default function ChecksPanel(props: {
   owner: string
   repo: string
@@ -44,9 +42,13 @@ export default function ChecksPanel(props: {
   createEffect(() => {
     const current = job()
     if (!current || seeded() === current.id) return
-    setOpen(new Set(current.steps
-      .filter((step) => FAILED_STATUSES.has((step.conclusion ?? '').toLowerCase()))
-      .map((step) => step.number)))
+    setOpen(
+      new Set(
+        current.steps
+          .filter((step) => FAILED_STATUSES.has((step.conclusion ?? '').toLowerCase()))
+          .map((step) => step.number),
+      ),
+    )
     setSeeded(current.id)
   })
 
@@ -66,10 +68,21 @@ export default function ChecksPanel(props: {
     <Portal>
       <Modal size="wide" title={job()?.name ?? props.jobName} onDismiss={props.onClose}>
         <Modal.Body>
-          <Show when={!jobs.isLoading} fallback={<EmptyState align="start" busy>Loading steps…</EmptyState>}>
+          <Show
+            when={!jobs.isLoading}
+            fallback={
+              <EmptyState align="start" busy>
+                Loading steps…
+              </EmptyState>
+            }
+          >
             <Show
               when={steps().length}
-              fallback={<EmptyState align="start" size="sm">{jobs.isError ? "Couldn't load this run's steps." : 'This run has no steps.'}</EmptyState>}
+              fallback={
+                <EmptyState align="start" size="sm">
+                  {jobs.isError ? "Couldn't load this run's steps." : 'This run has no steps.'}
+                </EmptyState>
+              }
             >
               <Stack gap="row">
                 <For each={steps()}>
@@ -81,9 +94,22 @@ export default function ChecksPanel(props: {
                         label={step.name}
                         open={open().has(step.number)}
                         onOpenChange={(next) => toggle(step.number, next)}
-                        meta={<StatusDot tone={checkStatusTone(status())} label={checkStatusWord(status())} tip={checkStatusWord(status())} />}
+                        meta={
+                          <StatusDot
+                            tone={checkStatusTone(status())}
+                            label={checkStatusWord(status())}
+                            tip={checkStatusWord(status())}
+                          />
+                        }
                       >
-                        <Show when={!log.isLoading} fallback={<EmptyState align="start" busy>Loading log…</EmptyState>}>
+                        <Show
+                          when={!log.isLoading}
+                          fallback={
+                            <EmptyState align="start" busy>
+                              Loading log…
+                            </EmptyState>
+                          }
+                        >
                           <Log lines={stepLog(step.number)} ariaLabel={`${step.name} log`} />
                         </Show>
                       </Fold>
@@ -95,9 +121,15 @@ export default function ChecksPanel(props: {
           </Show>
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="ghost" onPress={props.onClose}>Close</Button>
+          <Button variant="ghost" onPress={props.onClose}>
+            Close
+          </Button>
           <Show when={props.url}>
-            {(url) => <Button variant="solid" href={url()}>Open on GitHub</Button>}
+            {(url) => (
+              <Button variant="solid" href={url()}>
+                Open on GitHub
+              </Button>
+            )}
           </Show>
         </Modal.Actions>
       </Modal>

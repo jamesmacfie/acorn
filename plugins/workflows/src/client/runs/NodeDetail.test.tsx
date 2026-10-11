@@ -4,12 +4,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
 import {
-  extensionPointRegistry, extensionRegistry, provideClientCapability, type Disposable, type ExtensionContribution,
+  extensionPointRegistry,
+  extensionRegistry,
+  provideClientCapability,
+  type Disposable,
+  type ExtensionContribution,
 } from '@acorn/plugin-api/testkit/client'
 import { AGENTS_CONVERSATION, type AgentConversationProps } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 import {
-  MAX_STEP_BODY_JSON_BYTES, MAX_STEP_BODY_TAIL_LINES, WORKFLOW_STEP_BODY_POINT, type WorkflowStepBodyProps,
+  MAX_STEP_BODY_JSON_BYTES,
+  MAX_STEP_BODY_TAIL_LINES,
+  WORKFLOW_STEP_BODY_POINT,
+  type WorkflowStepBodyProps,
 } from '../../contract/stepBody.ts'
 import type { RunPaneModel } from './runPaneModel'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
@@ -19,7 +26,7 @@ import type { WorkflowGateForm } from '../../shared/workflowContracts'
 //
 // The second half is which shape a node draws. An agent node hands its detail to the conversation
 // plugins/agents publishes, and every other kind — and an agent node on a machine where that plugin
-// is switched off — keeps the summary this pane has always drawn.
+// is switched off — keeps this pane's own summary.
 
 vi.mock('@acorn/plugin-terminal/contract/sessionsClient.ts', () => ({
   terminalSessions: { create: async () => ({ id: 'term-1' }) },
@@ -31,10 +38,25 @@ vi.mock('@solidjs/router', () => ({ useNavigate: () => vi.fn(), useSearchParams:
 const { default: NodeDetail } = await import('./NodeDetail')
 
 const step = (over: Partial<WorkflowStepRow>): WorkflowStepRow => ({
-  id: 'st1', runId: 'run-1', idx: 0, name: 'reproduce', kind: 'agent', mode: 'headless',
-  profileId: 'claude-code', model: 'claude-opus-5', status: 'running', resultJson: null,
-  structuredJson: null, sessionId: null, agentSessionId: null, costUsd: null, iteration: 0,
-  error: null, createdAt: 10, updatedAt: 20, ...over,
+  id: 'st1',
+  runId: 'run-1',
+  idx: 0,
+  name: 'reproduce',
+  kind: 'agent',
+  mode: 'headless',
+  profileId: 'claude-code',
+  model: 'claude-opus-5',
+  status: 'running',
+  resultJson: null,
+  structuredJson: null,
+  sessionId: null,
+  agentSessionId: null,
+  costUsd: null,
+  iteration: 0,
+  error: null,
+  createdAt: 10,
+  updatedAt: 20,
+  ...over,
 })
 
 const kill = vi.fn()
@@ -44,21 +66,21 @@ const gate = vi.fn()
 const modelFor = (row: WorkflowStepRow, form?: WorkflowGateForm): RunPaneModel => {
   const [drafts, setDrafts] = createSignal<Record<string, Record<string, unknown>>>({})
   return {
-  gateForm: () => form,
-  gateDraft: (id: string) => drafts()[id],
-  setGateDraft: (id: string, values: Record<string, unknown>) => setDrafts((all) => ({ ...all, [id]: values })),
-  selectedStep: () => row,
-  selectedRun: () => undefined,
-  busy: () => false,
-  error: () => '',
-  setError: () => undefined,
-  now: () => 100_000,
-  contributedKindLabel: (kind: string) => kind,
-  eventsFor: () => [],
-  tailFor: () => [],
-  kill,
-  retry,
-  gate,
+    gateForm: () => form,
+    gateDraft: (id: string) => drafts()[id],
+    setGateDraft: (id: string, values: Record<string, unknown>) => setDrafts((all) => ({ ...all, [id]: values })),
+    selectedStep: () => row,
+    selectedRun: () => undefined,
+    busy: () => false,
+    error: () => '',
+    setError: () => undefined,
+    now: () => 100_000,
+    contributedKindLabel: (kind: string) => kind,
+    eventsFor: () => [],
+    tailFor: () => [],
+    kill,
+    retry,
+    gate,
   } as unknown as RunPaneModel
 }
 
@@ -68,16 +90,20 @@ let dispose: (() => void) | undefined
 const mount = (row: WorkflowStepRow, form?: WorkflowGateForm): void => {
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <NodeDetail task={{ id: 'task-1' } as never} model={modelFor(row, form)} />
-    </QueryClientProvider>
-  ), host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <NodeDetail task={{ id: 'task-1' } as never} model={modelFor(row, form)} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
-const buttons = (): string[] => [...host.querySelectorAll('button')]
-  .map((el) => el.textContent?.trim() ?? '')
-  .filter((label) => label && label !== '⧉')
+const buttons = (): string[] =>
+  [...host.querySelectorAll('button')]
+    .map((el) => el.textContent?.trim() ?? '')
+    .filter((label) => label && label !== '⧉')
 
 const press = (label: string): void => {
   const found = [...host.querySelectorAll('button')].find((el) => el.textContent?.trim() === label)
@@ -130,11 +156,20 @@ describe('the controls a node offers', () => {
   })
 
   it('a waiting gate with a form: the proposal to correct, then approve with the edited values', () => {
-    const form: WorkflowGateForm = { fields: [
-      { name: 'title', label: 'Title', schema: { type: 'string' }, required: true },
-      { name: 'body', label: 'Release note', schema: { type: 'string' } },
-    ] }
-    mount(step({ kind: 'gate-human', status: 'waiting-gate', inputsJson: JSON.stringify({ form: { values: { title: 'Draft', body: 'Notes' } } }) }), form)
+    const form: WorkflowGateForm = {
+      fields: [
+        { name: 'title', label: 'Title', schema: { type: 'string' }, required: true },
+        { name: 'body', label: 'Release note', schema: { type: 'string' } },
+      ],
+    }
+    mount(
+      step({
+        kind: 'gate-human',
+        status: 'waiting-gate',
+        inputsJson: JSON.stringify({ form: { values: { title: 'Draft', body: 'Notes' } } }),
+      }),
+      form,
+    )
     const title = host.querySelector<HTMLInputElement>('input[aria-label="Title"]')!
     expect(title.value).toBe('Draft')
     expect(buttons()).toEqual(['Approve', 'Reject'])
@@ -155,14 +190,23 @@ describe('the controls a node offers', () => {
 
   it('an approved gate with a form: the approved values, edits marked', () => {
     const form: WorkflowGateForm = { fields: [{ name: 'title', label: 'Title', schema: { type: 'string' } }] }
-    mount(step({ kind: 'gate-human', status: 'done', structuredJson: JSON.stringify({ approved: true, values: { title: 'Corrected' }, edited: ['title'] }) }), form)
+    mount(
+      step({
+        kind: 'gate-human',
+        status: 'done',
+        structuredJson: JSON.stringify({ approved: true, values: { title: 'Corrected' }, edited: ['title'] }),
+      }),
+      form,
+    )
     expect(buttons()).toEqual([])
     expect(host.textContent).toContain('Title (edited)')
     expect(host.textContent).toContain('Corrected')
   })
 
   it('a finished command node: nothing to press', () => {
-    mount(step({ kind: 'terminal:command', status: 'done', structuredJson: JSON.stringify({ exitCode: 0, stdout: 'ok' }) }))
+    mount(
+      step({ kind: 'terminal:command', status: 'done', structuredJson: JSON.stringify({ exitCode: 0, stdout: 'ok' }) }),
+    )
     expect(buttons()).toEqual([])
   })
 
@@ -190,7 +234,13 @@ describe('the controls a node offers', () => {
   })
 
   it('a run-target node offers its terminal once it reports one', () => {
-    mount(step({ kind: 'terminal:run-target', status: 'done', structuredJson: JSON.stringify({ sessionId: 'term-2', url: 'http://localhost:3000' }) }))
+    mount(
+      step({
+        kind: 'terminal:run-target',
+        status: 'done',
+        structuredJson: JSON.stringify({ sessionId: 'term-2', url: 'http://localhost:3000' }),
+      }),
+    )
     expect(buttons()).toEqual(['Open terminal'])
     expect(host.textContent).toContain('http://localhost:3000')
   })
@@ -243,7 +293,7 @@ describe('which shape a node draws', () => {
 
   it('keeps the summary when nothing provides a conversation', () => {
     mount(step({}))
-    // The harness and the model, which is what this pane drew before the transcript was here.
+    // The harness and the model.
     expect(host.textContent).toContain('claude-code')
     expect(buttons()).toEqual(['Stop step'])
   })
@@ -261,18 +311,35 @@ describe('the workflows:step-body point', () => {
   // test. What this pane owns is the key, the props, and what stays outside the slot.
   const seen: WorkflowStepBodyProps[] = []
   let mounts = 0
-  const point = () => registered.push(extensionPointRegistry.register({
-    id: WORKFLOW_STEP_BODY_POINT, ownerId: 'workflows', label: 'Workflow step result', kind: 'remote', mode: 'replace', max: 1,
-  }))
+  const point = () =>
+    registered.push(
+      extensionPointRegistry.register({
+        id: WORKFLOW_STEP_BODY_POINT,
+        ownerId: 'workflows',
+        label: 'Workflow step result',
+        kind: 'remote',
+        mode: 'replace',
+        max: 1,
+      }),
+    )
   const contributor = (pluginId: string, matches: string[]) => {
     const registration = extensionRegistry.register({
-      id: `plugin:${pluginId}:step-body`, pluginId, point: WORKFLOW_STEP_BODY_POINT, label: `${pluginId} body`, order: 500,
-      carrier: 'component', matches,
+      id: `plugin:${pluginId}:step-body`,
+      pluginId,
+      point: WORKFLOW_STEP_BODY_POINT,
+      label: `${pluginId} body`,
+      order: 500,
+      carrier: 'component',
+      matches,
       // A provider that knows only the contract: no Workflows client state, no run model.
       component: (body: WorkflowStepBodyProps) => {
         mounts++
         createRenderEffect(() => seen.push({ ...body, ...(body.tail ? { tail: [...body.tail] } : {}) }))
-        return <span>drawn by {pluginId}: {JSON.stringify(body.output)}</span>
+        return (
+          <span>
+            drawn by {pluginId}: {JSON.stringify(body.output)}
+          </span>
+        )
       },
     } as ExtensionContribution)
     registered.push(registration)
@@ -283,20 +350,33 @@ describe('the workflows:step-body point', () => {
   const live = (first: WorkflowStepRow) => {
     const [row, setRow] = createSignal(first)
     const [tails, setTails] = createSignal<Record<string, readonly string[]>>({})
-    const model = { ...modelFor(first), selectedStep: row, selectedRunId: () => row().runId, tailFor: (id: string) => tails()[id] ?? [] } as unknown as RunPaneModel
+    const model = {
+      ...modelFor(first),
+      selectedStep: row,
+      selectedRunId: () => row().runId,
+      tailFor: (id: string) => tails()[id] ?? [],
+    } as unknown as RunPaneModel
     return { model, setRow, setTails }
   }
   const mountModel = (model: RunPaneModel): void => {
     host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <NodeDetail task={{ id: 'task-1', projectId: 'project-1' } as never} model={model} />
-      </QueryClientProvider>
-    ), host)
+    dispose = render(
+      () => (
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <NodeDetail task={{ id: 'task-1', projectId: 'project-1' } as never} model={model} />
+        </QueryClientProvider>
+      ),
+      host,
+    )
   }
 
-  const http = step({ id: 'st-http', kind: 'http:request', status: 'done', structuredJson: JSON.stringify({ status: 201, headers: {}, body: 'made' }) })
+  const http = step({
+    id: 'st-http',
+    kind: 'http:request',
+    status: 'done',
+    structuredJson: JSON.stringify({ status: 201, headers: {}, body: 'made' }),
+  })
 
   afterEach(() => {
     for (const registration of registered.splice(0).reverse()) registration.dispose()
@@ -311,8 +391,15 @@ describe('the workflows:step-body point', () => {
     expect(host.textContent).toContain('drawn by http: {"status":201,"headers":{},"body":"made"}')
     expect(host.textContent).not.toContain('Status')
     expect(seen.at(-1)).toEqual({
-      taskId: 'task-1', runId: 'run-1', stepId: 'st-http', kind: 'http:request', status: 'failed',
-      inputs: null, inputsTruncated: false, output: { status: 201, headers: {}, body: 'made' }, outputTruncated: false,
+      taskId: 'task-1',
+      runId: 'run-1',
+      stepId: 'st-http',
+      kind: 'http:request',
+      status: 'failed',
+      inputs: null,
+      inputsTruncated: false,
+      output: { status: 201, headers: {}, body: 'made' },
+      outputTruncated: false,
       revision: expect.any(Number),
     })
     // The header, the error and Retry are this pane's, whoever draws the body.
@@ -362,7 +449,7 @@ describe('the workflows:step-body point', () => {
     const huge = JSON.stringify({ status: 200, body: 'x'.repeat(MAX_STEP_BODY_JSON_BYTES) })
     mount({ ...http, structuredJson: huge })
     expect(seen.at(-1)).toMatchObject({ output: null, outputTruncated: true, inputsTruncated: false })
-    expect(host.textContent).toContain('This step\'s output is over 64 KiB, so the plugin drawing it didn\'t get it.')
+    expect(host.textContent).toContain("This step's output is over 64 KiB, so the plugin drawing it didn't get it.")
   })
 
   it('updates a running step in place, with its tail and a rising revision', () => {
@@ -404,7 +491,7 @@ describe('the workflows:step-body point', () => {
     expect(host.textContent).toContain('drawn by acme: {"url":"b"}')
   })
 
-  it('draws the new Node\'s step after a Node switch, and nothing from the old pane', () => {
+  it("draws the new Node's step after a Node switch, and nothing from the old pane", () => {
     point()
     contributor('acme', ['acme:deploy'])
     const before = live(step({ id: 'st-a', kind: 'acme:deploy', status: 'running' }))
@@ -412,7 +499,9 @@ describe('the workflows:step-body point', () => {
     // A Node switch retires the pane model and the pane mounts again with the new Node's.
     dispose?.()
     host.remove()
-    const after = live(step({ id: 'st-z', runId: 'run-z', kind: 'acme:deploy', status: 'done', structuredJson: '{"url":"z"}' }))
+    const after = live(
+      step({ id: 'st-z', runId: 'run-z', kind: 'acme:deploy', status: 'done', structuredJson: '{"url":"z"}' }),
+    )
     mountModel(after.model)
     const count = seen.length
     before.setTails({ 'st-a': ['from the old Node'] })
@@ -420,13 +509,22 @@ describe('the workflows:step-body point', () => {
     expect(seen.at(-1)).toMatchObject({ runId: 'run-z', stepId: 'st-z', output: { url: 'z' } })
   })
 
-  it('falls back to its own body when a loaded provider\'s tree fails, and moves nothing', async () => {
+  it("falls back to its own body when a loaded provider's tree fails, and moves nothing", async () => {
     point()
     // A loaded contribution whose bundle this client cannot load. The tree reports it failed.
-    registered.push(extensionRegistry.register({
-      id: 'plugin:broken:step-body', pluginId: 'broken', point: WORKFLOW_STEP_BODY_POINT, label: 'broken body', order: 500,
-      carrier: 'remote', entry: 'stepBody', hash: 'missing', matches: ['http:request'],
-    } as ExtensionContribution))
+    registered.push(
+      extensionRegistry.register({
+        id: 'plugin:broken:step-body',
+        pluginId: 'broken',
+        point: WORKFLOW_STEP_BODY_POINT,
+        label: 'broken body',
+        order: 500,
+        carrier: 'remote',
+        entry: 'stepBody',
+        hash: 'missing',
+        matches: ['http:request'],
+      } as ExtensionContribution),
+    )
     mount({ ...http, status: 'failed', error: 'timed out' })
     await vi.waitFor(() => expect(host.textContent).toContain('Status'))
     expect(host.textContent).toContain('Failed')
@@ -446,7 +544,7 @@ describe('the workflows:step-body point', () => {
     expect(gate).toHaveBeenCalledWith(true)
   })
 
-  it('never hands an agent step\'s live conversation to a provider', () => {
+  it("never hands an agent step's live conversation to a provider", () => {
     point()
     contributor('sneaky', ['agent'])
     const drawn = provideConversation()

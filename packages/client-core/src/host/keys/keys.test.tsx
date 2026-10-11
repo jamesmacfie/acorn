@@ -61,11 +61,18 @@ const PULLS = [
 ]
 
 function mountRows(items = PULLS) {
-  dispose = render(() => (
-    <Rows id="pulls" ariaLabel="Pull requests" items={items}>
-      {(item, itemProps, selected) => <Row item={itemProps} selected={selected()}>{item.label}</Row>}
-    </Rows>
-  ), host)
+  dispose = render(
+    () => (
+      <Rows id="pulls" ariaLabel="Pull requests" items={items}>
+        {(item, itemProps, selected) => (
+          <Row item={itemProps} selected={selected()}>
+            {item.label}
+          </Row>
+        )}
+      </Rows>
+    ),
+    host,
+  )
   return host.querySelector<HTMLElement>('.ui-rows')!
 }
 
@@ -98,11 +105,18 @@ describe('a run of rows is a collection', () => {
   })
 
   it('renders a tree, with the same collection behind it, when the rows are nested', () => {
-    dispose = render(() => (
-      <Rows tree id="files" ariaLabel="Files" items={PULLS}>
-        {(item, itemProps, selected) => <Row item={itemProps} selected={selected()}>{item.label}</Row>}
-      </Rows>
-    ), host)
+    dispose = render(
+      () => (
+        <Rows tree id="files" ariaLabel="Files" items={PULLS}>
+          {(item, itemProps, selected) => (
+            <Row item={itemProps} selected={selected()}>
+              {item.label}
+            </Row>
+          )}
+        </Rows>
+      ),
+      host,
+    )
     const list = host.querySelector<HTMLElement>('.ui-rows')!
     // `tree` is what a file tree and a request tree are; the roles differ because a screen reader
     // announces "expandable" for one and not the other, and nothing else about the collection does.
@@ -153,19 +167,23 @@ describe('a run of rows is a collection', () => {
 })
 
 describe('a virtualised run of rows is the same collection', () => {
-  // github's pull list draws thousands of rows and used to own a virtualizer, a scroll element and a
-  // pair of animation frames to do it. `Rows virtual` is that, in the kit, and the point of the test
-  // is that nothing about the collection changes: the keys, the roles and the stored place are still
-  // the whole list's, not the drawn window's. jsdom measures nothing, so the window here is empty,
+  // github's pull list draws thousands of rows through `Rows virtual`, and the point of the test is
+  // that nothing about the collection changes: the keys, the roles and the stored place are still the
+  // whole list's, not the drawn window's. jsdom measures nothing, so the window here is empty,
   // which is exactly the case that has to keep working.
   it('keeps the whole list in the collection while its own scroller draws the window', () => {
-    dispose = render(() => (
-      <Rows virtual id="virtual-pulls" ariaLabel="Pull requests" items={PULLS}>
-        {(item, itemProps, selected, place) => (
-          <Row item={itemProps} selected={selected()} offset={place.offset} height={place.height}>{item.label}</Row>
-        )}
-      </Rows>
-    ), host)
+    dispose = render(
+      () => (
+        <Rows virtual id="virtual-pulls" ariaLabel="Pull requests" items={PULLS}>
+          {(item, itemProps, selected, place) => (
+            <Row item={itemProps} selected={selected()} offset={place.offset} height={place.height}>
+              {item.label}
+            </Row>
+          )}
+        </Rows>
+      ),
+      host,
+    )
     const list = host.querySelector<HTMLElement>('.ui-rows')!
     expect(host.querySelector('.ui-rows-scroll')).not.toBeNull()
     expect(list.getAttribute('role')).toBe('listbox')
@@ -179,7 +197,7 @@ describe('a virtualised run of rows is the same collection', () => {
 describe('something outside a collection can put an item in view', () => {
   // Notes' "view in Context" hands context a section and an item id and nothing else. The kit gives a
   // pane no class and no id to select a row on, which is the point, so the collection publishes the one
-  // operation and scroll stays the host's (./collection.ts).
+  // operation and scroll stays the host's (`revealCollectionItem`).
   it('makes the named item the roving stop', () => {
     mountRows()
     revealCollectionItem('pulls', 'pr-3')
@@ -201,15 +219,23 @@ describe('something outside a collection can put an item in view', () => {
 describe('a tab strip is a collection', () => {
   it('is a tablist whose arrows move the selection', () => {
     let active = 'one'
-    dispose = render(() => (
-      <Tabs
-        tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
-        active={active}
-        onChange={(id) => { active = id }}
-        idPrefix="panel"
-        ariaLabel="Sections"
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <Tabs
+          tabs={[
+            { id: 'one', label: 'One' },
+            { id: 'two', label: 'Two' },
+          ]}
+          active={active}
+          onChange={(id) => {
+            active = id
+          }}
+          idPrefix="panel"
+          ariaLabel="Sections"
+        />
+      ),
+      host,
+    )
     const strip = host.querySelector<HTMLElement>('.ui-tabs .ui-tab-scroll')!
     expect(strip.getAttribute('role')).toBe('tablist')
     // The tab keeps the id the panel points back at.
@@ -222,15 +248,21 @@ describe('a tab strip is a collection', () => {
   // A strip whose labels are all the same shape — github's pull strip labels every tab `#1234` —
   // needs a mark and a tooltip to tell them apart, and neither may cost the tab its role.
   it('draws a mark and a title on a tab that asks for one', () => {
-    dispose = render(() => (
-      <Tabs
-        tabs={[{ id: 'one', label: '#1', icon: 'link-2', title: 'Mentioned in #2' }, { id: 'two', label: '#2' }]}
-        active="one"
-        onChange={() => {}}
-        idPrefix="marked"
-        ariaLabel="Pulls"
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <Tabs
+          tabs={[
+            { id: 'one', label: '#1', icon: 'link-2', title: 'Mentioned in #2' },
+            { id: 'two', label: '#2' },
+          ]}
+          active="one"
+          onChange={() => {}}
+          idPrefix="marked"
+          ariaLabel="Pulls"
+        />
+      ),
+      host,
+    )
     const [first, second] = host.querySelectorAll<HTMLElement>('.ui-tab')
     expect(first.querySelector('.ui-icon')).not.toBeNull()
     expect(first.dataset.tip).toBe('Mentioned in #2')
@@ -247,7 +279,14 @@ describe('a modal is a trap', () => {
     const opener = document.createElement('button')
     document.body.append(opener)
     opener.focus()
-    dispose = render(() => <Modal title="Archive task" onDismiss={() => {}}><span>body</span></Modal>, host)
+    dispose = render(
+      () => (
+        <Modal title="Archive task" onDismiss={() => {}}>
+          <span>body</span>
+        </Modal>
+      ),
+      host,
+    )
     // On the document, not in `host`: the modal portals its backdrop to the body.
     const dialog = document.querySelector('[role="dialog"]')!
     expect(dialog.getAttribute('aria-modal')).toBe('true')
@@ -259,7 +298,9 @@ describe('a modal is a trap', () => {
 })
 
 describe('layout regions are focus groups', () => {
-  const text = (name: string): Region => () => <button data-region={name}>{name}</button>
+  const text =
+    (name: string): Region =>
+    () => <button data-region={name}>{name}</button>
   const mount = (layout: keyof typeof LAYOUTS, props: Partial<LayoutProps>) => {
     dispose = render(() => LAYOUTS[layout]({ stateKey: 'pane', label: 'Pane', regions: {}, ...props }), host)
   }
@@ -282,10 +323,10 @@ describe('layout regions are focus groups', () => {
     expect(document.activeElement?.getAttribute('data-region')).toBe('bottom')
   })
 
-  // Every layout, not just the one the phase happened to write a test for. A hole in the cycle is a
-  // region a keyboard can leave and not come back to, and it is a property of the layout rather than
-  // of whatever pane declared it (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing, on the rules with tests behind
-  // them, "every focus group has an entry and an exit").
+  // Every layout. A hole in the cycle is a region a keyboard can leave and not come back to, and it is
+  // a property of the layout rather than of whatever pane declared it
+  // (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing, on the rules with tests
+  // behind them, "every focus group has an entry and an exit").
   //
   // `regions` is what the layout is mounted with; `groups` is how many focus groups it actually draws,
   // which is not the same number. `header-body-footer` fills three regions and is one group, because
@@ -328,8 +369,13 @@ describe('layout regions are focus groups', () => {
 
 describe('the command layer still is the keybinding table', () => {
   const binding = (over: Partial<ResolvedKeybinding> = {}): ResolvedKeybinding => ({
-    id: 'core.test', command: 'core.test', description: 'Test', category: 'Global',
-    defaultChord: 'meta+k', chord: 'meta+k', ...over,
+    id: 'core.test',
+    command: 'core.test',
+    description: 'Test',
+    category: 'Global',
+    defaultChord: 'meta+k',
+    chord: 'meta+k',
+    ...over,
   })
 
   let ran: string[]
@@ -346,8 +392,22 @@ describe('the command layer still is the keybinding table', () => {
   beforeEach(() => {
     ran = []
     commands = registerCommands([
-      { id: 'core.test', title: 'Test', category: 'action', run: () => { ran.push('core.test') } },
-      { id: 'core.bare', title: 'Bare', category: 'action', run: () => { ran.push('core.bare') } },
+      {
+        id: 'core.test',
+        title: 'Test',
+        category: 'action',
+        run: () => {
+          ran.push('core.test')
+        },
+      },
+      {
+        id: 'core.bare',
+        title: 'Bare',
+        category: 'action',
+        run: () => {
+          ran.push('core.bare')
+        },
+      },
     ])
   })
   afterEach(() => commands.dispose())
@@ -363,9 +423,9 @@ describe('the command layer still is the keybinding table', () => {
   })
 
   // A chord carrying a command modifier reaches a scoped binding from inside a text field, because
-  // nothing types Cmd+K into a message. Before this a pane's own chord could not be pressed in the
-  // pane's own field, which is where the changes pane's Commit lives. The sandboxed-frame SDK and
-  // the terminal host's command layer already drew the line here (./install.ts § scopeActive).
+  // nothing types Cmd+K into a message. Otherwise a pane's own chord can't be pressed in the pane's
+  // own field, which is where the changes pane's Commit lives. The sandboxed-frame SDK and the
+  // terminal host's command layer draw the line in the same place (`scopeActive` in ./install.ts).
   it('runs a scoped chord from inside a text field, and holds a bare key back', () => {
     installWith([
       binding({ when: 'task' }),
@@ -415,7 +475,7 @@ describe('the command layer still is the keybinding table', () => {
     host.append(dialog)
     inside.focus()
     press('Escape')
-    // An overlay answers its own Escape (ui/dismissable.ts keeps the stack); the keymap must not
+    // An overlay answers its own Escape (`createDismissable` keeps the stack); the keymap must not
     // claim it first, or the topmost overlay never sees the press.
     expect(ran).toEqual([])
   })

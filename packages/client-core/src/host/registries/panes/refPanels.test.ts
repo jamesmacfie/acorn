@@ -9,10 +9,9 @@ import { activeRefPanel, closeRefPanel, openRefPanel, refPanelRegistry } from '.
 // they are what a content-link recogniser, plugin-supplied code returning an open record, is checked
 // against.
 //
-// What this suite cannot reach is the other half of the same failure: the props the host hands the
-// panel component. That is JSX, this package's vitest config has no Solid transform
-// (docs/frontend/registries.md § Registries and plugins), and the defect that produced a blank panel in the app
-// lived precisely there, a props member named `ref`, which Solid compiles into a setter.
+// What this suite cannot reach is the other half: the props the host hands the panel component. That
+// is JSX, this suite has no Solid transform (docs/frontend/registries.md § Registries and plugins), and
+// a props member named `ref` there, which Solid compiles into a setter, blanks the panel.
 // `tools/arch/boundaries.test.ts` holds that line instead, and the two together are the whole
 // invariant.
 
@@ -57,7 +56,12 @@ describe('openRefPanel', () => {
     // overlay. Degrading at render was never the same as declining, because declining is what lets
     // `openContentTarget` try the pane rung or the real URL.
     let running = false
-    const panel = refPanelRegistry.register({ id: 'board-ref', providerId: 'board', when: () => running, component: () => null })
+    const panel = refPanelRegistry.register({
+      id: 'board-ref',
+      providerId: 'board',
+      when: () => running,
+      component: () => null,
+    })
 
     expect(openRefPanel({ providerId: 'board', displayId: 'ENG-42' })).toBe(false)
     expect(activeRefPanel()).toBeNull()

@@ -9,7 +9,20 @@ import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
-import { buildDiffRows, fileAnchor, isCodeRow, plainTokenize, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
+import {
+  buildDiffRows,
+  fileAnchor,
+  isCodeRow,
+  plainTokenize,
+  type CodeRow,
+  type FileRow,
+  type GapRow,
+  type HunkRow,
+  type LoadDiffRow,
+  type LoadDiffStatus,
+  type Row,
+  type ThreadRowT,
+} from './diffModel'
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../lib/state/draftState'
 import { Button } from '../components/primitives'
@@ -71,14 +84,14 @@ export function NonCodeRow(props: {
         {(row) => {
           const failed = () => (props.loadStatus?.(row().file.path) ?? row().status) === 'error'
           return (
-          <span class="diff-load" classList={{ 'diff-load-error': failed() }}>
-            <span>{failed() ? "Couldn't load this part." : 'Loading…'}</span>
-            <Show when={failed()}>
-              <Button variant="ghost" size="xs" onPress={() => props.retryDiff?.(row().file)}>
-                Try again
-              </Button>
-            </Show>
-          </span>
+            <span class="diff-load" classList={{ 'diff-load-error': failed() }}>
+              <span>{failed() ? "Couldn't load this part." : 'Loading…'}</span>
+              <Show when={failed()}>
+                <Button variant="ghost" size="xs" onPress={() => props.retryDiff?.(row().file)}>
+                  Try again
+                </Button>
+              </Show>
+            </span>
           )
         }}
       </Match>
@@ -153,9 +166,12 @@ export function FileHead(props: {
 
 function GapRowView(props: { gap: GapRow; expandGap?: (gap: GapRow) => Promise<unknown> }) {
   const [busy, setBusy] = createSignal(false)
-  const label = () => (props.gap.side === 'bottom'
-    ? 'Show the rest of the file'
-    : props.gap.count == null ? 'Show hidden lines' : `Show ${props.gap.count} hidden lines`)
+  const label = () =>
+    props.gap.side === 'bottom'
+      ? 'Show the rest of the file'
+      : props.gap.count == null
+        ? 'Show hidden lines'
+        : `Show ${props.gap.count} hidden lines`
   const run = async () => {
     if (!props.expandGap || props.gap.sha == null) return
     setBusy(true)
@@ -197,13 +213,22 @@ export function DiffLine(props: {
         <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
       </span>
       <Show when={props.canAdd && props.composer}>
-        <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
+        <button
+          class="diff-add-btn"
+          title="Comment on this line"
+          onClick={() => props.composer?.setOpen(!props.composer.isOpen())}
+        >
           +
         </button>
       </Show>
       <CodeContent r={props.r} highlight={props.highlight} />
       <Show when={props.composer?.isOpen()}>
-        <LineComposer addComment={props.addComment} onMutated={props.onMutated} composer={props.composer!} mentions={props.mentions ?? []} />
+        <LineComposer
+          addComment={props.addComment}
+          onMutated={props.onMutated}
+          composer={props.composer!}
+          mentions={props.mentions ?? []}
+        />
       </Show>
     </>
   )
@@ -221,7 +246,15 @@ export function DiffLine(props: {
  */
 export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
   const rows = createMemo(() => {
-    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    const file = {
+      path: props.path,
+      status: null,
+      additions: null,
+      deletions: null,
+      sha: null,
+      viewed: false,
+      patch: props.patch,
+    }
     return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
       if (row.kind === 'hunk') return [row]
       if (!isCodeRow(row)) return []
@@ -237,14 +270,24 @@ export function StackedDiff(props: { path: string; patch: string; lineNumbers?: 
   return (
     <div class="diff diff-stacked">
       <div class="diff-rows">
-        <div class="diff-row diff-file-row"><FileHead file={head()} /></div>
+        <div class="diff-row diff-file-row">
+          <FileHead file={head()} />
+        </div>
         <For each={rows()}>
           {(row) => (
-            <Show when={isCodeRow(row) ? row : null} fallback={
-              <div class="diff-row diff-hunk"><span class="diff-hunk-text">{(row as HunkRow).text}</span></div>
-            }>
+            <Show
+              when={isCodeRow(row) ? row : null}
+              fallback={
+                <div class="diff-row diff-hunk">
+                  <span class="diff-hunk-text">{(row as HunkRow).text}</span>
+                </div>
+              }
+            >
               {(code) => (
-                <div class="diff-row" classList={{ 'diff-add': code().kind === 'insert', 'diff-del': code().kind === 'delete' }}>
+                <div
+                  class="diff-row"
+                  classList={{ 'diff-add': code().kind === 'insert', 'diff-del': code().kind === 'delete' }}
+                >
                   <DiffLine r={code()} canAdd={false} addComment={async () => {}} onMutated={() => {}} />
                 </div>
               )}
@@ -288,13 +331,22 @@ export function SplitCell(props: {
             </span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <Show when={props.canAdd && props.composer}>
-              <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
+              <button
+                class="diff-add-btn"
+                title="Comment on this line"
+                onClick={() => props.composer?.setOpen(!props.composer.isOpen())}
+              >
                 +
               </button>
             </Show>
             <CodeContent r={r()} highlight={props.highlight} />
             <Show when={props.composer?.isOpen()}>
-              <LineComposer addComment={props.addComment} onMutated={props.onMutated} composer={props.composer!} mentions={props.mentions ?? []} />
+              <LineComposer
+                addComment={props.addComment}
+                onMutated={props.onMutated}
+                composer={props.composer!}
+                mentions={props.mentions ?? []}
+              />
             </Show>
           </>
         )}
@@ -326,16 +378,23 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
 // The styled tip rather than `title`: the host's one delegated listener reads `data-tip`, so a tip per
 // row costs no handler per row (kit/components/overlays/tips.tsx).
 function AskAgentButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void; hint?: string }) {
-  return <Show when={props.onOpen && (props.row.newNo != null || props.row.oldNo != null)}>
-    <button
-      type="button"
-      class="diff-ask-btn"
-      data-tip="Ask agent about this line"
-      data-tip-sub={props.hint}
-      aria-label={`Ask agent about ${props.row.path}:${props.row.newNo ?? props.row.oldNo}`}
-      onClick={(event) => { event.stopPropagation(); props.onOpen?.(props.row) }}
-    >✦</button>
-  </Show>
+  return (
+    <Show when={props.onOpen && (props.row.newNo != null || props.row.oldNo != null)}>
+      <button
+        type="button"
+        class="diff-ask-btn"
+        data-tip="Ask agent about this line"
+        data-tip-sub={props.hint}
+        aria-label={`Ask agent about ${props.row.path}:${props.row.newNo ?? props.row.oldNo}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          props.onOpen?.(props.row)
+        }}
+      >
+        ✦
+      </button>
+    </Show>
+  )
 }
 
 function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
@@ -350,13 +409,18 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
         fallback={
           <Show
             when={hl()}
-            fallback={<For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>}
+            fallback={
+              <For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
+            }
           >
             {(h) => (
               <For each={markTokens(props.r.toks, h().ranges, h().current)}>
                 {(t) => (
-                  <span style={{ '--l': t.light, '--r': t.dark }} classList={{ 'ui-find-mark': t.mark > 0 }}
-                  {...(t.mark === 2 ? { 'data-current': '' } : {})}>
+                  <span
+                    style={{ '--l': t.light, '--r': t.dark }}
+                    classList={{ 'ui-find-mark': t.mark > 0 }}
+                    {...(t.mark === 2 ? { 'data-current': '' } : {})}
+                  >
                     {t.content}
                   </span>
                 )}
@@ -370,7 +434,11 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
             when={hl()}
             fallback={
               <For each={words()}>
-                {(w) => <span classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del' }}>{w.content}</span>}
+                {(w) => (
+                  <span classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del' }}>
+                    {w.content}
+                  </span>
+                )}
               </For>
             }
           >
@@ -378,7 +446,11 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               <For each={markTokens(words(), h().ranges, h().current)}>
                 {(w) => (
                   <span
-                    classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del', 'ui-find-mark': w.mark > 0 }}
+                    classList={{
+                      'diff-word-add': w.kind === 'add',
+                      'diff-word-del': w.kind === 'del',
+                      'ui-find-mark': w.mark > 0,
+                    }}
                     {...(w.mark === 2 ? { 'data-current': '' } : {})}
                   >
                     {w.content}
@@ -434,7 +506,9 @@ function LineComposer(props: {
         mentions={props.mentions}
       />
       <div class="diff-composer-actions">
-        <Button variant="ghost" onPress={() => props.composer.setOpen(false)}>Cancel</Button>
+        <Button variant="ghost" onPress={() => props.composer.setOpen(false)}>
+          Cancel
+        </Button>
         <Button variant="solid" disabled={busy() || !props.composer.body().trim()} onPress={submit}>
           {busy() ? 'Adding\u2026' : 'Comment'}
         </Button>
@@ -472,19 +546,21 @@ function ThreadRow(props: {
 
   const publishLayoutChange = () => props.onLayoutChange?.()
 
-  createEffect(on(
-    () => [props.thread.threadId, props.thread.resolved] as const,
-    ([threadId, serverResolved], previous) => {
-      if (!previous) {
+  createEffect(
+    on(
+      () => [props.thread.threadId, props.thread.resolved] as const,
+      ([threadId, serverResolved], previous) => {
+        if (!previous) {
+          publishLayoutChange()
+          return
+        }
+        if (previous && previous[0] === threadId && previous[1] === serverResolved) return
+        setOptimisticResolved(null)
+        setCollapsed(serverResolved)
         publishLayoutChange()
-        return
-      }
-      if (previous && previous[0] === threadId && previous[1] === serverResolved) return
-      setOptimisticResolved(null)
-      setCollapsed(serverResolved)
-      publishLayoutChange()
-    },
-  ))
+      },
+    ),
+  )
 
   const toggleResolve = async () => {
     const nextResolved = !resolved()

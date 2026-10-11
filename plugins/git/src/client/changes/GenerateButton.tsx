@@ -1,7 +1,5 @@
 import { Show } from 'solid-js'
-import {
-  ConfirmButton, Icon, Inline, ModelBackendPicker,
-} from '@acorn/plugin-api/ui'
+import { ConfirmButton, Icon, Inline, ModelBackendPicker } from '@acorn/plugin-api/ui'
 import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
 
@@ -9,15 +7,14 @@ import type { ChangesModel } from './changesModel'
 //
 // One press asks the picked backend — a stored key, or an agent CLI installed on this machine — for a
 // message from the diff the next commit would take, and the answer lands in the same draft typed text
-// does (./commitState.ts § generate). Nothing here knows a provider key exists: the node holds it, and
-// this sends a backend id (../server/routes/localGit.ts).
+// does. Nothing here knows a provider key exists: the node holds it, and this sends a backend id.
 //
 // Drawn only when there is something to spend. A button that exists to say "connect a provider first"
 // is a button in the way of the four controls beside it, and Settings is where connections are made.
 
 /** The backend a press will spend, or undefined while the pick does not resolve. Also what the
  *  failure copy reads: an installed CLI that is signed out fails like an unreachable provider and
- *  needs a different next step (./model.ts § generateReason). */
+ *  needs a different next step (`generateReason`). */
 const pickedBackend = (model: ChangesModel) =>
   model.modelBackends().find((candidate) => candidate.id === model.modelPick()?.backendId)
 
@@ -36,8 +33,8 @@ export function GenerateButton(props: { model: ChangesModel }) {
   // beside this one allows with no diff, and a message for it would have to be written from the
   // commit being replaced, which is a different prompt and a door nobody has opened.
   const empty = () => model().commitMode() === 'none'
-  // A pick exists only when something is connected (client-core's generatePick.ts), so this one
-  // guard hides the whole control.
+  // A pick exists only when something is connected (`effectiveModelPick`), so this one guard hides
+  // the whole control.
   const pick = () => model().modelPick()
   return (
     <Show when={pick()}>
@@ -57,12 +54,18 @@ export function GenerateButton(props: { model: ChangesModel }) {
             skipConfirm={!model().draft().trim()}
             busy={model().generating()}
             disabled={empty()}
-            tip={empty() ? 'Nothing staged or changed to describe' : `Write the message from the diff, using ${labelFor(model())}`}
+            tip={
+              empty()
+                ? 'Nothing staged or changed to describe'
+                : `Write the message from the diff, using ${labelFor(model())}`
+            }
             tipSub={model().commitMode() === 'staged' ? 'git diff --staged' : 'git diff'}
-            onConfirm={() => void model().generate(
-              { backendId: chosen().backendId, ...(chosen().modelId ? { modelId: chosen().modelId } : {}) },
-              pickedBackend(model()),
-            )}
+            onConfirm={() =>
+              void model().generate(
+                { backendId: chosen().backendId, ...(chosen().modelId ? { modelId: chosen().modelId } : {}) },
+                pickedBackend(model()),
+              )
+            }
           >
             <Icon name="sparkles" />
           </ConfirmButton>

@@ -1,5 +1,11 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { chunkRowsByColumnBudget, type PluginDatabase, type RefreshResult, type RouteFailure, type RouteResult } from '@acorn/plugin-api/node'
+import {
+  chunkRowsByColumnBudget,
+  type PluginDatabase,
+  type RefreshResult,
+  type RouteFailure,
+  type RouteResult,
+} from '@acorn/plugin-api/node'
 import { reposResource } from '../../resourceKeys'
 import { gh, ghError } from '../../githubApi'
 import type { Repo } from '../../../shared/api'
@@ -8,8 +14,6 @@ import { repoMatches } from '../../repoMatch'
 import { repos, syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
 
-// Every exported helper here already took the handle as a parameter, which is why this module needed no
-// reshaping when the tables moved.
 type Db = PluginDatabase
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 type RepoMirrorDependencies = { emit?: GithubEmit; fetcher?: GitHubFetcher }
@@ -124,10 +128,10 @@ export const refreshRepos = async (
 }
 
 // Read-path repo resolution: a mirror miss falls through to a live GitHub fetch and mirror, so a
-// never-seen repo still resolves. Looser than the write path, where resolvePr in prContext.ts is
-// mirror-only. A mirror hit is served with no TTL check, because repo rows only refresh via
-// refreshRepos, so a renamed or transferred repo resolves to its old repoId until then. Accepted
-// staleness (docs/data-layer.md).
+// never-seen repo still resolves. Looser than the write path, where `resolvePr` is mirror-only. A
+// mirror hit is served with no TTL check, because repo rows only refresh via refreshRepos, so a
+// renamed or transferred repo resolves to its old repoId until then. Accepted staleness
+// (docs/data-layer.md).
 export const resolveRepoForUser = async (
   db: Db,
   token: string,

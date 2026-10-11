@@ -1,12 +1,18 @@
 import { expect, it, vi } from 'vitest'
 
 const host = vi.hoisted(() => ({
-  on: vi.fn(), evict: vi.fn(), evictAll: vi.fn(),
+  on: vi.fn(),
+  evict: vi.fn(),
+  evictAll: vi.fn(),
 }))
 vi.mock('@acorn/plugin-api/client', () => ({
-  activeNodeId: () => 'local', activeTaskId: () => null,
-  clientEvents: { on: host.on }, previewViews: () => host,
-  openPane: vi.fn(), writeJson: vi.fn(), clientCapabilityId: (id: string) => id,
+  activeNodeId: () => 'local',
+  activeTaskId: () => null,
+  clientEvents: { on: host.on },
+  previewViews: () => host,
+  openPane: vi.fn(),
+  writeJson: vi.fn(),
+  clientCapabilityId: (id: string) => id,
 }))
 vi.mock('./configuredStore', () => ({ previewConfigured: () => true, previewConfiguredSchedule: {} }))
 vi.mock('./paneContribution', () => ({ previewPaneContribution: {} }))
@@ -15,7 +21,11 @@ it('retires hidden previews on Node switches and owner removal, and one preview 
   const { previewClientPlugin } = await import('./index')
   const register = vi.fn()
   previewClientPlugin.init({
-    capabilities: { provide: vi.fn() }, panes: { register }, contextMenus: { register }, schedules: { register }, commands: { register },
+    capabilities: { provide: vi.fn() },
+    panes: { register },
+    contextMenus: { register },
+    schedules: { register },
+    commands: { register },
     extensionPoints: { register },
   } as unknown as Parameters<typeof previewClientPlugin.init>[0])
   const listener = (event: string) => host.on.mock.calls.find(([kind]) => kind === event)![1]

@@ -32,7 +32,9 @@ it('draws terminal colour and never shows the escape codes', async () => {
   // Output that grows shows plain until its own colouring is ready, never the older one.
   setText('\x1b[34mdesktop\x1b[0m web\n\x1b[1mmore\x1b[0m')
   expect(host.textContent).toBe('desktop web\nmore')
-  await vi.waitFor(() => expect(host.querySelector<HTMLElement>('span[style*="bold"]')?.textContent).toBe('more'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(host.querySelector<HTMLElement>('span[style*="bold"]')?.textContent).toBe('more'), {
+    timeout: 10_000,
+  })
 })
 
 it('leaves text alone without the ansi prop', () => {

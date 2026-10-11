@@ -7,11 +7,11 @@
 // cleanups have run, and keeps it as the kind's `retired` entry. That reading is how a teardown check
 // proves observers and scheduled frames went back to zero without waiting on garbage collection.
 //
-// Numbers and one boolean, nothing else. The template below is the whole schema: `sanitize` copies
-// only the fields it names and only when they are finite numbers (or the boolean), so a reader that
-// returned a path, a line of code or a session id would lose it here rather than leak it. Diffs and
-// transcripts hold proprietary source and conversation, which is why this is structural rather than
-// a convention.
+// Numbers and one boolean, nothing else. The template below is the whole schema:
+// `sanitizeSurfaceHealth` copies only the fields it names and only when they are finite numbers (or
+// the boolean), so a reader that returned a path, a line of code or a session id would lose it here
+// rather than leak it. Diffs and transcripts hold proprietary source and conversation, which is why
+// this is structural rather than a convention.
 //
 // In `kit/` rather than in the telemetry folder, because the Timeline registers here and `kit/` may
 // not import the emitter (./contributionErrors.ts says why). The emitter installs a handler the same
@@ -22,20 +22,52 @@
 export type SurfaceKind = 'diff' | 'timeline'
 
 /** Every field a surface can report. Grouped by the question each answers; a field a surface has no
- *  concept of yet stays zero, which is what later phases report into. */
-export type SurfaceHealth = {
+ *  concept of stays zero. */
+type SurfaceHealth = {
   /** The document as a whole. `ready` is the source-owned structure being complete. */
-  topology: { files: number; segments: number; fixedRows: number; dynamicBlocks: number; ready: boolean; lateSourceBlocks: number }
+  topology: {
+    files: number
+    segments: number
+    fixedRows: number
+    dynamicBlocks: number
+    ready: boolean
+    lateSourceBlocks: number
+  }
   /** What is in the DOM now. Blank and uncovered are measured against the visible viewport only.
    *  `bodies` is deferred content that has been built: an opened disclosure, or a turn's body drawn
    *  once it came near the viewport. */
-  mounted: { segments: number; fixedRows: number; dynamicBlocks: number; blankBlocks: number; uncoveredRanges: number; bodies: number }
+  mounted: {
+    segments: number
+    fixedRows: number
+    dynamicBlocks: number
+    blankBlocks: number
+    uncoveredRanges: number
+    bodies: number
+  }
   /** Work still owed. Distance is in the surface's own unit (segments for the diff), never a path.
    *  `unvisitedSegments` is content prepared for a part of the surface the reader has not reached. */
-  work: { queuedSegments: number; queuedEnrichment: number; furthestQueueDistance: number; unvisitedSegments: number; scheduledFrames: number; heldPublications: number; prepareMs: number }
+  work: {
+    queuedSegments: number
+    queuedEnrichment: number
+    furthestQueueDistance: number
+    unvisitedSegments: number
+    scheduledFrames: number
+    heldPublications: number
+    prepareMs: number
+  }
   /** Size reads and the geometry writes they caused, cumulative since mount, plus live observers.
    *  `fixedRebuilds` counts rebuilds of the exact fixed geometry, which a dynamic resize must never cause. */
-  measurement: { candidates: number; reads: number; commits: number; maxCommitsInFrame: number; readMs: number; commitMs: number; fixedRebuilds: number; activeObservers: number; observedElements: number }
+  measurement: {
+    candidates: number
+    reads: number
+    commits: number
+    maxCommitsInFrame: number
+    readMs: number
+    commitMs: number
+    fixedRebuilds: number
+    activeObservers: number
+    observedElements: number
+  }
   /** Scroll writes the surface made to keep a reading place, cumulative since mount. `substituted`
    *  counts places whose anchor had gone and a neighbour stood in. */
   correction: { count: number; failed: number; substituted: number; maxPixels: number; maxAnchorDrift: number }
@@ -44,8 +76,19 @@ export type SurfaceHealth = {
    *  inserts since it was made. `hits` and `misses` are this surface's own, since mount. Bytes are
    *  the cache's estimate, not the heap's. */
   resident: {
-    documents: number; segments: number; rows: number; estimatedBytes: number; plainBytes: number; enrichmentBytes: number
-    hits: number; misses: number; inserts: number; evictions: number; oversize: number; rowCeiling: number; byteCeiling: number
+    documents: number
+    segments: number
+    rows: number
+    estimatedBytes: number
+    plainBytes: number
+    enrichmentBytes: number
+    hits: number
+    misses: number
+    inserts: number
+    evictions: number
+    oversize: number
+    rowCeiling: number
+    byteCeiling: number
   }
   /** A timeline drawing only its newest turns (../timeline/timelineWindow.ts). `hiddenEarlier` is the older
    *  turns not drawn now. `expansions` and `trims` count the window growing and shrinking since mount.
@@ -76,12 +119,41 @@ export type SurfaceHealthProbe = {
 const TEMPLATE: SurfaceHealth = {
   topology: { files: 0, segments: 0, fixedRows: 0, dynamicBlocks: 0, ready: false, lateSourceBlocks: 0 },
   mounted: { segments: 0, fixedRows: 0, dynamicBlocks: 0, blankBlocks: 0, uncoveredRanges: 0, bodies: 0 },
-  work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, unvisitedSegments: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
-  measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, commitMs: 0, fixedRebuilds: 0, activeObservers: 0, observedElements: 0 },
+  work: {
+    queuedSegments: 0,
+    queuedEnrichment: 0,
+    furthestQueueDistance: 0,
+    unvisitedSegments: 0,
+    scheduledFrames: 0,
+    heldPublications: 0,
+    prepareMs: 0,
+  },
+  measurement: {
+    candidates: 0,
+    reads: 0,
+    commits: 0,
+    maxCommitsInFrame: 0,
+    readMs: 0,
+    commitMs: 0,
+    fixedRebuilds: 0,
+    activeObservers: 0,
+    observedElements: 0,
+  },
   correction: { count: 0, failed: 0, substituted: 0, maxPixels: 0, maxAnchorDrift: 0 },
   resident: {
-    documents: 0, segments: 0, rows: 0, estimatedBytes: 0, plainBytes: 0, enrichmentBytes: 0,
-    hits: 0, misses: 0, inserts: 0, evictions: 0, oversize: 0, rowCeiling: 0, byteCeiling: 0,
+    documents: 0,
+    segments: 0,
+    rows: 0,
+    estimatedBytes: 0,
+    plainBytes: 0,
+    enrichmentBytes: 0,
+    hits: 0,
+    misses: 0,
+    inserts: 0,
+    evictions: 0,
+    oversize: 0,
+    rowCeiling: 0,
+    byteCeiling: 0,
   },
   window: { hiddenEarlier: 0, expansions: 0, trims: 0, pinned: 0 },
 }
@@ -89,7 +161,10 @@ const TEMPLATE: SurfaceHealth = {
 const KINDS: readonly SurfaceKind[] = ['diff', 'timeline']
 
 /** Copy the template's fields out of a reading and nothing else. Exported for the privacy test. */
-export function sanitizeSurfaceHealth(kind: SurfaceKind, reading: SurfaceHealthReading | undefined): SurfaceHealthEntry {
+export function sanitizeSurfaceHealth(
+  kind: SurfaceKind,
+  reading: SurfaceHealthReading | undefined,
+): SurfaceHealthEntry {
   const entry = { kind: KINDS.includes(kind) ? kind : 'diff' } as SurfaceHealthEntry
   for (const group of Object.keys(TEMPLATE) as (keyof SurfaceHealth)[]) {
     const source = (reading?.[group] ?? {}) as Record<string, unknown>
@@ -154,7 +229,9 @@ export function surfaceHealthSnapshot(): SurfaceHealthSnapshot {
 }
 
 /** Called by the client's telemetry start-up. One handler; a second replaces the first. */
-export const setSurfaceHealthHandler = (next: ((entry: SurfaceHealthEntry, checkpoint: SurfaceCheckpoint) => void) | null): void => {
+export const setSurfaceHealthHandler = (
+  next: ((entry: SurfaceHealthEntry, checkpoint: SurfaceCheckpoint) => void) | null,
+): void => {
   handler = next
 }
 

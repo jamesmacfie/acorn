@@ -13,16 +13,20 @@ import {
   isTerminalOpen,
   layoutForTask,
   maximizedPane,
-  recipeBrowserUrl,
   rememberWorkspaceView,
   setFocusedPane,
   setMaximizedPane,
-  setRecipeBrowserUrl,
   setTerminalMax,
   setTerminalOpen,
   workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
-import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/host/registries/commands'
+import {
+  clientEvents,
+  consumePaneIntent,
+  openPane,
+  requestTerminalFocusIntent,
+  consumeTerminalFocusIntent,
+} from '@acorn/client-core/host/registries/commands'
 import { activateScopedStateEviction } from './scopedEviction'
 import { completeTaskArchive } from '@acorn/client-core/features/tasks'
 
@@ -32,7 +36,6 @@ describe('scoped lifecycle eviction', () => {
     const stopSessions = initSessions()
     const taskId = 'evict-task'
     dispatchLayout(taskId, { type: 'add', pane: 'editor' })
-    setRecipeBrowserUrl(taskId, 'http://localhost:3000')
     setTerminalOpen(taskId, true)
     setTerminalMax(taskId, true)
     setFocusedPane(taskId, 'editor')
@@ -57,7 +60,6 @@ describe('scoped lifecycle eviction', () => {
     })
 
     expect(layoutForTask(taskId)).toBeUndefined()
-    expect(recipeBrowserUrl(taskId)).toBeUndefined()
     expect(isTerminalOpen(taskId)).toBe(false)
     expect(isTerminalMax(taskId)).toBe(false)
     expect(focusedPane(taskId)).toBeUndefined()
@@ -81,8 +83,14 @@ describe('scoped lifecycle eviction', () => {
     const stopSessions = initSessions()
     rememberActiveTerminal('task-on-a', 'session-1')
     managedAgentStore.upsertSession({
-      id: 'agent-1', taskId: 'task-on-a', provider: 'claude', title: 'On node A',
-      state: 'idle', createdAt: 1, updatedAt: 1, archivedAt: null,
+      id: 'agent-1',
+      taskId: 'task-on-a',
+      provider: 'claude',
+      title: 'On node A',
+      state: 'idle',
+      createdAt: 1,
+      updatedAt: 1,
+      archivedAt: null,
     } as never)
     expect(managedAgentStore.sessions()).toHaveLength(1)
 

@@ -8,7 +8,9 @@ describe('confirmTaskArchive', () => {
   let dispose: (() => void) | undefined
   // The dialog is a Modal, which portals to the body.
   const dialog = () => document.querySelector('[role="alertdialog"]')
-  const footer = () => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')]
+  const footer = () => [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button'),
+  ]
 
   beforeEach(() => {
     host = document.createElement('div')
@@ -23,7 +25,12 @@ describe('confirmTaskArchive', () => {
   })
 
   it('asks before archiving a task with no reported concerns', async () => {
-    const decision = confirmTaskArchive({ id: 'task-1', title: 'Add task search', branch: 'feature', worktreePath: '/tmp/worktrees/feature' })
+    const decision = confirmTaskArchive({
+      id: 'task-1',
+      title: 'Add task search',
+      branch: 'feature',
+      worktreePath: '/tmp/worktrees/feature',
+    })
 
     await expect.poll(() => dialog()?.textContent).toContain('deletes its worktree')
     expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
@@ -35,7 +42,12 @@ describe('confirmTaskArchive', () => {
   })
 
   it('says the project folder stays when the task has no worktree of its own', async () => {
-    const decision = confirmTaskArchive({ id: 'task-2', title: 'Review release notes', branch: null, worktreePath: '/tmp/project' })
+    const decision = confirmTaskArchive({
+      id: 'task-2',
+      title: 'Review release notes',
+      branch: null,
+      worktreePath: '/tmp/project',
+    })
 
     await expect.poll(() => dialog()?.textContent).toContain('leaves the project folder as it is')
     expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
@@ -47,11 +59,19 @@ describe('confirmTaskArchive', () => {
   })
 
   it('switches the confirm button to Delete task from its menu, with the warning', async () => {
-    const decision = confirmTaskArchive({ id: 'task-3', title: 'Old spike', branch: 'spike', worktreePath: '/tmp/worktrees/spike' })
+    const decision = confirmTaskArchive({
+      id: 'task-3',
+      title: 'Old spike',
+      branch: 'spike',
+      worktreePath: '/tmp/worktrees/spike',
+    })
 
     await expect.poll(() => dialog()?.textContent).toContain('Archive task')
     expect(dialog()?.textContent).not.toContain("You can't restore a deleted task.")
-    const deleteItem = () => [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((item) => item.textContent === 'Delete task')
+    const deleteItem = () =>
+      [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+        (item) => item.textContent === 'Delete task',
+      )
     footer()[2]!.click()
     await expect.poll(deleteItem).toBeDefined()
     deleteItem()!.click()

@@ -21,13 +21,6 @@ export type ProjectUpdateRefInput = {
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 export type PreviewMode = 'url' | 'port' | 'script'
 export type DbSchemaMode = 'auto' | 'script' | 'file'
-export type BrowserRule = {
-  id: string
-  enabled: boolean
-  urlPattern: string
-  trigger: 'load'
-  action: { type: 'fill'; selector: string; value: string }
-}
 export type ProjectConfig = {
   runTargets: string | null
   editorCommand: string | null
@@ -42,7 +35,6 @@ export type ProjectConfig = {
   dbSchemaNotes: string | null
   previewMode: PreviewMode | null
   previewValue: string | null
-  browserRules: BrowserRule[]
   branchPrefix: string | null
 }
 export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }

@@ -29,7 +29,7 @@ pnpm db:check
 3. Start a managed agent with an installed CLI, approve or deny one tool request, and reopen its
    transcript after a restart. Open a terminal session, send a command, and confirm that it survives a
    task switch.
-4. Open a task preview through the tunnel and a host-owned editor. Navigate the preview, open an
+4. Open a task preview and a host-owned editor. Navigate the preview, open an
    overlay, and confirm that the child webview stays behind it. Check the native menu and one file
    dialog.
 5. Install a freshly scaffolded plugin from a local package. Accept the bundle, open its pane, run its

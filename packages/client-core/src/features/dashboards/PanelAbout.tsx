@@ -22,17 +22,22 @@ import { planInputs } from './planInputs'
 
 export default function PanelAbout(props: { revision: DashboardRevision; onEdit: () => void; onDismiss: () => void }) {
   const plan = () => props.revision.content
-  const catalog = createQuery(() => dataSourceCatalogOptions(activeCacheId(), {
-    ...(props.revision.workspaceId ? { workspaceId: props.revision.workspaceId } : {}),
-    ...(props.revision.projectId ? { projectId: props.revision.projectId } : {}), parameters: {},
-  }))
+  const catalog = createQuery(() =>
+    dataSourceCatalogOptions(activeCacheId(), {
+      ...(props.revision.workspaceId ? { workspaceId: props.revision.workspaceId } : {}),
+      ...(props.revision.projectId ? { projectId: props.revision.projectId } : {}),
+      parameters: {},
+    }),
+  )
   const integrations = createQuery(() => integrationsOptions(true))
-  const inputs = createMemo(() => planInputs(plan(), catalog.data?.sources ?? [], integrations.data?.integrations ?? []))
+  const inputs = createMemo(() =>
+    planInputs(plan(), catalog.data?.sources ?? [], integrations.data?.integrations ?? []),
+  )
   /** "Release readiness (Northwind), reading Pull requests (GitHub · Work) and Cycle issues (Linear · Acme)". */
   const chain = (key: string): string | undefined => {
     const id = key.slice('source:'.length)
     const listed = inputs()[id]
-    const source = plan().sources.find(entry => entry.id === id)
+    const source = plan().sources.find((entry) => entry.id === id)
     if (!listed?.length || source?.reference.kind !== 'inline') return undefined
     return `${source.label} (${pluginLabel(source.reference.content.query.source.pluginId)}), reading ${inputChain(listed)}`
   }
@@ -42,37 +47,59 @@ export default function PanelAbout(props: { revision: DashboardRevision; onEdit:
         <Stack gap="row">
           <Text>{plan().title}</Text>
           <Stack gap="none">
-            <For each={planOutline(plan())}>{part => (
-              <Row density="compact" variant="stacked" leading={<Icon name={part.icon} />}>
-                <Stack gap="none">
-                  <Text>{part.title}</Text>
-                  <Show when={chain(part.key) ?? part.detail}>{detail => <Text emphasis="muted" wrap>{detail()}</Text>}</Show>
-                </Stack>
-              </Row>
-            )}</For>
+            <For each={planOutline(plan())}>
+              {(part) => (
+                <Row density="compact" variant="stacked" leading={<Icon name={part.icon} />}>
+                  <Stack gap="none">
+                    <Text>{part.title}</Text>
+                    <Show when={chain(part.key) ?? part.detail}>
+                      {(detail) => (
+                        <Text emphasis="muted" wrap>
+                          {detail()}
+                        </Text>
+                      )}
+                    </Show>
+                  </Stack>
+                </Row>
+              )}
+            </For>
           </Stack>
-          <Show when={plan().request}>{request => <>
-            <SectionHeader level="group">Asked for</SectionHeader>
-            <Text wrap>{request()}</Text>
-          </>}</Show>
+          <Show when={plan().request}>
+            {(request) => (
+              <>
+                <SectionHeader level="group">Asked for</SectionHeader>
+                <Text wrap>{request()}</Text>
+              </>
+            )}
+          </Show>
           <Show when={plan().requirements?.length}>
             <SectionHeader level="group">Requirements</SectionHeader>
             <Stack gap="none">
-              <For each={plan().requirements}>{item => (
-                <Row density="compact" variant="stacked">
-                  <Stack gap="none">
-                    <Text wrap>{`${REQUIREMENT_STATUS_LABELS[item.status]}: ${item.text}`}</Text>
-                    <Show when={item.reason}>{reason => <Text emphasis="muted" wrap>{reason()}</Text>}</Show>
-                  </Stack>
-                </Row>
-              )}</For>
+              <For each={plan().requirements}>
+                {(item) => (
+                  <Row density="compact" variant="stacked">
+                    <Stack gap="none">
+                      <Text wrap>{`${REQUIREMENT_STATUS_LABELS[item.status]}: ${item.text}`}</Text>
+                      <Show when={item.reason}>
+                        {(reason) => (
+                          <Text emphasis="muted" wrap>
+                            {reason()}
+                          </Text>
+                        )}
+                      </Show>
+                    </Stack>
+                  </Row>
+                )}
+              </For>
             </Stack>
           </Show>
           <Text emphasis="muted">{`Revision ${props.revision.revision}, published ${new Date(props.revision.createdAt).toLocaleString()}`}</Text>
         </Stack>
       </Modal.Body>
       <Modal.Actions>
-        <Button size="sm" onPress={props.onEdit}>Edit…</Button>
+        <Button size="sm" onPress={props.onEdit}>
+          Edit…
+        </Button>
       </Modal.Actions>
     </Modal>
   )

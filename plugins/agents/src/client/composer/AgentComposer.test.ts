@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentController, AgentRuntimeState } from '../../contract/wire.ts'
-import {
-  agentComposerDisabledMessage,
-  agentSessionIsStarting,
-} from './agentComposerState'
+import { agentComposerDisabledMessage, agentSessionIsStarting } from './agentComposerState'
 
 function message(controller: AgentController, runtimeState: AgentRuntimeState, disabled = true) {
   return agentComposerDisabledMessage({ controller, runtimeState }, disabled)
@@ -20,9 +17,7 @@ describe('agentComposerDisabledMessage', () => {
     expect(message('external', 'stopped')).toBe(
       'This session is controlled by an external client and cannot accept messages in Acorn.',
     )
-    expect(message('terminal', 'archived')).toBe(
-      'This session is archived and cannot accept new messages.',
-    )
+    expect(message('terminal', 'archived')).toBe('This session is archived and cannot accept new messages.')
   })
 
   it('returns no message while the composer is enabled', () => {
@@ -33,7 +28,15 @@ describe('agentComposerDisabledMessage', () => {
     for (const runtimeState of ['creating', 'connecting', 'replaying', 'reconnecting'] as const) {
       expect(agentSessionIsStarting({ runtimeState })).toBe(true)
     }
-    for (const runtimeState of ['ready', 'working', 'waiting', 'cancelling', 'stopped', 'failed', 'archived'] as const) {
+    for (const runtimeState of [
+      'ready',
+      'working',
+      'waiting',
+      'cancelling',
+      'stopped',
+      'failed',
+      'archived',
+    ] as const) {
       expect(agentSessionIsStarting({ runtimeState })).toBe(false)
     }
   })

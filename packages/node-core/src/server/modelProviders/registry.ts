@@ -2,17 +2,15 @@ import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,
 } from '../integrations/connectionProviders/registry'
+import type { Disposable } from '../pluginHost/capabilities'
 import type { ModelProviderAdapter } from './types'
 
 export class ModelProviderRegistry {
   readonly #adapters = new Map<string, ModelProviderAdapter>()
-  readonly #owners = new Map<string, string>() // providerId → owning plugin; see integrations/registry.ts
 
-  constructor(
-    private readonly connectionProviders: ConnectionProviderRegistry,
-  ) {}
+  constructor(private readonly connectionProviders: ConnectionProviderRegistry) {}
 
-  register(adapter: ModelProviderAdapter, owner?: string): void {
+  register(adapter: ModelProviderAdapter, owner?: string): Disposable {
     if (this.#adapters.has(adapter.providerId)) {
       throw new Error(`Duplicate model provider adapter '${adapter.providerId}'.`)
     }
@@ -28,14 +26,10 @@ export class ModelProviderRegistry {
       throw new Error(`Model provider '${adapter.providerId}' has no recommended model.`)
     }
     this.#adapters.set(adapter.providerId, adapter)
-    if (owner) this.#owners.set(adapter.providerId, owner)
-  }
-
-  removeForPlugin(plugin: string): void {
-    for (const [id, owner] of [...this.#owners.entries()]) {
-      if (owner !== plugin) continue
-      this.#adapters.delete(id)
-      this.#owners.delete(id)
+    return {
+      dispose: () => {
+        if (this.#adapters.get(adapter.providerId) === adapter) this.#adapters.delete(adapter.providerId)
+      },
     }
   }
 

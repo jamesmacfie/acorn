@@ -1,4 +1,9 @@
-import { distribution, refreshPluginTrust, syncPluginDistribution, type PluginTrustRequest } from '../plugins/distribution'
+import {
+  distribution,
+  refreshPluginTrust,
+  syncPluginDistribution,
+  type PluginTrustRequest,
+} from '../plugins/distribution'
 import { awaitingInputApproval, awaitingNodeApproval, awaitingSkillApproval } from '../plugins/distributionModel'
 import { grantPluginInputs, grantPluginSkills, saveDisabledNodePlugins } from '../../infra/node/nodePlugins'
 import { nextDisabledList } from '../../features/settings/plugins/pluginToggle'
@@ -36,21 +41,24 @@ import type { NodePluginRow, PluginInputGrant } from '@acorn/protocol/api.ts'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
-// A plain module rather than two memos inside the dialog, for the reason frames/layouts.ts gives:
-// the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
-// structurally untestable, and the two things here are the ones worth pinning. The tier split is a
-// security claim (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the client broker and
-// isolated Node worker hold; `Declared` describes plugin-authored scheduled/check behavior, and the
-// three lists may never be merged. And `decide` is
-// where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
+// A plain module rather than two memos inside the dialog, so a bare-Node suite with no Solid transform
+// can pin the two things worth pinning. The tier split is a security claim
+// (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the
+// client broker and isolated Node worker hold; `Declared` describes plugin-authored scheduled/check
+// behavior, and the three lists may never be merged. And `decide` records a remembered answer, so only
+// a deliberate choice may reach it.
 
 export type TierKey = 'reads' | 'provides' | 'enforced' | 'declared' | 'web'
 
 export const TIER_LABEL: Record<TierKey, string> = {
-  reads: 'Reads your data', provides: 'Provides', enforced: 'Enforced', declared: 'Declared', web: 'Web pages',
+  reads: 'Reads your data',
+  provides: 'Provides',
+  enforced: 'Enforced',
+  declared: 'Declared',
+  web: 'Web pages',
 }
 
-export type TrustLine = PermissionLine & {
+type TrustLine = PermissionLine & {
   tier: TierKey
   // Did the version the owner last approved lack this grant? Always false on a first install, where
   // there is no previous version for anything to be new against.
@@ -60,12 +68,11 @@ export type TrustLine = PermissionLine & {
 export type TrustTier = { key: TierKey; lines: TrustLine[] }
 
 /**
-/**
  * Every declared line, decorated with the tier that owns it and, on an update, whether the version
  * the owner last approved had it.
  *
  * The diff runs over the grant key, never the sentence, so a copy edit is a copy edit rather than a
- * fleet-wide "asks for more" (plugins/permissions.ts).
+ * fleet-wide "asks for more" (./permissions.ts).
  */
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
   const installed = request?.row.installed
@@ -103,14 +110,14 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       ],
       was: previous
         ? [
-          ...uiPermissionLines(previous.permissions, request.row.name),
-          ...nodePermissionLines(previous.permissions),
-          ...keyClaimPermissionLines(previous.keyClaims ?? []),
-          ...navigationDestinationPermissionLines(previous.navigationDestinations ?? []),
-          ...extensionPermissionLines(previous.extensions ?? []),
-          ...harnessPermissionLines(previous.harnesses ?? []),
-          ...agentToolPermissionLines(previous.agentTools ?? []),
-        ]
+            ...uiPermissionLines(previous.permissions, request.row.name),
+            ...nodePermissionLines(previous.permissions),
+            ...keyClaimPermissionLines(previous.keyClaims ?? []),
+            ...navigationDestinationPermissionLines(previous.navigationDestinations ?? []),
+            ...extensionPermissionLines(previous.extensions ?? []),
+            ...harnessPermissionLines(previous.harnesses ?? []),
+            ...agentToolPermissionLines(previous.agentTools ?? []),
+          ]
         : null,
     },
     {
@@ -130,15 +137,16 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         ...customAgentPermissionLines(customAgentGrants(installed.contributions)),
         ...skillPermissionLines(skills?.skills ?? []),
       ],
-      was: previous || skills?.granted
-        ? [
-          ...schedulePermissionLines(previous?.schedules ?? []),
-          ...taskCheckPermissionLines(previous?.taskChecks ?? []),
-          ...contextSectionPermissionLines(previous?.contextSections ?? []),
-          ...customAgentPermissionLines(previous?.customAgents ?? []),
-          ...(skills?.granted ? skillPermissionLines(skills.skills.filter((skill) => skill.approved)) : []),
-        ]
-        : null,
+      was:
+        previous || skills?.granted
+          ? [
+              ...schedulePermissionLines(previous?.schedules ?? []),
+              ...taskCheckPermissionLines(previous?.taskChecks ?? []),
+              ...contextSectionPermissionLines(previous?.contextSections ?? []),
+              ...customAgentPermissionLines(previous?.customAgents ?? []),
+              ...(skills?.granted ? skillPermissionLines(skills.skills.filter((skill) => skill.approved)) : []),
+            ]
+          : null,
     },
     {
       key: 'web',
@@ -146,24 +154,28 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
     },
   ]
-  return groups.filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared').map(({ key, now, was }) => {
-    const before = was ? new Set(was.map((entry) => entry.key)) : null
-    return {
-      key,
-      lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
-    }
-  })
+  return groups
+    .filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared')
+    .map(({ key, now, was }) => {
+      const before = was ? new Set(was.map((entry) => entry.key)) : null
+      return {
+        key,
+        lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
+      }
+    })
 }
 
 /**
-/**
  * Record an answer, accepted or rejected, and let the shell catch up.
  *
- * Both answers are remembered (@acorn/custody/plugins/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
+ * Both answers are remembered (the custody trust store keeps a rejection so a turned-away plugin does
  * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
  * and records nothing. See the dialog's `dismiss`.
  */
-export async function recordTrustDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+export async function recordTrustDecision(
+  request: PluginTrustRequest,
+  decision: 'accepted' | 'rejected',
+): Promise<void> {
   const installed = request.row.installed
   if (!installed) return
   await recordPluginTrust({
@@ -177,21 +189,13 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),
     navigationDestinations: navigationDestinationGrants(installed.contributions),
-    // Recorded as well as shown, for the reason the key claims are: the update prompt's "what is new"
-    // mark is a set difference against what the owner last approved, and a grant that is not stored can
-    // never read as newly requested. A plugin that starts reaching into a different package between
-    // versions is exactly the change that must not slide past unremarked.
+    // These grants are recorded as well as shown: the update prompt's "what is new" mark is a set
+    // difference against what the owner last approved, so a grant that is not stored can never read as
+    // newly requested. A package that starts reaching into another package, running itself every five
+    // minutes, or running a different binary must not slide past the update prompt unremarked.
     extensions: extensionGrants(request.row.name, installed.contributions),
-    // Recorded for the same reason as the other contribution grants: an unrecorded grant can never read as newly
-    // requested, and "this package now runs itself every five minutes" is exactly the change that must
-    // not slide past the update prompt unremarked.
     schedules: scheduleGrants(installed.contributions),
-    // Recorded for the same reason. "This package now stops my containers when I
-    // archive" is exactly the change the update prompt has to be able to mark as new.
     taskChecks: taskCheckGrants(installed.contributions),
-    // Recorded for the same reason, and it is the sharpest case of it: "this package
-    // now asks acorn to run a different binary" is precisely the change that must not slide past the
-    // update prompt unremarked, and an unrecorded grant can never read as newly requested.
     harnesses: harnessGrants(installed.contributions),
     agentTools: agentToolGrants(installed.contributions),
     contextSections: contextSectionGrants(installed.contributions),
@@ -208,7 +212,10 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
 export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => {
   const sources: PluginInputGrant['sources'] = {}
   for (const input of row.inputs?.inputs ?? []) {
-    sources[input.sourceId] = { ...sources[input.sourceId], [input.name]: { source: input.source, optional: input.optional } }
+    sources[input.sourceId] = {
+      ...sources[input.sourceId],
+      [input.name]: { source: input.source, optional: input.optional },
+    }
   }
   return sources
 }
@@ -221,7 +228,10 @@ export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => 
  * `recordTrustDecision` when a request carries both, so the re-read roster no longer asks once the
  * bundle answer lands.
  */
-export async function recordNodeDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+export async function recordNodeDecision(
+  request: PluginTrustRequest,
+  decision: 'accepted' | 'rejected',
+): Promise<void> {
   if (!awaitingNodeApproval(request.row)) return
   const nodeId = request.nodeId
   if (decision === 'accepted') {
@@ -230,6 +240,10 @@ export async function recordNodeDecision(request: PluginTrustRequest, decision: 
       const digests = Object.fromEntries((request.row.skills?.skills ?? []).map((skill) => [skill.name, skill.digest]))
       await grantPluginSkills(request.row.name, digests, nodeId)
     }
-  } else await saveDisabledNodePlugins(nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true), nodeId)
+  } else
+    await saveDisabledNodePlugins(
+      nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true),
+      nodeId,
+    )
   await syncPluginDistribution({ nodeIds: [nodeId] })
 }

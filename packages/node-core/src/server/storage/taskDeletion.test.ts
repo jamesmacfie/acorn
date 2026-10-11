@@ -26,21 +26,46 @@ describe('deleteTask', () => {
   const insertTask = async (id: string, status: 'active' | 'archived', parentId: string | null = null) => {
     const now = Date.now()
     await t.db.insert(schema.tasks).values({
-      id, title: id, origin: 'local', projectId: 'project-1', branch: null, worktreePath: null, pullNumber: null,
-      status, parentId, sort: 0, createdAt: now, updatedAt: now, archivedAt: status === 'archived' ? now : null,
+      id,
+      title: id,
+      origin: 'local',
+      projectId: 'project-1',
+      branch: null,
+      worktreePath: null,
+      pullNumber: null,
+      status,
+      parentId,
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: status === 'archived' ? now : null,
     })
   }
-  const taskIds = async () => (await t.db.select({ id: schema.tasks.id }).from(schema.tasks)).map((row) => row.id).sort()
+  const taskIds = async () =>
+    (await t.db.select({ id: schema.tasks.id }).from(schema.tasks)).map((row) => row.id).sort()
   const refuseArchive = vi.fn(async () => ({ ok: false as const, reason: 'Stop 1 running session first.' }))
 
   beforeEach(async () => {
     t = makeTestDb()
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'ws1', name: 'W', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'ws1', name: 'W', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-1', name: 'widget', path: null, workspaceId: 'ws1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-1',
+      name: 'widget',
+      path: null,
+      workspaceId: 'ws1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     refuseArchive.mockClear()
   })
@@ -54,7 +79,9 @@ describe('deleteTask', () => {
     await insertTask('parent', 'archived')
     await insertTask('child', 'archived', 'parent')
     await insertTask('other', 'archived')
-    await t.db.insert(schema.taskLinks).values({ taskId: 'child', integrationId: 'i1', provider: 'linear', identifier: 'ENG-1', createdAt: 0 })
+    await t.db
+      .insert(schema.taskLinks)
+      .values({ taskId: 'child', integrationId: 'i1', provider: 'linear', identifier: 'ENG-1', createdAt: 0 })
     await t.db.insert(schema.prefs).values([
       { userId: 'u', key: 'core:task-layouts:node-1/parent', value: '{}' },
       { userId: 'u', key: 'core:task-layouts:child', value: '{}' },
@@ -82,10 +109,17 @@ describe('deleteTask', () => {
     expect(await taskIds()).toEqual(['task'])
 
     const archive = async () => {
-      await t.db.update(schema.tasks).set({ status: 'archived', archivedAt: Date.now() }).where(eq(schema.tasks.id, 'task'))
+      await t.db
+        .update(schema.tasks)
+        .set({ status: 'archived', archivedAt: Date.now() })
+        .where(eq(schema.tasks.id, 'task'))
       return { ok: true as const, cleanupFailed: ['docker'] }
     }
-    expect(await deleteTask(t.db, 'task', { archive })).toEqual({ ok: true, taskIds: ['task'], cleanupFailed: ['docker'] })
+    expect(await deleteTask(t.db, 'task', { archive })).toEqual({
+      ok: true,
+      taskIds: ['task'],
+      cleanupFailed: ['docker'],
+    })
     expect(await taskIds()).toEqual([])
   })
 

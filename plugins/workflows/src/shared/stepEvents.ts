@@ -7,24 +7,20 @@
 // here rather than in a plugin so both the emitter and the reader name one type.
 
 /** An agent kind's own stream, forwarded from the managed session. */
-export type ManagedAgentStepEvent = { type: 'managed-agent'; sequence?: number; event: unknown }
+type ManagedAgentStepEvent = { type: 'managed-agent'; sequence?: number; event: unknown }
 
 /** A captured command's output, chunk by chunk. The client keeps a tail, not the whole stream. */
-export type OutputStepEvent = { type: 'stdout' | 'stderr'; text: string }
+type OutputStepEvent = { type: 'stdout' | 'stderr'; text: string }
 
 /** One line of "what it is doing now", from any kind. */
-export type ProgressStepEvent = { type: 'progress'; text: string }
+type ProgressStepEvent = { type: 'progress'; text: string }
 
 /** How many rows a data kind has read so far. */
-export type RowsStepEvent = { type: 'rows'; count: number }
+type RowsStepEvent = { type: 'rows'; count: number }
 
-export type WorkflowStepEventBody =
-  | ManagedAgentStepEvent
-  | OutputStepEvent
-  | ProgressStepEvent
-  | RowsStepEvent
+export type WorkflowStepEventBody = ManagedAgentStepEvent | OutputStepEvent | ProgressStepEvent | RowsStepEvent
 
-export const WORKFLOW_STEP_EVENT_TYPES = ['managed-agent', 'stdout', 'stderr', 'progress', 'rows'] as const
+const WORKFLOW_STEP_EVENT_TYPES = ['managed-agent', 'stdout', 'stderr', 'progress', 'rows'] as const
 
 /** True when the event is one this vocabulary describes. Anything else is kept and shown as JSON. */
 export function isWorkflowStepEvent(event: unknown): event is WorkflowStepEventBody {

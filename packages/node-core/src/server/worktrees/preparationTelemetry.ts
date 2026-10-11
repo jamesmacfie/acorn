@@ -10,9 +10,14 @@ async function preparation<T>(name: string, attrs: TelemetryAttrs, run: () => Pr
   const span = startSpan('core', { name, attrs: { ...attrs, seam: name } })
   if (!span.traceId) return run()
   try {
-    const result = await runWithTelemetry({
-      traceId: span.traceId, spanId: span.spanId, owner: currentTelemetryContext()?.owner ?? 'core',
-    }, run)
+    const result = await runWithTelemetry(
+      {
+        traceId: span.traceId,
+        spanId: span.spanId,
+        owner: currentTelemetryContext()?.owner ?? 'core',
+      },
+      run,
+    )
     span.end('ok')
     return result
   } catch (error) {

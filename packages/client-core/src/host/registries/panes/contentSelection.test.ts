@@ -25,7 +25,8 @@ describe('documentSelection', () => {
     expect(forward).toEqual({ text: 'second', range: { start: { line: 2, column: 1 }, end: { line: 2, column: 7 } } })
     expect(documentSelection(state(doc, 12, 6))).toEqual(forward)
     expect(documentSelection(state(doc, 3, 20))).toEqual({
-      text: 'st\nsecond line\nth', range: { start: { line: 1, column: 4 }, end: { line: 3, column: 3 } },
+      text: 'st\nsecond line\nth',
+      range: { start: { line: 1, column: 4 }, end: { line: 3, column: 3 } },
     })
   })
 

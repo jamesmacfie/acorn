@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { SubscriptionOutbox } from './subscriptionOutbox'
 
-const subscription = (viewerId: string, key: string, state: 'attached' | 'detached', cols = 80) => ({ viewerId, frame: { channel: `sample:${state}`, id: key, cols }, intent: { key, state } })
+const subscription = (viewerId: string, key: string, state: 'attached' | 'detached', cols = 80) => ({
+  viewerId,
+  frame: { channel: `sample:${state}`, id: key, cols },
+  intent: { key, state },
+})
 
 describe('subscription reconnect intent', () => {
   it('eliminates completed cycles and restores final state once at the final size', () => {
     for (const final of ['detached', 'attached'] as const) {
       const queue = new SubscriptionOutbox()
-      for (let i = 0; i < 1000; i++) { queue.push(subscription('a', 'stream', 'attached', i + 2)); queue.push(subscription('a', 'stream', 'detached')) }
+      for (let i = 0; i < 1000; i++) {
+        queue.push(subscription('a', 'stream', 'attached', i + 2))
+        queue.push(subscription('a', 'stream', 'detached'))
+      }
       if (final === 'attached') queue.push(subscription('a', 'stream', 'attached', 192))
       expect(queue.drain()).toEqual(final === 'attached' ? [subscription('a', 'stream', 'attached', 192)] : [])
     }
@@ -19,7 +26,11 @@ describe('subscription reconnect intent', () => {
     const unknown = { viewerId: 'b', frame: { channel: 'plugin-new:action', value: 3 } }
     const first = subscription('a', 'one', 'attached')
     const second = subscription('a', 'two', 'attached')
-    queue.push(first); queue.push(input); queue.push(second); queue.push(unknown); queue.push(subscription('a', 'one', 'detached'))
+    queue.push(first)
+    queue.push(input)
+    queue.push(second)
+    queue.push(unknown)
+    queue.push(subscription('a', 'one', 'detached'))
     expect(queue.drain()).toEqual([first, input, second, unknown, subscription('a', 'one', 'detached')])
   })
 

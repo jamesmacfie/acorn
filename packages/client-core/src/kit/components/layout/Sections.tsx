@@ -8,10 +8,9 @@ import { Fold } from './Fold'
 //
 // The node exists because that shape draws two completely different ways and the difference is the
 // host's business rather than the caller's. A window has room for the sections down one side of the
-// thing they are about, so they are folds beside a column — which is what github's PR surfaces drew
-// by hand, a `ListDetail split` with a stack of `Fold`s in the list column, written out twice
-// (docs/ui-design/closed-kit.md § The closed kit). A terminal has no second column to spend on six folds nobody
-// can see the bottom of, so the same declaration is a strip of tabs and one panel.
+// thing they are about, so they are folds beside a column (docs/ui-design/closed-kit.md § The closed kit).
+// A terminal has no second column to spend on six folds nobody can see the bottom of, so the same
+// declaration is a strip of tabs and one panel.
 //
 // Every part of a section is a thunk rather than an element, and both halves of that matter. A
 // section a host has decided not to draw must not be built — on this host that saves nothing, because

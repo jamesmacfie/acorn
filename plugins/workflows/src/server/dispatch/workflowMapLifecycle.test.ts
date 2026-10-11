@@ -27,7 +27,14 @@ const childDefinition: WorkflowDef = {
     { name: 'ticket', schema: { type: 'string' }, required: true },
     { name: 'queue', schema: { type: 'string' }, default: 'default-queue' },
   ],
-  steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.ticket} from ${inputs.queue}.', schema: { type: 'object' } }],
+  steps: [
+    {
+      id: 'review',
+      name: 'review',
+      prompt: 'Review ${inputs.ticket} from ${inputs.queue}.',
+      schema: { type: 'object' },
+    },
+  ],
 }
 
 const mapDefinition = (): WorkflowDef => ({
@@ -62,7 +69,14 @@ const mapDefinition = (): WorkflowDef => ({
 const resolved = (root: WorkflowDef, child = childDefinition): ResolvedWorkflowGraph => ({
   root,
   nodes: [
-    { path: ['$'], depth: 0, definition: root, provenance: { source: 'inline' }, defaultInputs: {}, fingerprint: 'root' },
+    {
+      path: ['$'],
+      depth: 0,
+      definition: root,
+      provenance: { source: 'inline' },
+      defaultInputs: {},
+      fingerprint: 'root',
+    },
     {
       path: ['$', 'dispatch'],
       depth: 1,
@@ -109,7 +123,11 @@ describe('workflow map lifecycle', () => {
   const makeRunner = (
     tickets: unknown[],
     overrides: Partial<RunnerDeps> = {},
-    createChild: (parentTaskId: string, seed: { title: string; branch: string }, intendedTaskId?: string) => Promise<string> = async (_parent, _seed, intended) => {
+    createChild: (
+      parentTaskId: string,
+      seed: { title: string; branch: string },
+      intendedTaskId?: string,
+    ) => Promise<string> = async (_parent, _seed, intended) => {
       taskIds.add(intended!)
       return intended!
     },
@@ -126,7 +144,8 @@ describe('workflow map lifecycle', () => {
       ...overrides,
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
-      selectWorkflowRecords: (request, signal) => new WorkflowProcessingStore(store.db, dispatcher).dispatch(request, signal),
+      selectWorkflowRecords: (request, signal) =>
+        new WorkflowProcessingStore(store.db, dispatcher).dispatch(request, signal),
     }
     const runner = new WorkflowRunner(store.db, deps)
     dispatcher = new WorkflowDispatcher(store.db, runner, {
@@ -145,26 +164,41 @@ describe('workflow map lifecycle', () => {
     const root = mapDefinition()
     const loop = root.steps[1]
     delete loop.childWorkflow
-    loop.agent = { prompt: 'Fix the current issue and verify the change.', profileId: DEFAULT_PROFILE_ID,
-      configOptions: { model: 'opus', reasoning: 'high' }, schema: { type: 'object' }, onFailure }
+    loop.agent = {
+      prompt: 'Fix the current issue and verify the change.',
+      profileId: DEFAULT_PROFILE_ID,
+      configOptions: { model: 'opus', reasoning: 'high' },
+      schema: { type: 'object' },
+      onFailure,
+    }
     return root
   }
-  const agentGraph = (runner: WorkflowRunner, root: WorkflowDef) => resolveWorkflowGraph(store.db, root, {
-    scope: { workspaceId: 'w', projectId: 'p', repoDir: null, userDir: null }, catalog: runner.validationCatalog(),
-  })
+  const agentGraph = (runner: WorkflowRunner, root: WorkflowDef) =>
+    resolveWorkflowGraph(store.db, root, {
+      scope: { workspaceId: 'w', projectId: 'p', repoDir: null, userDir: null },
+      catalog: runner.validationCatalog(),
+    })
 
   it('runs separate item sessions sequentially in the parent task and retries only the failed item', async () => {
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }, { id: 'three', number: 'ABC-3' }]
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+      { id: 'three', number: 'ABC-3' },
+    ]
     let release = () => {}
-    const blocked = new Promise<void>(resolve => { release = resolve })
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve
+    })
     let releaseThird = () => {}
-    const thirdBlocked = new Promise<void>(resolve => { releaseThird = resolve })
+    const thirdBlocked = new Promise<void>((resolve) => {
+      releaseThird = resolve
+    })
     const seen: { taskId: string; stepId: string; item: string; session: string }[] = []
     let fail = true
     const { runner } = makeRunner(tickets, {
       runStep: async (taskId, def, opts) => {
         if (def.name === 'source') return result({ tickets })
-        const item = opts.context!.find(part => part.label === 'Current item')!.content
+        const item = opts.context!.find((part) => part.label === 'Current item')!.content
         const session = opts.managedSessionId ?? `session-${opts.workflowStepId}`
         seen.push({ taskId, stepId: opts.workflowStepId!, item, session })
         expect(opts.profileId).toBe(DEFAULT_PROFILE_ID)
@@ -182,34 +216,41 @@ describe('workflow map lifecycle', () => {
     const root = agentDefinition()
     const runId = await runner.start('parent-task', root, { resolvedGraph: await agentGraph(runner, root) })
     await vi.waitFor(() => expect(seen).toHaveLength(1))
-    const loop = (await runner.steps(runId)).find(row => row.name === 'dispatch')!
+    const loop = (await runner.steps(runId)).find((row) => row.name === 'dispatch')!
     await vi.waitFor(() => {
       const page = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id)
       expect(page.counts.running).toBe(1)
-      expect(page.records.map(row => row.status)).toEqual(['running', 'waiting', 'waiting'])
+      expect(page.records.map((row) => row.status)).toEqual(['running', 'waiting', 'waiting'])
       expect(page.records[0].agentSessionId).toBe(seen[0].session)
     })
     expect(taskIds.size).toBe(0)
     release()
     await vi.waitFor(() => expect(seen).toHaveLength(3))
     const inFlightFailure = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records[1]
-    expect(await runner.retryStep(inFlightFailure.runId!, inFlightFailure.retryStepId!)).toMatchObject({ ok: false, error: expect.stringContaining('Another item') })
+    expect(await runner.retryStep(inFlightFailure.runId!, inFlightFailure.retryStepId!)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Another item'),
+    })
     expect(() => prepareWorkflowReprocess(store.db, runId, inFlightFailure.id)).toThrow('Another item')
     releaseThird()
     await waitForRun(runner, runId, ['completed-with-failures'])
-    expect(seen.map(row => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three'])
-    expect(seen.every(row => row.taskId === 'parent-task')).toBe(true)
-    expect(new Set(seen.map(row => row.stepId)).size).toBe(3)
-    expect(new Set(seen.map(row => row.session)).size).toBe(3)
-    const outcomes = JSON.parse((await runner.steps(runId)).find(row => row.id === loop.id)!.structuredJson!).children
-    expect(outcomes.map((row: { result: unknown }) => row.result)).toMatchObject([{ fixed: 'one' }, { status: 'error', stderrTail: 'Could not fix this issue' }, { fixed: 'three' }])
-    expect((await workflowRunsForTask(store.db, 'parent-task')).map(row => row.id)).toEqual([runId])
+    expect(seen.map((row) => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three'])
+    expect(seen.every((row) => row.taskId === 'parent-task')).toBe(true)
+    expect(new Set(seen.map((row) => row.stepId)).size).toBe(3)
+    expect(new Set(seen.map((row) => row.session)).size).toBe(3)
+    const outcomes = JSON.parse((await runner.steps(runId)).find((row) => row.id === loop.id)!.structuredJson!).children
+    expect(outcomes.map((row: { result: unknown }) => row.result)).toMatchObject([
+      { fixed: 'one' },
+      { status: 'error', stderrTail: 'Could not fix this issue' },
+      { fixed: 'three' },
+    ])
+    expect((await workflowRunsForTask(store.db, 'parent-task')).map((row) => row.id)).toEqual([runId])
     expect(await workflowRunById(store.db, outcomes[1].runId)).not.toBeNull()
     fail = false
     const failed = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records[1]
     expect(await runner.retryStep(failed.runId!, failed.retryStepId!)).toEqual({ ok: true })
     await waitForRun(runner, runId, ['done'])
-    expect(seen.map(row => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three', 'two'])
+    expect(seen.map((row) => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three', 'two'])
     expect(seen[3].session).toBe(seen[1].session)
     expect(taskIds.size).toBe(0)
   })
@@ -218,35 +259,56 @@ describe('workflow map lifecycle', () => {
     // A goal is checked through the harness's one-shot mode, which the default fixture profile lacks.
     unregisterProfile()
     unregisterProfile = agentProfileRegistry.register({
-      id: DEFAULT_PROFILE_ID, label: 'Claude Code', kind: 'agent', command: 'claude', managedProvider: 'claude',
-      backendPreference: 'tmux', transport: 'pty', aiArgv: () => null,
+      id: DEFAULT_PROFILE_ID,
+      label: 'Claude Code',
+      kind: 'agent',
+      command: 'claude',
+      managedProvider: 'claude',
+      backendPreference: 'tmux',
+      transport: 'pty',
+      aiArgv: (command) => ({ file: command, args: [] }),
     })
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+    ]
     const seen: { stepId: string; goal: string | undefined }[] = []
     const { runner } = makeRunner(tickets, {
       runStep: async (_taskId, def, opts) => {
         if (def.name === 'source') return result({ tickets })
         seen.push({ stepId: opts.workflowStepId!, goal: opts.goal })
-        const id = JSON.parse(opts.context!.find(part => part.label === 'Current item')!.content).id as string
-        return { ...result({ fixed: id }), goal: { objective: 'Its tests pass.', status: 'satisfied' as const,
-          continuations: id === 'two' ? 1 : 0, repairs: 0, verdict: null, automaticTurns: [] } }
+        const id = JSON.parse(opts.context!.find((part) => part.label === 'Current item')!.content).id as string
+        return {
+          ...result({ fixed: id }),
+          goal: {
+            objective: 'Its tests pass.',
+            status: 'satisfied' as const,
+            continuations: id === 'two' ? 1 : 0,
+            repairs: 0,
+            verdict: null,
+            automaticTurns: [],
+          },
+        }
       },
     })
     const root = agentDefinition()
     root.steps[1].agent!.goal = 'Its tests pass.'
     const runId = await runner.start('parent-task', root, { resolvedGraph: await agentGraph(runner, root) })
     await waitForRun(runner, runId, ['done'])
-    expect(seen.map(row => row.goal)).toEqual(['Its tests pass.', 'Its tests pass.'])
-    expect(new Set(seen.map(row => row.stepId)).size).toBe(2)
-    const loop = (await runner.steps(runId)).find(row => row.name === 'dispatch')!
+    expect(seen.map((row) => row.goal)).toEqual(['Its tests pass.', 'Its tests pass.'])
+    expect(new Set(seen.map((row) => row.stepId)).size).toBe(2)
+    const loop = (await runner.steps(runId)).find((row) => row.name === 'dispatch')!
     expect(JSON.parse(loop.structuredJson!).children.map((child: { goal: unknown }) => child.goal)).toEqual([
       { status: 'satisfied', continuations: 0, reason: null },
       { status: 'satisfied', continuations: 1, reason: null },
     ])
   })
 
-  it.each(['stop', 'cancel'] as const)('retains queued records when the agent loop must %s', async mode => {
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+  it.each(['stop', 'cancel'] as const)('retains queued records when the agent loop must %s', async (mode) => {
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+    ]
     let started = 0
     const cancelSession = vi.fn(async () => {})
     const { runner } = makeRunner(tickets, {
@@ -255,7 +317,8 @@ describe('workflow map lifecycle', () => {
         if (def.name === 'source') return result({ tickets })
         started++
         opts.onEvent?.({ type: 'managed-agent', sessionId: 'working-session' })
-        if (mode === 'cancel') await new Promise<void>(resolve => opts.signal!.addEventListener('abort', () => resolve(), { once: true }))
+        if (mode === 'cancel')
+          await new Promise<void>((resolve) => opts.signal!.addEventListener('abort', () => resolve(), { once: true }))
         return { ...result(), status: 'error', exitCode: 1, stderrTail: 'Fix failed' }
       },
     })
@@ -270,38 +333,57 @@ describe('workflow map lifecycle', () => {
     expect(started).toBe(1)
     const dispatches = store.db.select().from(schema.workflowDispatches).all()
     expect(dispatches).toHaveLength(2)
-    expect(dispatches.every(row => row.state === 'terminal' && row.taskId === 'parent-task')).toBe(true)
+    expect(dispatches.every((row) => row.state === 'terminal' && row.taskId === 'parent-task')).toBe(true)
     expect(await runner.run(dispatches[1].runId)).toBeUndefined()
     expect(cancelledTasks).toEqual([])
     expect(taskIds.size).toBe(0)
   })
 
   it('stops interrupted item work for review after restart without opening a duplicate session', async () => {
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+    ]
     let calls = 0
-    const first = makeRunner(tickets, { runStep: async (_taskId, def, opts) => {
-      if (def.name === 'source') return result({ tickets })
-      calls++
-      opts.onEvent?.({ type: 'managed-agent', sessionId: 'original-session' })
-      // Simulate the execution disappearing while its durable row remains running.
-      return new Promise(() => {})
-    } })
+    const first = makeRunner(tickets, {
+      runStep: async (_taskId, def, opts) => {
+        if (def.name === 'source') return result({ tickets })
+        calls++
+        opts.onEvent?.({ type: 'managed-agent', sessionId: 'original-session' })
+        // Simulate the execution disappearing while its durable row remains running.
+        return new Promise(() => {})
+      },
+    })
     const root = agentDefinition()
     const runId = await first.runner.start('parent-task', root, { resolvedGraph: await agentGraph(first.runner, root) })
-    await vi.waitFor(() => expect(store.db.select().from(schema.workflowSteps).all().some(row => row.agentSessionId === 'original-session')).toBe(true))
+    await vi.waitFor(() =>
+      expect(
+        store.db
+          .select()
+          .from(schema.workflowSteps)
+          .all()
+          .some((row) => row.agentSessionId === 'original-session'),
+      ).toBe(true),
+    )
     first.runner.stop()
-    const recovered = makeRunner([], { runStep: async (_task, _def, opts) => {
-      calls++
-      expect(opts.managedSessionId).toBe('original-session')
-      return result({ fixed: true })
-    } })
+    const recovered = makeRunner([], {
+      runStep: async (_task, _def, opts) => {
+        calls++
+        expect(opts.managedSessionId).toBe('original-session')
+        return result({ fixed: true })
+      },
+    })
     await recovered.dispatcher.reconcile()
     await recovered.runner.reconcile()
     await waitForRun(recovered.runner, runId, ['completed-with-failures'])
     expect(calls).toBe(1)
-    const loop = (await recovered.runner.steps(runId)).find(row => row.name === 'dispatch')!
+    const loop = (await recovered.runner.steps(runId)).find((row) => row.name === 'dispatch')!
     const records = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records
-    expect(records[0]).toMatchObject({ agentSessionId: 'original-session', status: 'failed', reason: expect.stringContaining('Interrupted during restart') })
+    expect(records[0]).toMatchObject({
+      agentSessionId: 'original-session',
+      status: 'failed',
+      reason: expect.stringContaining('Interrupted during restart'),
+    })
     expect(records[1].status).toBe('cancelled')
     expect(await recovered.runner.retryStep(records[0].runId!, records[0].retryStepId!)).toEqual({ ok: true })
     await waitForRun(recovered.runner, runId, ['completed-with-failures'])
@@ -326,16 +408,25 @@ describe('workflow map lifecycle', () => {
     expect((await waitForRun(runner, runId, ['done'])).status).toBe('done')
     const mapStep = (await runner.steps(runId)).find((step) => step.name === 'dispatch')!
     const summaries = await runner.childRuns(mapStep.id)
-    expect(summaries.map((summary) => summary.itemKey)).toEqual(tickets.map((ticket) => JSON.stringify(['string', ticket.id])))
+    expect(summaries.map((summary) => summary.itemKey)).toEqual(
+      tickets.map((ticket) => JSON.stringify(['string', ticket.id])),
+    )
     expect(summaries.every((summary) => summary.runStatus === 'done')).toBe(true)
     expect(prompts).toEqual(tickets.map((ticket) => `Review ${ticket.number} from triage.`))
     expect(taskIds.size).toBe(count)
-    expect(JSON.parse(mapStep.structuredJson!)).toEqual({ children: summaries, selected: count, skipped: 0, emptyReason: count ? null : 'no-matches' })
+    expect(JSON.parse(mapStep.structuredJson!)).toEqual({
+      children: summaries,
+      selected: count,
+      skipped: 0,
+      emptyReason: count ? null : 'no-matches',
+    })
   })
 
   it('refuses 101 items before it reserves or creates any child', async () => {
     const tickets = Array.from({ length: 101 }, (_, index) => ({ id: `id-${index}`, number: `ABC-${index + 1}` }))
-    const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => intended!)
+    const createChild = vi.fn(
+      async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => intended!,
+    )
     const { runner } = makeRunner(tickets, {}, createChild)
     const root = mapDefinition()
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root) })
@@ -347,27 +438,76 @@ describe('workflow map lifecycle', () => {
 
   it('uses source identity and title defaults, freezes schedule scope, and retries one retained attempt', async () => {
     const query = { source: { pluginId: 'fixture', sourceId: 'records' }, scope: { parameters: {} }, sort: [] }
-    const content = { name: 'Records', parameters: { type: 'object' as const, additionalProperties: false }, query, sourceParameters: {} }
-    const records = [{ ref: { pluginId: 'fixture', sourceId: 'records', recordId: '1' }, data: { count: 7 }, display: { title: 'One' } }]
+    const content = {
+      name: 'Records',
+      parameters: { type: 'object' as const, additionalProperties: false },
+      query,
+      sourceParameters: {},
+    }
+    const records = [
+      {
+        ref: { pluginId: 'fixture', sourceId: 'records', recordId: '1' },
+        data: { count: 7 },
+        display: { title: 'One' },
+      },
+    ]
     let fail = true
-    const invoke = vi.fn(async () => ({ records, mode: 'execution' as const, evaluationTime: 1, readTime: 1, revision: '1', completeness: { kind: 'complete' as const } }))
+    const invoke = vi.fn(async () => ({
+      records,
+      mode: 'execution' as const,
+      evaluationTime: 1,
+      readTime: 1,
+      revision: '1',
+      completeness: { kind: 'complete' as const },
+    }))
     const { runner } = makeRunner([], {
-      dataAccess: async () => ({ scope: { workspaceId: 'w' }, resolve: async () => ({ query, parameters: {} }), invoke: invoke as never }),
-      runStep: async () => fail ? { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'Retry this record' } : result(),
+      dataAccess: async () => ({
+        scope: { workspaceId: 'w' },
+        resolve: async () => ({ query, parameters: {} }),
+        invoke: invoke as never,
+      }),
+      runStep: async () =>
+        fail ? { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'Retry this record' } : result(),
     })
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
-      steps: [{ id: 'review', name: 'Review', prompt: 'Review ${inputs.record}' }] }
-    const root: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Source loop', steps: [
-      { id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'inline', content, bindings: {} } },
-      { id: 'dispatch', name: 'For each', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' },
-        childWorkflow: { ref: { source: 'database', id: 'child-def' }, inputs: { record: { address: { from: 'item', pointer: '/data' } } } } },
-    ] }
-    const graph = resolved(root, child); graph.nodes[1].defaultInputs = {}
-    const runId = await runner.start('parent-task', root, { resolvedGraph: graph, processingScope: { scopeId: 'schedule', epoch: '1' } })
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Review',
+      inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
+      steps: [{ id: 'review', name: 'Review', prompt: 'Review ${inputs.record}' }],
+    }
+    const root: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Source loop',
+      steps: [
+        { id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'inline', content, bindings: {} } },
+        {
+          id: 'dispatch',
+          name: 'For each',
+          kind: 'workflow-map',
+          items: { step: 'find', pointer: '/records' },
+          repeat: { mode: 'unseen' },
+          childWorkflow: {
+            ref: { source: 'database', id: 'child-def' },
+            inputs: { record: { address: { from: 'item', pointer: '/data' } } },
+          },
+        },
+      ],
+    }
+    const graph = resolved(root, child)
+    graph.nodes[1].defaultInputs = {}
+    const runId = await runner.start('parent-task', root, {
+      resolvedGraph: graph,
+      processingScope: { scopeId: 'schedule', epoch: '1' },
+    })
     await waitForRun(runner, runId, ['completed-with-failures'])
     const attempt = store.db.select().from(schema.workflowRecordAttempts).get()!
     const dispatch = store.db.select().from(schema.workflowDispatches).get()!
-    expect(JSON.parse(dispatch.payloadJson)).toMatchObject({ task: { title: 'Review: One' }, inputs: { record: { count: 7 } } })
+    expect(JSON.parse(dispatch.payloadJson)).toMatchObject({
+      task: { title: 'Review: One' },
+      inputs: { record: { count: 7 } },
+    })
     expect(dispatch.itemKey).toBe('["source","fixture","records",null,"1"]')
     fail = false
     const [failedStep] = await runner.steps(dispatch.runId)
@@ -375,10 +515,13 @@ describe('workflow map lifecycle', () => {
     await waitForRun(runner, runId, ['done'])
     expect(store.db.select().from(schema.workflowRecordAttempts).all()).toEqual([attempt])
     expect(invoke).toHaveBeenCalledTimes(1)
-    const second = await runner.start('parent-task', root, { resolvedGraph: graph, processingScope: { scopeId: 'schedule', epoch: '1' } })
+    const second = await runner.start('parent-task', root, {
+      resolvedGraph: graph,
+      processingScope: { scopeId: 'schedule', epoch: '1' },
+    })
     await waitForRun(runner, second, ['done'])
     expect(store.db.select().from(schema.workflowRecordAttempts).all()).toHaveLength(1)
-    const loop = (await runner.steps(second)).find(row => row.name === 'For each')!
+    const loop = (await runner.steps(second)).find((row) => row.name === 'For each')!
     expect(JSON.parse(loop.structuredJson!)).toMatchObject({ emptyReason: 'all-skipped', selected: 1, skipped: 1 })
   })
 
@@ -387,12 +530,16 @@ describe('workflow map lifecycle', () => {
       { id: 'same', number: 'ABC-1' },
       { id: 'same', number: 'ABC-2' },
     ]
-    const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => intended!)
+    const createChild = vi.fn(
+      async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => intended!,
+    )
     const { runner } = makeRunner(tickets, {}, createChild)
     const root = mapDefinition()
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root) })
 
-    expect((await waitForRun(runner, runId, ['failed'])).error).toContain(`item key '${JSON.stringify(['string', 'same'])}' is repeated`)
+    expect((await waitForRun(runner, runId, ['failed'])).error).toContain(
+      `item key '${JSON.stringify(['string', 'same'])}' is repeated`,
+    )
     expect(createChild).not.toHaveBeenCalled()
     expect(await store.db.select().from(schema.workflowDispatches)).toEqual([])
   })
@@ -423,7 +570,10 @@ describe('workflow map lifecycle', () => {
   })
 
   it('publishes ordered structured summaries to a downstream step', async () => {
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+    ]
     let downstreamPrompt = ''
     const { runner } = makeRunner(tickets, {
       runStep: async (_taskId, def, opts) => {
@@ -444,8 +594,9 @@ describe('workflow map lifecycle', () => {
 
     expect((await waitForRun(runner, runId, ['done'])).status).toBe('done')
     expect(downstreamPrompt).toContain(`"itemKey":${JSON.stringify(JSON.stringify(['string', 'one']))}`)
-    expect(downstreamPrompt.indexOf(JSON.stringify(JSON.stringify(['string', 'one']))))
-      .toBeLessThan(downstreamPrompt.indexOf(JSON.stringify(JSON.stringify(['string', 'two']))))
+    expect(downstreamPrompt.indexOf(JSON.stringify(JSON.stringify(['string', 'one'])))).toBeLessThan(
+      downstreamPrompt.indexOf(JSON.stringify(JSON.stringify(['string', 'two']))),
+    )
   })
 
   it('uses the frozen roster when predecessor output changes before restart recovery', async () => {
@@ -463,9 +614,9 @@ describe('workflow map lifecycle', () => {
     await waitForRun(first.runner, runId, ['gated'])
     first.runner.stop()
 
-    const [source] = await store.db.select().from(schema.workflowSteps)
-      .where(eq(schema.workflowSteps.name, 'source'))
-    await store.db.update(schema.workflowSteps)
+    const [source] = await store.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.name, 'source'))
+    await store.db
+      .update(schema.workflowSteps)
       .set({ structuredJson: JSON.stringify({ tickets: [{ id: 'changed', number: 'ABC-99' }] }) })
       .where(eq(schema.workflowSteps.id, source!.id))
 
@@ -478,7 +629,10 @@ describe('workflow map lifecycle', () => {
     })
     await recovered.dispatcher.reconcile()
     await recovered.runner.reconcile()
-    const [childRun] = await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, runId))
+    const [childRun] = await store.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.parentRunId, runId))
     const [gate] = await recovered.runner.steps(childRun!.id)
     await recovered.runner.resolveGate(childRun!.id, gate!.id, true)
 
@@ -503,7 +657,10 @@ describe('workflow map lifecycle', () => {
       left.dispatcher.reconcile().then(() => left.runner.reconcile()),
       right.dispatcher.reconcile().then(() => right.runner.reconcile()),
     ])
-    const [childRun] = await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, runId))
+    const [childRun] = await store.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.parentRunId, runId))
     const [gate] = await left.runner.steps(childRun!.id)
     await left.runner.resolveGate(childRun!.id, gate!.id, true)
 
@@ -513,9 +670,14 @@ describe('workflow map lifecycle', () => {
   })
 
   it('cancels reservations and retains tasks created while cancellation interrupts admission', async () => {
-    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    const tickets = [
+      { id: 'one', number: 'ABC-1' },
+      { id: 'two', number: 'ABC-2' },
+    ]
     let releaseSecond = () => {}
-    const secondBlocked = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const secondBlocked = new Promise<void>((resolve) => {
+      releaseSecond = resolve
+    })
     let calls = 0
     const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => {
       calls += 1
@@ -544,20 +706,73 @@ describe('workflow map lifecycle', () => {
 
   it('retains the committed incremental boundary and cancelled unstarted records', async () => {
     const query = { source: { pluginId: 'fixture', sourceId: 'records' }, scope: { parameters: {} }, sort: [] }
-    const content = { name: 'Records', parameters: { type: 'object' as const, additionalProperties: false }, query, sourceParameters: {} }
+    const content = {
+      name: 'Records',
+      parameters: { type: 'object' as const, additionalProperties: false },
+      query,
+      sourceParameters: {},
+    }
     let release = () => {}
-    const blocked = new Promise<void>(resolve => { release = resolve })
-    const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => { await blocked; return intended! })
-    const { runner } = makeRunner([], { dataAccess: async () => ({ scope: { workspaceId: 'w' }, resolve: async () => ({ query, parameters: {} }),
-      invoke: (async () => ({ records: [{ ref: { pluginId: 'fixture', sourceId: 'records', recordId: '1' }, data: {} }], mode: 'execution',
-        evaluationTime: 1, readTime: 1, revision: '1', completeness: { kind: 'complete' }, incrementalBoundary: 'committed' })) as never }) }, createChild)
-    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', steps: [{ id: 'gate', name: 'Gate', kind: 'gate-human' }] }
-    const root: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Incremental', steps: [
-      { id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'inline', content, bindings: {} }, incremental: true },
-      { id: 'dispatch', name: 'Loop', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' }, childWorkflow: { ref: { source: 'database', id: 'child-def' } } },
-    ] }
-    const graph = resolved(root, child); graph.nodes[1].defaultInputs = {}
-    const runId = await runner.start('parent-task', root, { resolvedGraph: graph, processingScope: { scopeId: 'schedule', epoch: '1' } })
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const createChild = vi.fn(async (_parent: string, _seed: { title: string; branch: string }, intended?: string) => {
+      await blocked
+      return intended!
+    })
+    const { runner } = makeRunner(
+      [],
+      {
+        dataAccess: async () => ({
+          scope: { workspaceId: 'w' },
+          resolve: async () => ({ query, parameters: {} }),
+          invoke: (async () => ({
+            records: [{ ref: { pluginId: 'fixture', sourceId: 'records', recordId: '1' }, data: {} }],
+            mode: 'execution',
+            evaluationTime: 1,
+            readTime: 1,
+            revision: '1',
+            completeness: { kind: 'complete' },
+            incrementalBoundary: 'committed',
+          })) as never,
+        }),
+      },
+      createChild,
+    )
+    const child: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Review',
+      steps: [{ id: 'gate', name: 'Gate', kind: 'gate-human' }],
+    }
+    const root: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Incremental',
+      steps: [
+        {
+          id: 'find',
+          name: 'Find',
+          kind: 'find-records',
+          query: { kind: 'inline', content, bindings: {} },
+          incremental: true,
+        },
+        {
+          id: 'dispatch',
+          name: 'Loop',
+          kind: 'workflow-map',
+          items: { step: 'find', pointer: '/records' },
+          repeat: { mode: 'unseen' },
+          childWorkflow: { ref: { source: 'database', id: 'child-def' } },
+        },
+      ],
+    }
+    const graph = resolved(root, child)
+    graph.nodes[1].defaultInputs = {}
+    const runId = await runner.start('parent-task', root, {
+      resolvedGraph: graph,
+      processingScope: { scopeId: 'schedule', epoch: '1' },
+    })
     await vi.waitFor(() => expect(createChild).toHaveBeenCalledTimes(1))
     expect(store.db.select().from(schema.workflowProcessingBoundaries).get()?.boundaryJson).toBe('"committed"')
     await runner.cancelRun(runId)

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { keybindingConflict, resolveFrameKeybinding, resolveKeybindings, type KeybindingContribution } from './keybindings'
+import {
+  keybindingConflict,
+  resolveFrameKeybinding,
+  resolveKeybindings,
+  type KeybindingContribution,
+} from './keybindings'
 
-const binding = (partial: Partial<KeybindingContribution> & Pick<KeybindingContribution, 'id' | 'defaultChord'>): KeybindingContribution => ({
+const binding = (
+  partial: Partial<KeybindingContribution> & Pick<KeybindingContribution, 'id' | 'defaultChord'>,
+): KeybindingContribution => ({
   command: partial.id,
   description: partial.id,
   category: 'Test',
@@ -11,7 +18,10 @@ const binding = (partial: Partial<KeybindingContribution> & Pick<KeybindingContr
 
 describe('resolveKeybindings', () => {
   it('leaves the later global conflict unbound and identifies its owner', () => {
-    const resolved = resolveKeybindings([binding({ id: 'first', defaultChord: 'meta+k' }), binding({ id: 'last', defaultChord: 'meta+k' })])
+    const resolved = resolveKeybindings([
+      binding({ id: 'first', defaultChord: 'meta+k' }),
+      binding({ id: 'last', defaultChord: 'meta+k' }),
+    ])
     expect(resolved[0].chord).toBe('meta+k')
     expect(resolved[1]).toMatchObject({ chord: null, conflict: 'first' })
   })
@@ -37,12 +47,18 @@ describe('resolveKeybindings', () => {
   it('puts first-party defaults ahead of plugin defaults and plugins in stable install order', () => {
     const state = () => 'enabled' as const
     const plugin = (id: string, installedAt: number): KeybindingContribution['plugin'] => ({
-      id, name: id, installedAt: () => installedAt, state,
+      id,
+      name: id,
+      installedAt: () => installedAt,
+      state,
     })
     const core = binding({ id: 'core', defaultChord: 'meta+f' })
     const early = binding({ id: 'plugin.early.search', defaultChord: 'meta+f', plugin: plugin('early', 1) })
     const late = binding({ id: 'plugin.late.search', defaultChord: 'meta+f', plugin: plugin('late', 2) })
-    for (const input of [[late, core, early], [early, late, core]]) {
+    for (const input of [
+      [late, core, early],
+      [early, late, core],
+    ]) {
       const resolved = resolveKeybindings(input)
       expect(resolved.find((entry) => entry.id === 'core')?.chord).toBe('meta+f')
       expect(resolved.find((entry) => entry.id === 'plugin.early.search')?.conflict).toBe('core')
@@ -53,12 +69,16 @@ describe('resolveKeybindings', () => {
   it('lets an explicit user override outrank a first-party default', () => {
     const core = binding({ id: 'core', defaultChord: 'meta+k' })
     const plugin = binding({
-      id: 'plugin.board.search', defaultChord: 'meta+f',
+      id: 'plugin.board.search',
+      defaultChord: 'meta+f',
       plugin: { id: 'board', name: 'Board', installedAt: () => 1, state: () => 'enabled' },
     })
     const resolved = resolveKeybindings([core, plugin], { keybindings: '{"plugin.board.search":"meta+k"}' })
     expect(resolved.find((entry) => entry.id === 'plugin.board.search')?.chord).toBe('meta+k')
-    expect(resolved.find((entry) => entry.id === 'core')).toMatchObject({ chord: null, conflict: 'plugin.board.search' })
+    expect(resolved.find((entry) => entry.id === 'core')).toMatchObject({
+      chord: null,
+      conflict: 'plugin.board.search',
+    })
   })
 
   it('keeps inactive defaults out of dispatch conflicts but includes them in save-time warnings', () => {
@@ -70,7 +90,10 @@ describe('resolveKeybindings', () => {
 
   it('prefers this frame’s surface binding when resolving a forwarded chord', () => {
     const surface = binding({
-      id: 'plugin.board.search', defaultChord: 'meta+f', when: 'pane', pane: 'board',
+      id: 'plugin.board.search',
+      defaultChord: 'meta+f',
+      when: 'pane',
+      pane: 'board',
       plugin: { id: 'board', name: 'Board', installedAt: () => 1, state: () => 'enabled' },
     })
     const global = binding({ id: 'global', defaultChord: 'meta+f' })
@@ -78,7 +101,8 @@ describe('resolveKeybindings', () => {
       { ...global, chord: 'meta+f' },
       { ...surface, chord: 'meta+f' },
     ]
-    expect(resolveFrameKeybinding('meta+f', resolved, { pluginId: 'board', surface: 'board', taskActive: true })?.id)
-      .toBe('plugin.board.search')
+    expect(
+      resolveFrameKeybinding('meta+f', resolved, { pluginId: 'board', surface: 'board', taskActive: true })?.id,
+    ).toBe('plugin.board.search')
   })
 })

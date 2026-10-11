@@ -1,32 +1,35 @@
-// Collections in cells: the terminal half of `client-core/kit/keys/collection.ts`.
+// Collections in cells: the terminal half of client-core's `createCollection`.
 //
-// The list rules — what wraps, where the first press lands, which of select and activate picks, what
-// the page keys move by — are `collectionIntents.ts` and are shared, so the two hosts cannot drift
-// (docs/tui/scrolling.md § Collections). This file supplies the two things the
-// DOM half supplies with elements:
+// The list rules (what wraps, where the first press lands, which of select and activate picks, what
+// the page keys move by) are `createCollectionIntents`, shared so the two hosts cannot drift
+// (docs/tui/scrolling.md § Collections). This file supplies the two things the DOM half supplies
+// with elements:
 //
 //   land    put focus on the item. There is no element, so a row hands its renderable back as it
-//           draws and the renderer focuses that. A virtualised row outside the drawn window has
-//           none, which is `Grid`'s documented exception made general: `active` moves anyway and the
-//           window follows it, because in a terminal there is no pointer to scroll with.
+//           draws and the store focuses that. A virtualised row outside the drawn window has none,
+//           so `active` moves anyway and the window follows it: in a terminal there is no pointer
+//           to scroll with.
 //   onItem  whether the item itself holds focus rather than a control inside it. Always true here: a
 //           cell row holds no stop of its own, so there is nothing else Enter could belong to.
 //
-// Phase 0's stand-in was one store for every list on screen and no focus at all. This is one
-// collection per `Rows`, keyed by the collection's own id, which is what the host store has always
-// been keyed by (client-core/kit/keys/collectionState.ts).
+// There is one collection per `Rows`, keyed by the collection's own id, which is what the host store
+// is keyed by.
 
 import { onCleanup } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { _resetCollectionState, registerCollectionReveal } from '@acorn/client-core/kit/keys'
-import {
-  COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
-} from '@acorn/client-core/kit/keys'
+import { COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions } from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { bindKeys } from './install'
 import {
-  activationEntersMain, focusedRenderable, focusRenderable, markCollection, markItem, moveColumn,
-  scheduleSettle, walkStops,
+  activationEntersMain,
+  focusedRenderable,
+  focusRenderable,
+  markCollection,
+  markItem,
+  moveColumn,
+  scheduleSettle,
+  walkStops,
 } from './regions'
 import { STOP } from './tiers'
 
@@ -95,20 +98,23 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         const previous = boxes.get(key)
         boxes.set(key, box)
         // A row, so a region opening on this pane lands on the list rather than on the filter above
-        // it (./regions.ts § entryStop).
-        // Browse opts into picking when its region is entered. Hand it the collection's ordinary
-        // move rather than a second selection path, so select-on-move remains the one rule.
+        // it (./regions.ts § entryStop). The pick is the collection's ordinary move, for a region that
+        // selects on entry, so select-on-move stays the one rule.
         markItem(box, () => keys.goTo(key), `${options.id()}\u0000${key}`)
         // Solid keys rows by their data-object reference, while collection state keys them by this
-        // logical key. A refresh may therefore redraw the same row as a new renderable, and the
-        // renderer's focus goes with the one it destroyed. The landing rule re-lands on the same
-        // logical row, because the identity registry now points at this box.
+        // logical key. A refresh may therefore redraw the same row as a new renderable, leaving the
+        // keys on the one it removed. The landing rule re-lands on the same logical row, because the
+        // identity registry points at this box.
         if (previous && previous !== box) scheduleSettle()
-        onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
+        onCleanup(() => {
+          if (boxes.get(key) === box) boxes.delete(key)
+        })
       },
       press: (run) => {
         presses.set(key, run)
-        onCleanup(() => { if (presses.get(key) === run) presses.delete(key) })
+        onCleanup(() => {
+          if (presses.get(key) === run) presses.delete(key)
+        })
       },
     }),
     focusActive: () => {
@@ -123,9 +129,11 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // the region-wide Shift+Tab skips those controls and traps keyboard readers in
       // the collection once its active row has been remembered.
       bindKeys(box, [{ key: 'shift+tab', cmd: () => walkStops(focusedRenderable(), -1) }], STOP)
-      onCleanup(registerCollectionReveal(options.id(), (key) => {
-        if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
-      }))
+      onCleanup(
+        registerCollectionReveal(options.id(), (key) => {
+          if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
+        }),
+      )
       // The collection tier, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality. The number comes from
       // `registerIntentLayer`'s own default, which both hosts read, so it is the one tier this
@@ -134,18 +142,18 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // And one stop from outside: a reader walking a panel with `↓` passes the list once, on the row
       // the caret is already on, rather than through every row of it (./regions.ts § stopsIn).
       // And whether this list folds, which the footer needs to know before a reader presses `h` or
-      // `l`: a tree's fold and a plain list's bubble to a column move are the same key
-      // (./regions.ts § focusedExpands, ../chrome/bindings.ts).
+      // `l`: a tree's fold and a plain list's column move are the same key (./regions.ts § focusedExpands).
       markCollection(
         box,
-        () => { const key = keys.active(); return key ? boxes.get(key) : undefined },
+        () => {
+          const key = keys.active()
+          return key ? boxes.get(key) : undefined
+        },
         () => !!options.onExpand,
       )
     },
   }
 }
-
-export type { CollectionItem }
 
 /** Test seam: the host store outlives a single render, so a suite must not inherit a caret. */
 export function _resetCollections(): void {

@@ -33,10 +33,15 @@ const EMPTY: SkillState = { approved: {}, disabled: [] }
 const parse = (raw: string): SkillState => {
   try {
     const value = JSON.parse(raw) as { approved?: unknown; disabled?: unknown }
-    const approved = value.approved && typeof value.approved === 'object' && !Array.isArray(value.approved)
-      ? Object.fromEntries(Object.entries(value.approved).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
-      : {}
-    const disabled = Array.isArray(value.disabled) ? value.disabled.filter((name): name is string => typeof name === 'string') : []
+    const approved =
+      value.approved && typeof value.approved === 'object' && !Array.isArray(value.approved)
+        ? Object.fromEntries(
+            Object.entries(value.approved).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+          )
+        : {}
+    const disabled = Array.isArray(value.disabled)
+      ? value.disabled.filter((name): name is string => typeof name === 'string')
+      : []
     return { approved, disabled }
   } catch {
     return EMPTY
@@ -56,7 +61,10 @@ export function skillStateStore(dataDir: string): SkillStateStore {
   }
   const write = (state: SkillState) => {
     mkdirSync(dataDir, { recursive: true, mode: 0o700 })
-    writePrivateAtomic(file, `${JSON.stringify({ approved: state.approved, disabled: [...new Set(state.disabled)].sort() })}\n`)
+    writePrivateAtomic(
+      file,
+      `${JSON.stringify({ approved: state.approved, disabled: [...new Set(state.disabled)].sort() })}\n`,
+    )
   }
   return {
     get: read,
@@ -66,7 +74,10 @@ export function skillStateStore(dataDir: string): SkillStateStore {
     },
     setDisabled(name, disabled) {
       const state = read()
-      write({ ...state, disabled: disabled ? [...state.disabled, name] : state.disabled.filter((entry) => entry !== name) })
+      write({
+        ...state,
+        disabled: disabled ? [...state.disabled, name] : state.disabled.filter((entry) => entry !== name),
+      })
     },
     forget(pluginId) {
       const state = read()

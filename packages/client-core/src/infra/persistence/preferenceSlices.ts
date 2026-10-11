@@ -1,14 +1,19 @@
 import { PrefKeys } from './prefKeys'
 import type { PersistedStateSlice, RestorePhase } from './persistedState'
 
-const direct = (id: string, key: string, restore: RestorePhase = 'workspace', maxBytes = 8 * 1024): PersistedStateSlice<string> => ({
+const direct = (
+  id: string,
+  key: string,
+  restore: RestorePhase = 'workspace',
+  maxBytes = 8 * 1024,
+): PersistedStateSlice<string> => ({
   id,
   key,
   scope: 'app',
   restore,
   version: 1,
   codec: {
-    parse: (raw) => typeof raw === 'string' ? raw : '',
+    parse: (raw) => (typeof raw === 'string' ? raw : ''),
     serialize: (value) => value,
   },
   empty: () => '',
@@ -16,7 +21,12 @@ const direct = (id: string, key: string, restore: RestorePhase = 'workspace', ma
   maxBytes,
 })
 
-const jsonObject = (id: string, key: string, restore: RestorePhase = 'workspace', maxBytes = 32 * 1024): PersistedStateSlice<Record<string, unknown>> => ({
+const jsonObject = (
+  id: string,
+  key: string,
+  restore: RestorePhase = 'workspace',
+  maxBytes = 32 * 1024,
+): PersistedStateSlice<Record<string, unknown>> => ({
   id,
   key,
   scope: 'app',
@@ -25,8 +35,8 @@ const jsonObject = (id: string, key: string, restore: RestorePhase = 'workspace'
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }
@@ -47,9 +57,8 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('core.theme-dark', PrefKeys.themeDark),
   direct('core.style', PrefKeys.style),
   jsonObject('core.keybindings', PrefKeys.keybindings),
-  // Unified or split. Named `github.diff-view` until 2026-08-31, which read as github's; the diff
-  // pane it belongs to is core's shared component and `changes` draws it too. Only the slice id
-  // changed — the stored key is still `diff_view`, so nothing migrates.
+  // Unified or split. Core's rather than github's, because the diff pane it belongs to is core's shared
+  // component and `changes` draws it too.
   direct('core.diff-view', PrefKeys.diffView, 'view'),
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
   jsonObject('core.rail-visibility', PrefKeys.railVisibility, 'view', 16 * 1024),

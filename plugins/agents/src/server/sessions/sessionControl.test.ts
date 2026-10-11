@@ -6,9 +6,9 @@ describe('workflow session cancellation', () => {
     const cancelTurn = vi.fn(async () => undefined)
     const control = createSessionControl({
       store: {
-        getSession: vi.fn(async (sessionId: string) => sessionId === 'session-1'
-          ? { id: sessionId, taskId: 'task-1' }
-          : undefined),
+        getSession: vi.fn(async (sessionId: string) =>
+          sessionId === 'session-1' ? { id: sessionId, taskId: 'task-1' } : undefined,
+        ),
       } as never,
       cancelTurn,
       patchSession: vi.fn(),

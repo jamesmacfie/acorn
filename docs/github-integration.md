@@ -142,29 +142,15 @@ first one opened fetches the whole job log once and slices every step out of it.
 
 ## Pages
 
-<a id="mirror"></a>
-<a id="pull-request-detail-and-files"></a>
-<a id="diff-documents"></a>
-
 - [The GitHub mirror](./github-integration/mirror.md): the mirror, pull request detail and files, and
   diff documents.
-
-<a id="reads-and-writes"></a>
 
 - [Reads and writes](./github-integration/reads-and-writes.md): editor markers, mutations, and
   `github_pull_create`.
 
-<a id="tasks-and-references"></a>
-<a id="content-links"></a>
-
 - [Tasks and references](./github-integration/tasks-and-references.md): promotion, the pull strip,
   and content links.
 
-<a id="surfaces"></a>
-<a id="conversation"></a>
-
 - [GitHub surfaces](./github-integration/surfaces.md): pane arrangement and the conversation.
-
-<a id="from-the-command-palette"></a>
 
 - [From the command palette](./github-integration/palette.md): GitHub's commands.

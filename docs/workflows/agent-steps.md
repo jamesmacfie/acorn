@@ -146,9 +146,9 @@ continuations in a row with no tool call or file change.
 
 The run pane shows the condition, where its checks stand (**Checking completion** and **Continuing
 toward goal** while it works), the number of goal continuations and repairs, the last check's
-reason, and its evidence summary. The state is in the step row's `goal_json`, apart from the step's
-output, so no binding can read it. A For each puts each item's goal status, continuation count, and
-reason in its `children` summary.
+reason, and its evidence summary. The standalone Agent pane doesn't show the goal. The state is in
+the step row's `goal_json`, apart from the step's output, so no binding can read it. A For each puts
+each item's goal status, continuation count, and reason in its `children` summary.
 
 ### Budgets
 

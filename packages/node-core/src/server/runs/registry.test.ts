@@ -16,13 +16,19 @@ const serve = (pluginId: string, body: () => unknown): void => {
   registerRoute({
     plugin: pluginId,
     prefix: '',
-    fetch: () => Promise.resolve(new Response(JSON.stringify(body()), { headers: { 'content-type': 'application/json' } })),
+    fetch: () =>
+      Promise.resolve(new Response(JSON.stringify(body()), { headers: { 'content-type': 'application/json' } })),
   })
   registerRunSource({ pluginId, runs: `/v1/p/${pluginId}/runs` })
 }
 
-const run = (id: string, over: Record<string, unknown> = {}) =>
-  ({ id, title: id, status: 'running', startedAt: 1_000, ...over })
+const run = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  title: id,
+  status: 'running',
+  startedAt: 1_000,
+  ...over,
+})
 
 describe('the merged run list', () => {
   afterEach(() => {
@@ -36,17 +42,30 @@ describe('the merged run list', () => {
     serve('alpha', () => ({ runs: [run('a1', { startedAt: 3_000 })] }))
     serve('beta', () => ({ runs: [run('b1', { startedAt: 5_000 }), run('b2', { startedAt: 1_000 })] }))
     const { runs, failed } = await readRuns(env)
-    expect(runs.map((row) => [row.pluginId, row.id])).toEqual([['beta', 'b1'], ['alpha', 'a1'], ['beta', 'b2']])
+    expect(runs.map((row) => [row.pluginId, row.id])).toEqual([
+      ['beta', 'b1'],
+      ['alpha', 'a1'],
+      ['beta', 'b2'],
+    ])
     expect(failed).toEqual([])
   })
 
   it('reads a built-in Hono run source under the service principal', async () => {
-    const router = new Hono<AppEnv>().get('/runs', (c) => c.json({ runs: [run('g1', {
-      detail: c.get('principal')?.kind === 'internal' ? 'service' : 'wrong-principal',
-    })] }))
+    const router = new Hono<AppEnv>().get('/runs', (c) =>
+      c.json({
+        runs: [
+          run('g1', {
+            detail: c.get('principal')?.kind === 'internal' ? 'service' : 'wrong-principal',
+          }),
+        ],
+      }),
+    )
     registerRoute({ plugin: 'gamma', prefix: '', router })
     registerRunSource({ pluginId: 'gamma', runs: '/v1/p/gamma/runs' })
-    expect(await readRuns(env)).toMatchObject({ runs: [{ pluginId: 'gamma', id: 'g1', detail: 'service' }], failed: [] })
+    expect(await readRuns(env)).toMatchObject({
+      runs: [{ pluginId: 'gamma', id: 'g1', detail: 'service' }],
+      failed: [],
+    })
   })
 
   it('never lets a source name itself', async () => {
@@ -55,7 +74,7 @@ describe('the merged run list', () => {
     expect((await readRuns(env)).runs[0].pluginId).toBe('alpha')
   })
 
-  it('costs a bad source its own rows and nobody else\'s', async () => {
+  it("costs a bad source its own rows and nobody else's", async () => {
     serve('alpha', () => ({ runs: [run('a1')] }))
     // Not a run list. A shorter list is a better answer than no list, and `failed` says so out loud.
     serve('beta', () => ({ nonsense: true }))
@@ -64,7 +83,7 @@ describe('the merged run list', () => {
     expect(failed).toEqual(['beta'])
   })
 
-  it('forgets a plugin\'s source when the plugin goes', async () => {
+  it("forgets a plugin's source when the plugin goes", async () => {
     serve('alpha', () => ({ runs: [run('a1')] }))
     clearRunSources('alpha')
     expect((await readRuns(env)).runs).toEqual([])

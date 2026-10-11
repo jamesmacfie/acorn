@@ -62,7 +62,11 @@ const TRUST: PluginTrustRequest = {
     installed: {
       version: '1.0.0',
       apiVersion: '9',
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
       contributions: { frames: [] },
       client: null,
     },
@@ -74,15 +78,24 @@ describe('keys and focus in cells', () => {
     const [open, setOpen] = createSignal(false)
     const [searching, setSearching] = createSignal(false)
     const [text, setText] = createSignal('')
-    let frame = await renderCells(() => <>
-      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'editor', regionId: 'search' }, 0)}>
-        <Button>Tree controls</Button>
-        <Input autofocus={searching()} value={text()} onInput={setText} />
-      </box>
-      <Show when={open()}><Modal title="Command" onDismiss={() => setOpen(false)}>
-        <ModalBody><Button>Command action</Button></ModalBody>
-      </Modal></Show>
-    </>, { width: 60, height: 12 })
+    let frame = await renderCells(
+      () => (
+        <>
+          <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'editor', regionId: 'search' }, 0)}>
+            <Button>Tree controls</Button>
+            <Input autofocus={searching()} value={text()} onInput={setText} />
+          </box>
+          <Show when={open()}>
+            <Modal title="Command" onDismiss={() => setOpen(false)}>
+              <ModalBody>
+                <Button>Command action</Button>
+              </ModalBody>
+            </Modal>
+          </Show>
+        </>
+      ),
+      { width: 60, height: 12 },
+    )
     try {
       setOpen(true)
       frame = await frame.press('TAB')
@@ -92,27 +105,58 @@ describe('keys and focus in cells', () => {
       frame = await frame.press('ESCAPE')
       frame = await frame.press('n')
       expect(text()).toBe('n')
-    } finally { frame.done() }
+    } finally {
+      frame.done()
+    }
   })
 
   it('keeps a narrow file row alive through F2 and restores focus for the context key', async () => {
     const [editing, setEditing] = createSignal(false)
     const [menu, setMenu] = createSignal('')
     const [create, setCreate] = createSignal(false)
-    const ActionList = () => <Show when={editing()} fallback={
-      <Rows id="files" items={[{ key: 'one', label: 'one' }, { key: 'two', label: 'two' }]} onMenu={setMenu}>
-        {(item, props) => <TreeRow item={props} onRename={() => setEditing(true)} onCreate={() => setCreate(true)}>{item.label}</TreeRow>}
-      </Rows>
-    }>
-      <Modal title="Rename entry" onDismiss={() => setEditing(false)}>
-        <ModalBody><Input label="Name" value="one" onInput={() => {}} /></ModalBody>
-      </Modal>
-    </Show>
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter stateKey="file-actions" label="Editor" regions={{ body: () =>
-        <ListDetail list={<ActionList />}><Text>Document detail</Text></ListDetail>
-      }} />
-    ), { width: 70, height: 24 })
+    const ActionList = () => (
+      <Show
+        when={editing()}
+        fallback={
+          <Rows
+            id="files"
+            items={[
+              { key: 'one', label: 'one' },
+              { key: 'two', label: 'two' },
+            ]}
+            onMenu={setMenu}
+          >
+            {(item, props) => (
+              <TreeRow item={props} onRename={() => setEditing(true)} onCreate={() => setCreate(true)}>
+                {item.label}
+              </TreeRow>
+            )}
+          </Rows>
+        }
+      >
+        <Modal title="Rename entry" onDismiss={() => setEditing(false)}>
+          <ModalBody>
+            <Input label="Name" value="one" onInput={() => {}} />
+          </ModalBody>
+        </Modal>
+      </Show>
+    )
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="file-actions"
+          label="Editor"
+          regions={{
+            body: () => (
+              <ListDetail list={<ActionList />}>
+                <Text>Document detail</Text>
+              </ListDetail>
+            ),
+          }}
+        />
+      ),
+      { width: 70, height: 24 },
+    )
     try {
       expect((await frame.press('F2')).text).toContain('Rename entry')
       const cancelled = await frame.press('ESCAPE')
@@ -122,20 +166,23 @@ describe('keys and focus in cells', () => {
       expect(menu()).toBe('two')
       await frame.press('n', { ctrl: true })
       expect(create()).toBe(true)
-    } finally { frame.done() }
+    } finally {
+      frame.done()
+    }
   }, 30_000)
 
   it('lands the keys on the list when a pane opens, and moves them with next and prev', async () => {
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />,
+      { width: 40, height: 10 },
+    )
     try {
       // Something has the keys before anything is pressed: a terminal has no pointer, so a pane that
       // opens with focus nowhere is a pane nobody can drive (./regions.ts § regionFocus).
       const first = caretRow(frame.lines)
       expect(first).toBeGreaterThanOrEqual(0)
 
-      // `j` is `next` in the one table both hosts read (client-core kit/keys/keymap.ts).
+      // `j` is `next` in the one table both hosts read (`intentKeys`).
       expect(caretRow((await frame.press('j')).lines)).toBe(first + 1)
       expect(caretRow((await frame.press('k')).lines)).toBe(first)
       // Wraps, because a list you cannot fall off the end of is a list you never have to look at.
@@ -149,12 +196,15 @@ describe('keys and focus in cells', () => {
 
   it('routes activate to the row the caret is on', async () => {
     const [opened, setOpened] = createSignal('')
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List onActivate={setOpened} /> }} />
-        <Text>{`opened:${opened()}`}</Text>
-      </>
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List onActivate={setOpened} /> }} />
+          <Text>{`opened:${opened()}`}</Text>
+        </>
+      ),
+      { width: 40, height: 10 },
+    )
     try {
       await frame.press('j')
       const after = await frame.press('RETURN')
@@ -165,18 +215,23 @@ describe('keys and focus in cells', () => {
   }, 30_000)
 
   it('cycles the regions of a pane, and each remembers where it was', async () => {
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          header: () => <Rows id="header-list" items={[{ key: 'h', label: 'Header row' }]}>
-            {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
-          </Rows>,
-          body: () => <List />,
-        }}
-      />
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            header: () => (
+              <Rows id="header-list" items={[{ key: 'h', label: 'Header row' }]}>
+                {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+              </Rows>
+            ),
+            body: () => <List />,
+          }}
+        />
+      ),
+      { width: 40, height: 10 },
+    )
     try {
       // The header registers first, so it opens with the keys.
       expect(frame.lines[caretRow(frame.lines)]).toContain('Header row')
@@ -190,23 +245,29 @@ describe('keys and focus in cells', () => {
     }
   }, 30_000)
 
-  it('keeps next inside a modal, on both of this host\'s keys for it, and dismiss closes it', async () => {
+  it("keeps next inside a modal, on both of this host's keys for it, and dismiss closes it", async () => {
     const [open, setOpen] = createSignal(false)
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
-        <Show when={open()}>
-          <Modal onDismiss={() => setOpen(false)} title="Ask"><ModalBody><Text>a question</Text></ModalBody></Modal>
-        </Show>
-      </>
-    ), { width: 40, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
+          <Show when={open()}>
+            <Modal onDismiss={() => setOpen(false)} title="Ask">
+              <ModalBody>
+                <Text>a question</Text>
+              </ModalBody>
+            </Modal>
+          </Show>
+        </>
+      ),
+      { width: 40, height: 12 },
+    )
     try {
       const before = caretRow(frame.lines)
       expect(before).toBeGreaterThanOrEqual(0)
 
       // A modal lands the keys as well as containing them, so the caret leaves the list behind it
-      // (./regions.ts § pushScope). One that only contained them left the reader looking at a dialog
-      // whose every key the trap then swallowed.
+      // (./regions.ts § pushScope).
       setOpen(true)
       const up = await frame.frame()
       expect(up.text).toContain('a question')
@@ -216,10 +277,8 @@ describe('keys and focus in cells', () => {
       // on a host with no scrim: with the modal's box on the scope stack no region is in scope, so
       // the region cycle has nowhere to go (./regions.ts § Scopes).
       //
-      // Both keys, because on this host `f6` and `tab` are the same intent (./install.ts § HOST_KEYS)
-      // and the swallow this replaced contained only one of them. It named its keys from the shared
-      // table, where `nextRegion` is `f6` alone, so Tab walked the keys onto the list behind the
-      // dialog. That is the whole of symptom A (../symptoms.test.tsx).
+      // Both keys, because on this host `f6` and `tab` are the same intent (./install.ts § HOST_KEYS),
+      // and the shared table, where `nextRegion` is `f6` alone, names only one of them.
       for (const key of ['F6', 'TAB']) {
         const held = await frame.press(key)
         expect(held.text, key).toContain('a question')
@@ -239,13 +298,10 @@ describe('keys and focus in cells', () => {
   // ── A dialog holds the keys because nothing outside it is in scope ──────────────────────────
   //
   // The two cases below drive the whole shell rather than one node, because the fault they prevent
-  // was in what the shell and the store said to each other about the dialog. A trap used to contain
-  // the keys by swallowing a named list of them, and the list it named came from `keysFor()`, where
-  // `nextRegion` is `f6` alone, while `install.ts` binds `hostKeysFor()`, which adds `tab` for this
-  // host. So Tab was swallowed nowhere: it walked the keys onto a rail row behind the dialog and the
-  // swallow then ate everything but Escape, which made the one key the footer advertised the one key
-  // that broke the dialog. A dialog is a scope now, so nothing behind it is in the universe a walk
-  // sees, and there is no list to leak (./regions.ts § Scopes, ./trap.ts).
+  // lives in what the shell and the store say to each other about the dialog. Tab is bound through
+  // `hostKeysFor()` while the shared `keysFor()` names only `f6`, so any containment that names keys
+  // leaks Tab onto a rail row behind the dialog. A dialog is a scope, so nothing behind it is in the
+  // universe a walk sees (./regions.ts § Scopes, ./trap.ts).
 
   it('answers the plugin trust prompt after a Tab', async () => {
     const screen = await renderFixture({ width: 100, height: 28, trust: [TRUST] })
@@ -258,12 +314,9 @@ describe('keys and focus in cells', () => {
       const before = focusedRenderable()
       const region = focusedRegion()
 
-      // Both halves are asserted, because the keys used to recover and that is what made this hard
-      // to see. The walk moved them onto a rail row behind the dialog and the next landing, which a
-      // query arriving supplies sooner or later, handed them back. What never recovered is the
-      // store's idea of which region has them, so the region had silently moved to the rail while
-      // the keys were in the dialog. Both halves are the store's own now: there is one focus value
-      // and this reads it (./regions.ts § The one owner).
+      // Both halves are asserted, because a leak can hide: the next landing, which a query arriving
+      // supplies sooner or later, can hand the keys back while the region claim stays on the rail
+      // (./regions.ts § The one owner).
       await screen.press('TAB')
       expect(focusedRenderable()).toBe(before)
       expect(focusedRegion()).toEqual(region)
@@ -298,11 +351,10 @@ describe('keys and focus in cells', () => {
   }, 60_000)
 
   it('offers Tab only where Tab goes somewhere', async () => {
-    // The footer used to advertise a key that did nothing. `moveRegion` returns false with fewer than
-    // two regions in scope, and the hint was drawn from "is Tab bound", which it always is. The hint
-    // asks the store how many regions the keys can reach instead, so a one-region screen does not
-    // offer it. The case is a disjunction because either answer is honest: Tab may move, or the
-    // footer may stay quiet, and only offering it while it does nothing is the bug
+    // `moveRegion` returns false with fewer than two regions in scope, and Tab is always bound, so the
+    // hint asks the store how many regions the keys can reach rather than whether Tab is bound. The
+    // case is a disjunction because either answer is honest: Tab may move, or the footer may stay
+    // quiet, and only offering it while it does nothing is the bug
     // (../chrome/bindings.ts, ./regions.ts § regionsInScope).
     const screen = await renderFixture({ width: 100, height: 28 })
     try {
@@ -324,21 +376,30 @@ describe('keys and focus in cells', () => {
   it('a pty rectangle takes the keys on enter and gives them back on escape', async () => {
     let terminal: CellTerminal | undefined
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter
-          stateKey="pane"
-          label="Test"
-          regions={{
-            header: () => <List />,
-            body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-              terminal = handle as unknown as CellTerminal
-              terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-            }} />,
-          }}
-        />
-      </>
-    ), { width: 40, height: 20 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter
+            stateKey="pane"
+            label="Test"
+            regions={{
+              header: () => <List />,
+              body: () => (
+                <Rectangle
+                  kind="pty"
+                  label="Terminal"
+                  mount={(handle) => {
+                    terminal = handle as unknown as CellTerminal
+                    terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                  }}
+                />
+              ),
+            }}
+          />
+        </>
+      ),
+      { width: 40, height: 20 },
+    )
     try {
       expect(terminal).toBeDefined()
       // Bytes from the PTY are drawn by a real emulator in cells, which is the thing a terminal does
@@ -384,18 +445,27 @@ describe('keys and focus in cells', () => {
   it('a pty rectangle tells the PTY its size, and again when the terminal is resized', async () => {
     let terminal: CellTerminal | undefined
     const sizes: [number, number][] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-            terminal = handle as unknown as CellTerminal
-            terminal.onResize((cols, rows) => sizes.push([cols, rows]))
-          }} />,
-        }}
-      />
-    ), { width: 40, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <Rectangle
+                kind="pty"
+                label="Terminal"
+                mount={(handle) => {
+                  terminal = handle as unknown as CellTerminal
+                  terminal.onResize((cols, rows) => sizes.push([cols, rows]))
+                }}
+              />
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 12 },
+    )
     try {
       expect(terminal).toBeDefined()
       await frame.resize(100, 30)
@@ -410,34 +480,39 @@ describe('keys and focus in cells', () => {
 
   // ── An entered rectangle that goes off screen ───────────────────────────────────────────────
   //
-  // Being entered used to be a flag, set by Enter and cleared by Escape or by unmounting. Neither of
-  // those happens when a subtree is hidden without being unmounted, which is what a tab switch and
-  // an overlay both do here, so a rectangle nobody could see went on consuming every key in the app,
-  // `Ctrl+C` included, since the intercept sits above every layer there is. It is a derived fact now:
-  // entered means the box has the keys, is on screen, and Enter was pressed since it last lost them,
-  // so the answer changes the moment the screen does and there is no flag to be stale
+  // A tab switch and an overlay hide a subtree without unmounting it, so a flag set by Enter and
+  // cleared by Escape or unmounting would leave a rectangle nobody can see consuming every key in the
+  // app, `Ctrl+C` included, since the intercept sits above every layer there is. Entered is derived
+  // instead: the box has the keys, is on screen, and Enter was pressed since it last lost them
   // (../kit/rectangle.tsx § entered).
 
   it('stops taking the keys the moment an entered rectangle goes off screen', async () => {
     const [shown, setShown] = createSignal(true)
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          header: () => <List />,
-          body: () => (
-            <box visible={shown()} flexGrow={1} flexDirection="column">
-              <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-                const terminal = handle as unknown as CellTerminal
-                terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-              }} />
-            </box>
-          ),
-        }}
-      />
-    ), { width: 40, height: 16 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            header: () => <List />,
+            body: () => (
+              <box visible={shown()} flexGrow={1} flexDirection="column">
+                <Rectangle
+                  kind="pty"
+                  label="Terminal"
+                  mount={(handle) => {
+                    const terminal = handle as unknown as CellTerminal
+                    terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                  }}
+                />
+              </box>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 16 },
+    )
     try {
       await frame.press('F6')
       const inside = await frame.press('RETURN')
@@ -445,8 +520,8 @@ describe('keys and focus in cells', () => {
       typed.length = 0
 
       // Hidden from outside the keyboard, and by a bare `visible` that asks for nothing else: this is
-      // the intercept's own guard, with no landing pass involved. `visible` is per node in OpenTUI,
-      // so the box below still reports itself focused and visible, and asking it alone was the bug.
+      // the intercept's own guard, with no landing pass involved. `visible` is per node, so the box
+      // below still reports itself focused and visible, and asking it alone is not enough.
       setShown(false)
       await frame.frame()
       await frame.press('j')
@@ -463,38 +538,48 @@ describe('keys and focus in cells', () => {
     // The path a reader actually meets: a terminal on one tab of a pane, entered, and the tab
     // switched by something other than the keyboard, such as a route change or a task activating
     // from a notification. `TabPanel` hides its panel rather than unmounting it so the panel keeps its
-    // state, so the hidden rectangle keeps the renderer's focus, and a viewport whose flag has gone
-    // false asks for a landing pass for exactly this reason (../kit/scrolling.tsx).
+    // state, so the hidden rectangle keeps the keys until a landing pass, and a viewport whose flag
+    // has gone false asks for one for exactly this reason (../kit/scrolling.tsx).
     const [tab, setTab] = createSignal('term')
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => (
-            <>
-              <Tabs
-                idPrefix="rect"
-                ariaLabel="Panes"
-                active={tab()}
-                onChange={setTab}
-                tabs={[{ id: 'term', label: 'Terminal' }, { id: 'list', label: 'List' }]}
-              />
-              <TabPanel idPrefix="rect" id="term" active={tab()}>
-                <Rectangle kind="pty" label="Shell" mount={(handle) => {
-                  const terminal = handle as unknown as CellTerminal
-                  terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-                }} />
-              </TabPanel>
-              <TabPanel idPrefix="rect" id="list" active={tab()}>
-                <List />
-              </TabPanel>
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 18 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <>
+                <Tabs
+                  idPrefix="rect"
+                  ariaLabel="Panes"
+                  active={tab()}
+                  onChange={setTab}
+                  tabs={[
+                    { id: 'term', label: 'Terminal' },
+                    { id: 'list', label: 'List' },
+                  ]}
+                />
+                <TabPanel idPrefix="rect" id="term" active={tab()}>
+                  <Rectangle
+                    kind="pty"
+                    label="Shell"
+                    mount={(handle) => {
+                      const terminal = handle as unknown as CellTerminal
+                      terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                    }}
+                  />
+                </TabPanel>
+                <TabPanel idPrefix="rect" id="list" active={tab()}>
+                  <List />
+                </TabPanel>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 18 },
+    )
     try {
       // The strip is a parent stop, so entry lands on it and Down goes into the panel it is showing,
       // which is the rectangle's door.
@@ -521,36 +606,42 @@ describe('keys and focus in cells', () => {
   }, 30_000)
 
   it('gets back to the strip from inside a panel with Up, and switches tabs from inside with Left and Right', async () => {
-    // The path the report named: a tabbed pane whose panel holds a row of controls. Down enters the
-    // panel; from there Up used to be a wall and Left used to be the column move, which from any
-    // control on the pane put the reader in the rail (./regions.ts § crossParent, § moveStop).
+    // A tabbed pane whose panel holds a row of controls. Down enters the panel; from there Up has to
+    // reach the strip rather than wall, and Left has to be the strip's rather than a column move into
+    // the rail (./regions.ts § crossParent, § moveStop).
     const [tab, setTab] = createSignal('one')
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => (
-            <>
-              <Tabs
-                idPrefix="ctl"
-                ariaLabel="Sections"
-                active={tab()}
-                onChange={setTab}
-                tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
-              />
-              <TabPanel idPrefix="ctl" id="one" active={tab()}>
-                <Button onPress={() => {}}>Merge</Button>
-                <Button onPress={() => {}}>Close</Button>
-              </TabPanel>
-              <TabPanel idPrefix="ctl" id="two" active={tab()}>
-                <Text>Second panel</Text>
-              </TabPanel>
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <>
+                <Tabs
+                  idPrefix="ctl"
+                  ariaLabel="Sections"
+                  active={tab()}
+                  onChange={setTab}
+                  tabs={[
+                    { id: 'one', label: 'One' },
+                    { id: 'two', label: 'Two' },
+                  ]}
+                />
+                <TabPanel idPrefix="ctl" id="one" active={tab()}>
+                  <Button onPress={() => {}}>Merge</Button>
+                  <Button onPress={() => {}}>Close</Button>
+                </TabPanel>
+                <TabPanel idPrefix="ctl" id="two" active={tab()}>
+                  <Text>Second panel</Text>
+                </TabPanel>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 12 },
+    )
     try {
       const strip = focusedRenderable()
       const second = await (await frame.press('ARROW_DOWN')).press('ARROW_DOWN')
@@ -599,8 +690,9 @@ describe('keys and focus in cells', () => {
  *  point of the typing shadow is this number, and a release that renames it should fail loudly rather
  *  than let the design quietly stop paying (`@opentui/keymap` § createKeymapState). */
 const cacheBlockers = (engine: object): number => {
-  const symbol = Object.getOwnPropertySymbols(Object.getPrototypeOf(engine))
-    .find((candidate) => String(candidate).includes('keymap-extension-context'))
+  const symbol = Object.getOwnPropertySymbols(Object.getPrototypeOf(engine)).find((candidate) =>
+    String(candidate).includes('keymap-extension-context'),
+  )
   expect(symbol, 'the keymap no longer exposes its extension context').toBeDefined()
   const read = (engine as Record<symbol, () => { state: { activeKeyCacheBlockers: number } }>)[symbol!]
   return read.call(engine).state.activeKeyCacheBlockers
@@ -610,19 +702,44 @@ describe('the typing shadow', () => {
   it('keeps a printable command shortcut in the focused search field', async () => {
     const [text, setText] = createSignal('')
     let opened = 0
-    const commands = registerCommands([{ id: 'test.open', title: 'Open', category: 'action', palette: true, run: () => { opened++ } }])
-    const bindings = registerKeybindings([{ id: 'test.open.key', command: 'test.open', description: 'Open', category: 'Global', defaultChord: 'n' }])
+    const commands = registerCommands([
+      {
+        id: 'test.open',
+        title: 'Open',
+        category: 'action',
+        palette: true,
+        run: () => {
+          opened++
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      { id: 'test.open.key', command: 'test.open', description: 'Open', category: 'Global', defaultChord: 'n' },
+    ])
     let screen: Awaited<ReturnType<typeof renderCells>> | undefined
     try {
-      screen = await renderCells(() => {
-        onMount(() => installCommandLayer(keymap()!, {
-          prefs: () => ({}), taskActive: () => true, focusedPane: () => undefined,
-        }))
-        return <box flexDirection="column" flexGrow={1}>
-          <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}><Input value={text()} onInput={setText} /></box>
-          <box ref={regionFocus({ paneId: 'test', regionId: 'button' }, 1)}><Button>Next</Button></box>
-        </box>
-      }, { width: 40, height: 8 })
+      screen = await renderCells(
+        () => {
+          onMount(() =>
+            installCommandLayer(keymap()!, {
+              prefs: () => ({}),
+              taskActive: () => true,
+              focusedPane: () => undefined,
+            }),
+          )
+          return (
+            <box flexDirection="column" flexGrow={1}>
+              <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
+                <Input value={text()} onInput={setText} />
+              </box>
+              <box ref={regionFocus({ paneId: 'test', regionId: 'button' }, 1)}>
+                <Button>Next</Button>
+              </box>
+            </box>
+          )
+        },
+        { width: 40, height: 8 },
+      )
       screen = await screen.press('n')
       expect(text()).toBe('n')
       expect(opened).toBe(0)
@@ -641,17 +758,20 @@ describe('the typing shadow', () => {
     const [pressed, setPressed] = createSignal('')
     // Two regions, because Tab is how the keys leave a field for something that is not one, and the
     // cycle needs somewhere to go (./regions.ts § moveRegion).
-    let screen = await renderCells(() => (
-      <box flexDirection="column" flexGrow={1}>
-        <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
-          <Input value={text()} onInput={setText} />
+    let screen = await renderCells(
+      () => (
+        <box flexDirection="column" flexGrow={1}>
+          <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
+            <Input value={text()} onInput={setText} />
+          </box>
+          <box flexDirection="column" ref={regionFocus({ paneId: 'test', regionId: 'buttons' }, 1)}>
+            <Button onPress={() => setPressed('first')}>First</Button>
+            <Button onPress={() => setPressed('second')}>Second</Button>
+          </box>
         </box>
-        <box flexDirection="column" ref={regionFocus({ paneId: 'test', regionId: 'buttons' }, 1)}>
-          <Button onPress={() => setPressed('first')}>First</Button>
-          <Button onPress={() => setPressed('second')}>Second</Button>
-        </box>
-      </box>
-    ), { width: 40, height: 8 })
+      ),
+      { width: 40, height: 8 },
+    )
     try {
       const { keymap } = await import('@acorn/client-core/kit/keys/keymapHost.ts')
       const engine = keymap()!
@@ -683,16 +803,36 @@ describe('the typing shadow', () => {
 
 it('reaches a preceding panel control from a focused collection row', async () => {
   let presses = 0
-  let screen = await renderCells(() => (
-    <HeaderBodyFooter stateKey="list-controls" label="List" regions={{ body: () => <>
-      <Toolbar><Button onPress={() => { presses++ }}>Collapse all</Button><Button>Reveal active</Button></Toolbar>
-      <Button>Show ignored</Button>
-      <Button>New</Button>
-      <Rows id="test-controls" items={[{ key: 'file', label: 'File' }]}>
-        {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
-      </Rows>
-    </> }} />
-  ), { width: 40, height: 8 })
+  let screen = await renderCells(
+    () => (
+      <HeaderBodyFooter
+        stateKey="list-controls"
+        label="List"
+        regions={{
+          body: () => (
+            <>
+              <Toolbar>
+                <Button
+                  onPress={() => {
+                    presses++
+                  }}
+                >
+                  Collapse all
+                </Button>
+                <Button>Reveal active</Button>
+              </Toolbar>
+              <Button>Show ignored</Button>
+              <Button>New</Button>
+              <Rows id="test-controls" items={[{ key: 'file', label: 'File' }]}>
+                {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+              </Rows>
+            </>
+          ),
+        }}
+      />
+    ),
+    { width: 40, height: 8 },
+  )
   try {
     screen = await screen.press('TAB', { shift: true })
     screen = await screen.press('k')

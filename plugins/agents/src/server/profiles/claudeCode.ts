@@ -13,14 +13,18 @@ export const claudeCodeProfile: AgentProfileContribution = {
   // Terminal builds standing context before spawn; no first-turn recall tool call is needed.
   launchContextArgs: (context) => [
     '--append-system-prompt',
-    [context, 'This session runs inside acorn. Use task_context for the task, pull request and linked issues, and notes_read for task notes. Re-read notes when the task shifts; the user edits them while you work. Never ask the user for context you can pull yourself.'].filter(Boolean).join('\n\n'),
+    [
+      context,
+      'This session runs inside acorn. Use task_context for the task, pull request and linked issues, and notes_read for task notes. Re-read notes when the task shifts; the user edits them while you work. Never ask the user for context you can pull yourself.',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
   ],
-  // `auto` rather than `dontAsk`, which is what this was until an agent tool got called and denied.
-  // `dontAsk` does not mean "do not prompt", it means "deny anything not already in a `permissions.allow`
-  // rule", and acorn writes no such rules. So every tool acorn projects — task_context, notes_read,
-  // memory_search, issue_detail — was denied in a workflow step, on a server the step could see and
-  // list. `auto` approves with a classifier instead of a prompt, which is the only shape that works
-  // when nobody is at the keyboard. The tools an agent may reach are still acorn's decision, taken at
+  // `auto` rather than `dontAsk`. `dontAsk` does not mean "do not prompt", it means "deny anything not
+  // already in a `permissions.allow` rule", and acorn writes no such rules, so every tool acorn projects
+  // (task_context, notes_read, memory_search, issue_detail) would be denied in a workflow step. `auto`
+  // approves with a classifier instead of a prompt, which is the only shape that works when nobody is at
+  // the keyboard. The tools an agent may reach are still acorn's decision, taken at
   // the node: the tier and per-tool preferences the owner set, narrowed by the step's own ceiling
   // (docs/agent-tools.md § Permissions).
   headlessArgv: (command, opts) => ({
@@ -39,11 +43,11 @@ export const claudeCodeProfile: AgentProfileContribution = {
     ],
   }),
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['--resume', sessionRef] }),
-  // One structured turn with both built-in and projected tools disabled. Two callers now: a workflow
+  // One structured turn with both built-in and projected tools disabled. Two callers: a workflow
   // `decide` step, and any Generate control in the app spending this CLI as a text backend
   // (docs/integrations/model-providers.md § Model providers).
   //
-  // It keeps `dontAsk` where the headless turn moved to `auto`: with `--tools ''` there is nothing to
+  // It keeps `dontAsk` where the headless turn uses `auto`: with `--tools ''` there is nothing to
   // approve, and a deny is the right answer for anything that gets past that. Neither caller acts, so
   // this is the one path where the denying mode is the point.
   //

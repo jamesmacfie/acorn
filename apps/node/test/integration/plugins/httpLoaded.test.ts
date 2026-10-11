@@ -11,14 +11,15 @@ import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { pluginDbPath } from '@acorn/node-core/server/plugins'
 import { pluginDir } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { openSqlite } from '@acorn/node-core/server/storage'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 
-// http is the first plugin to ship loaded with tables of its own, so this is the suite the storage
-// path never had: a manifest-declared migrations directory staged inside the package, a host-opened
+// http ships loaded with tables of its own, so this suite covers the loaded storage path: a
+// manifest-declared migrations directory staged inside the package, a host-opened
 // database bound to the manifest id, and a schema change arriving through the installer against a
 // database that already has rows in it (docs/plugins/data-ownership.md § Data ownership).
 //
@@ -35,7 +36,13 @@ describe('http as a loaded plugin with its own tables', () => {
   let running: Awaited<ReturnType<typeof initPlugins>> | null = null
 
   const coreServices = () =>
-    createCoreServices({ secrets: secrets(), db: core.db, activeIdentity: memoryIdentityStore() })
+    createCoreServices({ secrets: secrets(), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
+  // A scheduler that never starts, for the deleted-task purge the plugin registers at init.
+  const capabilities = () => {
+    const registry = new CapabilityRegistry()
+    registry.provide(SCHEDULER, new Scheduler(core.db))
+    return registry
+  }
 
   // One load-and-init cycle, standing in for a boot. Returns the route handler the plugin registered, so
   // a caller can drive real requests through the same door the host uses.
@@ -46,11 +53,11 @@ describe('http as a loaded plugin with its own tables', () => {
       const entry = loaded.find((row) => row.manifest.id === 'http')
       const plugins = entry
         ? await initPlugins([entry.plugin], {
-          capabilities: new CapabilityRegistry(),
-          core: coreServices(),
-          dataDir: dataRoot,
-          loaded: new Map([['http', { permissions: entry.manifest.permissions.node, storage: entry.storage }]]),
-        })
+            capabilities: capabilities(),
+            core: coreServices(),
+            dataDir: dataRoot,
+            loaded: new Map([['http', { permissions: entry.manifest.permissions.node, storage: entry.storage }]]),
+          })
         : null
       running = plugins
       const route = pluginRouteContributions().find((row) => row.plugin === 'http')
@@ -79,9 +86,13 @@ describe('http as a loaded plugin with its own tables', () => {
         principal: { kind: 'device', userId: 'owner-1', deviceId: 'device-1' },
         providers: {
           connections: async () => [],
-          resource: async () => { throw new Error('http has no provider') },
+          resource: async () => {
+            throw new Error('http has no provider')
+          },
           withConnections: async () => [],
-          items: () => { throw new Error('http has no provider') },
+          items: () => {
+            throw new Error('http has no provider')
+          },
         },
       },
     )
@@ -90,7 +101,10 @@ describe('http as a loaded plugin with its own tables', () => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-http-loaded-'))
     core = makeTestDb()
     const now = Date.now()
-    core.db.insert(schema.workspaces).values({ id: 'ws-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run?.()
+    core.db
+      .insert(schema.workspaces)
+      .values({ id: 'ws-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+      .run?.()
     execFileSync(process.execPath, [join(NODE_APP, 'scripts/build-plugin.mjs'), 'http'], {
       cwd: NODE_APP,
       env: { ...process.env, ACORN_DATA_DIR: dataRoot },
@@ -107,7 +121,7 @@ describe('http as a loaded plugin with its own tables', () => {
   it('stages its migration chain inside the package and declares it', () => {
     const dir = pluginDir(dataRoot, 'http')
     const manifest = JSON.parse(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')) as { migrations?: string }
-    // The whole point of the builder change: without a staged chain the manifest declaration would name a
+    // The point of staging the chain: without it the manifest declaration would name a
     // directory the loader confines and then fails to find, which is a plugin that dies on first open.
     expect(manifest.migrations).toBe('./migrations')
     expect(existsSync(join(dir, 'migrations/meta/_journal.json'))).toBe(true)
@@ -133,9 +147,20 @@ describe('http as a loaded plugin with its own tables', () => {
   it('applies a migration that arrives through an update, and keeps the rows', async () => {
     const now = Date.now()
     await core.db.insert(schema.projects).values({
-      id: 'proj-1', name: 'web', path: null, workspaceId: 'ws-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'proj-1',
+      name: 'web',
+      path: null,
+      workspaceId: 'ws-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
 
     const { route } = await boot()
@@ -159,10 +184,15 @@ describe('http as a loaded plugin with its own tables', () => {
       cpSync(built, staged, { recursive: true })
       rmSync(join(staged, '.acorn-dev-build'), { force: true })
       const manifest = JSON.parse(readFileSync(join(staged, 'acorn-plugin.json'), 'utf8')) as { version: string }
-      writeFileSync(join(staged, 'acorn-plugin.json'), JSON.stringify({ ...manifest, version: `${manifest.version}-next` }))
+      writeFileSync(
+        join(staged, 'acorn-plugin.json'),
+        JSON.stringify({ ...manifest, version: `${manifest.version}-next` }),
+      )
 
       const journalPath = join(staged, 'migrations/meta/_journal.json')
-      const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { idx: number; version: string; when: number; tag: string; breakpoints: boolean }[] }
+      const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+        entries: { idx: number; version: string; when: number; tag: string; breakpoints: boolean }[]
+      }
       writeFileSync(join(staged, 'migrations/0001_added_column.sql'), 'ALTER TABLE `http_requests` ADD `note` text;')
       journal.entries.push({ idx: 1, version: '6', when: now, tag: '0001_added_column', breakpoints: true })
       writeFileSync(journalPath, JSON.stringify(journal))
@@ -195,19 +225,32 @@ describe('http as a loaded plugin with its own tables', () => {
     mkdirSync(checkout)
     const now = Date.now()
     await core.db.insert(schema.projects).values({
-      id: 'proj-send', name: 'send', path: checkout, workspaceId: 'ws-1', sort: 1, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'proj-send',
+      name: 'send',
+      path: checkout,
+      workspaceId: 'ws-1',
+      sort: 1,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     writeFileSync(join(checkout, 'base-url.mjs'), 'process.stdout.write("http://127.0.0.1:1")')
     const { route } = await boot()
     const variable = await call(route!, '/projects/proj-send/vars', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'BASE_URL', kind: 'command', value: 'node base-url.mjs', enabled: true }),
     })
     expect(variable.status).toBe(201)
     const sent = await call(route!, '/projects/proj-send/send', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ method: 'GET', url: '{{BASE_URL}}/health' }),
     })
     expect(sent.status).toBe(200)
@@ -222,7 +265,9 @@ describe('http as a loaded plugin with its own tables', () => {
     const dir = pluginDir(dataRoot, 'http')
     const journalPath = join(dir, 'migrations/meta/_journal.json')
     const goodJournal = readFileSync(journalPath, 'utf8')
-    const journal = JSON.parse(goodJournal) as { entries: { idx: number; version: string; when: number; tag: string; breakpoints: boolean }[] }
+    const journal = JSON.parse(goodJournal) as {
+      entries: { idx: number; version: string; when: number; tag: string; breakpoints: boolean }[]
+    }
     writeFileSync(join(dir, 'migrations/0002_broken.sql'), 'CREATE TABLE `http_requests` (`id` text);')
     journal.entries.push({ idx: 2, version: '6', when: Date.now(), tag: '0002_broken', breakpoints: true })
     writeFileSync(journalPath, JSON.stringify(journal))

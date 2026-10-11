@@ -59,7 +59,8 @@ step. An app-server without the list endpoint runs with no Mode picker.
 Codex's `turn/plan/updated` steps draw as a progress card. A completed `plan` item is stored as a
 proposal and shown in the transcript. For the latest completed interactive Plan turn, the card offers
 **Implement plan**. The Node checks the proposal and turn in one transaction, switches the Mode option
-to Default, and queues one continuation in the same thread. The turn records the proposal, so a
+to Default, and queues one continuation in the same thread
+(`plugins/agents/src/server/drivers/codexPlanHandoff.ts`). The turn records the proposal, so a
 second click reuses it. A revision turn or a rejected handoff leaves Plan selected.
 
 Generated files cross a provider-neutral seam. A driver emits bytes with a title, media type, and
@@ -112,6 +113,13 @@ or widens the globs asks again. A one-shot mode is a second invocation with its 
 and a workflow step stores `profile`. Renaming one breaks every stored row. The built-in IDs
 `claude`, `codex`, and `claude-code` are bare names. The host namespaces a loaded plugin's harness ID
 as `<pluginId>:<harnessId>`. [Plugin authoring](../plugin-authoring.md) has the authoring contract.
+
+A harness's profile ID matches its harness ID, except for Claude Code: its harness is `claude` and
+its profile is `claude-code`. Both names predate the harness seam. The pair stays on purpose. Both
+spellings are stored in `acorn-1` session rows, and workflow files in other people's repositories
+name `claude-code` as a step's `profile`. Unifying them would need a data migration plus a period of
+accepting both spellings in workflow files. The Claude driver's one `profileId` line costs less than
+that. Don't copy the split for a new harness.
 
 ## Headless and one-shot modes
 

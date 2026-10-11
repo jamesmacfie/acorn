@@ -1,7 +1,7 @@
 // The acorn MCP server (docs/mcp.md, docs/agent-tools.md § Projections): a stdio server that
 // projects the app's agent-tool registry rather than holding its own tool definitions. One generic
-// proxy replaces 25 hand-written tool bodies; the registry (server/agentTools) stays the single
-// source of truth for names, schemas, risk and availability.
+// proxy serves every tool; the registry (server/agentTools) stays the single source of truth for
+// names, schemas, risk and availability.
 //
 // Launched by the agent, registered user-wide with `claude mcp add` pointing at the desktop app's
 // node launcher. Outside a task session, or with acorn not running, tools/list is empty
@@ -16,8 +16,13 @@ import { apiGet, apiSend } from './api'
 
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] })
-const NO_TASK = text({ status: 'no-active-task', hint: 'This session was not launched from an acorn task — task-scoped tools need ACORN_TASK_ID.' })
+const text = (value: unknown) => ({
+  content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
+})
+const NO_TASK = text({
+  status: 'no-active-task',
+  hint: 'This session was not launched from an acorn task — task-scoped tools need ACORN_TASK_ID.',
+})
 
 type ManifestTool = { name: string; description: string; inputSchema: Record<string, unknown> }
 
@@ -35,7 +40,7 @@ async function fetchManifest(): Promise<ManifestTool[]> {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
-export function buildServer(): Server {
+function buildServer(): Server {
   const server = new Server(
     { name: process.env.ACORN_MCP_NAME ?? 'acorn', version: '1.0.0' },
     { capabilities: { tools: { listChanged: true } } },
@@ -57,7 +62,8 @@ export function buildServer(): Server {
       { callId },
     )
     if (!res.ok) return text({ status: res.kind, detail: res.detail })
-    if (isToolImageResult(res.data)) return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
+    if (isToolImageResult(res.data))
+      return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
     return text(res.data)
   })
 

@@ -1,11 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ROOT, anchors } from './docAnchors'
+import { GONE, ROOT, anchors } from './docAnchors'
 
-// The docs carry a second implementation of the design (architecture review, finding 7), so a
-// reference that points at nothing is a bug rather than a typo. Twelve of the source paths cited
-// across `docs/` had rotted by 2026-08-27, four of them naming files that no longer exist at all.
+// The docs carry a second description of the design, so a reference that points at nothing is a bug
+// rather than a typo.
 //
 // Three things are checked: a repo-rooted path in backticks has to resolve, a relative markdown link
 // between two docs has to resolve, and a fragment on either kind of doc link has to name a heading or
@@ -42,19 +41,16 @@ const CITED = /`([A-Za-z0-9_./@-]+)`/g
 //   source files.
 //
 //   A path the same line marks as gone or not yet arrived. Design and phase files name the file a
-//   change deleted and the file it will add, which is the point of them. The markers below are the
-//   phrasings already in use, so nothing had to be reworded to pass.
-const GONE = ['delete', 'replaced', 'moved to', 'git history', 'git log', '(new']
+//   change deleted and the file it will add, which is the point of them. `GONE` holds the phrasings
+//   already in use, so nothing had to be reworded to pass.
 
 // `plugins/github.sqlite` and its siblings live in the data root, not the repo. They are spelled
 // like repo paths because that is the layout under the root (docs/data-layer.md).
 const isDataRoot = (path: string) => path.endsWith('.sqlite')
 
 // A review is dated evidence. Rewriting one so a path resolves would falsify what was true when it
-// was written, so reviews are read-only here and excluded. The list is empty today — the last entry
-// went with the folder reorganisation whose record it was — and it stays here because the next review
-// that lands in `docs/` needs the same exemption.
-const REVIEWS: string[] = []
+// was written, so reviews are read-only here and excluded.
+const REVIEWS: string[] = ['docs/security/review-2026-10-01.md']
 const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
 
 const decodeFragment = (fragment: string): string => {
@@ -121,7 +117,8 @@ describe('docs cite paths that exist', () => {
           if (!fragment || !destination.endsWith('.md')) continue
           fragmentsChecked += 1
           const anchor = decodeFragment(fragment)
-          if (!anchors(destination).has(anchor)) brokenFragments.push(`${rel(file)}:${index + 1}: ${target}#${fragment}`)
+          if (!anchors(destination).has(anchor))
+            brokenFragments.push(`${rel(file)}:${index + 1}: ${target}#${fragment}`)
         }
       }
     }
@@ -131,10 +128,9 @@ describe('docs cite paths that exist', () => {
     expect(fragmentsChecked).toBeGreaterThan(75)
   })
   it('no doc cites a retired directory name', () => {
-    // The escape hatch above — a path with no file extension is a directory, and directories move for
-    // reasons that are not rot — is exactly what let twelve source paths rot behind a folder rename.
-    // This is the narrow half of the check the hatch gives up: a denylist of directory names the
-    // 2026-08-30 reorganisation retired, which may only appear on a line that says they are gone.
+    // The check above skips a path with no file extension, so a renamed folder can leave every path
+    // under it stale. This denylist covers the folder names that are gone for good: each may only
+    // appear on a line that says so.
     const RETIRED = ['src/main/', 'src/app/', 'src/wiring/', 'src/service/']
     const offenders: string[] = []
     let checked = 0

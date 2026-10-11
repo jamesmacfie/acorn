@@ -14,7 +14,7 @@ The Node runs one Hono application:
 | `/v1/node` and `/v1/pair` | The two pre-auth pairing routes. |
 | `/v1/core/*` | Core-owned workspaces, projects, tasks, worktrees, integrations, settings, security, backup, audit, schedules, agent tools, and task context. |
 | `/v1/p/<plugin>/*` | Plugin routes. A compiled plugin's router is mounted when the app is built. A loaded plugin's handler is looked up per request, so a plugin reloaded in place serves its new handler without a restart. |
-| `/v1/events` | The authenticated WebSocket for invalidation events, PTY and process streams, Docker streams, workflow notices, agent events, and preview tunnels. |
+| `/v1/events` | The authenticated WebSocket for invalidation events, PTY and process streams, Docker streams, workflow notices, and agent events. |
 
 A plugin owns its own wire surface. Its route builders, request and response types, and query keys
 live in its `shared/` folder, or in `contract/` when another plugin reads them. Copy
@@ -33,7 +33,9 @@ groups what a host provides into separate nullable capabilities: Node transport,
 plugin custody, and native extras. The client's API layer calls the transport group. No other client
 file may read the injected `window.acorn` global, and `tools/arch/boundaries.test.ts` fails any file
 outside the folder that does. The desktop bridge implements every group. A web client would implement
-transport and leave out the desktop extras.
+transport and leave out the desktop extras. A host with no page `document`, such as the terminal
+client, also installs `visibility`, which says whether anybody can see it. Client schedules pause
+while a host is hidden. On the desktop, the page's own `document` answers.
 
 The helper supplies the Node endpoint, the pinned HTTPS agent, and the bearer token. The renderer
 never holds a token or certificate, and the app's CSP stops it from opening a direct network

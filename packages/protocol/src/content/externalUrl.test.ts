@@ -45,7 +45,7 @@ describe('isPluginOpenableUrl', () => {
 
   it('agrees with the parse every downstream consumer will do', () => {
     // Surrounding whitespace is stripped by the WHATWG parser, so this is `https://example.com` to this
-    // predicate AND to `new URL` in main's external-URL guard AND to `window.open`. Pinned rather than
+    // predicate AND to the shell's external-URL guard AND to `window.open`. Pinned rather than
     // trimmed here: a normalisation of its own would be a second interpretation of the same string,
     // which is exactly the class of disagreement this shared module exists to prevent.
     expect(isPluginOpenableUrl('  https://example.com  ')).toBe(true)
@@ -56,7 +56,14 @@ describe('isPluginOpenableUrl', () => {
 describe('safeVerificationUrl', () => {
   it('only turns an absolute, credential-free HTTPS provider reply into a renderer link', () => {
     expect(safeVerificationUrl('https://github.com/login/device')?.href).toBe('https://github.com/login/device')
-    for (const url of ['javascript:alert(1)', 'data:text/html,evil', 'http://example.test/', '//example.test/', 'https://user:secret@example.test/', 'https:\n//example.test/']) {
+    for (const url of [
+      'javascript:alert(1)',
+      'data:text/html,evil',
+      'http://example.test/',
+      '//example.test/',
+      'https://user:secret@example.test/',
+      'https:\n//example.test/',
+    ]) {
       expect(safeVerificationUrl(url)).toBeNull()
     }
   })
@@ -68,7 +75,15 @@ describe('safeContentHref', () => {
     expect(safeContentHref('#details')).toBe('#details')
     expect(safeContentHref('https://example.test/')).toBe('https://example.test/')
     expect(safeContentHref('mailto:owner@example.test')).toBe('mailto:owner@example.test')
-    for (const value of ['javascript:alert(1)', 'data:text/html,evil', 'file:///tmp/x', '//attacker.test/', '/\\attacker.test/', 'https://user:secret@example.test/', 'https:\n//example.test/']) {
+    for (const value of [
+      'javascript:alert(1)',
+      'data:text/html,evil',
+      'file:///tmp/x',
+      '//attacker.test/',
+      '/\\attacker.test/',
+      'https://user:secret@example.test/',
+      'https:\n//example.test/',
+    ]) {
       expect(safeContentHref(value)).toBeNull()
     }
   })

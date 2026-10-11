@@ -14,7 +14,12 @@ import { registerCommands } from '@acorn/client-core/host/registries/commands'
 import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail'
 import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { clearAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
-import { CORE_PANE_POINT, CORE_SOURCE_POINT, type PluginAnnotationKey, type PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import {
+  CORE_PANE_POINT,
+  CORE_SOURCE_POINT,
+  type PluginAnnotationKey,
+  type PluginAnnotationMark,
+} from '@acorn/protocol/extensionPoints.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { paneRegistry, type PaneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { keyedRows } from '../kit/showing'
@@ -47,31 +52,63 @@ const registerFixtureCommands = () => {
   return registerCommands([
     { id: 'fixture.group', kind: 'group', title: 'Fixture group', category: 'navigation', palette: true, order: 900 },
     {
-      id: 'fixture.stay', parentId: 'fixture.group', title: 'Stay open and say so', category: 'action',
-      palette: true, order: 100, run: () => ({ effect: 'stay', status: 'Still here.' }),
+      id: 'fixture.stay',
+      parentId: 'fixture.group',
+      title: 'Stay open and say so',
+      category: 'action',
+      palette: true,
+      order: 100,
+      run: () => ({ effect: 'stay', status: 'Still here.' }),
     },
     {
-      id: 'fixture.close', parentId: 'fixture.group', title: 'Close the palette', category: 'action',
-      palette: true, order: 200, run: () => {},
+      id: 'fixture.close',
+      parentId: 'fixture.group',
+      title: 'Close the palette',
+      category: 'action',
+      palette: true,
+      order: 200,
+      run: () => {},
     },
     {
-      id: 'fixture.search', parentId: 'fixture.group', kind: 'search', title: 'Search a list',
-      category: 'navigation', palette: true, order: 300, placeholder: 'Type to narrow the colours…',
-      minQueryLength: 0, debounceMs: 0,
-      query: async (text) => ['amber', 'cyan', 'magenta', 'teal']
-        .filter((colour) => colour.includes(text.trim()))
-        .map((colour) => ({ id: colour, title: colour })),
+      id: 'fixture.search',
+      parentId: 'fixture.group',
+      kind: 'search',
+      title: 'Search a list',
+      category: 'navigation',
+      palette: true,
+      order: 300,
+      placeholder: 'Type to narrow the colours…',
+      minQueryLength: 0,
+      debounceMs: 0,
+      query: async (text) =>
+        ['amber', 'cyan', 'magenta', 'teal']
+          .filter((colour) => colour.includes(text.trim()))
+          .map((colour) => ({ id: colour, title: colour })),
       select: (item) => ({ effect: 'stay', status: `You picked ${item.title}.` }),
     },
     {
-      id: 'fixture.input', parentId: 'fixture.group', kind: 'input', title: 'Say something back',
-      category: 'navigation', palette: true, order: 400, placeholder: 'Type a line and press Enter…',
+      id: 'fixture.input',
+      parentId: 'fixture.group',
+      kind: 'input',
+      title: 'Say something back',
+      category: 'navigation',
+      palette: true,
+      order: 400,
+      placeholder: 'Type a line and press Enter…',
       submit: (text) => ({ effect: 'stay', status: `You said ${text}.` }),
     },
     {
-      id: 'fixture.setting', parentId: 'fixture.group', kind: 'setting', title: 'Volume',
-      category: 'navigation', palette: true, order: 500,
-      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      id: 'fixture.setting',
+      parentId: 'fixture.group',
+      kind: 'setting',
+      title: 'Volume',
+      category: 'navigation',
+      palette: true,
+      order: 500,
+      options: [
+        { value: 'loud', label: 'Loud' },
+        { value: 'quiet', label: 'Quiet' },
+      ],
       read: async () => volume,
       write: async (value) => (volume = value),
     },
@@ -118,7 +155,7 @@ describe('the shell', () => {
     const frame = await screen.frame()
     screen.done()
 
-    // Wide enough for the rail to be a rail rather than a strip of marks.
+    // Wide enough for the rail and the pane strip to draw their labels whole.
     expect(frame).toContain('fix-login')
     expect(frame).toContain('[Notes]')
     for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
@@ -128,14 +165,15 @@ describe('the shell', () => {
     const registration = railMarkerRegistry.register({
       id: 'fixture-many-markers',
       order: 500,
-      markers: (target) => target.kind === 'task'
-        ? Array.from({ length: 5 }, (_, index) => ({
-          id: `marker-${index}`,
-          label: `Marker ${index + 1}`,
-          dotTone: 'warn' as const,
-          placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
-        }))
-        : [],
+      markers: (target) =>
+        target.kind === 'task'
+          ? Array.from({ length: 5 }, (_, index) => ({
+              id: `marker-${index}`,
+              label: `Marker ${index + 1}`,
+              dotTone: 'warn' as const,
+              placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
+            }))
+          : [],
     })
     const screen = await renderFixture({
       width: 80,
@@ -144,7 +182,8 @@ describe('the shell', () => {
       cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'Annotation lifecycle smoke' }]),
     })
     try {
-      expect(await screen.frame()).toContain('+5')
+      // Five fixture markers plus Git's uncommitted-changes dot, which the fixture task carries.
+      expect(await screen.frame()).toContain('+6')
       await screen.press('F10', { shift: true })
       expect(await screen.until('Marker 1')).toContain('Marker 1')
       await screen.press('END')
@@ -164,17 +203,23 @@ describe('the shell', () => {
       label: 'Late task markers',
       order: 500,
       carrier: 'items',
-      marks: async () => new Promise<PluginAnnotationMark[]>((resolve) => { answer = resolve }),
+      marks: async () =>
+        new Promise<PluginAnnotationMark[]>((resolve) => {
+          answer = resolve
+        }),
     })
     const screen = await renderFixture({ width: 80, height: 24, pane: 'notes' })
     try {
-      expect(await screen.frame()).not.toContain('+6')
-      answer(Array.from({ length: 6 }, (_, index) => ({
-        key: { task: TASK.id },
-        severity: 'warn' as const,
-        text: `Late marker ${index + 1}`,
-      })))
-      expect(await screen.until('+6')).toContain('+6')
+      // Each count includes Git's uncommitted-changes dot, which the fixture task carries.
+      expect(await screen.frame()).not.toContain('+7')
+      answer(
+        Array.from({ length: 6 }, (_, index) => ({
+          key: { task: TASK.id },
+          severity: 'warn' as const,
+          text: `Late marker ${index + 1}`,
+        })),
+      )
+      expect(await screen.until('+7')).toContain('+7')
 
       clearAnnotations()
       registration.dispose()
@@ -185,13 +230,14 @@ describe('the shell', () => {
         label: 'Replacement task markers',
         order: 500,
         carrier: 'items',
-        marks: async () => Array.from({ length: 10 }, (_, index) => ({
-          key: { task: TASK.id },
-          severity: 'info' as const,
-          text: `Replacement marker ${index + 1}`,
-        })),
+        marks: async () =>
+          Array.from({ length: 10 }, (_, index) => ({
+            key: { task: TASK.id },
+            severity: 'info' as const,
+            text: `Replacement marker ${index + 1}`,
+          })),
       })
-      expect(await screen.until('+10')).toContain('+10')
+      expect(await screen.until('+11')).toContain('+11')
     } finally {
       screen.done()
       registration.dispose()
@@ -200,12 +246,28 @@ describe('the shell', () => {
 
   it('counts a consenting source’s marks in the Menu and lists every label from its menu key', async () => {
     const registrations = [
-      sourceRegistry.register({ id: 'status-fixture', order: 1, glyph: 'rocket', label: 'Deploys', statusAnnotations: true }),
+      sourceRegistry.register({
+        id: 'status-fixture',
+        order: 1,
+        glyph: 'rocket',
+        label: 'Deploys',
+        statusAnnotations: true,
+      }),
       extensionRegistry.register({
-        id: 'fixture:source-status', pluginId: 'fixture', point: CORE_SOURCE_POINT, label: 'Source status', order: 500, carrier: 'items',
-        marks: async (keys: PluginAnnotationKey[]) => keys.flatMap((key) => Array.from({ length: 5 }, (_, index) => ({
-          key, severity: 'warn' as const, text: `Deploy ${index + 1}`,
-        }))),
+        id: 'fixture:source-status',
+        pluginId: 'fixture',
+        point: CORE_SOURCE_POINT,
+        label: 'Source status',
+        order: 500,
+        carrier: 'items',
+        marks: async (keys: PluginAnnotationKey[]) =>
+          keys.flatMap((key) =>
+            Array.from({ length: 5 }, (_, index) => ({
+              key,
+              severity: 'warn' as const,
+              text: `Deploy ${index + 1}`,
+            })),
+          ),
       }),
     ]
     const screen = await renderFixture({ width: 120, height: 40 })
@@ -226,18 +288,32 @@ describe('the shell', () => {
   it('puts pane markers after the label, lists the shown pane’s, and asks only consenting panes', async () => {
     const asked: PluginAnnotationKey[][] = []
     const pane = (id: string, label: string, statusAnnotations?: boolean) =>
-      paneRegistry.register({ id, label, glyph: 'circle', order: 900, component: () => null, ...(statusAnnotations ? { statusAnnotations } : {}) } as PaneContribution)
+      paneRegistry.register({
+        id,
+        label,
+        glyph: 'circle',
+        order: 900,
+        component: () => null,
+        ...(statusAnnotations ? { statusAnnotations } : {}),
+      } as PaneContribution)
     const registrations = [
       pane('status-pane', 'Checks', true),
       pane('quiet-pane', 'Quiet'),
       railMarkerRegistry.register({
-        id: 'fixture-notes-marker', order: 500,
-        markers: (target) => target.kind === 'pane' && target.id === 'notes'
-          ? [{ id: 'saved', label: 'Saved a minute ago', dotTone: 'ok' as const, placements: ['top-end'] as const }]
-          : [],
+        id: 'fixture-notes-marker',
+        order: 500,
+        markers: (target) =>
+          target.kind === 'pane' && target.id === 'notes'
+            ? [{ id: 'saved', label: 'Saved a minute ago', dotTone: 'ok' as const, placements: ['top-end'] as const }]
+            : [],
       }),
       extensionRegistry.register({
-        id: 'fixture:pane-status', pluginId: 'fixture', point: CORE_PANE_POINT, label: 'Pane status', order: 500, carrier: 'items',
+        id: 'fixture:pane-status',
+        pluginId: 'fixture',
+        point: CORE_PANE_POINT,
+        label: 'Pane status',
+        order: 500,
+        carrier: 'items',
         marks: async (keys: PluginAnnotationKey[]) => {
           asked.push(keys)
           return [
@@ -254,7 +330,12 @@ describe('the shell', () => {
       expect(frame).toContain('Saved a minute ago')
       expect(frame).not.toContain('Quiet +')
       // One batch: the shipped Git pane consents too, and the quiet pane is never asked about.
-      expect(asked).toEqual([[{ paneId: 'git', taskId: TASK.id }, { paneId: 'status-pane', taskId: TASK.id }]])
+      expect(asked).toEqual([
+        [
+          { paneId: 'git', taskId: TASK.id },
+          { paneId: 'status-pane', taskId: TASK.id },
+        ],
+      ])
     } finally {
       screen.done()
       for (const registration of registrations) registration.dispose()
@@ -290,9 +371,7 @@ describe('the shell', () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     expect(await screen.frame()).toContain('Browse')
 
-    // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
-    // it below 100 cells went with the icons, because the strip only said anything when every row had
-    // a mark and many of those marks drew nothing.
+    // One way to lose the column, and it is a chord.
     await screen.press('b', { ctrl: true })
     const hidden = await screen.frame()
     expect(hidden).not.toContain('Browse')
@@ -471,7 +550,8 @@ describe('the shell', () => {
 
     // The rows, as drawn: the key column of every line inside the dialog's frame. `Kbd` pads the key
     // to the widest one and the row has a gap of two, so two spaces end the column.
-    const drawn = frame.split('\n')
+    const drawn = frame
+      .split('\n')
       .filter((line) => line.startsWith('│ '))
       .map((line) => line.slice(2).split(/\s{2,}/)[0] ?? '')
 
@@ -561,18 +641,29 @@ describe('the shell', () => {
   // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
   // persisted cache with nothing on the wire.
   it('draws the whole shell from the persisted cache while the node it started is booting', async () => {
-    const cached: Task[] = [{
-      id: 'task-cached', title: 'from-last-time', projectId: 'project-1', branch: 'from-last-time',
-      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
-      github: null, worktreePath: null, pullNumber: null,
-    }]
+    const cached: Task[] = [
+      {
+        id: 'task-cached',
+        title: 'from-last-time',
+        projectId: 'project-1',
+        branch: 'from-last-time',
+        origin: 'local',
+        icon: null,
+        status: 'active',
+        links: [],
+        parentId: null,
+        sort: 0,
+        github: null,
+        worktreePath: null,
+        pullNumber: null,
+      },
+    ]
     const screen = await renderFixture({
       width: 100,
       height: 28,
       starting: true,
-      // Seeded into the same per-node client the shell renders under, which is the whole of this
-      // phase: `App` used to mint one of its own, so a restored snapshot was invisible to it and every
-      // start was cold (client-core/infra/node/fleet.ts § clientFor).
+      // Seeded into the same per-node client the shell renders under, so a restored snapshot is what
+      // the shell reads on a warm start (client-core/infra/node/fleet.ts § clientFor).
       cache: (client) => client.setQueryData(tasksKey, cached),
     })
     const frame = await screen.frame()
@@ -597,18 +688,25 @@ describe('the shell', () => {
 
   it('keeps a 500-child workflow group bounded and leaves manual siblings visible', async () => {
     const task = (id: string, title: string, parentId: string | null, sort: number, origin: string): Task => ({
-      id, title, projectId: 'project-1', branch: id, origin, icon: null, status: 'active', links: [],
-      parentId, sort, github: null, worktreePath: null, pullNumber: null,
+      id,
+      title,
+      projectId: 'project-1',
+      branch: id,
+      origin,
+      icon: null,
+      status: 'active',
+      links: [],
+      parentId,
+      sort,
+      github: null,
+      worktreePath: null,
+      pullNumber: null,
     })
     const cached = [
       task('phase18-root', 'Phase 18 root', null, 0, 'local'),
-      ...Array.from({ length: 500 }, (_, index) => task(
-        `phase18-child-${index}`,
-        `Workflow child ${index + 1}`,
-        'phase18-root',
-        index + 1,
-        'workflows:child',
-      )),
+      ...Array.from({ length: 500 }, (_, index) =>
+        task(`phase18-child-${index}`, `Workflow child ${index + 1}`, 'phase18-root', index + 1, 'workflows:child'),
+      ),
       task('phase18-manual', 'Manual sibling', null, 502, 'local'),
     ]
     const screen = await renderFixture({
@@ -660,8 +758,8 @@ describe('the shell', () => {
 
     // Enter on the first row quits. The overlay is still drawn afterwards and that is right: the real
     // `onQuit` takes the terminal back and ends the process, so there is no frame after it to close
-    // anything in. A list inside a `Modal` answering Enter at all is what the swallow layer used to
-    // break, and a scope cannot: it names no keys (../keys/trap.ts).
+    // anything in. A list inside a `Modal` can answer Enter because a scope names no keys
+    // (../keys/trap.ts).
     await started.press('RETURN')
     started.done()
     expect(started.quits()).toBe(1)
@@ -671,9 +769,8 @@ describe('the shell', () => {
 // ── What the footer costs ─────────────────────────────────────────────────────────────────────
 //
 // The footer is drawn on every frame the shell draws, and its list comes from a walk of every active
-// keymap layer. Asking per render was the cost; asking per change is the fix, and "per change" has to
-// mean the four things that actually move the answer
-// (./bindings.ts § When the answer moves).
+// keymap layer, so it is asked per change rather than per render, and "per change" has to mean the
+// things that actually move the answer (./bindings.ts § When the answer moves).
 
 describe('the footer asks the keymap once per change', () => {
   it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
@@ -701,12 +798,12 @@ describe('the footer asks the keymap once per change', () => {
         // And a key that moves the keys is a change, so the answer is asked for again. A handful
         // rather than one, because Tab into another region mounts the controls in it and each of them
         // registering a layer is a real change to what the footer can offer — but a handful bounded
-        // by the move rather than one per frame for the rest of the run, which is what it was.
+        // by the move rather than one per frame for the rest of the run.
         await screen.press('TAB')
         await screen.frame()
         expect(asks - idle).toBeGreaterThan(0)
         // The bound tracks the number of controls in the region tabbed into, so it moves when the
-        // rail gains a row. Memory (70) took it from eight to nine.
+        // rail gains a row.
         expect(asks - idle).toBeLessThanOrEqual(9)
       } finally {
         engine.getActiveKeys = real
@@ -737,7 +834,9 @@ describe('the rail keeps the rows a change did not touch', () => {
       const rows = keyedRows(orderedTasks, (task) => ({
         key: task.id,
         task,
-        get depth() { return depthByTask().get(task.id) ?? 0 },
+        get depth() {
+          return depthByTask().get(task.id) ?? 0
+        },
       }))
 
       const first = rows()
@@ -780,10 +879,10 @@ describe('the rail keeps the rows a change did not touch', () => {
 
 // ── The way out, at every depth ───────────────────────────────────────────────────────────────
 //
-// Last in the file, and that is not taste. The measurement above is of one screen's collects after
-// one Tab, and it counts nine rather than eight when a `pr` fixture ran before it: opening that pane
-// leaves something registered that the next screen's Tab pays for once. Worth finding and not worth
-// finding here, so this case sits after the count rather than in front of it.
+// Last in the file, and that is not taste. The count above is of one screen's collects after one Tab,
+// and it counts one more when a `pr` fixture ran before it: opening that pane leaves something
+// registered that the next screen's Tab pays for once. So this case sits after the count rather than
+// in front of it.
 
 describe('the footer says how to get out', () => {
   it('says how to get out at every depth, behind a menu and behind a modal', async () => {
@@ -791,8 +890,7 @@ describe('the footer says how to get out', () => {
     await screen.until('#42', 45)
     // The scopes are a stack and Escape pops it, and the footer's `esc` is the only thing on this host
     // that draws the depth at all. It has to survive the cut: the footer ellipsises rather than
-    // wrapping, and this row used to sit last in reading order, so the line ran out before it every
-    // time (./bindings.ts § specs).
+    // wrapping, so a row late in reading order never reaches the screen (./bindings.ts § specs).
     expect(footer(await screen.frame())).toContain('esc back')
 
     // Two deep, inside a `MenuList`'s scope. Nothing behind the menu is in scope, so most of what the

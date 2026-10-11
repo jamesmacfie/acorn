@@ -3,15 +3,27 @@ import { buildLink, MAX_LINK_LENGTH, parseLink, type Place } from './addresses'
 
 describe('Acorn addresses', () => {
   it.each<[string, Place]>([
-    ['acorn://node-a/t/task%201?pane=linear&item=ENG-1', { kind: 'task', taskId: 'task 1', pane: 'linear', item: 'ENG-1' }],
+    [
+      'acorn://node-a/t/task%201?pane=linear&item=ENG-1',
+      { kind: 'task', taskId: 'task 1', pane: 'linear', item: 'ENG-1' },
+    ],
     ['acorn://node-a/t/task%2Fone?pane=linear', { kind: 'task', taskId: 'task/one', pane: 'linear' }],
     ['acorn://node-a/t/task?pane=notes&item=%25', { kind: 'task', taskId: 'task', pane: 'notes', item: '%' }],
     ['acorn://node-a/t/task?pane=notes&item=%252F', { kind: 'task', taskId: 'task', pane: 'notes', item: '%2F' }],
-    ['acorn://node-a/p/project%2Fone/x/example/item%201', { kind: 'project', projectId: 'project/one', rest: ['x', 'example', 'item 1'] }],
+    [
+      'acorn://node-a/p/project%2Fone/x/example/item%201',
+      { kind: 'project', projectId: 'project/one', rest: ['x', 'example', 'item 1'] },
+    ],
     ['acorn://node-a/settings/agents#general', { kind: 'settings', pageId: 'agents', sectionId: 'general' }],
     ['acorn://node-a/source/pulls', { kind: 'source', sourceId: 'pulls' }],
-    ['acorn://node-a/open?url=https%3A%2F%2Fexample.com%2Fa%3Fq%3D1', { kind: 'open', url: 'https://example.com/a?q=1' }],
-    ['acorn://node-a/new-task?url=http%3A%2F%2Fexample.com%2Fitem', { kind: 'new-task', url: 'http://example.com/item' }],
+    [
+      'acorn://node-a/open?url=https%3A%2F%2Fexample.com%2Fa%3Fq%3D1',
+      { kind: 'open', url: 'https://example.com/a?q=1' },
+    ],
+    [
+      'acorn://node-a/new-task?url=http%3A%2F%2Fexample.com%2Fitem',
+      { kind: 'new-task', url: 'http://example.com/item' },
+    ],
   ])('parses %s', (href, place) => {
     expect(parseLink(href)).toEqual({ kind: 'address', address: { nodeId: 'node-a', ...place } })
   })
@@ -59,8 +71,9 @@ describe('Acorn addresses', () => {
     const largest = buildLink('node-a', { kind: 'task', taskId: 'x'.repeat(MAX_LINK_LENGTH - prefix.length) })
     expect(largest).toHaveLength(MAX_LINK_LENGTH)
     expect(parseLink(largest)).toMatchObject({ kind: 'address' })
-    expect(() => buildLink('node-a', { kind: 'task', taskId: 'x'.repeat(MAX_LINK_LENGTH - prefix.length + 1) }))
-      .toThrow(`Acorn link exceeds ${MAX_LINK_LENGTH} characters`)
+    expect(() =>
+      buildLink('node-a', { kind: 'task', taskId: 'x'.repeat(MAX_LINK_LENGTH - prefix.length + 1) }),
+    ).toThrow(`Acorn link exceeds ${MAX_LINK_LENGTH} characters`)
     expect(() => buildLink('node-a', { kind: 'task', taskId: 'task', item: 'item' })).toThrow('needs a pane')
   })
 })

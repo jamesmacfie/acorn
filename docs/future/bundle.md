@@ -21,8 +21,6 @@ Do not repeat the completed staging, dependency scanner, or certificate work.
 
 ## Build the container image
 
-<a id="docker-2026-08-22"></a>
-
 [Cloud phase one](./cloud/phases/01-node-image.md) owns the image, local pairing, hosted deployment,
 measurements, and image publication. Implement that phase once and update this page when it ships.
 A container build can compile `node-pty` without waiting for downloadable Linux prebuilds.
@@ -83,9 +81,6 @@ installed Node. Failed download or verification must leave the working installat
 
 ## Embed the terminal client in the desktop
 
-<a id="shipping-acorn"></a>
-<a id="shipping-acorn-historical-design"></a>
-
 Extend `apps/desktop/scripts/stage.mjs` and `apps/desktop/src-tauri/tauri.conf.json` to include the
 built TUI and shared command dispatch. Reuse the desktop's runtime and command installation flow.
 Keep Node resources and client chunks at the paths their launchers resolve.
@@ -97,7 +92,7 @@ closed. Verify commands from a directory outside the checkout and after an app u
 ## Sign macOS artifacts
 
 Apple Developer ID signing and notarization gate public macOS downloads.
-[Shell signing](../shell.md#signing-gates-and-the-updater) owns the desktop release gate.
+[Shell signing](../shell/packaging.md#signing-gates-and-the-updater) owns the desktop release gate.
 The updater signature and plugin-package attestation are separate contracts.
 
 Sign the bundled executables and native modules, notarize the distributable artifacts, and verify

@@ -38,7 +38,7 @@ export default function StatView(props: PanelViewProps) {
   const text = () => {
     const answer = value()
     // An em dash, not 0: "nothing to aggregate" and "the total is zero" are different, and only one
-    // of them is a fact about the data (node/FleetHome.tsx makes the same distinction).
+    // of them is a fact about the data (`FleetHome` makes the same distinction).
     if (answer === null) return '—'
     return measureText(answer)
   }
@@ -50,7 +50,10 @@ export default function StatView(props: PanelViewProps) {
 
   // Only the history tier costs a read; activity is bucketed from rows already on screen
   // (docs/dashboards/views.md § Trends).
-  const samples = createMeasureHistory(() => props.panelId, () => props.view.trend === 'history')
+  const samples = createMeasureHistory(
+    () => props.panelId,
+    () => props.view.trend === 'history',
+  )
 
   const points = createMemo(() => {
     const now = Date.now()
@@ -69,7 +72,16 @@ export default function StatView(props: PanelViewProps) {
 
   return (
     <div class="dash-stat">
-      <Button size="sm" variant="bare" disabled={!props.onDrilldown} onPress={() => props.onDrilldown?.({ key: 'measure', label: label(), count: props.rows.length, rows: props.rows })}><span class="dash-stat-value">{text()}</span></Button>
+      <Button
+        size="sm"
+        variant="bare"
+        disabled={!props.onDrilldown}
+        onPress={() =>
+          props.onDrilldown?.({ key: 'measure', label: label(), count: props.rows.length, rows: props.rows })
+        }
+      >
+        <span class="dash-stat-value">{text()}</span>
+      </Button>
       <span class="dash-stat-label">{label()}</span>
 
       {/* No axes, no grid, no ticks: the number above is the axis. `xMinYMid meet` scales uniformly
@@ -94,9 +106,7 @@ export default function StatView(props: PanelViewProps) {
             </For>
             {/* A day whose neighbours are both gaps has no line to belong to. Without these an
                 every-other-day series would draw as nothing at all. */}
-            <For each={spark().dots}>
-              {(dot) => <circle class="dash-stat-spark-end" cx={dot.x} cy={dot.y} r="2" />}
-            </For>
+            <For each={spark().dots}>{(dot) => <circle class="dash-stat-spark-end" cx={dot.x} cy={dot.y} r="2" />}</For>
             <circle class="dash-stat-spark-end" cx={spark().end.x} cy={spark().end.y} r="3" />
           </svg>
         )}
@@ -105,7 +115,9 @@ export default function StatView(props: PanelViewProps) {
       {/* Absence is a fact and it is not zero: no sample old enough to be a baseline draws nothing
           rather than "▲ 0", which would claim a comparison nobody could make. */}
       <Show when={delta()}>
-        <span class="dash-stat-delta" data-tone={delta()!.tone}>{deltaText()}</span>
+        <span class="dash-stat-delta" data-tone={delta()!.tone}>
+          {deltaText()}
+        </span>
       </Show>
 
       {/* A history trend accrues from when the panel first asked for it, so a panel switched on

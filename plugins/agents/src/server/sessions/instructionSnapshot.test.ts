@@ -8,9 +8,18 @@ import { scanInstructions, InstructionScanIncomplete } from './instructionSnapsh
 import { snapshotDigest } from './instructionReviewStore'
 
 const roots: string[] = []
-const root = () => { const path = mkdtempSync(join(tmpdir(), 'instruction-review-')); roots.push(path); return path }
-const write = (path: string, text: string | Buffer) => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, text) }
-afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
+const root = () => {
+  const path = mkdtempSync(join(tmpdir(), 'instruction-review-'))
+  roots.push(path)
+  return path
+}
+const write = (path: string, text: string | Buffer) => {
+  mkdirSync(join(path, '..'), { recursive: true })
+  writeFileSync(path, text)
+}
+afterEach(() => {
+  for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true })
+})
 
 it('discovers nested instructions, imports, linked skills and scripts while excluding dependencies', async () => {
   const dir = root()
@@ -26,11 +35,17 @@ it('discovers nested instructions, imports, linked skills and scripts while excl
   symlinkSync(join(linked, 'deploy'), join(dir, '.agents/skills/deploy'))
   const snapshot = await scanInstructions(dir, [])
   expect(snapshot.files.map((file) => file.path)).toEqual([
-    '.agents/skills/deploy/scripts/release.sh', '.agents/skills/deploy/SKILL.md',
-    'AGENTS.md', 'policy.md', 'src/AGENTS.override.md', 'src/CLAUDE.md',
+    '.agents/skills/deploy/scripts/release.sh',
+    '.agents/skills/deploy/SKILL.md',
+    'AGENTS.md',
+    'policy.md',
+    'src/AGENTS.override.md',
+    'src/CLAUDE.md',
   ])
   expect(snapshot.files.find((file) => file.path === 'policy.md')?.kind).toBe('import')
-  expect(snapshot.files.find((file) => file.path === '.agents/skills/deploy/SKILL.md')?.canonicalPath).toBe(realpathSync(join(linked, 'deploy/SKILL.md')))
+  expect(snapshot.files.find((file) => file.path === '.agents/skills/deploy/SKILL.md')?.canonicalPath).toBe(
+    realpathSync(join(linked, 'deploy/SKILL.md')),
+  )
 })
 
 it('skips git-ignored folders but keeps ignored instruction files and an ignored .claude folder', async () => {
@@ -40,7 +55,10 @@ it('skips git-ignored folders but keeps ignored instruction files and an ignored
   write(join(dir, 'references/clone/AGENTS.md'), 'Ignored.\n')
   write(join(dir, 'CLAUDE.local.md'), 'Local.\n')
   write(join(dir, '.claude/CLAUDE.md'), 'Project.\n')
-  expect((await scanInstructions(dir, [])).files.map((file) => file.path)).toEqual(['.claude/CLAUDE.md', 'CLAUDE.local.md'])
+  expect((await scanInstructions(dir, [])).files.map((file) => file.path)).toEqual([
+    '.claude/CLAUDE.md',
+    'CLAUDE.local.md',
+  ])
 })
 
 it('distinguishes an absent optional file from a broken link and refuses a skill cycle', async () => {
@@ -103,7 +121,10 @@ it('bounds advisory findings for a one-megabyte file of hidden characters', asyn
   const findings = analyzeInstruction(await scanInstructions(dir, []))
   expect(findings).toHaveLength(2_000)
   expect(findings[0]).toMatchObject({ category: 'hidden-character', line: 1 })
-  expect(findings.at(-1)).toMatchObject({ category: 'unsupported', detail: expect.stringContaining('Finding limit reached') })
+  expect(findings.at(-1)).toMatchObject({
+    category: 'unsupported',
+    detail: expect.stringContaining('Finding limit reached'),
+  })
 })
 
 it('refuses when discovered skill files exceed the file quota', async () => {

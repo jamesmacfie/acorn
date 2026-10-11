@@ -4,7 +4,10 @@ import type { PublicIntegrationProvider } from './providers'
 import type { ModelBackend } from './modelProviders'
 import { availableModelConnections, defaultModelIdFor, parseBackendId } from './modelProviders'
 
-const provider = (id: string, kind: PublicIntegrationProvider['kind'] = 'model-provider'): PublicIntegrationProvider => ({
+const provider = (
+  id: string,
+  kind: PublicIntegrationProvider['kind'] = 'model-provider',
+): PublicIntegrationProvider => ({
   id,
   label: id,
   glyph: id[0],
@@ -36,10 +39,10 @@ const connection = (
   updatedAt: 1,
 })
 
-const response = (
-  providers: PublicIntegrationProvider[],
-  integrations: Integration[],
-): IntegrationsResponse => ({ providers, integrations })
+const response = (providers: PublicIntegrationProvider[], integrations: Integration[]): IntegrationsResponse => ({
+  providers,
+  integrations,
+})
 
 describe('availableModelConnections', () => {
   it('returns no connections when no model provider is configured', () => {
@@ -51,12 +54,16 @@ describe('availableModelConnections', () => {
     const openai = connection('openai')
     const anthropic = connection('anthropic')
 
-    expect(availableModelConnections(response(providers, [openai])).map((backend) => backend.id))
-      .toEqual(['connection:openai-connection'])
-    expect(availableModelConnections(response(providers, [anthropic])).map((backend) => backend.id))
-      .toEqual(['connection:anthropic-connection'])
-    expect(availableModelConnections(response(providers, [openai, anthropic])).map((backend) => backend.id))
-      .toEqual(['connection:openai-connection', 'connection:anthropic-connection'])
+    expect(availableModelConnections(response(providers, [openai])).map((backend) => backend.id)).toEqual([
+      'connection:openai-connection',
+    ])
+    expect(availableModelConnections(response(providers, [anthropic])).map((backend) => backend.id)).toEqual([
+      'connection:anthropic-connection',
+    ])
+    expect(availableModelConnections(response(providers, [openai, anthropic])).map((backend) => backend.id)).toEqual([
+      'connection:openai-connection',
+      'connection:anthropic-connection',
+    ])
   })
 
   it.each([
@@ -84,21 +91,29 @@ describe('availableModelConnections', () => {
 describe('the connection projection', () => {
   it('carries only what a Generate control draws, under a minted id', () => {
     const openai = provider('openai')
-    openai.models = [{ id: 'gpt-5', label: 'GPT-5' }, { id: 'gpt-5-mini', label: 'GPT-5 mini' }]
+    openai.models = [
+      { id: 'gpt-5', label: 'GPT-5' },
+      { id: 'gpt-5-mini', label: 'GPT-5 mini' },
+    ]
     openai.defaultModelId = 'gpt-5-mini'
     const row = connection('openai')
     row.label = 'Work key'
 
     // The whole object, not a subset: an auth kind, a scope list or an account leaking into this
     // projection is exactly what the flat type exists to prevent, and only equality can see it.
-    expect(availableModelConnections(response([openai], [row]))).toEqual([{
-      id: 'connection:openai-connection',
-      kind: 'connection',
-      label: 'Work key',
-      glyph: 'o',
-      models: [{ id: 'gpt-5', label: 'GPT-5' }, { id: 'gpt-5-mini', label: 'GPT-5 mini' }],
-      defaultModelId: 'gpt-5-mini',
-    }])
+    expect(availableModelConnections(response([openai], [row]))).toEqual([
+      {
+        id: 'connection:openai-connection',
+        kind: 'connection',
+        label: 'Work key',
+        glyph: 'o',
+        models: [
+          { id: 'gpt-5', label: 'GPT-5' },
+          { id: 'gpt-5-mini', label: 'GPT-5 mini' },
+        ],
+        defaultModelId: 'gpt-5-mini',
+      },
+    ])
   })
 
   it('falls back to the provider label and an empty catalog', () => {
@@ -111,8 +126,19 @@ describe('the connection projection', () => {
 
 describe('parseBackendId', () => {
   it('requires a supported prefix and a nonempty id', () => {
-    expect(parseBackendId('connection:7c9e6679-7425-40de-944b-e07fc1f90ae7')).toEqual({ kind: 'connection', id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' })
-    for (const id of ['7c9e6679-7425-40de-944b-e07fc1f90ae7', 'connection:', 'connection:   ', 'harness:', 'harness:   ', 'unknown:item', '']) {
+    expect(parseBackendId('connection:7c9e6679-7425-40de-944b-e07fc1f90ae7')).toEqual({
+      kind: 'connection',
+      id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+    })
+    for (const id of [
+      '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+      'connection:',
+      'connection:   ',
+      'harness:',
+      'harness:   ',
+      'unknown:item',
+      '',
+    ]) {
       expect(() => parseBackendId(id)).toThrow('Backend ID must be connection:<id> or harness:<id>.')
     }
   })

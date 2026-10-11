@@ -2,16 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'solid-js'
 import { createArmedConfirm } from './confirm'
 
-// Carried over from the http plugin's confirmDelete.test.ts when that implementation became this
-// hook, plus the auto-disarm timer docker's copy had and http's did not.
-//
 // createRoot because the hook registers an onCleanup for its timer; outside an owner Solid warns and
 // the timer would outlive the test.
-const withRoot = <T>(fn: () => T): T => createRoot((dispose) => {
-  const result = fn()
-  dispose()
-  return result
-})
+const withRoot = <T>(fn: () => T): T =>
+  createRoot((dispose) => {
+    const result = fn()
+    dispose()
+    return result
+  })
 
 describe('arm-to-confirm', () => {
   it('needs a second request on the same key', () => {

@@ -11,19 +11,27 @@ import { fetchProjectMatcher } from './dockerClient'
 
 type ProjectScope = { context: { scope: { project?: { id: string; name: string; path: string | null } } } }
 
-const KEYS: Array<{ key: keyof DockerMatcherKeys; label: string; description: string; shown: (keys: DockerMatcherKeys) => string }> = [
+const KEYS: Array<{
+  key: keyof DockerMatcherKeys
+  label: string
+  description: string
+  shown: (keys: DockerMatcherKeys) => string
+}> = [
   {
-    key: 'composeProject', label: 'Compose project',
+    key: 'composeProject',
+    label: 'Compose project',
     description: 'Suggest this Compose project in the task summary when container worktree metadata is absent.',
     shown: (keys) => keys.composeProject ?? 'None',
   },
   {
-    key: 'matchLabels', label: 'Match labels',
-    description: 'Label keys whose value equals the task\'s branch slug.',
+    key: 'matchLabels',
+    label: 'Match labels',
+    description: "Label keys whose value equals the task's branch slug.",
     shown: (keys) => (keys.matchLabels.length ? keys.matchLabels.join(', ') : 'None'),
   },
   {
-    key: 'matchName', label: 'Match container names',
+    key: 'matchName',
+    label: 'Match container names',
     description: 'Suggest containers whose names contain the branch slug.',
     shown: (keys) => (keys.matchName ? 'On' : 'Off'),
   },
@@ -31,7 +39,10 @@ const KEYS: Array<{ key: keyof DockerMatcherKeys; label: string; description: st
 
 export default function DockerProjectSettings(props: ProjectScope) {
   const nodeId = queryOwner(useQueryClient())
-  const [matcher] = createResource(() => props.context.scope.project?.id, id => fetchProjectMatcher(id, nodeId))
+  const [matcher] = createResource(
+    () => props.context.scope.project?.id,
+    (id) => fetchProjectMatcher(id, nodeId),
+  )
   const from = (key: keyof DockerMatcherKeys): string | undefined => {
     const layers = matcher.latest
     if (!layers) return undefined
@@ -45,18 +56,27 @@ export default function DockerProjectSettings(props: ProjectScope) {
       label="Task linking"
       description="Compose worktree metadata determines task listings and cleanup. These keys add hints to the task summary; they do not authorize cleanup."
     >
-      <Show when={!matcher.error} fallback={<Text tone="danger" wrap>Could not read this project's Docker keys from the node.</Text>}>
+      <Show
+        when={!matcher.error}
+        fallback={
+          <Text tone="danger" wrap>
+            Could not read this project's Docker keys from the node.
+          </Text>
+        }
+      >
         <Show when={matcher.latest}>
-          {(layers) => KEYS.map((entry) => (
-            <SettingRow label={entry.label} description={entry.description} from={from(entry.key)}>
-              <Text emphasis="mono">{entry.shown(layers().effective)}</Text>
-            </SettingRow>
-          ))}
+          {(layers) =>
+            KEYS.map((entry) => (
+              <SettingRow label={entry.label} description={entry.description} from={from(entry.key)}>
+                <Text emphasis="mono">{entry.shown(layers().effective)}</Text>
+              </SettingRow>
+            ))
+          }
         </Show>
       </Show>
       <SettingRow
         label="Change them"
-        description={`Set them in the [docker] table of ${props.context.scope.project?.path ? `${props.context.scope.project.path}/` : 'the project\'s '}.acorn/config.toml. A key the file leaves out falls back to ~/.acorn/config.toml, then to the default.`}
+        description={`Set them in the [docker] table of ${props.context.scope.project?.path ? `${props.context.scope.project.path}/` : "the project's "}.acorn/config.toml. A key the file leaves out falls back to ~/.acorn/config.toml, then to the default.`}
         layout="stacked"
       >
         <CodeBlock size="xs" copy>{`[docker]

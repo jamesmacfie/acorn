@@ -13,12 +13,14 @@ import type { TelemetryPoster } from './emitter'
 // A rejection is left to reach the emitter, which puts the records back at the front of its queue.
 // The node being offline is the case this whole queue exists for.
 
-export const postTelemetryBatch = (runtime: PostedTelemetryRuntime): TelemetryPoster =>
+export const postTelemetryBatch =
+  (runtime: PostedTelemetryRuntime): TelemetryPoster =>
   async (records: readonly TelemetryRecord[]) => {
-    for (const body of encodeTelemetryBatches(runtime, records)) await sendJson<{ accepted: number }>(coreTelemetryRoute, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body,
-      unmeasured: true,
-    })
+    for (const body of encodeTelemetryBatches(runtime, records))
+      await sendJson<{ accepted: number }>(coreTelemetryRoute, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        unmeasured: true,
+      })
   }

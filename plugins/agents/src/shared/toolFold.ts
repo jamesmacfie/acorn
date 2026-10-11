@@ -3,15 +3,13 @@ import type { AgentEventRecord, AgentToolCall, AgentWebActivity } from '../contr
 // One tool card per call, in one place, because several sides apply it.
 //
 // A harness reports a tool call as a run of updates on one id: the call, its output as it streams, its
-// status. On this developer's database `tool` is half of every event recorded, and a long session is
-// mostly them: 38,000 of one session's 48,000 rows. The transcript has always folded a call's updates
-// into one card (client/sessions/conversationItems.ts), so every client was paging through, parsing and
-// re-projecting rows it was only going to merge. The HTTP snapshot and event pages now fold them before
-// they serialise, for a reader that asks (../server/routes/managed.ts, `fold=1`).
+// status, and a long session is mostly these rows. The transcript folds a call's updates into one card,
+// and the HTTP snapshot and event pages fold them before they serialise for a reader that asks
+// (`fold=1`), so a client doesn't page through and parse rows it would only merge.
 //
-// The ledger itself now keeps a call as two rows, its opener and its latest state
-// (../server/sessions/ledgerFold.ts, which merges with `mergeToolCall` below). Readers that do not ask
-// for this fold, such as workflow execution, the wait route and export, get those two rows.
+// The ledger keeps a call as two rows, its opener and its latest state (the ledger fold merges them with
+// `mergeToolCall` below). Readers that do not ask for this fold, such as workflow execution, the wait
+// route and export, get those two rows.
 
 // Field by field rather than a spread: the normalizers write absent values as present-but-undefined
 // keys, which a spread would use to wipe what an earlier update reported.
@@ -23,14 +21,12 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
   kind: next.kind ?? previous.kind,
   status: next.status ?? previous.status,
   input: next.input ?? previous.input,
-  output: next.outputAppend
-    ? (previous.output ?? '') + (next.output ?? '')
-    : next.output ?? previous.output,
+  output: next.outputAppend ? (previous.output ?? '') + (next.output ?? '') : (next.output ?? previous.output),
   paths: next.paths ?? previous.paths,
   subagentId: next.subagentId ?? previous.subagentId,
   ...(next.background || previous.background ? { background: true } : {}),
   ...((next.exitCode ?? previous.exitCode) != null ? { exitCode: next.exitCode ?? previous.exitCode } : {}),
-  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
+  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : (next.web ?? previous.web),
 })
 
 // Same convention, one level down. A provider reports the request and the sources on different

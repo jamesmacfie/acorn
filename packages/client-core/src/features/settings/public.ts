@@ -1,14 +1,13 @@
-export { THEMES } from './builtInThemes.ts'
 export { connectionAttention } from './connections/connectionAttention.ts'
-export { defaultModelIdFor } from './models/defaultModel.ts'
+
 export { effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick } from './models/generatePick.ts'
 export type { ModelPick } from './models/generatePick.ts'
 export { createSettingSave, createTextSetting } from './settingSave.ts'
-export type { SettingSave, TextSetting } from './settingSave.ts'
+export type { SettingSave } from './settingSave.ts'
 export { telemetryOn } from './telemetrySetting.ts'
 export { useUnsavedChanges } from './unsavedChanges.ts'
 export { openRepoConfigTrust } from './trust/configTrust.ts'
-export { STYLES } from './uiStyles.ts'
+
 export { CORE_SETTINGS_PAGES } from './corePages.ts'
 export { settingsCategoryLabel, settingsPageForMode } from './settingsPresentation.ts'
 export type { CoreSettingsPageId } from './corePages.ts'

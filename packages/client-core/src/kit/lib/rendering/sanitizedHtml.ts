@@ -2,18 +2,78 @@
 // inert template, then copy only text and known formatting tags into new nodes. Parsed nodes and
 // their attributes never enter the live document.
 const FORMATTING_TAGS = new Set([
-  'a', 'b', 'blockquote', 'br', 'code', 'del', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'hr', 'i', 'kbd', 'li', 'ol', 'p', 'pre', 's', 'samp', 'span', 'strong', 'sub', 'sup',
-  'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+  'a',
+  'b',
+  'blockquote',
+  'br',
+  'code',
+  'del',
+  'div',
+  'em',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'i',
+  'kbd',
+  'li',
+  'ol',
+  'p',
+  'pre',
+  's',
+  'samp',
+  'span',
+  'strong',
+  'sub',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
+  'u',
+  'ul',
 ])
 
 // These can execute, navigate, fetch, change document parsing, or conceal content. Drop their
 // descendants too; unrecognised ordinary HTML elements instead keep their text/formatting children.
 const DROP_SUBTREE = new Set([
-  'audio', 'base', 'button', 'canvas', 'embed', 'fieldset', 'form', 'frame', 'frameset',
-  'iframe', 'img', 'input', 'link', 'math', 'meta', 'noembed', 'noscript', 'object',
-  'option', 'picture', 'plaintext', 'portal', 'script', 'select', 'source', 'style',
-  'svg', 'template', 'textarea', 'track', 'video', 'xmp',
+  'audio',
+  'base',
+  'button',
+  'canvas',
+  'embed',
+  'fieldset',
+  'form',
+  'frame',
+  'frameset',
+  'iframe',
+  'img',
+  'input',
+  'link',
+  'math',
+  'meta',
+  'noembed',
+  'noscript',
+  'object',
+  'option',
+  'picture',
+  'plaintext',
+  'portal',
+  'script',
+  'select',
+  'source',
+  'style',
+  'svg',
+  'template',
+  'textarea',
+  'track',
+  'video',
+  'xmp',
 ])
 
 // GitHub draws a "Suggested change" block as a table of removed and added lines, and only its classes
@@ -92,9 +152,7 @@ export function sanitizedHtmlFragment(html: string): DocumentFragment {
 
     const allowed = FORMATTING_TAGS.has(tag)
     const href = tag === 'a' ? safeHref(element.getAttribute('href')) : null
-    const output = allowed && (tag !== 'a' || href)
-      ? document.createElement(tag)
-      : target
+    const output = allowed && (tag !== 'a' || href) ? document.createElement(tag) : target
     if (href && output !== target) {
       const anchor = output as HTMLAnchorElement
       anchor.href = href

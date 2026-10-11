@@ -46,13 +46,19 @@ async function buildFixture(root: string, minify: boolean, heavyImport: 'static'
     configFile: false,
     root,
     logLevel: 'silent',
-    plugins: [{
-      name: 'fixture-graph',
-      generateBundle(_options, bundle) {
-        const chunks = describeChunks(this, bundle, root)
-        this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }) })
+    plugins: [
+      {
+        name: 'fixture-graph',
+        generateBundle(_options, bundle) {
+          const chunks = describeChunks(this, bundle, root)
+          this.emitFile({
+            type: 'asset',
+            fileName: 'startup-graph.json',
+            source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }),
+          })
+        },
       },
-    }],
+    ],
     build: {
       ssr: true,
       outDir,
@@ -61,7 +67,12 @@ async function buildFixture(root: string, minify: boolean, heavyImport: 'static'
       rollupOptions: {
         input: { service: join(root, 'service.js'), mcp: join(root, 'mcp.js') },
         external: (id) => id.startsWith('node:') || ['node-pty', 'playwright-core', 'node-forge'].includes(id),
-        output: { format: 'es', keepNames: true, entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js' },
+        output: {
+          format: 'es',
+          keepNames: true,
+          entryFileNames: '[name].js',
+          chunkFileNames: 'chunks/[name]-[hash].js',
+        },
       },
     },
   })
@@ -83,7 +94,9 @@ const startup = (graph: ChunkGraph) => {
 describe('chunk graph', () => {
   let root: string
   // The bundler reports real paths, and macOS's temporary directory is behind a symlink.
-  beforeEach(() => { root = realpathSync(mkdtempSync(join(tmpdir(), 'chunk-graph-'))) })
+  beforeEach(() => {
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'chunk-graph-')))
+  })
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
   it('finds the same startup closure in formatted and minified output', async () => {
@@ -104,7 +117,7 @@ describe('chunk graph', () => {
 
     expect(lazy.modules).not.toContain('heavy.js')
     expect(eager.modules).toContain('heavy.js')
-    // Less the few bytes of dynamic-import glue the eager build no longer needs.
+    // Less the few bytes of dynamic-import glue the eager build doesn't need.
     expect(eager.bytes - lazy.bytes).toBeGreaterThan(HEAVY - 100)
   })
 
@@ -118,8 +131,19 @@ describe('chunk graph', () => {
     expect(() => readChunkGraph(dist)).toThrow(/stale: records \d+ B for service\.js, which has \d+ B/)
 
     const { [shared]: _dropped, ...rest } = graph.chunks
-    writeFileSync(join(dist, 'startup-graph.json'), JSON.stringify({ ...graph, chunks: { ...rest, 'service.js': { ...graph.chunks['service.js'], bytes: graph.chunks['service.js'].bytes + 1 } } }))
-    expect(() => readChunkGraph(dist)).toThrow(new RegExp(`import ${shared} without naming it.*does not name ${shared}`))
+    writeFileSync(
+      join(dist, 'startup-graph.json'),
+      JSON.stringify({
+        ...graph,
+        chunks: {
+          ...rest,
+          'service.js': { ...graph.chunks['service.js'], bytes: graph.chunks['service.js'].bytes + 1 },
+        },
+      }),
+    )
+    expect(() => readChunkGraph(dist)).toThrow(
+      new RegExp(`import ${shared} without naming it.*does not name ${shared}`),
+    )
 
     rmSync(join(dist, 'startup-graph.json'))
     expect(() => readChunkGraph(dist)).toThrow(/ENOENT/)

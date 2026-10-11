@@ -2,7 +2,13 @@ import { createMemo, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
-  CHECK_TONE, checksState, checksSummary, formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps,
+  CHECK_TONE,
+  checksState,
+  checksSummary,
+  formatRelativeTime,
+  openInAppUrl,
+  railDotProps,
+  type RefPanelProps,
 } from '@acorn/plugin-api/client'
 import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
@@ -10,8 +16,8 @@ import { parsePullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
 // GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
-// (docs/github-integration/tasks-and-references.md § Content links). It shows less than the full pane and offers the pane
-// as the next step, rather than being a smaller copy of a whole review.
+// (docs/github-integration/tasks-and-references.md § Content links). It shows less than the full pane
+// and offers the pane as the next step, rather than being a smaller copy of a whole review.
 //
 // A tree in the box the host draws. The backdrop, the drawer, the title and the dismiss affordance
 // are `RefPanelBox`, the same box a loaded plugin's panel is wrapped in.
@@ -20,8 +26,8 @@ const STATE_WORD: Record<string, string> = { open: 'Open', closed: 'Closed', mer
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
-  // `owner/repo#number`, parsed by the module that also spells it (../shared/pullRef.ts), so this
-  // panel, the source row, and the URL recogniser name the same thing.
+  // `owner/repo#number`, parsed by the module that also spells it, so this panel, the source row, and
+  // the URL recogniser name the same thing.
   const parts = createMemo(() => parsePullRef(props.target.displayId))
 
   const detail = createQuery(() => {
@@ -55,7 +61,11 @@ export default function PullRefPanel(props: RefPanelProps) {
           <EmptyState align="start" size="sm" busy={detail.isLoading}>
             {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
                 which is a bug, not a missing pull request. Say so instead of spinning. */}
-            {!parts() ? "acorn can't read this pull request link." : detail.isLoading ? 'Loading…' : "Couldn't load this pull request."}
+            {!parts()
+              ? "acorn can't read this pull request link."
+              : detail.isLoading
+                ? 'Loading…'
+                : "Couldn't load this pull request."}
           </EmptyState>
         }
       >
@@ -70,7 +80,7 @@ export default function PullRefPanel(props: RefPanelProps) {
                   value: (
                     <Inline>
                       <StatusDot tone={loaded().draft ? 'muted' : loaded().state === 'open' ? 'ok' : 'accent'} />
-                      <Text>{loaded().draft ? 'Draft' : STATE_WORD[loaded().state] ?? loaded().state}</Text>
+                      <Text>{loaded().draft ? 'Draft' : (STATE_WORD[loaded().state] ?? loaded().state)}</Text>
                     </Inline>
                   ),
                 },
@@ -79,19 +89,30 @@ export default function PullRefPanel(props: RefPanelProps) {
                   ? [{ label: 'Updated', value: <Text>{formatRelativeTime(loaded().updatedAt)}</Text> }]
                   : []),
                 ...(loaded().headRef
-                  ? [{ label: 'Branch', value: <Text>{loaded().headRef} → {loaded().baseRef ?? ''}</Text> }]
+                  ? [
+                      {
+                        label: 'Branch',
+                        value: (
+                          <Text>
+                            {loaded().headRef} → {loaded().baseRef ?? ''}
+                          </Text>
+                        ),
+                      },
+                    ]
                   : []),
                 // Checks as one word, not a list. The list is the pane's job.
                 ...(checks().length
-                  ? [{
-                    label: 'Checks',
-                    value: (
-                      <Inline>
-                        <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
-                        <Text>{checksSummary(checks())}</Text>
-                      </Inline>
-                    ),
-                  }]
+                  ? [
+                      {
+                        label: 'Checks',
+                        value: (
+                          <Inline>
+                            <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
+                            <Text>{checksSummary(checks())}</Text>
+                          </Inline>
+                        ),
+                      },
+                    ]
                   : []),
               ]}
             />

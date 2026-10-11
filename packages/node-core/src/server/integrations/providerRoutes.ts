@@ -7,9 +7,8 @@ import { servePluginFetch } from '../pluginHost/fetchRoute'
 
 // One core projection for every provider-owned HTTP router, mounted at PLUGIN_NAMESPACE under each
 // provider's own id (docs/integrations.md § Connection lifecycle; docs/api-reference/plugin-routes.md §
-// Plugin routes). Built lazily at createApp() time, after the provider activation list
-// (app/server/providers.ts) has populated the registry, so core itself never imports plugin
-// activation code.
+// Plugin routes). Built lazily at createApp() time, after plugin init has populated the registry, so
+// core itself never imports plugin activation code.
 export function buildIntegrationProviderRoutes(): Hono<AppEnv> {
   const app = new Hono<AppEnv>()
   for (const contribution of integrationProviderRegistry.routes()) {
@@ -23,11 +22,12 @@ export function buildIntegrationProviderRoutes(): Hono<AppEnv> {
       guarded.route('/', contribution.router)
     } else {
       const pluginId = integrationProviderRegistry.ownerOf(contribution.providerId) ?? contribution.providerId
-      const serve = (c: Parameters<typeof servePluginFetch>[0]) => servePluginFetch(c, {
-        pluginId,
-        mount: `${PLUGIN_NAMESPACE}${relativeMount}`,
-        fetch: contribution.fetch,
-      })
+      const serve = (c: Parameters<typeof servePluginFetch>[0]) =>
+        servePluginFetch(c, {
+          pluginId,
+          mount: `${PLUGIN_NAMESPACE}${relativeMount}`,
+          fetch: contribution.fetch,
+        })
       guarded.all('/', serve)
       guarded.all('/*', serve)
     }

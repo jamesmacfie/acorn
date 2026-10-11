@@ -34,9 +34,8 @@ const GAP = 8
 function fitTip(rect: DOMRect, preferred: 'left' | 'right', width: number, height: number, margin: number) {
   const fitsRight = rect.right + GAP + width <= window.innerWidth - margin
   const fitsLeft = rect.left - GAP - width >= margin
-  const side = preferred === 'right'
-    ? (fitsRight || !fitsLeft ? 'right' : 'left')
-    : (fitsLeft || !fitsRight ? 'left' : 'right')
+  const side =
+    preferred === 'right' ? (fitsRight || !fitsLeft ? 'right' : 'left') : fitsLeft || !fitsRight ? 'left' : 'right'
   const middle = rect.top + rect.height / 2
   const y = Math.max(margin + height / 2, Math.min(middle, window.innerHeight - margin - height / 2))
   return {
@@ -46,8 +45,7 @@ function fitTip(rect: DOMRect, preferred: 'left' | 'right', width: number, heigh
   } as const
 }
 
-const edgeMargin = () =>
-  parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-4')) || GAP
+const edgeMargin = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-4')) || GAP
 
 /** The attribute set, typed, so call sites get completion instead of guessing the spelling. */
 export const tip = (text: string, opts?: { sub?: string; key?: string; at?: number }) => ({
@@ -100,7 +98,7 @@ export default function Tips() {
     const at = rawAt === null ? NaN : Number(rawAt)
     setTip({
       title,
-      sub: Number.isFinite(at) ? formatRelativeTime(at) : el.getAttribute('data-tip-sub') ?? undefined,
+      sub: Number.isFinite(at) ? formatRelativeTime(at) : (el.getAttribute('data-tip-sub') ?? undefined),
       key: el.getAttribute('data-tip-key') ?? undefined,
       legend: parseLegend(el.getAttribute('data-tip-legend')),
       kind: el.getAttribute('data-tip-kind') ?? undefined,
@@ -149,7 +147,9 @@ export default function Tips() {
     <Show when={tip()}>
       {(t) => (
         <div
-          ref={(el) => { bubble = el }}
+          ref={(el) => {
+            bubble = el
+          }}
           class="rail-tip"
           data-kind={t().kind}
           style={{

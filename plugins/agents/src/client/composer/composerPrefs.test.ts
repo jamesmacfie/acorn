@@ -1,13 +1,20 @@
 import { afterEach, expect, it } from 'vitest'
 import { evictScope } from '@acorn/plugin-api/testkit/client'
-import { clearComposerExpansion, composerExpanded, composerExpansionSlice, toggleComposerExpanded } from './composerPrefs'
+import {
+  clearComposerExpansion,
+  composerExpanded,
+  composerExpansionSlice,
+  toggleComposerExpanded,
+} from './composerPrefs'
 
 afterEach(() => evictScope({ scope: 'node-switched' }))
 
 it('restores saved booleans without replacing choices made before hydration', () => {
   toggleComposerExpanded('task', 'edited')
   toggleComposerExpanded('task', 'edited')
-  const stored = composerExpansionSlice.codec.parse('{"edited":true,"expanded":true,"collapsed":false,"invalid":"false"}')
+  const stored = composerExpansionSlice.codec.parse(
+    '{"edited":true,"expanded":true,"collapsed":false,"invalid":"false"}',
+  )
   expect(stored).toEqual({ edited: true, expanded: true, collapsed: false })
   composerExpansionSlice.binding!.hydrate('task', stored)
   expect(composerExpanded('task', 'edited')).toBe(false)

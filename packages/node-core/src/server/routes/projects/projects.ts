@@ -6,8 +6,15 @@ import { z } from 'zod'
 import type { Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
-import { createProject, detectProject, getProject, listProjects, patchProject, type ProjectRow } from '../../projects'
-import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projectConfig'
+import {
+  createProject,
+  detectProject,
+  getProject,
+  listProjects,
+  patchProject,
+  type ProjectRow,
+} from '../../projects/projects'
+import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projects/projectConfig'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
@@ -17,10 +24,14 @@ import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { projectBranches } from '../../worktrees/branches'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
-// Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
-// validated. Project ids are the only live core identity for local folders and remote candidates.
+// This demands nothing of the folder: facets are detected, not validated. Project ids are the only
+// core identity for local folders and remote candidates.
 
-const createBody = z.object({ path: z.string().min(1), workspaceId: z.string().optional(), name: z.string().max(120).optional() })
+const createBody = z.object({
+  path: z.string().min(1),
+  workspaceId: z.string().optional(),
+  name: z.string().max(120).optional(),
+})
 const patchBody = z.object({
   name: z.string().max(120).optional(),
   workspaceId: z.string().optional(),
@@ -28,13 +39,6 @@ const patchBody = z.object({
   color: z.string().refine(isValidProjectColor).nullable().optional(),
   sort: z.number().int().optional(),
   path: z.string().min(1).optional(),
-})
-const browserRuleBody = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-  urlPattern: z.string(),
-  trigger: z.literal('load'),
-  action: z.object({ type: z.literal('fill'), selector: z.string(), value: z.string() }),
 })
 const configBody = z.object({
   patch: z.object({
@@ -49,13 +53,12 @@ const configBody = z.object({
     dbSchemaNotes: z.string().max(8000).optional(),
     previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
     previewValue: z.string().optional(),
-    browserRules: z.array(browserRuleBody).optional(),
     branchPrefix: z.string().max(60).optional(),
   }),
 })
 const runTargetsBody = z.object({ runTargets: z.string() })
 
-export const toWireProject = (row: ProjectRow): Project => ({
+const toWireProject = (row: ProjectRow): Project => ({
   id: row.id,
   name: row.name,
   path: row.path,
@@ -66,7 +69,10 @@ export const toWireProject = (row: ProjectRow): Project => ({
   vcs: (row.vcs as 'git' | null) ?? null,
   defaultBranch: row.defaultBranch,
   remoteUrl: row.remoteUrl,
-  github: row.githubOwner && row.githubName ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId } : null,
+  github:
+    row.githubOwner && row.githubName
+      ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
+      : null,
 })
 
 // MCP config inspector (docs/mcp.md § Configuration): read only the known candidate files and mask
@@ -115,7 +121,13 @@ export const projects = new Hono<AppEnv>()
     const parsed = configBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['Invalid project configuration.'])
     const result = await setProjectConfig(getDb(c.env), c.req.param('id'), parsed.data.patch)
-    if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
+    if (!result.ok)
+      return respondError(
+        c,
+        result.reason === 'No such project.' ? 404 : 400,
+        result.reason === 'No such project.' ? 'not_found' : 'bad_request',
+        [result.reason],
+      )
     return c.json(result.response)
   })
   // Absolute paths of every free worktree are a layout disclosure, so a task-confined caller gets
@@ -145,10 +157,16 @@ export const projects = new Hono<AppEnv>()
     const project = await getProject(db, c.req.param('id'))
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
     const branchSource = c.req.query('branchSource')
-    if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact') return respondError(c, 400, 'bad_request')
+    if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact')
+      return respondError(c, 400, 'bad_request')
     const { taskBranchAvailability, TaskBranchError } = await import('../../worktrees/taskBranch')
     try {
-      const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch'), baseCommit: c.req.query('baseCommit') })
+      const result = await taskBranchAvailability(db, project, {
+        branch,
+        branchSource,
+        baseBranch: c.req.query('baseBranch'),
+        baseCommit: c.req.query('baseCommit'),
+      })
       // Preserve the response for callers that do not request a preview.
       if (!branchSource && c.req.query('baseBranch') === undefined && c.req.query('baseCommit') === undefined) {
         const { branch: _branch, ...availability } = result
@@ -178,7 +196,11 @@ export const projects = new Hono<AppEnv>()
       await writeFile(resolve(row.path, '.mcp.json'), STARTER_MCP_JSON, { encoding: 'utf8', flag: 'wx' })
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
-      return c.json({ ok: false, reason: code === 'EEXIST' ? '.mcp.json already exists.' : `Could not write .mcp.json: ${code ?? 'unknown error'}.` })
+      return c.json({
+        ok: false,
+        reason:
+          code === 'EEXIST' ? '.mcp.json already exists.' : `Could not write .mcp.json: ${code ?? 'unknown error'}.`,
+      })
     }
     return c.json({ ok: true })
   })
@@ -186,7 +208,13 @@ export const projects = new Hono<AppEnv>()
     const parsed = runTargetsBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['runTargets is required.'])
     const result = await setProjectRunTargets(getDb(c.env), c.req.param('id'), parsed.data.runTargets)
-    if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
+    if (!result.ok)
+      return respondError(
+        c,
+        result.reason === 'No such project.' ? 404 : 400,
+        result.reason === 'No such project.' ? 'not_found' : 'bad_request',
+        [result.reason],
+      )
     return c.json(result.response)
   })
   .patch('/:id', async (c) => {
@@ -209,7 +237,7 @@ export const projects = new Hono<AppEnv>()
     const db = getDb(c.env)
     if (!(await getProject(db, c.req.param('id')))) return respondError(c, 404, 'not_found', ['No such project.'])
     // Row only. The folder and any worktrees on disk are never touched from here.
-    const { deleteProject } = await import('../../projectDeletion')
+    const { deleteProject } = await import('../../projects/projectDeletion')
     await deleteProject(db, c.req.param('id'), ownerId(c))
     return c.json({ ok: true })
   })

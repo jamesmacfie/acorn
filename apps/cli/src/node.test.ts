@@ -7,12 +7,22 @@ import type { DeviceTokens } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { decodeNodeResponse, matchingNode, probeFailure } from './node'
 
 const dirs: string[] = []
-afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 const fleet = () => {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-cli-test-'))
   dirs.push(dir)
   const values = new Map<string, string>()
-  const tokens: DeviceTokens = { read: (key) => values.get(key), write: (key, value) => { values.set(key, value) }, forget: (key) => { values.delete(key) } }
+  const tokens: DeviceTokens = {
+    read: (key) => values.get(key),
+    write: (key, value) => {
+      values.set(key, value)
+    },
+    forget: (key) => {
+      values.delete(key)
+    },
+  }
   return new FleetStore(dir, tokens)
 }
 
@@ -44,14 +54,30 @@ describe('probe failures', () => {
 describe('Node HTTP errors', () => {
   it('maps a workspace-mode 409 envelope to usage exit code and preserves its message', () => {
     const message = 'Workspaces are off on this Node, so each project has its own. Add a project instead.'
-    const response = { status: 409, body: new TextEncoder().encode(JSON.stringify({ error: {
-      code: 'workspaces_off', message, requestId: 'request-one', retryable: false,
-    } })) }
+    const response = {
+      status: 409,
+      body: new TextEncoder().encode(
+        JSON.stringify({
+          error: {
+            code: 'workspaces_off',
+            message,
+            requestId: 'request-one',
+            retryable: false,
+          },
+        }),
+      ),
+    }
     try {
       decodeNodeResponse(response, 'POST', '/v1/core/workspaces')
       throw new Error('Expected the Node refusal')
     } catch (error) {
-      expect(error).toMatchObject({ code: 'workspaces_off', message, exitCode: 2, requestId: 'request-one', retryable: false })
+      expect(error).toMatchObject({
+        code: 'workspaces_off',
+        message,
+        exitCode: 2,
+        requestId: 'request-one',
+        retryable: false,
+      })
     }
   })
 })

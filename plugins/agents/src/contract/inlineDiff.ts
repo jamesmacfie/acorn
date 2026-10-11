@@ -15,7 +15,13 @@ export type InlineDiffOrigin = {
 }
 
 export const sameInlineLine = (left: InlineDiffOrigin, right: InlineDiffOrigin): boolean =>
-  left.taskId === right.taskId && left.source === right.source && left.path === right.path &&
-  left.side === right.side && left.line === right.line && left.patchKey === right.patchKey &&
-  left.scope === right.scope && left.pull?.owner === right.pull?.owner &&
-  left.pull?.repo === right.pull?.repo && left.pull?.number === right.pull?.number
+  left.taskId === right.taskId &&
+  left.source === right.source &&
+  left.path === right.path &&
+  left.side === right.side &&
+  left.line === right.line &&
+  left.patchKey === right.patchKey &&
+  left.scope === right.scope &&
+  left.pull?.owner === right.pull?.owner &&
+  left.pull?.repo === right.pull?.repo &&
+  left.pull?.number === right.pull?.number

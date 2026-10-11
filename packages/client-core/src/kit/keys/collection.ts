@@ -3,15 +3,15 @@
 // Every roving-focus list in the kit is this: `Rows`, `TreeRow` runs, `Tabs`, `Menu`, `ChipRow`,
 // `SegmentedControl`, `Timeline`, `Grid`. They differ in what they draw and in nothing else, which is
 // why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once
-// rather than eight times (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 //
 // The rules about the *list* — what wraps, where the first press lands, which of select and activate
-// picks — moved to `collectionIntents.ts` in terminal phase 2, so the terminal host keeps them
-// exactly rather than nearly. What is left here is the DOM's share: `focus()`, `scrollIntoView`, the
-// `aria-*` attributes and the roving `tabindex`.
+// picks — live in `collectionIntents.ts`, so the terminal host keeps them exactly rather than nearly.
+// This is the DOM's share: `focus()`, `scrollIntoView`, the `aria-*` attributes and the roving
+// `tabindex`.
 //
 // A collection is one tab stop with roving focus inside, the React Aria and Kobalte shape. `active`
-// and `selected` live in `collectionState.ts` keyed by the item's own key, so a list rebuilt from a
+// and `selected` live in `collectionState` keyed by the item's own key, so a list rebuilt from a
 // fresh response keeps its place and its selection.
 //
 // The node handles intents and never reads a key. Anything it does not handle returns false and
@@ -20,7 +20,11 @@
 import { createMemo, onCleanup, type JSX } from 'solid-js'
 import { setActiveItem } from './collectionState'
 import {
-  COLLECTION_INTENTS, createCollectionIntents, createTypeAhead, PAGE, type CollectionItem,
+  COLLECTION_INTENTS,
+  createCollectionIntents,
+  createTypeAhead,
+  PAGE,
+  type CollectionItem,
 } from './collectionIntents'
 import type { Intent } from './intents'
 import { bindIntents } from './keymapHost'
@@ -70,7 +74,9 @@ export function revealCollectionItem(id: string, key: string): void {
 /** The same named reveal door for a host that draws cells instead of DOM rows. */
 export function registerCollectionReveal(id: string, reveal: (key: string) => void): () => void {
   live.set(id, reveal)
-  return () => { if (live.get(id) === reveal) live.delete(id) }
+  return () => {
+    if (live.get(id) === reveal) live.delete(id)
+  }
 }
 
 /** The row that actually has DOM focus when a host opens a command session. */
@@ -159,34 +165,44 @@ export function createCollection(options: CollectionOptions): Collection {
   // collection that is no longer on screen.
   // The id is read once, here. Read again in the cleanup it can already name the next owner's
   // collection: a task-scoped id reads the task through props, and by the time a task switch disposes
-  // the old view those props answer with the new task. The old entry then stayed in `live`, and its
-  // `reveal` held the whole detached view, until that task was opened again.
+  // the old view those props answer with the new task. The old entry would then stay in `live`, its
+  // `reveal` holding the whole detached view, until that task was opened again.
   const id = options.id()
   onCleanup(registerCollectionReveal(id, reveal))
 
   return {
     active,
     selected: keys.selected,
-    focus: (key) => { setActiveItem(options.id(), key) },
+    focus: (key) => {
+      setActiveItem(options.id(), key)
+    },
     reveal,
     containerProps: {
       ref: (element: HTMLElement) => bindIntents(element, COLLECTION_INTENTS, keys.handle),
       'data-collection-id': id,
       role: options.role,
       'aria-orientation': options.role === 'tablist' && options.orientation !== 'horizontal' ? 'vertical' : undefined,
-      get 'aria-activedescendant'() { return active() ? itemId(active()!) : undefined },
+      get 'aria-activedescendant'() {
+        return active() ? itemId(active()!) : undefined
+      },
       onKeyDown,
     },
     itemProps: (key: string) => ({
       'data-collection-key': key,
-      get id() { return itemId(key) },
+      get id() {
+        return itemId(key)
+      },
       role: options.itemRole ?? (options.role ? ITEM_ROLES[options.role] : undefined),
       // Roving: one item in the collection is tab-reachable and the arrows move within it. A getter,
       // because a spread object is read once and this changes on every move.
-      get tabindex() { return active() === key ? 0 : -1 },
+      get tabindex() {
+        return active() === key ? 0 : -1
+      },
       ref: (element: HTMLElement) => {
         elements.set(key, element)
-        onCleanup(() => { if (elements.get(key) === element) elements.delete(key) })
+        onCleanup(() => {
+          if (elements.get(key) === element) elements.delete(key)
+        })
       },
       onFocus: () => setActiveItem(options.id(), key),
     }),
@@ -213,7 +229,9 @@ export function createDomCollection(options: {
 }): { containerProps: Record<string, unknown>; attach: (element: HTMLElement) => void } {
   let container: HTMLElement | undefined
   const items = (): HTMLElement[] =>
-    [...container?.querySelectorAll<HTMLElement>(options.selector) ?? []].filter((item) => !item.hasAttribute('disabled'))
+    [...(container?.querySelectorAll<HTMLElement>(options.selector) ?? [])].filter(
+      (item) => !item.hasAttribute('disabled'),
+    )
 
   const move = (delta: number, absolute?: 'first' | 'last'): boolean => {
     const list = items()
@@ -223,22 +241,31 @@ export function createDomCollection(options: {
       return true
     }
     const at = list.indexOf(container?.ownerDocument.activeElement as HTMLElement)
-    list[(((at < 0 ? 0 : at) + delta) + list.length) % list.length].focus()
+    list[((at < 0 ? 0 : at) + delta + list.length) % list.length].focus()
     return true
   }
 
   const horizontal = options.orientation === 'horizontal'
   const handle = (intent: Intent): boolean => {
     switch (intent) {
-      case 'next': return move(1)
-      case 'prev': return move(-1)
-      case 'first': return move(0, 'first')
-      case 'last': return move(0, 'last')
-      case 'pageNext': return move(PAGE)
-      case 'pagePrev': return move(-PAGE)
-      case 'expand': return horizontal ? move(1) : false
-      case 'collapse': return horizontal ? move(-1) : false
-      default: return false
+      case 'next':
+        return move(1)
+      case 'prev':
+        return move(-1)
+      case 'first':
+        return move(0, 'first')
+      case 'last':
+        return move(0, 'last')
+      case 'pageNext':
+        return move(PAGE)
+      case 'pagePrev':
+        return move(-PAGE)
+      case 'expand':
+        return horizontal ? move(1) : false
+      case 'collapse':
+        return horizontal ? move(-1) : false
+      default:
+        return false
     }
   }
 

@@ -45,11 +45,7 @@ export type {
 } from './contracts/capabilities.js'
 export type { PluginRunRegistry } from './contracts/runs.js'
 export type { PluginAuditRegistry } from './contracts/audit.js'
-export type {
-  ExtensionPointId,
-  Extension,
-  PluginExtensionPointRegistry,
-} from './contracts/extensionPoints.js'
+export type { ExtensionPointId, Extension, PluginExtensionPointRegistry } from './contracts/extensionPoints.js'
 export type {
   PluginHookRegistry,
   PluginHookPoint,
@@ -102,7 +98,6 @@ export type {
   SetupTrigger,
   PreviewMode,
   DbSchemaMode,
-  BrowserRule,
   ProjectConfig,
   ProjectConfigResponse,
   CoreProjectService,

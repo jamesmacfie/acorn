@@ -1,15 +1,28 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
-import { _resetClientTelemetry, flushTelemetry, setTelemetryEnabled, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import {
+  _resetClientTelemetry,
+  flushTelemetry,
+  setTelemetryEnabled,
+  startClientTelemetry,
+} from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { featureUsable, openFeature } from '@acorn/client-core/infra/telemetry'
 import { startupTraceId } from './boot'
-import { _resetStartupMilestones, claimStartupAccount, emitStartupMilestones, markFirstFrame, markShellDrawn } from './startupMilestones'
+import {
+  _resetStartupMilestones,
+  claimStartupAccount,
+  emitStartupMilestones,
+  markFirstFrame,
+  markShellDrawn,
+} from './startupMilestones'
 
 let posted: TelemetryRecord[]
 
 const spans = async (): Promise<TelemetrySpan[]> => {
   await flushTelemetry()
-  return posted.filter((record): record is TelemetrySpan => record.kind === 'span' && record.name.startsWith('renderer.startup'))
+  return posted.filter(
+    (record): record is TelemetrySpan => record.kind === 'span' && record.name.startsWith('renderer.startup'),
+  )
 }
 const named = (all: TelemetrySpan[], name: string) => all.filter((span) => span.name === name)
 
@@ -62,7 +75,10 @@ it('records each milestone once and emits them when consent arrives later, in th
   // Nothing was open at the landing, which is the empty or no-project screen.
   const [usable] = named(all, 'renderer.startup.usable')
   expect(usable!.attrs).toMatchObject({ features: 0, outcome: 'usable', proxy: false })
-  expect(named(all, 'renderer.startup.phase').map((span) => span.parentSpanId)).toEqual([usable!.spanId, usable!.spanId])
+  expect(named(all, 'renderer.startup.phase').map((span) => span.parentSpanId)).toEqual([
+    usable!.spanId,
+    usable!.spanId,
+  ])
 
   consent(false)
   consent(true)
@@ -91,7 +107,10 @@ it('keeps the numbers local while the switch is off, then emits each once when i
   await settle()
   expect(await spans()).toEqual([])
   consent(true)
-  const names = (await spans()).map((span) => span.name).filter((name) => name !== 'renderer.startup.phase').sort()
+  const names = (await spans())
+    .map((span) => span.name)
+    .filter((name) => name !== 'renderer.startup.phase')
+    .sort()
   expect(names).toEqual(['renderer.startup.first_frame', 'renderer.startup.restored', 'renderer.startup.usable'])
   consent(false)
   consent(true)
@@ -123,13 +142,18 @@ it('reports the restore of a Node the window re-homed to before restoring', asyn
 
 it('labels a milestone reached after the window was hidden', async () => {
   const listeners: (() => void)[] = []
-  const fakeDocument = { hidden: false, addEventListener: (_: string, listener: () => void) => listeners.push(listener) }
+  const fakeDocument = {
+    hidden: false,
+    addEventListener: (_: string, listener: () => void) => listeners.push(listener),
+  }
   vi.stubGlobal('document', fakeDocument)
   _resetStartupMilestones()
   const account = claimStartupAccount('node-a')
   account.restored()
   const restoredAt = performance.now()
-  while (performance.now() === restoredAt) { /* the hide has to come strictly after the restore */ }
+  while (performance.now() === restoredAt) {
+    /* the hide has to come strictly after the restore */
+  }
   fakeDocument.hidden = true
   for (const listener of listeners) listener()
   markFirstFrame()

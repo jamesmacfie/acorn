@@ -60,11 +60,6 @@ pub enum Signal {
     /// `reason` is what the service said about the last attempt, when it said anything. The recovery
     /// dialog is the only place an owner reads it.
     CrashBudgetExhausted { reason: Option<String> },
-    /// A preview tunnel is listening on this loopback port under this secret. wry cannot inject a
-    /// per-request header, so src/webviews.rs seeds the credential into the preview webview's cookie
-    /// store. It travels on this pipe so the renderer never sees it.
-    TunnelOpened { port: u16, secret: String },
-    TunnelClosed { port: u16 },
     /// Telemetry is on and the helper wants this machine's memory numbers. Answered on stdin by
     /// src/footprint.rs, because only this process can find the renderer's web content process.
     FootprintRequest,
@@ -72,14 +67,11 @@ pub enum Signal {
 
 fn parse_signal(line: &str) -> Option<Signal> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
-    let port = || u16::try_from(value.get("port")?.as_u64()?).ok();
     match value.get("acorn-helper")?.as_str()? {
         "ready" => serde_json::from_value(value.clone()).ok().map(Signal::Ready),
         "crash-budget-exhausted" => Some(Signal::CrashBudgetExhausted {
             reason: value.get("reason").and_then(|r| r.as_str()).map(str::to_string),
         }),
-        "tunnel-opened" => Some(Signal::TunnelOpened { port: port()?, secret: value.get("secret")?.as_str()?.to_string() }),
-        "tunnel-closed" => Some(Signal::TunnelClosed { port: port()? }),
         "footprint-request" => Some(Signal::FootprintRequest),
         _ => None,
     }
@@ -147,9 +139,9 @@ fn group_has_members(group: i32) -> bool {
 ///
 /// The wait is on the group rather than on the helper, and that is the whole point. The helper exits
 /// promptly and politely; the node it supervises is the one that can wedge, and the node is what
-/// holds the data root's exclusive lock. Returning as soon as the helper was reaped left a live node
-/// behind in an abandoned group, so the next launch failed with "Another acorn node already holds
-/// <dataDir>" until somebody killed a pid by hand.
+/// holds the data root's exclusive lock. Returning as soon as the helper is reaped would leave a live
+/// node behind in an abandoned group, so the next launch would fail with "Another acorn node already
+/// holds <dataDir>" until somebody killed a pid by hand.
 ///
 /// The ceiling is that the group id is the helper's pid, which the kernel may reuse once the helper
 /// is reaped. Escalating onto a recycled group would need that exact pid to be handed to a new group
@@ -318,10 +310,8 @@ mod tests {
 
     /// A shell in its own process group, with stdout piped so it can say when it is ready.
     ///
-    /// Both group tests below used to set their scene with `sleep(300ms)` and then assert on it. That
-    /// was long enough on an idle machine and not inside a full `pnpm test`, where the assert read
-    /// "the backgrounded sleep should still hold the group" and told nobody why. The scene is
-    /// observable, so these wait for it.
+    /// The group tests below wait for their scene rather than sleeping and asserting on it: a fixed
+    /// sleep is long enough on an idle machine and not inside a full `pnpm test`.
     #[cfg(unix)]
     fn shell_in_its_own_group(script: &str) -> (Child, i32, Receiver<String>) {
         use std::os::unix::process::CommandExt;
@@ -435,16 +425,5 @@ mod tests {
         assert!(line.contains("\"isPackaged\":false"), "{line}");
         assert!(line.contains("\"envFiles\":[\"/a/.env\"]"), "{line}");
         assert!(!line.contains("bundledPluginsDir"), "{line}");
-    }
-
-    #[test]
-    fn a_tunnel_signal_carries_a_port_and_a_secret() {
-        let opened = parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":51999,\"secret\":\"s3cr3t\"}");
-        let Some(Signal::TunnelOpened { port, secret }) = opened else { panic!("expected a tunnel-opened signal") };
-        assert_eq!((port, secret.as_str()), (51999, "s3cr3t"));
-        assert!(matches!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":51999}"), Some(Signal::TunnelClosed { port: 51999 })));
-        // A port that cannot be one is not a signal, rather than a signal about port 0.
-        assert!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":70000}").is_none());
-        assert!(parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":1}").is_none());
     }
 }

@@ -10,11 +10,15 @@ export function QueryCacheProvider(props: ParentProps<{ cache: NodeCache }>) {
   onMount(() => {
     const lease = props.cache.persistence.acquire()
     onCleanup(lease.release)
-    void lease.restored.catch(() => {}).finally(() => {
-      if (!disposed && !props.cache.persistence.retired()) setRestoring(false)
-    })
+    void lease.restored
+      .catch(() => {})
+      .finally(() => {
+        if (!disposed && !props.cache.persistence.retired()) setRestoring(false)
+      })
   })
-  onCleanup(() => { disposed = true })
+  onCleanup(() => {
+    disposed = true
+  })
   return (
     <QueryClientProvider client={props.cache.client}>
       <IsRestoringProvider value={restoring}>{props.children}</IsRestoringProvider>

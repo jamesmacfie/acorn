@@ -1,12 +1,9 @@
-// Which component this host draws a descriptor source's rail list with.
+// Which component this host draws a descriptor source's rail list with (docs/tui/host-switch.md § The
+// host switch).
 //
-// The third seam of this shape, after `KIT_COMPONENTS` and `layouts/table.ts`, and it is here for the
-// same reason both of those are: `chromeRegister.ts` named `ChromeSourcePanel` directly, and that
-// component is DOM all the way down — `<main class="panes">`, `<section>`, `<span>`, `Dynamic` from
-// `solid-js/web` and the DOM kit's primitives. Registering it on a cell host handed the reconciler a
-// `main` and it refused, so selecting Linear or any other descriptor source in `acorn` threw
-// "[Reconciler] Unknown component type: main" rather than drawing a list
-// (docs/tui/host-switch.md § The host switch).
+// The same seam as `KIT_COMPONENTS` and `layouts/table.ts`. The desktop's `ChromeSourceList` is DOM all
+// the way down, and the terminal's cell reconciler throws "Unknown component type" on DOM elements, so
+// each host supplies its own.
 //
 // A whole contribution rather than a component, because the two hosts do not put the halves in the
 // same place: the desktop draws one surface across the window, and the terminal puts the list in its
@@ -34,6 +31,6 @@ export function setSourcePanel(factory: SourcePanelFactory): void {
 export const suppliedSourcePanel = (): SourcePanelFactory | null => supplied
 
 /** Test seam. The factory is module-level, so a suite must not inherit the previous one's host. */
-export function _resetSourcePanel(): void {
+function _resetSourcePanel(): void {
   supplied = null
 }

@@ -8,12 +8,26 @@ import type { InstructionSnapshot } from './instructionSnapshot'
 
 let testDb: TestPluginDb
 let store: InstructionReviewStore
-beforeEach(() => { testDb = makeTestPluginDb('agents'); store = new InstructionReviewStore(testDb.db, new SecretService('33'.repeat(32))) })
+beforeEach(() => {
+  testDb = makeTestPluginDb('agents')
+  store = new InstructionReviewStore(testDb.db, new SecretService('33'.repeat(32)))
+})
 afterEach(() => testDb.cleanup())
-const snapshot = (text: string): InstructionSnapshot => ({ version: 1, scope: 'test scope', files: [{
-  path: 'AGENTS.md', canonicalPath: '/project/AGENTS.md', sha256: createHash('sha256').update(text).digest('hex'), bytes: text.length,
-  text, kind: 'instruction', unsupported: false,
-}] })
+const snapshot = (text: string): InstructionSnapshot => ({
+  version: 1,
+  scope: 'test scope',
+  files: [
+    {
+      path: 'AGENTS.md',
+      canonicalPath: '/project/AGENTS.md',
+      sha256: createHash('sha256').update(text).digest('hex'),
+      bytes: text.length,
+      text,
+      kind: 'instruction',
+      unsupported: false,
+    },
+  ],
+})
 
 it('seals bodies, restores approval, retains only two snapshots, and isolates projects', async () => {
   const first = await store.save('one', snapshot('API_KEY=supersecret'))
@@ -45,8 +59,10 @@ it('requires renewed review when the encrypted body cannot be opened', async () 
 it('recognizes either of two approved task roots in the same project', async () => {
   const one = snapshot('one')
   const two = snapshot('two')
-  const first = await store.save('project', one); await store.approve(first.id, 'project')
-  const second = await store.save('project', two); await store.approve(second.id, 'project')
+  const first = await store.save('project', one)
+  await store.approve(first.id, 'project')
+  const second = await store.save('project', two)
+  await store.approve(second.id, 'project')
   expect((await store.approved('project', snapshotDigest(one)))?.id).toBe(first.id)
   expect((await store.approved('project', snapshotDigest(two)))?.id).toBe(second.id)
   const pending = await store.save('project', snapshot('third'))
@@ -56,7 +72,12 @@ it('recognizes either of two approved task roots in the same project', async () 
 
 it('does not save a review cancelled while encryption is pending', async () => {
   let finishSeal!: (value: string) => void
-  const seal = vi.fn(() => new Promise<string>((resolve) => { finishSeal = resolve }))
+  const seal = vi.fn(
+    () =>
+      new Promise<string>((resolve) => {
+        finishSeal = resolve
+      }),
+  )
   const delayed = new InstructionReviewStore(testDb.db, { seal } as unknown as SecretService)
   const abort = new AbortController()
   const saving = delayed.save('project', snapshot('instruction'), abort.signal)

@@ -12,14 +12,53 @@ const MAX_TEXT_BYTES = 1024 * 1024
 const UPLOAD_GRACE_MS = 24 * 60 * 60 * 1_000
 
 const TEXT_EXTENSIONS = new Set([
-  'txt', 'md', 'markdown', 'json', 'jsonl', 'yaml', 'yml', 'toml', 'xml', 'csv',
-  'ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'css', 'html', 'htm',
-  'py', 'rb', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'hpp', 'swift', 'kt', 'kts',
-  'sh', 'bash', 'zsh', 'fish', 'sql', 'graphql', 'gql', 'diff', 'patch', 'log',
+  'txt',
+  'md',
+  'markdown',
+  'json',
+  'jsonl',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'csv',
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mts',
+  'cts',
+  'mjs',
+  'cjs',
+  'css',
+  'html',
+  'htm',
+  'py',
+  'rb',
+  'go',
+  'rs',
+  'java',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'swift',
+  'kt',
+  'kts',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'sql',
+  'graphql',
+  'gql',
+  'diff',
+  'patch',
+  'log',
 ])
 
-/** The two image families the editor seam accepts, sniffed rather than believed
- *  (../../contract/draftAttachments.ts).
+/** The two image families the editor seam (AGENTS_DRAFT_ATTACHMENTS) accepts, sniffed rather than
+ *  believed.
  *
  *  Deliberately narrower than what `upload` takes. GIF and WebP may be animated, so a plugin that
  *  decoded one to a canvas and re-encoded it would silently flatten it to a single frame, and a PDF is
@@ -45,7 +84,11 @@ const startsWith = (bytes: Uint8Array, signature: number[]): boolean =>
 const ascii = (bytes: Uint8Array, start: number, end: number): string =>
   new TextDecoder().decode(bytes.slice(start, end))
 
-function validatedMediaType(filename: string, supplied: string, bytes: Uint8Array): {
+function validatedMediaType(
+  filename: string,
+  supplied: string,
+  bytes: Uint8Array,
+): {
   mediaType: string
   textEncoding: string | null
 } {
@@ -62,10 +105,12 @@ function validatedMediaType(filename: string, supplied: string, bytes: Uint8Arra
   if (ascii(bytes, 0, 5) === '%PDF-') return { mediaType: 'application/pdf', textEncoding: null }
 
   const extension = filename.split('.').pop()?.toLowerCase() ?? ''
-  const declaredText = supplied.startsWith('text/')
-    || ['application/json', 'application/xml', 'application/yaml'].includes(supplied)
-    || TEXT_EXTENSIONS.has(extension)
-  if (!declaredText) throw new Error('Unsupported attachment type. Use JPEG, PNG, GIF, WebP, PDF, or UTF-8 text/source files.')
+  const declaredText =
+    supplied.startsWith('text/') ||
+    ['application/json', 'application/xml', 'application/yaml'].includes(supplied) ||
+    TEXT_EXTENSIONS.has(extension)
+  if (!declaredText)
+    throw new Error('Unsupported attachment type. Use JPEG, PNG, GIF, WebP, PDF, or UTF-8 text/source files.')
   if (bytes.byteLength > MAX_TEXT_BYTES) throw new Error('Decoded text attachments are limited to 1 MiB.')
   try {
     new TextDecoder('utf-8', { fatal: true }).decode(bytes)
@@ -99,7 +144,10 @@ export class AgentAttachmentStore {
 
   /** Copies an attachment a turn is sending into its session's folder, and returns the copy's path. A
    *  clone where the file system makes one, so on APFS the copy takes no space. */
-  async copyToSession(sessionId: string, attachment: { id: string; filename: string; localPath: string }): Promise<string> {
+  async copyToSession(
+    sessionId: string,
+    attachment: { id: string; filename: string; localPath: string },
+  ): Promise<string> {
     const dir = join(this.sessionFolder(sessionId), attachment.id)
     await mkdir(dir, { recursive: true })
     // `upload` keeps only a base name, and `..` is one.
@@ -116,20 +164,25 @@ export class AgentAttachmentStore {
     return rm(this.sessionFolder(sessionId), { recursive: true, force: true })
   }
 
-  async upload(taskId: string, filename: string, suppliedMediaType: string, bytes: Uint8Array): Promise<AgentAttachment> {
+  async upload(
+    taskId: string,
+    filename: string,
+    suppliedMediaType: string,
+    bytes: Uint8Array,
+  ): Promise<AgentAttachment> {
     if (!bytes.byteLength) throw new Error('Empty attachments are not supported.')
     if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachments are limited to 10 MiB each.')
     if (!(await this.core.tasks.load(taskId))) throw new Error('Task not found.')
-    const safeFilename = basename(filename).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 500) || 'attachment'
+    const safeFilename =
+      basename(filename)
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .slice(0, 500) || 'attachment'
     const validated = validatedMediaType(safeFilename, suppliedMediaType.toLowerCase(), bytes)
     const hash = createHash('sha256').update(bytes).digest('hex')
     const [existing] = await this.db
       .select()
       .from(schema.agentAttachments)
-      .where(and(
-        eq(schema.agentAttachments.taskId, taskId),
-        eq(schema.agentAttachments.contentHash, hash),
-      ))
+      .where(and(eq(schema.agentAttachments.taskId, taskId), eq(schema.agentAttachments.contentHash, hash)))
       .limit(1)
     if (existing && existing.deletedAt == null) return rowToAttachment(existing)
 
@@ -138,7 +191,11 @@ export class AgentAttachmentStore {
     const path = join(directory, hash)
     await mkdir(directory, { recursive: true, mode: 0o700 })
     try {
-      const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
+      const handle = await open(
+        path,
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+        0o600,
+      )
       try {
         await handle.writeFile(bytes)
       } finally {
@@ -148,7 +205,9 @@ export class AgentAttachmentStore {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       const stat = await lstat(path)
       if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Attachment object path is not a regular file.')
-      const existingHash = createHash('sha256').update(await readFile(path)).digest('hex')
+      const existingHash = createHash('sha256')
+        .update(await readFile(path))
+        .digest('hex')
       if (existingHash !== hash) throw new Error('Attachment object failed its integrity check.')
     }
 
@@ -175,17 +234,20 @@ export class AgentAttachmentStore {
       }
     }
     const id = randomUUID()
-    await this.db.insert(schema.agentAttachments).values({
-      id,
-      taskId,
-      storageKey,
-      contentHash: hash,
-      filename: safeFilename,
-      mediaType: validated.mediaType,
-      byteSize: bytes.byteLength,
-      textEncoding: validated.textEncoding,
-      createdAt: timestamp,
-    }).onConflictDoNothing()
+    await this.db
+      .insert(schema.agentAttachments)
+      .values({
+        id,
+        taskId,
+        storageKey,
+        contentHash: hash,
+        filename: safeFilename,
+        mediaType: validated.mediaType,
+        byteSize: bytes.byteLength,
+        textEncoding: validated.textEncoding,
+        createdAt: timestamp,
+      })
+      .onConflictDoNothing()
     const [row] = await this.db
       .select()
       .from(schema.agentAttachments)
@@ -228,13 +290,15 @@ export class AgentAttachmentStore {
     const [row] = await this.db
       .select()
       .from(schema.agentAttachments)
-      .where(and(
-        eq(schema.agentAttachments.id, id),
-        eq(schema.agentAttachments.taskId, taskId),
-        isNull(schema.agentAttachments.deletedAt),
-      ))
+      .where(
+        and(
+          eq(schema.agentAttachments.id, id),
+          eq(schema.agentAttachments.taskId, taskId),
+          isNull(schema.agentAttachments.deletedAt),
+        ),
+      )
       .limit(1)
-    if (!row || await this.#referenced(id)) return null
+    if (!row || (await this.#referenced(id))) return null
     // A row whose object is gone is a draft that cannot be edited, which reads the same as absent to
     // every caller. The garbage collector is what reconciles the two.
     const bytes = await readFile(join(this.root, row.storageKey)).catch(() => null)
@@ -261,7 +325,7 @@ export class AgentAttachmentStore {
   }
 
   /** Did a turn of this session claim this attachment? An attachment belongs to a task, and this is
-   *  what ties it to one session's transcript (../../contract/transcriptMedia.ts). */
+   *  what ties it to one session's transcript (AGENTS_TRANSCRIPT_MEDIA). */
   async sentIn(sessionId: string, id: string): Promise<boolean> {
     const [reference] = await this.db
       .select({ attachmentId: schema.agentAttachmentRefs.attachmentId })
@@ -285,7 +349,10 @@ export class AgentAttachmentStore {
 
   async removeUnreferenced(id: string): Promise<boolean> {
     if (await this.#referenced(id)) return false
-    await this.db.update(schema.agentAttachments).set({ deletedAt: Date.now() }).where(eq(schema.agentAttachments.id, id))
+    await this.db
+      .update(schema.agentAttachments)
+      .set({ deletedAt: Date.now() })
+      .where(eq(schema.agentAttachments.id, id))
     return true
   }
 
@@ -294,13 +361,15 @@ export class AgentAttachmentStore {
     const rows = await this.db
       .select()
       .from(schema.agentAttachments)
-      .where(or(
-        and(isNull(schema.agentAttachments.deletedAt), lt(schema.agentAttachments.createdAt, cutoff)),
-        and(isNotNull(schema.agentAttachments.deletedAt), lt(schema.agentAttachments.deletedAt, cutoff)),
-      ))
+      .where(
+        or(
+          and(isNull(schema.agentAttachments.deletedAt), lt(schema.agentAttachments.createdAt, cutoff)),
+          and(isNotNull(schema.agentAttachments.deletedAt), lt(schema.agentAttachments.deletedAt, cutoff)),
+        ),
+      )
     let removed = 0
     for (const row of rows) {
-      if (!await this.removeUnreferenced(row.id)) continue
+      if (!(await this.removeUnreferenced(row.id))) continue
       await this.#unlinkIfUnused(row.storageKey)
       removed++
     }
@@ -309,8 +378,12 @@ export class AgentAttachmentStore {
 
   async collectNow(ids: string[]): Promise<void> {
     for (const id of new Set(ids)) {
-      const [row] = await this.db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.id, id)).limit(1)
-      if (!row || !await this.removeUnreferenced(id)) continue
+      const [row] = await this.db
+        .select()
+        .from(schema.agentAttachments)
+        .where(eq(schema.agentAttachments.id, id))
+        .limit(1)
+      if (!row || !(await this.removeUnreferenced(id))) continue
       await this.#unlinkIfUnused(row.storageKey)
     }
   }

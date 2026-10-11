@@ -9,7 +9,7 @@ import Icon from '../../../kit/components/content/Icon'
 import { Heading } from '../../../kit/components/content/Heading'
 import { Modal } from '../../../kit/components/overlays/Modal'
 import { createLogger } from '../../../infra/telemetry/logger'
-export { collectConcerns, registerWillHandler } from './willPhaseModel'
+export { registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
 
 const log = createLogger('will')
@@ -43,30 +43,34 @@ const CONFIRM = 'confirm'
 
 const [prompt, setPrompt] = createSignal<Prompt | null>(null)
 
-export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
-  kind: K
-  payload: WillEventMap[K]
-  title: string
-  subject?: string
-  message?: string
-  /** What the action leaves in place, said apart from what it removes. */
-  stays?: string
-  alwaysConfirm?: boolean
-  concerns?: Concern[]
-  // One confirm button, or a choice of actions (see WillAction).
-} & ({ actionLabel: string; actions?: never } | { actions: [WillAction, ...WillAction[]]; actionLabel?: never })): Promise<WillDecision> {
+export async function confirmWillEvent<K extends keyof WillEventMap>(
+  options: {
+    kind: K
+    payload: WillEventMap[K]
+    title: string
+    subject?: string
+    message?: string
+    /** What the action leaves in place, said apart from what it removes. */
+    stays?: string
+    alwaysConfirm?: boolean
+    concerns?: Concern[]
+    // One confirm button, or a choice of actions (see WillAction).
+  } & ({ actionLabel: string; actions?: never } | { actions: [WillAction, ...WillAction[]]; actionLabel?: never }),
+): Promise<WillDecision> {
   const actions = options.actions ?? [{ id: CONFIRM, label: options.actionLabel }]
   const concerns = [...(options.concerns ?? []), ...(await collectConcerns(options.kind, options.payload))]
   if (!options.alwaysConfirm && !concerns.length) return { confirmed: true, checked: [], action: actions[0]!.id }
-  return new Promise<WillDecision>((resolve) => setPrompt({
-    title: options.title,
-    subject: options.subject,
-    actions,
-    message: options.message,
-    ...(options.stays ? { stays: options.stays } : {}),
-    concerns,
-    resolve,
-  }))
+  return new Promise<WillDecision>((resolve) =>
+    setPrompt({
+      title: options.title,
+      subject: options.subject,
+      actions,
+      message: options.message,
+      ...(options.stays ? { stays: options.stays } : {}),
+      concerns,
+      resolve,
+    }),
+  )
 }
 
 /**
@@ -85,22 +89,24 @@ export function confirmAction(options: {
   // Back to where the person was, which inside settings is the button that asked. The dialog is drawn
   // outside the settings layer, and a closed dialog leaves the focus on the body otherwise.
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
-  return new Promise<boolean>((resolve) => setPrompt({
-    title: options.title,
-    actions: [{ id: CONFIRM, label: options.actionLabel }],
-    message: options.goes,
-    ...(options.stays ? { stays: options.stays } : {}),
-    ...(options.danger ? { danger: true } : {}),
-    concerns: [],
-    resolve: ({ confirmed }) => {
-      // WebKit does not focus a clicked button, so the opener can be the body; and a confirmed delete
-      // can take the opener away. Either way the focus goes to the layer the dialog was raised over,
-      // settings among them, so its Escape and ⌘[ keep working without a click first.
-      if (opener?.isConnected && opener !== document.body) opener.focus()
-      else [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].at(-1)?.focus()
-      resolve(confirmed)
-    },
-  }))
+  return new Promise<boolean>((resolve) =>
+    setPrompt({
+      title: options.title,
+      actions: [{ id: CONFIRM, label: options.actionLabel }],
+      message: options.goes,
+      ...(options.stays ? { stays: options.stays } : {}),
+      ...(options.danger ? { danger: true } : {}),
+      concerns: [],
+      resolve: ({ confirmed }) => {
+        // WebKit does not focus a clicked button, so the opener can be the body; and a confirmed delete
+        // can take the opener away. Either way the focus goes to the layer the dialog was raised over,
+        // settings among them, so its Escape and ⌘[ keep working without a click first.
+        if (opener?.isConnected && opener !== document.body) opener.focus()
+        else [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].at(-1)?.focus()
+        resolve(confirmed)
+      },
+    }),
+  )
 }
 
 export function WillConfirmationHost() {
@@ -108,7 +114,8 @@ export function WillConfirmationHost() {
   const [checks, setChecks] = createSignal<Record<string, boolean>>({})
   // The chosen action's id, or null for the prompt's default.
   const [chosen, setChosen] = createSignal<string | null>(null)
-  const selected = (current: Prompt): WillAction => current.actions.find((action) => action.id === chosen()) ?? current.actions[0]!
+  const selected = (current: Prompt): WillAction =>
+    current.actions.find((action) => action.id === chosen()) ?? current.actions[0]!
   const finish = (confirmed: boolean) => {
     const current = prompt()
     if (!current) return
@@ -120,8 +127,8 @@ export function WillConfirmationHost() {
       const ticked = checks()[concern.id] ?? concern.checkbox?.checked ?? false
       if (confirmed && concern.checkbox && ticked) checked.push(concern.id)
       // Contained, because this loop is between the owner clicking and the caller finding out. One
-      // handler throwing used to skip the resolve below, leaving the archive promise pending forever:
-      // the dialog closed and nothing happened, with no error anyone would connect to it.
+      // handler throwing would skip the resolve below, leaving the archive promise pending forever:
+      // the dialog closes and nothing happens, with no error anyone would connect to it.
       try {
         concern.onDecision?.(confirmed, ticked)
       } catch (error) {
@@ -131,96 +138,142 @@ export function WillConfirmationHost() {
     setChecks({})
     current.resolve({ confirmed, checked, action })
   }
-  const dangerous = (current: Prompt) => !!current.danger || !!selected(current).danger
-    || current.concerns.some((concern) => concern.severity === 'danger')
+  const dangerous = (current: Prompt) =>
+    !!current.danger || !!selected(current).danger || current.concerns.some((concern) => concern.severity === 'danger')
   // Focus starts on the action unless something would be lost, when it is Modal's own choice for an
   // `alertdialog`: Cancel. The newest alert dialog is this one, because it is the last one mounted.
-  const action = (current: Prompt) => dangerous(current)
-    ? undefined
-    : [...document.querySelectorAll<HTMLElement>('[role="alertdialog"]')].at(-1)?.querySelector<HTMLElement>('.ui-modal-actions [data-variant="solid"]') ?? undefined
+  const action = (current: Prompt) =>
+    dangerous(current)
+      ? undefined
+      : ([...document.querySelectorAll<HTMLElement>('[role="alertdialog"]')]
+          .at(-1)
+          ?.querySelector<HTMLElement>('.ui-modal-actions [data-variant="solid"]') ?? undefined)
   // Each concern names its own subject, because the dialog does not add the feature's name to it.
   return (
     <Portal>
-    <Show when={prompt()} keyed>
-      {(current) => (
-        <Modal title={current.title} size="sm" role="alertdialog" autoFocus={() => action(current)} onDismiss={() => finish(false)}>
-          <Modal.Body>
-            <Show when={current.subject}>{(subject) => <div class="will-subject"><Heading level={2}>{subject()}</Heading></div>}</Show>
-            <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
-            <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
-            <Show when={current.concerns.length}>
-              <ul class="will-concerns">
-                {current.concerns.map((concern) => (
-                  <li data-severity={concern.severity}>
-                    <Icon name={concern.severity === 'danger' ? 'octagon-alert' : 'triangle-alert'} tone={concern.severity} />
-                    <span>{concern.message}</span>
-                    <Show when={concern.details?.length}>
-                      <ul class="will-concern-details">
-                        {/* Sliced here as well as on the node: a client-side producer answers with
+      <Show when={prompt()} keyed>
+        {(current) => (
+          <Modal
+            title={current.title}
+            size="sm"
+            role="alertdialog"
+            autoFocus={() => action(current)}
+            onDismiss={() => finish(false)}
+          >
+            <Modal.Body>
+              <Show when={current.subject}>
+                {(subject) => (
+                  <div class="will-subject">
+                    <Heading level={2}>{subject()}</Heading>
+                  </div>
+                )}
+              </Show>
+              <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
+              <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
+              <Show when={current.concerns.length}>
+                <ul class="will-concerns">
+                  {current.concerns.map((concern) => (
+                    <li data-severity={concern.severity}>
+                      <Icon
+                        name={concern.severity === 'danger' ? 'octagon-alert' : 'triangle-alert'}
+                        tone={concern.severity}
+                      />
+                      <span>{concern.message}</span>
+                      <Show when={concern.details?.length}>
+                        <ul class="will-concern-details">
+                          {/* Sliced here as well as on the node: a client-side producer answers with
                             whatever it holds, and the cap is the dialog's rule, not the producer's. */}
-                        <For each={concern.details!.slice(0, DETAILS_MAX)}>{(detail) => <li>{detail}</li>}</For>
-                        <Show when={(concern.detailsMore ?? 0) + Math.max(0, concern.details!.length - DETAILS_MAX)}>
-                          {(more) => <li class="muted">+{more()} more</li>}
-                        </Show>
-                      </ul>
-                    </Show>
-                    <Show when={concern.checkbox}>
-                      {(checkbox) => (
-                        <Checkbox
-                          label={checkbox().label}
-                          checked={checks()[concern.id] ?? checkbox().checked}
-                          onChange={(checked) => setChecks((all) => ({ ...all, [concern.id]: checked }))}
-                        />
-                      )}
-                    </Show>
-                  </li>
-                ))}
-              </ul>
-            </Show>
-            <Show when={selected(current).warning}>{(warning) => <Alert tone="danger" variant="banner">{warning()}</Alert>}</Show>
-          </Modal.Body>
-          <Modal.Actions>
-            <Button variant="ghost" onPress={() => finish(false)}>Cancel</Button>
-            <Show
-              when={current.actions.length > 1}
-              fallback={<Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>{selected(current).label}</Button>}
-            >
-              {/* Drawn the way the commit footer draws Commit and its options
+                          <For each={concern.details!.slice(0, DETAILS_MAX)}>{(detail) => <li>{detail}</li>}</For>
+                          <Show when={(concern.detailsMore ?? 0) + Math.max(0, concern.details!.length - DETAILS_MAX)}>
+                            {(more) => <li class="muted">+{more()} more</li>}
+                          </Show>
+                        </ul>
+                      </Show>
+                      <Show when={concern.checkbox}>
+                        {(checkbox) => (
+                          <Checkbox
+                            label={checkbox().label}
+                            checked={checks()[concern.id] ?? checkbox().checked}
+                            onChange={(checked) => setChecks((all) => ({ ...all, [concern.id]: checked }))}
+                          />
+                        )}
+                      </Show>
+                    </li>
+                  ))}
+                </ul>
+              </Show>
+              <Show when={selected(current).warning}>
+                {(warning) => (
+                  <Alert tone="danger" variant="banner">
+                    {warning()}
+                  </Alert>
+                )}
+              </Show>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="ghost" onPress={() => finish(false)}>
+                Cancel
+              </Button>
+              <Show
+                when={current.actions.length > 1}
+                fallback={
+                  <Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>
+                    {selected(current).label}
+                  </Button>
+                }
+              >
+                {/* Drawn the way the commit footer draws Commit and its options
                   (plugins/git/src/client/changes/ChangesPane.tsx), with both halves solid. Keyed on the chosen
                   action, so both are drawn again in its tone: Button reads its tone once, and Delete has
                   to turn them red. */}
-              <Show when={selected(current)} keyed>
-                {(chosenAction) => {
-                  const tone = dangerous(current) ? 'danger' : undefined
-                  return (
-                    <Toolbar.Group joined>
-                      <Button variant="solid" tone={tone} onPress={() => finish(true)}>{chosenAction.label}</Button>
-                      <Menu
-                        ariaLabel={`${current.title} options`}
-                        placement="bottom-end"
-                        trigger={({ open, toggle }) => (
-                          <IconButton icon="chevron-down" variant="solid" size="md" tone={tone} label={`${current.title} options`} opens="menu" expanded={open()} onPress={toggle} />
-                        )}
-                      >
-                        {(menu) => (
-                          <For each={current.actions}>
-                            {(option) => (
-                              <Menu.Item context={menu} kind="radio" checked={option.id === chosenAction.id} onSelect={() => setChosen(option.id)}>
-                                {option.label}
-                              </Menu.Item>
-                            )}
-                          </For>
-                        )}
-                      </Menu>
-                    </Toolbar.Group>
-                  )
-                }}
+                <Show when={selected(current)} keyed>
+                  {(chosenAction) => {
+                    const tone = dangerous(current) ? 'danger' : undefined
+                    return (
+                      <Toolbar.Group joined>
+                        <Button variant="solid" tone={tone} onPress={() => finish(true)}>
+                          {chosenAction.label}
+                        </Button>
+                        <Menu
+                          ariaLabel={`${current.title} options`}
+                          placement="bottom-end"
+                          trigger={({ open, toggle }) => (
+                            <IconButton
+                              icon="chevron-down"
+                              variant="solid"
+                              size="md"
+                              tone={tone}
+                              label={`${current.title} options`}
+                              opens="menu"
+                              expanded={open()}
+                              onPress={toggle}
+                            />
+                          )}
+                        >
+                          {(menu) => (
+                            <For each={current.actions}>
+                              {(option) => (
+                                <Menu.Item
+                                  context={menu}
+                                  kind="radio"
+                                  checked={option.id === chosenAction.id}
+                                  onSelect={() => setChosen(option.id)}
+                                >
+                                  {option.label}
+                                </Menu.Item>
+                              )}
+                            </For>
+                          )}
+                        </Menu>
+                      </Toolbar.Group>
+                    )
+                  }}
+                </Show>
               </Show>
-            </Show>
-          </Modal.Actions>
-        </Modal>
-      )}
-    </Show>
+            </Modal.Actions>
+          </Modal>
+        )}
+      </Show>
     </Portal>
   )
 }

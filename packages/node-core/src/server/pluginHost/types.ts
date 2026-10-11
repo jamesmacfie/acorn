@@ -30,13 +30,19 @@ import type { PluginTelemetry } from '../telemetry/collector'
 import type { Logger } from '../telemetry/logger'
 
 // Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.
-export type PluginEventChannel = `plugin:${string}:${string}`
+type PluginEventChannel = `plugin:${string}:${string}`
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
-import type { DataSourceDescription, DataSourceIdentity, DataSourceOptions, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import type {
+  DataSourceDescription,
+  DataSourceIdentity,
+  DataSourceOptions,
+  DataSourceQuery,
+  DataSourceResult,
+} from '@acorn/protocol/dataSources.ts'
 
-export type PluginRouteOptions = {
+type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
   // task-scoped sub-resources. The effective mount is /v1/p/<plugin><prefix>.
   prefix?: string
@@ -70,8 +76,17 @@ export type DataSourceInputHandle = {
   options(request: DataSourceInputOptionsRequest): Promise<DataSourceOptions>
 }
 // The host fills in the source, the bound scope, the mode, and the evaluation time.
-export type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & { cursor?: string; pageSize?: number }
-export type DataSourceInputOptionsRequest = { target: 'field' | 'parameter'; pointer: string; search?: string; cursor?: string; pageSize?: number }
+type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & {
+  cursor?: string
+  pageSize?: number
+}
+type DataSourceInputOptionsRequest = {
+  target: 'field' | 'parameter'
+  pointer: string
+  search?: string
+  cursor?: string
+  pageSize?: number
+}
 
 export type PluginProviderResourceRequest<TInput> = {
   providerId: string
@@ -83,10 +98,7 @@ export type PluginProviderResourceRequest<TInput> = {
   requireFresh?: boolean
 }
 
-export type PluginProviderConnectionVisitor<T> = (
-  connection: StoredConnection,
-  secret: string,
-) => Promise<T | undefined>
+type PluginProviderConnectionVisitor<T> = (connection: StoredConnection, secret: string) => Promise<T | undefined>
 
 export type PluginProviderRuntime = {
   resource<TInput, TOutput>(args: PluginProviderResourceRequest<TInput>): Promise<RouteResult<TOutput>>
@@ -109,14 +121,14 @@ export type PluginProviderRuntime = {
 // hand over `app.fetch`.
 export type PluginFetchHandler = (request: Request, context: PluginRequestContext) => Response | Promise<Response>
 
-export type PluginRouteRegistry = {
+type PluginRouteRegistry = {
   // The portable half, and the only one a loaded plugin gets. Same mount, same auth gate. The handler
   // receives a Request whose path is relative to that mount, exactly as `register` gives a router paths
   // relative to its own.
   fetch(handler: PluginFetchHandler, options?: PluginRouteOptions): void
 }
 
-export type CompiledPluginRouteRegistry = PluginRouteRegistry & {
+type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   // The plugin id is bound by the host, so a plugin can't mount itself under another's namespace, which
   // a raw registerRoute({ plugin }) call could do by typo or intent.
   //
@@ -125,7 +137,7 @@ export type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
 }
 
-export type PluginToolRegistry = {
+type PluginToolRegistry = {
   // Agent-tool contributions live with the engine they drive. The host binds the plugin owner and
   // projects the registry to HTTP, MCP and renderer permission surfaces.
   register(tool: AgentToolContribution): void
@@ -136,16 +148,16 @@ export type PluginToolRegistry = {
 //
 // Declaring one is the whole lifecycle: the host mints the key, ties removal to teardown, and keeps the
 // state row across a disable and re-enable. Any `setInterval` in plugin node code is a review flag.
-export type PluginScheduleRegistry = {
+type PluginScheduleRegistry = {
   register(schedule: PluginSchedule): void
 }
 
-export type CompiledPluginScheduleRegistry = PluginScheduleRegistry & {
+type CompiledPluginScheduleRegistry = PluginScheduleRegistry & {
   /** User-owned target kinds are live host callbacks and therefore compiled-only. */
   registerTarget(target: import('../schedules/scheduler').ScheduleTarget): void
 }
 
-export type PluginSchedule = {
+type PluginSchedule = {
   // Unique within this plugin. The host prefixes it, so a plugin can't file a schedule under a
   // stranger's name any more than it can mount a route under one.
   scheduleId: string
@@ -166,14 +178,14 @@ export type PluginSchedule = {
 // What this plugin has to say when the owner archives a task, and the cleanup it can offer
 // (./taskChecks.ts). See docs/plugins/task-checks.md § Task checks. Declaring one is the whole lifecycle: the host
 // binds the owner, qualifies every concern id, bounds the call and ties removal to teardown.
-export type PluginTaskCheckRegistry = {
+type PluginTaskCheckRegistry = {
   register(check: TaskCheck): void
 }
 
 // What this plugin can find for a search, and how a hit opens (./search.ts). See docs/plugins/search-providers.md §
 // Search providers. The host binds the owner, bounds the call, sanitises the hits and ties removal to
 // teardown.
-export type PluginSearchRegistry = {
+type PluginSearchRegistry = {
   register(provider: SearchProvider): void
 }
 
@@ -220,7 +232,7 @@ export type PluginHookPoint = {
   collect?: boolean
 }
 
-export type PluginHookHandler = {
+type PluginHookHandler = {
   /** Unique within this plugin. The host qualifies it before it leaves. */
   id: string
   mode: HookMode
@@ -231,27 +243,22 @@ export type PluginHookHandler = {
   run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 
-// Where this plugin's data sources can be read from the node, with no client attached.
-// (docs/schedules.md § Sampling a published dashboard). Not a second way to declare a data source: the client-side
-// registration is what makes one appear in a panel editor, and this is the pointer that lets the
-// measure sampler ask the same route the same question. A loaded plugin registers nothing here.
-
-// Where this plugin's runs can be read from the node (../runs/registry.ts). Not a second way to
+// Where this plugin's runs can be read from the node (`registerRunSource`). Not a second way to
 // declare a run: the plugin keeps its own table, its own lifecycle and its own surfaces, and this is
 // the pointer that lets the host list them beside another plugin's without either importing the other.
 //
 // Register one if your plugin owns work that starts, takes time, and ends. A plugin that owns no such
 // thing registers nothing, which is the right answer for most.
-export type PluginRunRegistry = {
+type PluginRunRegistry = {
   register(source: RunSourceRegistration): void
 }
 
 // Work this plugin will do when something asks: a name, a route inside its own namespace, and how
-// dangerous it is (../nodeActions/registry.ts). Not a way to declare an action — it is the pointer
-// plus the risk tier — and not a schedule seam, though a user schedule is the one thing asking today
-// (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means nothing outside this plugin can make it
-// act, which is the right default for most.
-export type PluginNodeActionRegistry = {
+// dangerous it is (`registerNodeAction`). Not a way to declare an action, since it is the pointer plus
+// the risk tier, and not a schedule seam, though a user schedule is one thing that asks
+// (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means
+// nothing outside this plugin can make it act, which is the right default for most.
+type PluginNodeActionRegistry = {
   register(action: NodeActionRegistration): void
 }
 
@@ -262,7 +269,7 @@ export type PluginNodeActionRegistry = {
 //
 // The verbs are the same three words hooks uses, because it is the same shape: an owner declares a
 // point, anyone handles it, the owner reads the handlers (docs/plugins/plugin-api.md § The plugin API).
-export type PluginExtensionPointRegistry = {
+type PluginExtensionPointRegistry = {
   // Declare a point this plugin hosts. The id must start with this plugin's own name.
   declare<T>(point: ExtensionPointId<T>, label: string): void
   // Deliver one entry into a point, this plugin's own or another's. The host mints the entry id from
@@ -271,12 +278,6 @@ export type PluginExtensionPointRegistry = {
   // What is in a point right now, in declared order. Resolve at call time: the plugin that fills your
   // point may init after you do.
   handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
-  /** @deprecated Renamed to `declare`. Removed in the next PLUGIN_API_MAJOR. */
-  open<T>(point: ExtensionPointId<T>, label: string): void
-  /** @deprecated Renamed to `handle`. Removed in the next PLUGIN_API_MAJOR. */
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
-  /** @deprecated Renamed to `handlers`. Removed in the next PLUGIN_API_MAJOR. */
-  entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 
 // What this plugin puts on the node's audit trail (docs/security/audit.md § Audit). Both tiers: a loaded
@@ -286,15 +287,18 @@ export type PluginExtensionPointRegistry = {
 // The host qualifies every verb with the plugin id and refuses a `record` naming one this plugin did
 // not declare, so the trail stays enumerable: the settings surface can name every verb it might draw
 // because each one came from a parsed manifest.
-export type PluginAuditRegistry = {
+type PluginAuditRegistry = {
   declare(action: { id: string; label: string }): void
   // Fire-and-forget, like core's own writes: an audit row is evidence, and a failed insert must never
   // fail the thing it describes. `details` takes allowlisted scalars decided at the call site — never a
   // request body, a credential, or a file's contents.
-  record(action: string, entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> }): void
+  record(
+    action: string,
+    entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> },
+  ): void
 }
 
-export type PluginContextSectionRegistry = {
+type PluginContextSectionRegistry = {
   // A plugin contributes one task-context section. Core owns assembly, ordering, budgets and output
   // format; the section gets no core database handle and declares only its own data source.
   register(section: PluginContextSection): void
@@ -302,7 +306,7 @@ export type PluginContextSectionRegistry = {
 
 // Connection, integration and model-provider descriptors are registered by the plugin that owns them.
 // The host validates provider ids and projects provider routes under the provider namespace.
-export type PluginProviderRegistry = {
+type PluginProviderRegistry = {
   // `route` is a built-in Hono router or a portable fetch handler, mounted at /v1/p/<provider.id>
   // through buildIntegrationProviderRoutes(). Both stay behind `requireProviderAccess`; loaded plugins
   // must use the fetch carrier.
@@ -339,7 +343,7 @@ export type PluginBroadcast = {
   // Push a frame to every connected client. The hub skips task-confined sockets.
   send(frame: WsServerFrame): void
   // "Re-read my chrome descriptors": this plugin's rail rows, badges, sources and agent context.
-  // Scoped to the calling plugin by the host, so one plugin saying its rows moved no longer costs every
+  // Scoped to the calling plugin by the host, so one plugin saying its rows moved does not cost every
   // other plugin a descriptor round trip on every connected client
   // (docs/plugins/events.md § Hearing a core event).
   status(): void
@@ -350,13 +354,8 @@ export type PluginBroadcast = {
   // "This repo's committed config changed and needs the owner's review". The one notice that carries an
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void
-  // A row in the client's bell, and where clicking it lands (@acorn/protocol/notices.ts).
-  //
-  // This member existed before, lost to the `workflows.notices` capability in the API-4 batch, and is
-  // back because the objection was to the vocabulary rather than to the surface: what sat here was a
-  // `'gate' | 'run-done'` kind and a `runId`/`stepId` pair, one plugin's nouns on the context all
-  // twenty-one receive. A `target` is core's own, shared with the attention inbox
-  // (client-core host/registries/rail/attention.ts), so nothing here knows what a workflow run is.
+  // A row in the client's bell, and where clicking it lands (@acorn/protocol/notices.ts). A `target` is
+  // core's own vocabulary, shared with the attention inbox, so nothing here knows what a workflow run is.
   //
   // Both tiers, and they are not handed the same thing. A loaded plugin's `target` is dropped and its
   // `kind` is forced to `plugin`: naming a target kind is naming another plugin's handler and an
@@ -365,8 +364,7 @@ export type PluginBroadcast = {
   // rail source, or the Settings page listing it (client-core host/plugins/rowTargets.ts).
   //
   // A compiled plugin names its own kind and registers the handler for it with
-  // `registerNoticeTargetHandler` from `@acorn/plugin-api/client`. That half was always here; this is
-  // the half that was missing.
+  // `registerNoticeTargetHandler` from `@acorn/plugin-api/client`.
   notice(notice: PluginNotice): void
   // Hear a core event on this node, whether or not a client is attached
   // (docs/plugins/events.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
@@ -377,7 +375,7 @@ export type PluginBroadcast = {
   // its own namespace and hears core's and, through the producer's `emits` declaration, another
   // plugin's.
   //
-  // Since 2026-08-28 `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
+  // `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
   // declared the verb in its `emits` and, for a loaded subscriber, the channel is in its own
   // `permissions.events`. An absent producer delivers nothing and errors nothing
   // (docs/plugins/events.md § Hearing another plugin).
@@ -397,7 +395,7 @@ export type CompiledPluginBroadcast = PluginBroadcast & {
 
 // The registry as plugins may use it. Structural rather than the class itself, because a loaded plugin
 // receives a filtered wrapper (server/plugins/permissions.ts).
-export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
+type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
 
 // Host-bound storage, for both tiers. The host binds the database filename to the plugin id. A loaded
 // plugin opens and migrates that exact file inside its isolated realm; a built-in does so in the host.
@@ -426,12 +424,35 @@ export type NodePluginContext = {
   dataSources: {
     register(source: import('@acorn/protocol/dataSources.ts').DataSourceRegistration): void
     discover(discovery: import('@acorn/protocol/dataSources.ts').DataSourceDiscovery): void
-    list(scope: import('@acorn/protocol/dataSources.ts').DataSourceScope, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceCatalog>
-    discoverAvailable(request: import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryPage>
-    invoke<R extends import('@acorn/protocol/dataSources.ts').DataSourceRequest>(request: R, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceResponse<R>>
-    resolveQuery(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, reference: import('@acorn/protocol/dataQueries.ts').QueryReference, context: import('@acorn/protocol/dataQueries.ts').QueryBindingContext, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataQueries.ts').ResolvedQuery>
-    setQueryConsumer(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, queryId: string, consumer: Omit<import('@acorn/protocol/dataQueries.ts').QueryConsumer, 'pluginId'>, invocation: import('../dataSources/authority').DataSourceInvocation, remove?: boolean): Promise<void>
-    queryPublication(request: import('@acorn/protocol/queryPublication.ts').QueryPublicationRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/queryPublication.ts').QueryPublicationResult>
+    list(
+      scope: import('@acorn/protocol/dataSources.ts').DataSourceScope,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceCatalog>
+    discoverAvailable(
+      request: import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryRequest,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryPage>
+    invoke<R extends import('@acorn/protocol/dataSources.ts').DataSourceRequest>(
+      request: R,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceResponse<R>>
+    resolveQuery(
+      scope: import('@acorn/protocol/dataQueries.ts').QueryScope,
+      reference: import('@acorn/protocol/dataQueries.ts').QueryReference,
+      context: import('@acorn/protocol/dataQueries.ts').QueryBindingContext,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataQueries.ts').ResolvedQuery>
+    setQueryConsumer(
+      scope: import('@acorn/protocol/dataQueries.ts').QueryScope,
+      queryId: string,
+      consumer: Omit<import('@acorn/protocol/dataQueries.ts').QueryConsumer, 'pluginId'>,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+      remove?: boolean,
+    ): Promise<void>
+    queryPublication(
+      request: import('@acorn/protocol/queryPublication.ts').QueryPublicationRequest,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/queryPublication.ts').QueryPublicationResult>
   }
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.
@@ -459,13 +480,13 @@ export type NodePluginContext = {
   // files under this plugin, because the host closed over the id rather than taking one
   // (../telemetry/collector.ts, docs/plugin-authoring/telemetry.md § Telemetry and logging).
   telemetry: PluginTelemetry
-  // Both tiers. A stderr line prefixed with this plugin's id, exactly as `console.error` gave you,
-  // and a log record with the owner bound when telemetry is on. That attribution is the whole reason
-  // this member came back after being removed on 2026-08-27 (docs/plugins/activation.md § Activation).
+  // Both tiers. A stderr line prefixed with this plugin's id, and a log record with the owner bound when
+  // telemetry is on. That attribution is why a plugin logs through this rather than `console.error`
+  // (docs/plugins/activation.md § Activation).
   log: Logger
 }
 
-// What a plugin compiled into this binary is handed: everything above, plus the six seams that cannot
+// What a plugin compiled into this binary is handed: everything above, plus the seams that cannot
 // cross a process boundary or are otherwise first-party
 // (docs/contribution-kinds.md names the reason per kind).
 //
@@ -479,17 +500,17 @@ export type CompiledNodePluginContext = NodePluginContext & {
   tools: PluginToolRegistry
   contextSections: PluginContextSectionRegistry
   events: CompiledPluginBroadcast
-  // Compiled only for now: no loaded plugin has asked to be searchable. Its twin would be a manifest
-  // route the host calls with the query, the way task checks work (docs/contribution-kinds.md).
+  // Compiled only. A loaded twin would be a manifest route the host calls with the query, the way task
+  // checks work (docs/contribution-kinds.md).
   search: PluginSearchRegistry
 }
 
 // The two seams the host fills in on a plugin's behalf, kept off the authoring types above.
 //
 // Neither is something a plugin writes. A manifest declares node actions (as commands whose verb is
-// `runNodeAction`) and harnesses, and server/pluginHost/host.ts replays those declarations through here.
-// Sitting on a context a plugin author reads they'd look like members to reach for, and in 21 plugins
-// nobody ever did. `harnesses` is not even a registry: it is a handover to whichever plugin owns agent
+// `runNodeAction`) and harnesses, and the host replays those declarations through here. Sitting on a
+// context a plugin author reads, they would look like members to reach for. `harnesses` is not even a
+// registry: it is a handover to whichever plugin owns agent
 // sessions (./harnesses.ts), and `customAgents` is the same handover for a manifest's saved agents
 // (./customAgents.ts).
 export type HostPluginContext = CompiledNodePluginContext & {

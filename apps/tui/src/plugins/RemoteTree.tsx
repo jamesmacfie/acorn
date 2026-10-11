@@ -9,9 +9,19 @@ import { eligiblePlugins, isTaskPane } from '@acorn/client-core/host/plugins'
 import { recordSurfaceFailure } from '@acorn/client-core/host/plugins'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/host/registries/commands'
-import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from '@acorn/client-core/host/tree/workerHost.ts'
 import {
-  createTreeBridgeFactory, answerOwnerInvoke, GESTURE_WINDOW_MS, unknownHostOp, unsupportedOverlay, type OwnerActions,
+  acquireTreeWorker,
+  treeAuthorityKey,
+  treeModelAuthorityKey,
+  treeDocumentGrant,
+} from '@acorn/client-core/host/tree/workerHost.ts'
+import {
+  createTreeBridgeFactory,
+  answerOwnerInvoke,
+  GESTURE_WINDOW_MS,
+  unknownHostOp,
+  unsupportedOverlay,
+  type OwnerActions,
 } from '@acorn/client-core/host/tree'
 import type { RemoteContribution } from '@acorn/client-core/host/tree'
 import { toast } from '@acorn/client-core/features/notifications'
@@ -26,8 +36,8 @@ import { fenceScope } from '@acorn/client-core/host/markdownFences/fenceViewers.
 // The terminal's sibling of `client-core/host/tree/RemoteTree.tsx`, and the same division of labour:
 // this is lifecycle and wiring, the broker decides every bridge call, and ./TreeHost.tsx applies every
 // mutation. Everything below the bridge is shared with the desktop — the same fourteen effects, the
-// same three pushes, the same worker host — and what differs is the four answers a terminal has to
-// give differently, each marked where it is given.
+// same three pushes, the same worker host — and what differs is the few answers a terminal has to
+// give differently.
 
 export type RemoteTreeProps = {
   contribution: RemoteContribution
@@ -54,10 +64,14 @@ export type RemoteTreeProps = {
   onFailed?: (reason: string) => void
 }
 
-const treeRefusal = (contribution: RemoteContribution) => (reason: string): void => {
-  recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
+const treeRefusal =
+  (contribution: RemoteContribution) =>
+  (reason: string): void => {
+    recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
+  }
+const copy = (text: string): void => {
+  if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`)
 }
-const copy = (text: string): void => { if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`) }
 const openExternal = (url: string): void => toast(`Open in a browser: ${url}`)
 const navigate = (): void => {}
 
@@ -109,11 +123,11 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const bound = binding()
   // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
   // it, so a tree mounting for the first time gets its selection in `context` rather than racing
-  // its own mount against an event that has already fired — the same split a frame region makes
-  // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+  // its own mount against an event that has already fired — the same split client-core's
+  // `PluginFrame` makes for a frame region. A routed item wins, because for a project-scoped surface it IS the
   // current selection rather than a one-shot.
-  const opened = scope().item
-    ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
+  const opened =
+    scope().item ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
   const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
   const context: PluginFrameContext = {
     surface: bound.surface,
@@ -123,15 +137,15 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     ...(bound.projectId ? { projectId: bound.projectId } : {}),
     ...(item ? { item } : {}),
     // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
-    // and no theme id to resolve until the appearance layer publishes its colours as data
-    // (../appearance.ts, docs/tui.md).
+    // and no theme id for a tree to resolve (../appearance.ts, docs/tui.md).
     theme: 'terminal',
     style: 'terminal',
     claimsKeys: [],
   }
   const documentGrant = treeDocumentGrant(componentProps.document)
   context.authority = treeModelAuthorityKey(contribution.hash, qc, bound, context, componentProps.document)
-  const legacyContext = componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
+  const legacyContext =
+    componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
   const worker = acquireTreeWorker({
     pluginId: contribution.pluginId,
     hash: contribution.hash,
@@ -141,11 +155,13 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     onRefused: refuse,
     connect: createTreeBridgeFactory(
       { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
-      { qc, navigate, copy, openExternal }, context, refuse,
+      { qc, navigate, copy, openExternal },
+      context,
+      refuse,
     ),
   })
 
-  // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
+  // Where a terminal answers differently. An owner action is host-agnostic and goes through
   // the shared check; a companion overlay is a rectangle over the window, and this host has none, so it
   // says so rather than pretending. A plugin catches `unsupported_host` and leaves its static preview
   // up, which is why the owner's chip is what a reader sees here (docs/tui/rectangles.md § Rectangles).
@@ -169,10 +185,16 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
 
   // Selection and actions go to this slot's bridge, as they do in the DOM host.
-  createEffect(on(() => scope().item, (next, previous) => {
-    if (!next || next === previous) return
-    worker.select(slot, next)
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => scope().item,
+      (next, previous) => {
+        if (!next || next === previous) return
+        worker.select(slot, next)
+      },
+      { defer: true },
+    ),
+  )
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
     if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
@@ -195,8 +217,20 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   const pluginId = createMemo(() => contribution.pluginId)
   return (
-    <box flexDirection="column" flexGrow={1} ref={(element: Renderable) => { container = element }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} {...(componentProps.onFailed ? { onFailed: componentProps.onFailed } : {})} {...fenceScope(componentProps.markdownFences, boundScope)} />
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      ref={(element: Renderable) => {
+        container = element
+      }}
+    >
+      <TreeHost
+        pluginId={pluginId()}
+        transport={transport}
+        onRefused={refuse}
+        {...(componentProps.onFailed ? { onFailed: componentProps.onFailed } : {})}
+        {...fenceScope(componentProps.markdownFences, boundScope)}
+      />
     </box>
   )
 }

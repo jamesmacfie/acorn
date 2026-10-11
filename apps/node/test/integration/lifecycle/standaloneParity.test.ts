@@ -1,44 +1,133 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { agentProfileRegistry } from '@acorn/node-core/server/agentProfiles/index.ts'
 import { agentToolContributions } from '@acorn/node-core/server/agentTools'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { launcherSpec } from '@acorn/node-core/server/mcpRegister.ts'
 import { markPluginUserManaged } from '@acorn/node-core/server/plugins'
 import { pluginDir } from '@acorn/node-core/server/plugins'
 import { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins'
+import { openDataRoot } from '@acorn/node-core/server/storage'
 import { makeTestDb } from '@acorn/node-core/testkit'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools'
-import { NODE_DRAIN_ORDER, assembleNodeGraph, nodePluginNames, reconcileBundledPackages } from '../../../src/composition/composition'
+import { bootNode, type BootNodeOptions } from '../../../src/composition/boot'
+import { reconcileBundledPackages } from '../../../src/composition/composition'
 import { effectiveDisabled } from '../../../src/composition/pluginState'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
-describe('composition graph parity', () => {
-  it('uses one plugin graph and one drain order for both Node hosts', async () => {
-    // No install directory at this data root, so the loader contributes nothing and the graph is
-    // exactly the compiled-in list, which is the assertion that matters here.
-    const graph = await assembleNodeGraph('', {} as never)
-    expect(graph.plugins.map((plugin) => plugin.name)).toEqual(nodePluginNames())
-    expect(graph.loaded.size).toBe(0)
-    expect(graph.drainOrder).toEqual(NODE_DRAIN_ORDER)
+// What each entry passes bootNode, less the data root: ../../../src/composition/runtime.ts for the
+// supervised Node and ../../../src/entries/standalone.ts for the standalone one.
+const hosts: Record<'supervised' | 'standalone', Omit<BootNodeOptions, 'root'>> = {
+  supervised: {
+    appVersion: 'test',
+    keys: { sessionKey: '0'.repeat(64), signingKey: 'boot-test-signing-key-0123456789' },
+    development: true,
+    loginShellPath: false,
+    mcp: { name: 'acorn-test', launcher: launcherSpec(process.execPath, '/unused/mcp.js', 'acorn-test') },
+  },
+  standalone: { development: true, loginShellPath: false },
+}
+
+describe.each(Object.entries(hosts))('a %s Node booted through bootNode', (_host, options) => {
+  const original = { key: process.env.SESSION_ENC_KEY, port: process.env.ACORN_PORT }
+  let dataDir = ''
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-boot-'))
+    process.env.SESSION_ENC_KEY = '0'.repeat(64)
+    delete process.env.ACORN_PORT
   })
+  afterEach(() => {
+    if (original.key == null) delete process.env.SESSION_ENC_KEY
+    else process.env.SESSION_ENC_KEY = original.key
+    if (original.port != null) process.env.ACORN_PORT = original.port
+    rmSync(dataDir, { recursive: true, force: true })
+  })
+
+  // If the standalone drain skips the task script close, a setup attempt pending at SIGTERM reads
+  // as interrupted by `restart` on the next boot. The second boot here is that next boot, and
+  // taking the data root lock at all proves the first one released it.
+  it('records a pending setup attempt as interrupted by shutdown, and releases the data root', async () => {
+    const first = await bootNode({ ...options, root: openDataRoot(dataDir) })
+    let attemptId: string | null = null
+    try {
+      // After reconcile, which would otherwise mark the fresh attempt as interrupted by `restart`.
+      await first.reconciled
+      const db = first.runtime.DB
+      const now = Date.now()
+      db.insert(schema.workspaces).values({ id: 'w', name: 'Fixture', createdAt: now, updatedAt: now }).run()
+      db.insert(schema.projects)
+        .values({
+          id: 'p',
+          name: 'Fixture',
+          workspaceId: 'w',
+          setupScript: 'pnpm install',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      db.insert(schema.tasks)
+        .values({
+          id: 'task',
+          title: 'Fixture',
+          projectId: 'p',
+          origin: 'local',
+          status: 'active',
+          branch: 'fixture',
+          worktreePath: dataDir,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      // A failed first run, so setup may be started again by hand.
+      db.insert(schema.taskScriptAttempts)
+        .values({
+          attemptId: 'failed',
+          taskId: 'task',
+          phase: 'setup',
+          generation: 1,
+          state: 'failed',
+          reason: 'nonzero_exit',
+          requestedAt: now,
+        })
+        .run()
+      const pending = await first.core.taskScripts.admitManualSetup('task')
+      expect(pending).toMatchObject({ state: 'starting' })
+      attemptId = pending.attemptId
+    } finally {
+      await first.stop()
+    }
+
+    const second = await bootNode({ ...options, root: openDataRoot(dataDir) })
+    try {
+      await second.reconciled
+      const attempt = second.runtime.DB.select()
+        .from(schema.taskScriptAttempts)
+        .where(eq(schema.taskScriptAttempts.attemptId, attemptId!))
+        .get()
+      expect(attempt).toMatchObject({ state: 'interrupted', reason: 'shutdown' })
+    } finally {
+      await second.stop()
+    }
+  }, 60_000)
 })
 
 describe('plugin-state parity', () => {
-  // Both roots build the PLUGIN_STATE bridge through buildPluginStateBridge, so the copies cannot
-  // drift again. What can still differ is what each root passes in. There are exactly two such
-  // deltas, both asserted here, so a third one shows up as a red test rather than an archaeology dig.
+  // bootNode builds the PLUGIN_STATE bridge for both hosts. What still differs is what each host
+  // passes in. There are exactly two such deltas, both asserted here.
   it('unions the file with the start-config override, and the file alone when there is none', () => {
     const store = { get: () => ['github'], set: () => {} }
     // The supervised root: a start config may pin a list without writing one (`dev:node`, an integration
-    // harness). Reporting only the file made restartRequired permanently true.
+    // harness). Reporting only the file would make restartRequired permanently true.
     expect(effectiveDisabled(store, ['rollbar']).call(null).sort()).toEqual(['github', 'rollbar'])
     // The standalone root: nothing hands a service-managed node a list, so the file is the whole answer.
     expect(effectiveDisabled(store)()).toEqual(['github'])
   })
 
   it('reconciles bundled packages only when a bundled root is configured', () => {
-    // Both roots now call the same reporter, so the account of what reconciliation did cannot exist
+    // Both roots call the same reporter, so the account of what reconciliation did cannot exist
     // on one root only. What still differs is the input: the supervised root always has application
     // resources, while a standalone node's bundled root comes from the environment and is unset on
     // every service-managed node, the documented "there is nothing to reconcile from" case
@@ -47,9 +136,17 @@ describe('plugin-state parity', () => {
     const resources = mkdtempSync(join(tmpdir(), 'acorn-parity-resources-'))
     try {
       mkdirSync(join(resources, 'rollbar', 'dist'), { recursive: true })
-      writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
-        id: 'rollbar', name: 'Rollbar', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-      }))
+      writeFileSync(
+        join(resources, 'rollbar/acorn-plugin.json'),
+        JSON.stringify({
+          id: 'rollbar',
+          name: 'Rollbar',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+        }),
+      )
       writeFileSync(join(resources, 'rollbar/dist/node.js'), 'export default {}\n')
 
       reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: undefined, development: true })
@@ -64,13 +161,13 @@ describe('plugin-state parity', () => {
   })
 
   it('names a package frozen by an ownership row even with no bundled root to refuse an update from', () => {
-    // The `preserved` list can only report a package it declined to replace this boot, so a
-    // standalone node, which has nothing to replace it with, used to say nothing at all while a
+    // The `preserved` list can only report a package it declined to replace this boot, so on its
+    // own a standalone node, which has nothing to replace it with, would say nothing at all while a
     // `build:plugin` output outlived every later build. The row itself is the fact, so it is read
     // directly.
     //
     // Read off `console.error`, not `console.log`: every line the node writes goes to stderr
-    // through the logger now, because stdout is a wire (docs/telemetry/logging.md § Logging).
+    // through the logger, because stdout is a wire (docs/telemetry/logging.md § Logging).
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
     const lines: string[] = []
     const write = console.error
@@ -89,9 +186,12 @@ describe('plugin-state parity', () => {
 })
 
 describe('what the shared composition populates', () => {
-  it('registers the three built-in agent profiles beside core\'s shell', () => {
+  it("registers the three built-in agent profiles beside core's shell", () => {
     registerBuiltInProfiles()
-    const ids = agentProfileRegistry.list().map((profile) => profile.id).sort()
+    const ids = agentProfileRegistry
+      .list()
+      .map((profile) => profile.id)
+      .sort()
     expect(ids).toEqual(expect.arrayContaining(['claude-code', 'codex', 'aider', 'shell']))
   })
 

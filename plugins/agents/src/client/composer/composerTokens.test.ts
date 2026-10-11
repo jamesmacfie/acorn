@@ -33,15 +33,9 @@ describe('composerTokens', () => {
   it('colours exactly the file mentions the turn sends as file parts', () => {
     const text = 'read @src/app.ts:12-20 and @"a b/c.ts", not @not-an-email@example.com or @/etc/passwd'
     const tokens = composerTokens(text, advertised, files)
-    expect(spans(text, tokens)).toEqual([
-      'file:@src/app.ts:12-20',
-      'file:@"a b/c.ts"',
-    ])
+    expect(spans(text, tokens)).toEqual(['file:@src/app.ts:12-20', 'file:@"a b/c.ts"'])
     // The highlighter and the sender agree on what counts, which is the point of sharing the walk.
-    expect(parseFileMentions(text, files).map((part) => part.path)).toEqual([
-      'src/app.ts',
-      'a b/c.ts',
-    ])
+    expect(parseFileMentions(text, files).map((part) => part.path)).toEqual(['src/app.ts', 'a b/c.ts'])
   })
 
   it('leaves unmatched @ text uncoloured while retaining known file colour', () => {
@@ -62,7 +56,11 @@ describe('composerTokens', () => {
 describe('composerSegments', () => {
   it('rebuilds the draft exactly, so the mirror cannot drift from the textarea', () => {
     const text = 'run /review on @src/app.ts\nthen $readable it'
-    expect(composerSegments(text, advertised, files).map((segment) => segment.text).join('')).toBe(`${text}\n`)
+    expect(
+      composerSegments(text, advertised, files)
+        .map((segment) => segment.text)
+        .join(''),
+    ).toBe(`${text}\n`)
   })
 
   it('marks only the token pieces, and carries the name a tooltip is keyed by', () => {
@@ -92,8 +90,11 @@ describe('advertisedSuggestions', () => {
 
   it('matches on the name', () => {
     expect(advertisedSuggestions(items, 'comm').map((item) => item.name)).toEqual(['commit'])
-    expect(advertisedSuggestions(items, 'com').map((item) => item.name).sort())
-      .toEqual(['commit', 'compact'])
+    expect(
+      advertisedSuggestions(items, 'com')
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(['commit', 'compact'])
   })
 
   it('keeps a match that only the description makes, ranked below the name matches', () => {

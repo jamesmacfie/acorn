@@ -3,14 +3,18 @@ import { Show } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Alert } from '../../kit/components/primitives'
 import type { Disposable } from '../../kit/lib/state/registry'
-import { commandRegistry, type CommandContribution, type CommandExecutionContext } from '../registries/commands/commands'
+import {
+  commandRegistry,
+  type CommandContribution,
+  type CommandExecutionContext,
+} from '../registries/commands/commands'
 import type { CommandSession } from '../registries/commands/sessionStore'
 import { createCommandPaletteView } from './paletteView'
 import { PaletteSurface } from './PaletteSurface'
 
 // The desktop half of the palette, over the shared session.
 //
-// The transitions themselves are `../registries/commands/sessionStore.test.tsx` and are not repeated here.
+// The transitions themselves are tested with `createCommandSession` and are not repeated here.
 // What this file asks is the part only a DOM can answer: does the dialog say what it is to a screen
 // reader, does the field name the row the arrows are on, does the keyboard reach the same operations,
 // and does focus come back to where it was — on the final close, and not on the way back up.
@@ -20,17 +24,34 @@ const register = (command: CommandContribution): void => {
   held.push(commandRegistry.register(command))
 }
 
-const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id, title: id, category: 'navigation', palette: true, kind: 'group', ...over,
-} as CommandContribution)
+const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'navigation',
+    palette: true,
+    kind: 'group',
+    ...over,
+  }) as CommandContribution
 
-const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id, title: id, category: 'action', palette: true, run: () => {}, ...over,
-} as CommandContribution)
+const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    run: () => {},
+    ...over,
+  }) as CommandContribution
 
 const CONTEXT: CommandExecutionContext = {
-  host: 'desktop', nodeId: 'node-1', workspaceId: null, projectId: null, taskId: null,
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: null,
+  projectId: null,
+  taskId: null,
+  paneId: null,
+  surfaceId: null,
 }
 
 let host: HTMLDivElement
@@ -56,8 +77,15 @@ const mount = (): void => {
         emptyText="No matches."
         breadcrumb={view.session.breadcrumb()}
         busy={view.session.busy()}
-        announce={view.session.status() || (view.session.rows().length === 1 ? '1 result' : `${view.session.rows().length} results`)}
-        status={<Show when={view.session.status()}><Alert>{view.session.status()}</Alert></Show>}
+        announce={
+          view.session.status() ||
+          (view.session.rows().length === 1 ? '1 result' : `${view.session.rows().length} results`)
+        }
+        status={
+          <Show when={view.session.status()}>
+            <Alert>{view.session.status()}</Alert>
+          </Show>
+        }
         onPick={(row) => view.session.activateRow(row.id)}
         row={(row) => <span class="palette-label">{row.label}</span>}
       />
@@ -91,8 +119,22 @@ afterEach(() => {
 describe('the dialog', () => {
   it('keeps a result mounted through hover and runs the clicked command', async () => {
     const ran: string[] = []
-    register(leaf('cmd.one', { title: 'One', run: () => { ran.push('one') } }))
-    register(leaf('cmd.two', { title: 'Two', run: () => { ran.push('two') } }))
+    register(
+      leaf('cmd.one', {
+        title: 'One',
+        run: () => {
+          ran.push('one')
+        },
+      }),
+    )
+    register(
+      leaf('cmd.two', {
+        title: 'Two',
+        run: () => {
+          ran.push('two')
+        },
+      }),
+    )
     mount()
     session.openRoot()
 
@@ -144,7 +186,15 @@ describe('the dialog', () => {
 
   it('marks itself busy while something is in flight', async () => {
     let release = (): void => {}
-    register(leaf('cmd.slow', { title: 'Slow', run: () => new Promise<void>((resolve) => { release = () => resolve() }) }))
+    register(
+      leaf('cmd.slow', {
+        title: 'Slow',
+        run: () =>
+          new Promise<void>((resolve) => {
+            release = () => resolve()
+          }),
+      }),
+    )
     mount()
     session.openRoot()
     expect(dialog()?.getAttribute('aria-busy')).toBeNull()
@@ -167,7 +217,9 @@ describe('the keyboard', () => {
         onClosePane: () => () => {},
         onCommandPalette: (callback: () => void) => {
           emit = callback
-          return () => { emit = () => {} }
+          return () => {
+            emit = () => {}
+          }
         },
         onWillQuit: () => () => {},
         openConfigFile: async () => {},
@@ -247,10 +299,21 @@ describe('the interactive frames', () => {
     let release: (items: { id: string; title: string }[]) => void = () => {}
     const picked: string[] = []
     register({
-      id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
-      placeholder: 'Search issues…', minQueryLength: 0, debounceMs: 0,
-      query: () => new Promise((resolve) => { release = resolve }),
-      select: (item: { id: string }) => { picked.push(item.id) },
+      id: 'find',
+      title: 'Find',
+      category: 'action',
+      palette: true,
+      kind: 'search',
+      placeholder: 'Search issues…',
+      minQueryLength: 0,
+      debounceMs: 0,
+      query: () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+      select: (item: { id: string }) => {
+        picked.push(item.id)
+      },
     } as unknown as CommandContribution)
     mount()
     session.openAt('find')
@@ -263,7 +326,10 @@ describe('the interactive frames', () => {
     // An explanatory row is not a tab stop and not the cursor: there is nothing to press Enter on.
     expect(field().getAttribute('aria-activedescendant')).toBeNull()
 
-    release([{ id: 'i-1', title: 'One' }, { id: 'i-2', title: 'Two' }])
+    release([
+      { id: 'i-1', title: 'One' },
+      { id: 'i-2', title: 'Two' },
+    ])
     await settle()
     expect(options().map((row) => row.textContent)).toEqual(['One', 'Two'])
     expect(dialog()?.getAttribute('aria-busy')).toBeNull()
@@ -279,9 +345,17 @@ describe('the interactive frames', () => {
   it('holds a query back while an IME is composing a character', async () => {
     const asked: string[] = []
     register({
-      id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
-      minQueryLength: 0, debounceMs: 0,
-      query: async (text: string) => { asked.push(text); return [] },
+      id: 'find',
+      title: 'Find',
+      category: 'action',
+      palette: true,
+      kind: 'search',
+      minQueryLength: 0,
+      debounceMs: 0,
+      query: async (text: string) => {
+        asked.push(text)
+        return []
+      },
       select: () => {},
     } as unknown as CommandContribution)
     mount()
@@ -303,7 +377,11 @@ describe('the interactive frames', () => {
   it('submits an input on Enter, shows it pending, and keeps the text when it fails', async () => {
     let answer: () => Promise<void> = () => Promise.reject(new Error('the node said no'))
     register({
-      id: 'ask', title: 'Ask', category: 'action', palette: true, kind: 'input',
+      id: 'ask',
+      title: 'Ask',
+      category: 'action',
+      palette: true,
+      kind: 'input',
       placeholder: 'Describe the query…',
       submit: () => answer(),
     } as unknown as CommandContribution)
@@ -330,8 +408,15 @@ describe('the interactive frames', () => {
   it('draws a setting as its choices, marks the one that is set, and stays open on a write', async () => {
     let stored = 'quiet'
     register({
-      id: 'volume', title: 'Volume', category: 'navigation', palette: true, kind: 'setting',
-      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      id: 'volume',
+      title: 'Volume',
+      category: 'navigation',
+      palette: true,
+      kind: 'setting',
+      options: [
+        { value: 'loud', label: 'Loud' },
+        { value: 'quiet', label: 'Quiet' },
+      ],
       read: () => Promise.resolve(stored),
       write: (value: string) => Promise.resolve((stored = value)),
     } as unknown as CommandContribution)
@@ -358,28 +443,38 @@ describe('the interactive frames', () => {
 
 describe('the surface', () => {
   it('builds its status and footer once', () => {
-    // Testing a slot and then inserting it ran the caller's JSX twice (kit/components/slotReads.test.tsx).
+    // Testing a slot and then inserting it runs the caller's JSX twice (kit/components/slotReads.test.tsx).
     let built = 0
     const Mark = () => {
       built++
       return <b>mark</b>
     }
     const view = {
-      open: () => true, query: () => '', sel: () => 0, setSel: () => {}, setQuery: () => {}, close: () => {},
-      setInputRef: () => {}, onKeyDown: () => {}, onDialogMouseDown: () => {},
+      open: () => true,
+      query: () => '',
+      sel: () => 0,
+      setSel: () => {},
+      setQuery: () => {},
+      close: () => {},
+      setInputRef: () => {},
+      onKeyDown: () => {},
+      onDialogMouseDown: () => {},
     }
-    dispose = render(() => (
-      <PaletteSurface
-        palette={view}
-        items={[]}
-        placeholder="Find"
-        emptyText="Nothing"
-        onPick={() => {}}
-        row={() => null}
-        status={<Mark />}
-        footer={<Mark />}
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <PaletteSurface
+          palette={view}
+          items={[]}
+          placeholder="Find"
+          emptyText="Nothing"
+          onPick={() => {}}
+          row={() => null}
+          status={<Mark />}
+          footer={<Mark />}
+        />
+      ),
+      host,
+    )
     expect(document.querySelectorAll('.palette b')).toHaveLength(2)
     expect(built).toBe(2)
   })

@@ -1,8 +1,10 @@
+import { latestSignal } from '@acorn/plugin-api/client'
+
 /** One dialog owns one response. Cache invalidation keeps the submission's captured query keys. */
 export function createStashSubmission() {
-  let generation = 0
+  const submission = latestSignal()
   return {
-    invalidate: () => { generation++ },
+    invalidate: () => submission.abort(),
     async run<T>(options: {
       targetTaskId: string
       request: () => Promise<T>
@@ -12,16 +14,16 @@ export function createStashSubmission() {
       failure: (error: unknown) => void
       settled: () => void
     }): Promise<void> {
-      const own = ++generation
+      const signal = submission.next()
       try {
         const value = await options.request()
         options.refreshCaptured()
-        if (own === generation && options.currentScope()) options.success(value, options.targetTaskId)
+        if (!signal.aborted && options.currentScope()) options.success(value, options.targetTaskId)
       } catch (error) {
         options.refreshCaptured()
-        if (own === generation && options.currentScope()) options.failure(error)
+        if (!signal.aborted && options.currentScope()) options.failure(error)
       } finally {
-        if (own === generation && options.currentScope()) options.settled()
+        if (!signal.aborted && options.currentScope()) options.settled()
       }
     },
   }

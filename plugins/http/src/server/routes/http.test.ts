@@ -1,7 +1,13 @@
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginDatabase, Principal } from '@acorn/plugin-api/node'
-import { makeTestNodeContext, makeTestRequestContext, schema, validatePluginConfig, type TestNodeContext } from '@acorn/plugin-api/testkit'
+import {
+  makeTestNodeContext,
+  makeTestRequestContext,
+  schema,
+  validatePluginConfig,
+  type TestNodeContext,
+} from '@acorn/plugin-api/testkit'
 import type { AgentContextOption } from '@acorn/protocol/agentContext.ts'
 import type { PluginRailItems } from '@acorn/protocol/api.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
@@ -46,27 +52,75 @@ describe('HTTP credential isolation', () => {
     // The manifest-bound storage seam, opened and migrated by the host, exactly as init() does at boot.
     pluginDb = ctx.storage.open()
     const now = Date.now()
-    await ctx.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await ctx.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await ctx.db.insert(schema.projects).values([
       {
-        id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-        vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: null,
-        createdAt: now, updatedAt: now,
+        id: 'project-web',
+        name: 'web',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: 'https://github.com/acme/web.git',
+        githubOwner: 'acme',
+        githubName: 'web',
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
       },
       {
-        id: 'project-api', name: 'api', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false,
-        vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/api.git', githubOwner: 'acme', githubName: 'api', githubRepoId: null,
-        createdAt: now, updatedAt: now,
+        id: 'project-api',
+        name: 'api',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 1,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: 'https://github.com/acme/api.git',
+        githubOwner: 'acme',
+        githubName: 'api',
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
       },
     ])
     await ctx.db.insert(schema.tasks).values([
       {
-        id: 'task-web', title: 'Web task', icon: null, origin: 'local', projectId: 'project-web', branch: 'main', worktreePath: null,
-        pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+        id: 'task-web',
+        title: 'Web task',
+        icon: null,
+        origin: 'local',
+        projectId: 'project-web',
+        branch: 'main',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
       },
       {
-        id: 'task-api', title: 'API task', icon: null, origin: 'local', projectId: 'project-api', branch: 'main', worktreePath: null,
-        pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: now, updatedAt: now, archivedAt: null,
+        id: 'task-api',
+        title: 'API task',
+        icon: null,
+        origin: 'local',
+        projectId: 'project-api',
+        branch: 'main',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 1,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
       },
     ])
   })
@@ -91,15 +145,26 @@ describe('HTTP credential isolation', () => {
   ])('keeps private preparation values out of route errors: $url', async (config) => {
     const secret = 'SyntheticPrivatePreparationValue'
     const created = await call(principal('alice'), '/projects/project-web/vars', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'TOKEN', kind: 'secret', value: secret, enabled: true }),
     })
     expect(created.status).toBe(201)
     const fetcher = vi.fn()
     vi.stubGlobal('fetch', fetcher)
     const route = await call(principal('alice'), '/projects/project-web/send', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...requestBody, method: 'GET', url: config.url, headers: Object.entries(config.headers ?? {}).map(([name, value]) => ({ name, value, enabled: true })), auth: { mode: 'none' }, vars: {}, bodyMode: 'none', body: '' }),
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...requestBody,
+        method: 'GET',
+        url: config.url,
+        headers: Object.entries(config.headers ?? {}).map(([name, value]) => ({ name, value, enabled: true })),
+        auth: { mode: 'none' },
+        vars: {},
+        bodyMode: 'none',
+        body: '',
+      }),
     })
     expect(route.status).toBe(422)
     const envelope = await route.json()
@@ -208,7 +273,9 @@ describe('HTTP credential isolation', () => {
 
     const rows = (await (await call(principal('alice'), '/rail-items?project=project-web')).json()) as PluginRailItems
     // The project tree only: a task's ad-hoc request is not a project row, and another owner's never was.
-    expect(rows.items).toEqual([{ id: expect.any(String), title: 'Filed', badge: 'POST', icon: 'send', short: 'POST', subtitle: 'auth' }])
+    expect(rows.items).toEqual([
+      { id: expect.any(String), title: 'Filed', badge: 'POST', icon: 'send', short: 'POST', subtitle: 'auth' },
+    ])
     // No `task` block, which is what tells the host there is nothing here to promote.
     expect(rows.items[0]).not.toHaveProperty('task')
   })
@@ -223,9 +290,13 @@ describe('HTTP credential isolation', () => {
     const adhoc = (await (await save('alice', { name: 'Login', taskId: 'task-web' })).json()) as HttpRequest
     await save('alice', { name: 'Filed in the project' })
 
-    const options = (await (await call(principal('alice'), '/context-options?taskId=task-web')).json()) as AgentContextOption[]
+    const options = (await (
+      await call(principal('alice'), '/context-options?taskId=task-web')
+    ).json()) as AgentContextOption[]
     // The option's URL is redacted too: the fixture's `?token=query-secret` is exactly the case for it.
-    expect(options).toEqual([{ id: adhoc.id, label: 'Login', description: 'POST https://api.example.test/items?token=•••' }])
+    expect(options).toEqual([
+      { id: adhoc.id, label: 'Login', description: 'POST https://api.example.test/items?token=•••' },
+    ])
 
     const captured = await call(principal('alice'), '/context-capture', {
       method: 'POST',
@@ -267,23 +338,61 @@ describe('the palette routes', () => {
     ctx = makeTestNodeContext({ plugin: { name: 'http' }, permissions: config.manifest.permissions.node })
     pluginDb = ctx.storage.open()
     const now = Date.now()
-    await ctx.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await ctx.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await ctx.db.insert(schema.projects).values([
       {
-        id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-        vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'web', githubRepoId: null,
-        createdAt: now, updatedAt: now,
+        id: 'project-web',
+        name: 'web',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: 'acme',
+        githubName: 'web',
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
       },
       {
-        id: 'project-api', name: 'api', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false,
-        vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'api', githubRepoId: null,
-        createdAt: now, updatedAt: now,
+        id: 'project-api',
+        name: 'api',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 1,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: 'acme',
+        githubName: 'api',
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
       },
     ])
-    await ctx.db.insert(schema.tasks).values([{
-      id: 'task-web', title: 'Web task', icon: null, origin: 'local', projectId: 'project-web', branch: 'main', worktreePath: null,
-      pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
-    }])
+    await ctx.db.insert(schema.tasks).values([
+      {
+        id: 'task-web',
+        title: 'Web task',
+        icon: null,
+        origin: 'local',
+        projectId: 'project-web',
+        branch: 'main',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+      },
+    ])
   })
   afterEach(() => ctx.cleanup())
 
@@ -311,11 +420,16 @@ describe('the palette routes', () => {
     await save('alice', 'project-api', { name: 'Elsewhere' })
     await save('bob', 'project-web', { name: 'Bob’s' })
 
-    expect((await search('alice', '/palette/requests?projectId=project-web')).items)
-      .toEqual([{ id: expect.any(String), title: 'Filed', subtitle: 'auth', badge: 'POST', icon: 'send' }])
+    expect((await search('alice', '/palette/requests?projectId=project-web')).items).toEqual([
+      { id: expect.any(String), title: 'Filed', subtitle: 'auth', badge: 'POST', icon: 'send' },
+    ])
     // Bob's row is not narrowed out afterwards — the query filters on owner and project in SQL.
-    expect((await search('bob', '/palette/requests?projectId=project-web')).items.map((i) => i.title)).toEqual(['Bob’s'])
-    expect((await search('alice', '/palette/requests?projectId=project-api')).items.map((i) => i.title)).toEqual(['Elsewhere'])
+    expect((await search('bob', '/palette/requests?projectId=project-web')).items.map((i) => i.title)).toEqual([
+      'Bob’s',
+    ])
+    expect((await search('alice', '/palette/requests?projectId=project-api')).items.map((i) => i.title)).toEqual([
+      'Elsewhere',
+    ])
     // No routed project, and a project that does not exist: an empty list rather than everything.
     expect((await search('alice', '/palette/requests')).items).toEqual([])
     expect((await search('alice', '/palette/requests?projectId=nope')).items).toEqual([])
@@ -338,9 +452,12 @@ describe('the palette routes', () => {
   })
 
   it('imports a curl command into an encrypted row and answers only after it is stored', async () => {
-    const res = await importCurl('alice', `curl -X POST 'https://api.example.test/v1/orders' -H 'Authorization: Bearer import-secret' -d '{"a":1}'`)
+    const res = await importCurl(
+      'alice',
+      `curl -X POST 'https://api.example.test/v1/orders' -H 'Authorization: Bearer import-secret' -d '{"a":1}'`,
+    )
     expect(res.status).toBe(200)
-    const answer = await res.json() as { ok: true; item: { id: string; title: string; badge: string } }
+    const answer = (await res.json()) as { ok: true; item: { id: string; title: string; badge: string } }
     expect(answer.ok).toBe(true)
     expect(answer.item).toEqual({ id: expect.any(String), title: 'POST orders', badge: 'POST' })
     // The answer itself carries none of what was just parsed.
@@ -349,11 +466,19 @@ describe('the palette routes', () => {
     // The row is there by the time the answer arrived, on the task, and encrypted like every other
     // write in this file.
     const [stored] = await pluginDb.select().from(httpRequests)
-    expect(stored).toMatchObject({ userId: 'alice', projectId: 'project-web', taskId: 'task-web', method: 'POST', encrypted: true })
+    expect(stored).toMatchObject({
+      userId: 'alice',
+      projectId: 'project-web',
+      taskId: 'task-web',
+      method: 'POST',
+      encrypted: true,
+    })
     expect(JSON.stringify(stored)).not.toContain('import-secret')
 
     // And it reads back as the request that was pasted.
-    const rows = (await (await call(principal('alice'), '/projects/project-web/requests?taskId=task-web')).json()) as HttpRequest[]
+    const rows = (await (
+      await call(principal('alice'), '/projects/project-web/requests?taskId=task-web')
+    ).json()) as HttpRequest[]
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({
       id: answer.item.id,
@@ -374,7 +499,9 @@ describe('the palette routes', () => {
     expect(res.status).toBe(200)
     expect(fetchSpy).not.toHaveBeenCalled()
     // The substitutions were stored as the literal text they are, not run.
-    const rows = (await (await call(principal('alice'), '/projects/project-web/requests?taskId=task-web')).json()) as HttpRequest[]
+    const rows = (await (
+      await call(principal('alice'), '/projects/project-web/requests?taskId=task-web')
+    ).json()) as HttpRequest[]
     expect(rows[0].url).toBe('https://api.example.test/danger?x=$(rm -rf /)')
     expect(rows[0].headers).toEqual([{ name: 'X', value: '`whoami`', enabled: true }])
     fetchSpy.mockRestore()

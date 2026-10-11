@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deviceService } from './auth/deviceTokens'
-import { AUDIT_RETENTION_MS, auditVocabulary, clearAuditActions, declareAuditAction, pruneAudit, readAudit, recordAudit } from './audit'
+import {
+  AUDIT_RETENTION_MS,
+  auditVocabulary,
+  clearAuditActions,
+  declareAuditAction,
+  pruneAudit,
+  readAudit,
+  recordAudit,
+} from './audit'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
 
@@ -98,8 +106,24 @@ describe('pruneAudit', () => {
   it('deletes rows past the 90-day retention and keeps everything newer', async () => {
     const now = Date.now()
     await test.db.insert(schema.audit).values([
-      { id: 'old', at: now - AUDIT_RETENTION_MS - 1_000, actor: 'system', actorId: null, action: 'device.paired', subject: 'old', details: null },
-      { id: 'fresh', at: now - 1_000, actor: 'system', actorId: null, action: 'device.paired', subject: 'fresh', details: null },
+      {
+        id: 'old',
+        at: now - AUDIT_RETENTION_MS - 1_000,
+        actor: 'system',
+        actorId: null,
+        action: 'device.paired',
+        subject: 'old',
+        details: null,
+      },
+      {
+        id: 'fresh',
+        at: now - 1_000,
+        actor: 'system',
+        actorId: null,
+        action: 'device.paired',
+        subject: 'fresh',
+        details: null,
+      },
     ])
 
     await pruneAudit(test.db, now)
@@ -120,12 +144,22 @@ describe('what gets recorded', () => {
     // Pairing has no device actor by definition: whoever holds the code is not yet a device, and the
     // bundled local node pairs with no code at all.
     const [paired] = await readAudit(test.db)
-    expect(paired).toMatchObject({ action: 'device.paired', actor: 'system', subject: device.id, details: { name: "James's laptop" } })
+    expect(paired).toMatchObject({
+      action: 'device.paired',
+      actor: 'system',
+      subject: device.id,
+      details: { name: "James's laptop" },
+    })
 
     await devices.revoke(device.id, { actor: 'device', actorId: 'other-device' })
     await settled()
     const [revoked] = await readAudit(test.db)
-    expect(revoked).toMatchObject({ action: 'device.revoked', actor: 'device', actorId: 'other-device', subject: device.id })
+    expect(revoked).toMatchObject({
+      action: 'device.revoked',
+      actor: 'device',
+      actorId: 'other-device',
+      subject: device.id,
+    })
   })
 
   it('does not record a second row for a repeat revoke', async () => {

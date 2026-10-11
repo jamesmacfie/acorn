@@ -18,7 +18,9 @@ export default function ConfigTrustDialog() {
     setReview(null)
     setError('')
     if (!request) return
-    void readJson<RepoConfigTrustReview>(repoConfigTrustRoute(request.taskId)).then(setReview).catch((e) => setError(e instanceof Error ? e.message : 'Could not load repo configuration.'))
+    void readJson<RepoConfigTrustReview>(repoConfigTrustRoute(request.taskId))
+      .then(setReview)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load repo configuration.'))
   })
 
   const trustAndRun = async () => {
@@ -29,7 +31,9 @@ export default function ConfigTrustDialog() {
     setError('')
     try {
       const next = await writeJson<RepoConfigTrustReview>(repoConfigTrustRoute(request.taskId), {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hash: current.hash }),
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hash: current.hash }),
       })
       if (!next.trusted) throw new Error('The configuration was not acknowledged.')
       closeRepoConfigTrust()
@@ -37,7 +41,9 @@ export default function ConfigTrustDialog() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not trust repo configuration.')
       // A 409 means the file changed while the dialog was open; reload so the user sees the new diff.
-      void readJson<RepoConfigTrustReview>(repoConfigTrustRoute(request.taskId)).then(setReview).catch(() => {})
+      void readJson<RepoConfigTrustReview>(repoConfigTrustRoute(request.taskId))
+        .then(setReview)
+        .catch(() => {})
     } finally {
       setSaving(false)
     }
@@ -53,43 +59,49 @@ export default function ConfigTrustDialog() {
   // **Trust configuration** when the person opened the review from a notice.
   return (
     <Portal>
-    <Show when={configTrustRequest()}>
-      <Modal title="Review project configuration" size="lg" role="alertdialog" onDismiss={closeRepoConfigTrust}>
-        <Modal.Body>
-          <p>
-            This project has settings in its repository that can run commands on this computer. Only
-            trust them if you've read them.
-          </p>
-          <Show when={error()}><Alert>{error()}</Alert></Show>
-          <Show when={review()?.current} fallback={<p class="muted">Loading configuration…</p>}>
-            <Show
-              when={review()?.previous}
-              fallback={
-                <For each={review()?.current?.files ?? []}>
-                  {(file) => (
-                    <section class="config-trust-file">
-                      <h3>{file.path}</h3>
-                      <pre>{file.content}</pre>
-                    </section>
-                  )}
-                </For>
-              }
-            >
-              <p class="muted">These settings changed since you last trusted them.</p>
-              <pre class="config-trust-diff">
-                <For each={changes()}>{(part) => <span classList={{ added: part.added, removed: part.removed }}>{part.value}</span>}</For>
-              </pre>
+      <Show when={configTrustRequest()}>
+        <Modal title="Review project configuration" size="lg" role="alertdialog" onDismiss={closeRepoConfigTrust}>
+          <Modal.Body>
+            <p>
+              This project has settings in its repository that can run commands on this computer. Only trust them if
+              you've read them.
+            </p>
+            <Show when={error()}>
+              <Alert>{error()}</Alert>
             </Show>
-          </Show>
-        </Modal.Body>
-        <Modal.Actions>
-          <Button variant="ghost" onPress={closeRepoConfigTrust}>Not now</Button>
-          <Button variant="solid" disabled={saving() || !review()?.current} onPress={() => void trustAndRun()}>
-            {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
-          </Button>
-        </Modal.Actions>
-      </Modal>
-    </Show>
+            <Show when={review()?.current} fallback={<p class="muted">Loading configuration…</p>}>
+              <Show
+                when={review()?.previous}
+                fallback={
+                  <For each={review()?.current?.files ?? []}>
+                    {(file) => (
+                      <section class="config-trust-file">
+                        <h3>{file.path}</h3>
+                        <pre>{file.content}</pre>
+                      </section>
+                    )}
+                  </For>
+                }
+              >
+                <p class="muted">These settings changed since you last trusted them.</p>
+                <pre class="config-trust-diff">
+                  <For each={changes()}>
+                    {(part) => <span classList={{ added: part.added, removed: part.removed }}>{part.value}</span>}
+                  </For>
+                </pre>
+              </Show>
+            </Show>
+          </Modal.Body>
+          <Modal.Actions>
+            <Button variant="ghost" onPress={closeRepoConfigTrust}>
+              Not now
+            </Button>
+            <Button variant="solid" disabled={saving() || !review()?.current} onPress={() => void trustAndRun()}>
+              {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
+            </Button>
+          </Modal.Actions>
+        </Modal>
+      </Show>
     </Portal>
   )
 }

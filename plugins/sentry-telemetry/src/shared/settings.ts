@@ -51,7 +51,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export function parseSettings(raw: unknown): SentrySettings {
   if (!isRecord(raw)) return DEFAULT_SETTINGS
   const kinds = isRecord(raw.kinds) ? raw.kinds : {}
-  const rate = typeof raw.sampleRate === 'number' && Number.isFinite(raw.sampleRate) ? raw.sampleRate : DEFAULT_SETTINGS.sampleRate
+  const rate =
+    typeof raw.sampleRate === 'number' && Number.isFinite(raw.sampleRate) ? raw.sampleRate : DEFAULT_SETTINGS.sampleRate
   return {
     sampleRate: Math.min(1, Math.max(0, rate)),
     kinds: {

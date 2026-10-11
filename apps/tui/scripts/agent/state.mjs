@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 
 export const repoRoot = resolve(import.meta.dirname, '../../../..')
 export const tuiRoot = resolve(import.meta.dirname, '../..')
-export const sessionsRoot = join(repoRoot, '.acorn', 'agent-dev', 'tui')
+const sessionsRoot = join(repoRoot, '.acorn', 'agent-dev', 'tui')
 
 export function validateSessionName(name) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)) {
@@ -35,7 +35,7 @@ export async function writePrivateJson(path, value) {
   await chmod(path, 0o600)
 }
 
-export async function activeManifests() {
+async function activeManifests() {
   let entries = []
   try { entries = await readdir(sessionsRoot, { withFileTypes: true }) } catch { return [] }
   const manifests = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {

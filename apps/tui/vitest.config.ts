@@ -6,9 +6,8 @@ import base from './vite.config'
 // test renders through our own tree module rather than through the DOM one, and it inherits the
 // `@acorn/plugin-api/ui` alias, so a pane under test imports the kit exactly as the bundle does.
 //
-// Nothing here passes a flag and nothing here skips. The painter is TypeScript, Yoga through wasm and
-// cells in an array, so every drawing test runs on the 24.21.0 the repo pins
-// (../../node-runtime.json, docs/tui/process.md § The runtime floor).
+// The painter is TypeScript, Yoga through wasm and cells in an array, so every drawing test runs on
+// the Node the repo pins (../../node-runtime.json, docs/tui/process.md § The runtime floor).
 
 // The root `pnpm test` sets VITEST_MAX_WORKERS=3, and Vitest lets that variable override the
 // `maxWorkers: 2` below. Lower the variable rather than the config, so the suite cap can't lift this
@@ -16,20 +15,23 @@ import base from './vite.config'
 const WORKERS = 2
 if (Number(process.env.VITEST_MAX_WORKERS) > WORKERS) process.env.VITEST_MAX_WORKERS = String(WORKERS)
 
-export default mergeConfig(base, defineConfig({
-  // `ws` ships a `browser` export condition whose whole body is a throw, and this pipeline picks it:
-  // the broker's `new WebSocket(...)` then fails with "not a constructor" after the HTTP half of the
-  // same connection worked, which is a confusing hour. Resolved here rather than in vite.config.ts,
-  // because the bundle leaves `ws` external and a deep specifier would not resolve there — `ws`
-  // exports its root and nothing else.
-  resolve: { alias: [{ find: /^ws$/, replacement: fileURLToPath(import.meta.resolve('ws')) }] },
-  test: {
-    experimental: { fsModuleCache: true },
-    environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}', 'scripts/agent/**/*.test.mjs'],
-    pool: 'forks',
-    // The repository runs six packages concurrently. Bound this package's cold shell transforms
-    // so their fixture startup does not exhaust the five-second test deadline under suite load.
-    maxWorkers: WORKERS,
-  },
-}))
+export default mergeConfig(
+  base,
+  defineConfig({
+    // `ws` ships a `browser` export condition whose whole body is a throw, and this pipeline picks it:
+    // the broker's `new WebSocket(...)` then fails with "not a constructor" after the HTTP half of the
+    // same connection worked, which is a confusing hour. Resolved here rather than in vite.config.ts,
+    // because the bundle leaves `ws` external and a deep specifier would not resolve there — `ws`
+    // exports its root and nothing else.
+    resolve: { alias: [{ find: /^ws$/, replacement: fileURLToPath(import.meta.resolve('ws')) }] },
+    test: {
+      experimental: { fsModuleCache: true },
+      environment: 'node',
+      include: ['src/**/*.test.{ts,tsx}', 'scripts/agent/**/*.test.mjs'],
+      pool: 'forks',
+      // The repository runs six packages concurrently. Bound this package's cold shell transforms
+      // so their fixture startup does not exhaust the five-second test deadline under suite load.
+      maxWorkers: WORKERS,
+    },
+  }),
+)

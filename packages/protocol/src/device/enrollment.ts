@@ -13,7 +13,7 @@ export const ENROLLMENT_PROTOCOL_VERSION = 1
 
 // What the node posts, once, on the first boot where both environment variables are set.
 //
-// Strict, and deliberately small. Everything here is find-and-vouch metadata (docs/security.md
+// Strict, and deliberately small. Everything here is find-and-vouch metadata (docs/security/control-plane.md
 // § The control plane): how to reach the node, how to recognise it, and one credential for talking
 // to it. Nothing about what the node is doing, and nothing that would grow into it — a field
 // describing tasks, repositories or runs fails review by inspection.
@@ -44,7 +44,6 @@ export const enrollmentResponseSchema = z.object({
   // already there.
   controlPlaneName: z.string().optional(),
 })
-export type EnrollmentResponse = z.infer<typeof enrollmentResponseSchema>
 
 // The path the node posts to, appended to ACORN_CONTROL_PLANE_URL.
 export const ENROLLMENT_PATH = '/enroll'

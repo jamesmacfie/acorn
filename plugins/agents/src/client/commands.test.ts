@@ -3,8 +3,13 @@ import type { AgentProviderDescriptor, AgentSession } from '../contract/wire.ts'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 
 const mocks = vi.hoisted(() => ({
-  search: vi.fn(), providers: vi.fn(), startSession: vi.fn(), readJson: vi.fn(),
-  setSelectedSource: vi.fn(), openManagedSession: vi.fn(), requestComposerFocus: vi.fn(),
+  search: vi.fn(),
+  providers: vi.fn(),
+  startSession: vi.fn(),
+  readJson: vi.fn(),
+  setSelectedSource: vi.fn(),
+  openManagedSession: vi.fn(),
+  requestComposerFocus: vi.fn(),
 }))
 vi.mock('./sessions/managedClient', () => ({
   managedAgentApi: { search: mocks.search, providers: mocks.providers },
@@ -13,9 +18,14 @@ vi.mock('./sessions/managedSelection', () => ({
   openManagedSession: mocks.openManagedSession,
   requestComposerFocus: mocks.requestComposerFocus,
 }))
-vi.mock('./sessions/managedStore', () => ({ managedAgentStore: { captureRead: () => ({ nodeId: null, check: () => {}, current: () => true }), startSession: mocks.startSession } }))
+vi.mock('./sessions/managedStore', () => ({
+  managedAgentStore: {
+    captureRead: () => ({ nodeId: null, check: () => {}, current: () => true }),
+    startSession: mocks.startSession,
+  },
+}))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   setSelectedSource: mocks.setSelectedSource,
   readJson: mocks.readJson,
 }))
@@ -27,24 +37,61 @@ import { agentsCommands } from './commands'
 // through a second one of this plugin's own.
 
 const session = (over: Partial<AgentSession> = {}): AgentSession => ({
-  id: 's1', taskId: 'task-1', providerId: 'claude-code', profileId: 'claude-code',
-  kind: 'interactive', driverKind: 'acp', driverVersion: '1', providerSessionRef: null,
-  controller: 'acorn', runtimeState: 'ready', attention: 'none', statusAuthority: 'protocol',
-  title: 'Fix the rail', model: 'opus', config: {}, parentSessionId: null, parentTurnId: null,
-  subagents: [], queuedTurns: 0, lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 0, updatedAt: 0,
+  id: 's1',
+  taskId: 'task-1',
+  providerId: 'claude-code',
+  profileId: 'claude-code',
+  kind: 'interactive',
+  driverKind: 'acp',
+  driverVersion: '1',
+  providerSessionRef: null,
+  controller: 'acorn',
+  runtimeState: 'ready',
+  attention: 'none',
+  statusAuthority: 'protocol',
+  title: 'Fix the rail',
+  model: 'opus',
+  config: {},
+  parentSessionId: null,
+  parentTurnId: null,
+  subagents: [],
+  queuedTurns: 0,
+  lastEventSeq: 0,
+  lastReadSeq: 0,
+  archivedAt: null,
+  createdAt: 0,
+  updatedAt: 0,
   ...over,
 })
 
 const provider = (over: Partial<AgentProviderDescriptor> = {}): AgentProviderDescriptor => ({
-  id: 'claude-code', profileId: 'claude-code', label: 'Claude Code', glyph: 'brand:agents/claude',
-  driverKind: 'acp', driverVersion: '1', installed: true, authenticated: true, statusAuthority: 'protocol',
-  executableVersion: '1.2.3', capabilities: [], configOptions: [], commands: [], skills: [], diagnostics: [],
+  id: 'claude-code',
+  profileId: 'claude-code',
+  label: 'Claude Code',
+  glyph: 'brand:agents/claude',
+  driverKind: 'acp',
+  driverVersion: '1',
+  installed: true,
+  authenticated: true,
+  statusAuthority: 'protocol',
+  executableVersion: '1.2.3',
+  capabilities: [],
+  configOptions: [],
+  commands: [],
+  skills: [],
+  diagnostics: [],
   ...over,
 })
 
 const context = (over: Partial<CommandExecutionContext> = {}): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 'task-1',
-  paneId: null, surfaceId: null, ...over,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 'task-1',
+  paneId: null,
+  surfaceId: null,
+  ...over,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -59,8 +106,13 @@ describe('the agents plugin catalogue', () => {
   })
 
   it('registers session goals, the rail source, mark-all-read, and two task-scoped searches', () => {
-    expect(agentsCommands.map((command) => command.id))
-      .toEqual(['agents.goal.set', 'agents.sessions.new', 'source.agents.open', 'agents.sessions.mark-read', 'agents.sessions.find'])
+    expect(agentsCommands.map((command) => command.id)).toEqual([
+      'agents.goal.set',
+      'agents.sessions.new',
+      'source.agents.open',
+      'agents.sessions.mark-read',
+      'agents.sessions.find',
+    ])
     expect(at('agents.goal.set')).toMatchObject({ scope: 'task', palette: true, requires: { plugin: 'agents' } })
     expect(start()).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'agents' } })
     expect(at('source.agents.open')).toMatchObject({ palette: true, scope: 'none', requires: { plugin: 'agents' } })
@@ -84,7 +136,11 @@ describe('the agents plugin catalogue', () => {
       // No title yet, so the provider names it; an attention reason becomes the badge.
       { id: 's2', title: 'claude-code', subtitle: 'claude-code', badge: 'permission', taskId: 'task-1', ref: 's2' },
     ])
-    expect(mocks.search).toHaveBeenCalledWith('rail', { taskId: 'task-1', limit: 50 }, { nodeId: 'node-1', signal: abort })
+    expect(mocks.search).toHaveBeenCalledWith(
+      'rail',
+      { taskId: 'task-1', limit: 50 },
+      { nodeId: 'node-1', signal: abort },
+    )
   })
 
   it('opens the pick through the retained selection path', async () => {
@@ -128,22 +184,48 @@ describe('the agents plugin catalogue', () => {
     const rows = await start().query('', world, signal())
     expect(await start().select(rows[0], world)).toEqual({ effect: 'close' })
     // The profile travels on the row, because the pick is all `select` is handed.
-    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code-fast' }, undefined)
+    expect(mocks.startSession).toHaveBeenCalledWith(
+      'task-1',
+      { id: 'claude-code', profileId: 'claude-code-fast' },
+      undefined,
+    )
     expect(mocks.openManagedSession).toHaveBeenCalledWith('task-1', 'new-1')
   })
 
   it('lists custom agents after the harnesses and starts one by its id', async () => {
-    mocks.providers.mockResolvedValue([provider(), provider({ id: 'codex', profileId: 'codex', label: 'Codex', installed: false })])
+    mocks.providers.mockResolvedValue([
+      provider(),
+      provider({ id: 'codex', profileId: 'codex', label: 'Codex', installed: false }),
+    ])
     mocks.readJson.mockResolvedValue([
-      { id: 'a1', name: 'Bug reviewer', providerId: 'claude-code', profileId: 'claude-code', options: { model: 'opus' }, source: { kind: 'user' } },
+      {
+        id: 'a1',
+        name: 'Bug reviewer',
+        providerId: 'claude-code',
+        profileId: 'claude-code',
+        options: { model: 'opus' },
+        source: { kind: 'user' },
+      },
       // Its harness is not installed, so the palette leaves it out.
-      { id: 'a2', name: 'Codex reviewer', providerId: 'codex', profileId: 'codex', options: {}, source: { kind: 'user' } },
+      {
+        id: 'a2',
+        name: 'Codex reviewer',
+        providerId: 'codex',
+        profileId: 'codex',
+        options: {},
+        source: { kind: 'user' },
+      },
     ])
     mocks.startSession.mockResolvedValue(session({ id: 'new-2' }))
     const world = context()
     const rows = await start().query('', world, signal())
     expect(rows.map((row) => row.title)).toEqual(['Claude Code', 'Bug reviewer'])
-    expect(rows[1]).toMatchObject({ id: 'custom-agent:a1', subtitle: 'Claude Code · opus', badge: 'Agent', ref: 'claude-code' })
+    expect(rows[1]).toMatchObject({
+      id: 'custom-agent:a1',
+      subtitle: 'Claude Code · opus',
+      badge: 'Agent',
+      ref: 'claude-code',
+    })
     await start().select(rows[1], world)
     expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code' }, 'a1')
   })

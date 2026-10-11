@@ -43,10 +43,18 @@ export function createModelService(db: AppDatabase, secrets: SecretService): Mod
       try {
         backend = parseBackendId(backendId)
       } catch {
-        throw new ProviderOperationError('provider_bad_config', 400, 'Backend ID must be connection:<id> or harness:<id>.')
+        throw new ProviderOperationError(
+          'provider_bad_config',
+          400,
+          'Backend ID must be connection:<id> or harness:<id>.',
+        )
       }
       if (backend.kind === 'harness') {
-        return generateTextForHarness({ profileId: backend.id, input: request.input, ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}) })
+        return generateTextForHarness({
+          profileId: backend.id,
+          input: request.input,
+          ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+        })
       }
       return generateTextForConnection({ ...request, connectionId: backend.id, db, secrets })
     },
@@ -61,7 +69,7 @@ export function createModelService(db: AppDatabase, secrets: SecretService): Mod
       // Connections first, in the order they already came in, then the installed CLIs in registry
       // order. The palette fast path and the changes plugin's silent fallback both take `[0]`, and
       // they must keep spending the key the owner configured on purpose; a CLI is chosen for someone
-      // only when there is no key at all, which is the lock-out this list exists to fix.
+      // only when there is no key at all, which is the lock-out this list exists to prevent.
       //
       // No cache. `which` costs milliseconds, and the list is read when a dialog opens.
       return [...connections, ...(await harnessBackends()).backends]

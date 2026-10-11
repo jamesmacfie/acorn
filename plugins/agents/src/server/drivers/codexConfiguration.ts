@@ -3,9 +3,9 @@ import type { AgentMcpReportedServer } from '../../shared/mcpServers'
 import type { AgentDriverMcpServer } from './types'
 import { asObject } from './codexNormalizer'
 
-const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
+const stringValue = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
-export type CodexCollaborationModePreset = {
+type CodexCollaborationModePreset = {
   name: string
   mode: 'default' | 'plan'
   model: string | null
@@ -41,7 +41,12 @@ export function codexCollaborationModes(response: unknown, currentMode: string |
       const mode = modeValue(row?.mode)
       const model = row?.model == null ? null : stringValue(row.model)
       const reasoningEffort = row?.reasoning_effort == null ? null : stringValue(row.reasoning_effort)
-      if (!name || !mode || (row?.model != null && model == null) || (row?.reasoning_effort != null && reasoningEffort == null)) {
+      if (
+        !name ||
+        !mode ||
+        (row?.model != null && model == null) ||
+        (row?.reasoning_effort != null && reasoningEffort == null)
+      ) {
         continue
       }
       presets.set(mode, { name, mode, model, reasoningEffort })
@@ -104,23 +109,27 @@ export function codexOptionsWithThreadSettings(
     ['model', settings.model],
     ['reasoning', settings.reasoningEffort],
   ])
-  return options.map((option) => values.has(option.id)
-    ? { ...option, currentValue: values.get(option.id) ?? null }
-    : option)
+  return options.map((option) =>
+    values.has(option.id) ? { ...option, currentValue: values.get(option.id) ?? null } : option,
+  )
 }
 
 export function codexModelOptions(response: unknown, currentModel: string | null): AgentConfigOption[] {
   const root = asObject(response)
-  const models = Array.isArray(root?.data) ? root.data.flatMap((value) => {
-    const row = asObject(value)
-    const id = stringValue(row?.id) ?? stringValue(row?.model)
-    if (!id) return []
-    return [{
-      value: id,
-      label: stringValue(row?.displayName) ?? id,
-      description: stringValue(row?.description) ?? undefined,
-    }]
-  }) : []
+  const models = Array.isArray(root?.data)
+    ? root.data.flatMap((value) => {
+        const row = asObject(value)
+        const id = stringValue(row?.id) ?? stringValue(row?.model)
+        if (!id) return []
+        return [
+          {
+            value: id,
+            label: stringValue(row?.displayName) ?? id,
+            description: stringValue(row?.description) ?? undefined,
+          },
+        ]
+      })
+    : []
   return models.length
     ? [{ id: 'model', label: 'Model', category: 'model', currentValue: currentModel, values: models }]
     : []
@@ -133,39 +142,45 @@ export function codexReasoningOptions(
 ): AgentConfigOption[] {
   const root = asObject(response)
   const rows = Array.isArray(root?.data) ? root.data.map(asObject).filter((row) => row != null) : []
-  const model = rows.find((row) =>
-    stringValue(row?.id) === currentModel || stringValue(row?.model) === currentModel)
-    ?? rows.find((row) => row?.isDefault === true)
-    ?? rows[0]
+  const model =
+    rows.find((row) => stringValue(row?.id) === currentModel || stringValue(row?.model) === currentModel) ??
+    rows.find((row) => row?.isDefault === true) ??
+    rows[0]
   if (!model || !Array.isArray(model.supportedReasoningEfforts)) return []
   const values = model.supportedReasoningEfforts.flatMap((value) => {
     const option = asObject(value)
     const effort = stringValue(option?.reasoningEffort)
     if (!effort) return []
-    return [{
-      value: effort,
-      label: effort,
-      description: stringValue(option?.description) ?? undefined,
-    }]
+    return [
+      {
+        value: effort,
+        label: effort,
+        description: stringValue(option?.description) ?? undefined,
+      },
+    ]
   })
   if (!values.length) return []
-  return [{
-    id: 'reasoning',
-    label: 'Effort',
-    category: 'reasoning',
-    currentValue: currentEffort ?? stringValue(model.defaultReasoningEffort),
-    values,
-  }]
+  return [
+    {
+      id: 'reasoning',
+      label: 'Effort',
+      category: 'reasoning',
+      currentValue: currentEffort ?? stringValue(model.defaultReasoningEffort),
+      values,
+    },
+  ]
 }
 
 export function codexPermissionOptions(response: unknown, current: string | null): AgentConfigOption[] {
   const root = asObject(response)
-  const profiles = Array.isArray(root?.data) ? root.data.flatMap((value) => {
-    const row = asObject(value)
-    const id = stringValue(row?.id)
-    if (!id || row?.allowed === false) return []
-    return [{ value: id, label: id, description: stringValue(row?.description) ?? undefined }]
-  }) : []
+  const profiles = Array.isArray(root?.data)
+    ? root.data.flatMap((value) => {
+        const row = asObject(value)
+        const id = stringValue(row?.id)
+        if (!id || row?.allowed === false) return []
+        return [{ value: id, label: id, description: stringValue(row?.description) ?? undefined }]
+      })
+    : []
   return profiles.length
     ? [{ id: 'permissions', label: 'Permissions', category: 'permission', currentValue: current, values: profiles }]
     : []
@@ -181,11 +196,13 @@ export function codexSkillsFromResponse(response: unknown): AgentSkillDescriptor
       const skill = asObject(value)
       const name = stringValue(skill?.name)
       if (!name || skill?.enabled === false) return []
-      return [{
-        name,
-        description: stringValue(skill?.description) ?? undefined,
-        path: stringValue(skill?.path) ?? undefined,
-      }]
+      return [
+        {
+          name,
+          description: stringValue(skill?.description) ?? undefined,
+          path: stringValue(skill?.path) ?? undefined,
+        },
+      ]
     })
   })
 }
@@ -196,21 +213,30 @@ export function codexSkillsFromResponse(response: unknown): AgentSkillDescriptor
  * a process that already holds the thread ignores it (docs/mcp.md § Your own servers). A declared name
  * sits beside the CLI's own servers rather than replacing them.
  */
-export function codexMcpConfig(servers: readonly AgentDriverMcpServer[]): { mcp_servers: Record<string, unknown> } | null {
+export function codexMcpConfig(
+  servers: readonly AgentDriverMcpServer[],
+): { mcp_servers: Record<string, unknown> } | null {
   if (!servers.length) return null
   return {
-    mcp_servers: Object.fromEntries(servers.map((server) => [
-      server.name,
-      server.transport === 'stdio'
-        ? { command: server.command, args: server.args, env: server.env }
-        : { url: server.url, http_headers: server.headers },
-    ])),
+    mcp_servers: Object.fromEntries(
+      servers.map((server) => [
+        server.name,
+        server.transport === 'stdio'
+          ? { command: server.command, args: server.args, env: server.env }
+          : { url: server.url, http_headers: server.headers },
+      ]),
+    ),
   }
 }
 
 // Codex reports a server's start as it happens, in `mcpServer/startupStatus/updated`, and its tools and
 // sign-in state only when asked, in `mcpServerStatus/list`. The panel wants both on one row.
-const CODEX_STARTUP_STATUS: Record<string, string> = { starting: 'starting', ready: 'connected', failed: 'failed', cancelled: 'failed' }
+const CODEX_STARTUP_STATUS: Record<string, string> = {
+  starting: 'starting',
+  ready: 'connected',
+  failed: 'failed',
+  cancelled: 'failed',
+}
 
 export function codexReportedMcpServers(
   response: unknown,
@@ -224,9 +250,12 @@ export function codexReportedMcpServers(
     if (!server || !name) return []
     const started = startup.get(name)
     const tools = asObject(server.tools)
-    const status = server.authStatus === 'notLoggedIn'
-      ? 'needs_auth'
-      : started ? CODEX_STARTUP_STATUS[started.status] ?? started.status : 'unknown'
+    const status =
+      server.authStatus === 'notLoggedIn'
+        ? 'needs_auth'
+        : started
+          ? (CODEX_STARTUP_STATUS[started.status] ?? started.status)
+          : 'unknown'
     return [{ name, status, toolCount: tools ? Object.keys(tools).length : null, error: started?.error ?? null }]
   })
 }

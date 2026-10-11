@@ -1,5 +1,6 @@
 import { createEffect, createSignal, type Accessor } from 'solid-js'
 import { withFailuresThrown } from './savePref'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 
 // The save model every settings page shares (docs/frontend/settings.md § Settings). A switch or a select saves
 // when it changes. A text field saves on blur or Enter. Either way the row says **Saved** when the
@@ -7,7 +8,7 @@ import { withFailuresThrown } from './savePref'
 //
 // These hold the state; `SettingRow` draws it, from `savedAt` and `error`. A form of fields that only
 // make sense together is the one thing that does not save this way: it has Save and Cancel, and
-// ./unsavedChanges.ts asks before anyone leaves it.
+// `useUnsavedChanges` asks before anyone leaves it.
 
 export type SettingSave = {
   /** When the last write landed, for `SettingRow`'s `savedAt`. */
@@ -15,7 +16,7 @@ export type SettingSave = {
   /** Why the last write failed, for `SettingRow`'s `error`. Cleared when the next one starts. */
   error: Accessor<string | undefined>
   /** Run one write. A write that resolves `false` failed; one that throws failed with its message.
-   *  A pref written inside it throws rather than posting a notice (./savePref.ts), so the failure is
+   *  A pref written inside it throws rather than posting a notice (`withFailuresThrown`), so the failure is
    *  said once, on the row. Resolves `false` on a failure, so a switch handed this promise as its
    *  `onChange` result shows the stored value again rather than staying flipped (kit Checkbox). */
   run: (write: () => Promise<unknown>) => Promise<boolean>
@@ -28,17 +29,17 @@ export function createSettingSave(): SettingSave {
   const [error, setError] = createSignal<string>()
   // Only the latest write may report. Two quick changes to one switch finish in any order, and the
   // row should say what happened to the value it now shows.
-  let latest = 0
+  const latest = latestSignal()
   const run = async (write: () => Promise<unknown>): Promise<boolean> => {
-    const attempt = ++latest
+    const attempt = latest.next()
     setError(undefined)
     try {
       const result = await withFailuresThrown(write)
       if (result === false) throw new Error(FALLBACK)
-      if (attempt === latest) setSavedAt(Date.now())
+      if (!attempt.aborted) setSavedAt(Date.now())
       return true
     } catch (failure) {
-      if (attempt === latest) setError(failure instanceof Error && failure.message ? failure.message : FALLBACK)
+      if (!attempt.aborted) setError(failure instanceof Error && failure.message ? failure.message : FALLBACK)
       return false
     }
   }

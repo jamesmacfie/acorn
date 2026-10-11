@@ -1,5 +1,15 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type Component, type JSX } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
@@ -7,11 +17,18 @@ import type { PromoteTaskAction } from '@acorn/client-core/features/integrations
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
-  extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
+  extensionDeliveries,
+  extensionPointRegistry,
+  type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
-import { compiledOwnerHost, createSlotChoice, GESTURE_WINDOW_MS, resolveSlot, type OwnerActions } from '@acorn/client-core/host/tree'
-import type { OverlayPalette } from '@acorn/client-core/host/palette'
+import {
+  compiledOwnerHost,
+  createSlotChoice,
+  GESTURE_WINDOW_MS,
+  resolveSlot,
+  type OwnerActions,
+} from '@acorn/client-core/host/tree'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 import { RemoteTree } from '../plugins/remoteTreeLoader'
@@ -19,11 +36,15 @@ import type { Renderable } from '../tree/compat'
 import { pressedWithin } from '../keys/stops'
 import { CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { MarkdownFenceAdapter } from '@acorn/client-core/kit/lib/markdown'
-import { createFenceViewers, type FenceScope, type FenceViewer } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
+import {
+  createFenceViewers,
+  type FenceScope,
+  type FenceViewer,
+} from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
-import { Button, CopyButton, IconButton, Input } from './asking'
+import { Button, CopyButton, IconButton } from './asking'
 import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
 // What `@acorn/plugin-api/ui/host` is on this host.
@@ -33,22 +54,12 @@ import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 // cooperative-extension nodes — and the DOM's copies of them are backdrops, portals and `<ul>`s. A
 // pane imports the same names on both hosts and a different component answers each, which is the
 // same switch ./ui.ts makes and the reason a pane's source is unchanged here.
-//
-// Phase 5 left this barrel uncrossed because nothing in that phase's roster used one
-// (docs/tui.md). The pane sweep is the phase with the roster.
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
-// From the model rather than from `willPhase.tsx`, which is the DOM's confirmation dialog and would
-// bring a `<div>` with it. The registration and the concern type are the model's own.
-export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
-export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 // The shell's one confirmation, drawn by the shell over whatever has the screen (../chrome/Confirmation.tsx).
 export { confirmAction } from '../chrome/confirmStore'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
-export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
-export { RemoteTree } from '../plugins/remoteTreeLoader'
-export type { RemoteTreeProps } from '../plugins/RemoteTree'
 // The `wizard` layout for a surface that is a wizard and is not a pane. The same component the layout
 // table hands the pane registry, so onboarding's overlay and a `wizard` pane are arranged alike.
 export { Wizard } from '../layouts/Wizard'
@@ -56,7 +67,6 @@ export { Wizard } from '../layouts/Wizard'
 // The compiled message composer uses the terminal projection of the host's model-choice control.
 export { ModelPickerPopover } from './asking/modelPickerPopover'
 export { IconPicker } from './asking/iconPicker'
-export type { IconPickerProps } from '@acorn/client-core/kit/components/inputs'
 
 // ── The acorn ────────────────────────────────────────────────────────────────────────────────────
 
@@ -82,61 +92,28 @@ export function Acorn(props: { label?: string }) {
  *  sources are rows in the rail, and choosing one opens the PTY where the pane goes
  *  (docs/tui/chrome.md § What is drawn bespoke). So the box stays and the geography
  *  goes, and `height` is ignored because a pixel count is not a thing a cell host can spend. */
-export function Drawer(props: { height: number; maximized?: boolean; ariaLabel: string; ref?: (element: HTMLElement) => void; children: JSX.Element }) {
-  return <box flexDirection="column" flexGrow={1}>{props.children}</box>
-}
-
-/** A palette overlay somebody else owns: the editor's file finder, github's shortcut sheet.
- *
- *  The shell's own palette is `chrome/Palette.tsx` and is not this — it is core-owned and drives the
- *  overlay stack (docs/tui.md). This is the deduped chrome a *plugin* opens,
- *  and here it is the same `Modal` with a filter field and a list of rows, because that is what a
- *  terminal overlay is.
- *
- *  The cursor is the hook's, exactly as on the desktop: an input owns the typing, so a collection's
- *  bare keys would never fire inside one. What the hook cannot give this host is a DOM key event, so
- *  the arrows and Enter are the modal's own layer. */
-export function PaletteSurface<T>(props: {
-  palette: OverlayPalette
-  items: readonly T[]
-  placeholder: string
-  emptyText: string
-  row: (item: T, selected: boolean) => JSX.Element
-  rowClassList?: (item: T) => Record<string, boolean | undefined>
-  onPick: (item: T, index: number) => void
-  footer?: JSX.Element
-  status?: JSX.Element
-  class?: string
-  ariaLabel?: string
+export function Drawer(props: {
+  height: number
+  maximized?: boolean
+  ariaLabel: string
+  ref?: (element: HTMLElement) => void
+  children: JSX.Element
 }) {
   return (
-    <Show when={props.palette.open()}>
-      <Modal onDismiss={props.palette.close} title={props.ariaLabel} size="wide">
-        <ModalBody>
-          <Input
-            kind="filter"
-            placeholder={props.placeholder}
-            value={props.palette.query()}
-            onInput={(value) => props.palette.setQuery(value)}
-          />
-          <Show when={props.status}>{props.status}</Show>
-          <For each={props.items} fallback={<Line role="muted">{props.emptyText}</Line>}>
-            {(item, index) => (
-              <Row selected={index() === props.palette.sel()} leading={index() === props.palette.sel() ? '›' : ' '}>
-                {props.row(item, index() === props.palette.sel())}
-              </Row>
-            )}
-          </For>
-          <Show when={props.footer}>{props.footer}</Show>
-        </ModalBody>
-      </Modal>
-    </Show>
+    <box flexDirection="column" flexGrow={1}>
+      {props.children}
+    </box>
   )
 }
 
 /** The box a reference panel is drawn in. A drawer over half the window on the desktop; a modal where
  *  the pane goes here, for the reason every other overlay flattens (../kit/grouping.tsx). */
-export default function RefPanelBoxDefault(props: { title: string; onClose: () => void; children: JSX.Element; footer?: JSX.Element }) {
+export default function RefPanelBoxDefault(props: {
+  title: string
+  onClose: () => void
+  children: JSX.Element
+  footer?: JSX.Element
+}) {
   return (
     <Modal onDismiss={props.onClose} title={props.title} size="lg">
       <ModalBody>{props.children}</ModalBody>
@@ -148,11 +125,10 @@ export { RefPanelBoxDefault as RefPanelBox }
 
 /** Promote a row to a task, with the optional workflow step above it.
  *
- *  Absent, and it says so, for the same reason `RefPanelTaskLink` below is: the box needs the routed
- *  project and the source's registered `promotion`, and this host has no router. The surface that
- *  opens it is a row menu on a descriptor source's list, and this host's source panel draws no row
- *  menu (../plugins/SourcePanel.tsx, docs/tui/plugin-losses.md § What a plugin loses here). Nothing here mounts an
- *  `overlay` slot either, so this stands in for a build, not for a screen. */
+ *  Absent, and it says so. The surface that opens it is a row menu on a descriptor source's list, and
+ *  this host's source panel draws no row menu
+ *  (../plugins/SourcePanel.tsx, docs/tui/plugin-losses.md § What a plugin loses here). Nothing here
+ *  mounts an `overlay` slot either, so this stands in for a build, not for a screen. */
 export function PromoteToTaskModal(_props: {
   providerId: string
   item: unknown
@@ -167,22 +143,21 @@ export function PromoteToTaskModal(_props: {
 }) {
   return <Line role="muted">Making a task from this row is not drawn here.</Line>
 }
-// Type-only, so the DOM component this names is erased rather than imported.
-export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
-
 /** The Config files section of the agents plugin's MCP page.
  *
- *  Absent, and it says so. Core draws the list with the desktop's own controls, and it had no terminal
- *  form when it was a page of its own either. */
+ *  Absent, and it says so: core draws the list with the desktop's own controls. */
 export function McpConfigFiles() {
-  return <Line role="muted">The servers each CLI loads from its own config files are listed in the Config files section in the desktop app.</Line>
+  return (
+    <Line role="muted">
+      The servers each CLI loads from its own config files are listed in the Config files section in the desktop app.
+    </Line>
+  )
 }
 
 /** "Is there a task for this thing, and if not, start one".
  *
  *  Absent, and it says so. The DOM control is a `Select` of repos and a create button wired to the
- *  router — and there is no router here, which is the same reason `RemoteTree` passes an empty
- *  `navigate`. A reader who wants a task for this reference makes one in the rail, which is two keys
+ *  desktop's router. A reader who wants a task for this reference makes one in the rail, which is two keys
  *  away and does not need this line to be a lie. */
 export function RefPanelTaskLink(_props: { target: unknown }) {
   return <Line role="muted">Start a task for this from the rail.</Line>
@@ -213,7 +188,7 @@ export function ProviderHtml(props: {
 
 // ── Cooperative extension points ─────────────────────────────────────────────────────────────────
 
-export type SlotProps = {
+type SlotProps = {
   point: string
   key?: string
   props?: () => unknown
@@ -239,7 +214,10 @@ export type SlotProps = {
  * of muted text rather than a `<span class="muted">`.
  */
 export function Slot(props: SlotProps) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -324,7 +302,12 @@ function CompiledWithHost(props: {
   onCleanup(presses.dispose)
   const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: presses.recent })
   return (
-    <box flexShrink={0} ref={(element: Renderable) => { container = element }}>
+    <box
+      flexShrink={0}
+      ref={(element: Renderable) => {
+        container = element
+      }}
+    >
       <Dynamic component={props.component} {...props.props()} host={host} />
     </box>
   )
@@ -369,7 +352,9 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
                 props={() => viewer.props}
                 {...(props.scope.taskId ? { taskId: props.scope.taskId } : {})}
                 {...(props.scope.projectId ? { projectId: props.scope.projectId } : {})}
-                occupied={(occupied) => { if (!occupied && viewer.pluginId()) viewer.failed() }}
+                occupied={(occupied) => {
+                  if (!occupied && viewer.pluginId()) viewer.failed()
+                }}
               />
             </box>
           </Show>
@@ -417,7 +402,8 @@ function ExtensionGroupRows(props: { contribution: ExtensionContribution }) {
     { nodeIds: [nodeId] },
   )
   const items = createMemo(() =>
-    (result().rows[0]?.data ?? []).map((item) => ({ ...item, key: item.id, label: item.title })))
+    (result().rows[0]?.data ?? []).map((item) => ({ ...item, key: item.id, label: item.title })),
+  )
 
   return (
     <Show when={items().length}>
@@ -463,7 +449,7 @@ export function InlineSlot(props: { point: string; key?: string; taskId?: string
 
 // ── Selection actions ────────────────────────────────────────────────────────────────────────────
 
-export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+export type { SelectedContent } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 
 /**
  * Other plugins' actions on selected text (`content.selection`), in cells.
@@ -483,18 +469,33 @@ export function SelectionActions(props: SelectionActionsProps) {
     <>
       {props.children}
       <Show when={rows().length}>
-        <Menu ariaLabel="Actions for the whole text"
+        <Menu
+          ariaLabel="Actions for the whole text"
           trigger={({ toggle, open }) => (
-            <IconButton icon="ellipsis" label="Actions for the whole text" opens="menu" expanded={open()} onPress={toggle} />
+            <IconButton
+              icon="ellipsis"
+              label="Actions for the whole text"
+              opens="menu"
+              expanded={open()}
+              onPress={toggle}
+            />
           )}
         >
           {(menu) => {
             const opened = untrack(target)
             return (
-              <Show when={opened && !selectionTooLarge(opened.text)} fallback={opened && <Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}>
+              <Show
+                when={opened && !selectionTooLarge(opened.text)}
+                fallback={opened && <Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}
+              >
                 <For each={opened ? contextMenuItems('content.selection', opened) : []}>
                   {(row) => (
-                    <Menu.Item context={menu} onSelect={() => { if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened) }}>
+                    <Menu.Item
+                      context={menu}
+                      onSelect={() => {
+                        if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened)
+                      }}
+                    >
                       {row.label}
                     </Menu.Item>
                   )}

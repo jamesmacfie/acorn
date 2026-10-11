@@ -3,10 +3,9 @@
 // for `window` at module scope). See docs/plugins/client-half.md § Loaded plugins: the client half for the
 // frame's full sandbox and the `mountFrame` boot sequence.
 //
-// `openLinkOnClick` is here rather than beside `renderMarkdown` on ./ui because it needs the bridge.
+// `openLinkOnClick` is here rather than on ./ui because it needs the bridge.
 export { connect, AcornBridgeError, mountFrame, openLinkOnClick } from '@acorn/client-core/host/frames/sdk'
-// `AcornBridge` is the whole bridge. `AcornBridgeApi` was its `.api` sub-shape, and nothing ever named
-// the sub-shape on its own.
+// `AcornBridge` is the whole bridge; its `.api` sub-shape has no name of its own.
 export type { AcornBridge } from '@acorn/client-core/host/frames/sdk'
 // What `api.getBytes` resolves to. Named because an author annotating the variable they decoded an
 // image out of has nowhere else to reach for it.
@@ -15,8 +14,8 @@ export type { PluginByteResponse } from '@acorn/client-core/host/frames/sdk'
 // because an author who builds an attribute map in one function and emits it in another has nowhere
 // else to reach for the type (docs/plugin-authoring/the-bridge.md § Telemetry from a frame).
 export type { PluginTelemetryAttrs } from '@acorn/client-core/host/frames/sdk'
-// The context the host hands a frame on connect. Kept rather than pruned: the four things that name it
-// today are all host-side, and a frame that wants to type the context it was given has nowhere else to go.
+// The context the host hands a frame on connect. A frame that wants to type the context it was given
+// has nowhere else to go.
 export type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
@@ -32,7 +31,15 @@ export type { TreeMount, TreeRender } from '@acorn/client-core/host/frames/sdk'
 // The remote root's mutators, as free functions. This is the surface a framework adapter binds to —
 // `acorn-plugin-sdk/remote` is Solid's, in a dozen lines — and vanilla code can call them directly.
 export {
-  createNode, createText, firstChild, insertNode, isTextNode, nextSibling, parentOf, removeNode,
-  setProperty, setText,
+  createNode,
+  createText,
+  firstChild,
+  insertNode,
+  isTextNode,
+  nextSibling,
+  parentOf,
+  removeNode,
+  setProperty,
+  setText,
 } from '@acorn/client-core/host/frames/remoteRoot.ts'
 export type { RemoteNode, RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'

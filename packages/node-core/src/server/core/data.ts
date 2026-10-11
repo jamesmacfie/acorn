@@ -2,19 +2,19 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { QueryResult, QueryResultRow } from 'pg'
-import { loadRepoConfig } from '../runConfig'
+import { loadRepoConfig } from '../projects/runConfig'
 import type { ProjectService } from './projectRefs'
 import type { ProcResult, ProcSpec } from './proc'
 import type { TaskService } from './tasks'
 import { taskDataPools } from './dataPools'
 import { dataCatalog, invalidateDataCatalog } from './dataCatalog'
 
-export type DataCell = string | null
+type DataCell = string | null
 export type DataColumn = { name: string; dataType: string; nullable: boolean; isPk: boolean }
 export type DataTable = { schema: string; name: string; columns: DataColumn[] }
-export type DataSchemaSource = 'auto' | 'script' | 'file'
+type DataSchemaSource = 'auto' | 'script' | 'file'
 
-export type DataQueryOptions = {
+type DataQueryOptions = {
   maxRows?: number
   /** Reads are the default. A permission-scoped service refuses `false` without `data:write`. */
   readOnly?: boolean
@@ -22,7 +22,7 @@ export type DataQueryOptions = {
   parameters?: DataCell[]
 }
 
-export type DataQueryResult = {
+type DataQueryResult = {
   columns: string[]
   rows: DataCell[][]
   rowCount: number | null
@@ -31,7 +31,7 @@ export type DataQueryResult = {
   ms: number
 }
 
-export type DataSchemaResult = {
+type DataSchemaResult = {
   tables: DataTable[]
   text: string
   source: DataSchemaSource
@@ -48,9 +48,9 @@ export type DataSourceService = {
   schema(taskId: string): Promise<DataSchemaResult>
 }
 
-export const DATA_MAX_QUERY_ROWS = 500
-export const DATA_DEFAULT_TIMEOUT_MS = 15_000
-export const DATA_MAX_TIMEOUT_MS = 60_000
+const DATA_MAX_QUERY_ROWS = 500
+const DATA_DEFAULT_TIMEOUT_MS = 15_000
+const DATA_MAX_TIMEOUT_MS = 60_000
 
 const SCHEMA_CHAR_CAP = 80_000
 type DataCore = {
@@ -77,7 +77,10 @@ const formatSchema = (tables: readonly DataTable[]): string =>
   tables
     .map((table) => {
       const columns = table.columns
-        .map((column) => `  ${qid(column.name)} ${column.dataType}${column.nullable ? '' : ' NOT NULL'}${column.isPk ? ', -- PK' : ','}`)
+        .map(
+          (column) =>
+            `  ${qid(column.name)} ${column.dataType}${column.nullable ? '' : ' NOT NULL'}${column.isPk ? ', -- PK' : ','}`,
+        )
         .join('\n')
       return `CREATE TABLE ${qid(table.schema)}.${qid(table.name)} (\n${columns}\n);`
     })
@@ -94,7 +97,8 @@ const boundedTimeout = (value: number | undefined): number => {
 }
 
 const READ_ONLY_LEAD = new Set(['select', 'with', 'show', 'explain', 'table', 'values'])
-const WRITES = /\b(insert|update|delete|merge|create|drop|alter|truncate|grant|revoke|copy|call|refresh|vacuum|lock|set)\b/i
+const WRITES =
+  /\b(insert|update|delete|merge|create|drop|alter|truncate|grant|revoke|copy|call|refresh|vacuum|lock|set)\b/i
 
 /** A useful early refusal; the read-only transaction below is the enforcement boundary. */
 export function dataReadOnlyRefusal(sql: string): string | null {
@@ -152,7 +156,7 @@ export async function hasTaskDataSource(core: DataCore, taskId: string): Promise
   if (!sources) return false
   const { root, script } = sources
   if (script && root) return true
-  if (root && await readEnvUrl(join(root, '.env'))) return true
+  if (root && (await readEnvUrl(join(root, '.env')))) return true
   return !!process.env.DATABASE_URL?.trim()
 }
 
@@ -194,9 +198,9 @@ export async function resolveTaskDataUrl(core: DataCore, taskId: string): Promis
 const resultSet = (result: QueryResult<QueryResultRow>, maxRows: number, ms: number): DataQueryResult => {
   const columns = result.fields?.map((field) => field.name) ?? []
   const driverRows = result.rows ?? []
-  const rows = driverRows.slice(0, maxRows).map((row) =>
-    columns.map((column) => cell((row as Record<string, unknown>)[column])),
-  )
+  const rows = driverRows
+    .slice(0, maxRows)
+    .map((row) => columns.map((column) => cell((row as Record<string, unknown>)[column])))
   return {
     columns,
     rows,
@@ -237,7 +241,9 @@ export function createDataSourceService(core: DataCore): DataSourceService {
           try {
             await client.query(readOnly ? 'BEGIN READ ONLY' : 'BEGIN')
             await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`)
-            raw = await client.query(sql, options.parameters ?? []) as QueryResult<QueryResultRow> | QueryResult<QueryResultRow>[]
+            raw = (await client.query(sql, options.parameters ?? [])) as
+              | QueryResult<QueryResultRow>
+              | QueryResult<QueryResultRow>[]
             await client.query(readOnly ? 'ROLLBACK' : 'COMMIT')
           } catch (error) {
             await client.query('ROLLBACK').catch(() => {})

@@ -18,7 +18,7 @@ explicitly selected conversation.
 ## Starting point and owners
 
 - `packages/protocol/src/transport/api/projects.ts` defines project configuration contracts.
-- `packages/node-core/src/server/projectConfig.ts` and
+- `packages/node-core/src/server/projects/projectConfig.ts` and
   `packages/node-core/src/server/routes/projects/projects.ts` own config read/write behavior.
 - `packages/node-core/src/server/db/schema.ts` owns persisted project data. Read [project
   configuration](../../workspaces-and-tasks/project-config.md).

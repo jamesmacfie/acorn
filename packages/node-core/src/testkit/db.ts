@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { openDb, type Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
 import { createCoreServices } from '../server/core'
+import { CapabilityRegistry } from '../server/pluginHost/capabilities'
 import { SecretService } from '../server/core/secrets'
 import { ActiveCredentials } from '../server/auth/activeCredentials'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
@@ -46,7 +47,18 @@ export function makeTestCoreServices(testDb: TestDb, userId: string | null = nul
     db: testDb.db,
     secrets: testDb.secrets,
     activeIdentity: memoryIdentityStore(userId),
+    ...testCoreSeams(),
   })
+}
+
+// The two createCoreServices inputs a Node takes from its boot: the key custody report from the
+// session key check, and the capability registry. The report says the keys are sealed. The registry is
+// empty, so `pluginSecurity` rejects until a test passes its own registry with PLUGIN_STATE provided.
+export function testCoreSeams() {
+  return {
+    nodeKeys: { snapshot: () => ({ delivery: 'desktop' as const, keyCheck: 'ok' as const, plainFiles: [] }) },
+    capabilities: new CapabilityRegistry(),
+  }
 }
 
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
@@ -60,11 +72,18 @@ export class EveryCredentialActive extends ActiveCredentials {
   }
 }
 
-export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService; incoming: Env['incoming']; INTERNAL_CREDENTIALS: ActiveCredentials } {
+export function testSecretEnv(hexKey: string): {
+  SESSION_ENC_KEY: string
+  SECRETS: SecretService
+  incoming: Env['incoming']
+  INTERNAL_CREDENTIALS: ActiveCredentials
+} {
   // Direct app.fetch tests have no socket. Give their existing internal-token requests the same peer
   // as the real listener; security tests override this with a remote or missing peer explicitly.
   return {
-    SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey), incoming: { socket: { remoteAddress: '127.0.0.1' } } as Env['incoming'],
+    SESSION_ENC_KEY: hexKey,
+    SECRETS: new SecretService(hexKey),
+    incoming: { socket: { remoteAddress: '127.0.0.1' } } as Env['incoming'],
     INTERNAL_CREDENTIALS: new EveryCredentialActive(),
   }
 }
@@ -93,14 +112,24 @@ export function workspacePluginMigrations(plugin: string): string | null {
   }
 }
 
-export type TestPluginDb = { db: PluginDatabase; dataDir: string; openConnection(): PluginDatabase; cleanup: () => void }
+export type TestPluginDb = {
+  db: PluginDatabase
+  dataDir: string
+  openConnection(): PluginDatabase
+  cleanup: () => void
+}
 
 // A real per-plugin SQLite file in a temp data root. See docs/testing/layers.md § The testkit for how the
 // migration chain resolves. Separate schemas mean a plugin's tests exercise the ownership boundary
 // production has.
-export function makeTestPluginDb(plugin: string, migrationsFolder: string | null = workspacePluginMigrations(plugin)): TestPluginDb {
+export function makeTestPluginDb(
+  plugin: string,
+  migrationsFolder: string | null = workspacePluginMigrations(plugin),
+): TestPluginDb {
   if (!migrationsFolder) {
-    throw new Error(`makeTestPluginDb('${plugin}') found no migration chain at plugins/${plugin}/migrations; pass the folder if it lives elsewhere.`)
+    throw new Error(
+      `makeTestPluginDb('${plugin}') found no migration chain at plugins/${plugin}/migrations; pass the folder if it lives elsewhere.`,
+    )
   }
   const dataDir = mkdtempSync(join(tmpdir(), `acorn-test-${plugin}-`))
   const db = openPluginDb(dataDir, plugin, { migrationsFolder })

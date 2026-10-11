@@ -2,10 +2,10 @@ import type { KeyEvent as ParsedKey } from './input/events'
 
 // A key as the keymap engine reads one, and the spelling table the two harnesses press through.
 //
-// Its own module rather than part of `./renderer.ts`, and the reason is a byte count. The keymap host
+// Its own module rather than part of `./renderer.ts`, because of the startup budget. The keymap host
 // adapter needs `keyEvent` and it is in `App`'s eager graph, while `./renderer.ts` reaches the whole
-// painter — the screen, the buffers and the parser. Importing one from the other put 59 KB into a
-// startup closure that had no use for it, which the budget check caught
+// painter — the screen, the buffers and the parser. Importing one from the other puts all of that into
+// the startup closure, which the budget check fails
 // (../scripts/check-startup-graph.mjs, docs/frontend/startup-budget.md § Startup budget).
 //
 // The parser's own vocabulary meets the engine's here, and the whole of the difference is one word:
@@ -17,10 +17,9 @@ import type { KeyEvent as ParsedKey } from './input/events'
  *
  *  Structurally OpenTUI's `KeyEvent`, and both flags have to be here rather than in the closures that
  *  set them. `defaultPrevented` is what `./keys/install.ts § typeInto` reads to leave a claimed key
- *  alone; `propagationStopped` is what the engine reads to know an intercept consumed the key, and
- *  without it `ctx.consume()` was a no-op — an entered `pty` rectangle sent every key to its program
- *  and then let the app's own bindings answer the same key, so Escape's pair left and F6 walked out
- *  of the rectangle it had just taken (@opentui/keymap § handleKeyEvent). */
+ *  alone; `propagationStopped` is what the engine reads to know an intercept consumed the key. Without
+ *  it `ctx.consume()` is a no-op, and an entered `pty` rectangle sends every key to its program and
+ *  then lets the app's own bindings answer the same key (@opentui/keymap § handleKeyEvent). */
 export type KeyEvent = {
   name: string
   ctrl: boolean
@@ -41,11 +40,9 @@ export type KeyEvent = {
 
 /** The harness's spelling of a key, as the name our parser produces for it.
  *
- *  Both suites press through one table today: a single character is itself, and a named key is
- *  OpenTUI's upper-case spelling of the bytes that make it, because that is what its `mockInput`
- *  takes (`KeyCodes.RETURN`). Our parser names the same keys the way `./input/names.ts` does, so the
- *  two spellings have to meet somewhere and this is the shorter half. Phase 4 rewrites the harness to
- *  press a `KeyEvent` and this table goes with it (./kit/render.tsx § RAW_KEYS). */
+ *  Both suites press through one table: a single character is itself, and a named key is the
+ *  upper-case spelling the tests are written in (`RETURN`, `ARROW_UP`). Our parser names the same keys
+ *  the way `./input/names.ts` does, and this maps one onto the other. */
 const NAMED: Readonly<Record<string, string>> = {
   RETURN: 'return',
   LINEFEED: 'linefeed',
@@ -71,12 +68,15 @@ const NAMED: Readonly<Record<string, string>> = {
  *  (./input/parser.ts § A key name is lower case). The character itself goes in `sequence`, which is
  *  what a field types: with the case in the modifier there is nowhere else for a capital to live, and
  *  `space` as a name is a word rather than a character (./kit/field.ts § typedBy). */
-export function pressedKey(key: string, modifiers: {
-  shift?: boolean
-  ctrl?: boolean
-  meta?: boolean
-  super?: boolean
-} = {}): KeyEvent {
+export function pressedKey(
+  key: string,
+  modifiers: {
+    shift?: boolean
+    ctrl?: boolean
+    meta?: boolean
+    super?: boolean
+  } = {},
+): KeyEvent {
   const named = NAMED[key]
   // A named key types nothing at all, which is the same thing our parser says by leaving `text`
   // empty: what a Return does inside a field is the edit model's decision from the name, not a
@@ -87,12 +87,16 @@ export function pressedKey(key: string, modifiers: {
   return keyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers, key)
 }
 
-export const keyEvent = (name: string, modifiers: {
-  shift?: boolean
-  ctrl?: boolean
-  meta?: boolean
-  super?: boolean
-} = {}, typed?: string): KeyEvent => {
+export const keyEvent = (
+  name: string,
+  modifiers: {
+    shift?: boolean
+    ctrl?: boolean
+    meta?: boolean
+    super?: boolean
+  } = {},
+  typed?: string,
+): KeyEvent => {
   const event: KeyEvent = {
     name,
     ctrl: modifiers.ctrl ?? false,
@@ -110,8 +114,12 @@ export const keyEvent = (name: string, modifiers: {
     source: 'raw',
     defaultPrevented: false,
     propagationStopped: false,
-    preventDefault: () => { event.defaultPrevented = true },
-    stopPropagation: () => { event.propagationStopped = true },
+    preventDefault: () => {
+      event.defaultPrevented = true
+    },
+    stopPropagation: () => {
+      event.propagationStopped = true
+    },
   }
   return event
 }
@@ -129,12 +137,16 @@ export const keyEvent = (name: string, modifiers: {
  * (./kit/field.ts § typedBy, ./kit/ptyKeys.ts).
  */
 export function keyPressed(key: ParsedKey): KeyEvent {
-  const event = keyEvent(key.name, {
-    ctrl: key.ctrl,
-    meta: key.alt,
-    shift: key.shift,
-    super: key.super,
-  }, key.text)
+  const event = keyEvent(
+    key.name,
+    {
+      ctrl: key.ctrl,
+      meta: key.alt,
+      shift: key.shift,
+      super: key.super,
+    },
+    key.text,
+  )
   event.eventType = key.action
   return event
 }

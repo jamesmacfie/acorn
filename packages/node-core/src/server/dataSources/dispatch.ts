@@ -23,13 +23,19 @@ async function failureReason(response: Response): Promise<DataSourceErrorDetail 
       chunks.push(chunk.value)
       size += chunk.value.byteLength
     }
-  } catch { return undefined } finally { void reader.cancel().catch(() => {}) }
+  } catch {
+    return undefined
+  } finally {
+    void reader.cancel().catch(() => {})
+  }
   if (size > REASON_BYTES) return undefined
   try {
     const body = JSON.parse(new TextDecoder().decode(Buffer.concat(chunks))) as { reason?: unknown }
     const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, REASON_CHARS) : ''
     return reason ? { reason } : undefined
-  } catch { return undefined }
+  } catch {
+    return undefined
+  }
 }
 
 /** Race the full body read as well as the callback: an uncooperative plugin cannot hold admission. */
@@ -51,10 +57,19 @@ export async function dispatchSource(
   })
   const read = async () => {
     const response = await dispatchPluginRoute(
-      env, pluginId, handler, { method: 'POST', body: JSON.stringify(body) }, signal,
-      invocation.principal, connectionScope,
+      env,
+      pluginId,
+      handler,
+      { method: 'POST', body: JSON.stringify(body) },
+      signal,
+      invocation.principal,
+      connectionScope,
     )
-    if (!response.ok) throw new DataSourceError(response.status === 429 ? 'rate-limited' : 'provider-failure', await failureReason(response))
+    if (!response.ok)
+      throw new DataSourceError(
+        response.status === 429 ? 'rate-limited' : 'provider-failure',
+        await failureReason(response),
+      )
     const reader = response.body?.getReader()
     if (!reader) throw new DataSourceError('invalid-response')
     let size = 0
@@ -68,13 +83,27 @@ export async function dispatchSource(
         if (size > maxBytes) throw new DataSourceError('oversize')
         chunks.push(chunk.value)
       }
-    } finally { void reader.cancel().catch(() => {}) }
+    } finally {
+      void reader.cancel().catch(() => {})
+    }
     const merged = new Uint8Array(size)
     let offset = 0
-    for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.byteLength }
-    try { return JSON.parse(new TextDecoder().decode(merged)) as unknown } catch { throw new DataSourceError('invalid-response') }
+    for (const chunk of chunks) {
+      merged.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    try {
+      return JSON.parse(new TextDecoder().decode(merged)) as unknown
+    } catch {
+      throw new DataSourceError('invalid-response')
+    }
   }
-  try { return await Promise.race([read(), cancelled]) }
-  catch (error) { if (error instanceof DataSourceError) throw error; throw new DataSourceError('provider-failure') }
-  finally { signal.removeEventListener('abort', abort) }
+  try {
+    return await Promise.race([read(), cancelled])
+  } catch (error) {
+    if (error instanceof DataSourceError) throw error
+    throw new DataSourceError('provider-failure')
+  } finally {
+    signal.removeEventListener('abort', abort)
+  }
 }

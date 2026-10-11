@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { SecretService } from '@acorn/plugin-api/testkit'
+import { SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
@@ -22,7 +22,16 @@ describe('managed-agent signed webhooks', () => {
   beforeEach(() => {
     testDb = makeTestPluginDb('agents')
     coreDb = makeTestDb()
-    service = new AgentWebhookService(testDb.db, SECRETS, createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }))
+    service = new AgentWebhookService(
+      testDb.db,
+      SECRETS,
+      createCoreServices({
+        secrets: SECRETS,
+        db: coreDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
+    )
   })
 
   afterEach(async () => {
@@ -110,10 +119,12 @@ describe('managed-agent signed webhooks', () => {
   })
 
   it('refuses non-loopback cleartext and private-network destinations', async () => {
-    await expect(service.create({
-      url: 'http://169.254.169.254/latest/meta-data',
-      events: ['attention'],
-    })).rejects.toThrow(/private|HTTPS/)
+    await expect(
+      service.create({
+        url: 'http://169.254.169.254/latest/meta-data',
+        events: ['attention'],
+      }),
+    ).rejects.toThrow(/private|HTTPS/)
   })
 
   it('normalizes IPv6 loopback without treating URL brackets as a DNS hostname', async () => {
@@ -125,10 +136,12 @@ describe('managed-agent signed webhooks', () => {
   })
 
   it('does not create a task-filtered webhook for an unknown task', async () => {
-    await expect(service.create({
-      taskId: randomUUID(),
-      url: 'http://127.0.0.1:54321/acorn',
-      events: ['attention'],
-    })).rejects.toThrow(/task not found/)
+    await expect(
+      service.create({
+        taskId: randomUUID(),
+        url: 'http://127.0.0.1:54321/acorn',
+        events: ['attention'],
+      }),
+    ).rejects.toThrow(/task not found/)
   })
 })

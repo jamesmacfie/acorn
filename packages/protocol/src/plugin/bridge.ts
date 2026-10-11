@@ -10,18 +10,16 @@
 // because the host bound all three when it created the frame. That is why `path` is the only
 // addressing a request has.
 //
-// Types rather than Zod schemas, unlike the HTTP wire: the parsing here is hand-rolled in the broker
-// (client-core/host/frames/broker.ts) because the trust boundary is inverted. An HTTP route
-// validates a body it will act on; the broker's job is to decide whether to act at all, which is a
-// permission check against a route table rather than a shape check. A schema in front of it would
-// validate the shape of a request it is about to deny anyway.
+// Types rather than Zod schemas, unlike the HTTP wire: client-core's frame broker parses these by hand
+// because the trust boundary is inverted. An HTTP route validates a body it will act on; the broker
+// decides whether to act at all, which is a permission check against a route table rather than a
+// shape check.
 import type { ErrorEnvelope } from '../transport/errors'
 
 // The handshake. The host posts exactly this into the frame with the port transferred alongside, and
 // the SDK's `connect()` resolves on it. Versioned so a future protocol change is a different number
 // rather than a silently mis-parsed message.
 export const PLUGIN_BRIDGE_VERSION = 1
-export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 
 // What the frame was opened to look at. Handed over on the port rather than read from the URL by the
 // SDK, so the query string stays an implementation detail of how the host happens to serve frames.
@@ -100,7 +98,7 @@ export type PluginBridgeApiRequest = {
  * No streaming. The desktop broker fully buffers a node response already, so a chunked API here would be
  * a shape with no transport under it. `MAX_PLUGIN_BYTES` is the memory bound instead.
  */
-export type PluginBridgeApiBytesRequest = {
+type PluginBridgeApiBytesRequest = {
   id: number
   kind: 'api.bytes'
   method: 'GET' | 'POST'
@@ -120,23 +118,18 @@ export type PluginBridgeApiBytesRequest = {
  * limit stays authoritative for what may be stored; this only bounds what may cross a port. */
 export const MAX_PLUGIN_BYTES = 12 * 1024 * 1024
 
-/** What a successful `api.bytes` call resolves to. Rides the ordinary reply envelope's `body`, because
- * a `Uint8Array` is structured-clone-safe and a parallel reply type would be a second envelope to keep
- * in step for no gain. The request kind is what carries the security property, not the reply's shape. */
-export type PluginBridgeApiBytesBody = { bytes: Uint8Array; type: string; filename: string | null }
-
 // Server-push. The channel must appear in the manifest's `events` list and be one the shell actually
 // has; subscribing does not create a channel.
-export type PluginBridgeSubscribeRequest = { id: number; kind: 'subscribe'; channel: string }
+type PluginBridgeSubscribeRequest = { id: number; kind: 'subscribe'; channel: string }
 
 // Namespaced durable storage, keyed `(pluginId, key)` by the host. Distinct from the frame's own
 // `localStorage`, which works but is keyed by bundle hash and so rotates with every plugin update.
-export type PluginBridgeStateRequest =
+type PluginBridgeStateRequest =
   | { id: number; kind: 'state.get'; key: string }
   | { id: number; kind: 'state.set'; key: string; value: unknown }
 
-// The closed verb set. Not "some UI operations": these six and nothing else, because each one is a
-// thing the host does on the frame's behalf in the host's own realm.
+// The closed verb set. Not "some UI operations": these and nothing else, because each one is a thing
+// the host does on the frame's behalf in the host's own realm.
 export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'toast'; title: string; detail?: string }
   | { id: number; kind: 'ui'; op: 'copy'; text: string }
@@ -165,11 +158,9 @@ export type PluginBridgeUiRequest =
 // every other surface is denied, because there is no document on the other side of the port to
 // touch.
 //
-// Three operations, each with a proven consumer in the pane that forced this contract: `read` is the
-// Run button needing the current SQL, `write` is the saved-query picker loading one into the editor,
-// and `flush` is "make sure my write route has the latest before I act on it". Nothing about the
-// editor crosses: no cursor, no selection, no decorations. Those stay the host's, and the growth
-// rule sends anything richer to an LSP-shaped route instead.
+// `read` returns the current text, `write` replaces it, and `flush` makes sure the pane's write route
+// has the latest text before the frame acts on it. Nothing else about the editor crosses: no cursor,
+// no selection, no decorations. Anything richer belongs on an LSP-shaped route.
 export type PluginBridgeDocumentRequest =
   | { id: number; kind: 'document'; op: 'read' }
   | { id: number; kind: 'document'; op: 'write'; text: string; expectedText?: string }
@@ -194,8 +185,8 @@ export type PluginBridgeWebviewRequest =
 
 // Abandon an in-flight request. The SDK sends this when an AbortSignal fires; the host stops caring
 // about the response rather than pretending it can un-send an HTTP request.
-export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
-export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
+type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
+type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
 // One telemetry record from inside a frame (docs/telemetry.md, docs/plugin-authoring/the-bridge.md § Telemetry
 // from a frame).
@@ -222,7 +213,7 @@ export type PluginBridgeTelemetryAttrs = Record<string, string | number | boolea
 // so there is no outcome for the frame to await and nothing it could do with one. The message still
 // counts against the port's rate window, which is what stops a frame emitting in a loop: it kills
 // itself long before the collector notices.
-export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTelemetryRecord }
+type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTelemetryRecord }
 
 // The acknowledgement. The SDK posts it the moment `connect()` resolves, and it is the only message
 // a frame is required to send: the host starts a deadline when it transfers the port and shows a
@@ -232,7 +223,7 @@ export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTel
 // No id and no reply. It is not a request, so the broker's request parser drops it and only the
 // arrival matters, which also means any other message from the frame is just as good an ack, and the
 // host treats it as one.
-export type PluginBridgeConnected = { kind: 'connected'; treeSlotBridge?: 1 }
+type PluginBridgeConnected = { kind: 'connected'; treeSlotBridge?: 1 }
 
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
@@ -270,7 +261,7 @@ export type PluginBridgeAppearance = {
   tokens: Record<string, string>
 }
 
-export type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
+type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
 
 // A row was selected on this plugin's declarative rail source while its pane was already mounted. The
 // first such selection arrives in `context`; this is every one after it, because remounting a frame per

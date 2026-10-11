@@ -1,9 +1,26 @@
 import { activeNodeId } from '@acorn/plugin-api/client'
-import { fileDocumentCustodies, recoverDocumentCustody, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/plugin-api/ui/editor'
+import {
+  fileDocumentCustodies,
+  recoverDocumentCustody,
+  reserveDocumentDestinations,
+  reserveFileSourceCustodies,
+  type DocumentCustody,
+} from '@acorn/plugin-api/ui/editor'
 import type { FileTarget, FileActionResult } from '../contract/api'
 import type { EditorApi } from './editorClient'
 import { flushEditorDocument, rebindEditorFile, suspendEditorFile, type EditorPool } from './editorDocumentPool'
-import { captureTaskEditorState, editorMovePaths, editorOpen, editorRemovePaths, movePathsInEditorState, movedPath, openFiles, pathContains, removePathsInEditorState, type TaskEditorState } from './editorState'
+import {
+  captureTaskEditorState,
+  editorMovePaths,
+  editorOpen,
+  editorRemovePaths,
+  movePathsInEditorState,
+  movedPath,
+  openFiles,
+  pathContains,
+  removePathsInEditorState,
+  type TaskEditorState,
+} from './editorState'
 import { moveEditorTreeDirectories, removeEditorTreeDirectories } from './editorTreeState'
 import { moveEditorViewStates, removeEditorViewStates } from './editorViewState'
 import { reconcileEditorMetadata } from './editorNavigation'
@@ -22,28 +39,57 @@ export type ArmedFileAction = {
   tabs: TaskEditorState
 }
 
-export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: string, nodeId: string | null, beforeMutation: () => void, persistInactiveTabs?: (state: TaskEditorState) => Promise<void>) {
+export function createFileActionModel(
+  api: EditorApi,
+  pool: EditorPool,
+  taskId: string,
+  nodeId: string | null,
+  beforeMutation: () => void,
+  persistInactiveTabs?: (state: TaskEditorState) => Promise<void>,
+) {
   const live = () => !pool.retired && activeNodeId() === nodeId
   const address = (path: string) => [nodeId, 'file', taskId, path] as const
-  const affected = (path: string) => [...new Set([...pool.files.keys(), ...pool.saved.keys(), ...pool.reading.keys(), ...openFiles(taskId).map((file) => file.path), ...fileDocumentCustodies(nodeId, taskId, path).keys()])]
-    .filter((file) => pathContains(path, file)).sort()
-  const ensureLive = () => { if (!live()) throw new Error('The Node or task changed. Open the menu again.') }
+  const affected = (path: string) =>
+    [
+      ...new Set([
+        ...pool.files.keys(),
+        ...pool.saved.keys(),
+        ...pool.reading.keys(),
+        ...openFiles(taskId).map((file) => file.path),
+        ...fileDocumentCustodies(nodeId, taskId, path).keys(),
+      ]),
+    ]
+      .filter((file) => pathContains(path, file))
+      .sort()
+  const ensureLive = () => {
+    if (!live()) throw new Error('The Node or task changed. Open the menu again.')
+  }
   const check = (result: FileActionResult, armed?: ArmedFileAction): string => {
     if (!result.ok) {
-      if (result.partial) armed?.block(`The Node reported a partial file action. Find the entry at its actual path before resolving drafts. ${result.reason}`)
+      if (result.partial)
+        armed?.block(
+          `The Node reported a partial file action. Find the entry at its actual path before resolving drafts. ${result.reason}`,
+        )
       throw new Error(result.partial ? `${result.reason} Refresh the tree before trying again.` : result.reason)
     }
     return result.path
   }
   const sameEntry = (captured: FileTarget, current: FileTarget) => {
-    if (current.root !== captured.root || current.path !== captured.path || current.kind !== captured.kind || current.entryId !== captured.entryId) throw new Error('The tree entry changed. Refresh and try again.')
+    if (
+      current.root !== captured.root ||
+      current.path !== captured.path ||
+      current.kind !== captured.kind ||
+      current.entryId !== captured.entryId
+    )
+      throw new Error('The tree entry changed. Refresh and try again.')
   }
 
   /** Called at pointer/key invocation, before a menu can move focus and trigger blur autosave. */
   const arm = (target: FileTarget): ArmedFileAction => {
     ensureLive()
     const paths = affected(target.path)
-    if ([...pool.externalEditors].some((path) => pathContains(target.path, path))) throw new Error('Close $EDITOR before changing this entry.')
+    if ([...pool.externalEditors].some((path) => pathContains(target.path, path)))
+      throw new Error('Close $EDITOR before changing this entry.')
     const source = reserveFileSourceCustodies(nodeId, taskId, target.path)
     let releases: Array<() => void> = [source.release]
     const custodies = fileDocumentCustodies(nodeId, taskId, target.path)
@@ -59,9 +105,13 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
       for (const release of releases.reverse()) release()
       releases = []
     }
-    const pending = [...custodies].map(([path, custody]) => pool.files.has(path)
-      ? suspendEditorFile(pool, path) : custody.suspendWrites()) // all counters rise before awaiting an admitted write
-    const ready = Promise.all(pending).then((held) => { releases.push(...held); unlock() })
+    const pending = [...custodies].map(([path, custody]) =>
+      pool.files.has(path) ? suspendEditorFile(pool, path) : custody.suspendWrites(),
+    ) // all counters rise before awaiting an admitted write
+    const ready = Promise.all(pending).then((held) => {
+      releases.push(...held)
+      unlock()
+    })
     const currentCustodies = () => new Map([...custodies, ...source.custodies()])
     return {
       target,
@@ -70,13 +120,26 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
       savedRevisions,
       tabs: captureTaskEditorState(taskId),
       ready,
-      release: () => { uiReleased = true; unlock() },
+      release: () => {
+        uiReleased = true
+        unlock()
+      },
       hold: () => {
         operations++
         let ended = false
-        return () => { if (ended) return; ended = true; operations--; unlock() }
+        return () => {
+          if (ended) return
+          ended = true
+          operations--
+          unlock()
+        }
       },
-      block: (reason) => { for (const custody of currentCustodies().values()) { custody.writeBlock = reason; custody.flushRecovery() } },
+      block: (reason) => {
+        for (const custody of currentCustodies().values()) {
+          custody.writeBlock = reason
+          custody.flushRecovery()
+        }
+      },
       dirty: () => [...currentCustodies()].filter(([, custody]) => custody.dirty).map(([path]) => path),
     }
   }
@@ -93,10 +156,13 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
       const path = check(await api.create(taskId, parent, name, kind))
       if (kind === 'file') {
         if (activeNodeId() === nodeId) editorOpen(taskId, path, false)
-        else if (persistInactiveTabs) await persistInactiveTabs({ files: [...tabs.files, { path, ephemeral: false, dirty: false }], active: path })
+        else if (persistInactiveTabs)
+          await persistInactiveTabs({ files: [...tabs.files, { path, ephemeral: false, dirty: false }], active: path })
       }
       return path
-    } finally { unreserve() }
+    } finally {
+      unreserve()
+    }
   }
 
   const rename = async (armed: ArmedFileAction, name: string): Promise<string> => {
@@ -105,11 +171,16 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
     const from = armed.target.path
     const to = from.includes('/') ? `${from.slice(0, from.lastIndexOf('/'))}/${name}` : name
     const paths = new Set([from, ...affected(from), ...armed.sourceCustodies().keys()])
-    const unreserve = reserveDocumentDestinations([...paths].filter((path) => movedPath(path, from, to) !== path)
-      .map((path) => ({ address: address(movedPath(path, from, to)), custody: armed.sourceCustodies().get(path) })))
+    const unreserve = reserveDocumentDestinations(
+      [...paths]
+        .filter((path) => movedPath(path, from, to) !== path)
+        .map((path) => ({ address: address(movedPath(path, from, to)), custody: armed.sourceCustodies().get(path) })),
+    )
     let mutated = false
     try {
-      const admittedSave = [...armed.custodies].some(([path, custody]) => custody.savedRevision !== armed.savedRevisions.get(path))
+      const admittedSave = [...armed.custodies].some(
+        ([path, custody]) => custody.savedRevision !== armed.savedRevisions.get(path),
+      )
       const target = admittedSave ? await api.entry(taskId, from) : armed.target
       sameEntry(armed.target, target)
       const result = check(await api.rename(taskId, target, name), armed)
@@ -136,7 +207,9 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
         throw new Error(message)
       }
       throw cause
-    } finally { unreserve() }
+    } finally {
+      unreserve()
+    }
   }
 
   const trash = async (armed: ArmedFileAction, saveDrafts: boolean): Promise<void> => {

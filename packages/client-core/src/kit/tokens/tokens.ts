@@ -6,28 +6,28 @@
 // answer on a host with no pixels is a value pretending to be a meaning.
 
 /** Distance between things. `none` and four steps, from "inside one control" to "between sections". */
-export const space = ['none', 'inline', 'row', 'stack', 'section'] as const
+const space = ['none', 'inline', 'row', 'stack', 'section'] as const
 
 /** Four steps, and only four. A fifth is a new component, not a new size. */
-export const size = ['xs', 'sm', 'md', 'lg'] as const
+const size = ['xs', 'sm', 'md', 'lg'] as const
 
 /** What a thing means, not what colour it is. */
-export const tone = ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'] as const
+const tone = ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'] as const
 
 /** How text carries. `mono` is the only one a host without fonts ignores outright.
  *
  *  `match` is the odd one: it means "this run is what you searched for", and it is the only value
  *  that is about a run inside a line rather than about the line. It is here because two surfaces
- *  highlight a hit — the diff's find bar and the editor's find-in-files — and both used to reach for
+ *  highlight a hit — the diff's find bar and the editor's find-in-files — and neither may reach for
  *  the host class `.ui-find-mark` directly, which a plugin is not allowed to spell. */
-export const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'] as const
+const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'] as const
 
 /** Which border this is, by the job it does. See docs/ui-design/tokens.md § Border roles: a pack may set any of
  *  these to zero width, so picking the wrong role renders nothing at all. */
-export const border = ['none', 'divider', 'control', 'surface', 'stripe'] as const
+const border = ['none', 'divider', 'control', 'surface', 'stripe'] as const
 
 /** Which corner rounding, by the surface it rounds. */
-export const radius = ['control', 'surface', 'chip', 'pill'] as const
+const radius = ['control', 'surface', 'chip', 'pill'] as const
 
 export type Space = (typeof space)[number]
 export type Size = (typeof size)[number]

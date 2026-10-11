@@ -8,7 +8,7 @@ import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 // refusal, instead of each caller remembering both.
 
 /** A cell, as the pane renders it: every value flattened to text, and NULL kept distinct. */
-export type DatabaseQueryCell = string | null
+type DatabaseQueryCell = string | null
 
 export type DatabaseQueryResult = {
   columns: string[]
@@ -35,7 +35,8 @@ export const MAX_QUERY_ROWS = 200
 // Statements that only read. Everything else is refused, including a `WITH` whose body writes, which
 // PostgreSQL allows and which is the one way a statement that starts like a read is not one.
 const READ_ONLY_LEAD = new Set(['select', 'with', 'show', 'explain', 'table', 'values'])
-const WRITES = /\b(insert|update|delete|merge|create|drop|alter|truncate|grant|revoke|copy|call|refresh|vacuum|lock|set)\b/i
+const WRITES =
+  /\b(insert|update|delete|merge|create|drop|alter|truncate|grant|revoke|copy|call|refresh|vacuum|lock|set)\b/i
 
 /**
  * Why this statement is not a read, or `null` when it is one.

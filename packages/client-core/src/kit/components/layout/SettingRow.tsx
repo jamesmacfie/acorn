@@ -47,8 +47,8 @@ export type SettingRowProps = {
    every input, select and button inside it inert without the row reaching into its child.
 
    The save state sits on the title line, after the label and its help mark: the changed dot, the
-   scope chip, then **Saved** or **Reset** in one spot. The control column holds the control and nothing else, so the
-   control never moves or narrows while a save lands.
+   scope chip, then **Saved** or **Reset** in one spot. The control column holds the control and
+   nothing else, so the control never moves or narrows while a save lands.
 
    At 80×24: one line, the label then the control; `stacked` puts the control on the next line. The
    description and the help in grey under it, **Saved** in green or the error in red after it. A
@@ -74,31 +74,59 @@ export function SettingRow(props: SettingRowProps) {
         <span class="ui-setting-title">
           <Show
             when={props.help}
-            fallback={<label class="ui-setting-label" id={labelId} for={slot.target()}>{props.label}</label>}
+            fallback={
+              <label class="ui-setting-label" id={labelId} for={slot.target()}>
+                {props.label}
+              </label>
+            }
           >
             {(help) => (
               <span class="ui-titled">
-                <label class="ui-setting-label" id={labelId} for={slot.target()}>{props.label}</label>
+                <label class="ui-setting-label" id={labelId} for={slot.target()}>
+                  {props.label}
+                </label>
                 <HelpMark text={help()} titleId={labelId} />
               </span>
             )}
           </Show>
-          <Show when={props.onReset}><span class="ui-setting-changed" data-tip="Changed from the default">•</span></Show>
-          <Show when={props.scope === 'device'}><span class="ui-setting-scope" id={scopeId}><Badge size="xs">This device</Badge></span></Show>
-          <span class="ui-setting-status" aria-live="polite">{showSaved() ? 'Saved' : ''}</span>
+          <Show when={props.onReset}>
+            <span class="ui-setting-changed" data-tip="Changed from the default">
+              •
+            </span>
+          </Show>
+          <Show when={props.scope === 'device'}>
+            <span class="ui-setting-scope" id={scopeId}>
+              <Badge size="xs">This device</Badge>
+            </span>
+          </Show>
+          <span class="ui-setting-status" aria-live="polite">
+            {showSaved() ? 'Saved' : ''}
+          </span>
           <Show when={props.onReset && !props.from && !showSaved()}>
-            <Button variant="ghost" size="xs" onPress={() => props.onReset?.()}>Reset</Button>
+            <Button variant="ghost" size="xs" onPress={() => props.onReset?.()}>
+              Reset
+            </Button>
           </Show>
         </span>
-        <Show when={props.description}><span class="ui-setting-description" id={descriptionId}>{props.description}</span></Show>
-        <Show when={props.from}><span class="ui-setting-from">From {props.from}</span></Show>
+        <Show when={props.description}>
+          <span class="ui-setting-description" id={descriptionId}>
+            {props.description}
+          </span>
+        </Show>
+        <Show when={props.from}>
+          <span class="ui-setting-from">From {props.from}</span>
+        </Show>
       </div>
       <div class="ui-setting-control">
         <fieldset class="ui-setting-fieldset" disabled={!!props.from}>
           <FieldProvider value={slot.claim}>{props.children}</FieldProvider>
         </fieldset>
       </div>
-      <Show when={props.error}><span class="ui-setting-error" role="alert">{props.error}</span></Show>
+      <Show when={props.error}>
+        <span class="ui-setting-error" role="alert">
+          {props.error}
+        </span>
+      </Show>
     </div>
   )
 }

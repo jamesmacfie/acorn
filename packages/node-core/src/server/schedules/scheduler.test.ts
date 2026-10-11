@@ -157,10 +157,12 @@ describe('scheduler', () => {
         run: () => {
           live += 1
           peak = Math.max(peak, live)
-          return new Promise<void>((resolve) => releases.push(() => {
-            live -= 1
-            resolve()
-          }))
+          return new Promise<void>((resolve) =>
+            releases.push(() => {
+              live -= 1
+              resolve()
+            }),
+          )
         },
       })
     }
@@ -243,7 +245,12 @@ describe('scheduler', () => {
     const time = fakeClock()
     const scheduler = new Scheduler(test.db, { clock: time.clock })
     let ran = 0
-    scheduler.register({ key: 'core:sample', name: 'Sample', cadence: { every: 3600 }, run: async () => void (ran += 1) })
+    scheduler.register({
+      key: 'core:sample',
+      name: 'Sample',
+      cadence: { every: 3600 },
+      run: async () => void (ran += 1),
+    })
     await scheduler.start()
 
     await scheduler.patch('core:sample', { enabled: false })
@@ -262,13 +269,20 @@ describe('scheduler', () => {
   it('retains the state row of a schedule nothing declares, and reattaches when it comes back', async () => {
     const time = fakeClock()
     const first = new Scheduler(test.db, { clock: time.clock })
-    const registration = first.register({ key: 'linear:refresh', name: 'Refresh', cadence: { every: 600 }, run: async () => {} })
+    const registration = first.register({
+      key: 'linear:refresh',
+      name: 'Refresh',
+      cadence: { every: 600 },
+      run: async () => {},
+    })
     await first.start()
     await first.patch('linear:refresh', { enabled: false })
     registration.dispose() // the plugin was disabled
     await first.stop()
 
-    const orphan = (await new Scheduler(test.db, { clock: time.clock }).list()).find((row) => row.key === 'linear:refresh')!
+    const orphan = (await new Scheduler(test.db, { clock: time.clock }).list()).find(
+      (row) => row.key === 'linear:refresh',
+    )!
     expect(orphan).toMatchObject({ owner: 'plugin', pluginId: 'linear', registered: false, enabled: false })
 
     const second = new Scheduler(test.db, { clock: time.clock })
@@ -283,9 +297,9 @@ describe('scheduler', () => {
     const time = fakeClock()
     const scheduler = new Scheduler(test.db, { clock: time.clock })
     await scheduler.start()
-    await expect(scheduler.create({ name: 'Nightly', kind: 'node-action', target: {}, cadence: { every: 3600 } })).rejects.toThrow(
-      /nothing that can run/,
-    )
+    await expect(
+      scheduler.create({ name: 'Nightly', kind: 'node-action', target: {}, cadence: { every: 3600 } }),
+    ).rejects.toThrow(/nothing that can run/)
 
     // A row written by a version that had the kind: listed, never run, never deleted.
     await test.db.insert(schema.userSchedules).values({
@@ -349,16 +363,18 @@ describe('scheduler', () => {
 describe('target calendar timezones', () => {
   it('skips a nonexistent local time at the daylight-saving gap', () => {
     const from = Date.parse('2026-09-26T12:00:00Z')
-    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, from, 'Pacific/Auckland')).toISOString())
-      .toBe('2026-09-27T13:30:00.000Z')
+    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, from, 'Pacific/Auckland')).toISOString()).toBe(
+      '2026-09-27T13:30:00.000Z',
+    )
   })
 
   it('chooses the first repeated local time once at the daylight-saving fold', () => {
     const from = Date.parse('2026-04-04T12:00:00Z')
     const first = nextRunAtInTimezone({ daily: '02:30' }, from, 'Pacific/Auckland')
     expect(new Date(first).toISOString()).toBe('2026-04-04T13:30:00.000Z')
-    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, first, 'Pacific/Auckland')).toISOString())
-      .toBe('2026-04-05T14:30:00.000Z')
+    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, first, 'Pacific/Auckland')).toISOString()).toBe(
+      '2026-04-05T14:30:00.000Z',
+    )
   })
 })
 

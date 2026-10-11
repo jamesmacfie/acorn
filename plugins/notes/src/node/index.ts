@@ -21,26 +21,31 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
     // and announces once at the end, so a consumer hears one `notes-changed`, not one per note.
     const silent = new NotesStore(join(dataDir, 'notes'))
     ctx.capabilities.provide(NOTES_SEED_TASK, async (task) => {
-      if (await seedTaskNotes(ctx.core, silent, deps.internalEnv({ scope: 'service' }), task)) store.changed({ scope: 'task', taskId: task.id })
+      if (await seedTaskNotes(ctx.core, silent, deps.internalEnv({ scope: 'service' }), task))
+        store.changed({ scope: 'task', taskId: task.id })
     })
     ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
-    registerDeletedTaskPurge(ctx, async (taskIds) => (await import('../server/taskFolders')).removeTaskFolders(join(dataDir, 'notes'), taskIds))
+    registerDeletedTaskPurge(ctx, async (taskIds) =>
+      (await import('../server/taskFolders')).removeTaskFolders(join(dataDir, 'notes'), taskIds),
+    )
     // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)
-    // The `notes` context section. This closure is the whole body of what
-    // apps/node/src/wiring/contextSectionsWiring.ts held on this plugin's behalf (the three-scope walk,
-    // the empty-note skip and the workspace-note compatibility filter), moved to the plugin that owns
-    // the files. Core keeps the section's budget and compact formatter.
+    // The `notes` context section: the three-scope walk, the empty-note skip and the workspace-note
+    // compatibility filter, here because this plugin owns the files. Core keeps the section's budget and
+    // compact formatter.
     ctx.contextSections.register(
       notesSection(async (taskId) => {
         const workspaceId = await ctx.core.tasks.workspaceIdOrNull(taskId)
         const locations: { scope: NoteScope; location: NoteLocation }[] = [
           { scope: 'task', location: { scope: 'task', taskId } },
-          ...(workspaceId ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }] : []),
+          ...(workspaceId
+            ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }]
+            : []),
           { scope: 'global', location: { scope: 'global' } },
         ]
-        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] = []
+        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] =
+          []
         for (const { scope, location } of locations) {
           for (const summary of await store.list(location)) {
             if (!summary.included) continue
@@ -51,7 +56,14 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
             // Skip empty notes, such as an untouched scratchpad: they contribute only a `### title` of
             // noise.
             if (note && note.body.trim()) {
-              out.push({ slug: summary.slug, scope, title: `${note.title} (${note.kind})`, kind: note.kind, body: note.body, author: note.author })
+              out.push({
+                slug: summary.slug,
+                scope,
+                title: `${note.title} (${note.kind})`,
+                kind: note.kind,
+                body: note.body,
+                author: note.author,
+              })
             }
           }
         }

@@ -17,23 +17,38 @@ let workshop = ''
 let development: PluginDevelopment | undefined
 
 const board = {
-  sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/readiness/board',
+  sourceId: 'board',
+  name: 'Release readiness',
+  singular: 'Issue',
+  plural: 'Issues',
+  identityScope: 'issue',
+  handler: '/v1/p/readiness/board',
   inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } },
 }
 
 function packageDir(): string {
   const dir = mkdtempSync(join(workshop, 'pkg-'))
   mkdirSync(join(dir, 'dist'))
-  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id: 'readiness', name: 'Readiness', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    node: './dist/node.js', contributions: { dataSources: [board] },
-  }))
+  writeFileSync(
+    join(dir, 'acorn-plugin.json'),
+    JSON.stringify({
+      id: 'readiness',
+      name: 'Readiness',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      node: './dist/node.js',
+      contributions: { dataSources: [board] },
+    }),
+  )
   writeFileSync(join(dir, 'dist', 'node.js'), 'export default { name: "readiness", init() {} }\n')
   return dir
 }
 
-const start = (reload: (id: string) => Promise<PluginReloadResult>) => (development = createPluginDevelopment({ dataDir: root, reload }))
-const reloaded = (id: string): Promise<PluginReloadResult> => Promise.resolve({ id, version: '1.0.0', state: 'reloaded' })
+const start = (reload: (id: string) => Promise<PluginReloadResult>) =>
+  (development = createPluginDevelopment({ dataDir: root, reload }))
+const reloaded = (id: string): Promise<PluginReloadResult> =>
+  Promise.resolve({ id, version: '1.0.0', state: 'reloaded' })
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'acorn-dev-root-'))
@@ -69,9 +84,18 @@ describe('development mode', () => {
     const dev = start(reload)
     dev.set('readiness', true)
     writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "readiness", init() { /* 1 */ } }\n')
-    writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-      id: 'readiness', name: 'Readiness', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js', contributions: { dataSources: [board] },
-    }))
+    writeFileSync(
+      join(source, 'acorn-plugin.json'),
+      JSON.stringify({
+        id: 'readiness',
+        name: 'Readiness',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+        node: './dist/node.js',
+        contributions: { dataSources: [board] },
+      }),
+    )
     await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1), { timeout: 5_000 })
     await new Promise((resolve) => setTimeout(resolve, 900))
     expect(reload).toHaveBeenCalledTimes(1)
@@ -85,7 +109,7 @@ describe('development mode', () => {
     expect(reload).toHaveBeenCalledTimes(3)
   })
 
-  it('runs one reload at a time, from a save or the route, and records the route\'s too', async () => {
+  it("runs one reload at a time, from a save or the route, and records the route's too", async () => {
     await installPlugin(root, { path: packageDir() })
     let running = 0
     let most = 0
@@ -106,7 +130,8 @@ describe('development mode', () => {
     const dev = start(reloaded)
     dev.set('readiness', true)
     expect(inputGrantsStore(root).get('readiness')).toMatchObject({
-      development: true, sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } },
+      development: true,
+      sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } },
     })
     dev.set('readiness', false)
     expect(inputGrantsStore(root).get('readiness')).toBeUndefined()

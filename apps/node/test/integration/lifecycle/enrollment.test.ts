@@ -9,10 +9,9 @@ import { startControlPlaneStub, type ControlPlaneStub } from '@acorn/node-core/t
 // A real node, booted with the two environment variables set, enrolling with the fifty-line stub
 // (docs/node-enrollment.md).
 //
-// The phase's acceptance wording is "a node booted in a container", and the container is the Docker
-// image docs/future/bundle.md owns and which does not exist yet. A spawned standalone entry is the same
-// node with the same boot path, so this is that test with one fewer layer; when the image lands, it
-// should run this same pair of assertions from inside it.
+// A spawned standalone entry is the same node, with the same boot path, as the container image
+// docs/future/bundle.md plans. When the image lands, it should run this same pair of assertions from
+// inside it.
 //
 // Two cases, and the second is the one that protects every existing install: with both variables set
 // the node appears in the stub's inventory, and with neither it writes nothing about a control plane at
@@ -23,7 +22,10 @@ const READY_BUDGET_MS = 90_000
 
 type Handshake = { nodeId: string; endpoint: string; fingerprint: string; deviceToken: string }
 
-function startNode(dataDir: string, extra: Record<string, string> = {}): { child: ChildProcess; ready: Promise<Handshake> } {
+function startNode(
+  dataDir: string,
+  extra: Record<string, string> = {},
+): { child: ChildProcess; ready: Promise<Handshake> } {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/entries/standalone.ts'], {
     cwd: appRoot,
     env: {
@@ -75,7 +77,8 @@ const stop = (child: ChildProcess): Promise<void> =>
     child.kill('SIGTERM')
   })
 
-const identityOf = (dataDir: string) => JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')) as Record<string, unknown>
+const identityOf = (dataDir: string) =>
+  JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')) as Record<string, unknown>
 
 describe('a standalone node enrolling with a control plane', () => {
   let child: ChildProcess | null = null

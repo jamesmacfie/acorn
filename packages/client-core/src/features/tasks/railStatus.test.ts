@@ -3,10 +3,25 @@ import { railStatusMarkers, type RailStatusInputs } from './railStatus'
 import { resolveRailMarkers } from '../tabs/railMarkers'
 import type { TaskStatus } from '@acorn/protocol/task.ts'
 
-const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, branch: null, head: null, ...p })
+const status = (p: Partial<TaskStatus>): TaskStatus => ({
+  taskId: 't',
+  worktreePath: null,
+  dirty: false,
+  dirtyCount: 0,
+  missing: false,
+  branch: null,
+  head: null,
+  ...p,
+})
 
 const inputs = (over: Partial<RailStatusInputs> = {}): RailStatusInputs => ({
-  checks: null, unread: false, status: status({}), archiving: false, settingUp: false, pinned: false, ...over,
+  checks: null,
+  unread: false,
+  status: status({}),
+  archiving: false,
+  settingUp: false,
+  pinned: false,
+  ...over,
 })
 
 const placements = (over: Partial<RailStatusInputs>) =>
@@ -18,7 +33,9 @@ describe('railStatusMarkers', () => {
   })
 
   it('gives every marker a meaning and exactly one representation', () => {
-    const markers = railStatusMarkers(inputs({ checks: 'failure', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }))
+    const markers = railStatusMarkers(
+      inputs({ checks: 'failure', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }),
+    )
     expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned', 'checks'])
     expect(markers.every((m) => m.label && !!m.icon !== !!m.dotTone && m.placements.length)).toBe(true)
   })
@@ -37,16 +54,23 @@ describe('railStatusMarkers', () => {
   })
 
   it('crowds the pin out of the corner it shares with a missing worktree, without losing it', () => {
-    const resolved = resolveRailMarkers(railStatusMarkers(inputs({ pinned: true, unread: true, status: status({ missing: true }) })))
+    const resolved = resolveRailMarkers(
+      railStatusMarkers(inputs({ pinned: true, unread: true, status: status({ missing: true }) })),
+    )
     expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([
-      ['needs', 'top-end'], ['repair', 'bottom-end'], ['pinned', 'top-start'],
+      ['needs', 'top-end'],
+      ['repair', 'bottom-end'],
+      ['pinned', 'top-start'],
     ])
     expect(resolved.legend.map((item) => item.l)).toContain('Pinned to top')
   })
 
   it('gives teardown the slot under the glyph and spins it', () => {
     const resolved = resolveRailMarkers(railStatusMarkers(inputs({ archiving: true, unread: true })))
-    expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([['archiving', 'bottom-center'], ['needs', 'top-end']])
+    expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([
+      ['archiving', 'bottom-center'],
+      ['needs', 'top-end'],
+    ])
     expect(resolved.placed.find((m) => m.id === 'archiving')?.busy).toBe(true)
   })
 

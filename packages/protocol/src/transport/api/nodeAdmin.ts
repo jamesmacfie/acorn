@@ -65,16 +65,16 @@ export type AuditEntry = {
   details: Record<string, unknown> | null
 }
 // One plugin-declared verb, qualified `<pluginId>:<actionId>` by the node. Core's own verbs are a
-// closed union the client already knows; this is the half that arrives from parsed manifests, which is
-// what keeps the vocabulary enumerable now that a plugin can write to the trail.
+// closed union the client already knows; this is the half that arrives from parsed manifests, which
+// keeps the vocabulary enumerable when a plugin writes to the trail.
 export type AuditVocabularyEntry = { action: string; label: string }
 // `nextBefore` is a timestamp cursor, not an offset. Rows are only appended and pruned from the far
-// end, so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
+// end, so an offset would skip or repeat entries whenever the 90-day prune runs under a paging reader.
 //
 // `vocabulary` rides on every page rather than taking a route of its own: its only reader is the list
 // beside it, the two are always fetched together, and it is a few dozen short strings. Optional on the
-// wire because an older node's page will not carry it.
-export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary?: AuditVocabularyEntry[] }
+// wire, though every `acorn-1` Node sends it.
+export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary: AuditVocabularyEntry[] }
 export const coreAuditRoute = '/v1/core/audit'
 
 // `POST /v1/core/backup` (docs/data-layer/backup-and-retention.md § Backup and import). `destPath` is a path on the node's filesystem,

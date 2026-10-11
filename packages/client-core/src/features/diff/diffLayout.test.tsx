@@ -1,19 +1,30 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
+import {
+  _resetSurfaceHealth,
+  surfaceHealthSnapshot,
+  type SurfaceHealthEntry,
+} from '../../kit/lib/telemetry/surfaceHealth'
 import { largeDiffFiles, largeDiffSource } from '../../testkit/largeDiff'
 import { installDiffLayout, type DiffLayoutModel } from './layout.helper'
 import type { DiffSource } from './source'
 
-// The reader's place through dynamic-block resizes (./diffLayout.ts), against the real pane and the
-// generated fixture. The geometry is ./layout.helper.ts's model: a 600px viewport whose scrollTop
-// clamps, blocks as tall as the test says, and a ResizeObserver that reports when the test says the
-// browser would. Momentum, fractional pixels and paint are the real window's to check.
+// The reader's place through dynamic-block resizes, against the real pane and the generated fixture. The
+// geometry is ./layout.helper.ts's model: a 600px viewport whose scrollTop clamps, blocks as tall as the test
+// says, and a ResizeObserver that reports when the test says the browser would. Momentum, fractional pixels
+// and paint are the real window's to check.
 
 vi.mock('../../infra/highlight/worker', () => {
-  const tokenizeDocument = async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
-  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: false }) }
+  const tokenizeDocument = async (_path: string, code: string) =>
+    code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
+  return {
+    tokenizeDocument,
+    highlightDocument: async (path: string, code: string) => ({
+      lines: await tokenizeDocument(path, code),
+      timedOut: false,
+    }),
+  }
 })
 
 const { DiffPane } = await import('./DiffPane')
@@ -38,7 +49,14 @@ const mount = (source: DiffSource = largeDiffSource([...largeDiffFiles('small', 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <QueryClientProvider client={client}><DiffPane source={source} /></QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <DiffPane source={source} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 const settle = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -46,16 +64,23 @@ const scroller = () => host.querySelector<HTMLElement>('.diff')!
 const health = (): SurfaceHealthEntry => surfaceHealthSnapshot().surfaces.find((entry) => entry.kind === 'diff')!
 
 type Mounted = { element: HTMLElement; index: number; start: number }
-const mounted = (): Mounted[] => [...host.querySelectorAll<HTMLElement>('.diff-item')]
-  .map((element) => ({ element, index: Number(element.dataset.index), start: parseFloat(/translateY\(([-\d.]+)px\)/.exec(element.style.transform)?.[1] ?? '0') }))
-  .sort((a, b) => a.index - b.index)
+const mounted = (): Mounted[] =>
+  [...host.querySelectorAll<HTMLElement>('.diff-item')]
+    .map((element) => ({
+      element,
+      index: Number(element.dataset.index),
+      start: parseFloat(/translateY\(([-\d.]+)px\)/.exec(element.style.transform)?.[1] ?? '0'),
+    }))
+    .sort((a, b) => a.index - b.index)
 const itemOf = (element: Element) => mounted().find((item) => item.element.contains(element))!
 const itemAfter = (item: Mounted) => mounted().find((candidate) => candidate.index === item.index + 1)
 
 /** The item the viewport starts in, and how far down the viewport its top sits. */
 const anchor = () => {
   const top = scroller().scrollTop
-  const item = mounted().filter((candidate) => candidate.start <= top).at(-1)!
+  const item = mounted()
+    .filter((candidate) => candidate.start <= top)
+    .at(-1)!
   return { index: item.index, edge: item.start - top }
 }
 
@@ -90,11 +115,14 @@ async function scan<T>(pick: () => T | undefined): Promise<T> {
 }
 
 /** A mounted thread whose item has a mounted item after it, no further than `span` on. */
-const findThread = (span = Infinity) => scan(() => [...host.querySelectorAll<HTMLElement>('[data-block^="t:"]')].find((element) => {
-  const item = itemOf(element)
-  const next = itemAfter(item)
-  return item.start > 1_000 && next && next.start - item.start < span
-}))
+const findThread = (span = Infinity) =>
+  scan(() =>
+    [...host.querySelectorAll<HTMLElement>('[data-block^="t:"]')].find((element) => {
+      const item = itemOf(element)
+      const next = itemAfter(item)
+      return item.start > 1_000 && next && next.start - item.start < span
+    }),
+  )
 
 /** Put the viewport 200px below the end of the thread's item, so the thread is wholly above it. */
 async function threadAbove(): Promise<{ thread: HTMLElement; id: string }> {
@@ -139,14 +167,25 @@ describe('the diff reading place', () => {
   }, 30_000)
 
   it('opening a composer moves what follows once, in one commit', async () => {
-    const source = { ...largeDiffSource([...largeDiffFiles('small', 1)]), canComment: () => true, addComment: async () => {} }
+    const source = {
+      ...largeDiffSource([...largeDiffFiles('small', 1)]),
+      canComment: () => true,
+      addComment: async () => {},
+    }
     mount(source)
     // A line with nothing under it yet, in an item that starts on screen, with an item after it.
-    const button = await scan(() => [...host.querySelectorAll<HTMLElement>('.diff-item .diff-row .diff-add-btn')].find((candidate) => {
-      const item = itemOf(candidate)
-      const top = scroller().scrollTop
-      return !candidate.closest('.diff-row')!.querySelector('.diff-line-extra') && item.start >= top && item.start < top + 400 && itemAfter(item)
-    }))
+    const button = await scan(() =>
+      [...host.querySelectorAll<HTMLElement>('.diff-item .diff-row .diff-add-btn')].find((candidate) => {
+        const item = itemOf(candidate)
+        const top = scroller().scrollTop
+        return (
+          !candidate.closest('.diff-row')!.querySelector('.diff-line-extra') &&
+          item.start >= top &&
+          item.start < top + 400 &&
+          itemAfter(item)
+        )
+      }),
+    )
     const next = itemAfter(itemOf(button))!
     const nextStart = next.start
     const commits = health().measurement.commits
@@ -155,7 +194,9 @@ describe('the diff reading place', () => {
     watch.observe(next.element, { attributes: true, attributeFilter: ['style'] })
 
     button.click()
-    await vi.waitFor(() => expect(host.querySelector('.diff-composer')?.closest('[data-block]')).not.toBeNull(), { timeout: 5_000 })
+    await vi.waitFor(() => expect(host.querySelector('.diff-composer')?.closest('[data-block]')).not.toBeNull(), {
+      timeout: 5_000,
+    })
     // Wait for the commit itself, since a loaded CI runner can take longer than one settle to make
     // it. The settle after it gives a second commit time to show up.
     await vi.waitFor(() => expect(health().measurement.commits).toBeGreaterThan(commits), { timeout: 5_000 })
@@ -206,15 +247,21 @@ describe('the diff reading place', () => {
     await vi.waitFor(() => expect(host.querySelector('.diff-item .diff-row')).not.toBeNull(), { timeout: 5_000 })
     // Somewhere inside a file, below its header.
     await place(2_500)
-    const inside = mounted().filter((item) => item.start <= 2_500).at(-1)!
+    const inside = mounted()
+      .filter((item) => item.start <= 2_500)
+      .at(-1)!
     expect(inside.element.dataset.kind).not.toBe('file')
-    await vi.waitFor(() => expect(host.querySelector('.diff-sticky-file .diff-file-collapse')).not.toBeNull(), { timeout: 5_000 })
+    await vi.waitFor(() => expect(host.querySelector('.diff-sticky-file .diff-file-collapse')).not.toBeNull(), {
+      timeout: 5_000,
+    })
     const path = host.querySelector('.diff-sticky-file .diff-file-path')!.textContent!
 
     host.querySelector<HTMLElement>('.diff-sticky-file .diff-file-collapse')!.click()
     await settle()
 
-    const header = mounted().find((item) => item.element.dataset.kind === 'file' && item.element.textContent?.includes(path))!
+    const header = mounted().find(
+      (item) => item.element.dataset.kind === 'file' && item.element.textContent?.includes(path),
+    )!
     expect(header.start).toBeCloseTo(scroller().scrollTop, 0)
     expect(health().correction.substituted).toBeGreaterThan(0)
   }, 30_000)

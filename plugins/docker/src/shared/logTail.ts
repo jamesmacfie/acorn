@@ -31,18 +31,34 @@ export class LogTail {
       cursor = Math.min(BLOCK_CHARS - last.length, text.length)
       this.chunks[this.chunks.length - 1] = last + text.slice(0, cursor).split('').join('')
     }
-    for (; cursor < text.length; cursor += BLOCK_CHARS) this.chunks.push(text.slice(cursor, cursor + BLOCK_CHARS).split('').join(''))
+    for (; cursor < text.length; cursor += BLOCK_CHARS)
+      this.chunks.push(
+        text
+          .slice(cursor, cursor + BLOCK_CHARS)
+          .split('')
+          .join(''),
+      )
     this.chars += text.length
     let excess = this.chars - MAX_CHARS
     while (excess > 0) {
       const first = this.chunks[0]
       const remaining = first.length - this.headOffset
-      if (remaining <= excess) { this.chunks.shift(); this.headOffset = 0; excess -= remaining; this.chars -= remaining }
-      else { this.headOffset += excess; this.chars -= excess; excess = 0 }
+      if (remaining <= excess) {
+        this.chunks.shift()
+        this.headOffset = 0
+        excess -= remaining
+        this.chars -= remaining
+      } else {
+        this.headOffset += excess
+        this.chars -= excess
+        excess = 0
+      }
     }
   }
 
   text(): string {
-    return this.projection ??= this.chunks.map((chunk, index) => index === 0 ? chunk.slice(this.headOffset) : chunk).join('')
+    return (this.projection ??= this.chunks
+      .map((chunk, index) => (index === 0 ? chunk.slice(this.headOffset) : chunk))
+      .join(''))
   }
 }

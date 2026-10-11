@@ -1,4 +1,4 @@
-// The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
+// The terminal plugin's agent tools: the run_* tools, as the `tools` contribution point
 // (docs/plugins/data-ownership.md § Tool projection).
 //
 // They live here, beside the RuntimeService this plugin's init builds, because that service closes
@@ -10,7 +10,10 @@ import { z } from 'zod'
 import { type AgentToolContribution, isRepoConfigTrustError, type ToolContext, ToolError } from '@acorn/plugin-api/node'
 import type { TerminalRunTargets } from '../contract/runTargets'
 
-export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNotice: (taskId: string) => void = () => {}): AgentToolContribution[] {
+export function runAgentTools(
+  runTargets: TerminalRunTargets,
+  repoConfigTrustNotice: (taskId: string) => void = () => {},
+): AgentToolContribution[] {
   const empty = z.object({})
 
   // Starting a run target executes the repo's committed `.acorn/config.toml`, so it sits behind the
@@ -34,7 +37,13 @@ export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNot
     const t = await runTargets.targets(ctx.taskId)
     return 'targets' in t && t.targets.length > 0
   }
-  const gated = { scope: 'task', risk: 'execute', exposeToRenderer: true, when: hasRunTargets, whenDescription: 'Only available in tasks with run targets.' } as const
+  const gated = {
+    scope: 'task',
+    risk: 'execute',
+    exposeToRenderer: true,
+    when: hasRunTargets,
+    whenDescription: 'Only available in tasks with run targets.',
+  } as const
 
   return [
     {

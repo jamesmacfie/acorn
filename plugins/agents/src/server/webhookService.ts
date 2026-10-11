@@ -4,14 +4,19 @@ import { request as requestHttp } from 'node:http'
 import { request as requestHttps } from 'node:https'
 import { isIP } from 'node:net'
 import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
-import { type CoreServices, type PluginDatabase, type SecretService, SecretUnavailableError } from '@acorn/plugin-api/node'
+import {
+  type CoreServices,
+  type PluginDatabase,
+  type SecretService,
+  SecretUnavailableError,
+} from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type { AgentWsFrame } from '../contract/wire.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
 
 // The one reduction of the session firehose to human-scale edges. Webhooks deliver these two kinds
-// externally, and `agent-session:changed` (@acorn/protocol/nodeEvents.ts) carries the same two
+// externally, and `agent-session:changed` (@acorn/protocol's node events) carries the same two
 // inward, so there is exactly one vocabulary for "the agent did something a person cares about".
 export const webhookEventKind = (frame: AgentWsFrame): AgentWebhookEventType | null => {
   if (frame.channel !== 'agent:event') return null
@@ -74,9 +79,7 @@ const webhookFromRow = (row: typeof schema.agentWebhooks.$inferSelect): AgentWeb
   updatedAt: row.updatedAt,
 })
 
-const deliveryFromRow = (
-  row: typeof schema.agentWebhookDeliveries.$inferSelect,
-): AgentWebhookDelivery => ({
+const deliveryFromRow = (row: typeof schema.agentWebhookDeliveries.$inferSelect): AgentWebhookDelivery => ({
   id: row.id,
   webhookId: row.webhookId,
   eventId: row.eventId,
@@ -94,29 +97,38 @@ function isBlockedAddress(address: string): boolean {
   if (address === '127.0.0.1' || address === '::1') return false
   if (isIP(address) === 4) {
     const [a, b] = address.split('.').map(Number)
-    return a === 0 || a === 10 || a === 127 || a >= 224
-      || (a === 100 && b! >= 64 && b! <= 127)
-      || (a === 169 && b === 254)
-      || (a === 172 && b! >= 16 && b! <= 31)
-      || (a === 192 && b === 168)
-      || (a === 198 && (b === 18 || b === 19))
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      a >= 224 ||
+      (a === 100 && b! >= 64 && b! <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b! >= 16 && b! <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19))
+    )
   }
   const normalized = address.toLowerCase().split('%')[0]!
-  return normalized.startsWith('fc') || normalized.startsWith('fd')
-    || normalized.startsWith('fe8') || normalized.startsWith('fe9')
-    || normalized.startsWith('fea') || normalized.startsWith('feb')
-    || normalized.startsWith('ff')
-    || normalized.startsWith('::ffff:')
-    || normalized.startsWith('2001:db8:')
-    || normalized.startsWith('2002:')
-    || normalized === '::'
+  return (
+    normalized.startsWith('fc') ||
+    normalized.startsWith('fd') ||
+    normalized.startsWith('fe8') ||
+    normalized.startsWith('fe9') ||
+    normalized.startsWith('fea') ||
+    normalized.startsWith('feb') ||
+    normalized.startsWith('ff') ||
+    normalized.startsWith('::ffff:') ||
+    normalized.startsWith('2001:db8:') ||
+    normalized.startsWith('2002:') ||
+    normalized === '::'
+  )
 }
 
 const normalizedHostname = (hostname: string): string =>
   hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 
-const isLoopbackAddress = (address: string): boolean =>
-  address === '127.0.0.1' || address === '::1'
+const isLoopbackAddress = (address: string): boolean => address === '127.0.0.1' || address === '::1'
 
 async function resolvedWebhookTarget(value: string): Promise<ResolvedWebhookTarget> {
   const url = new URL(value)
@@ -150,24 +162,27 @@ function postWebhook(
 ): Promise<number> {
   return new Promise((resolve, reject) => {
     const hostname = normalizedHostname(target.url.hostname)
-    const request = (target.url.protocol === 'https:' ? requestHttps : requestHttp)({
-      protocol: target.url.protocol,
-      hostname: target.address,
-      family: target.family,
-      port: target.url.port || undefined,
-      path: `${target.url.pathname}${target.url.search}`,
-      method: 'POST',
-      signal,
-      ...(target.url.protocol === 'https:' && isIP(hostname) === 0 ? { servername: hostname } : {}),
-      headers: {
-        ...headers,
-        host: target.url.host,
-        'content-length': String(Buffer.byteLength(body)),
+    const request = (target.url.protocol === 'https:' ? requestHttps : requestHttp)(
+      {
+        protocol: target.url.protocol,
+        hostname: target.address,
+        family: target.family,
+        port: target.url.port || undefined,
+        path: `${target.url.pathname}${target.url.search}`,
+        method: 'POST',
+        signal,
+        ...(target.url.protocol === 'https:' && isIP(hostname) === 0 ? { servername: hostname } : {}),
+        headers: {
+          ...headers,
+          host: target.url.host,
+          'content-length': String(Buffer.byteLength(body)),
+        },
       },
-    }, (response) => {
-      response.resume()
-      resolve(response.statusCode ?? 0)
-    })
+      (response) => {
+        response.resume()
+        resolve(response.statusCode ?? 0)
+      },
+    )
     request.on('error', reject)
     request.end(body)
   })
@@ -270,13 +285,12 @@ export class AgentWebhookService {
     const webhooks = await this.#db
       .select()
       .from(schema.agentWebhooks)
-      .where(and(
-        eq(schema.agentWebhooks.enabled, true),
-        or(
-          eq(schema.agentWebhooks.taskId, session.taskId),
-          isNull(schema.agentWebhooks.taskId),
+      .where(
+        and(
+          eq(schema.agentWebhooks.enabled, true),
+          or(eq(schema.agentWebhooks.taskId, session.taskId), isNull(schema.agentWebhooks.taskId)),
         ),
-      ))
+      )
     const payload: WebhookPayload = {
       version: 1,
       event: eventType,
@@ -291,16 +305,19 @@ export class AgentWebhookService {
     for (const webhook of webhooks) {
       const events = JSON.parse(webhook.eventsJson) as AgentWebhookEventType[]
       if (!events.includes(eventType)) continue
-      await this.#db.insert(schema.agentWebhookDeliveries).values({
-        id: randomUUID(),
-        webhookId: webhook.id,
-        eventId: frame.event.id,
-        eventType,
-        payloadJson: JSON.stringify(payload),
-        status: 'pending',
-        nextAttemptAt: timestamp,
-        createdAt: timestamp,
-      }).onConflictDoNothing()
+      await this.#db
+        .insert(schema.agentWebhookDeliveries)
+        .values({
+          id: randomUUID(),
+          webhookId: webhook.id,
+          eventId: frame.event.id,
+          eventType,
+          payloadJson: JSON.stringify(payload),
+          status: 'pending',
+          nextAttemptAt: timestamp,
+          createdAt: timestamp,
+        })
+        .onConflictDoNothing()
     }
     void this.pump()
   }
@@ -326,10 +343,12 @@ export class AgentWebhookService {
         const [delivery] = await this.#db
           .select()
           .from(schema.agentWebhookDeliveries)
-          .where(and(
-            inArray(schema.agentWebhookDeliveries.status, ['pending', 'retrying']),
-            lte(schema.agentWebhookDeliveries.nextAttemptAt, Date.now()),
-          ))
+          .where(
+            and(
+              inArray(schema.agentWebhookDeliveries.status, ['pending', 'retrying']),
+              lte(schema.agentWebhookDeliveries.nextAttemptAt, Date.now()),
+            ),
+          )
           .orderBy(asc(schema.agentWebhookDeliveries.nextAttemptAt))
           .limit(1)
         if (!delivery) break
@@ -356,10 +375,12 @@ export class AgentWebhookService {
     }
     // reveal(), because the signature is computed below over the delivery body, outside any scope this
     // could bracket. SecretUnavailable reads as the same null used for an unavailable credential.
-    const secret = await this.#secrets.reveal(webhook.secretEnc, 'agent webhook: sign delivery').catch((error: unknown) => {
-      if (error instanceof SecretUnavailableError) return null
-      throw error
-    })
+    const secret = await this.#secrets
+      .reveal(webhook.secretEnc, 'agent webhook: sign delivery')
+      .catch((error: unknown) => {
+        if (error instanceof SecretUnavailableError) return null
+        throw error
+      })
     if (!secret) {
       await this.#failAttempt(delivery, null, 'Webhook signing secret cannot be decrypted.', false)
       return
@@ -371,13 +392,18 @@ export class AgentWebhookService {
       // Resolve and validate immediately before delivery, then connect to that exact address. This
       // closes the DNS-rebinding window between an SSRF check and the outbound socket.
       const target = await resolvedWebhookTarget(webhook.url)
-      const responseStatus = await postWebhook(target, delivery.payloadJson, {
-        'content-type': 'application/json',
-        'user-agent': 'Acorn-Agent-Webhook/1',
-        'x-acorn-event': delivery.eventType,
-        'x-acorn-delivery': delivery.id,
-        'x-acorn-signature-256': `sha256=${signature}`,
-      }, controller.signal)
+      const responseStatus = await postWebhook(
+        target,
+        delivery.payloadJson,
+        {
+          'content-type': 'application/json',
+          'user-agent': 'Acorn-Agent-Webhook/1',
+          'x-acorn-event': delivery.eventType,
+          'x-acorn-delivery': delivery.id,
+          'x-acorn-signature-256': `sha256=${signature}`,
+        },
+        controller.signal,
+      )
       if (responseStatus >= 200 && responseStatus < 300) {
         await this.#db
           .update(schema.agentWebhookDeliveries)

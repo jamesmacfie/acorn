@@ -22,7 +22,17 @@ import {
 import { readJson, sendJson, writeJson } from '../../infra/node/apiClient'
 import { formatRelativeTime } from '../../kit/lib/rendering/formatRelativeTime'
 import { nodes } from '../../infra/node/fleet'
-import { Alert, Badge, Button, Checkbox, EmptyState, Input, Row, Select, StatusDot } from '../../kit/components/primitives'
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  Input,
+  Row,
+  Select,
+  StatusDot,
+} from '../../kit/components/primitives'
 import { Text } from '../../kit/components/content/Text'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
@@ -42,7 +52,13 @@ import './settings.css'
 const OWNER_TONE = { core: 'neutral', plugin: 'accent', user: 'ok' } as const
 /** Who declared a schedule, as a person reads it: acorn itself, a plugin by its name, or you. */
 const ownerLabel = (row: ScheduleRow): string =>
-  row.owner === 'plugin' && row.pluginId ? pluginLabel(row.pluginId) : row.owner === 'core' ? 'acorn' : row.owner === 'user' ? 'You' : row.owner
+  row.owner === 'plugin' && row.pluginId
+    ? pluginLabel(row.pluginId)
+    : row.owner === 'core'
+      ? 'acorn'
+      : row.owner === 'user'
+        ? 'You'
+        : row.owner
 
 /** What the arming strip says about each tier, in the register a person would use. The vocabulary is
  *  `ToolRisk` (docs/schedules/user-schedules.md § Settings), the same three the agent-tool permission surface
@@ -61,7 +77,8 @@ const CADENCE_CHOICES = [
   { id: 'weekly', label: 'Every Monday at 09:00', cadence: { weekly: { day: 1, at: '09:00' } } satisfies Cadence },
 ] as const
 const DEFAULT_CADENCE: string = CADENCE_CHOICES[0].id
-const cadenceFor = (id: string): Cadence => (CADENCE_CHOICES.find((choice) => choice.id === id) ?? CADENCE_CHOICES[0]).cadence
+const cadenceFor = (id: string): Cadence =>
+  (CADENCE_CHOICES.find((choice) => choice.id === id) ?? CADENCE_CHOICES[0]).cadence
 
 const STATUS_TONE: Record<ScheduleStatus, 'ok' | 'danger' | 'warn' | 'muted'> = {
   ok: 'ok',
@@ -138,7 +155,12 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
   const pause = createSettingSave()
   const setPaused = (next: boolean) =>
     pause.run(async () => {
-      await writeJson(schedulesRoute, { method: 'PATCH', body: JSON.stringify({ paused: next }), headers: { 'content-type': 'application/json' }, nodeId: nodeId() ?? undefined })
+      await writeJson(schedulesRoute, {
+        method: 'PATCH',
+        body: JSON.stringify({ paused: next }),
+        headers: { 'content-type': 'application/json' },
+        nodeId: nodeId() ?? undefined,
+      })
       await invalidate()
     })
 
@@ -147,7 +169,7 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
   const toggles = new Map<string, SettingSave>()
   const toggleFor = (key: string): SettingSave => {
     let save = toggles.get(key)
-    if (!save) toggles.set(key, save = createSettingSave())
+    if (!save) toggles.set(key, (save = createSettingSave()))
     return save
   }
   const setEnabled = (row: ScheduleRow, enabled: boolean) =>
@@ -165,7 +187,7 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
     act(row.key, () => sendJson(scheduleRunNowRoute(row.key), { method: 'POST', nodeId: nodeId() ?? undefined }))
 
   // Through the shell's one confirmation, which says the run history goes too: the node deletes it with
-  // the schedule (node-core/server/schedules/scheduler.ts § remove).
+  // the schedule (the scheduler's `remove`).
   const remove = async (row: ScheduleRow) => {
     const confirmed = await confirmAction({
       title: `Delete ${row.name}`,
@@ -174,7 +196,8 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
       stays: 'Anything its runs already made stays where it is. Every other schedule keeps running.',
       danger: true,
     })
-    if (confirmed) await act(row.key, () => sendJson(scheduleRoute(row.key), { method: 'DELETE', nodeId: nodeId() ?? undefined }))
+    if (confirmed)
+      await act(row.key, () => sendJson(scheduleRoute(row.key), { method: 'DELETE', nodeId: nodeId() ?? undefined }))
   }
 
   // Re-take consent after a tier rise. No tier is sent: the node re-stamps from its own registry, so
@@ -184,9 +207,13 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
 
   return (
     <>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
       {/* Said, rather than drawn as an empty list and a pause switch at Off, which would both be guesses. */}
-      <Show when={schedules.isError}><Alert>{`Could not read this node's schedules. ${schedules.error?.message ?? ''}`.trim()}</Alert></Show>
+      <Show when={schedules.isError}>
+        <Alert>{`Could not read this node's schedules. ${schedules.error?.message ?? ''}`.trim()}</Alert>
+      </Show>
 
       <SettingsSection
         id="schedules"
@@ -210,7 +237,9 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
         </SettingRow>
 
         <Show when={schedules.isSuccess && rows().length === 0}>
-          <EmptyState align="start" size="sm">This node has no schedules.</EmptyState>
+          <EmptyState align="start" size="sm">
+            This node has no schedules.
+          </EmptyState>
         </Show>
 
         <For each={rows()}>
@@ -220,17 +249,30 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
               <>
                 <Row
                   variant="stacked"
-                  leading={<StatusDot tone={row.enabled && row.registered ? STATUS_TONE[row.lastStatus ?? 'ok'] : 'muted'} label={row.lastStatus ?? 'never run'} />}
+                  leading={
+                    <StatusDot
+                      tone={row.enabled && row.registered ? STATUS_TONE[row.lastStatus ?? 'ok'] : 'muted'}
+                      label={row.lastStatus ?? 'never run'}
+                    />
+                  }
                   trailing={
                     <>
-                      <Button size="sm" disabled={busy() === row.key || !row.registered} onPress={() => void runNow(row)}>
+                      <Button
+                        size="sm"
+                        disabled={busy() === row.key || !row.registered}
+                        onPress={() => void runNow(row)}
+                      >
                         Run now
                       </Button>
                       <Checkbox
                         switch
                         size="sm"
                         ariaLabel={`Run ${row.name} on its schedule`}
-                        title={row.enabled ? 'On. Turn off to pause this schedule.' : 'Paused. Turn on to resume this schedule.'}
+                        title={
+                          row.enabled
+                            ? 'On. Turn off to pause this schedule.'
+                            : 'Paused. Turn on to resume this schedule.'
+                        }
                         checked={row.enabled}
                         disabled={busy() === row.key}
                         onChange={(checked) => setEnabled(row, checked)}
@@ -245,23 +287,49 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
                 >
                   <span class="settings-label">
                     {row.name}{' '}
-                    <Badge size="xs" tone={OWNER_TONE[row.owner]}>{ownerLabel(row)}</Badge>
+                    <Badge size="xs" tone={OWNER_TONE[row.owner]}>
+                      {ownerLabel(row)}
+                    </Badge>
                     {/* The consent taken at creation stays visible for the schedule's whole life. */}
-                    <Show when={row.risk}>{(risk) => <> <Badge size="xs" tone="warn">{risk()}</Badge></>}</Show>
+                    <Show when={row.risk}>
+                      {(risk) => (
+                        <>
+                          {' '}
+                          <Badge size="xs" tone="warn">
+                            {risk()}
+                          </Badge>
+                        </>
+                      )}
+                    </Show>
                   </span>
                   <Inline gap="row" wrap>
                     <Text emphasis="muted" wrap>
                       {describeCadence(row.cadence)}
-                      <Show when={row.declaredCadence}>{(declared) => <> · default {describeCadence(declared())}</>}</Show>
+                      <Show when={row.declaredCadence}>
+                        {(declared) => <> · default {describeCadence(declared())}</>}
+                      </Show>
                       {' · '}
                       {row.enabled ? `next ${formatWhen(row.nextRunAt, now)}` : 'paused'}
                       <Show when={row.lastRunAt}>{(last) => <> · last run {formatRelativeTime(last(), now)}</>}</Show>
                     </Text>
-                    <Button variant="ghost" size="xs" expanded={expanded() === row.key} onPress={() => setExpanded(expanded() === row.key ? null : row.key)}>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      expanded={expanded() === row.key}
+                      onPress={() => setExpanded(expanded() === row.key ? null : row.key)}
+                    >
                       {expanded() === row.key ? 'Hide history' : 'History'}
                     </Button>
                   </Inline>
-                  <Show when={toggleFor(row.key).error()}>{(message) => <span role="alert"><Text tone="danger" wrap>{message()}</Text></span>}</Show>
+                  <Show when={toggleFor(row.key).error()}>
+                    {(message) => (
+                      <span role="alert">
+                        <Text tone="danger" wrap>
+                          {message()}
+                        </Text>
+                      </span>
+                    )}
+                  </Show>
                   {/* Honest about the two ways a row can be listed but unrunnable, because both look like
                       "it just stopped working" from the outside. */}
                   <Show when={!row.registered}>
@@ -271,11 +339,21 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
                         : "Its plugin is off or removed, so it can't run. Its settings and history are kept."}
                     </Text>
                   </Show>
-                  <Show when={row.lastError}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+                  <Show when={row.lastError}>
+                    {(message) => (
+                      <Text tone="danger" wrap>
+                        {message()}
+                      </Text>
+                    )}
+                  </Show>
                   {/* The re-arm. A schedule whose target now declares MORE than the tier stamped on it
                       fails closed on every run, and stays that way until someone agrees to the new one —
                       which is the same act as creating it, so it gets the same host-drawn strip. */}
-                  <Show when={row.owner === 'user' && row.lastStatus === 'skipped' && row.lastError?.startsWith('risk changed')}>
+                  <Show
+                    when={
+                      row.owner === 'user' && row.lastStatus === 'skipped' && row.lastError?.startsWith('risk changed')
+                    }
+                  >
                     <Row
                       variant="stacked"
                       trailing={
@@ -285,18 +363,28 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
                       }
                     >
                       <Text emphasis="muted" wrap>
-                        You agreed to <Badge size="xs" tone="warn">{row.risk}</Badge> when you made this. It now
-                        asks for more, so nothing has run since.
+                        You agreed to{' '}
+                        <Badge size="xs" tone="warn">
+                          {row.risk}
+                        </Badge>{' '}
+                        when you made this. It now asks for more, so nothing has run since.
                       </Text>
                     </Row>
                   </Show>
                   <Show when={row.backoffUntil !== undefined && row.backoffUntil > now ? row.backoffUntil : undefined}>
-                    {(until) => <Text emphasis="muted" wrap>Failed several times in a row. Trying again {formatWhen(until(), now)}.</Text>}
+                    {(until) => (
+                      <Text emphasis="muted" wrap>
+                        Failed several times in a row. Trying again {formatWhen(until(), now)}.
+                      </Text>
+                    )}
                   </Show>
                 </Row>
                 <Show when={expanded() === row.key}>
                   <Stack gap="inline">
-                    <Show when={(runs.data ?? []).length > 0} fallback={<Text emphasis="muted">No runs recorded.</Text>}>
+                    <Show
+                      when={(runs.data ?? []).length > 0}
+                      fallback={<Text emphasis="muted">No runs recorded.</Text>}
+                    >
                       <For each={runs.data ?? []}>
                         {(run) => (
                           <Text emphasis="muted" wrap>
@@ -319,7 +407,13 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
             fails, and saying "nothing here can be scheduled" is the more useful sentence. */}
         <Show
           when={targets.isSuccess && options().length > 0}
-          fallback={<Show when={targets.isSuccess}><EmptyState align="start" size="sm">Nothing on this node can be scheduled.</EmptyState></Show>}
+          fallback={
+            <Show when={targets.isSuccess}>
+              <EmptyState align="start" size="sm">
+                Nothing on this node can be scheduled.
+              </EmptyState>
+            </Show>
+          }
         >
           <NewScheduleForm nodeId={nodeId()} options={options()} onCreated={invalidate} />
         </Show>
@@ -331,15 +425,21 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
 // The creation form. Its fields only make sense together, so it is the one part of this page that
 // does not save as it changes: it has Accept and schedule, which is its Save, and Cancel, and it tells
 // settings when it holds a choice nobody has scheduled yet.
-function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTargetOption[]; onCreated: () => Promise<unknown> }) {
+function NewScheduleForm(props: {
+  nodeId: string | null
+  options: ScheduleTargetOption[]
+  onCreated: () => Promise<unknown>
+}) {
   const [chosen, setChosen] = createSignal('')
   const [newName, setNewName] = createSignal('')
   const [cadenceId, setCadenceId] = createSignal(DEFAULT_CADENCE)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const optionKey = (option: ScheduleTargetOption) => option.kind === 'dataset-capture' ? `dataset:${option.datasetId}` : `${option.pluginId}:${option.actionId}`
+  const optionKey = (option: ScheduleTargetOption) =>
+    option.kind === 'dataset-capture' ? `dataset:${option.datasetId}` : `${option.pluginId}:${option.actionId}`
   const selected = () => props.options.find((option) => optionKey(option) === chosen())
-  const providerLabel = (option: ScheduleTargetOption) => option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)
+  const providerLabel = (option: ScheduleTargetOption) =>
+    option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)
 
   const dirty = () => chosen() !== '' || newName() !== '' || cadenceId() !== DEFAULT_CADENCE
   useUnsavedChanges(dirty)
@@ -365,7 +465,10 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
         body: JSON.stringify({
           name: newName().trim() || option.name,
           kind: option.kind,
-          target: option.kind === 'dataset-capture' ? { datasetId: option.datasetId } : { pluginId: option.pluginId, actionId: option.actionId },
+          target:
+            option.kind === 'dataset-capture'
+              ? { datasetId: option.datasetId }
+              : { pluginId: option.pluginId, actionId: option.actionId },
           cadence: cadenceFor(cadenceId()),
         }),
         nodeId: props.nodeId ?? undefined,
@@ -387,7 +490,10 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
           value={chosen()}
           options={[
             { value: '', label: 'Pick something to run…' },
-            ...props.options.map((option) => ({ value: optionKey(option), label: `${option.name} · ${option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)}` })),
+            ...props.options.map((option) => ({
+              value: optionKey(option),
+              label: `${option.name} · ${option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)}`,
+            })),
           ]}
           onChange={(value) => setChosen(value)}
         />
@@ -403,16 +509,28 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
               Once you schedule it, it runs on its own and never asks again.
             </Alert>
             <SettingRow label="Name">
-              <Input label="Name" value={newName()} placeholder={option().name} onInput={(value) => setNewName(value)} />
+              <Input
+                label="Name"
+                value={newName()}
+                placeholder={option().name}
+                onInput={(value) => setNewName(value)}
+              />
             </SettingRow>
             <SettingRow label="When">
-              <Select label="When" value={cadenceId()} onChange={(value) => setCadenceId(value)} options={[...CADENCE_CHOICES.map((choice) => ({ value: choice.id, label: choice.label }))]} />
+              <Select
+                label="When"
+                value={cadenceId()}
+                onChange={(value) => setCadenceId(value)}
+                options={[...CADENCE_CHOICES.map((choice) => ({ value: choice.id, label: choice.label }))]}
+              />
             </SettingRow>
           </>
         )}
       </Show>
 
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
 
       {/* Shown whenever something has been changed, not only once an action is picked, so a name typed
           before the action was cleared can still be thrown away. */}
@@ -433,7 +551,10 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
           <Show when={selected()} fallback={<Text emphasis="muted">Pick an action to schedule.</Text>}>
             {(option) => (
               <Text emphasis="muted" wrap>
-                Runs {describeCadence(cadenceFor(cadenceId()))}. Access: <Badge size="xs" tone="warn">{option().risk}</Badge>
+                Runs {describeCadence(cadenceFor(cadenceId()))}. Access:{' '}
+                <Badge size="xs" tone="warn">
+                  {option().risk}
+                </Badge>
               </Text>
             )}
           </Show>

@@ -6,8 +6,8 @@ import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../
 import { createArmedConfirm } from '../../lib/controls/confirm'
 import Icon from '../content/Icon'
 
-// A dropdown menu: Popover plus menu semantics. See docs/ui-design/interaction.md § Menus and right-click for
-// why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
+// A dropdown menu: Popover plus menu semantics. See docs/ui-design/interaction.md § Menus and right-click
+// for how ContextMenu below reuses the same surface.
 
 export type MenuContext = { close: () => void; register: (element: HTMLElement | undefined) => void }
 
@@ -17,21 +17,20 @@ export type MenuContext = { close: () => void; register: (element: HTMLElement |
 const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
   (wrapper?.firstElementChild as HTMLElement | null) ?? wrapper
 
-
 /** The menu itself: portal, `role="menu"`, roving focus, and first-item focus on open. Mounted only
  *  while the popover is open, which keeps the item list from growing a copy of every item on each
  *  re-open.
  *
- *  A DOM collection (../keys/collection.ts): the items are the caller's JSX, so the host cannot key
+ *  A DOM collection (`createDomCollection`): the items are the caller's JSX, so the host cannot key
  *  them, but it can read them out of the DOM when a key arrives. The `register` callback stays on the
- *  context because `Menu.Item` is a public shape, and it now records nothing. */
+ *  context because `Menu.Item` is a public shape, and it records nothing. */
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
   children: (context: MenuContext) => JSX.Element
 }) {
-  // See docs/ui-design/interaction.md § Menus and right-click for why this focuses the first item on mount, and
-  // ../keys/trap.ts for the restore that goes with a trap.
+  // See docs/ui-design/interaction.md § Menus and right-click for why this focuses the first item on
+  // mount, and `restoreFocusOnCleanup` for the restore that goes with a trap.
   const collection = createDomCollection({ selector: '.ui-menu-item', focusOnMount: true })
   restoreFocusOnCleanup()
 
@@ -82,13 +81,20 @@ export function Menu(props: {
 
   return (
     <>
-      <span class="ui-popover-anchor" ref={anchorRef}
-        onPointerDown={() => { if (!popover.open()) props.onBeforeOpen?.() }}
-        onKeyDown={(event) => { if (!popover.open() && (event.key === 'Enter' || event.key === ' ')) props.onBeforeOpen?.() }}>
+      <span
+        class="ui-popover-anchor"
+        ref={anchorRef}
+        onPointerDown={() => {
+          if (!popover.open()) props.onBeforeOpen?.()
+        }}
+        onKeyDown={(event) => {
+          if (!popover.open() && (event.key === 'Enter' || event.key === ' ')) props.onBeforeOpen?.()
+        }}
+      >
         {props.trigger({ open: popover.open, toggle: popover.toggle })}
       </span>
       <Show when={popover.open()}>
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel}>
           {props.children}
         </MenuSurface>
       </Show>
@@ -97,7 +103,7 @@ export function Menu(props: {
 }
 
 /**
- * The same menu, opened at a point instead of under a trigger. See docs/ui-design.md
+ * The same menu, opened at a point instead of under a trigger. See docs/ui-design/interaction.md
  * § Menus and right-click for why visibility is the caller's state and why this is keyed on `at`.
  */
 export function ContextMenu(props: {
@@ -125,7 +131,7 @@ export function ContextMenu(props: {
   return (
     <Show keyed when={props.at()}>
       {(_at) => (
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel}>
           {props.children}
         </MenuSurface>
       )}
@@ -173,7 +179,7 @@ Menu.Item = (props: {
       class="ui-menu-item"
       role={props.kind === 'radio' ? 'menuitemradio' : props.kind === 'checkbox' ? 'menuitemcheckbox' : 'menuitem'}
       aria-checked={props.kind ? !!props.checked : undefined}
-      data-tone={isArmed() ? 'danger' : props.tone ?? 'neutral'}
+      data-tone={isArmed() ? 'danger' : (props.tone ?? 'neutral')}
       data-armed={isArmed() ? '' : undefined}
       disabled={props.disabled}
       data-tip={props.title}
@@ -193,18 +199,28 @@ Menu.Item = (props: {
       }}
     >
       <Show when={props.kind}>
-        <span class="ui-menu-check" aria-hidden="true"><Show when={props.checked}><Icon name="check" /></Show></span>
+        <span class="ui-menu-check" aria-hidden="true">
+          <Show when={props.checked}>
+            <Icon name="check" />
+          </Show>
+        </span>
       </Show>
-      <Show when={props.leading}><span class="ui-menu-leading">{props.leading}</span></Show>
+      <Show when={props.leading}>
+        <span class="ui-menu-leading">{props.leading}</span>
+      </Show>
       <span class="ui-menu-label">{isArmed() ? props.confirm : props.children}</span>
-      <Show when={props.trailing}><span class="ui-menu-trailing">{props.trailing}</span></Show>
+      <Show when={props.trailing}>
+        <span class="ui-menu-trailing">{props.trailing}</span>
+      </Show>
     </button>
   )
 }
 
 /** A non-interactive heading row. */
 Menu.Label = (props: { children: JSX.Element }) => (
-  <div class="ui-menu-label-row" role="presentation">{props.children}</div>
+  <div class="ui-menu-label-row" role="presentation">
+    {props.children}
+  </div>
 )
 
 Menu.Separator = () => <div class="ui-menu-separator" role="separator" />

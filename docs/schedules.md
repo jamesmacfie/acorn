@@ -6,20 +6,8 @@ it before you add anything that runs on a clock.
 
 ## Pages
 
-<a id="how-a-plugin-declares-one"></a>
-<a id="the-override-model"></a>
-<a id="lifecycle"></a>
-<a id="trust"></a>
-
 [Plugin schedules](./schedules/plugin-schedules.md) covers how a loaded or compiled plugin declares a
 schedule, the owner's overrides, the lifecycle, and the trust disclosure.
-
-<a id="targets-what-a-user-schedule-may-do"></a>
-<a id="node-action"></a>
-<a id="consent-and-the-two-ways-it-fails-closed"></a>
-<a id="workflow"></a>
-<a id="routes"></a>
-<a id="settings"></a>
 
 [User schedules](./schedules/user-schedules.md) covers target kinds, `node-action`, consent and how it
 fails closed, workflow schedules, the routes, and Settings → Schedules.
@@ -34,8 +22,7 @@ Client polling, such as a panel refresh, is freshness for a person who's present
 "I'm looking at this". A schedule says "do this whether or not anyone is".
 
 The scheduler lives in `packages/node-core/src/server/schedules/`, so both Node hosts get the same one.
-Each composition root (`apps/node/src/composition/runtime.ts`, `apps/node/src/entries/standalone.ts`)
-builds it, provides it as the `SCHEDULER` capability before the listener binds, starts it after, and
+`bootNode` in `apps/node/src/composition/boot.ts`, which both Node hosts call, builds it, provides it as the `SCHEDULER` capability before the listener binds, starts it after, and
 stops it in the `schedules` step of the ordered drain. That step sits after the listener and before
 plugins and SQLite, because a run holds a database handle.
 
@@ -105,9 +92,13 @@ workflow target does.
 
 The renderer has its own `ctx.schedules`, and it isn't this one. A client schedule takes a raw
 `intervalMs` with no floor (`packages/client-core/src/host/registries/shell/schedules.ts`), because
-below the 300-second floor a schedule is a poll, and polling is the client's job. It starts when its
-plugin becomes available, stops when the plugin goes, admits no reads in a hidden window, and coalesces
-timer, event, and visibility edges into one refresh and one follow-up.
+below the 300-second floor a schedule is a poll, and polling is the client's job. Both clients run
+client schedules, from the shared start in `packages/client-core/src/host/clientRuntime.ts`, once the
+Node is ready. A schedule starts when its plugin becomes available, stops when the plugin goes, admits
+no reads while its host is hidden, and coalesces timer, event, and visibility edges into one refresh and
+one follow-up. The host reports whether it's hidden through the platform seam, and the terminal client
+always reports itself visible
+([the platform seam](./architecture/node-api.md#the-platform-seam)).
 
 ## Policies
 
@@ -146,15 +137,12 @@ turning a trend on never creates a hidden schedule.
 Every run writes a row. `schedule_runs` keeps the 20 most recent per schedule, trimmed on write, so
 the table is bounded and nothing sweeps it.
 
-<a id="what-deliberately-is-not-a-schedule"></a>
-<a id="not-built-yet"></a>
-
 ## Limits
 
 Calendar-shaped work runs as a schedule row, and anything a person might want to see, pause, or retune
-is calendar-shaped. A timer whose lifetime is an object's stays on its own: the WebSocket hub sweep, the
-tunnel sweep, the MCP keepalive, the terminal idle watch, and the agents plugin's sweep over its live
-provider processes, whose limit is an agents setting
+is calendar-shaped. A timer whose lifetime is an object's stays on its own: the WebSocket hub sweep, the MCP keepalive,
+the terminal idle watch, and the agents plugin's sweep over its live provider processes, whose limit
+is an agents setting
 ([operations and failure](./managed-agents/operations.md)). Startup repairs that converge to
 zero stay boot-time calls, such as `pruneOrphanedGithubMirror` and the agents ledger compaction.
 

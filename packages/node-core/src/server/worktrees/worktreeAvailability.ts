@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeAvailability } from '@acorn/protocol/api.ts'
 import { schema, type AppDatabase } from '../db'
-import type { ProjectRow } from '../projects'
+import type { ProjectRow } from '../projects/projects'
 import { gitText } from '../core/git'
 import { getWorktreesRoot, isDir, projectWorktreeIdentity } from './taskWorktree'
 import { isContainedPath, worktreeBranchDirName } from './pathGuards'
@@ -22,15 +22,22 @@ function worktreePath(project: ProjectRow, branch: string): string {
 export function worktreeNameConflict(db: AppDatabase, project: ProjectRow, branch: string): string | null {
   if (project.vcs !== 'git' || !branch) return null
   const path = worktreePath(project, branch)
-  const active = db.select({ task: schema.tasks, project: schema.projects }).from(schema.tasks)
+  const active = db
+    .select({ task: schema.tasks, project: schema.projects })
+    .from(schema.tasks)
     .innerJoin(schema.projects, eq(schema.tasks.projectId, schema.projects.id))
-    .where(eq(schema.tasks.status, 'active')).all()
-  if (active.some(({ task, project: owner }) =>
-    (task.projectId === project.id && task.branch === branch)
-    || (task.worktreePath
-      ? resolve(task.worktreePath) === resolve(path)
-      : task.branch && owner.vcs === 'git' && resolve(worktreePath(owner, task.branch)) === resolve(path)),
-  )) return occupied
+    .where(eq(schema.tasks.status, 'active'))
+    .all()
+  if (
+    active.some(
+      ({ task, project: owner }) =>
+        (task.projectId === project.id && task.branch === branch) ||
+        (task.worktreePath
+          ? resolve(task.worktreePath) === resolve(path)
+          : task.branch && owner.vcs === 'git' && resolve(worktreePath(owner, task.branch)) === resolve(path)),
+    )
+  )
+    return occupied
   try {
     if (getWorktreesRoot() && lstatSync(path, { throwIfNoEntry: false })) return occupied
   } catch {
@@ -39,9 +46,16 @@ export function worktreeNameConflict(db: AppDatabase, project: ProjectRow, branc
   return null
 }
 
-export async function worktreeAvailability(db: AppDatabase, project: ProjectRow, branch: string): Promise<WorktreeAvailability> {
+export async function worktreeAvailability(
+  db: AppDatabase,
+  project: ProjectRow,
+  branch: string,
+): Promise<WorktreeAvailability> {
   if (project.vcs !== 'git' || !branch) return { available: true }
-  if (!isValidBranch(branch) || (getWorktreesRoot() && !isContainedPath(getWorktreesRoot(), worktreePath(project, branch)))) {
+  if (
+    !isValidBranch(branch) ||
+    (getWorktreesRoot() && !isContainedPath(getWorktreesRoot(), worktreePath(project, branch)))
+  ) {
     return { available: false, reason: 'Invalid branch name.' }
   }
   const conflict = worktreeNameConflict(db, project, branch)

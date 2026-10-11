@@ -4,7 +4,8 @@ import { renderFixture } from './harness'
 import { fixtureBadgePresses } from './fixtureExtensions'
 
 // What another plugin reaches inside this one's surfaces, on the real shell
-// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, docs/tui/plugin-losses.md § What a plugin loses here).
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points,
+// docs/tui/plugin-losses.md § What a plugin loses here).
 //
 // Its own file rather than a case in ./panes.test.tsx, for the reason ./browseLong.test.tsx and
 // ./diffLong.test.tsx are their own files: each of these needs an environment flag set before the
@@ -19,16 +20,19 @@ afterEach(() => {
 })
 
 /** Every run drawn in the focused form, as ./controls.test.tsx reads them. */
-const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]> }): Promise<string[]> =>
-  (await screen.spans()).flat()
+const litRuns = async (screen: {
+  spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]>
+}): Promise<string[]> =>
+  (await screen.spans())
+    .flat()
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 
 describe('a contribution inside somebody else’s surface', () => {
-  // The keyboard contract for extension content, and the whole of requirement 9: content in a remote
-  // slot is as reachable as the kit nodes it draws, inside the region its host registered. The slot
-  // sits above github's own merge box in the Details panel, so a contributed button is that panel's
-  // first stop and `[Merge]` becomes its second.
+  // The keyboard contract for extension content: content in a remote slot is as reachable as the kit
+  // nodes it draws, inside the region its host registered. The slot sits above github's own merge box
+  // in the Details panel, so a contributed button is that panel's first stop and `[Merge]` becomes its
+  // second.
   it('draws a contributed button as a stop, reached with Down and pressable', async () => {
     process.env.ACORN_FIXTURE_BADGE = 'button'
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
@@ -66,7 +70,7 @@ describe('a contribution inside somebody else’s surface', () => {
     }
   }, 180_000)
 
-  // Requirement 7: a mark is text about one line, and it changes nothing about how the diff is
+  // A mark is text about one line, and it changes nothing about how the diff is
   // driven. 160 by 40 because that is the size the diff column draws at (./diffLong.test.tsx).
   it('draws another plugin’s mark under the diff line it is about', async () => {
     process.env.ACORN_FIXTURE_DIFF_MARK = '1'
@@ -89,7 +93,7 @@ describe('a contribution inside somebody else’s surface', () => {
     }
   }, 180_000)
 
-  // Requirement 13. A manifest chord carries a command modifier, and the desktop's is `meta`, which
+  // A manifest chord carries a command modifier, and the desktop's is `meta`, which
   // `toKeymapKey` spells `super` and `asCtrl` rewrites to `ctrl` — so `meta+ctrl+alt+shift+d` reaches
   // the engine as `ctrl+ctrl+meta+shift+d`. The parser reads modifiers into flags, so the repeat is
   // one flag and no dedupe is owed; what a reader presses is Ctrl+Option+Shift+D

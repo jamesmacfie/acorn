@@ -38,13 +38,16 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   statusAuthority: row.statusAuthority as AgentSession['statusAuthority'],
   title: row.title,
   model: row.model,
-  goal: row.goalObjective && row.goalStatus ? {
-    objective: row.goalObjective,
-    status: row.goalStatus as AgentGoalStatus,
-    continuations: row.goalContinuations,
-    noProgress: row.goalNoProgress,
-    verdict: parseJson<AgentGoalVerdict | null>(row.goalVerdictJson, null),
-  } : null,
+  goal:
+    row.goalObjective && row.goalStatus
+      ? {
+          objective: row.goalObjective,
+          status: row.goalStatus as AgentGoalStatus,
+          continuations: row.goalContinuations,
+          noProgress: row.goalNoProgress,
+          verdict: parseJson<AgentGoalVerdict | null>(row.goalVerdictJson, null),
+        }
+      : null,
   config: parseJson(row.configJson, {}),
   parentSessionId: row.parentSessionId,
   parentTurnId: row.parentTurnId,
@@ -95,8 +98,7 @@ export const mapAgentEvent = (row: typeof schema.agentEvents.$inferSelect): Agen
 
 /** A record as a client receives it, over HTTP or the socket: without `searchText`. That column is the
  *  search index's input, no client reads it, and on a tool row it repeats the title, input and output
- *  the event already carries. It was a third of the agent socket's bytes. Export and the node's own
- *  readers keep the whole record. */
+ *  the event already carries. Export and the node's own readers keep the whole record. */
 export const clientEventRecord = ({ searchText: _, ...record }: AgentEventRecord): AgentEventRecord => record
 
 export const mapAgentRequest = (row: typeof schema.agentRequests.$inferSelect): AgentRequest => ({

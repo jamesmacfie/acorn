@@ -11,7 +11,7 @@ export const GIT_SECTIONS = [
   { id: 'worktrees', label: 'Worktrees' },
 ] as const
 
-export type GitSection = typeof GIT_SECTIONS[number]['id']
+export type GitSection = (typeof GIT_SECTIONS)[number]['id']
 
 export const isGitSection = (id: string): id is GitSection => GIT_SECTIONS.some((section) => section.id === id)
 

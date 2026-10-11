@@ -10,8 +10,6 @@ import { nodeState } from './fleet'
 // (docs/architecture/node-api.md § The platform seam), which owns the endpoint, the pinned
 // certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.
-//
-// readJson, writeJson and postJson keep the signatures their call sites use.
 
 // Typed error for non-OK API responses. It carries the HTTP status so consumers branch structurally,
 // such as the node-state machine's 401 handling, instead of pattern-matching message text.
@@ -24,7 +22,12 @@ export class ApiError extends Error {
   /** The envelope's `details`, such as the input a data source error names. Unparsed: each caller
    *  reads the shape its route documents. */
   readonly details?: unknown
-  constructor(message: string, status: number, code?: string, meta?: { requestId?: string; retryable?: boolean; details?: unknown }) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    meta?: { requestId?: string; retryable?: boolean; details?: unknown },
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -37,17 +40,21 @@ export class ApiError extends Error {
 
 // What a call site sees. Not a web Response, because a broker reply is fully buffered and pretending
 // otherwise invites streaming code that cannot work over IPC.
-export type ApiResponse = { ok: boolean; status: number; headers: Record<string, string>; body: Uint8Array }
+type ApiResponse = { ok: boolean; status: number; headers: Record<string, string>; body: Uint8Array }
 
 let requestSeq = 0
 const nextRequestId = (): string => `r${++requestSeq}-${Date.now()}`
 
 const decoder = new TextDecoder()
 
-export type ApiBody = string | NodeFetchBody
+type ApiBody = string | NodeFetchBody
 
 const asNodeBody = (body: ApiBody | undefined): NodeFetchBody | undefined =>
-  body === undefined ? undefined : typeof body === 'string' ? { kind: 'bytes', bytes: new TextEncoder().encode(body) } : body
+  body === undefined
+    ? undefined
+    : typeof body === 'string'
+      ? { kind: 'bytes', bytes: new TextEncoder().encode(body) }
+      : body
 
 type SendOptions = {
   method?: string
@@ -116,10 +123,10 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   const span = options.unmeasured
     ? null
     : startSpan(options.owner ?? 'core', {
-      name: 'api.request',
-      ...(trace ? { traceId: trace.traceId, parentSpanId: trace.spanId } : {}),
-      attrs: { seam: 'api.request', method, route: apiRouteAttr(path) },
-    })
+        name: 'api.request',
+        ...(trace ? { traceId: trace.traceId, parentSpanId: trace.spanId } : {}),
+        attrs: { seam: 'api.request', method, route: apiRouteAttr(path) },
+      })
   const headers: Record<string, string> = {
     ...options.headers,
     'x-request-id': requestId,
@@ -151,14 +158,13 @@ async function deliver(
   const nodeId = options.nodeId === undefined ? activeNodeId() : options.nodeId
 
   if (!transport || !nodeId) {
-    // A host that HAS a broker but no node picked yet. That used to be unreachable, because the window
-    // opened after the fleet had answered; it now happens for the first moments of a launch with
-    // nothing remembered (docs/frontend/data-and-startup.md § Startup readiness), and a module-level prime can
-    // land here. Falling through to the same-origin branch below would fetch a node route off the
-    // shell's own scheme handler, which refuses those on purpose and answers with a message about the
-    // API being the helper — true, and misleading about what actually went wrong. Retryable, because
-    // it is about to stop being true.
-    if (transport) throw new ApiError('acorn has not picked a node to talk to yet.', 0, 'no_active_node', { retryable: true })
+    // A host that HAS a broker but no node picked yet: the first moments of a launch with nothing
+    // remembered (docs/frontend/data-and-startup.md § Startup readiness), where a module-level prime can
+    // land. Falling through to the same-origin branch below would fetch a node route off the shell's
+    // own scheme handler, which refuses those with a message that misleads about what went wrong.
+    // Retryable, because it is about to stop being true.
+    if (transport)
+      throw new ApiError('acorn has not picked a node to talk to yet.', 0, 'no_active_node', { retryable: true })
 
     // No broker, so the renderer is in a plain browser served by a node (`dev:node`) or in a unit test
     // that stubs global fetch. Same-origin, so whatever auth that origin accepts applies. There is no
@@ -169,15 +175,19 @@ async function deliver(
       body: bodyForFetch(asNodeBody(options.body)),
       signal: options.signal,
     })
-    return { ok: res.ok, status: res.status, headers: headersToObject(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
+    return {
+      ok: res.ok,
+      status: res.status,
+      headers: headersToObject(res.headers),
+      body: new Uint8Array(await res.arrayBuffer()),
+    }
   }
 
   // Mutations fail fast and keep the user's input as a draft, with no replay queue
   // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
-  // Fail fast rather than wait for a TCP timeout, because main already knows the node is unreachable.
-  // Without the check a submit spins for the broker's 30s request timeout and then reports
-  // ECONNREFUSED. A read is still worth attempting: the broker may reconnect between the status update
+  // Fail fast rather than wait out the broker's request timeout, because main already knows the node is
+  // unreachable. A read is still worth attempting: the broker may reconnect between the status update
   // and the request, and a failed read costs a stale badge.
   //
   // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where writes still work, and
@@ -237,7 +247,8 @@ const bodyForFetch = (body: NodeFetchBody | undefined): BodyInit | undefined => 
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
 
-const parseJson = <T>(res: ApiResponse): T => (res.body.byteLength === 0 ? (undefined as T) : (JSON.parse(decoder.decode(res.body)) as T))
+const parseJson = <T>(res: ApiResponse): T =>
+  res.body.byteLength === 0 ? (undefined as T) : (JSON.parse(decoder.decode(res.body)) as T)
 
 // One place that reads the wire envelope (docs/api-reference/transport.md § Transport). A non-JSON or
 // pre-envelope body degrades to `undefined` rather than throwing over the original failure.
@@ -253,7 +264,8 @@ function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
 
 // Prefer the upstream prose in `message`, such as GitHub's verbatim 422 reason, over the machine code.
 // The code is for branching, the message is for people.
-const errorText = (error: ApiErrorBody['error'] | undefined, fallback: string): string => error?.message || error?.code || fallback
+const errorText = (error: ApiErrorBody['error'] | undefined, fallback: string): string =>
+  error?.message || error?.code || fallback
 
 const raise = (res: ApiResponse, fallback: string): never => {
   const error = errorBody(res)
@@ -269,7 +281,11 @@ type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: strin
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
 // does not know about (docs/api-reference/transport.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
-  const res = await send(url, { signal: options.signal, nodeId: options.nodeId, ...(options.owner ? { owner: options.owner } : {}) })
+  const res = await send(url, {
+    signal: options.signal,
+    nodeId: options.nodeId,
+    ...(options.owner ? { owner: options.owner } : {}),
+  })
   if (!res.ok) raise(res, `${url} ${res.status}`)
   recordSample(options.owner ?? 'core', 'api.response.bytes', res.body.byteLength, 'byte', { route: apiRouteAttr(url) })
   return measure(options.owner ?? 'core', 'api.decode', () => parseJson<T>(res), { route: apiRouteAttr(url) })
@@ -278,7 +294,11 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
 // The one non-JSON read: a download. Under app:// a route builder's URL resolves against the protocol
 // handler rather than a node, so it cannot be an `href` or `src`. A download comes back as bytes and
 // becomes a blob URL on this side.
-export async function readBytes(url: string, fallback = 'download failed', options: ReadOptions & { maxResponseBytes?: number } = {}): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
+export async function readBytes(
+  url: string,
+  fallback = 'download failed',
+  options: ReadOptions & { maxResponseBytes?: number } = {},
+): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
   const res = await send(url, options)
   if (!res.ok) raise(res, fallback)
   return {
@@ -292,12 +312,6 @@ export async function readBytes(url: string, fallback = 'download failed', optio
 // returns null and the caller names the file.
 const filenameFromDisposition = (header: string | undefined): string | null =>
   /filename="([^"]+)"/.exec(header ?? '')?.[1] ?? null
-
-// Reads the error prose out of a failed response. Kept as a separate export because a few call sites
-// want the message without the throw.
-export async function apiError(res: ApiResponse, fallback: string): Promise<string> {
-  return errorText(errorBody(res), fallback)
-}
 
 // Status, parsed body, and the node's own error envelope, without the throw. Every other export here
 export type RawApiResult = { ok: boolean; status: number; body: unknown; error?: ApiErrorBody['error'] }
@@ -338,7 +352,11 @@ export async function sendRawBytes(url: string, init: WriteInit = {}): Promise<R
 
 type ErrorFallback = string | ((res: ApiResponse) => string)
 
-export async function writeJson<T>(url: string, init: WriteInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {
+export async function writeJson<T>(
+  url: string,
+  init: WriteInit,
+  fallback: ErrorFallback = (res) => `${res.status}`,
+): Promise<T> {
   const res = await send(url, init)
   if (!res.ok) raise(res, typeof fallback === 'function' ? fallback(res) : fallback)
   return parseJson<T>(res)
@@ -370,7 +388,11 @@ export const postJson = async <T>(url: string, body?: unknown, options?: { idemp
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 
-export async function sendJson<T = void>(url: string, init: WriteInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {
+export async function sendJson<T = void>(
+  url: string,
+  init: WriteInit,
+  fallback: ErrorFallback = (res) => `${res.status}`,
+): Promise<T> {
   const res = await send(url, init)
   if (!res.ok) raise(res, typeof fallback === 'function' ? fallback(res) : fallback)
   return parseJson<T>(res)
@@ -378,7 +400,12 @@ export async function sendJson<T = void>(url: string, init: WriteInit, fallback:
 
 // Multipart upload. The parts are described, not encoded, so main builds the real body and the
 // renderer never hand-rolls a boundary.
-export async function sendForm<T>(url: string, parts: Extract<NodeFetchBody, { kind: 'form' }>['parts'], fallback = 'upload failed', options: ReadOptions = {}): Promise<T> {
+export async function sendForm<T>(
+  url: string,
+  parts: Extract<NodeFetchBody, { kind: 'form' }>['parts'],
+  fallback = 'upload failed',
+  options: ReadOptions = {},
+): Promise<T> {
   const res = await send(url, { ...options, method: 'POST', body: { kind: 'form', parts } })
   if (!res.ok) raise(res, fallback)
   return parseJson<T>(res)

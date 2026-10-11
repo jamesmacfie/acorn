@@ -33,12 +33,21 @@ export const pluginAuthoringSection: ContextSectionContribution = {
   defaultIncluded: false,
   // One item, and a per-item ceiling well above the rendered guide, so the budget is a backstop rather
   // than a silent truncation of the contract. `truncate-tail` because the brief leads and the derived
-  // vocabulary follows, so losing the tail is the less wrong half to lose. The guide was 30,381 bytes
-  // on October 10, 2026, once it listed every extension point.
+  // vocabulary follows, so losing the tail is the less wrong half to lose. Measure the guide against
+  // the ceiling with `renderPluginAuthoring().length`.
   budget: { maxItems: 1, maxBytesPerItem: 40_000, overflow: 'truncate-tail' },
   assemble: async () => {
     const { renderPluginAuthoring } = await import('./pluginAuthoring.ts')
-    return { items: [{ id: PLUGIN_AUTHORING_SECTION, kind: 'guide', label: 'Writing an acorn plugin', body: renderPluginAuthoring() }] }
+    return {
+      items: [
+        {
+          id: PLUGIN_AUTHORING_SECTION,
+          kind: 'guide',
+          label: 'Writing an acorn plugin',
+          body: renderPluginAuthoring(),
+        },
+      ],
+    }
   },
   format: (items) => items[0]?.body ?? '',
 }

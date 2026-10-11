@@ -21,7 +21,7 @@ import { setTaskLookup } from '../../../features/tasks/taskLookup'
 import { selectedSource, setSelectedSource } from '../../../features/tasks/tasks'
 import type { Task } from '../../../infra/queries'
 
-// A target's pane has to be registered (registries/contentLinks.ts § openPluginContentTarget), so the
+// A target's pane has to be registered (`openPluginContentTarget`), so the
 // suite registers one before asserting on it.
 let pane: Disposable
 beforeEach(() => {
@@ -36,14 +36,20 @@ afterEach(() => {
 
 describe('declarative content-link resolution', () => {
   it('opens a URL-less record only through its registered plugin namespace', () => {
-    const own = contentLinkRegistry.register({ id: 'board.card', providerId: 'board', parse: () => null,
-      target: item => ({ kind: 'board.card', item, pane: 'board', providerId: 'linear' }) })
+    const own = contentLinkRegistry.register({
+      id: 'board.card',
+      providerId: 'board',
+      parse: () => null,
+      target: (item) => ({ kind: 'board.card', item, pane: 'board', providerId: 'linear' }),
+    })
     try {
       expect(resolveNamedContentTarget('board.card', 'ENG-42')?.target.providerId).toBe('board')
       expect(openNamedContentTarget('board.card', 'ENG-42', { taskId: 'task-1', prefer: 'pane' })).toBe('pane')
       expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'ENG-42' })
       expect(resolveNamedContentTarget('linear.card', 'ENG-42')).toBeNull()
-    } finally { own.dispose() }
+    } finally {
+      own.dispose()
+    }
   })
   it('opens the declared pane and retains the captured item as its selection', () => {
     expect(openPluginContentTarget({ kind: 'board.card', pane: 'board', item: 'ENG-42' }, 'task-1')).toBe(true)
@@ -65,7 +71,7 @@ describe('declarative content-link resolution', () => {
 
 describe('the provider stamp on a parsed target', () => {
   // `providerId` decides which plugin's reference panel a link opens, so it is the registry's to
-  // write and never the recogniser's (registries/contentLinks.ts § claimFor).
+  // write and never the recogniser's (`claimFor`).
   it('stamps the contributing plugin, overwriting whatever the recogniser claimed', () => {
     const board = contentLinkRegistry.register({
       id: 'board.card',
@@ -74,12 +80,19 @@ describe('the provider stamp on a parsed target', () => {
       parse: () => ({ kind: 'board.card', providerId: 'linear', item: 'ENG-42' }),
     })
 
-    expect(parseInAppTarget('https://board.example/c/1')).toEqual({ kind: 'board.card', providerId: 'board', item: 'ENG-42' })
+    expect(parseInAppTarget('https://board.example/c/1')).toEqual({
+      kind: 'board.card',
+      providerId: 'board',
+      item: 'ENG-42',
+    })
     board.dispose()
   })
 
   it('strips a claim from a recogniser that declared no provider at all', () => {
-    const anon = contentLinkRegistry.register({ id: 'anon.card', parse: () => ({ kind: 'anon.card', providerId: 'linear', item: 'ENG-42' }) })
+    const anon = contentLinkRegistry.register({
+      id: 'anon.card',
+      parse: () => ({ kind: 'anon.card', providerId: 'linear', item: 'ENG-42' }),
+    })
 
     expect(parseInAppTarget('https://anon.example/c/1')?.providerId).toBeUndefined()
     anon.dispose()
@@ -134,17 +147,21 @@ describe('scanning text for every provider at once', () => {
     // issue-with-title-slug URLs are different strings naming the same ticket.
     const refs = scanContentRefs(['https://board.example/c/ENG-1', 'again: https://board.example/c/ENG-1/some-title'])
 
-    expect(refs).toEqual([{ providerId: 'board', kind: 'board.card', item: 'ENG-1', url: 'https://board.example/c/ENG-1' }])
+    expect(refs).toEqual([
+      { providerId: 'board', kind: 'board.card', item: 'ENG-1', url: 'https://board.example/c/ENG-1' },
+    ])
   })
 
   it('ignores near-misses, plain prose and URLs no recogniser claims', () => {
-    expect(scanContentRefs([
-      'ENG-1 on its own is not a URL',                    // bare id — task 03's problem, not this one
-      'http://board.example/c/ENG-1',                     // http: refused by the grammar at compile time
-      'https://board.example/card/ENG-1',                 // wrong path
-      'https://unrelated.example/c/ENG-1',                // nobody claims it
-      'https://board.example/c/eng-1',                    // wrong case
-    ])).toEqual([])
+    expect(
+      scanContentRefs([
+        'ENG-1 on its own is not a URL', // bare id — task 03's problem, not this one
+        'http://board.example/c/ENG-1', // http: refused by the grammar at compile time
+        'https://board.example/card/ENG-1', // wrong path
+        'https://unrelated.example/c/ENG-1', // nobody claims it
+        'https://board.example/c/eng-1', // wrong case
+      ]),
+    ).toEqual([])
   })
 
   it('leaves a claim that captured no item out, because it references nothing', () => {
@@ -157,7 +174,12 @@ describe('scanning text for every provider at once', () => {
 })
 
 describe('bare tokens licensed by a prefix witnessed in the same surface', () => {
-  const ref = (providerId: string | undefined, item: string) => ({ providerId, kind: 'x', item, url: `https://x/${item}` })
+  const ref = (providerId: string | undefined, item: string) => ({
+    providerId,
+    kind: 'x',
+    item,
+    url: `https://x/${item}`,
+  })
 
   it('licenses a bare id whose prefix arrived on a confirmed URL ref', () => {
     const prefixes = learnRefPrefixes([ref('board', 'ENG-1')])
@@ -171,7 +193,7 @@ describe('bare tokens licensed by a prefix witnessed in the same surface', () =>
   })
 
   it('leaves everything plain when nothing was witnessed', () => {
-    // The cold-start case (registries/contentLinks.ts § "Bare tokens"): with no confirmed ref in the
+    // The cold-start case (the "Bare tokens" section of ./contentLinks.ts): with no confirmed ref in the
     // surface, `ENG-404` is a token no provider has claimed, so it stays text.
     expect(splitRefTokens('Closes ENG-404', learnRefPrefixes([]))).toEqual([{ text: 'Closes ENG-404' }])
   })
@@ -179,7 +201,12 @@ describe('bare tokens licensed by a prefix witnessed in the same surface', () =>
   it('attributes two providers’ prefixes separately, first witness winning a contested one', () => {
     const prefixes = learnRefPrefixes([ref('board', 'ENG-1'), ref('tickets', 'OPS-2'), ref('tickets', 'ENG-9')])
 
-    expect(prefixes).toEqual(new Map([['ENG', 'board'], ['OPS', 'tickets']]))
+    expect(prefixes).toEqual(
+      new Map([
+        ['ENG', 'board'],
+        ['OPS', 'tickets'],
+      ]),
+    )
     expect(splitRefTokens('ENG-404 and OPS-7', prefixes)).toEqual([
       { text: 'ENG-404', ref: { providerId: 'board', item: 'ENG-404' } },
       { text: ' and ' },
@@ -190,7 +217,9 @@ describe('bare tokens licensed by a prefix witnessed in the same surface', () =>
   it('learns nothing from a ref with no provider or the wrong shape', () => {
     // A recogniser with no panel of its own licenses nothing, because there is no provider to
     // attribute a bare token to. A captured item that is not `PREFIX-NUMBER` is not a prefix.
-    expect(learnRefPrefixes([ref(undefined, 'ENG-1'), ref('board', 'some-slug'), ref('board', 'eng-1')])).toEqual(new Map())
+    expect(learnRefPrefixes([ref(undefined, 'ENG-1'), ref('board', 'some-slug'), ref('board', 'eng-1')])).toEqual(
+      new Map(),
+    )
   })
 })
 
@@ -232,7 +261,7 @@ describe('the host ladder', () => {
   it('refuses a panel for a provider this device has none for, and says so', () => {
     // The other half of the ownership check: a target may name any provider, and only a provider with
     // a registered panel gets one. A panel may only be registered under its own plugin's name
-    // (registries/plugin.ts § declaredProvider), so naming a stranger here can never produce one.
+    // (`declaredProvider` in the client plugin registry), so naming a stranger here can never produce one.
     const stranger = { kind: 'board.card', providerId: 'not-installed', item: 'ENG-42' }
     expect(openContentTarget(stranger, { taskId: 'task-1', prefer: 'refPanel' })).toBe('external')
     expect(activeRefPanel()).toBeNull()
@@ -244,11 +273,18 @@ describe('the host ladder', () => {
     // calls `preventDefault` and then does nothing.
     let running = false
     const stopped = paneRegistry.register({
-      id: 'stopped', label: 'Stopped', glyph: 'kanban', order: 500,
-      when: () => running, component: () => null,
+      id: 'stopped',
+      label: 'Stopped',
+      glyph: 'kanban',
+      order: 500,
+      when: () => running,
+      component: () => null,
     })
     const stoppedPanel = refPanelRegistry.register({
-      id: 'stopped-ref', providerId: 'stopped-plugin', when: () => running, component: () => null,
+      id: 'stopped-ref',
+      providerId: 'stopped-plugin',
+      when: () => running,
+      component: () => null,
     })
     setTaskLookup(() => ({ id: 'task-1' }) as Task)
     const target = { kind: 'x', providerId: 'stopped-plugin', pane: 'stopped', item: 'ENG-42' }
@@ -298,13 +334,18 @@ describe('the host ladder', () => {
     it('honours the surface’s preference over every other rung', () => {
       const panel = refPanelRegistry.register({ id: 'triple-ref', providerId: 'triple', component: () => null })
       const source = sourceRegistry.register({
-        id: 'triple-source', order: 10, label: 'Triple', glyph: 'circle', component: () => null,
+        id: 'triple-source',
+        order: 10,
+        label: 'Triple',
+        glyph: 'circle',
+        component: () => null,
         routes: [{ id: 'triple.detail', path: '/p/:projectId/triple/:item', order: 10 }],
       })
       const claimed = contentLinkRegistry.register({
         id: 'test.triple',
         providerId: 'triple',
-        parse: (href) => (href === 'https://example.com/t/ENG-1' ? { kind: 'issue', item: 'ENG-1', pane: 'board' } : null),
+        parse: (href) =>
+          href === 'https://example.com/t/ENG-1' ? { kind: 'issue', item: 'ENG-1', pane: 'board' } : null,
         path: () => '/p/project-1/triple/ENG-1',
       })
       const navigated: string[] = []
@@ -344,7 +385,9 @@ describe('the host ladder', () => {
 
       // Asked for the panel; the provider has none and no pane, so the route takes it.
       const navigated: string[] = []
-      expect(openInAppUrl('https://example.com/r-only', { prefer: 'refPanel', navigate: (to) => void navigated.push(to) })).toBe(true)
+      expect(
+        openInAppUrl('https://example.com/r-only', { prefer: 'refPanel', navigate: (to) => void navigated.push(to) }),
+      ).toBe(true)
       expect(navigated).toEqual(['/p/project-1/pulls/9'])
 
       // The route was asked for with no navigator in scope, so that rung is unreachable and nothing
@@ -378,7 +421,11 @@ describe('the host ladder', () => {
     it('selects the rail source that owns the route before navigating', () => {
       setSelectedSource('home')
       const source = sourceRegistry.register({
-        id: 'pulls-source', order: 10, label: 'Pulls', glyph: 'git-pull-request', component: () => null,
+        id: 'pulls-source',
+        order: 10,
+        label: 'Pulls',
+        glyph: 'git-pull-request',
+        component: () => null,
         routes: [{ id: 'pulls.detail', path: '/p/:projectId/pulls/:number', order: 10 }],
       })
       const routed = contentLinkRegistry.register({
@@ -447,9 +494,11 @@ describe('the host ladder', () => {
 
   it('reports external when neither rung can take the target', () => {
     // The deliberate browser fall-through, as a named outcome rather than a boolean
-    // (registries/contentLinks.ts § ContentLinkOutcome). A boolean lets `preventDefault` reach branches
+    // (`ContentLinkOutcome`). A boolean lets `preventDefault` reach branches
     // that handled nothing.
-    expect(openContentTarget({ kind: 'github.pull-request', owner: 'runn', repo: 'acorn' }, { taskId: 'task-1' })).toBe('external')
+    expect(openContentTarget({ kind: 'github.pull-request', owner: 'runn', repo: 'acorn' }, { taskId: 'task-1' })).toBe(
+      'external',
+    )
     expect(activeRefPanel()).toBeNull()
   })
 })

@@ -18,14 +18,24 @@ afterEach(() => {
 })
 
 const target = (selected: SelectedContent, over: Partial<ContentSelectionTarget> = {}): ContentSelectionTarget => ({
-  location: 'content.selection', nodeId: 'node-a', taskId: 'task-1', projectId: 'p1', ownerId: 'agents',
-  contentKind: selected.contentKind, ...(selected.languageId ? { languageId: selected.languageId } : {}),
-  readOnly: true, text: selected.text, revision: 3, ...over,
+  location: 'content.selection',
+  nodeId: 'node-a',
+  taskId: 'task-1',
+  projectId: 'p1',
+  ownerId: 'agents',
+  contentKind: selected.contentKind,
+  ...(selected.languageId ? { languageId: selected.languageId } : {}),
+  readOnly: true,
+  text: selected.text,
+  revision: 3,
+  ...over,
 })
 
 const explain = () => {
   const run = vi.fn()
-  registered.push(registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 1, run }]))
+  registered.push(
+    registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 1, run }]),
+  )
   return run
 }
 
@@ -34,18 +44,27 @@ const mount = (options: { current?: () => boolean } = {}) => {
   const select = vi.fn((selected: SelectedContent | undefined) => selected && target(selected))
   const host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => (
-    <>
-      <SelectionActions select={select} isCurrent={() => options.current?.() ?? true}>
-        <p id="first">Ship the release today</p>
-        <div class="ui-code-wrap" data-language="ts"><pre><code id="code">const a = 1</code></pre></div>
-        <a id="link" href="https://example.com">a link</a>
-      </SelectionActions>
-      <SelectionActions select={select} isCurrent={() => true}>
-        <p id="second">Another message</p>
-      </SelectionActions>
-    </>
-  ), host)
+  dispose = render(
+    () => (
+      <>
+        <SelectionActions select={select} isCurrent={() => options.current?.() ?? true}>
+          <p id="first">Ship the release today</p>
+          <div class="ui-code-wrap" data-language="ts">
+            <pre>
+              <code id="code">const a = 1</code>
+            </pre>
+          </div>
+          <a id="link" href="https://example.com">
+            a link
+          </a>
+        </SelectionActions>
+        <SelectionActions select={select} isCurrent={() => true}>
+          <p id="second">Another message</p>
+        </SelectionActions>
+      </>
+    ),
+    host,
+  )
   return { select }
 }
 
@@ -66,7 +85,10 @@ const rightClick = (id: string, init: MouseEventInit = {}) => {
 }
 
 const items = () => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
-const press = (label: string) => items().find((item) => item.textContent?.trim() === label)!.click()
+const press = (label: string) =>
+  items()
+    .find((item) => item.textContent?.trim() === label)!
+    .click()
 
 describe('SelectionActions', () => {
   it('reads the selection only when asked, and runs a row with the owner’s target', () => {

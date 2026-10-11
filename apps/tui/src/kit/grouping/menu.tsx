@@ -49,7 +49,9 @@ export function Menu(props: {
       </box>
       <Show when={open()}>
         {/* Mount the trap with the list so closing it releases the keys. */}
-        <MenuList close={() => set(false)} maxVisibleRows={props.maxVisibleRows}>{props.children({ close: () => set(false) })}</MenuList>
+        <MenuList close={() => set(false)} maxVisibleRows={props.maxVisibleRows}>
+          {props.children({ close: () => set(false) })}
+        </MenuList>
       </Show>
     </box>
   )
@@ -72,21 +74,29 @@ function MenuList(props: { close: () => void; children: JSX.Element; maxVisibleR
         onCleanup(pushScope(element))
         // Menus contain arbitrary child trees, so walk their stops within this list box.
         const walk = (delta: 1 | -1) => () => walkStops(focusedRenderable(), delta, { within: element })
-        bindKeys(element, [
-          { key: 'j', cmd: walk(1) },
-          { key: 'k', cmd: walk(-1) },
-          { key: 'down', cmd: walk(1) },
-          { key: 'up', cmd: walk(-1) },
-        ], LIST)
+        bindKeys(
+          element,
+          [
+            { key: 'j', cmd: walk(1) },
+            { key: 'k', cmd: walk(-1) },
+            { key: 'down', cmd: walk(1) },
+            { key: 'up', cmd: walk(-1) },
+          ],
+          LIST,
+        )
         // While a filter owns typing, arrows still walk menu rows. Bind only during that state;
         // a runtime matcher would disable the key engine's active-binding cache.
         createEffect(() => {
           focusedRenderable()
           if (!isTyping()) return
-          bindKeys(element, [
-            { key: 'down', cmd: walk(1) },
-            { key: 'up', cmd: walk(-1) },
-          ], OVERLAY_OWN)
+          bindKeys(
+            element,
+            [
+              { key: 'down', cmd: walk(1) },
+              { key: 'up', cmd: walk(-1) },
+            ],
+            OVERLAY_OWN,
+          )
         })
       }}
     >
@@ -133,13 +143,15 @@ Menu.Item = (props: {
         <Line>{props.kind === 'checkbox' ? (props.checked ? '[x]' : '[ ]') : props.checked ? '(•)' : '( )'}</Line>
       </Show>
       {slot(props.leading)}
-      <Line {...litControl({
-        focused: control.focused(),
-        strong: isArmed(),
-        disabled: props.disabled,
-        tone: isArmed() || props.tone === 'danger' ? 'danger' : undefined,
-      })}>
-        {isArmed() ? props.confirm ?? '' : flatten(props.children)}
+      <Line
+        {...litControl({
+          focused: control.focused(),
+          strong: isArmed(),
+          disabled: props.disabled,
+          tone: isArmed() || props.tone === 'danger' ? 'danger' : undefined,
+        })}
+      >
+        {isArmed() ? (props.confirm ?? '') : flatten(props.children)}
       </Line>
       <box flexGrow={1} />
       {slot(props.trailing)}

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 
 // A gate is a state, not an event: the inbox fetches, so the row for one gate has to come back with
-// the same id every time until somebody answers it (client-core registries/rail/attention.ts).
+// the same id every time until somebody answers it.
 
 let runs: { id: string; title: string; status: string; taskId: string | null; startedAt: number }[] = []
 let steps: WorkflowStepRow[] = []
@@ -18,10 +18,25 @@ vi.mock('../workflowsClient', () => ({
 const { workflowsAttentionSource } = await import('./attentionSource')
 
 const step = (over: Partial<WorkflowStepRow>): WorkflowStepRow => ({
-  id: 'st1', runId: 'run-1', idx: 0, name: 'review', kind: 'gate-human', mode: 'headless',
-  profileId: null, model: null, status: 'waiting-gate', resultJson: null, structuredJson: null,
-  sessionId: null, agentSessionId: null, costUsd: null, iteration: 0, error: null,
-  createdAt: 10, updatedAt: 20, ...over,
+  id: 'st1',
+  runId: 'run-1',
+  idx: 0,
+  name: 'review',
+  kind: 'gate-human',
+  mode: 'headless',
+  profileId: null,
+  model: null,
+  status: 'waiting-gate',
+  resultJson: null,
+  structuredJson: null,
+  sessionId: null,
+  agentSessionId: null,
+  costUsd: null,
+  iteration: 0,
+  error: null,
+  createdAt: 10,
+  updatedAt: 20,
+  ...over,
 })
 
 const fetchRows = () => workflowsAttentionSource.fetch('node-1', new AbortController().signal)

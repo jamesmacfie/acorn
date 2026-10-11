@@ -185,15 +185,7 @@ load there.
 
 ## Related pages
 
-<a id="what-an-agent-step-sees"></a>
-<a id="a-turn-that-ends-early"></a>
-
 [Agent steps](./agent-steps.md) covers what an agent step sees and a turn that ends early.
-
-<a id="what-a-run-reports"></a>
-<a id="where-a-file-comes-from"></a>
-<a id="child-workflow-tasks"></a>
-<a id="client-run-refreshes-and-live-output"></a>
 
 [Running child workflows](./child-runs.md) covers what a run reports, where a file comes from, child
 workflow tasks, and live output.

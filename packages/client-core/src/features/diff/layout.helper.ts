@@ -52,19 +52,27 @@ export function installDiffLayout(): DiffLayoutModel {
 
   Object.defineProperty(Element.prototype, 'clientHeight', {
     configurable: true,
-    get(this: Element) { return isScroller(this) ? VIEW_HEIGHT : 0 },
+    get(this: Element) {
+      return isScroller(this) ? VIEW_HEIGHT : 0
+    },
   })
   Object.defineProperty(Element.prototype, 'clientWidth', {
     configurable: true,
-    get(this: Element) { return isScroller(this) ? VIEW_WIDTH : 0 },
+    get(this: Element) {
+      return isScroller(this) ? VIEW_WIDTH : 0
+    },
   })
   Object.defineProperty(Element.prototype, 'scrollHeight', {
     configurable: true,
-    get(this: Element) { return isScroller(this) ? canvasHeight(this) : 0 },
+    get(this: Element) {
+      return isScroller(this) ? canvasHeight(this) : 0
+    },
   })
   Object.defineProperty(Element.prototype, 'scrollTop', {
     configurable: true,
-    get(this: Element) { return isScroller(this) ? tops.get(this) ?? 0 : scrollTop.get!.call(this) },
+    get(this: Element) {
+      return isScroller(this) ? (tops.get(this) ?? 0) : scrollTop.get!.call(this)
+    },
     set(this: Element, value: number) {
       if (!isScroller(this)) return scrollTop.set!.call(this, value)
       tops.set(this, Math.max(0, Math.min(value, canvasHeight(this) - VIEW_HEIGHT)))
@@ -74,7 +82,17 @@ export function installDiffLayout(): DiffLayoutModel {
     const id = this instanceof HTMLElement ? this.dataset.block : undefined
     if (!id) return rect.call(this)
     const height = baseOf(id) + dynamicOf(heights, id)
-    return { x: 0, y: 0, top: 0, left: 0, right: VIEW_WIDTH, bottom: height, width: VIEW_WIDTH, height, toJSON: () => ({}) } as DOMRect
+    return {
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: VIEW_WIDTH,
+      bottom: height,
+      width: VIEW_WIDTH,
+      height,
+      toJSON: () => ({}),
+    } as DOMRect
   }
   Element.prototype.scrollTo = function (this: Element, options?: ScrollToOptions | number) {
     if (typeof options === 'object' && options.top != null) this.scrollTop = options.top
@@ -82,8 +100,13 @@ export function installDiffLayout(): DiffLayoutModel {
   } as typeof Element.prototype.scrollTo
 
   const entry = (element: Element): ResizeObserverEntry => {
-    const box = isScroller(element) ? { width: VIEW_WIDTH, height: VIEW_HEIGHT } : { width: VIEW_WIDTH, height: element.getBoundingClientRect().height }
-    return { target: element, contentRect: { ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height } } as unknown as ResizeObserverEntry
+    const box = isScroller(element)
+      ? { width: VIEW_WIDTH, height: VIEW_HEIGHT }
+      : { width: VIEW_WIDTH, height: element.getBoundingClientRect().height }
+    return {
+      target: element,
+      contentRect: { ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height },
+    } as unknown as ResizeObserverEntry
   }
 
   class ModelResizeObserver {

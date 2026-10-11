@@ -10,7 +10,15 @@ import { Input } from './fields'
 export function KeyValueEditor(props: {
   rows: readonly { enabled?: boolean; key: string; value: string }[]
   onChange: (rows: { enabled?: boolean; key: string; value: string }[]) => void
-  columns?: readonly { id: string; header: string; render: (row: { enabled?: boolean; key: string; value: string }, update: (patch: Partial<{ enabled: boolean; key: string; value: string }>) => void, index: number) => JSX.Element }[]
+  columns?: readonly {
+    id: string
+    header: string
+    render: (
+      row: { enabled?: boolean; key: string; value: string },
+      update: (patch: Partial<{ enabled: boolean; key: string; value: string }>) => void,
+      index: number,
+    ) => JSX.Element
+  }[]
   rowHint?: (row: { enabled?: boolean; key: string; value: string }) => string | undefined
   enableColumn?: boolean
   keyPlaceholder?: string
@@ -37,8 +45,16 @@ export function KeyValueEditor(props: {
             <Show when={props.enableColumn !== false}>
               <Checkbox checked={row().enabled} onChange={(checked) => write(index, { enabled: checked })} />
             </Show>
-            <Input value={row().key} placeholder={props.keyPlaceholder ?? 'Name'} onInput={(value) => write(index, { key: value })} />
-            <Input value={row().value} placeholder={props.valuePlaceholder ?? 'Value'} onInput={(value) => write(index, { value })} />
+            <Input
+              value={row().key}
+              placeholder={props.keyPlaceholder ?? 'Name'}
+              onInput={(value) => write(index, { key: value })}
+            />
+            <Input
+              value={row().value}
+              placeholder={props.valuePlaceholder ?? 'Value'}
+              onInput={(value) => write(index, { value })}
+            />
           </box>
         )}
       </Index>
@@ -68,7 +84,11 @@ export function FindBar(props: {
       <Show when={!props.error && props.count}>
         {(count) => {
           const total = () => `${count().total}${count().more ? '+' : ''}`
-          return <Line role="muted">{!count().total ? 'no matches' : count().current ? `${count().current}/${total()}` : `${total()} matches`}</Line>
+          return (
+            <Line role="muted">
+              {!count().total ? 'no matches' : count().current ? `${count().current}/${total()}` : `${total()} matches`}
+            </Line>
+          )
         }}
       </Show>
       {slot(props.status)}
@@ -89,11 +109,21 @@ export function Field(props: {
 }) {
   return (
     <box flexDirection={props.layout === 'row' ? 'row' : 'column'} gap={props.layout === 'row' ? 1 : 0}>
-      <Show when={props.label}><Line role="muted">{props.label!}</Line></Show>
+      <Show when={props.label}>
+        <Line role="muted">{props.label!}</Line>
+      </Show>
       {props.children}
-      <Show when={props.hint}><Line role="muted">{props.hint!}</Line></Show>
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
-      <Show when={props.error}><Line tone="danger">{props.error!}</Line></Show>
+      <Show when={props.hint}>
+        <Line role="muted">{props.hint!}</Line>
+      </Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
+      <Show when={props.error}>
+        <Line tone="danger">{props.error!}</Line>
+      </Show>
     </box>
   )
 }

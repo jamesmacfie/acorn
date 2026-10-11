@@ -2,8 +2,8 @@ import type { WorkflowDef, WorkflowStepDef } from './workflowContracts'
 
 export function stepIdentity(step: Pick<WorkflowStepDef, 'id' | 'name'>): string {
   // Editors and validators must remain able to inspect an invalid generated draft so they can
-  // explain how to repair it. Persisted definitions are admitted only after the v2 parser and
-  // validator require a stable id, so this fallback is never runtime compatibility authority.
+  // explain how to repair it. The parser and validator require a stable id before a definition is
+  // persisted, so a run never relies on this fallback.
   return step.id ?? step.name
 }
 

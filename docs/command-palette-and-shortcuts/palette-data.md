@@ -78,6 +78,11 @@ Each of these is decided. The sentence after each says what would reopen it.
 - **A second registry for each interactive kind.** Groups, searches, inputs, and settings share
   shortcuts, capability gates, ownership, and outcomes with commands. A kind with no command meaning
   at all, such as a background job nobody invokes, would reopen it.
+- **A required `kind: 'action'` on in-process registrations.** An in-process registration with a
+  `run` and no `kind` is an action, so a plain runnable command stays a plain object (`ActionCommand`
+  in `commands.ts`). Manifest commands still state their `kind`. Requiring it in code would touch
+  every registration and change no behavior. A new kind that can't be told from an action by its
+  fields would reopen it.
 - **Commands returned from a loaded search response.** A route's answer is untrusted, and letting it
   choose a verb or a URL makes it more powerful than the reviewed manifest. A schema-bounded result
   action contract with a trust disclosure would reopen it.

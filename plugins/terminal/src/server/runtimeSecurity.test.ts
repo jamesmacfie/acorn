@@ -3,16 +3,26 @@ import type { RunTarget } from '@acorn/plugin-api/node'
 import { RuntimeService, type RuntimeDeps } from './runtime'
 
 function fixture() {
-  let targets: RunTarget[] = [{ id: 'dev', command: 'approved-command', stop: 'approved-stop', urlCommand: 'approved-url' }]
+  let targets: RunTarget[] = [
+    { id: 'dev', command: 'approved-command', stop: 'approved-stop', urlCommand: 'approved-url' },
+  ]
   let selectedHash: string | null = 'approved-hash'
   let currentHash = 'approved-hash'
   const startSession = vi.fn(async () => 'session-1')
-  const runScript = vi.fn(async (_taskId: string, _script: string, _cwd: string) => ({ ok: true, output: 'http://localhost:3000' }))
+  const runScript = vi.fn(async (_taskId: string, _script: string, _cwd: string) => ({
+    ok: true,
+    output: 'http://localhost:3000',
+  }))
   const authorizeRepoConfig = vi.fn(async (_taskId: string, expectedHash: string) => {
     if (expectedHash !== currentHash) throw Object.assign(new Error('Needs trust'), { code: 'needs-trust' })
   })
   const deps: RuntimeDeps = {
-    loadTargets: async () => ({ targets, cwd: '/synthetic-task', repoTargetIds: ['dev'], repoConfigHash: selectedHash }),
+    loadTargets: async () => ({
+      targets,
+      cwd: '/synthetic-task',
+      repoTargetIds: ['dev'],
+      repoConfigHash: selectedHash,
+    }),
     startSession,
     runScript,
     authorizeRepoConfig,
@@ -23,7 +33,10 @@ function fixture() {
     retireSession: vi.fn(),
   }
   return {
-    deps, startSession, runScript, authorizeRepoConfig,
+    deps,
+    startSession,
+    runScript,
+    authorizeRepoConfig,
     edit: (next: RunTarget[], hash: string | null, acknowledged = 'approved-hash') => {
       targets = next
       selectedHash = hash
@@ -48,17 +61,20 @@ describe('run-target configuration admission', () => {
     service.dispose()
   })
 
-  it.each(['start', 'restart'] as const)('refuses %s of stale selected commands before execution', async (operation) => {
-    const f = fixture()
-    const service = new RuntimeService(f.deps)
-    // Current bytes were restored to an acknowledged snapshot after an unreviewed selection.
-    f.edit([{ id: 'dev', command: 'unreviewed-command', restart: 'unreviewed-restart' }], 'unreviewed-hash')
-    await expect(service[operation]('task-1', 'dev')).rejects.toMatchObject({ code: 'needs-trust' })
-    expect(f.authorizeRepoConfig).toHaveBeenCalledWith('task-1', 'unreviewed-hash')
-    expect(f.startSession).not.toHaveBeenCalled()
-    expect(f.runScript).not.toHaveBeenCalled()
-    service.dispose()
-  })
+  it.each(['start', 'restart'] as const)(
+    'refuses %s of stale selected commands before execution',
+    async (operation) => {
+      const f = fixture()
+      const service = new RuntimeService(f.deps)
+      // Current bytes were restored to an acknowledged snapshot after an unreviewed selection.
+      f.edit([{ id: 'dev', command: 'unreviewed-command', restart: 'unreviewed-restart' }], 'unreviewed-hash')
+      await expect(service[operation]('task-1', 'dev')).rejects.toMatchObject({ code: 'needs-trust' })
+      expect(f.authorizeRepoConfig).toHaveBeenCalledWith('task-1', 'unreviewed-hash')
+      expect(f.startSession).not.toHaveBeenCalled()
+      expect(f.runScript).not.toHaveBeenCalled()
+      service.dispose()
+    },
+  )
 
   it.each(['start', 'restart'] as const)('refuses %s of repo targets with no captured identity', async (operation) => {
     const f = fixture()
@@ -80,11 +96,20 @@ describe('run-target configuration admission', () => {
     f.authorizeRepoConfig.mockClear()
     const personal = new RuntimeService({
       ...f.deps,
-      loadTargets: async () => ({ targets: [{ id: 'personal', command: 'personal-command' }], cwd: '/synthetic-task', repoTargetIds: [], repoConfigHash: null }),
+      loadTargets: async () => ({
+        targets: [{ id: 'personal', command: 'personal-command' }],
+        cwd: '/synthetic-task',
+        repoTargetIds: [],
+        repoConfigHash: null,
+      }),
     })
     expect(await personal.start('task-1', 'personal')).toMatchObject({ ok: true })
     expect(f.authorizeRepoConfig).not.toHaveBeenCalled()
-    expect(f.startSession).toHaveBeenCalledWith('task-1', { id: 'personal', command: 'personal-command' }, '/synthetic-task')
+    expect(f.startSession).toHaveBeenCalledWith(
+      'task-1',
+      { id: 'personal', command: 'personal-command' },
+      '/synthetic-task',
+    )
     service.dispose()
     personal.dispose()
   })

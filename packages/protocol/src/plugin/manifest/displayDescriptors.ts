@@ -23,13 +23,17 @@ export const nodeStatDescriptor = z.object({
   refresh,
 })
 
-const contentLinkPattern = z.string().min(1).max(CONTENT_LINK_PATTERN_MAX_LENGTH).superRefine((value, ctx) => {
-  try {
-    compileContentLinkPattern(value)
-  } catch (error) {
-    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
-  }
-})
+const contentLinkPattern = z
+  .string()
+  .min(1)
+  .max(CONTENT_LINK_PATTERN_MAX_LENGTH)
+  .superRefine((value, ctx) => {
+    try {
+      compileContentLinkPattern(value)
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
+    }
+  })
 
 // A renderer URL the host matches for this plugin, handing the matched value to the surface the entry
 // names. The node confines it to a host-minted prefix, one per plugin id, so a manifest can't claim
@@ -49,21 +53,28 @@ export const clientRouteDescriptor = z.object({
   order: z.number().int().min(0).max(100_000).default(500),
 })
 
-export const contentLinkDescriptor = z.object({
-  id: z.string().min(1).max(64),
-  match: contentLinkPattern.optional(),
-  // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
-  // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
-  // the two a click gets is the clicking surface's call, not the manifest's.
-  // See docs/plugins/client-half.md § Loaded plugins: the client half.
-  openPane: z.string().min(1).max(64).optional(),
-  openOverlay: z.string().min(1).max(64).optional(),
-  item: z.string().min(1).max(32).optional(),
-  presentations: z.array(z.enum(['route', 'refPanel', 'pane', 'overlay', 'external'])).min(1).max(5).optional(),
-}).refine(value => !value.match || !!value.item, { message: 'URL targets need an item capture', path: ['item'] })
+export const contentLinkDescriptor = z
+  .object({
+    id: z.string().min(1).max(64),
+    match: contentLinkPattern.optional(),
+    // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
+    // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
+    // the two a click gets is the clicking surface's call, not the manifest's.
+    // See docs/plugins/client-half.md § Loaded plugins: the client half.
+    openPane: z.string().min(1).max(64).optional(),
+    openOverlay: z.string().min(1).max(64).optional(),
+    item: z.string().min(1).max(32).optional(),
+    presentations: z
+      .array(z.enum(['route', 'refPanel', 'pane', 'overlay', 'external']))
+      .min(1)
+      .max(5)
+      .optional(),
+  })
+  .refine((value) => !value.match || !!value.item, { message: 'URL targets need an item capture', path: ['item'] })
 
 // An entry in the agent composer's "add Acorn context" list, served by two routes on the plugin's own
-// node half (@acorn/protocol/agentContext.ts holds the response schemas).
+// node half (`pluginAgentContextOptionsSchema` and `pluginAgentContextSnapshotsSchema` hold the
+// response schemas).
 //
 // `revision?()` gets no manifest form: it's a synchronous number the composer reads while assembling
 // its cache key, and a descriptor answers across a fetch. The invalidation ping the rest of the chrome
@@ -81,7 +92,7 @@ export const agentContextDescriptor = z.object({
 
 // One batch-enrichment route, so a surface holding identifiers of this plugin's items can display them
 // without importing this plugin. The host POSTs `{ identifiers }` and parses the answer against
-// @acorn/protocol/refResolvers.ts. There's no single-identifier form: ask for an array of one.
+// `pluginRefResolutionsSchema`. There's no single-identifier form: ask for an array of one.
 // See docs/plugins/descriptors.md § Descriptors.
 export const refResolverDescriptor = z.object({
   id: z.string().min(1).max(64),
@@ -97,23 +108,39 @@ export const refResolverDescriptor = z.object({
 export const themeDescriptor = z.object({
   // Namespaced by the host into `plugin:<pluginId>:<id>`. The alphabet is bounded because the result
   // is written into a CSS attribute selector.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'theme id must be lower-case alphanumeric with dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'theme id must be lower-case alphanumeric with dashes'),
   label: z.string().min(1).max(80),
   // Drives `--is-dark` and `--color-scheme`, which is everything that asks a theme whether it's
   // dark: the terminal and editor bridges read `--is-dark`, and the diff and Markdown fence rules
   // pick their syntax palette with `light-dark()`, which follows `--color-scheme`.
   dark: z.boolean().default(false),
-  tokens: z.strictObject(Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [
-    name,
-    z.string().min(1).max(THEME_COLOR_VALUE_MAX).refine(
-      isThemeColorValue,
-      'must be a hex colour or a flat colour function — #1e1e2e, rgba(0, 0, 0, 0.42), oklch(0.7 0.15 250)',
+  tokens: z.strictObject(
+    Object.fromEntries(
+      THEME_PALETTE_TOKENS.map((name) => [
+        name,
+        z
+          .string()
+          .min(1)
+          .max(THEME_COLOR_VALUE_MAX)
+          .refine(
+            isThemeColorValue,
+            'must be a hex colour or a flat colour function — #1e1e2e, rgba(0, 0, 0, 0.42), oklch(0.7 0.15 250)',
+          ),
+      ]),
     ),
-  ]))),
+  ),
 })
 
 export const styleDescriptor = z.object({
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'style id must be lower-case alphanumeric with dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'style id must be lower-case alphanumeric with dashes'),
   label: z.string().min(1).max(80),
   description: z.string().max(240).optional(),
   tokens: z.record(z.string(), z.string()).superRefine((tokens, ctx) => {

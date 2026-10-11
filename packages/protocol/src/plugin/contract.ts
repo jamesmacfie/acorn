@@ -7,22 +7,52 @@ import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data
 import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import {
-  chromeAction, contextFreeAction, contextMenuDescriptor, emptyStateDescriptor, panelRegion,
-  selectedRowAction, slotDescriptor, sourceDescriptor,
+  chromeAction,
+  contextFreeAction,
+  contextMenuDescriptor,
+  emptyStateDescriptor,
+  panelRegion,
+  selectedRowAction,
+  slotDescriptor,
+  sourceDescriptor,
 } from './manifest/chromeDescriptors.ts'
 import {
-  actionCommandDescriptor, commandCategory, commandDescriptor, groupCommandDescriptor,
-  inputCommandDescriptor, keybindingDescriptor, searchCommandDescriptor, settingCommandDescriptor,
+  actionCommandDescriptor,
+  commandCategory,
+  commandDescriptor,
+  groupCommandDescriptor,
+  inputCommandDescriptor,
+  keybindingDescriptor,
+  searchCommandDescriptor,
+  settingCommandDescriptor,
 } from './manifest/commandDescriptors.ts'
 import {
-  agentContextDescriptor, attentionDescriptor, clientRouteDescriptor, contentLinkDescriptor,
-  nodeStatDescriptor, refResolverDescriptor, styleDescriptor, themeDescriptor,
+  agentContextDescriptor,
+  attentionDescriptor,
+  clientRouteDescriptor,
+  contentLinkDescriptor,
+  nodeStatDescriptor,
+  refResolverDescriptor,
+  styleDescriptor,
+  themeDescriptor,
 } from './manifest/displayDescriptors.ts'
 import { extensionDescriptor, extensionPointDescriptor } from './manifest/extensionDescriptors.ts'
 import { brandMark, entry, ID_RE, nodePermissions } from './manifest/manifestFields.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
-import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, skillDescriptor, taskCheckDescriptor } from './manifest/runtimeDescriptors.ts'
-import { documentCompletions, documentRegion, documentServiceDescriptor, frameSurface, navigationDestination } from './manifest/surfaces.ts'
+import {
+  auditActionDescriptor,
+  harnessDescriptor,
+  scheduleDescriptor,
+  skillDescriptor,
+  taskCheckDescriptor,
+} from './manifest/runtimeDescriptors.ts'
+import {
+  documentCompletions,
+  documentRegion,
+  documentServiceDescriptor,
+  frameSurface,
+  navigationDestination,
+} from './manifest/surfaces.ts'
 
 // A saved start for a managed session: a harness, the provider options it starts on, text for its
 // system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents). Data
@@ -30,7 +60,11 @@ import { documentCompletions, documentRegion, documentServiceDescriptor, frameSu
 // cannot bring a tool server: a server is a program to run, which is what `agentTools` is for.
 const customAgentDescriptor = z.object({
   // Namespaced by the host into `<pluginId>:<id>` and copied onto every session started from it.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/),
   name: z.string().min(1).max(100),
   glyph: z.string().min(1).max(64).optional(),
   description: z.string().min(1).max(500).optional(),
@@ -39,7 +73,8 @@ const customAgentDescriptor = z.object({
   harness: z.string().min(1).max(130),
   // Provider option id to value, the same table a session default is. A value the harness does not
   // advertise is dropped when the session starts, with a line in the transcript.
-  options: z.record(z.string().min(1).max(200), z.string().max(500))
+  options: z
+    .record(z.string().min(1).max(200), z.string().max(500))
     .refine((value) => Object.keys(value).length <= 20, 'at most 20 options')
     .default({}),
   // Shown in full in the trust prompt, and a changed text asks again.
@@ -47,9 +82,8 @@ const customAgentDescriptor = z.object({
   maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
 
-// `api` and `events` are enforced by the UI bridge (client-core/host/plugins/frames). `contributions` stays
-// loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
-// to parse.
+// `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
+// written for a newer acorn should contribute less on an older one rather than fail to parse.
 //
 // The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
 // and four is "a handful"; a package that wants more is describing an app rather than an integration.
@@ -69,12 +103,11 @@ const contributionsShape = z.looseObject({
   styles: z.array(styleDescriptor).max(8).default([]),
   // A plugin can declare more than eight rail surfaces; keep the total bounded.
   contextMenus: z.array(contextMenuDescriptor).max(32).default([]),
-  // Raised from four and eight when the one key grew from rows to five kinds: a plugin that opens a
-  // pane, a slot in it, a hook before it acts and an annotation on its rows is describing one
-  // integration, not four, and the old caps were sized for rows alone.
+  // Higher than the other caps: a plugin that opens a pane, a slot in it, a hook before it acts and an
+  // annotation on its rows is describing one integration, not four.
   extensionPoints: z.array(extensionPointDescriptor).max(16).default([]),
   extensions: z.array(extensionDescriptor).max(16).default([]),
-  // Hover and diagnostics for Editor's files in one language (./manifest/surfaces.ts).
+  // Hover and diagnostics for Editor's files in one language (`documentServiceDescriptor`).
   documentServices: z.array(documentServiceDescriptor).max(8).default([]),
   dataSources: z.array(dataSourceRegistrationSchema).max(32).optional(),
   dataSourceDiscoveries: z.array(dataSourceDiscoverySchema).max(8).optional(),
@@ -100,8 +133,8 @@ const contributionsShape = z.looseObject({
 // Every contribution kind a manifest may declare, as a runtime list.
 //
 // Derived from the schema rather than typed out beside it, so the two cannot drift. Two consumers: the
-// forward-compatibility report, which needs to know which of a loose object's keys this build actually
-// understands (node-core/server/plugins/manifest.ts), and the contribution-kind table in
+// forward-compatibility report in node-core's `parsePluginManifest`, which needs to know which of a
+// loose object's keys this build understands, and the contribution-kind table in
 // docs/contribution-kinds.md, which a test holds against this list.
 export const CONTRIBUTION_KINDS = Object.keys(contributionsShape.shape).sort() as readonly string[]
 
@@ -112,7 +145,16 @@ const contributions = contributionsShape.prefault({})
 // scope is one this acorn can't grant, which the bridge denies rather than the manifest rejecting.
 const manifestPermissions = z.object({
   api: z.array(z.string().min(1).max(64)).max(64).default([]),
-  events: z.array(z.string().min(1).max(64).regex(/^[a-z][a-z0-9:._-]*$/i)).max(64).default([]),
+  events: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-z][a-z0-9:._-]*$/i),
+    )
+    .max(64)
+    .default([]),
   node: nodePermissions.prefault({}),
 })
 
@@ -121,15 +163,15 @@ const manifestPermissions = z.object({
 // plugin's own frames; declaring it is what lets another manifest name it in `permissions.events`, and
 // what gives the settings page a line to render. The description is the author's own words and is
 // shown as text, never as trust-prompt copy.
-export const pluginEmitSchema = z.object({
+const pluginEmitSchema = z.object({
   verb: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'a verb is lowercase, starts with a letter, and holds no colon'),
   description: z.string().min(1).max(200),
 })
 export type PluginEmit = z.infer<typeof pluginEmitSchema>
 
 const manifestShape = z.object({
-  // The JSON Schema an editor validates this file against (./pluginSchema.test.ts generates it, and
-  // create-acorn-plugin writes the key). Declared so it is a known key rather than one the
+  // The JSON Schema an editor validates this file against (plugin-types' pluginSchema test generates it,
+  // and create-acorn-plugin writes the key). Declared so it is a known key rather than one the
   // forward-compatibility report has to name on every scaffolded plugin. Nothing reads it at load time.
   $schema: z.string().max(200).optional(),
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
@@ -140,7 +182,15 @@ const manifestShape = z.object({
   icon: brandMark.optional(),
   // The plural feeder, for a package that hosts several brands. Keys become the suffix in
   // `brand:<pluginId>/<key>`; the host stamps the prefix, so the key namespace is private to the plugin.
-  icons: z.record(z.string().min(1).max(32).regex(/^[a-z0-9][a-z0-9-]*$/), brandMark)
+  icons: z
+    .record(
+      z
+        .string()
+        .min(1)
+        .max(32)
+        .regex(/^[a-z0-9][a-z0-9-]*$/),
+      brandMark,
+    )
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
   version: z.string().min(1).max(64),
@@ -148,7 +198,11 @@ const manifestShape = z.object({
   emits: z.array(pluginEmitSchema).max(32).default([]),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./apiVersion.ts).
-  apiVersion: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
+  apiVersion: z
+    .string()
+    .min(1)
+    .max(16)
+    .regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
   // What this package needs from the rest of the node before it can work.
   //
   // Without it a plugin that consumes another plugin's capability has no way to say so, and the failure
@@ -159,12 +213,24 @@ const manifestShape = z.object({
   // `version` is a range over the required plugin's major, the same grammar and the same matcher as
   // `apiVersion` above. A plugin's version is its own, so majors are all a dependant can reason about
   // without the two packages sharing a release process.
-  requires: z.object({
-    plugins: z.array(z.object({
-      id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
-      version: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"').optional(),
-    })).max(16).default([]),
-  }).prefault({}),
+  requires: z
+    .object({
+      plugins: z
+        .array(
+          z.object({
+            id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
+            version: z
+              .string()
+              .min(1)
+              .max(16)
+              .regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"')
+              .optional(),
+          }),
+        )
+        .max(16)
+        .default([]),
+    })
+    .prefault({}),
   node: entry.optional(),
   client: entry.optional(),
   // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
@@ -173,16 +239,13 @@ const manifestShape = z.object({
   permissions: manifestPermissions.prefault({}),
   contributions,
 })
-// `pluginManifestSchema` in node-core/server/plugins/manifest.ts wraps this with the cross-field
-// refinements (route confinement, surface reachability, id uniqueness), which need `id` and the frame
-// list and so can't live on the fields.
+// `pluginManifestSchema` in node-core wraps this with the cross-field refinements (route confinement, surface
+// reachability, id uniqueness), which need `id` and the frame list and so can't live on the fields.
 export const pluginManifestShape = manifestShape
-export type PluginManifestShape = z.infer<typeof manifestShape>
 
 // The permissions block on its own, because the desktop parses it a second time. It arrives there
-// over IPC and is written into the trust store, where it used to be accepted by `z.custom<...>()`, a
-// cast wearing a Zod costume that accepts anything. That's the one place where a wrong shape doesn't
-// crash: it shows the owner a security disclosure and records their consent against it.
+// over IPC and goes into the trust store, where a wrong shape would not crash: it would show the owner
+// a security disclosure and record their consent against it.
 export const pluginPermissionsSchema = manifestPermissions
 
 // ── Surface classification ────────────────────────────────────────────────────────────────────────
@@ -191,9 +254,9 @@ export const pluginPermissionsSchema = manifestPermissions
 // node checks that an `openPane` names a pane the manifest declared, and the client builds the runtime
 // allowlist for the same verb.
 //
-// `scope !== 'project'` rather than `scope === 'task'`: the client reads these off a roster row, where
-// the field is absent whenever the sending node predates it. Only the negative spelling is correct
-// before defaults are applied.
+// `scope !== 'project'` rather than `scope === 'task'`: the roster row's type keeps `scope` optional,
+// though every `acorn-1` Node fills its default. Only the negative spelling is correct before
+// defaults are applied.
 export const isTaskPaneSurface = (frame: { target: string; scope?: string }): boolean =>
   frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')
 
@@ -215,17 +278,6 @@ export const hasRemoteRegion = (frame: { regions?: Record<string, unknown> }): b
   Object.values(frame.regions ?? {}).some(
     (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'remote',
   )
-
-/** Does this pane have a host-drawn editor in it? */
-export const hasDocumentRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
-  Object.values(frame.regions ?? {}).some(
-    (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'document',
-  )
-
-/** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,
- *  no click site of its own and no verb that opens it. The user's arbitration is the only thing that
- *  ever puts one on screen (@acorn/protocol/extensionPoints.ts). */
-export const isCoreSlotSurface = (frame: { target: string }): boolean => frame.target === 'coreSlot'
 
 // ── The wire projection ───────────────────────────────────────────────────────────────────────────
 //
@@ -255,17 +307,22 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   completions?: PluginDocumentCompletions
 }
 /** A file-language provider as a roster row carries it. `languageId` is re-checked on arrival. */
-export type PluginDocumentService = Omit<z.infer<typeof documentServiceDescriptor>, 'languageId'> & { languageId: string }
+export type PluginDocumentService = Omit<z.infer<typeof documentServiceDescriptor>, 'languageId'> & {
+  languageId: string
+}
 /** What one region holds. The two object kinds carry a `kind` tag so the union stays discriminated;
  *  `'frame'` is a bare string because it has nothing to say beyond its own name. */
 export type PluginPaneRegion =
   | 'frame'
   | { kind: 'remote'; entry: string }
   | ({ kind: 'document' } & PluginDocumentRegion)
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot' | 'category' | 'settingsScope'> & {
+export type PluginFrameSurface = Omit<
+  z.infer<typeof frameSurface>,
+  'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot' | 'category' | 'settingsScope'
+> & {
   scope?: 'task' | 'project'
   // Wider than the parse: a newer node can know a group or scope this build does not, and the client
-  // places the page by its own lists (client-core/host/frames/register.ts).
+  // places the page by its own lists (`isPluginSettingsCategory`, `isSettingsScope`).
   category?: string
   settingsScope?: string
   claimsKeys?: string[]
@@ -299,11 +356,11 @@ export type PluginCommandCategory = z.infer<typeof commandCategory>
 // header states: the field was added to a shape that had already shipped, so a roster row from a node
 // running the previous parser carries no `kind` at all and means the action it always meant. The other
 // four members can only have come from a node that has this schema.
-export type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
-export type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
-export type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
-export type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
-export type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
+type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
+type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
+type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
+type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
+type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
 /** A newer node may send a kind this build has no frame for, so every reader switches on `kind` and
  *  skips what it does not know rather than coercing it into an action. */
 export type PluginCommandDescriptor =
@@ -333,25 +390,37 @@ export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescrip
 // `kind` and `location` are wider than the parse, for the reason the context-menu descriptor gives
 // above: the client re-checks both against its own copy of the vocabulary before registering anything,
 // and a newer node's kind must not be coerced into one this shell has a host for.
-export type PluginExtensionPointDescriptor =
-  & Omit<z.infer<typeof extensionPointDescriptor>, 'kind' | 'location' | 'panels' | 'key' | 'mode' | 'allows' | 'order' | 'max' | 'timeoutMs' | 'onTimeout' | 'collect' | 'mounts'>
-  & {
-    kind: string
-    // `region` is wider for the reason `kind` is: the client re-checks it before mounting anything.
-    mounts?: { surface: string; region: string }[]
-    location?: string
-    panels?: PluginPanelRegion
-    key?: Record<string, string>
-    mode?: string
-    allows?: string[]
-    order?: string
-    // Optional for the reason the projection's header gives: these gained defaults when the kinds
-    // landed, and an older node's roster row carries none of them.
-    max?: number
-    timeoutMs?: number
-    onTimeout?: 'allow' | 'deny'
-    collect?: boolean
-  }
+export type PluginExtensionPointDescriptor = Omit<
+  z.infer<typeof extensionPointDescriptor>,
+  | 'kind'
+  | 'location'
+  | 'panels'
+  | 'key'
+  | 'mode'
+  | 'allows'
+  | 'order'
+  | 'max'
+  | 'timeoutMs'
+  | 'onTimeout'
+  | 'collect'
+  | 'mounts'
+> & {
+  kind: string
+  // `region` is wider for the reason `kind` is: the client re-checks it before mounting anything.
+  mounts?: { surface: string; region: string }[]
+  location?: string
+  panels?: PluginPanelRegion
+  key?: Record<string, string>
+  mode?: string
+  allows?: string[]
+  order?: string
+  // Optional on the wire, though every `acorn-1` Node's roster row carries them: they gained defaults
+  // before the baseline.
+  max?: number
+  timeoutMs?: number
+  onTimeout?: 'allow' | 'deny'
+  collect?: boolean
+}
 // `mode` is wider than the parse, for the same reason the point's is; `priority` is optional, for the
 // reason the defaulted fields above are.
 export type PluginExtensionDescriptor = Omit<z.infer<typeof extensionDescriptor>, 'mode' | 'priority'> & {
@@ -365,11 +434,10 @@ export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 export type PluginSkillDescriptor = z.infer<typeof skillDescriptor>
 export type PluginCustomAgentDescriptor = z.infer<typeof customAgentDescriptor>
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
-export type { PluginCliCommandDescriptor } from './cliCommands.ts'
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
-// roster row won't carry it, and every reader uses `?? []`.
+// roster row won't carry it, and every reader uses `?? []`. Mixed-version path until 2027-01-08.
 export type PluginContributions = {
   frames: PluginFrameSurface[]
   sources?: PluginSourceDescriptor[]

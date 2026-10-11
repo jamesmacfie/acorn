@@ -1,25 +1,25 @@
 // `core:task`: what other plugins know about a task, drawn on its rail row.
 //
-// The point itself is core's, declared in @acorn/protocol/extensionPoints.ts because core has no
-// manifest to declare it in. Everything else is the ordinary annotation machinery: the host collects
-// the keys on screen, asks each contributor once, and stamps provenance on every mark
-// (../plugins/annotations/annotations.ts).
+// Core declares the point in @acorn/protocol/extensionPoints.ts because core has no manifest to declare
+// it in. Everything else is the shared annotation machinery in ./annotations.ts.
 //
-// What is particular to this point is the drawing. A rail row is a 52-pixel square, so a mark cannot
-// be a line of text the way it is on a diff line: the icon takes a free corner and the words go in
-// the hover legend, which is what the rail already does for core's own states and for docker's
-// (../tabs/railMarkers.ts). So this module is a rail-marker contribution rather than a draw site: a
-// plugin publishes facts about a task, and where they land on the row is the host's business
+// A rail row is a 52-pixel square, so a mark can't be a line of text the way it is on a diff line: the
+// icon takes a free corner and the words go in the hover legend, as the rail does for core's own states
+// (`RailMarker`). So this module is a rail-marker contribution rather than a draw site
 // (docs/plugins/rows-and-annotations.md § Task annotations).
 //
-// Registered at module scope, and the lazy-import property is the same feature ../registries/
-// scopeEviction.ts names: the rail is the only thing that imports this, so the point exists exactly
-// when there is a rail to draw it on.
+// Registered at module scope on purpose: the rail is the only thing that imports this, so the point
+// exists exactly when there is a rail to draw it on.
 import { CORE_TASK_KEY, CORE_TASK_POINT, type AnnotationSeverity } from '@acorn/protocol/extensionPoints.ts'
 import { annotationsFor, requestAnnotations, type StampedMark } from './annotations'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { railMarkerRegistry } from '../registries/rail/railMarkerFeed'
-import { RAIL_MARKER_CORNERS, type RailMarker, type RailMarkerDot, type RailTone } from '../../features/tabs/railMarkers'
+import {
+  RAIL_MARKER_CORNERS,
+  type RailMarker,
+  type RailMarkerDot,
+  type RailTone,
+} from '../../features/tabs/railMarkers'
 
 extensionPointRegistry.register({
   id: CORE_TASK_POINT,
@@ -60,7 +60,7 @@ export const annotationRailMarkers = (marks: readonly StampedMark[]): RailMarker
   }))
 
 /** One task's marks as rail markers. */
-export const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
+const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
   annotationRailMarkers(annotationsFor(CORE_TASK_POINT, { task: taskId }))
 
 railMarkerRegistry.register({
@@ -72,4 +72,7 @@ railMarkerRegistry.register({
 /** Ask every contributor about the rows on screen, in one request each. Idempotent for a task list it
  *  has already asked about, so the rail's own re-renders cost a string compare. */
 export const requestTaskAnnotations = (taskIds: readonly string[]): void =>
-  requestAnnotations(CORE_TASK_POINT, taskIds.map((task) => ({ task })))
+  requestAnnotations(
+    CORE_TASK_POINT,
+    taskIds.map((task) => ({ task })),
+  )

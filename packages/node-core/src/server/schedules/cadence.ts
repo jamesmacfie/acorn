@@ -39,18 +39,38 @@ type CalendarParts = { year: number; month: number; day: number; weekday: number
 const partsInTimezone = (instant: number, timezone: string): CalendarParts => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    weekday: 'short',
   }).formatToParts(instant)
-  const value = (kind: Intl.DateTimeFormatPartTypes) => Number(parts.find(part => part.type === kind)?.value)
-  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    .indexOf(parts.find(part => part.type === 'weekday')?.value ?? '')
-  return { year: value('year'), month: value('month'), day: value('day'), hour: value('hour'), minute: value('minute'), weekday }
+  const value = (kind: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === kind)?.value)
+  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(
+    parts.find((part) => part.type === 'weekday')?.value ?? '',
+  )
+  return {
+    year: value('year'),
+    month: value('month'),
+    day: value('day'),
+    hour: value('hour'),
+    minute: value('minute'),
+    weekday,
+  }
 }
 
 const calendarDate = (parts: CalendarParts, days: number): CalendarParts => {
   const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days))
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate(), weekday: date.getUTCDay(), hour: 0, minute: 0 }
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+    weekday: date.getUTCDay(),
+    hour: 0,
+    minute: 0,
+  }
 }
 
 function firstCalendarInstant(date: CalendarParts, at: string, timezone: string): number | null {
@@ -58,8 +78,14 @@ function firstCalendarInstant(date: CalendarParts, at: string, timezone: string)
   const nominal = Date.UTC(date.year, date.month - 1, date.day, hour, minute)
   for (let instant = nominal - 18 * 60 * 60_000; instant <= nominal + 18 * 60 * 60_000; instant += 60_000) {
     const candidate = partsInTimezone(instant, timezone)
-    if (candidate.year === date.year && candidate.month === date.month && candidate.day === date.day
-      && candidate.hour === hour && candidate.minute === minute) return instant
+    if (
+      candidate.year === date.year &&
+      candidate.month === date.month &&
+      candidate.day === date.day &&
+      candidate.hour === hour &&
+      candidate.minute === minute
+    )
+      return instant
   }
   return null
 }
@@ -81,7 +107,7 @@ export function nextRunAtInTimezone(cadence: Cadence, from: number, timezone: st
   throw new Error(`Could not resolve the next calendar occurrence in '${timezone}'.`)
 }
 
-/** Existing callers omit timezone and retain the scheduler's node-local calendar behavior. */
+/** A caller that omits timezone keeps the scheduler's node-local calendar behavior. */
 export function nextRunAtForTarget(
   cadence: Cadence,
   from: number,

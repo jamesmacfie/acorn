@@ -21,8 +21,9 @@ client ([caching](../caching.md) § Renderer query cache).
 
 The roster and the loaded-plugin worker factory load after the first frame.
 `apps/tui/src/roster.ts` holds the 12 client plugins. `main.tsx` imports it and the worker factory on
-the renderer's first `frame` event, then installs the factory before starting the loaded-plugin
-watcher. Every contribution registry is a Solid signal, so the chrome draws first and the rail, pane
+the renderer's first `frame` event. The shared client start, which `main.tsx` awaits before the first
+frame, holds its loaded-plugin watcher until the factory is installed
+([composition](../frontend.md#composition)). Every contribution registry is a Solid signal, so the chrome draws first and the rail, pane
 strip, and palette fill in as plugins register. The four host seams in `App.tsx`, the layout table
 above all, stay eager, because a pane needs them before it can draw.
 
@@ -40,7 +41,7 @@ The terminal installs these platform groups:
 | Group | What the terminal installs |
 | --- | --- |
 | `transport` | `NodeBroker`, in process. Responses stay buffered `Uint8Array`. |
-| `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` and tunnels aren't installed. |
+| `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` isn't installed. |
 | `pairing` | Probe only. The seam remembers the probe, so confirming a fingerprint is a step a caller can't skip. |
 | `plugins` | File-backed custody ([loaded plugins](./plugins.md#custody)). |
 | `files` | A path prompt reads local bytes for attachments and writes exports locally. It needs an absolute path, rejects attachments over the Agent route's 10 MiB limit before reading, reports errors, and confirms before replacing a file. The Node never sees the local path. |

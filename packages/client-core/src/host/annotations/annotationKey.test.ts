@@ -26,8 +26,11 @@ describe('a diff row as an annotation key', () => {
   // The view mode is not part of it: a contributor marking "line 42 as it will be" means the new side
   // whether the reader is in split or unified.
   it('answers the old side, and the old number, for a deletion', () => {
-    expect(annotationKey(row({ kind: 'delete', oldNo: 17, newNo: null })))
-      .toEqual({ file: 'src/auth.ts', line: 17, side: 'old' })
+    expect(annotationKey(row({ kind: 'delete', oldNo: 17, newNo: null }))).toEqual({
+      file: 'src/auth.ts',
+      line: 17,
+      side: 'old',
+    })
   })
 
   it('looks up under the same string the owner’s declared field order mints', () => {

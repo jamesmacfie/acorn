@@ -104,7 +104,11 @@ export type PullFile = {
 export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness; revision?: string | null }
 // The diff route's answer: the pull's files as a segmented document, with no patch text in it, and
 // whether that is every file GitHub has (docs/github-integration/mirror.md § Diff documents).
-export type PullDiffResponse = { document: DiffDocumentTopology; completeness: PullTopologyCompleteness; revision?: string | null }
+export type PullDiffResponse = {
+  document: DiffDocumentTopology
+  completeness: PullTopologyCompleteness
+  revision?: string | null
+}
 // A batch of segments by patch digest and ordinal, from a pull's document or a compare preview's.
 export type DiffSegmentsBody = { requests: DiffSegmentRequest[] }
 // A search over the files the request names, by path and patch digest, in document order.
@@ -112,17 +116,41 @@ export type DiffSearchBody = DiffSearchRequest & { files: { path: string; patchK
 // Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
 // (or the trial merge couldn't run), the UI then can't enumerate files, only say conflicts exist.
 export type PullConflicts = { available: boolean; files: string[] }
-export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
+export type Review = {
+  id: string
+  author: string | null
+  state: string | null
+  body: string | null
+  submittedAt: number | null
+}
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
-export type PullCommit = { sha: string; message: string; author: string | null; authorLogin: string | null; committedAt: number | null }
+export type PullCommit = {
+  sha: string
+  message: string
+  author: string | null
+  authorLogin: string | null
+  committedAt: number | null
+}
 export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
 // A workflow run's jobs and their steps, for the checks side panel. Logs are a separate fetch.
 export type WorkflowStep = { number: number; name: string; status: string | null; conclusion: string | null }
-export type WorkflowJob = { id: number; name: string; status: string | null; conclusion: string | null; steps: WorkflowStep[] }
+export type WorkflowJob = {
+  id: number
+  name: string
+  status: string | null
+  conclusion: string | null
+  steps: WorkflowStep[]
+}
 export type RunJobs = { jobs: WorkflowJob[] }
 export type JobLog = { text: string }
 export type Label = { name: string; color: string | null }
-export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
+export type ThreadComment = {
+  id: string
+  databaseId: number | null
+  author: string | null
+  body: string | null
+  createdAt: number | null
+}
 export type Thread = {
   threadId: string
   path: string | null
@@ -155,12 +183,18 @@ export type Branch = { name: string }
 export type CompareCommit = { sha: string; message: string }
 // The compare's files as a document, like a pull's. GitHub sends their patches inline; the route
 // stores each under its digest and answers descriptors, so the preview loads segments the same way.
-export type Compare = { aheadBy: number; document: DiffDocumentTopology; completeness: PullTopologyCompleteness; commits: CompareCommit[] }
+export type Compare = {
+  aheadBy: number
+  document: DiffDocumentTopology
+  completeness: PullTopologyCompleteness
+  commits: CompareCommit[]
+}
 
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
-export const repoRoute = (owner: string, repo: string, child = '') => `/v1/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
+export const repoRoute = (owner: string, repo: string, child = '') =>
+  `/v1/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
 
@@ -168,16 +202,20 @@ export const reposRoute = '/v1/p/github/repos'
 export const reposRefreshRoute = '/v1/p/github/repos/refresh'
 export const githubImportRoute = '/v1/p/github/import'
 
-export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
-export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
+export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') =>
+  `${repoRoute(owner, repo)}/pulls?state=${state}`
+export const closedPullsRoute = (owner: string, repo: string, page: number) =>
+  `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullSearchRoute = (owner: string, repo: string, state: 'open' | 'closed', query: string) =>
   `${repoRoute(owner, repo)}/pulls/search?state=${state}&q=${encodeURIComponent(query)}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
 export const taskPullsRoute = (taskId: string) => `/v1/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
 export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
-export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
-export const pullDiffRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'diff')
+export const fileSummariesRoute = (owner: string, repo: string, number: string | number) =>
+  `${pullRoute(owner, repo, number, 'files')}?summary=1`
+export const pullDiffRoute = (owner: string, repo: string, number: string | number) =>
+  pullRoute(owner, repo, number, 'diff')
 export const diffSegmentsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'diff/segments')
 export const diffSearchRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'diff/search')
 export const branchesRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'branches')
@@ -186,20 +224,24 @@ export const compareRoute = (owner: string, repo: string, base: string, head: st
 export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoRoute(owner, repo, `blobs/${sha}`)
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
-export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
-// Trial-merge conflicts (server/routes/pullConflicts.ts). `base` is the PR's base ref.
+export const autoMergeRoute = (owner: string, repo: string, number: string | number) =>
+  pullRoute(owner, repo, number, 'auto-merge')
+// Trial-merge conflicts. `base` is the PR's base ref.
 export const conflictsRoute = (owner: string, repo: string, number: string | number, base: string) =>
   `${pullRoute(owner, repo, number, 'conflicts')}?base=${encodeURIComponent(base)}`
-export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
-export const runJobsRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/runs/${runId}/jobs`)
-export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoRoute(owner, repo, `actions/jobs/${jobId}/logs`)
+export const rerunFailedRoute = (owner: string, repo: string, runId: number) =>
+  repoRoute(owner, repo, `actions/${runId}/rerun`)
+export const runJobsRoute = (owner: string, repo: string, runId: number) =>
+  repoRoute(owner, repo, `actions/runs/${runId}/jobs`)
+export const jobLogRoute = (owner: string, repo: string, jobId: number) =>
+  repoRoute(owner, repo, `actions/jobs/${jobId}/logs`)
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/v1/p/github/pins'
 
 export const reposKey = ['repos'] as const
-export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
+export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') =>
+  ['pulls', owner, repo, state] as const
 // The closed list is an infinite query, so its key includes the `pages` shape marker.
 export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
@@ -210,19 +252,22 @@ export const taskPullsKey = (taskId: string) => ['task-pulls', taskId] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
-export const conflictsKey = (owner: string, repo: string, number: string, base: string) => ['conflicts', owner, repo, number, base] as const
-// 'v2': the response became PullFilesResponse, and a persisted summary array from before must not
-// hydrate into it.
-export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary', 'v2'] as const
+export const conflictsKey = (owner: string, repo: string, number: string, base: string) =>
+  ['conflicts', owner, repo, number, base] as const
+// The version marker changes with the response shape. The persisted cache has no buster, so an
+// answer saved in an older shape would otherwise hydrate into PullFilesResponse.
+export const fileSummariesKey = (owner: string, repo: string, number: string) =>
+  ['files', owner, repo, number, 'summary', 'v2'] as const
 // Under 'files' and not 'summary', so it is not persisted: a document can be large, and it is
 // rebuilt from the node's own blobs in one read.
-export const pullDiffKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'diff'] as const
+export const pullDiffKey = (owner: string, repo: string, number: string) =>
+  ['files', owner, repo, number, 'diff'] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
-// 'v3': Compare's `files` became a `document` (v2 added `completeness`). A persisted answer from before
-// must not hydrate into the new shape.
-export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head, 'v3'] as const
-export const pinsKey = ['pins'] as const
+// The version marker changes with Compare's shape, so a persisted answer in an older shape never
+// hydrates into the current one.
+export const compareKey = (owner: string, repo: string, base: string, head: string) =>
+  ['compare', owner, repo, base, head, 'v3'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const

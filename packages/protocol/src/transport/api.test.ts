@@ -25,7 +25,9 @@ describe('shared API contract helpers', () => {
       .filter(([name]) => name.endsWith('Route'))
       .map(([name, value]): [string, unknown] => [
         name,
-        typeof value === 'function' ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy)) : value,
+        typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy))
+          : value,
       ])
     expect(paths.length).toBeGreaterThan(20) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {

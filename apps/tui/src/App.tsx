@@ -1,7 +1,14 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, lazy, Show, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
-import { prefsOptions, projectsKey, tasksKey, tasksOptions, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
+import {
+  prefsOptions,
+  projectsKey,
+  tasksKey,
+  tasksOptions,
+  type Project,
+  type Task,
+} from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -38,14 +45,12 @@ import { resetFilePrompts } from './chrome/filePrompt'
 // The query client is a prop rather than a `new QueryClient()` here, and that is the caching contract
 // rather than a preference. client-core builds one client and one persister per node
 // (infra/node/fleet.ts § clientFor), and that is the client `watchTaskChanges` and its siblings
-// invalidate. A second one minted here read a cache nobody wrote and nobody invalidated, so every
-// `acorn` start was cold and a task created elsewhere never appeared
+// invalidate. A second one minted here would read a cache nobody writes or invalidates, so every
+// `acorn` start would be cold and a task created elsewhere would never appear
 // (docs/caching.md § Renderer query cache).
 
-// This host's layout table, before any pane draws. Phase 0 could not do this: the pane registry named
-// client-core's DOM table directly, so `paneContributions()` handed back a component this host could
-// not use. Phase 2 made the table a seam, so a pane's own component is now the thing that draws
-// (client-core/host/layouts/table.ts, docs/tui.md).
+// This host's layout table, before any pane draws. Without it `paneContributions()` hands back
+// client-core's DOM layouts, which this host can't draw (docs/tui.md).
 setLayouts(LAYOUTS)
 // And what a pane draws while its code loads: the panel's own loading line, with the pane's name.
 setRegionPlaceholder((props) => <Line role="muted">Loading {props.label}…</Line>)
@@ -55,33 +60,28 @@ setRegionPlaceholder((props) => <Line role="muted">Loading {props.label}…</Lin
 setRemoteTree(RemoteTree)
 // The document region is host-owned too. Keep its editor and route reader behind a loader so opening
 // an ordinary task does not add them to the first frame's startup graph.
-setDocumentSurface(lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))))
+setDocumentSurface(
+  lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))),
+)
 
-// …and the third seam of the same shape. A plugin that contributes a rail source by descriptor rather
-// than by code gets `ChromeSourcePanel` on the desktop, which is `<main class="panes">` and DOM kit
-// primitives all the way down — so registering it here handed the reconciler a `main` and selecting
-// Linear threw instead of drawing a list. This host supplies its own, as a list and a detail rather
-// than one surface, because the two go in different panels here
-// (client-core/host/chrome/sourcePanel.ts, ./plugins/SourcePanel.tsx).
+// A plugin that contributes a rail source by descriptor rather than by code gets `ChromeSourcePanel`
+// on the desktop, which is DOM all the way down, and the reconciler throws on it. This host supplies
+// its own, as a list and a detail rather than one surface, because the two go in different panels
+// here (./plugins/SourcePanel.tsx).
 setSourcePanel(sourcePanel)
 
-// …and the fourth, which was a crash rather than a gap. A loaded plugin's pane that reserved a
-// `pane.footer` or a `pane.aside` was wrapped in the DOM's `ExtendedPane` — a `div` and an `aside`
-// around a `PanelGrid` — so the reconciler refused the pane rather than drawing it. This host's
-// wrapper puts the reserved regions under the owner's tree in reading order
-// (client-core/host/chrome/extendedPane.ts, ./plugins/ExtendedPane.tsx).
+// A loaded plugin's pane that reserves a `pane.footer` or a `pane.aside` is otherwise wrapped in the
+// DOM's `ExtendedPane`, which the reconciler refuses. This host's wrapper puts the reserved regions
+// under the owner's tree in reading order (./plugins/ExtendedPane.tsx).
 setExtendedPane(ExtendedPane)
 
 // No core Home source. `selectedSource()` otherwise resolves an unset selection against the raw
 // registry before provider/workspace gates have loaded. Keep it explicitly empty so the rail can
-// choose the first source it actually draws once those gates are ready (chrome/Rail.tsx).
+// choose the first source it actually draws once those gates are ready (./chrome/Rail.tsx).
 setSelectedSource(null)
 
-/** `acorn --task <id>`, resolved off the shell's own tasks query rather than off a request of its own.
- *
- *  `main.tsx` used to `await readJson(tasksRoute)` before it created a renderer — a round trip on the
- *  critical path whose answer the query below asks for a moment later anyway. It waits on the first
- *  answer now, which a warm cache makes immediate.
+/** `acorn --task <id>`, resolved off the shell's own tasks query rather than off a request of its own,
+ *  so it costs no round trip before the first frame and a warm cache answers it at once.
  *
  *  A plain flag rather than `on()`: `on()` re-fires on identity change, and a fresh array from a
  *  refetch is a new identity, so this would re-activate the task under whatever the reader had since
@@ -143,7 +143,11 @@ export function App(props: {
   setProjectsLookup(() => clientFor(activeNodeId() ?? props.nodeId).client.getQueryData<Project[]>(projectsKey) ?? [])
   // The same for one task by id: a plugin's menu row on a file checks its task is still on this Node.
   // From the tasks barrel, which the first frame already loads through chrome/Rail.tsx.
-  setTaskLookup((taskId) => clientFor(activeNodeId() ?? props.nodeId).client.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
+  setTaskLookup((taskId) =>
+    clientFor(activeNodeId() ?? props.nodeId)
+      .client.getQueryData<Task[]>(tasksKey)
+      ?.find((task) => task.id === taskId),
+  )
   let shownNode: string | undefined
   const forNode = (nodeId: string) => {
     if (shownNode && shownNode !== nodeId) {
@@ -164,13 +168,20 @@ export function App(props: {
       <QueryClientProvider client={client}>
         <Telemetry />
         <TaskArg id={nodeId === props.nodeId ? props.task : undefined} onMissing={props.onNoTask}>
-          <Shell nodeId={nodeId} supervised={props.supervised && nodeId === props.nodeId} onQuit={props.onQuit}
-            link={nodeId === props.nodeId ? props.link : undefined} linkReady={props.linkReady} />
+          <Shell
+            nodeId={nodeId}
+            supervised={props.supervised && nodeId === props.nodeId}
+            onQuit={props.onQuit}
+            link={nodeId === props.nodeId ? props.link : undefined}
+            linkReady={props.linkReady}
+          />
         </TaskArg>
       </QueryClientProvider>
     )
   }
   return (
-    <Show when={activeNodeId() ?? props.nodeId} keyed>{forNode}</Show>
+    <Show when={activeNodeId() ?? props.nodeId} keyed>
+      {forNode}
+    </Show>
   )
 }

@@ -27,7 +27,7 @@ export function taskDataPools(resolveUrl: (taskId: string) => Promise<string | n
   const tasks = new Map<string, TaskPools>()
   const close = (entry: DataPoolEntry): Promise<void> => {
     if (entry.readers) return Promise.resolve()
-    return entry.closing ??= entry.pool.end().catch(() => {})
+    return (entry.closing ??= entry.pool.end().catch(() => {}))
   }
   const retire = (entry: DataPoolEntry) => {
     entry.retired = true
@@ -60,7 +60,10 @@ export function taskDataPools(resolveUrl: (taskId: string) => Promise<string | n
       if (!openingValid()) throw retired()
       const url = await resolveUrl(taskId)
       if (!openingValid()) throw retired()
-      if (!url) throw new Error('No database found. Set a connection script in Settings, or add DATABASE_URL to the worktree .env.')
+      if (!url)
+        throw new Error(
+          'No database found. Set a connection script in Settings, or add DATABASE_URL to the worktree .env.',
+        )
       const pool = new pg.Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
       pool.on('error', () => {})
       const entry: DataPoolEntry = { pool, database: '', retired: false, readers: 0, schemaVersion: 0 }
@@ -82,10 +85,12 @@ export function taskDataPools(resolveUrl: (taskId: string) => Promise<string | n
       }
     })
     task.pending = result
-    void result.finally(() => {
-      if (task.pending === result) task.pending = undefined
-      if (!task.entry && !task.pending && tasks.get(taskId) === task) tasks.delete(taskId)
-    }).catch(() => {})
+    void result
+      .finally(() => {
+        if (task.pending === result) task.pending = undefined
+        if (!task.entry && !task.pending && tasks.get(taskId) === task) tasks.delete(taskId)
+      })
+      .catch(() => {})
     return { result, valid }
   }
 
@@ -113,8 +118,9 @@ export function taskDataPools(resolveUrl: (taskId: string) => Promise<string | n
       if (!valid() || entry.retired) throw retired()
       // Reserve before another await; retirement drains admitted operations before ending the pool.
       entry.readers++
-      try { return await operation(entry) }
-      finally {
+      try {
+        return await operation(entry)
+      } finally {
         entry.readers--
         if (entry.retired) await close(entry)
       }

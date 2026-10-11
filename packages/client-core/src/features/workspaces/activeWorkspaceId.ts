@@ -10,11 +10,11 @@ import { workspaceForProject } from './activeWorkspace'
 
 /** The workspace the shell is showing, for anything that has no query of its own: the routed
  *  project's, or the active task's when the URL carries no project (`/t/:taskId`). The rail derives
- *  the same pair for its roster, and App.tsx for the topbar. It is a hook, so call it during setup.
+ *  the same pair for its roster, and the shell for the topbar. It is a hook, so call it during setup.
  *
- *  `undefined` before the workspace mapping has loaded, and on a device with no projects at all. A
- *  Home board composed then is the pre-workspace board, which the first workspace to open Home
- *  adopts (dashboards/persist.ts § adoptLegacyHome). */
+ *  `undefined` before the workspace mapping has loaded, and when no project is routed and no task
+ *  is active. A Home board composed then is the unscoped board, which the next workspace to open
+ *  Home adopts (`adoptUnscopedHome`). */
 export function createActiveWorkspaceId(): () => string | undefined {
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))

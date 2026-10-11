@@ -1,18 +1,15 @@
-// The GitHub browse surface behind the `github` rail Source (docs/github-integration/reads-and-writes.md § Reads and
-// writes), as two regions rather than one component.
-//
-// It used to be one `ListDetail split` here, with the pull list in one column and everything else in
-// the other. That is still what the desktop draws — `SourceSurface` composes exactly this from the
-// two exports below — but the columns are now named, because the terminal shell puts the list in a
-// panel of its own down the left and the detail in the main panel, and no host can pull two columns
-// apart from inside an opaque component (client-core § SourceContribution.regions).
+// The GitHub browse surface behind the `github` rail Source
+// (docs/github-integration/reads-and-writes.md § Reads and writes), as two regions rather than one
+// component. The desktop composes them side by side; the terminal shell puts the list in a panel of
+// its own down the left and the detail in the main panel, and no host can pull two columns apart from
+// inside an opaque component (client-core § SourceContribution.regions).
 //
 // Params-driven, like the components it hosts: `PullList` reads `useParams()` itself, and the routes
 // exist only to populate params. That is why neither export takes props.
 //
-// The routed project is all this surface needs to render, the same gate every other Source applies
-// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins/descriptors.md § Routes): the routes address a pull, they do not decide whether the surface
-// renders.
+// The routed project is all this surface needs to render. None of this plugin's own routes has to
+// match (docs/plugins/descriptors.md § Routes): the routes address a pull, they do not decide whether
+// the surface renders.
 import { createSignal, lazy, Show, Suspense, type JSX } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -25,7 +22,14 @@ import { githubCreateRoute } from './clientRoutes'
 import { prFilterFor } from './pullList/filterStore'
 import { pullsOptions } from './queries'
 import {
-  Button, DetailColumn, EmptyState, Icon, IconButton, ListColumn, ListDetail, SectionHeader,
+  Button,
+  DetailColumn,
+  EmptyState,
+  Icon,
+  IconButton,
+  ListColumn,
+  ListDetail,
+  SectionHeader,
 } from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
@@ -36,18 +40,21 @@ const CreatePullForm = lazy(() => import('./CreatePullForm'))
 const ComparePreview = lazy(() => import('./ComparePreview'))
 
 /** The gate both regions share. Drawn once per region rather than once for the surface, because the
- *  two regions no longer have a common parent to put it on — and a list that renders while its detail
+ *  two regions have no common parent to put it on, and a list that renders while its detail
  *  says "no GitHub remote" is the disagreement `createBrowseScope` exists to prevent. The reason is
  *  said once, in the detail; the list stays empty beside it. */
 function WhenLinked(props: { scope: ReturnType<typeof createBrowseScope>; quiet?: boolean; children: JSX.Element }) {
   return (
-    <Show when={props.scope.linked()} fallback={
-      <Show when={!props.quiet}>
-        <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
-          {(message) => <EmptyState title={message().title}>{message().body}</EmptyState>}
+    <Show
+      when={props.scope.linked()}
+      fallback={
+        <Show when={!props.quiet}>
+          <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
+            {(message) => <EmptyState title={message().title}>{message().body}</EmptyState>}
+          </Show>
         </Show>
-      </Show>
-    }>
+      }
+    >
       {props.children}
     </Show>
   )
@@ -86,8 +93,16 @@ export function GithubBrowseList() {
             <Button
               tip="New pull request"
               onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(scope.projectId())))}
-            ><Icon name="plus" /> New</Button>
-            <IconButton icon="refresh-cw" tip="Refresh pull requests" label="Refresh pull requests" busy={refreshing()} onPress={refreshAllPulls} />
+            >
+              <Icon name="plus" /> New
+            </Button>
+            <IconButton
+              icon="refresh-cw"
+              tip="Refresh pull requests"
+              label="Refresh pull requests"
+              busy={refreshing()}
+              onPress={refreshAllPulls}
+            />
           </>
         }
       >
@@ -121,18 +136,24 @@ export function GithubBrowseDetail() {
             {/* No split written here any more. A pull request is a header, its sections and its diff,
                 and `Sections` is the node that says so — so this region is the gate and `PullDetail`
                 is the surface (client-core/kit/components/layout/Sections.tsx). */}
-            <Suspense fallback={null}><PullDetail /></Suspense>
+            <Suspense fallback={null}>
+              <PullDetail />
+            </Suspense>
           </Show>
         }
       >
         <ListDetail split listWidth="wide">
           <ListColumn scroll label="New pull request">
             <SectionHeader>New pull request</SectionHeader>
-            <Suspense fallback={null}><CreatePullForm /></Suspense>
+            <Suspense fallback={null}>
+              <CreatePullForm />
+            </Suspense>
           </ListColumn>
           <DetailColumn>
             <SectionHeader>Compare</SectionHeader>
-            <Suspense fallback={null}><ComparePreview /></Suspense>
+            <Suspense fallback={null}>
+              <ComparePreview />
+            </Suspense>
           </DetailColumn>
         </ListDetail>
       </Show>

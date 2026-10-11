@@ -1,11 +1,9 @@
-// Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
-// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so a fetch
-// that outlasts it reads to the user as "your machine is down" rather than "this API is slow". Eight
-// seconds did exactly that: the client always gave up first, so the "this provider is unavailable"
-// answer below could never reach anyone. Four, which is what core's own provider routes allow
-// themselves against the same deadline (node-core server/routes/nodeProviders.ts).
-// ponytail: per-request, not per-route. A route that loops over several connections can still add up
-// past the client's 5s; give it a shared budget if anyone hits that with enough workspaces.
+// Every call out to a provider needs a deadline shorter than the client's. The client's fan-out gives a
+// node 5s and then draws "unavailable" over the whole node, so a fetch that outlasts it reads to the
+// user as "your machine is down" rather than "this API is slow", and the "this provider is
+// unavailable" answer below never reaches anyone. Four seconds matches core's own provider routes
+// (`LIST_TIMEOUT_MS` in node-core). The deadline is per request, not per route: a route that loops over
+// several connections can still add up past the client's 5s.
 const REQUEST_TIMEOUT_MS = 4_000
 
 const ghHeaders = (token: string) => ({
@@ -15,7 +13,7 @@ const ghHeaders = (token: string) => ({
   'User-Agent': 'acorn',
 })
 
-// No credential means GitHub is not connected (githubToken.ts returns '' for that). Answer locally
+// No credential means GitHub is not connected (`githubToken` returns '' for that). Answer locally
 // with the response GitHub itself would give, rather than spending a round trip to be told: ghError
 // maps 401 to `reauth`, which is already the client's "reconnect GitHub" path, so "never connected"
 // and "credential revoked" converge on one user-visible outcome and no call site needs a new branch.
@@ -78,6 +76,7 @@ export const ghGraphQLResult = async <T>(res: Response): Promise<GhGraphQLResult
   const err = ghError(res)
   if (err) return { ok: false, kind: 'http', failure: err }
   const body = (await res.json().catch(() => ({}))) as { data?: T; errors?: { message?: string }[] }
-  if (body.errors?.length) return { ok: false, kind: 'graphql', messages: body.errors.map((e) => e.message ?? 'unknown graphql error') }
+  if (body.errors?.length)
+    return { ok: false, kind: 'graphql', messages: body.errors.map((e) => e.message ?? 'unknown graphql error') }
   return { ok: true, data: body.data as T }
 }

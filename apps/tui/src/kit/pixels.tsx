@@ -30,27 +30,34 @@ export function Rectangle(props: {
   children?: JSX.Element
 }) {
   return (
-    <Show when={props.kind === 'pty'} fallback={
-      <Show when={props.kind === 'editor'} fallback={
-        <box
-          flexDirection="column"
-          flexShrink={0}
-          {...boxBorder('surface')}
-          title={props.label}
+    <Show
+      when={props.kind === 'pty'}
+      fallback={
+        <Show
+          when={props.kind === 'editor'}
+          fallback={
+            <box flexDirection="column" flexShrink={0} {...boxBorder('surface')} title={props.label}>
+              {slot(props.children) ?? (
+                <Line role="muted">{`${props.label} needs pixels, so it is not drawn here.`}</Line>
+              )}
+            </box>
+          }
         >
-          {slot(props.children) ?? <Line role="muted">{`${props.label} needs pixels, so it is not drawn here.`}</Line>}
-        </box>
-      }>
-        <EditorRectangle label={props.label}>{slot(props.children)}</EditorRectangle>
-      </Show>
-    }>
+          <EditorRectangle label={props.label}>{slot(props.children)}</EditorRectangle>
+        </Show>
+      }
+    >
       {/* The caller is handed a terminal rather than an element, which is the whole difference between
           the two hosts here. The prop keeps the kit's own type — the DOM's `HTMLElement` — because a
           node's props are one contract on both hosts and a pane compiles against one of them; what
           arrives is this host's filler, and `attachPty` is the one thing that reads it (./pty.ts). A
           rectangle is the kit's single admission that a host draws something of its own, and this is
           where it is admitted. */}
-      <PtyRectangle label={props.label} hidden={props.hidden} mount={props.mount as ((terminal: CellTerminal) => void) | undefined} />
+      <PtyRectangle
+        label={props.label}
+        hidden={props.hidden}
+        mount={props.mount as ((terminal: CellTerminal) => void) | undefined}
+      />
     </Show>
   )
 }

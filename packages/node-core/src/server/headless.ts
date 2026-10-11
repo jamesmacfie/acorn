@@ -1,8 +1,7 @@
 // Headless step runner (docs/workflows.md): run an agent CLI to completion in a worktree and capture a
-// structured result, modelled on the term:previewUrl capture of run, timeout and parse. Interactive
-// sessions stay spawnOne's job.
+// structured result: run, time out, and parse. Interactive sessions are the terminal's job.
 //
-// Argv templates per profile. Flags verified against the CLIs installed on this machine (2026-07-03):
+// Argv templates per profile, with the flags each CLI takes:
 //   claude: -p --output-format stream-json --verbose --json-schema <schema> --model <m>
 //           --permission-mode <mode>, plus --resume <session_id> for continuity
 //   codex:  exec --json --output-schema <FILE> -m <m>, where the schema is a file path, not inline
@@ -15,9 +14,7 @@ import type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJs
 import { requireProfile } from './profiles'
 import { spawnsReady } from './core/loginShellPath'
 
-export type HeadlessMode = 'interactive' | 'headless'
-
-export type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent }
+export type { HeadlessArgv, HeadlessOpts, StreamEvent }
 
 // Build the non-interactive invocation for a profile. `command` is injectable so tests route the same
 // template through the fake agent script.
@@ -46,7 +43,14 @@ export const HEADLESS_TIMEOUT_MS = 10 * 60 * 1000
 
 export async function runHeadless(
   argv: HeadlessArgv,
-  opts: { cwd: string; env: Record<string, string>; timeoutMs?: number; signal?: AbortSignal; onEvent?: (event: StreamEvent) => void; adapter?: StreamJsonAdapter },
+  opts: {
+    cwd: string
+    env: Record<string, string>
+    timeoutMs?: number
+    signal?: AbortSignal
+    onEvent?: (event: StreamEvent) => void
+    adapter?: StreamJsonAdapter
+  },
 ): Promise<HeadlessResult> {
   // Same gate as core/proc.ts, and for the same reason: an agent CLI is exactly the kind of command
   // the login-shell PATH probe exists to find (core/loginShellPath.ts).
@@ -55,7 +59,12 @@ export async function runHeadless(
     const adapter = opts.adapter ?? lineDelimitedJsonAdapter
     // detached gives it its own process group, so the timeout kill reaps grandchildren too. A hung
     // agent's own children would otherwise hold the stdio pipes open and stall the 'close' event.
-    const child = spawn(argv.file, argv.args, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+    const child = spawn(argv.file, argv.args, {
+      cwd: opts.cwd,
+      env: opts.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    })
     let stdout = ''
     let lineBuffer = ''
     let stderr = ''
@@ -97,7 +106,12 @@ export async function runHeadless(
       settled = true
       clearTimeout(timer)
       opts.signal?.removeEventListener('abort', abort)
-      resolve({ status: cancelled ? 'cancelled' : 'error', exitCode: null, capture: adapter.parse(''), stderrTail: err.message })
+      resolve({
+        status: cancelled ? 'cancelled' : 'error',
+        exitCode: null,
+        capture: adapter.parse(''),
+        stderrTail: err.message,
+      })
     })
     child.on('close', (exitCode) => {
       if (settled) return
@@ -114,7 +128,8 @@ export async function runHeadless(
       if (timedOut) return resolve({ status: 'timeout', exitCode, capture, stderrTail })
       if (exitCode !== 0) return resolve({ status: 'error', exitCode, capture, stderrTail })
       // Exit 0 with no result event means output that's unusable for edges: a typed error, not a guess.
-      if (capture.result == null && capture.structuredOutput == null) return resolve({ status: 'malformed', exitCode, capture, stderrTail })
+      if (capture.result == null && capture.structuredOutput == null)
+        return resolve({ status: 'malformed', exitCode, capture, stderrTail })
       resolve({ status: 'ok', exitCode, capture, stderrTail })
     })
   })

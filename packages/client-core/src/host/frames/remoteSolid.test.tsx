@@ -13,8 +13,8 @@ import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 // The kit, written by a plugin and drawn by the host: `remoteSolid.ts`'s node components against
 // `components.ts`'s real ones, through a serialization in between.
 //
-// ./twoPaths.test.tsx pinned the same claim one rung lower, over hand-built nodes. This one starts
-// where a plugin starts — `<Card tone="ok">` — which is the rung the loaded four moved onto in phase 5.
+// ./twoPaths.test.tsx pins the same claim one rung lower, over hand-built nodes. This one starts
+// where a plugin starts: `<Card tone="ok">`.
 //
 // Called rather than written as JSX, and that is the honest limit here: a `.tsx` file compiles under
 // one preset per vitest project, and this project's is the DOM one. What Solid's universal preset
@@ -23,7 +23,11 @@ import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 
 /** A kit node the way the preset reaches it: a component call with a props object. */
 const node = (type: string, props: Record<string, unknown>): RemoteNode =>
-  (KIT_NODE_COMPONENTS[type as keyof typeof KIT_NODE_COMPONENTS] as unknown as (p: Record<string, unknown>) => RemoteNode)(props)
+  (
+    KIT_NODE_COMPONENTS[type as keyof typeof KIT_NODE_COMPONENTS] as unknown as (
+      p: Record<string, unknown>,
+    ) => RemoteNode
+  )(props)
 
 // Through `kitComponent`, because a table entry is a component or a loader for one and the host
 // resolves it in one place (../tree/kitEntry.ts). Every node below is a cheap primitive, so what
@@ -58,7 +62,10 @@ async function draw(build: () => RemoteNode, into: HTMLElement, send?: (handler:
   await new Promise<void>((resolve) => queueMicrotask(resolve))
   let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
   const transport: TreeTransport = {
-    onBatch: (listener) => { deliver = listener; return () => {} },
+    onBatch: (listener) => {
+      deliver = listener
+      return () => {}
+    },
     onFailed: () => () => {},
     send: (handler, _event, payload) => (send ? send(handler, payload) : root.dispatch(handler, payload)),
   }
@@ -76,24 +83,31 @@ describe('the kit as a plugin writes it', () => {
   it('draws the same DOM through the node components as through the components themselves', async () => {
     // A slice of the rollbar pane: a heading with an eyebrow, a status badge, and a fact list, which
     // between them cover a string child, a role prop, and an array-of-objects prop.
-    const build = () => node('Stack', {
-      gap: 'section',
-      children: [
-        node('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
-        node('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
-        node('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
-      ],
-    })
+    const build = () =>
+      node('Stack', {
+        gap: 'section',
+        children: [
+          node('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
+          node('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
+          node('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
+        ],
+      })
     await draw(build, host)
 
-    disposers.push(render(() => direct('Stack', {
-      gap: 'section',
-      children: [
-        direct('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
-        direct('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
-        direct('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
-      ],
-    }), shell))
+    disposers.push(
+      render(
+        () =>
+          direct('Stack', {
+            gap: 'section',
+            children: [
+              direct('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
+              direct('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
+              direct('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
+            ],
+          }),
+        shell,
+      ),
+    )
 
     expect(host.innerHTML).toBe(shell.innerHTML)
   })
@@ -106,15 +120,15 @@ describe('the kit as a plugin writes it', () => {
   })
 
   it('draws a tree Button that has only a label', async () => {
-    // A tree hands every node its children as a list, and an empty list is truthy, so the label used
-    // to lose to an empty body and the button drew as an empty box.
+    // A tree hands every node its children as a list, and an empty list is truthy, so the label can
+    // lose to an empty body and the button draw as an empty box.
     await draw(() => node('Button', { variant: 'outline', size: 'sm', label: 'Open agent run' }), host)
     expect(host.querySelector('button')!.textContent).toBe('Open agent run')
   })
 
-  it('draws a number among a Text node\'s children', async () => {
+  it("draws a number among a Text node's children", async () => {
     // What `<Text>{200} OK</Text>` compiles to: the universal renderer passes the 200 through as a
-    // number, which the wire used to turn into nothing.
+    // number, which the wire must not turn into nothing.
     await draw(() => node('Text', { children: [200, ' OK'] }), host)
     expect(host.querySelector('.ui-text')!.textContent).toBe('200 OK')
   })
@@ -127,14 +141,19 @@ describe('the kit as a plugin writes it', () => {
     await new Promise<void>((resolve) => queueMicrotask(resolve))
     let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
     const transport: TreeTransport = {
-      onBatch: (listener) => { deliver = listener; return () => {} },
+      onBatch: (listener) => {
+        deliver = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       send: () => {},
     }
-    disposers.push(render(
-      () => <TreeHost pluginId="rollbar" transport={transport} onRefused={(reason) => refused.push(reason)} />,
-      host,
-    ))
+    disposers.push(
+      render(
+        () => <TreeHost pluginId="rollbar" transport={transport} onRefused={(reason) => refused.push(reason)} />,
+        host,
+      ),
+    )
     for (const ops of batches) deliver!(ops)
     await frame()
 
@@ -146,9 +165,9 @@ describe('the kit as a plugin writes it', () => {
 
 // What `solidTree` hands the component, which is the whole of a plugin author's access to the host.
 //
-// `host` is here because it was once not, and nothing caught it: the two things a tree may ask its host
-// for landed on `TreeMount`, and every loaded plugin acorn ships is written through this adapter, so a
-// seam that never reached a component was a seam no plugin could use. This is the test that says so.
+// `host` has to reach the component: the two things a tree may ask its host for are on `TreeMount`, and
+// every loaded plugin acorn ships is written through this adapter, so a seam that never reached a
+// component would be one no plugin could use.
 describe('what a Solid tree renderer receives', () => {
   const mountWith = (props: Record<string, unknown>) => {
     const seen: Record<string, unknown>[] = []
@@ -177,10 +196,13 @@ describe('what a Solid tree renderer receives', () => {
 
   // The store proxies `host`, as it does every object in the props, so identity is not the claim. What
   // matters is that the component reaches the two methods and they are the ones the mount supplied.
-  const hostOf = (props: Record<string, unknown> | undefined) => props?.host as {
-    invoke: () => Promise<unknown>
-    openOverlay: () => Promise<unknown>
-  } | undefined
+  const hostOf = (props: Record<string, unknown> | undefined) =>
+    props?.host as
+      | {
+          invoke: () => Promise<unknown>
+          openOverlay: () => Promise<unknown>
+        }
+      | undefined
 
   it('hands over the owner’s props, the bridge, and the host', async () => {
     const { seen, treeHost } = mountWith({ attachment: { id: 'a1' }, taskId: 't1' })

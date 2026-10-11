@@ -19,11 +19,9 @@ export class AcornBridgeError extends Error {
   }
 }
 
-// Five verbs, matching `PluginBridgeApiRequest.method` exactly. `put` was missing until a frame needed
-// one: the protocol and the broker both carried PUT from the start and only this facade didn't, so a
-// plugin whose routes take a full-replacement body had no way to call them. A method absent here is a
-// method no plugin can reach, however permissive the table underneath.
-export type AcornBridgeApi = {
+// Five verbs, matching `PluginBridgeApiRequest.method` exactly. A method absent here is a method no
+// plugin can reach, however permissive the table underneath.
+type AcornBridgeApi = {
   get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
   post<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   put<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
@@ -62,7 +60,8 @@ export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: st
 // Named for what it is rather than for the app: `Acorn` on @acorn/plugin-api/ui is the shell component,
 // and two things called Acorn in one plugin's imports is a trap.
 export type AcornBridge = {
-  /** Per-mount authority, legacy host fallback, or authority-free module bootstrap. */
+  /** Per-mount authority, legacy host fallback, or authority-free module bootstrap. `legacy` names a
+   *  host without per-mount bridges. Mixed-version path until 2026-12-30. */
   readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. A snapshot, not reactive: a frame is recreated when its
    * subject changes. */

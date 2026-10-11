@@ -8,7 +8,10 @@ import { createTimelineWindow, revealStart, TIMELINE_PAGE, windowStart, type Tim
 const keysOf = (count: number, from = 0) => Array.from({ length: count }, (_, index) => `k${from + index}`)
 
 let dispose: (() => void) | undefined
-afterEach(() => { dispose?.(); dispose = undefined })
+afterEach(() => {
+  dispose?.()
+  dispose = undefined
+})
 
 const windowOver = (initial: string[]) => {
   const [keys, setKeys] = createSignal(initial)

@@ -8,8 +8,9 @@ restore brings that root back on a fresh, isolated Node when someone needs the d
 ## Why the existing backup is not enough
 
 `POST /v1/core/backup` is a precedent for consistent SQLite snapshots, not the cloud archive format
-([backup and import](../../data-layer.md#backup-and-import)). It leaves out blobs and worktrees, it
-blanks credentials, and restoring it is a manual step into a fresh root. A cloud archive needs:
+([backup and import](../../data-layer/backup-and-retention.md#backup-and-import)). It leaves out
+blobs and worktrees, it blanks credentials, and restoring it is a manual step into a fresh root. A
+cloud archive needs:
 
 - Every SQLite database, captured consistently.
 - Installed plugin packages and their lockfiles, so the restore runs the same code.

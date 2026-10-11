@@ -10,14 +10,11 @@ import { z } from 'zod'
 // Transport-level codes: the floor every consumer can rely on, used verbatim for failures that have
 // no domain meaning.
 //
-// docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive
-// allowlist. 37 domain codes are already load-bearing on the client: `needs-trust` opens the
-// config-trust modal, `provider_needs_auth` rewrites the message, and collapsing them all into ten
-// would delete real behaviour. A closed set buys interop discipline across an API boundary, and there
-// isn't one here: client and Node ship from the same repo and are released together
-// (docs/api-reference/transport.md § Versioning). So a route may return its own documented code, and anything
-// without one falls back to these.
-export const ERROR_CODES = [
+// A closed *floor*, not an exclusive allowlist. Domain codes are load-bearing on the client:
+// `needs-trust` opens the config-trust modal and `provider_needs_auth` rewrites the message. Client
+// and Node ship from the same repo and release together (docs/api-reference/transport.md § Versioning),
+// so a route may return its own documented code, and anything without one falls back to these.
+const ERROR_CODES = [
   'bad_request',
   'unauthorized',
   'forbidden',
@@ -40,7 +37,7 @@ export type ErrorCodeOrDomain = ErrorCode | (string & {})
 // charset-restricted so an attacker-controlled header cannot inject into logs or response headers.
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9._-]{1,128}$/)
 
-export const errorEnvelopeSchema = z.object({
+const errorEnvelopeSchema = z.object({
   error: z.object({
     code: z.string().min(1),
     // Human/upstream prose (e.g. GitHub's verbatim 422 reason). Never a stack, SQL or path.

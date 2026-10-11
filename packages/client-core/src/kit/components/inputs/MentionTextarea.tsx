@@ -7,10 +7,9 @@ import type { Tone } from '../../tokens/tokens'
 
 // A textarea that completes what is typed after a sigil, and colours what it has completed.
 //
-// One node for three fields that had grown apart: the diff viewer's `@login` box, github's comment
-// composer, and the agents composer's `@file` / `/command` / `$skill` draft, which was the only one
-// with a coloured mirror and was the only one that lived in a plugin — with the stylesheet the two
-// boxes need in order to agree on where a glyph sits (docs/ui-design/closed-kit.md § The closed kit).
+// One node for the diff viewer's `@login` box, github's comment composer, and the agents composer's
+// `@file` / `/command` / `$skill` draft, with the stylesheet the textarea and its coloured mirror need
+// in order to agree on where a glyph sits (docs/ui-design/closed-kit.md § The closed kit).
 //
 // What crosses is data: sources say what may be completed after which sigil, and `segments` says
 // which runs of the text are already a mention and what tone to draw them in. Neither is a DOM
@@ -79,17 +78,24 @@ export type MentionTextareaProps = {
 }
 
 export default function MentionTextarea(props: MentionTextareaProps) {
-  const sources = createMemo<readonly MentionSource[]>(() => props.sources ?? (props.mentions
-    ? [{
-        sigil: '@',
-        label: 'Mentions',
-        emptyText: 'No matching names.',
-        suggest: (query: string) => (props.mentions ?? [])
-          .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
-          .slice(0, 8)
-          .map((name) => ({ value: `@${name}`, label: name })),
-      }]
-    : []))
+  const sources = createMemo<readonly MentionSource[]>(
+    () =>
+      props.sources ??
+      (props.mentions
+        ? [
+            {
+              sigil: '@',
+              label: 'Mentions',
+              emptyText: 'No matching names.',
+              suggest: (query: string) =>
+                (props.mentions ?? [])
+                  .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+                  .slice(0, 8)
+                  .map((name) => ({ value: `@${name}`, label: name })),
+            },
+          ]
+        : []),
+  )
   const sigils = createMemo(() => sources().map((source) => source.sigil))
 
   const [mention, setMention] = createSignal<ActiveMention | null>(null)
@@ -154,7 +160,9 @@ export default function MentionTextarea(props: MentionTextareaProps) {
 
   return (
     <div class="ui-mentionfield" data-mirrored={segments() ? '' : undefined} data-tone={props.tone}>
-      <Show when={overlay()}><div class="ui-mentionfield-overlay">{overlay()}</div></Show>
+      <Show when={overlay()}>
+        <div class="ui-mentionfield-overlay">{overlay()}</div>
+      </Show>
       <Show when={segments()}>
         {(runs) => (
           // Hidden from the accessibility tree: the textarea already carries this text, and a screen
@@ -269,7 +277,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           }
           // One key, innermost thing first: the list above closes before Escape reaches whatever the
           // caller does with it. With no `onCancel` it stays unclaimed, and because the overlay
-          // listener stands down on `defaultPrevented` (./dismissable.ts), an un-prevented Escape
+          // listener stands down on `defaultPrevented` (`createDismissable`), an un-prevented Escape
           // still closes a modal the field happens to be sitting inside.
           if (event.key === 'Escape' && props.onCancel) {
             event.preventDefault()
@@ -288,10 +296,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
         <div class="ui-mentionfield-list" role="listbox" aria-label={source()?.label}>
           <Show when={!source()?.loading} fallback={<p class="repo-picker-empty">Loading…</p>}>
             <Show when={!source()?.error} fallback={<Alert>{source()?.error}</Alert>}>
-              <Show
-                when={suggestions().length}
-                fallback={<p class="repo-picker-empty">{source()?.emptyText}</p>}
-              >
+              <Show when={suggestions().length} fallback={<p class="repo-picker-empty">{source()?.emptyText}</p>}>
                 <ul ref={list} class="repo-picker-list">
                   <For each={suggestions()}>
                     {(suggestion, index) => (

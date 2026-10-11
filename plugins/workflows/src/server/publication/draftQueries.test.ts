@@ -8,16 +8,29 @@ import { getDef, removeDef } from '../definitions/store'
 import { publishFixtureDef } from '../../testkit/publishedDefinition'
 
 let store: TestPluginDb
-beforeEach(() => { store = makeTestPluginDb('workflows') })
+beforeEach(() => {
+  store = makeTestPluginDb('workflows')
+})
 afterEach(() => store.cleanup())
-const def = (...queryIds: string[]): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Draft', steps: queryIds.map((queryId, i) => ({ id: `find-${i}`, name: `Find ${i}`, kind: 'find-records', query: { kind: 'saved', queryId, bindings: {} } })) })
+const def = (...queryIds: string[]): WorkflowDef => ({
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
+  name: 'Draft',
+  steps: queryIds.map((queryId, i) => ({
+    id: `find-${i}`,
+    name: `Find ${i}`,
+    kind: 'find-records',
+    query: { kind: 'saved', queryId, bindings: {} },
+  })),
+})
 const input = (...ids: string[]) => ({ workspaceId: 'workspace', projectId: 'project', def: def(...ids) })
 
 it('protects draft references before saving and removes stale references without touching published consumers', async () => {
   const references = new Map<string, Set<string>>([['first', new Set(['published'])]])
   const drafts = workflowDraftQueries(store.db, async (_scope, queryId, consumer, remove) => {
     const set = references.get(queryId) ?? new Set<string>()
-    if (remove) set.delete(consumer.id); else set.add(consumer.id)
+    if (remove) set.delete(consumer.id)
+    else set.add(consumer.id)
     references.set(queryId, set)
   })
   const row = await drafts.create(input('first'))
@@ -34,8 +47,12 @@ it('retains claims across an interrupted registration and reconciles them after 
   let fail = true
   const write: Parameters<typeof workflowDraftQueries>[1] = async (_scope, queryId, consumer, remove) => {
     const key = `${queryId}:${consumer.id}`
-    if (remove) references.delete(key); else references.add(key)
-    if (fail) { fail = false; throw new Error('Response lost') }
+    if (remove) references.delete(key)
+    else references.add(key)
+    if (fail) {
+      fail = false
+      throw new Error('Response lost')
+    }
   }
   await expect(workflowDraftQueries(store.db, write).create(input('query'))).rejects.toThrow('Response lost')
   expect(references.size).toBe(1)
@@ -50,10 +67,15 @@ it('keeps the winning reference when another device changes the draft during reg
   let id = ''
   const drafts = workflowDraftQueries(store.db, async (_scope, queryId, consumer, remove) => {
     const key = `${queryId}:${consumer.id}`
-    if (remove) references.delete(key); else references.add(key)
+    if (remove) references.delete(key)
+    else references.add(key)
     if (change) {
       change = false
-      store.db.update(workflowDefs).set({ revision: 2, defJson: JSON.stringify(def('winner')) }).where(eq(workflowDefs.id, id)).run()
+      store.db
+        .update(workflowDefs)
+        .set({ revision: 2, defJson: JSON.stringify(def('winner')) })
+        .where(eq(workflowDefs.id, id))
+        .run()
     }
   })
   id = (await drafts.create(input('original'))).id
@@ -67,7 +89,8 @@ it('reconciles draft and published references after deletion interrupted between
   const references = new Set<string>()
   const write: Parameters<typeof workflowDraftQueries>[1] = async (_scope, queryId, consumer, remove) => {
     const key = `${queryId}:${consumer.id}`
-    if (remove) references.delete(key); else references.add(key)
+    if (remove) references.delete(key)
+    else references.add(key)
   }
   const row = await workflowDraftQueries(store.db, write).create(input('query'))
   await publishFixtureDef(store.db, row.id)

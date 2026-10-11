@@ -1,16 +1,22 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginFrameSurface } from '@acorn/protocol/api.ts'
+import {
+  PLUGIN_API_MAJOR,
+  type NodePluginRow,
+  type PluginContributions,
+  type PluginFrameSurface,
+} from '@acorn/protocol/api.ts'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
 import { _resetPluginDistribution, _seedDevicePluginDistribution, _seedPluginDistribution } from './distribution'
 
-// The questions that used to be answered twice, once in each register module. Both callers are plain
-// `.ts` and have their own suites now (chrome/register.test.ts, frames/register.test.ts); this one
-// pins the shared answer they both start from.
+// The shared answer both registration passes start from. Each pass has its own suite
+// (chrome/chromeRegister.test.ts, frames/register.test.ts).
 
 const HASH = 'a'.repeat(64)
 const HASH_B = 'b'.repeat(64)
 
-const surface = (over: Partial<PluginFrameSurface> & Pick<PluginFrameSurface, 'id' | 'target'>): PluginFrameSurface => ({
+const surface = (
+  over: Partial<PluginFrameSurface> & Pick<PluginFrameSurface, 'id' | 'target'>,
+): PluginFrameSurface => ({
   label: over.id,
   glyph: 'puzzle',
   order: 500,
@@ -18,7 +24,11 @@ const surface = (over: Partial<PluginFrameSurface> & Pick<PluginFrameSurface, 'i
   ...over,
 })
 
-const row = (name: string, over: Partial<NodePluginRow['installed']> = {}, frames: PluginFrameSurface[] = []): NodePluginRow => ({
+const row = (
+  name: string,
+  over: Partial<NodePluginRow['installed']> = {},
+  frames: PluginFrameSurface[] = [],
+): NodePluginRow => ({
   name,
   required: false,
   disabled: false,
@@ -26,10 +36,14 @@ const row = (name: string, over: Partial<NodePluginRow['installed']> = {}, frame
   state: 'active',
   installed: {
     version: '1.0.0',
-    // The real constant, not '1': the literal made every fixture here a candidate this shell could not
-    // speak the day PLUGIN_API_MAJOR moved, and the failure looked like a bug in resolution.
+    // The real constant, not '1': a literal makes every fixture here a candidate this shell can't speak
+    // once PLUGIN_API_MAJOR moves, and the failure looks like a bug in resolution.
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+    permissions: {
+      api: [],
+      events: [],
+      node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    },
     contributions: { frames } as PluginContributions,
     client: null,
     ...over,
@@ -40,12 +54,18 @@ afterEach(() => _resetPluginDistribution())
 
 describe('eligiblePlugins', () => {
   it('withdraws every device contribution on disable while retaining device precedence', () => {
-    _seedPluginDistribution([['node-a', [row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } })]]], [
-      `board ${HASH}`, `board ${HASH_B}`,
-    ])
+    _seedPluginDistribution(
+      [['node-a', [row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } })]]],
+      [`board ${HASH}`, `board ${HASH_B}`],
+    )
     const device = row('board', {
-      version: '1.9.0', client: { hash: HASH, bytes: 12 },
-      contributions: { frames: [], themes: [{ id: 'warm', label: 'Warm', dark: false, tokens: {} }], styles: [] } as PluginContributions,
+      version: '1.9.0',
+      client: { hash: HASH, bytes: 12 },
+      contributions: {
+        frames: [],
+        themes: [{ id: 'warm', label: 'Warm', dark: false, tokens: {} }],
+        styles: [],
+      } as PluginContributions,
     })
     const entry = { hash: HASH, row: device, sourceLabel: 'this device', nodeIds: ['node-a'], sameHashNodeIds: [] }
     _seedDevicePluginDistribution([entry])
@@ -56,8 +76,12 @@ describe('eligiblePlugins', () => {
   })
 
   it('uses one active declaration when the installed package has moved ahead of the node half', () => {
-    const old = row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [surface({ id: 'old', target: 'pane' })])
-    const candidate = row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } }, [surface({ id: 'new', target: 'pane' })])
+    const old = row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [
+      surface({ id: 'old', target: 'pane' }),
+    ])
+    const candidate = row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } }, [
+      surface({ id: 'new', target: 'pane' }),
+    ])
     candidate.state = 'pending-restart'
     candidate.active = { ...old.installed!, activation: 'node' }
     _seedPluginDistribution([['node-a', [candidate]]], [`board ${HASH}`])
@@ -69,10 +93,15 @@ describe('eligiblePlugins', () => {
   })
 
   it('withholds legacy failed and pending rows whose running declaration cannot be proven', () => {
-    _seedPluginDistribution([['node-a', [
-      { ...row('pending', { client: { hash: HASH, bytes: 12 } }), state: 'pending-restart' },
-      { ...row('failed', { client: { hash: HASH_B, bytes: 12 } }), state: 'failed' },
-    ]]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          { ...row('pending', { client: { hash: HASH, bytes: 12 } }), state: 'pending-restart' },
+          { ...row('failed', { client: { hash: HASH_B, bytes: 12 } }), state: 'failed' },
+        ],
+      ],
+    ])
     expect(eligiblePlugins()).toEqual([])
   })
 
@@ -87,7 +116,7 @@ describe('eligiblePlugins', () => {
   })
 
   it('never marks a package with no client half as trusted, but withholds nothing from it', () => {
-    // Two answers, not one, and collapsing them is what let a bundle-less manifest mount a webview.
+    // Two answers, not one, because collapsing them lets a bundle-less manifest mount a webview.
     // `trusted` is "may this device execute this plugin's code", and the answer for a package with no
     // code is no. A webview surface is not host-drawn, so `trusted: true` here would mount external
     // web content behind a prompt that can never fire (the trust queue only holds bundles).
@@ -102,10 +131,16 @@ describe('eligiblePlugins', () => {
   it('withholds a bundle-less package that declares a webview from the frame pass', () => {
     // The regression this pair exists for. A manifest may legally declare `target: 'webview'` with no
     // client entry, and nothing about that package ever reaches the trust dialog.
-    _seedPluginDistribution([[
-      'node-a',
-      [row('board', {}, [surface({ id: 'docs', target: 'webview', hosts: ['docs.example.com'], url: 'https://docs.example.com' })])],
-    ]])
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row('board', {}, [
+            surface({ id: 'docs', target: 'webview', hosts: ['docs.example.com'], url: 'https://docs.example.com' }),
+          ]),
+        ],
+      ],
+    ])
     // frames/register.ts registers a non-host-owned surface only when this is true.
     expect(eligiblePlugins()[0]!.trusted).toBe(false)
   })
@@ -126,8 +161,22 @@ describe('eligiblePlugins', () => {
   it('keeps node A on its own runtime when node B offers a newer version', () => {
     _seedPluginDistribution(
       [
-        ['node-a', [row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [surface({ id: 'old', target: 'pane' })])]],
-        ['node-b', [row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } }, [surface({ id: 'new', target: 'pane' })])]],
+        [
+          'node-a',
+          [
+            row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [
+              surface({ id: 'old', target: 'pane' }),
+            ]),
+          ],
+        ],
+        [
+          'node-b',
+          [
+            row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } }, [
+              surface({ id: 'new', target: 'pane' }),
+            ]),
+          ],
+        ],
       ],
       [`board ${HASH_B}`],
     )
@@ -198,7 +247,7 @@ describe('eligiblePlugins', () => {
 
 describe('isTaskPane', () => {
   // The `openPane` allowlist (which pane ids a sandboxed frame may ask the host to open) is built
-  // from this predicate on both sides of the frames/chrome split. It was copy-paste until now.
+  // from this predicate on both sides of the frames/chrome split.
   it('counts task panes and webviews, and nothing else', () => {
     expect(isTaskPane({ target: 'pane' })).toBe(true)
     expect(isTaskPane({ target: 'pane', scope: 'task' })).toBe(true)

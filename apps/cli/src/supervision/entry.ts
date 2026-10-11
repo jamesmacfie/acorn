@@ -7,11 +7,20 @@ import { findWorkspaceRoot } from '@acorn/node-core/server/storage'
  * by the isolated service integration fixture. No credential is included in these arguments. */
 export function standaloneEntry(): { command: string; args: string[]; cwd?: string } {
   const override = process.env.ACORN_CLI_NODE_ENTRY
-  if (override) return override.endsWith('.ts')
-    ? { command: process.execPath, args: ['--import', 'tsx', override], cwd: join(findWorkspaceRoot(override), 'apps/node') }
-    : { command: process.execPath, args: [override] }
-  const candidates = ['../standalone.js', '../../standalone.js', '../../node/dist/standalone.js', '../../../node/dist/standalone.js']
-    .map((relative) => fileURLToPath(new URL(relative, import.meta.url)))
+  if (override)
+    return override.endsWith('.ts')
+      ? {
+          command: process.execPath,
+          args: ['--import', 'tsx', override],
+          cwd: join(findWorkspaceRoot(override), 'apps/node'),
+        }
+      : { command: process.execPath, args: [override] }
+  const candidates = [
+    '../standalone.js',
+    '../../standalone.js',
+    '../../node/dist/standalone.js',
+    '../../../node/dist/standalone.js',
+  ].map((relative) => fileURLToPath(new URL(relative, import.meta.url)))
   const built = candidates.find(existsSync)
   if (built) return { command: process.execPath, args: [built] }
   const app = join(findWorkspaceRoot(fileURLToPath(import.meta.url)), 'apps/node')

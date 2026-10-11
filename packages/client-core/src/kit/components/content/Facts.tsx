@@ -1,8 +1,8 @@
 import { For, type JSX } from 'solid-js'
 import { DescriptionList } from './DescriptionList'
 
-/* Facts: label-and-value pairs in auto-fitting tiles. `DescriptionList layout="facts"` had four
-   users (linear, rollbar, docker, onboarding) and no name; this is the name.
+/* Facts: label-and-value pairs in auto-fitting tiles, the named form of
+   `DescriptionList layout="facts"`.
 
    Values take JSX because a fact is often a Badge or a StatusDot, but labels are strings: a fact
    whose label needs markup is a Row.
@@ -22,7 +22,9 @@ export function Facts(props: {
     <DescriptionList layout={props.grouping === 'rows' ? 'columns' : 'facts'} size={props.size}>
       <For each={props.items}>
         {(item) => (
-          <DescriptionList.Item label={item.label} mono={item.mono} wide={item.wide}>{item.value}</DescriptionList.Item>
+          <DescriptionList.Item label={item.label} mono={item.mono} wide={item.wide}>
+            {item.value}
+          </DescriptionList.Item>
         )}
       </For>
     </DescriptionList>

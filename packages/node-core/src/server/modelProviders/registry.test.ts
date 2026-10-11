@@ -72,12 +72,14 @@ describe('ModelProviderRegistry', () => {
     expect(() => empty.register({ ...adapter, recommendedModelId: ' ' })).toThrow('has no recommended model')
   })
 
-  it('does not let one plugin receive another plugin\'s model credential', () => {
+  it("does not let one plugin receive another plugin's model credential", () => {
     const connections = new ConnectionProviderRegistry()
     connections.register(connectionProvider(true), 'owner')
     const registry = new ModelProviderRegistry(connections)
 
-    expect(() => registry.register(adapter, 'other')).toThrow("Plugin 'other' cannot use connection provider 'model-test'")
+    expect(() => registry.register(adapter, 'other')).toThrow(
+      "Plugin 'other' cannot use connection provider 'model-test'",
+    )
     registry.register(adapter, 'owner')
     expect(registry.require('model-test')).toBe(adapter)
   })

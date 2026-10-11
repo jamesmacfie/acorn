@@ -35,22 +35,36 @@ export function dockerLogBuffer(target: string): DockerLogBuffer {
     const tail = new LogTail()
     const [version, setVersion] = createSignal(0)
     let timer: ReturnType<typeof setTimeout> | undefined
-    const publish = () => { timer = undefined; setVersion(v => v + 1) }
-    const text = () => { version(); return tail.text() }
-    const setText = () => { tail.clear(); if (timer) clearTimeout(timer); publish() }
+    const publish = () => {
+      timer = undefined
+      setVersion((v) => v + 1)
+    }
+    const text = () => {
+      version()
+      return tail.text()
+    }
+    const setText = () => {
+      tail.clear()
+      if (timer) clearTimeout(timer)
+      publish()
+    }
     const [ended, setEnded] = createSignal(false)
     const off = wsDockerAttach('logs', target, (event) => {
       if (event.kind === 'log') {
         tail.append(event.data)
         if (!timer) timer = setTimeout(publish, PUBLICATION_MS)
-      }
-      else if (event.kind === 'end') {
+      } else if (event.kind === 'end') {
         if (timer) clearTimeout(timer)
         publish()
         setEnded(true)
       }
     })
-    const detach = () => { off(); if (timer) clearTimeout(timer); timer = undefined; setEnded(true) }
+    const detach = () => {
+      off()
+      if (timer) clearTimeout(timer)
+      timer = undefined
+      setEnded(true)
+    }
     entry = { text, setText, ended, detach, stamp: 0 }
     buffers.set(key, entry)
     if (buffers.size > MAX_BUFFERS) {

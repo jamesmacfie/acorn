@@ -18,14 +18,18 @@ const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'
 /** The `hooks` entry for Claude's settings: one command hook per point that has a handler. Claude runs
  *  these beside the person's own hooks, and a deny from any of them refuses the call. */
 export function claudeLoopHookSettings(bridge: AgentDriverLoopHooks): Record<string, unknown> {
-  const entry = (event: AgentLoopHookEvent) => [{
-    matcher: '*',
-    hooks: [{
-      type: 'command',
-      command: [bridge.command, ...bridge.args, 'claude', event].map(shellQuote).join(' '),
-      timeout: LOOP_HOOK_TIMEOUT_SECONDS,
-    }],
-  }]
+  const entry = (event: AgentLoopHookEvent) => [
+    {
+      matcher: '*',
+      hooks: [
+        {
+          type: 'command',
+          command: [bridge.command, ...bridge.args, 'claude', event].map(shellQuote).join(' '),
+          timeout: LOOP_HOOK_TIMEOUT_SECONDS,
+        },
+      ],
+    },
+  ]
   return {
     ...(bridge.beforeTool ? { PreToolUse: entry('PreToolUse') } : {}),
     ...(bridge.afterTool ? { PostToolUse: entry('PostToolUse') } : {}),
@@ -40,7 +44,11 @@ const FILE_GUARD_TIMEOUT_SECONDS = 10
  *  outside it, so a PreToolUse hook runs the file guard on each call, which checks the real path against
  *  the block, including a file created after the start. The deny rules keep Claude's own permission
  *  check out of the entries that existed at the start too, so the guard isn't the only line. */
-export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox: Record<string, unknown>; deny: string[]; preToolUse: unknown[] } {
+export function claudeReadBlockSettings(block: AgentDriverReadBlock): {
+  sandbox: Record<string, unknown>
+  deny: string[]
+  preToolUse: unknown[]
+} {
   const policy = encodeFileGuardPolicy({
     dataDir: [block.dataDir],
     read: block.readable,
@@ -55,19 +63,33 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox:
       allowUnsandboxedCommands: false,
       // A machine that can't run the sandbox refuses the session rather than running it unconfined.
       failIfUnavailable: true,
-      filesystem: { denyRead: [block.dataDir], allowRead: block.readable, allowWrite: block.writable, denyWrite: block.writeDenied },
+      filesystem: {
+        denyRead: [block.dataDir],
+        allowRead: block.readable,
+        allowWrite: block.writable,
+        denyWrite: block.writeDenied,
+      },
       ...(block.loopback ? { network: { allowedDomains: [block.loopback] } } : {}),
     },
     // `//` anchors at the filesystem root, as the skill allow rules below do.
-    deny: block.hidden.flatMap((path) => [`Read(/${path})`, `Read(/${path}/**)`, `Edit(/${path})`, `Edit(/${path}/**)`]),
-    preToolUse: [{
-      matcher: FILE_GUARD_MATCHER,
-      hooks: [{
-        type: 'command',
-        command: [block.fileGuard.command, ...block.fileGuard.args, policy].map(shellQuote).join(' '),
-        timeout: FILE_GUARD_TIMEOUT_SECONDS,
-      }],
-    }],
+    deny: block.hidden.flatMap((path) => [
+      `Read(/${path})`,
+      `Read(/${path}/**)`,
+      `Edit(/${path})`,
+      `Edit(/${path}/**)`,
+    ]),
+    preToolUse: [
+      {
+        matcher: FILE_GUARD_MATCHER,
+        hooks: [
+          {
+            type: 'command',
+            command: [block.fileGuard.command, ...block.fileGuard.args, policy].map(shellQuote).join(' '),
+            timeout: FILE_GUARD_TIMEOUT_SECONDS,
+          },
+        ],
+      },
+    ],
   }
 }
 
@@ -85,25 +107,20 @@ export const claudeHarness: HarnessLaunchSpec = {
     requires: { command: 'claude', env: 'CLAUDE_CODE_EXECUTABLE' },
   },
   envPassthrough: ['CLAUDE_CODE_*'],
-  // Claude Code now waits and continues inside its own process by default. Acorn disables that
-  // session-local behavior so the durable runtime owns the timer, the opt-out setting, restart
-  // recovery, and the transcript notice consistently with Codex and contributed harnesses.
-  //
-  // Host attendance is fixed at session creation and supplies bootstrap instructions. The runtime
-  // also supplies per-turn instructions for legacy sessions and other harness prompt channels.
   // Claude Code 2.1.292 keeps the appended prompt a session was created with and ignores a new one on
-  // resume, so nothing that can change between starts goes here. The skills index goes ahead of a turn
-  // instead (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
+  // resume, so nothing that can change between starts goes there. Attendance instructions are fixed at
+  // session creation, so they can. The skills index goes ahead of a turn instead
+  // (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
   // (`//` anchors at the filesystem root), so the agent reads a body without a prompt and gains no write
   // access anywhere new. Flag settings are per process, so the rule follows the current index.
   //
   // The skills themselves go in as session plugins, the Agent SDK's `plugins` option, which the adapter
   // passes through unchanged and the SDK turns into `--plugin-dir` on a create and a resume alike. Unlike
-  // the appended prompt, a resume loads the plugins it's given now. See
+  // the appended prompt, a resume loads the plugins it's given. See
   // docs/managed-agents/native-skills.md § Native skills.
   nativeSkills: true,
   // acorn's bridge goes in as command hooks in the same flag settings, which Claude Code runs beside the
-  // person's own and never writes anywhere (claudeLoopHookSettings above, docs/managed-agents/loop-hooks.md).
+  // person's own and never writes anywhere (claudeLoopHookSettings, docs/managed-agents/loop-hooks.md).
   // Like the allow rules, flag settings follow each process, so a resume installs what has a handler now.
   loopHooks: true,
   // The read block goes in the same flag settings, so like the hooks it applies from each start.
@@ -113,19 +130,38 @@ export const claudeHarness: HarnessLaunchSpec = {
       sessionCustomAgent(session.config)?.instructions,
       attendanceInstructions,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
-    ].filter(Boolean).join('\n\n')
+    ]
+      .filter(Boolean)
+      .join('\n\n')
     const block = readBlock ? claudeReadBlockSettings(readBlock) : null
     const allow = skills.folders.map((dir) => `Read(/${dir}/**)`)
-    const permissions = allow.length || block ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } } : {}
+    const permissions =
+      allow.length || block
+        ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } }
+        : {}
     const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
     const bridged = loopHooks ? claudeLoopHookSettings(loopHooks) : {}
     const preToolUse = [...(block?.preToolUse ?? []), ...((bridged.PreToolUse as unknown[] | undefined) ?? [])]
     const hookSettings = { ...bridged, ...(preToolUse.length ? { PreToolUse: preToolUse } : {}) }
     const hooks = Object.keys(hookSettings).length ? { hooks: hookSettings } : {}
     return {
-      // The adapter drops the SDK's task messages unless a session asks for them. A background
-      // command's exit arrives only as `task_notification` (./claudeBackgroundCommands.ts).
-      claudeCode: { emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }], options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
+      claudeCode: {
+        // The adapter drops the SDK's task messages unless a session asks for them. A background
+        // command's exit arrives only as `task_notification` (./claudeBackgroundCommands.ts).
+        emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }],
+        options: {
+          settings: {
+            // Claude Code otherwise waits out a usage limit and continues inside its own process. Off,
+            // so the durable runtime owns the timer, the opt-out setting, restart recovery, and the
+            // transcript notice, the same as for Codex and contributed harnesses.
+            autoContinueAtUsageLimit: false,
+            ...permissions,
+            ...hooks,
+            ...(block ? { sandbox: block.sandbox } : {}),
+          },
+          ...plugins,
+        },
+      },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },

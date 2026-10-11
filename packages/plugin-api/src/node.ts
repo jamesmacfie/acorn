@@ -4,58 +4,48 @@
 // Off this surface, and staying off:
 //   ctx.events.streams()/channel(), PTY and WS-channel ownership. Exactly one plugin may own those,
 //     so they are terminal-plugin infrastructure handed in through ctx, not API.
-//   main/wsHub, main/notify. Plugins broadcast through ctx, and a ratchet keeps it that way.
+//   server/transport/wsHub, server/notify. Plugins broadcast through ctx, and a boundary test keeps it
+//     that way.
 //   server/db. A plugin owns its own SQLite file; core's tables are not its business.
 //   createCoreServices, createTaskService, testkit/*. Test scaffolding has its own entrypoint,
 //     @acorn/plugin-api/testkit. A test gets a real context from makeTestNodeContext rather than
-//     constructing core's services itself, which is why the factories are still not here.
+//     constructing core's services itself.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
 // `PluginHook*` are named here for the same reason `TaskConcern` below is: a plugin that opens a hook
 // passes `ctx.hooks` into the module that runs it, and a parameter needs a type to name
-// (server/pluginHost/hooks.ts, docs/plugins/hooks.md § Hooks).
+// (docs/plugins/hooks.md § Hooks).
 export type {
   NodePlugin,
   CompiledPluginBroadcast,
   PluginBroadcast,
   PluginFetchHandler,
-  PluginHookHandler,
-  PluginHookPoint,
   PluginHookRegistry,
   PluginProviderResourceRequest,
   PluginRequestContext,
 } from '@acorn/node-core/server/pluginHost'
-export type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
-// an inline literal, and a function needs a return type to name (server/pluginHost/taskChecks.ts).
+// an inline literal, and a function needs a return type to name.
 export type { TaskConcern } from '@acorn/node-core/server/pluginHost'
-// What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
-export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost'
+// What a `ctx.search.register` provider's `search` answers with.
 export type { SearchHit } from '@acorn/protocol/search.ts'
-// The hook and daily catch-up a plugin that stores task data purges deleted tasks from
-// (server/pluginHost/deletedTaskPurge.ts).
+// The hook and daily catch-up a plugin that stores task data purges deleted tasks from.
 export { registerDeletedTaskPurge } from '@acorn/node-core/server/pluginHost'
-// The major this host speaks to loaded plugins. Exported here for compiled callers, but the private
-// facade's snapshot does not govern when this number changes.
-//
 // The context types are not here: a plugin keeps `ctx` inside `init`/`activate` and passes `ctx.core`
 // onward, so `NodePluginContext` never has to be named.
-export { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins'
-export { capabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 export type { Disposable } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 // The many-provider seam beside capabilities (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Only
-// the id minter and the entry type: `open`, `contribute` and `entries` arrive on
-// `ctx.extensionPoints`, and a plugin that imported the registry directly would get its own copy of
-// the maps, since a loaded bundle inlines every @acorn/* import it makes.
-export { extensionPointId } from '@acorn/node-core/server/pluginHost'
+// the types: `declare`, `handle` and `handlers` arrive on `ctx.extensionPoints`, and a plugin that
+// imported the registry directly would get its own copy of the maps, since a loaded bundle inlines
+// every @acorn/* import it makes.
 export type { Extension, ExtensionPointId } from '@acorn/node-core/server/pluginHost'
 // The managed agent harness seam (docs/managed-agents/harnesses.md § Harnesses). The capability id and its
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
-export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost'
+export type { HarnessRegistry, ManifestHarness } from '@acorn/node-core/server/pluginHost'
 export { AGENTS_CUSTOM_AGENT_REGISTRY } from '@acorn/node-core/server/pluginHost'
-export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
+export type { ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
 // The skill catalogue (docs/managed-agents/skills.md § Skills). Core owns the list and the owner's
 // answers; the agents plugin asks what a starting provider may receive and says what it sent. Compiled
 // only: a loaded bundle inlining this would get its own empty catalogue.
@@ -64,51 +54,51 @@ export type { DeliverableSkill } from '@acorn/node-core/server/pluginHost'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-export { isTaskConfined, mayActOnTask, ownerId, principalMayActOnTask, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
+export {
+  isTaskConfined,
+  mayActOnTask,
+  ownerId,
+  principalMayActOnTask,
+  requireDevice,
+} from '@acorn/node-core/server/middleware/requireUser.ts'
+export { respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins/loaded-plugins.md § Loaded plugins).
 export { portableCarrier } from '@acorn/node-core/server/pluginHost'
 // Routes whose module loads on the first request rather than at boot
 // (docs/plugin-authoring/the-node-half.md § Load a route on first use).
-export { LazyRouteLoadError, lazyFetch, lazyRouter } from '@acorn/node-core/server/pluginHost'
-export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
+export { lazyFetch, lazyRouter } from '@acorn/node-core/server/pluginHost'
+export {
+  BridgeError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/node-core/server/bridge.ts'
 export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // `Env`, core's runtime bindings, is not here. A loaded plugin may inherit only environment names
 // declared in its manifest; host bindings never enter its RPC context. Where it needs a store, it
-// states the methods it calls (plugins/github/src/server/routes/prMirror.ts § PatchBlobStore).
+// states the methods it calls, as github's `PatchBlobStore` does.
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The objects arrive on `ctx.telemetry`, `ctx.log` and `ctx.core.telemetry`; the types are here
 // because a plugin that passes one into a module of its own needs a parameter type to name
-// (docs/telemetry.md, docs/plugin-authoring/telemetry.md § Telemetry and logging). `TelemetrySink` is what a
-// plugin holding the `telemetry` token writes.
-export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-core/server/telemetry'
-// The one value in this block, for a compiled plugin's module-level code with no `ctx` in reach: a
-// PTY engine, a route factory, a driver. Pass your own plugin id as the owner and the tag you
-// already had in the string you were prefixing, so `[github] pruned 3 rows` keeps reading the same
-// and gains an owner. A loaded plugin uses `ctx.log`, which binds the id for it.
-//
-// `describeError` beside it because a logger takes scalars: it turns a caught `unknown` into a name
-// and a scrubbed one-line message, which is what goes in the line.
+// (docs/telemetry.md, docs/plugin-authoring/telemetry.md § Telemetry and logging).
+export type { PluginTelemetry, SpanHandle } from '@acorn/node-core/server/telemetry'
+// For a compiled plugin's module-level code with no `ctx` in reach: a PTY engine, a route factory, a
+// driver. Pass your own plugin id as the owner. A loaded plugin uses `ctx.log`, which binds the id for
+// it. `describeError` is beside it because a logger takes scalars: it turns a caught `unknown` into a
+// name and a scrubbed one-line message.
 export { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 export type { Logger } from '@acorn/node-core/server/telemetry'
 // The rule from docs/telemetry/model.md § What never leaves the machine, as a function, for the one
 // plugin shape that needs it: a sink, which is the last thing a record passes through before the
 // network. Core scrubs at the ingest door, so a sink is re-checking rather than cleaning, and a
-// span name or a metric name is the part core takes on trust as a pattern.
-//
-// Exported rather than copied because there are already two copies of these token patterns in this
-// repository and the header of each says a change belongs in both. A third, inside a plugin whose
-// whole job is egress, is the copy that would rot unnoticed.
+// span name or a metric name is the part core takes on trust as a pattern. A sink imports this
+// rather than copying the token patterns, so a change to them reaches it.
 export { scrub } from '@acorn/node-core/server/telemetry'
-export type { TelemetryService } from '@acorn/node-core/server/core'
-export type {
-  TelemetryAttrs,
-  TelemetryBatch,
-  TelemetryRecord,
-} from '@acorn/protocol/telemetry.ts'
+export type { TelemetryAttrs, TelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
 // The handle type only. See docs/data-layer.md and docs/plugins/data-ownership.md § Data ownership for
@@ -121,20 +111,11 @@ export type { PluginDatabase } from '@acorn/node-core/server/plugins'
 // projections rather than the drizzle row.
 export type {
   CompiledCoreServices,
-  CoreFsService,
-  CoreGitService,
   CoreProcService,
   CoreServices,
-  DataCell,
   DataColumn,
-  DataQueryOptions,
-  DataQueryResult,
-  DataSchemaResult,
-  DataSchemaSource,
-  DataSourceService,
   DataTable,
   GenerateTextRequest,
-  ModelService,
   ProjectRef,
   TaskRef,
 } from '@acorn/node-core/server/core/index.ts'
@@ -144,7 +125,13 @@ export type { PrefService } from '@acorn/node-core/server/core'
 export { confineExistingFile, readConfigFileSync, resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 // The local secret detector, pure and bounded. The publication gate is `ctx.core.secretPublication`
 // (docs/security/secret-publication.md).
-export { decodeSecretInput, redactSecretText, scanSecretText, secretReport, SECRET_DETECTOR_VERSION } from '@acorn/node-core/server/secretChecks/detector.ts'
+export {
+  decodeSecretInput,
+  redactSecretText,
+  scanSecretText,
+  secretReport,
+  SECRET_DETECTOR_VERSION,
+} from '@acorn/node-core/server/secretChecks/detector.ts'
 export { describeSecretRefusal } from '@acorn/node-core/server/secretChecks/gate.ts'
 export type { SecretPublicationGate } from '@acorn/node-core/server/secretChecks/gate.ts'
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
@@ -163,7 +150,6 @@ export type { SessionTaskInfo } from '@acorn/node-core/server/taskEnv.ts'
 // Takes a `TaskRef` (above), not the `tasks` row; see docs/plugins/plugin-api.md § The plugin API for why a
 // column rename in core would otherwise be a silent plugin break.
 export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/server/worktrees'
-export { loadRepoConfig } from '@acorn/node-core/server/runConfig.ts'
 export type { LayoutRecipe, RunTarget } from '@acorn/node-core/server/runConfig.ts'
 export { isRepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.ts'
 export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/server/storage'
@@ -187,32 +173,29 @@ export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core
 export {
   getProfile,
   interactiveProfile,
-  listProfileDefs,
   listProfiles,
-  profileAvailable,
   requireProfile,
   resolveCommand,
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
-export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { acornFileGuard, acornLoopHook, acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export {
+  acornFileGuard,
+  acornLoopHook,
+  acornMcp,
+  configureAcornMcp,
+  envFlags,
+  launcherSpec,
+  registerAcornMcp,
+  registerAcornMcpBeforeSpawn,
+  resolveMcpEntry,
+  serverName,
+} from '@acorn/node-core/server/mcpRegister.ts'
 export { encodeFileGuardPolicy, FILE_GUARD_MATCHER, type FileGuardPolicy } from '@acorn/node-core/mcp/fileGuard.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
 export { ToolError } from '@acorn/node-core/server/agentTools'
 export type { AgentToolContribution, ToolContext } from '@acorn/node-core/server/agentTools'
-export {
-  PLUGIN_CONTEXT_SECTION_MAX_BYTES,
-  PLUGIN_CONTEXT_SECTION_MAX_TOKENS,
-  PLUGIN_CONTEXT_TIMEOUT_MAX_MS,
-  PLUGIN_TOOL_OUTPUT_MAX_BYTES,
-  PLUGIN_TOOL_SCHEMA_MAX_BYTES,
-  PLUGIN_TOOL_SCHEMA_MAX_DEPTH,
-  PLUGIN_TOOL_TIMEOUT_MAX_MS,
-} from '@acorn/protocol/plugin/runtimeContributions.ts'
-export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
-export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
 // that own their rows (docs/agent-tools/context-sections.md § Context sections). `pastedContent` is also how agents
 // marks another agent's report.
@@ -233,14 +216,12 @@ export type {
   CachedItemCodec,
   CodecResult,
   MirroredResourceContribution,
-  ProviderDetailContext,
   ProviderItemComment,
   ProviderItemDetail,
   ProviderItemImage,
   ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
-  ProviderWriteContext,
 } from '@acorn/node-core/server/integrations'
 export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core/server/integrations'
 export { connectionHasCapability } from '@acorn/node-core/server/integrations'
@@ -249,21 +230,22 @@ export type { StoredConnection } from '@acorn/node-core/server/integrations'
 export { providerCredential } from '@acorn/node-core/server/integrations'
 export { providerError } from '@acorn/node-core/server/integrations'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations'
-export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations'
+export {
+  defaultBudgets,
+  externalIdsFor,
+  publicConnectionProvider,
+  publicProvider,
+} from '@acorn/node-core/server/integrations'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders'
 // The node-provider contract (docs/plugins/node-providers.md § Node providers). Types only: the provider arrives on
 // `ctx.providers.nodes`, and a plugin that imported the registry directly would get its own copy of
 // the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
 // enum live in @acorn/protocol, which a plugin already depends on.
-export type { NodeProviderContribution, NodeSpec, ProvidedNodeRecord } from '@acorn/node-core/server/nodeProviders/registry.ts'
-export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
-export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
-export { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
-export type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
-export { DATA_OPERATORS, dataPointerSchema, dataBindingSchema, dataFieldSchema, dataFieldsSchema, parseDataPredicate, compareDataValues } from '@acorn/protocol/dataBindings.ts'
-export type { DataBinding, DataBindingAddress, DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
-export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataSourceDiscovery, DataSourceScope, DataSourceDescription, DataSourceQuery, DataSourceRequest, DataRecordRef, DataRecord, DataSourcePage, DataSourceResult, DataSourceOptions, DataSourceDetails, DataSourceResponse, DataSourceDiscoveryRequest, DataSourceDiscoveryPage } from '@acorn/protocol/dataSources.ts'
+export type {
+  NodeProviderContribution,
+  NodeSpec,
+  ProvidedNodeRecord,
+} from '@acorn/node-core/server/nodeProviders/registry.ts'
+export { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
+
 export { createDataSelectionPager, dataComparisons, selectDataRecords } from '@acorn/node-core/server/dataSources'
-export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery } from '@acorn/protocol/dataQueries.ts'
-export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
-export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'

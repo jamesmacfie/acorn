@@ -14,53 +14,24 @@ modules own field and validation details, and there's no OpenAPI document or gen
 
 ## Pages
 
-<a id="transport"></a>
-<a id="pairing"></a>
-<a id="versioning"></a>
-<a id="request-processing"></a>
-<a id="errors"></a>
-<a id="captured-client-origins"></a>
-
 [Transport, pairing, and versioning](./api-reference/transport.md) covers the namespaces, the broker's
 request deadline, pairing codes and their limits, the protocol major and the tolerant handshake, the
 middleware order, idempotency keys, and the error envelope.
-
-<a id="core-routes"></a>
-<a id="node-administration"></a>
-<a id="preferences-and-integrations"></a>
-<a id="workspaces-and-tasks"></a>
-<a id="worktrees-configuration-and-run-targets"></a>
-<a id="task-script-reads"></a>
 
 [Core routes](./api-reference/core-routes.md) lists every `/v1/core` route with its gate: node
 administration, plugins, schedules, preferences, integrations, telemetry, workspaces, projects,
 tasks, run targets, task scripts, data sources, queries, and dashboards.
 
-<a id="plugin-routes"></a>
-<a id="github"></a>
-<a id="agents"></a>
-<a id="notes-and-memory"></a>
-<a id="other-feature-plugins"></a>
-<a id="changes-diff-document"></a>
-<a id="command-palette-routes"></a>
-<a id="loaded-agent-tools-and-context-sections"></a>
-<a id="memory-library-operations"></a>
-
 [Plugin routes](./api-reference/plugin-routes.md) lists the route families of GitHub, agents,
-terminal, changes, editor, Docker, notes, memory, preview, browser, and the loaded plugins, with the
+terminal, Git, editor, Docker, notes, memory, preview, browser, and the loaded plugins, with the
 GitHub pull request and Changes diff document contracts.
 The Git plugin's history and revision routes are in [Git history](./git-client/history.md#routes).
-
-<a id="terminal-workflows-and-execution"></a>
 
 [Workflow routes](./api-reference/workflow-routes.md) lists the workflows plugin's run, processing
 history, definition, and schedule binding routes.
 
-<a id="websocket"></a>
-<a id="logical-event-viewers"></a>
-
-[WebSocket](./api-reference/websocket.md) covers `/v1/events`, logical viewers, the preview tunnel,
-channel prefixes, and the eleven Node events.
+[WebSocket](./api-reference/websocket.md) covers `/v1/events`, logical viewers, channel prefixes, and
+the eleven Node events.
 
 ## Related pages
 

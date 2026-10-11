@@ -2,7 +2,13 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { SEARCH_MIN_LENGTH, searchRoute, type SearchGroup, type SearchResponse } from '@acorn/protocol/search.ts'
-import { archivedTasksOptions, projectsOptions, tasksKey, workspacesOptions, type ArchivedTask } from '../../infra/queries'
+import {
+  archivedTasksOptions,
+  projectsOptions,
+  tasksKey,
+  workspacesOptions,
+  type ArchivedTask,
+} from '../../infra/queries'
 import { readJson } from '../../infra/node/apiClient'
 import { createActiveWorkspaceId } from '../workspaces/activeWorkspaceId'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
@@ -11,7 +17,18 @@ import { confirmTaskDelete } from '../tasks/confirmTaskArchive'
 import { taskBridge } from '../tasks/taskBridge'
 import TaskPaneHost from '../tasks/TaskPaneHost'
 import { openTarget } from '../notifications/notifications'
-import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader, FilterBar } from '../../kit/components/primitives'
+import {
+  Alert,
+  Button,
+  DetailColumn,
+  EmptyState,
+  Input,
+  ListColumn,
+  ListDetail,
+  Row,
+  SectionHeader,
+  FilterBar,
+} from '../../kit/components/primitives'
 import { Rows } from '../../kit/components/layout/Rows'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Inline } from '../../kit/components/layout/Inline'
@@ -30,18 +47,16 @@ const ARCHIVE_SIDEBAR_KEY = 'archive'
 // results are not kept, since the search box starts empty again.
 const listOffsets = new Map<string, number>()
 
-const archivedOn = (at: number): string => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+const archivedOn = (at: number): string =>
+  new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 // The archive: archived tasks newest first, a search over every provider, and a read-only preview of
 // the selected task with a way to restore it (docs/workspaces-and-tasks/archive.md § Restoring a task)
 // or delete it for good (§ Deleting a task).
 //
-// The page uses the search seam; it does not own it. The same providers can back a search across
-// active tasks, which is `archived=0` on the same route.
-//
-// The preview is the ordinary pane host on the archived task. Only panes that opt into stored-history
-// reads appear in its layout and switcher (registries/panes.ts § readsArchived). The task never enters
-// the task rail, because it is selected here rather than activated.
+// The page uses the search seam; it does not own it. The preview is the ordinary pane host on the
+// archived task, so only panes whose contribution sets `readsArchived` appear in it. The task never
+// enters the task rail, because it is selected here rather than activated.
 export default function ArchivePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -55,7 +70,9 @@ export default function ArchivePage() {
     const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId())
     return workspace ? new Set(workspace.projects.map((project) => project.id)) : null
   })
-  const tasks = createMemo(() => (archived.data ?? []).filter((task) => workspaceProjectIds()?.has(task.projectId) ?? true))
+  const tasks = createMemo(() =>
+    (archived.data ?? []).filter((task) => workspaceProjectIds()?.has(task.projectId) ?? true),
+  )
   const taskById = createMemo(() => new Map(tasks().map((task) => [task.id, task])))
   const projectName = (projectId: string) => projects.data?.find((project) => project.id === projectId)?.name ?? ''
   const taskGlyph = (task: ArchivedTask) => task.icon ?? taskOriginAppearance(task.origin).glyph
@@ -159,21 +176,30 @@ export default function ArchivePage() {
           </FilterBar>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </Show>
-        <div class="scroll" ref={(element) => retainScroll(element, {
-          key: () => query() ? 'search' : `tasks:${workspaceId() ?? ''}`,
-          read: (key) => listOffsets.get(key) ?? 0,
-          write: (key, offset) => { if (key !== 'search') listOffsets.set(key, offset) },
-        })}>
+        <div
+          class="scroll"
+          ref={(element) =>
+            retainScroll(element, {
+              key: () => (query() ? 'search' : `tasks:${workspaceId() ?? ''}`),
+              read: (key) => listOffsets.get(key) ?? 0,
+              write: (key, offset) => {
+                if (key !== 'search') listOffsets.set(key, offset)
+              },
+            })
+          }
+        >
           <Show
             when={query()}
             fallback={
               <Show
                 when={tasks().length}
-                fallback={(
+                fallback={
                   <Show when={!collapsed()}>
-                    <EmptyState align="start" size="sm">Nothing archived. Tasks you archive land here, with their history.</EmptyState>
+                    <EmptyState align="start" size="sm">
+                      Nothing archived. Tasks you archive land here, with their history.
+                    </EmptyState>
                   </Show>
-                )}
+                }
               >
                 <Rows
                   id="archive:tasks"
@@ -199,10 +225,19 @@ export default function ArchivePage() {
                             meta={<Text emphasis="muted">{archivedOn(current().archivedAt)}</Text>}
                             trailing={
                               <Inline>
-                                <Button size="sm" busy={restoring() === current().id} onPress={() => void restore(current())}>
+                                <Button
+                                  size="sm"
+                                  busy={restoring() === current().id}
+                                  onPress={() => void restore(current())}
+                                >
                                   Restore
                                 </Button>
-                                <Button size="sm" tone="danger" busy={deleting() === current().id} onPress={() => void remove(current())}>
+                                <Button
+                                  size="sm"
+                                  tone="danger"
+                                  busy={deleting() === current().id}
+                                  onPress={() => void remove(current())}
+                                >
                                   Delete
                                 </Button>
                               </Inline>
@@ -223,22 +258,36 @@ export default function ArchivePage() {
           >
             <Show
               when={!results.loading || results()}
-              fallback={<Show when={!collapsed()}><EmptyState busy align="start" size="sm">Searching…</EmptyState></Show>}
+              fallback={
+                <Show when={!collapsed()}>
+                  <EmptyState busy align="start" size="sm">
+                    Searching…
+                  </EmptyState>
+                </Show>
+              }
             >
               <Show
                 when={groups().length}
-                fallback={(
+                fallback={
                   <Show when={!collapsed()}>
-                    <EmptyState align="start" size="sm">Nothing archived matches “{query()}”.</EmptyState>
+                    <EmptyState align="start" size="sm">
+                      Nothing archived matches “{query()}”.
+                    </EmptyState>
                   </Show>
-                )}
+                }
               >
                 <For each={groups()}>
                   {(group) => (
                     <Stack gap="row">
-                      <SectionHeader level="group" count={group.hits.length}>{group.label}</SectionHeader>
+                      <SectionHeader level="group" count={group.hits.length}>
+                        {group.label}
+                      </SectionHeader>
                       <Show when={!collapsed() && group.status !== 'ok'}>
-                        <Text emphasis="muted">{group.status === 'timeout' ? `${group.label} took too long to search.` : `Couldn't search ${group.label}.`}</Text>
+                        <Text emphasis="muted">
+                          {group.status === 'timeout'
+                            ? `${group.label} took too long to search.`
+                            : `Couldn't search ${group.label}.`}
+                        </Text>
                       </Show>
                       <For each={group.hits}>
                         {(hit) => (
@@ -246,14 +295,19 @@ export default function ArchivePage() {
                             variant="stacked"
                             selected={hit.taskId === selectedId()}
                             title={hit.title}
-                            collapsed={collapsed()
-                              ? <Icon name={searchHitGlyph(hit)} />
-                              : undefined}
+                            collapsed={collapsed() ? <Icon name={searchHitGlyph(hit)} /> : undefined}
                             onPress={() => openHit(hit)}
                           >
                             <Text emphasis="strong">{hit.title}</Text>
                             <Text emphasis="muted" wrap>
-                              {[hit.taskId && group.providerId !== 'core:tasks' ? taskById().get(hit.taskId)?.title : '', hit.preview].filter(Boolean).join(' — ')}
+                              {[
+                                hit.taskId && group.providerId !== 'core:tasks'
+                                  ? taskById().get(hit.taskId)?.title
+                                  : '',
+                                hit.preview,
+                              ]
+                                .filter(Boolean)
+                                .join(' — ')}
                             </Text>
                           </Row>
                         )}
@@ -277,7 +331,9 @@ export default function ArchivePage() {
               <header class="archive-preview-head">
                 <Inline spread wrap>
                   <Stack gap="none">
-                    <Heading level={2} eyebrow={`Archived ${archivedOn(task.archivedAt)}`}>{task.title}</Heading>
+                    <Heading level={2} eyebrow={`Archived ${archivedOn(task.archivedAt)}`}>
+                      {task.title}
+                    </Heading>
                     <Text emphasis="muted">
                       {[projectName(task.projectId), task.branch].filter(Boolean).join(' · ')}
                     </Text>

@@ -11,7 +11,11 @@ export type PluginProviderRegistry = {
   /** A provider that knows about nodes, and optionally can make and remove them
    *  (docs/plugins/node-providers.md § Node providers). */
   nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
-  withConnection<T>(userId: string, providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T | undefined>
+  withConnection<T>(
+    userId: string,
+    providerId: string,
+    visit: PluginProviderConnectionVisitor<T>,
+  ): Promise<T | undefined>
 }
 
 export type GenerateTextInput = {

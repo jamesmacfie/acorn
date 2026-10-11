@@ -1,10 +1,8 @@
-// Node-owned page rules and preview home URL resolution. The shell owns the native webview;
+// Node-owned preview home URL resolution. The shell owns the native webview;
 // this plugin exposes capabilities, routes, and invalidation events through the plugin API.
 import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { PREVIEW_RULES } from '../contract/rules'
 import { PREVIEW_URLS } from '../contract/urls'
-import { previewRulesForTask } from '../server/previewRules'
 import { createPreviewUrlRuntime, type PreviewUrlRuntime } from '../server/previewUrls'
 
 export const previewPlugin = (): NodePlugin => {
@@ -13,12 +11,9 @@ export const previewPlugin = (): NodePlugin => {
   return {
     name: 'preview',
     label: 'Preview',
-    emits: [
-      { verb: 'url-changed', description: 'A task’s resolved preview home URL changed' },
-    ],
+    emits: [{ verb: 'url-changed', description: 'A task’s resolved preview home URL changed' }],
     init: (ctx) => {
       urls = createPreviewUrlRuntime(ctx.core, () => ctx.capabilities.get(TERMINAL_RUN_TARGETS), ctx.events.send)
-      ctx.capabilities.provide(PREVIEW_RULES, { forTask: (taskId) => previewRulesForTask(ctx.core, taskId) })
       ctx.capabilities.provide(PREVIEW_URLS, { forTask: (taskId) => urls!.forTask(taskId) })
 
       const serveUrl: PluginFetchHandler = async (request, context) => {
@@ -38,7 +33,7 @@ export const previewPlugin = (): NodePlugin => {
           return Response.json(await urls!.forTask(taskId))
         }
         if (match[2] === 'recipe-url' && request.method === 'POST') {
-          const body = await request.json().catch(() => null) as { url?: unknown } | null
+          const body = (await request.json().catch(() => null)) as { url?: unknown } | null
           if (typeof body?.url !== 'string' || !body.url.trim()) {
             return Response.json({ error: 'bad_request' }, { status: 400 })
           }
@@ -47,18 +42,33 @@ export const previewPlugin = (): NodePlugin => {
         }
         return new Response(null, { status: 405 })
       }
-      ctx.routes.fetch(serveUrl, { prefix: '', note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one' })
+      ctx.routes.fetch(serveUrl, {
+        prefix: '',
+        note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one',
+      })
 
       ctx.events.on('run:changed', (event) => {
         if (typeof event.taskId !== 'string') return
-        void urls?.refresh(event.taskId).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refresh(event.taskId)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
       ctx.events.on('tasks:changed', (event) => {
-        void urls?.refreshTasks(typeof event.taskId === 'string' ? event.taskId : null).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refreshTasks(typeof event.taskId === 'string' ? event.taskId : null)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
       ctx.events.on('project:changed', (event) => {
         if (typeof event.projectId !== 'string') return
-        void urls?.refreshProject(event.projectId).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refreshProject(event.projectId)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
     },
     dispose: () => {

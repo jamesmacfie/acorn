@@ -1,7 +1,11 @@
 import { spawnOwnedProcess } from '../processes/ownedProcess'
 import type { AgentProviderUsageReading, AgentUsageQuota } from '../../shared/usage'
 import {
-  clampRemaining, SESSION_WINDOW_SECONDS, usageHealth, WEEKLY_WINDOW_SECONDS, worstUsageHealth,
+  clampRemaining,
+  SESSION_WINDOW_SECONDS,
+  usageHealth,
+  WEEKLY_WINDOW_SECONDS,
+  worstUsageHealth,
 } from '../../shared/usage'
 import {
   capturePty,
@@ -31,28 +35,33 @@ export type CodexUsageOptions = {
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
 }
 
 export function startCodexAppServer(): CodexRpcProcess {
   const env = usageProcessEnv()
   const executable = resolveUsageCommand('codex', env)
   if (!executable) throw new UsageProcessError('cli_missing', 'codex is not available on PATH.')
-  // `-a never` rather than `-a untrusted`: codex 0.154 dropped `untrusted` from --ask-for-approval,
-  // so the app-server died on the flag before it could answer and usage read as "no data". Reading
-  // rate limits never asks for approval anyway; the flag is only here to keep the probe silent.
+  // `-a never` rather than `-a untrusted`: codex 0.154 and later reject `untrusted` for
+  // --ask-for-approval, so the app-server dies on the flag before it can answer and usage reads as
+  // "no data". Reading rate limits never asks for approval anyway; the flag only keeps the probe silent.
   const { child, owner } = spawnOwnedProcess({
-    command: executable, args: ['-s', 'read-only', '-a', 'never', 'app-server'], env,
+    command: executable,
+    args: ['-s', 'read-only', '-a', 'never', 'app-server'],
+    env,
   })
   child.stderr.resume()
   return {
     write: (line) => child.stdin.write(line),
     end: () => child.stdin.end(),
-    kill: () => owner.stop().finally(() => {
-      child.stdin.destroy()
-      child.stdout.destroy()
-      child.stderr.destroy()
-    }),
+    kill: () =>
+      owner.stop().finally(() => {
+        child.stdin.destroy()
+        child.stdout.destroy()
+        child.stderr.destroy()
+      }),
     onData: (listener) => {
       const handler = (chunk: Buffer) => listener(chunk.toString('utf8'))
       child.stdout.on('data', handler)
@@ -65,7 +74,10 @@ export function startCodexAppServer(): CodexRpcProcess {
     onError: (listener) => {
       child.on('error', listener)
       child.stdin.on('error', listener)
-      return () => { child.off('error', listener); child.stdin.off('error', listener) }
+      return () => {
+        child.off('error', listener)
+        child.stdin.off('error', listener)
+      }
     },
   }
 }
@@ -129,7 +141,9 @@ export async function readCodexRateLimitsViaRpc(
       }
     }
   })
-  const offExit = process.onExit(() => failAll(new UsageProcessError('execution_failure', 'Codex app-server closed unexpectedly.')))
+  const offExit = process.onExit(() =>
+    failAll(new UsageProcessError('execution_failure', 'Codex app-server closed unexpectedly.')),
+  )
   const offError = process.onError((error) => failAll(new UsageProcessError('execution_failure', error.message)))
   const timeout = setTimeout(
     () => failAll(new UsageProcessError('timeout', `Codex app-server did not respond within ${timeoutMs}ms.`)),
@@ -144,7 +158,9 @@ export async function readCodexRateLimitsViaRpc(
         return
       }
       pending.set(id, { resolve, reject })
-      try { process.write(`${JSON.stringify({ id, method, params })}\n`) } catch (error) {
+      try {
+        process.write(`${JSON.stringify({ id, method, params })}\n`)
+      } catch (error) {
         failAll(error instanceof Error ? error : new Error('Codex usage write failed.'))
       }
     })
@@ -160,7 +176,9 @@ export async function readCodexRateLimitsViaRpc(
     try {
       process.end()
     } finally {
-      try { await process.kill() } finally {
+      try {
+        await process.kill()
+      } finally {
         offData()
         offExit()
         offError()
@@ -177,8 +195,7 @@ function quota(
 ): AgentUsageQuota | null {
   if (typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent)) return null
   const percentRemaining = clampRemaining(100 - window.usedPercent)
-  const resetSeconds =
-    typeof window.resetsAt === 'number' && Number.isFinite(window.resetsAt) ? window.resetsAt : null
+  const resetSeconds = typeof window.resetsAt === 'number' && Number.isFinite(window.resetsAt) ? window.resetsAt : null
   // Codex sends the window length with some payloads and not others, so its own number wins and the
   // usual five hours or week stands in when it is absent.
   const reportedWindowMinutes = window.windowDurationMins ?? window.windowMinutes
@@ -244,8 +261,8 @@ function classifyCodexOutput(text: string): UsageProcessError | null {
   if (lower.includes('update available') || lower.includes('update required')) {
     return new UsageProcessError('update_required', 'Codex CLI must be updated before usage can be read.')
   }
-  // A flag this probe passes is no longer one the CLI takes. Named, because the last time it happened
-  // the only symptom was "/status output did not contain usage limits", which pointed at the wrong thing.
+  // A flag this probe passes is not one the CLI takes. Named, because otherwise the only symptom is
+  // "/status output did not contain usage limits", which points at the wrong thing.
   if (/error:\s*(invalid value|unexpected argument|unrecognized)/i.test(text)) {
     return new UsageProcessError('execution_failure', 'The codex CLI rejected the options acorn uses to read usage.')
   }
@@ -271,12 +288,33 @@ export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): Agen
   const quotas: AgentUsageQuota[] = [
     ...(session == null
       ? []
-      : [{ id: 'session', label: 'Session (5h)', percentRemaining: session, resetsAt: null, resetText: null, windowSeconds: SESSION_WINDOW_SECONDS, health: usageHealth(session) }]),
+      : [
+          {
+            id: 'session',
+            label: 'Session (5h)',
+            percentRemaining: session,
+            resetsAt: null,
+            resetText: null,
+            windowSeconds: SESSION_WINDOW_SECONDS,
+            health: usageHealth(session),
+          },
+        ]),
     ...(weekly == null
       ? []
-      : [{ id: 'weekly', label: 'Weekly', percentRemaining: weekly, resetsAt: null, resetText: null, windowSeconds: WEEKLY_WINDOW_SECONDS, health: usageHealth(weekly) }]),
+      : [
+          {
+            id: 'weekly',
+            label: 'Weekly',
+            percentRemaining: weekly,
+            resetsAt: null,
+            resetText: null,
+            windowSeconds: WEEKLY_WINDOW_SECONDS,
+            health: usageHealth(weekly),
+          },
+        ]),
   ]
-  if (quotas.length === 0) throw new UsageProcessError('parse_failure', 'Codex `/status` output did not contain usage limits.')
+  if (quotas.length === 0)
+    throw new UsageProcessError('parse_failure', 'Codex `/status` output did not contain usage limits.')
   return {
     provider: 'codex',
     availability: 'available',

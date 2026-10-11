@@ -1,7 +1,7 @@
 // Pure terminal helpers: no node-pty imports, so they are unit-testable under plain Node
 // (terminalUtils.test.ts). The PTY and IPC wiring that needs those lives in terminal.ts. Helpers that
-// are not terminal-specific live in core: path and checkout guards in core/server/worktrees/pathGuards.ts, the
-// task-scoped child environment in core/server/taskEnv.ts.
+// are not terminal-specific live in node-core: path and checkout guards in server/worktrees/pathGuards.ts,
+// the task-scoped child environment in server/taskEnv.ts.
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 
@@ -23,8 +23,12 @@ export class OutputRing {
     const encoded = Buffer.from(data, 'utf8')
     // An aligned ordinary block already owns exactly its storage. Adopt it without a second
     // allocation or copy. Pooled or oversized backing storage still takes the bounded copy path.
-    if (this.cursor % RING_BLOCK_BYTES === 0 && encoded.length === RING_BLOCK_BYTES &&
-        encoded.byteOffset === 0 && encoded.buffer.byteLength === RING_BLOCK_BYTES) {
+    if (
+      this.cursor % RING_BLOCK_BYTES === 0 &&
+      encoded.length === RING_BLOCK_BYTES &&
+      encoded.byteOffset === 0 &&
+      encoded.buffer.byteLength === RING_BLOCK_BYTES
+    ) {
       this.blocks[this.cursor / RING_BLOCK_BYTES] = encoded
       this.cursor = (this.cursor + RING_BLOCK_BYTES) % RING_CAP
       this.total = Math.min(RING_CAP, this.total + RING_BLOCK_BYTES)
@@ -70,7 +74,7 @@ export const clampDim = (n: unknown, fallback: number): number =>
 
 // tmux session names for our sessions: `acorn-<uuid>`. The prefix lets reconciliation pick out our
 // sessions from any the user runs, and is the handle for `tmux attach -t` from a real terminal.
-export const TMUX_PREFIX = 'acorn-'
+const TMUX_PREFIX = 'acorn-'
 export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 
 // argv for the two tmux calls. new-session -A -d is create-or-noop, detached (a separate attach PTY
@@ -79,8 +83,8 @@ export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 // `-e KEY=VAL` sets the session environment explicitly (tmux >=3.2), and it is load-bearing. The tmux
 // server is a singleton, so a session created against an already-running one does not inherit the env
 // handed to execFileSync. It takes the server's stale global env plus the `update-environment`
-// allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN. That made agent panes show
-// "connected, no tools" while shell panes worked. Session names are unique per pane, so -A never
+// allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN, and agent panes show "connected, no
+// tools" while shell panes work. Session names are unique per pane, so -A never
 // attaches to an existing session where -e would not apply.
 export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, env: Record<string, string> = {}) => [
   'new-session',
@@ -110,7 +114,12 @@ export const launchCommandLine = (command: string, launchArgs: string[] = []): s
 
 // Parse `tmux list-sessions -F '#{session_name}'` into the set of our session names.
 export const parseTmuxSessions = (stdout: string): Set<string> =>
-  new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))
+  new Set(
+    stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith(TMUX_PREFIX)),
+  )
 
 // Idle threshold (docs/terminal/activity.md § Activity and status).
 export const IDLE_MS = 10_000
@@ -131,14 +140,9 @@ export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: b
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[a-zA-Z~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][A-Z0-9])/g
 const SPINNER_RE = /[⠁⠂⠄⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g
 
-const BLOCKED_PATTERNS: RegExp[] = [
-  /\(y\/n\)/i,
-  /\[y\/n\]/i,
-  /do you want to proceed/i,
-  /press enter/i,
-]
+const BLOCKED_PATTERNS: RegExp[] = [/\(y\/n\)/i, /\[y\/n\]/i, /do you want to proceed/i, /press enter/i]
 
-export const TAIL_SCAN_LINES = 12
+const TAIL_SCAN_LINES = 12
 
 export function matchBlockedPrompt(ringTail: string): boolean {
   const cleaned = ringTail.replace(ANSI_RE, '').replace(SPINNER_RE, '').replace(/\r/g, '\n')

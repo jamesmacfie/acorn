@@ -25,12 +25,15 @@ function page(url = 'app://acorn/t/task-1') {
 }
 
 describe('desktop external links', () => {
-  it.each(['https://example.com/article', 'http://localhost:3000/preview', 'mailto:hello@example.com'])('hands %s to the device and cancels webview navigation', (href) => {
-    const { window, open, click } = page()
-    window.document.querySelector('a')!.href = href
-    expect(click().defaultPrevented).toBe(true)
-    expect(open).toHaveBeenCalledExactlyOnceWith(href)
-  })
+  it.each(['https://example.com/article', 'http://localhost:3000/preview', 'mailto:hello@example.com'])(
+    'hands %s to the device and cancels webview navigation',
+    (href) => {
+      const { window, open, click } = page()
+      window.document.querySelector('a')!.href = href
+      expect(click().defaultPrevented).toBe(true)
+      expect(open).toHaveBeenCalledExactlyOnceWith(href)
+    },
+  )
 
   it('leaves links claimed by in-app handlers inside the app', () => {
     const { window, open, click } = page()

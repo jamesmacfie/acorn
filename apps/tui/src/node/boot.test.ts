@@ -18,12 +18,11 @@ import { installPlatform, type Platform } from '../platform'
 // It runs the real thing — a real standalone node against a fresh data root, the real fleet store and
 // device-token files in a fresh config directory, the real broker over pinned TLS — and then asks the
 // first questions the renderer asks: is there a node, can a `/v1` request reach it, and did the event
-// socket authenticate. It draws nothing, so unlike the rest of this package's suite it needs no FFI
-// and never skips.
+// socket authenticate. It draws nothing, so it needs no renderer.
 //
-// The desktop's twin is apps/desktop/test/boot.test.ts, and the shapes differ for the reason
-// 03-process-model.md gives: the desktop has a helper process to talk to over a wire, and this is one
-// process, so the test calls the functions directly.
+// The desktop's twin is apps/desktop/test/boot.test.ts, and the shapes differ: the desktop has a
+// helper process to talk to over a wire, and this is one process, so the test calls the functions
+// directly.
 
 const BUDGET_MS = 180_000
 
@@ -76,7 +75,12 @@ describe('acorn against a node it started', () => {
   })
 
   it('carries a /v1 request through the broker to the node', async () => {
-    const response = await platform.broker.fetch(opened.nodeId, { requestId: 'boot-test', path: '/v1/node', method: 'GET', headers: {} })
+    const response = await platform.broker.fetch(opened.nodeId, {
+      requestId: 'boot-test',
+      path: '/v1/node',
+      method: 'GET',
+      headers: {},
+    })
     // 200 means the pinned TLS connection came up and the device token authenticated, which is the
     // whole custody stack end to end.
     expect(response.status).toBe(200)
@@ -86,11 +90,16 @@ describe('acorn against a node it started', () => {
   it('brings the event socket up with the bearer on the upgrade', async () => {
     // `online` is set when the WebSocket opens, and the upgrade carries the bearer in a header, so
     // reaching it is the one assertion that covers the half of the transport HTTP does not.
-    await waitFor(() => platform.broker.statuses().some((status) => status.nodeId === opened.nodeId && status.state === 'online'), 'the socket to open')
+    await waitFor(
+      () => platform.broker.statuses().some((status) => status.nodeId === opened.nodeId && status.state === 'online'),
+      'the socket to open',
+    )
   })
 
   it('never exposes the token in what the renderer can read', async () => {
-    const fleet = await (globalThis as { window: { acorn: { fleetList(): Promise<{ nodes: unknown[] }> } } }).window.acorn.fleetList()
+    const fleet = await (
+      globalThis as { window: { acorn: { fleetList(): Promise<{ nodes: unknown[] }> } } }
+    ).window.acorn.fleetList()
     expect(JSON.stringify(fleet)).not.toContain(opened.fleet.tokenFor(opened.nodeId))
   })
 
@@ -105,9 +114,9 @@ describe('acorn against a node it started', () => {
     expect(lockedBy(dataDir())).toBe(holder)
 
     // …and the row it wrote is one the next launch can read. A fleet row is parsed back with a strict
-    // schema, so the attach path spreading the running node's `pid` into it made the whole file
-    // unreadable next time: an empty fleet, nothing for `connect` to connect, and a shell stuck on
-    // "the node is unreachable". A fresh store, because the one above has the rows in memory.
+    // schema, so one extra field, such as the running node's `pid`, makes the whole file unreadable
+    // next time: an empty fleet, nothing for `connect` to connect, and a shell stuck on "the node is
+    // unreachable". A fresh store, because the one above has the rows in memory.
     expect(custody(join(root, 'config')).fleet.get(opened.nodeId)?.endpoint).toBeDefined()
   }, 30_000)
 
@@ -119,16 +128,20 @@ describe('acorn against a node it started', () => {
     const attached = await openNode(undefined, stranger)
     const strangerPlatform = installPlatform(attached, () => {})
     try {
-      await waitFor(() => strangerPlatform.broker.statuses().some((status) => status.state === 'revoked'), 'the revoked transition')
-      expect(strangerPlatform.broker.statuses().at(-1)).toMatchObject({ state: 'revoked', error: { code: 'unauthorized' } })
+      await waitFor(
+        () => strangerPlatform.broker.statuses().some((status) => status.state === 'revoked'),
+        'the revoked transition',
+      )
+      expect(strangerPlatform.broker.statuses().at(-1)).toMatchObject({
+        state: 'revoked',
+        error: { code: 'unauthorized' },
+      })
     } finally {
       strangerPlatform.broker.dispose()
     }
   }, 30_000)
 
   // The caching contract, end to end against a real node id (docs/caching.md § Renderer query cache).
-  // Before this the TUI installed the file store and never drove a persister, so the directory was
-  // empty on every run and every start was cold.
   it('writes one cache file named by the partition key, and reads the rows back out of it', async () => {
     const cacheDir = join(root, 'config', 'cache')
     setCacheStorage(fileCacheStorage(cacheDir))
@@ -136,16 +149,30 @@ describe('acorn against a node it started', () => {
     const lease = persistence.acquire()
     await lease.restored
     try {
-
-      const rows: Task[] = [{
-        id: 'task-persisted', title: 'from the cache', projectId: 'project-1', branch: 'from-the-cache',
-        origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
-        github: null, worktreePath: null, pullNumber: null,
-      }]
+      const rows: Task[] = [
+        {
+          id: 'task-persisted',
+          title: 'from the cache',
+          projectId: 'project-1',
+          branch: 'from-the-cache',
+          origin: 'local',
+          icon: null,
+          status: 'active',
+          links: [],
+          parentId: null,
+          sort: 0,
+          github: null,
+          worktreePath: null,
+          pullNumber: null,
+        },
+      ]
       client.setQueryData(tasksKey, rows)
       // Wait for the production capture clock to write the final rows, not only a filename.
       const written = join(cacheDir, `${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`)
-      await waitFor(() => existsSync(written) && readFileSync(written, 'utf8').includes('task-persisted'), 'the rows to be persisted')
+      await waitFor(
+        () => existsSync(written) && readFileSync(written, 'utf8').includes('task-persisted'),
+        'the rows to be persisted',
+      )
 
       // One file, named by the partition key with the colon encoded. Node A's snapshot must never be
       // able to rehydrate into node B, and the name is what makes that structural.
@@ -174,25 +201,29 @@ describe('acorn against a node it started', () => {
 // returns as soon as the child is spawned, which is what lets the renderer draw in front of a booting
 // node.
 describe('acorn starting a node it has started before', () => {
-  it('returns the node id from the data root without waiting for the handshake', async () => {
-    // The root above has been opened and drained, so `node.json` names its node and nothing holds it.
-    expect(lockedBy(dataDir())).toBeNull()
-    const second = await openNode(undefined)
-    try {
-      expect(second.supervised).toBe(true)
-      expect(second.nodeId).toBe(opened.nodeId)
-      // The distinguishing fact: the boot line is still in flight. `openNode` resolved before the
-      // child had bound a port, let alone printed anything.
-      expect(second.starting).toBeDefined()
-      expect(second.held).toBeDefined()
+  it(
+    'returns the node id from the data root without waiting for the handshake',
+    async () => {
+      // The root above has been opened and drained, so `node.json` names its node and nothing holds it.
       expect(lockedBy(dataDir())).toBeNull()
+      const second = await openNode(undefined)
+      try {
+        expect(second.supervised).toBe(true)
+        expect(second.nodeId).toBe(opened.nodeId)
+        // The distinguishing fact: the boot line is still in flight. `openNode` resolved before the
+        // child had bound a port, let alone printed anything.
+        expect(second.starting).toBeDefined()
+        expect(second.held).toBeDefined()
+        expect(lockedBy(dataDir())).toBeNull()
 
-      // …and it does land, with the same id, which is what rewrites the fleet row's endpoint.
-      const handshake = await second.starting!
-      expect(handshake.nodeId).toBe(opened.nodeId)
-      expect(second.fleet.get(opened.nodeId)?.endpoint).toBe(handshake.endpoint)
-    } finally {
-      await second.stop()
-    }
-  }, BUDGET_MS)
+        // …and it does land, with the same id, which is what rewrites the fleet row's endpoint.
+        const handshake = await second.starting!
+        expect(handshake.nodeId).toBe(opened.nodeId)
+        expect(second.fleet.get(opened.nodeId)?.endpoint).toBe(handshake.endpoint)
+      } finally {
+        await second.stop()
+      }
+    },
+    BUDGET_MS,
+  )
 })

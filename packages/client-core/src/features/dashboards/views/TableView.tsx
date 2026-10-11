@@ -11,42 +11,108 @@ import RowControls, { openRowMenu } from './RowControls'
 // clickable by mouse is a table half the app can't use.
 //
 // No source column is hardcoded here. Provenance is an ordinary panel-local field on a mapped
-// multi-source panel (mapping.ts § PANEL_SOURCE_FIELD_ID), so it arrives through `fields` like every
-// other column: projectable, hideable, reorderable and filterable, none of which the special case
-// allowed.
+// multi-source panel (`PANEL_SOURCE_FIELD_ID`), so it arrives through `fields` like every other column:
+// projectable, hideable, reorderable and filterable.
 
 export default function TableView(props: PanelViewProps) {
-  const fields = () => props.fields.filter(field => !field.hidden)
+  const fields = () => props.fields.filter((field) => !field.hidden)
   const table = (rows: typeof props.rows) => (
     <Show
       when={rows.length && fields().length}
-      fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}
+      fallback={
+        <EmptyState align="start" size="sm">
+          Nothing to show.
+        </EmptyState>
+      }
     >
       <Table size="sm" stickyHead>
         <TableRow head>
-          <For each={fields()}>{(field) => <TableHead><Show when={props.onSelectPart} fallback={field.name}>
-            {select => <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>{field.name}</Button>}
-          </Show></TableHead>}</For>
-          <Show when={props.onButton || props.onCorrect}><TableHead>Actions</TableHead></Show>
+          <For each={fields()}>
+            {(field) => (
+              <TableHead>
+                <Show when={props.onSelectPart} fallback={field.name}>
+                  {(select) => (
+                    <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>
+                      {field.name}
+                    </Button>
+                  )}
+                </Show>
+              </TableHead>
+            )}
+          </For>
+          <Show when={props.onButton || props.onCorrect}>
+            <TableHead>Actions</TableHead>
+          </Show>
         </TableRow>
         <For each={rows}>
           {(row) => (
-            <TableRow onPress={rowPress(props, row)} onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined} tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}>
+            <TableRow
+              onPress={rowPress(props, row)}
+              onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined}
+              tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}
+            >
               <For each={fields()}>
-                {(field) => <TableCell><Show when={row.summaryStage !== undefined && props.onMeasureDrilldown && field.type === 'number'} fallback={<Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />}>
-                  <Button size="sm" variant="bare" onPress={() => props.onMeasureDrilldown?.(row, field.id)}><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></Button>
-                </Show><Show when={row.partial?.[field.id]}>{reason => <span title={reason()} aria-label={`Partial: ${reason()}`}> · partial</span>}</Show></TableCell>}
+                {(field) => (
+                  <TableCell>
+                    <Show
+                      when={row.summaryStage !== undefined && props.onMeasureDrilldown && field.type === 'number'}
+                      fallback={<Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />}
+                    >
+                      <Button size="sm" variant="bare" onPress={() => props.onMeasureDrilldown?.(row, field.id)}>
+                        <Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />
+                      </Button>
+                    </Show>
+                    <Show when={row.partial?.[field.id]}>
+                      {(reason) => (
+                        <span title={reason()} aria-label={`Partial: ${reason()}`}>
+                          {' '}
+                          · partial
+                        </span>
+                      )}
+                    </Show>
+                  </TableCell>
+                )}
               </For>
-              <Show when={props.onButton || props.onCorrect}><TableCell>
-                <Show when={props.onButton}><RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /></Show>
-                <Show when={row.correctableDatasetId && props.onCorrect}><Button size="sm" variant="ghost" onPress={() => props.onCorrect?.(row)}>Correct</Button></Show>
-              </TableCell></Show>
+              <Show when={props.onButton || props.onCorrect}>
+                <TableCell>
+                  <Show when={props.onButton}>
+                    <RowControls
+                      panelId={props.panelId}
+                      row={row}
+                      buttons={props.buttons}
+                      onButton={props.onButton}
+                      onOpenRecord={props.onOpenRecord}
+                    />
+                  </Show>
+                  <Show when={row.correctableDatasetId && props.onCorrect}>
+                    <Button size="sm" variant="ghost" onPress={() => props.onCorrect?.(row)}>
+                      Correct
+                    </Button>
+                  </Show>
+                </TableCell>
+              </Show>
             </TableRow>
           )}
         </For>
       </Table>
     </Show>
   )
-  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown && !props.onSelectPart} onPress={() => props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : table(group.rows)}</section>}</For>
+  const sections = (groups: NonNullable<typeof props.groups>) => (
+    <For each={groups}>
+      {(group) => (
+        <section class="dash-row-group">
+          <h4>
+            <Button
+              size="sm"
+              variant="bare"
+              disabled={!props.onDrilldown && !props.onSelectPart}
+              onPress={() => (props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group))}
+            >{`${group.label} · ${group.count}`}</Button>
+          </h4>
+          {group.children?.length ? sections(group.children) : table(group.rows)}
+        </section>
+      )}
+    </For>
+  )
   return props.groups?.length ? sections(props.groups) : table(props.rows)
 }

@@ -18,10 +18,16 @@ import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
  *  data root holds", which is the one row `homeNode()` prefers and the one whose token is scoped by
  *  the store rather than by a nodeId (packages/custody/src/broker/fleetStore.ts). Pairing reaches it
  *  when a node the desktop started is running and this TUI has never held a token for it. */
-export async function pairInteractively(endpoint: string, fleet: FleetStore, node: { label: string; local: boolean }): Promise<FleetNode> {
+export async function pairInteractively(
+  endpoint: string,
+  fleet: FleetStore,
+  node: { label: string; local: boolean },
+): Promise<FleetNode> {
   const probe = await probeNode(endpoint)
   if (!probe.compatible) {
-    throw new Error(`${probe.endpoint} speaks acorn protocol ${probe.protocolVersion}; this build speaks a different one. Upgrade whichever is older.`)
+    throw new Error(
+      `${probe.endpoint} speaks acorn protocol ${probe.protocolVersion}; this build speaks a different one. Upgrade whichever is older.`,
+    )
   }
 
   const words = fingerprintPhrase(probe.fingerprint) ?? probe.fingerprint
@@ -29,7 +35,7 @@ export async function pairInteractively(endpoint: string, fleet: FleetStore, nod
   console.log(`  ${probe.endpoint}`)
   console.log(`  Identity      ${words}`)
   console.log('')
-  console.log('  Check those words against the node\'s pairing display. If they do not match,')
+  console.log("  Check those words against the node's pairing display. If they do not match,")
   console.log('  something is intercepting this connection: press Enter with no code.')
   console.log('')
 

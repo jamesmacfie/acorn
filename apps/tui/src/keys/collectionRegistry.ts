@@ -21,12 +21,7 @@ export const collectionAt = (box: Renderable): Collection | undefined => contain
 export const collections = (): ReadonlyMap<Renderable, Collection> => containerByBox
 
 // Keep logical row identity across a query refresh that replaces its renderable.
-export function registerItem(
-  box: Renderable,
-  pick?: () => void,
-  identity?: string,
-  onDispose?: () => void,
-): void {
+export function registerItem(box: Renderable, pick?: () => void, identity?: string, onDispose?: () => void): void {
   items.add(box)
   if (pick) itemPicks.set(box, pick)
   if (!identity) return

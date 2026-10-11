@@ -19,7 +19,7 @@
 // node's row in docs/ui-design/every-node.md § Every node at 80 by 24.
 
 export type Host = 'dom' | 'tui'
-export type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
+type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
 /** A row: a level per host, and what a `reduced` level costs. */
 export type NodeSupportRow = Record<Host, SupportLevel> & { loss?: string }
 
@@ -30,8 +30,11 @@ export const NODE_SUPPORT = {
   Section: { dom: 'full', tui: 'full' },
   Fold: { dom: 'full', tui: 'full' },
   Card: { dom: 'full', tui: 'full' },
-  Timeline: { dom: 'full', tui: 'reduced',
-    loss: 'the reader is not put back on the turn they left; a redrawn list opens at the newest turn' },
+  Timeline: {
+    dom: 'full',
+    tui: 'reduced',
+    loss: 'the reader is not put back on the turn they left; a redrawn list opens at the newest turn',
+  },
   Tabs: { dom: 'full', tui: 'full' },
   Toolbar: { dom: 'full', tui: 'full' },
   FilterBar: { dom: 'full', tui: 'full' },
@@ -42,24 +45,28 @@ export const NODE_SUPPORT = {
   ModalActions: { dom: 'full', tui: 'full' },
   Menu: { dom: 'full', tui: 'full' },
   Popover: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'the panel opens as a full-width block under its anchor, not floating',
   },
   ListDetail: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'two columns above 80 cells, one at a time below',
   },
   // The columns as nodes, for a caller that cannot put an element in ListDetail's `list` prop.
   ListColumn: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'the whole width when the split has collapsed, rather than a column beside the detail',
   },
   DetailColumn: { dom: 'full', tui: 'full' },
   // A header, its named sections, and the one region that gets the room. Two shapes for one
   // declaration, which is the node's whole reason to exist.
   Sections: {
-    dom: 'full', tui: 'reduced',
-    loss: 'the sections are a strip of tabs over one panel rather than folds beside the main region, and a section\'s `meta` is not drawn — a strip has room for a label and a count',
+    dom: 'full',
+    tui: 'reduced',
+    loss: "the sections are a strip of tabs over one panel rather than folds beside the main region, and a section's `meta` is not drawn — a strip has room for a label and a count",
   },
   SplitHandle: { dom: 'full', tui: 'absent' },
   DocumentTabs: { dom: 'full', tui: 'full' },
@@ -72,7 +79,8 @@ export const NODE_SUPPORT = {
   // page lines up with core's and search has an anchor to land on (docs/frontend/settings.md § Settings).
   SettingsSection: { dom: 'full', tui: 'full' },
   SettingRow: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'a row whose value is set elsewhere names where and draws no control, so the value this machine holds is not shown',
   },
 
@@ -92,31 +100,37 @@ export const NODE_SUPPORT = {
   Facts: { dom: 'full', tui: 'full' },
   DescriptionList: { dom: 'full', tui: 'full' },
   Table: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'columns are truncated by the priority its heads declare',
   },
   // Table's rows as nodes, for the reason ModalBody is one: a host cannot truncate columns it
   // receives as opaque DOM, so the promise above is only keepable if it can see the rows.
   TableHead: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'the lowest priority column is dropped first, and the header names what was lost',
   },
   TableRow: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'cells are separated by │ and truncated by column priority',
   },
   TableCell: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'the text is ellipsised where its column does not fit',
   },
   Grid: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'a row-range indicator instead of a scrollbar, and the same column truncation as Table',
   },
   // The canvas. Ranks and lanes are a picture here and an indentation there, which is the whole of
   // what the terminal loses: the same cards, the same order, the same selection, no positions.
   Graph: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'the indented list the editor already draws — one line per card, no positions, no wires, and no dragging an edge into place',
   },
   HistoryMark: { dom: 'full', tui: 'reduced', loss: 'relationship text and lane number replace drawn connections' },
@@ -124,51 +138,59 @@ export const NODE_SUPPORT = {
   CodeBlock: { dom: 'full', tui: 'full' },
   Log: { dom: 'full', tui: 'full' },
   Markdown: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'no images, and a link is its text with the URL beside it in dim',
   },
   DiffPane: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'unified only, and no syntax colour',
   },
   DiffLine: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'no intra-line word highlight',
   },
   FileHead: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'no per-file collapse control; the path and the counts only',
   },
   StackedDiff: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'no intra-line word highlight, and the header has no copy control',
   },
   NonCodeRow: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'a dim line saying what is not being shown, with no control to act on it',
   },
   SplitCell: { dom: 'full', tui: 'absent' },
   EmptyState: { dom: 'full', tui: 'full' },
   Alert: { dom: 'full', tui: 'full' },
   Spinner: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'a braille cycle, or … where motion is off',
   },
   Kbd: { dom: 'full', tui: 'full' },
   UserAvatar: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'initials in brackets; no image',
   },
   Icon: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'a one-cell glyph from apps/tui/src/kit/glyphs.ts, and nothing for an unmapped name or literal',
   },
 
   // Asking
   Button: { dom: 'full', tui: 'full' },
   ConfirmButton: { dom: 'full', tui: 'full' },
-  IconButton: { dom: 'full', tui: 'reduced',
-    loss: 'the text label is the control; the icon name is not drawn' },
+  IconButton: { dom: 'full', tui: 'reduced', loss: 'the text label is the control; the icon name is not drawn' },
   Input: { dom: 'full', tui: 'full' },
   Textarea: { dom: 'full', tui: 'full' },
   Select: { dom: 'full', tui: 'full' },
@@ -179,7 +201,8 @@ export const NODE_SUPPORT = {
   PickerRow: { dom: 'full', tui: 'full' },
   Composer: { dom: 'full', tui: 'full' },
   MentionTextarea: {
-    dom: 'full', tui: 'reduced',
+    dom: 'full',
+    tui: 'reduced',
     loss: 'no inline highlight of the completed token; the menu is a list under the field',
   },
   KeyValueEditor: { dom: 'full', tui: 'full' },

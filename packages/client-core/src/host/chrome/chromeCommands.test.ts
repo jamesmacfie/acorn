@@ -26,32 +26,64 @@ type SettingCommand = import('../registries/commands/commands').SettingCommand
 // picked is the static one the manifest declared (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
 const CONTEXT: CommandExecutionContext = {
-  host: 'desktop', nodeId: 'node-b', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-b',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 't-1',
+  paneId: null,
+  surfaceId: null,
 }
 
-const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () => true, usableSelectAction: () => true }
+const binding = {
+  nodeId: () => 'node-a',
+  enabled: () => true,
+  usableAction: () => true,
+  usableSelectAction: () => true,
+}
 
-const searchDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
-  id: 'find', title: 'Find an issue', category: 'action', palette: true, kind: 'search',
-  scope: 'node', route: '/v1/p/linear/search',
-  onSelect: { verb: 'runNodeAction', path: '/v1/p/linear/open' },
-  ...over,
-} as PluginCommandDescriptor)
+const searchDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor =>
+  ({
+    id: 'find',
+    title: 'Find an issue',
+    category: 'action',
+    palette: true,
+    kind: 'search',
+    scope: 'node',
+    route: '/v1/p/linear/search',
+    onSelect: { verb: 'runNodeAction', path: '/v1/p/linear/open' },
+    ...over,
+  }) as PluginCommandDescriptor
 
-const inputDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
-  id: 'ask', title: 'Generate SQL', category: 'action', palette: true, kind: 'input',
-  scope: 'task', route: '/v1/p/database/generate',
-  onSuccess: { verb: 'runNodeAction', path: '/v1/p/database/open' },
-  ...over,
-} as PluginCommandDescriptor)
+const inputDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor =>
+  ({
+    id: 'ask',
+    title: 'Generate SQL',
+    category: 'action',
+    palette: true,
+    kind: 'input',
+    scope: 'task',
+    route: '/v1/p/database/generate',
+    onSuccess: { verb: 'runNodeAction', path: '/v1/p/database/open' },
+    ...over,
+  }) as PluginCommandDescriptor
 
-const settingDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
-  id: 'theme', title: 'Board theme', category: 'action', palette: true, kind: 'setting',
-  scope: 'project', readRoute: '/v1/p/linear/theme', writeRoute: '/v1/p/linear/theme',
-  options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
-  ...over,
-} as PluginCommandDescriptor)
+const settingDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor =>
+  ({
+    id: 'theme',
+    title: 'Board theme',
+    category: 'action',
+    palette: true,
+    kind: 'setting',
+    scope: 'project',
+    readRoute: '/v1/p/linear/theme',
+    writeRoute: '/v1/p/linear/theme',
+    options: [
+      { value: 'light', label: 'Light' },
+      { value: 'dark', label: 'Dark' },
+    ],
+    ...over,
+  }) as PluginCommandDescriptor
 
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -66,11 +98,21 @@ afterEach(() => {
 
 describe('what the host binds', () => {
   it('qualifies the id, the parent and the owner, and never reads them off the manifest', () => {
-    const command = pluginCommand('linear', {
-      id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
-      scope: 'node', route: '/v1/p/linear/search', parentId: 'issues',
-      onSelect: { verb: 'openTask' },
-    } as PluginCommandDescriptor, binding)
+    const command = pluginCommand(
+      'linear',
+      {
+        id: 'find',
+        title: 'Find',
+        category: 'action',
+        palette: true,
+        kind: 'search',
+        scope: 'node',
+        route: '/v1/p/linear/search',
+        parentId: 'issues',
+        onSelect: { verb: 'openTask' },
+      } as PluginCommandDescriptor,
+      binding,
+    )
     expect(command.id).toBe('plugin.linear.find')
     expect(command.parentId).toBe('plugin.linear.issues')
     expect(command.ownerId).toBe('linear')
@@ -78,15 +120,30 @@ describe('what the host binds', () => {
   })
 
   it('makes a group a group and an omitted kind an action, which is what every shipped manifest is', () => {
-    const group = pluginCommand('linear', {
-      id: 'issues', title: 'Issues', category: 'navigation', palette: true, kind: 'group',
-    } as PluginCommandDescriptor, binding)
+    const group = pluginCommand(
+      'linear',
+      {
+        id: 'issues',
+        title: 'Issues',
+        category: 'navigation',
+        palette: true,
+        kind: 'group',
+      } as PluginCommandDescriptor,
+      binding,
+    )
     expect(group.kind).toBe('group')
 
-    const legacy = pluginCommand('linear', {
-      id: 'sync', title: 'Sync', category: 'action', palette: true,
-      action: { verb: 'runNodeAction', path: '/v1/p/linear/sync' },
-    } as PluginCommandDescriptor, binding)
+    const legacy = pluginCommand(
+      'linear',
+      {
+        id: 'sync',
+        title: 'Sync',
+        category: 'action',
+        palette: true,
+        action: { verb: 'runNodeAction', path: '/v1/p/linear/sync' },
+      } as PluginCommandDescriptor,
+      binding,
+    )
     expect(legacy.kind).toBeUndefined()
   })
 })
@@ -95,7 +152,10 @@ describe('a search command', () => {
   it('asks for the reader’s text and the identifiers its scope owns, and nothing else', async () => {
     const command = pluginCommand('linear', searchDescriptor({ scope: 'task' }), binding) as SearchCommand
     await command.query('rol', CONTEXT, signal())
-    expect(readJson).toHaveBeenCalledWith('/v1/p/linear/search?q=rol&taskId=t-1', expect.objectContaining({ nodeId: 'node-b' }))
+    expect(readJson).toHaveBeenCalledWith(
+      '/v1/p/linear/search?q=rol&taskId=t-1',
+      expect.objectContaining({ nodeId: 'node-b' }),
+    )
 
     const project = pluginCommand('linear', searchDescriptor({ scope: 'project' }), binding) as SearchCommand
     await project.query('rol', CONTEXT, signal())
@@ -125,15 +185,17 @@ describe('a search command', () => {
 
   it('cannot be told what to do by the thing it is showing', async () => {
     readJson.mockResolvedValue({
-      items: [{
-        id: 'i-1',
-        title: 'One',
-        // Everything a hostile answer would want to say, and none of it survives the sanitiser.
-        action: { verb: 'openUrl', url: 'https://evil.test' },
-        route: '/v1/tasks',
-        url: 'https://evil.test',
-        taskId: 't-9',
-      }],
+      items: [
+        {
+          id: 'i-1',
+          title: 'One',
+          // Everything a hostile answer would want to say, and none of it survives the sanitiser.
+          action: { verb: 'openUrl', url: 'https://evil.test' },
+          route: '/v1/tasks',
+          url: 'https://evil.test',
+          taskId: 't-9',
+        },
+      ],
     })
     const command = pluginCommand('linear', searchDescriptor(), binding) as SearchCommand
     const rows = await command.query('rol', CONTEXT, signal())
@@ -142,9 +204,13 @@ describe('a search command', () => {
     await command.select(rows[0], CONTEXT)
     // The route the manifest declared, with the row's id as its subject. The row's own path and verb
     // reached nothing.
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/linear/open', expect.objectContaining({
-      method: 'POST', body: JSON.stringify({ item: 'i-1' }),
-    }))
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/linear/open',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ item: 'i-1' }),
+      }),
+    )
   })
 
   it('reports a refused action rather than closing over it', async () => {
@@ -189,22 +255,30 @@ describe('an input command', () => {
     writeJson.mockResolvedValue({ ok: true, item: { id: 'q-1', title: 'Saved query' } })
     const command = pluginCommand('database', inputDescriptor(), binding) as InputCommand
     const outcome = await command.submit('rows per project', CONTEXT, signal())
-    expect(writeJson).toHaveBeenCalledWith('/v1/p/database/generate', expect.objectContaining({
-      method: 'POST',
-      nodeId: 'node-b',
-      body: JSON.stringify({ input: 'rows per project', taskId: 't-1' }),
-    }))
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/database/open', expect.objectContaining({
-      body: JSON.stringify({ item: 'q-1' }),
-    }))
+    expect(writeJson).toHaveBeenCalledWith(
+      '/v1/p/database/generate',
+      expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-b',
+        body: JSON.stringify({ input: 'rows per project', taskId: 't-1' }),
+      }),
+    )
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/database/open',
+      expect.objectContaining({
+        body: JSON.stringify({ item: 'q-1' }),
+      }),
+    )
     expect(outcome).toEqual({ effect: 'close' })
   })
 
   it('keeps the frame open when the route said something worth reading', async () => {
     writeJson.mockResolvedValue({ ok: true, message: 'Wrote the query to the scratch document.' })
     const command = pluginCommand('database', inputDescriptor(), binding) as InputCommand
-    expect(await command.submit('rows', CONTEXT, signal()))
-      .toEqual({ effect: 'stay', status: 'Wrote the query to the scratch document.' })
+    expect(await command.submit('rows', CONTEXT, signal())).toEqual({
+      effect: 'stay',
+      status: 'Wrote the query to the scratch document.',
+    })
   })
 
   it('runs no action at all when the submission failed', async () => {
@@ -227,58 +301,87 @@ describe('which descriptors this device will honour', () => {
     usablePluginCommands('linear', descriptors, binding).map((descriptor) => descriptor.id)
 
   it('refuses a route outside the plugin’s own namespace', () => {
-    expect(usable([
-      searchDescriptor({ id: 'own' }),
-      searchDescriptor({ id: 'core', route: '/v1/tasks' }),
-      searchDescriptor({ id: 'neighbour', route: '/v1/p/rollbar/search' }),
-      searchDescriptor({ id: 'escaped', route: '/v1/p/linear/../rollbar/search' }),
-      inputDescriptor({ id: 'posts-core', route: '/v1/tasks' }),
-    ])).toEqual(['own'])
+    expect(
+      usable([
+        searchDescriptor({ id: 'own' }),
+        searchDescriptor({ id: 'core', route: '/v1/tasks' }),
+        searchDescriptor({ id: 'neighbour', route: '/v1/p/rollbar/search' }),
+        searchDescriptor({ id: 'escaped', route: '/v1/p/linear/../rollbar/search' }),
+        inputDescriptor({ id: 'posts-core', route: '/v1/tasks' }),
+      ]),
+    ).toEqual(['own'])
   })
 
   it('refuses a verb this device cannot honour, on a search as on an action', () => {
     const refuse = (action: { verb: string }): boolean => action.verb !== 'openPane'
     const refusing = { ...binding, usableAction: refuse, usableSelectAction: refuse }
-    expect(usablePluginCommands('linear', [
-      searchDescriptor({ id: 'fine' }),
-      searchDescriptor({ id: 'undrawable', onSelect: { verb: 'openPane', pane: 'nope' } }),
-    ], refusing).map((descriptor) => descriptor.id)).toEqual(['fine'])
+    expect(
+      usablePluginCommands(
+        'linear',
+        [
+          searchDescriptor({ id: 'fine' }),
+          searchDescriptor({ id: 'undrawable', onSelect: { verb: 'openPane', pane: 'nope' } }),
+        ],
+        refusing,
+      ).map((descriptor) => descriptor.id),
+    ).toEqual(['fine'])
   })
 
   it('skips a kind this build has no frame for rather than treating it as an action', () => {
-    expect(usable([
-      { id: 'later', title: 'A sixth kind', category: 'action', palette: true, kind: 'toggle' } as unknown as PluginCommandDescriptor,
-      searchDescriptor(),
-    ])).toEqual(['find'])
+    expect(
+      usable([
+        {
+          id: 'later',
+          title: 'A sixth kind',
+          category: 'action',
+          palette: true,
+          kind: 'toggle',
+        } as unknown as PluginCommandDescriptor,
+        searchDescriptor(),
+      ]),
+    ).toEqual(['find'])
   })
 
   it('refuses a setting whose routes are not its own, or that declares too few choices', () => {
-    expect(usable([
-      settingDescriptor({ id: 'own' }),
-      settingDescriptor({ id: 'reads-core', readRoute: '/v1/prefs' }),
-      settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v1/p/rollbar/theme' }),
-      settingDescriptor({ id: 'one-choice', options: [{ value: 'on', label: 'On' }] }),
-    ])).toEqual(['own'])
+    expect(
+      usable([
+        settingDescriptor({ id: 'own' }),
+        settingDescriptor({ id: 'reads-core', readRoute: '/v1/prefs' }),
+        settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v1/p/rollbar/theme' }),
+        settingDescriptor({ id: 'one-choice', options: [{ value: 'on', label: 'On' }] }),
+      ]),
+    ).toEqual(['own'])
   })
 
   it('drops a child whose parent is missing, is not a group, or is its own descendant', () => {
     const group = (id: string): PluginCommandDescriptor =>
-      ({ id, title: id, category: 'navigation', palette: true, kind: 'group' } as PluginCommandDescriptor)
-    expect(usable([
-      group('issues'),
-      searchDescriptor({ id: 'kept', parentId: 'issues' }),
-      searchDescriptor({ id: 'orphan', parentId: 'gone' }),
-      searchDescriptor({ id: 'under-a-leaf', parentId: 'kept' }),
-      { ...group('loop-a'), parentId: 'loop-b' } as PluginCommandDescriptor,
-      { ...group('loop-b'), parentId: 'loop-a' } as PluginCommandDescriptor,
-    ])).toEqual(['issues', 'kept'])
+      ({ id, title: id, category: 'navigation', palette: true, kind: 'group' }) as PluginCommandDescriptor
+    expect(
+      usable([
+        group('issues'),
+        searchDescriptor({ id: 'kept', parentId: 'issues' }),
+        searchDescriptor({ id: 'orphan', parentId: 'gone' }),
+        searchDescriptor({ id: 'under-a-leaf', parentId: 'kept' }),
+        { ...group('loop-a'), parentId: 'loop-b' } as PluginCommandDescriptor,
+        { ...group('loop-b'), parentId: 'loop-a' } as PluginCommandDescriptor,
+      ]),
+    ).toEqual(['issues', 'kept'])
   })
 
   it('drops a child of a parent this device already refused, rather than promoting it', () => {
-    expect(usable([
-      { id: 'issues', title: 'Issues', category: 'navigation', palette: true, kind: 'group', parentId: 'gone' } as PluginCommandDescriptor,
-      searchDescriptor({ id: 'inside', parentId: 'issues' }),
-    ])).toEqual([])
+    expect(
+      usable([
+        {
+          id: 'issues',
+          title: 'Issues',
+          category: 'navigation',
+          palette: true,
+          kind: 'group',
+          parentId: 'gone',
+        } as PluginCommandDescriptor,
+        searchDescriptor({ id: 'inside', parentId: 'issues' }),
+      ]),
+    ).toEqual([])
   })
 })
 
@@ -291,16 +394,22 @@ describe('a loaded setting', () => {
     await expect(command().read(CONTEXT, signal())).resolves.toBe('dark')
     // The project, because the descriptor said `project`. Never the task, which the session also
     // captured and this scope does not own.
-    expect(readJson).toHaveBeenCalledWith('/v1/p/linear/theme?projectId=p-1', expect.objectContaining({ nodeId: 'node-b' }))
+    expect(readJson).toHaveBeenCalledWith(
+      '/v1/p/linear/theme?projectId=p-1',
+      expect.objectContaining({ nodeId: 'node-b' }),
+    )
   })
 
   it('writes the chosen value and answers with the value the node says is now stored', async () => {
     writeJson.mockResolvedValue({ value: 'light' })
     await expect(command().write('dark', CONTEXT, signal())).resolves.toBe('light')
-    expect(writeJson).toHaveBeenCalledWith('/v1/p/linear/theme', expect.objectContaining({
-      method: 'PUT',
-      body: JSON.stringify({ value: 'dark', projectId: 'p-1' }),
-    }))
+    expect(writeJson).toHaveBeenCalledWith(
+      '/v1/p/linear/theme',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ value: 'dark', projectId: 'p-1' }),
+      }),
+    )
   })
 
   it('refuses to write a value the manifest never declared', async () => {
@@ -314,6 +423,9 @@ describe('a loaded setting', () => {
   })
 
   it('carries the manifest’s choices through unchanged, because they are what a value is checked against', () => {
-    expect(command().options).toEqual([{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }])
+    expect(command().options).toEqual([
+      { value: 'light', label: 'Light' },
+      { value: 'dark', label: 'Dark' },
+    ])
   })
 })

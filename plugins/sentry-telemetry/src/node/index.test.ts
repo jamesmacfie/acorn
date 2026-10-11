@@ -19,17 +19,26 @@ const declaredPermissions = async () => {
   return config.manifest.permissions.node
 }
 
-const posted = () => (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-  .map((call) => String((call[1] as RequestInit).body))
+const posted = () =>
+  (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((call) =>
+    String((call[1] as RequestInit).body),
+  )
 
 const itemTypes = () => posted().map((body) => JSON.parse(body.split('\n')[1]).type as string)
 
 async function world(options: { connected?: boolean } = {}) {
-  const ctx = makeTestNodeContext({ plugin: sentryTelemetryPlugin(), permissions: await declaredPermissions(), userId: OWNER })
+  const ctx = makeTestNodeContext({
+    plugin: sentryTelemetryPlugin(),
+    permissions: await declaredPermissions(),
+    userId: OWNER,
+  })
   if (options.connected !== false) {
     await seedProviderConnection(ctx.db, PROVIDER_ID, OWNER, DSN, ctx.encryptionKey, 'api-key')
   }
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(null, { status: 200 })),
+  )
   const plugin = sentryTelemetryPlugin()
   await plugin.init(ctx)
   return { ctx, plugin }
@@ -66,7 +75,10 @@ describe('the sentry-telemetry plugin', () => {
       await vi.waitFor(() => expect(itemTypes()).toContain('log'))
       await vi.waitFor(() => expect(itemTypes()).toContain('trace_metric'))
 
-      const [url, init] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
+      const [url, init] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [
+        string,
+        RequestInit,
+      ]
       expect(url).toBe('https://o42.ingest.us.sentry.io/api/1234567/envelope/')
       expect(init.headers).toMatchObject({ 'content-type': 'application/x-sentry-envelope' })
       // The credential authenticates the post and appears nowhere in the payload it authenticates.

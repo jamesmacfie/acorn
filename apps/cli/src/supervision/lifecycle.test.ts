@@ -76,16 +76,27 @@ describe('CLI-owned local Node', () => {
     const entry = process.env.ACORN_CLI_NODE_ENTRY!
     manual = spawn(process.execPath, ['--import', 'tsx', entry], {
       cwd: fileURLToPath(new URL('../../../node', import.meta.url)),
-      env: { ...process.env, ACORN_DATA_DIR: dataDir, ACORN_CLI_BACKGROUND: undefined,
-        ACORN_CLI_SERVICE_ID: undefined, ACORN_CLI_LOG_PATH: undefined },
+      env: {
+        ...process.env,
+        ACORN_DATA_DIR: dataDir,
+        ACORN_CLI_BACKGROUND: undefined,
+        ACORN_CLI_SERVICE_ID: undefined,
+        ACORN_CLI_LOG_PATH: undefined,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     manual.stderr?.resume()
     await new Promise<void>((resolve, reject) => {
       const lines = createInterface({ input: manual!.stdout! })
       lines.on('line', (line) => {
-        try { if ((JSON.parse(line) as { deviceToken?: unknown }).deviceToken) { lines.close(); resolve() } }
-        catch { /* startup log, not the handshake */ }
+        try {
+          if ((JSON.parse(line) as { deviceToken?: unknown }).deviceToken) {
+            lines.close()
+            resolve()
+          }
+        } catch {
+          /* startup log, not the handshake */
+        }
       })
       manual!.once('exit', (code) => reject(new Error(`Manual Node exited before readiness (${code}).`)))
     })

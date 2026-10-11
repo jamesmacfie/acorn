@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { definitionForPrompt, restoreProtectedDefinition } from './edit'
 
-const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+const current: WorkflowDef = {
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Deploy',
   trigger: 'schedule:nightly',
   tools: { maxRisk: 'execute', allow: ['deploy'] },
@@ -18,7 +20,12 @@ const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as
     {
       name: 'send',
       kind: 'http:request',
-      with: { method: 'POST', url: 'https://old.example', auth: 'secret-auth', headers: { Authorization: 'Bearer secret' } },
+      with: {
+        method: 'POST',
+        url: 'https://old.example',
+        auth: 'secret-auth',
+        headers: { Authorization: 'Bearer secret' },
+      },
     },
   ],
 }
@@ -37,21 +44,37 @@ describe('the model-visible definition', () => {
 
 describe('protected configuration restoration', () => {
   it('keeps nested agent settings private and restores them without restoring a replaced child target', () => {
-    const configured: WorkflowDef = { ...current, steps: [{
-      name: 'each', kind: 'workflow-map', agent: { prompt: 'Fix it.', model: 'private-model', configOptions: { reasoning: 'high' } },
-    }] }
+    const configured: WorkflowDef = {
+      ...current,
+      steps: [
+        {
+          name: 'each',
+          kind: 'workflow-map',
+          agent: { prompt: 'Fix it.', model: 'private-model', configOptions: { reasoning: 'high' } },
+        },
+      ],
+    }
     expect(definitionForPrompt(configured).steps[0]?.agent).toEqual({ prompt: 'Fix it.' })
-    const edited = { ...configured, steps: [{ name: 'each', kind: 'workflow-map', agent: { prompt: 'Fix and test it.' } }] }
+    const edited = {
+      ...configured,
+      steps: [{ name: 'each', kind: 'workflow-map', agent: { prompt: 'Fix and test it.' } }],
+    }
     expect(restoreProtectedDefinition(configured, edited).steps[0]?.agent).toEqual({
-      prompt: 'Fix and test it.', model: 'private-model', configOptions: { reasoning: 'high' },
+      prompt: 'Fix and test it.',
+      model: 'private-model',
+      configOptions: { reasoning: 'high' },
     })
-    const child: WorkflowDef = { ...configured, steps: [{ name: 'each', kind: 'workflow-map',
-      childWorkflow: { ref: { source: 'database', id: 'old-target' } } }] }
+    const child: WorkflowDef = {
+      ...configured,
+      steps: [{ name: 'each', kind: 'workflow-map', childWorkflow: { ref: { source: 'database', id: 'old-target' } } }],
+    }
     expect(restoreProtectedDefinition(child, edited).steps[0]?.childWorkflow).toBeUndefined()
   })
 
   it('restores hidden values only onto a surviving step of the same kind', () => {
-    const changed: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const changed: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Safer deploy',
       tools: { maxRisk: 'read' },
       steps: [
@@ -75,53 +98,74 @@ describe('protected configuration restoration', () => {
       headers: { Authorization: 'Bearer secret' },
     })
 
-    const changedKind = restoreProtectedDefinition(current, { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Deploy', steps: [{ name: 'send', prompt: 'Now use an agent.' }] })
+    const changedKind = restoreProtectedDefinition(current, {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'Deploy',
+      steps: [{ name: 'send', prompt: 'Now use an agent.' }],
+    })
     expect(changedKind.steps[0]?.with).toBeUndefined()
   })
 
   it('does not restore a changed child target after grounding', () => {
-    const configured: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const configured: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
-      steps: [{
-        name: 'review',
-        kind: 'workflow',
-        childWorkflow: {
-          ref: { source: 'database', id: 'approved-target' },
-          inputs: { ticket: { from: 'input', name: 'ticket' } },
+      steps: [
+        {
+          name: 'review',
+          kind: 'workflow',
+          childWorkflow: {
+            ref: { source: 'database', id: 'approved-target' },
+            inputs: { ticket: { from: 'input', name: 'ticket' } },
+          },
         },
-      }],
+      ],
     }
     const visible = definitionForPrompt(configured)
     expect(visible.steps[0]?.childWorkflow).not.toHaveProperty('ref')
     expect(visible.steps[0]?.childWorkflow?.inputs).toEqual(configured.steps[0]?.childWorkflow?.inputs)
 
-    const attemptedChange = restoreProtectedDefinition(configured, { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const attemptedChange = restoreProtectedDefinition(configured, {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
-      steps: [{
-        name: 'review',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
-      }],
+      steps: [
+        {
+          name: 'review',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
+        },
+      ],
     })
     expect(attemptedChange.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'invented-target' })
 
-    const renamed = restoreProtectedDefinition(configured, { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const renamed = restoreProtectedDefinition(configured, {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
-      steps: [{
-        name: 'different',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'replacement' } },
-      }],
+      steps: [
+        {
+          name: 'different',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'replacement' } },
+        },
+      ],
     })
     expect(renamed.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'replacement' })
 
-    const changedKind = restoreProtectedDefinition(configured, { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const changedKind = restoreProtectedDefinition(configured, {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
       steps: [{ name: 'review', prompt: 'Review in this task.' }],
     })
     expect(changedKind.steps[0]?.childWorkflow).toBeUndefined()
 
-    const duplicate = restoreProtectedDefinition(configured, { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const duplicate = restoreProtectedDefinition(configured, {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
       steps: [
         { name: 'review', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'first' } } },

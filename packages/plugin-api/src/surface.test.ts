@@ -62,7 +62,9 @@ function readSnapshot(path: string): string[] {
 
 it('the private plugin facade matches its snapshot', () => {
   const actual = Object.entries(ENTRYPOINTS)
-    .flatMap(([entry, file]) => exportedNames(readFileSync(join(HERE, file), 'utf8')).map((name) => `${entry}: ${name}`))
+    .flatMap(([entry, file]) =>
+      exportedNames(readFileSync(join(HERE, file), 'utf8')).map((name) => `${entry}: ${name}`),
+    )
     .sort()
 
   // Anti-vacuity: the assertion below is an exact match against a file, so a parser that stopped
@@ -71,7 +73,7 @@ it('the private plugin facade matches its snapshot', () => {
   expect(actual).toContain('node: NodePlugin')
   expect(actual).toContain('client: ClientPlugin')
   expect(actual).toContain('ui: Button')
-  expect(actual).toContain('ui/diff: buildDiffRows')
+  expect(actual).toContain('ui/diff: createDiffSnippets')
   expect(new Set(actual).size).toBe(actual.length) // no entrypoint exports the same name twice
 
   const snapshotPath = join(HERE, 'surface.snapshot.txt')

@@ -33,27 +33,48 @@ const { AgentDetailHeader } = await import('./AgentPane')
 const { registerSessionActionCommands } = await import('../commands')
 const { selectManagedSubagent, clearManagedSubagent } = await import('./managedSelection')
 
-const session = (over: Partial<AgentSession>): AgentSession => ({
-  id: 'sess-1', taskId: 'task-1', providerId: 'claude', profileId: 'claude-code', kind: 'interactive',
-  driverKind: 'acp', driverVersion: '1', providerSessionRef: null, controller: 'acorn',
-  runtimeState: 'ready', attention: 'none', statusAuthority: 'driver', title: 'A session',
-  model: null, config: {}, parentSessionId: null, parentTurnId: null, subagents: [],
-  lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 1, updatedAt: 1, ...over,
-} as AgentSession)
+const session = (over: Partial<AgentSession>): AgentSession =>
+  ({
+    id: 'sess-1',
+    taskId: 'task-1',
+    providerId: 'claude',
+    profileId: 'claude-code',
+    kind: 'interactive',
+    driverKind: 'acp',
+    driverVersion: '1',
+    providerSessionRef: null,
+    controller: 'acorn',
+    runtimeState: 'ready',
+    attention: 'none',
+    statusAuthority: 'driver',
+    title: 'A session',
+    model: null,
+    config: {},
+    parentSessionId: null,
+    parentTurnId: null,
+    subagents: [],
+    lastEventSeq: 0,
+    lastReadSeq: 0,
+    archivedAt: null,
+    createdAt: 1,
+    updatedAt: 1,
+    ...over,
+  }) as AgentSession
 
-const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel => ({
-  selected: () => current,
-  snapshot: () => undefined,
-  selectedManagedParent: () => parent,
-  openManagedParent,
-  sessionActions: () => [],
-  providers: () => [],
-  providersLoading: () => false,
-  choices: () => [],
-  creating: () => false,
-  refreshProviders: () => undefined,
-  action: (operation: () => Promise<unknown>) => operation(),
-} as unknown as AgentPaneModel)
+const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel =>
+  ({
+    selected: () => current,
+    snapshot: () => undefined,
+    selectedManagedParent: () => parent,
+    openManagedParent,
+    sessionActions: () => [],
+    providers: () => [],
+    providersLoading: () => false,
+    choices: () => [],
+    creating: () => false,
+    refreshProviders: () => undefined,
+    action: (operation: () => Promise<unknown>) => operation(),
+  }) as unknown as AgentPaneModel
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
@@ -68,11 +89,14 @@ const mount = (current: AgentSession, parent?: AgentSession): void => {
     codex: { overrides: [], customModels: [] },
   })
   queryClient.setQueryData(['prefs'], {})
-  dispose = render(() => (
-    <QueryClientProvider client={queryClient}>
-      <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />
-    </QueryClientProvider>
-  ), host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={queryClient}>
+        <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -89,9 +113,15 @@ describe('stopping the selected agent', () => {
   const stop = () => [...host.querySelectorAll('button')].find((button) => button.textContent === 'Stop')!
 
   it('stops a running Codex child under a ready parent and restores parent controls on return', async () => {
-    mount(session({ driverKind: 'codex-app-server', providerId: 'codex', subagents: [
-      { id: 'child-1', title: 'desktop_boundaries', status: 'running', startedAt: 1, updatedAt: 1 },
-    ] }))
+    mount(
+      session({
+        driverKind: 'codex-app-server',
+        providerId: 'codex',
+        subagents: [
+          { id: 'child-1', title: 'desktop_boundaries', status: 'running', turnId: null, startedAt: 1, updatedAt: 1 },
+        ],
+      }),
+    )
     await settle()
     expect(stop().disabled).toBe(true)
     selectManagedSubagent('sess-1', 'child-1')
@@ -105,12 +135,26 @@ describe('stopping the selected agent', () => {
   })
 
   it.each([
-    ['codex-app-server', 'idle'], ['acp', 'running'],
+    ['codex-app-server', 'idle'],
+    ['acp', 'running'],
   ])('disables child Stop for %s / %s even when the parent is working', async (driverKind, status) => {
     selectManagedSubagent('sess-1', 'child-1')
-    mount(session({ driverKind, runtimeState: 'working', subagents: [
-      { id: 'child-1', title: 'Child', status: status as 'idle' | 'running', startedAt: 1, updatedAt: 1 },
-    ] }))
+    mount(
+      session({
+        driverKind,
+        runtimeState: 'working',
+        subagents: [
+          {
+            id: 'child-1',
+            title: 'Child',
+            status: status as 'idle' | 'running',
+            turnId: null,
+            startedAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      }),
+    )
     await settle()
     expect(stop().disabled).toBe(true)
     clearManagedSubagent('sess-1')
@@ -131,7 +175,11 @@ describe('the workflow chip', () => {
 
     expect(chip()?.textContent).toContain('Workflow: Investigate an issue · synthesise')
     ;(chip() as HTMLElement).click()
-    expect(openPane).toHaveBeenCalledWith('task-1', 'workflows', { kind: 'workflows:show-run', runId: 'run-1', stepId: 'st-2' })
+    expect(openPane).toHaveBeenCalledWith('task-1', 'workflows', {
+      kind: 'workflows:show-run',
+      runId: 'run-1',
+      stepId: 'st-2',
+    })
   })
 
   it('stays away from a session a person started', async () => {
@@ -146,8 +194,9 @@ describe('managed delegation parent navigation', () => {
   it('names an available managed parent and returns to it', async () => {
     mount(session({ id: 'child', kind: 'delegated' }), session({ id: 'parent', title: 'Parent session' }))
     await settle()
-    const parentChip = [...host.querySelectorAll('.ui-chip')]
-      .find((item) => item.textContent?.includes('Parent: Parent session')) as HTMLElement
+    const parentChip = [...host.querySelectorAll('.ui-chip')].find((item) =>
+      item.textContent?.includes('Parent: Parent session'),
+    ) as HTMLElement
     expect(parentChip).toBeTruthy()
     parentChip.click()
     expect(openManagedParent).toHaveBeenCalledOnce()
@@ -169,8 +218,11 @@ describe('managed delegation parent navigation', () => {
 type ActionRow = Extract<ContributedCommand, { run: unknown }>
 
 describe('the session actions in the palette', () => {
-  const item = (over: Partial<SessionAction> & { id: string }): SessionAction =>
-    ({ label: over.id, run: () => {}, ...over })
+  const item = (over: Partial<SessionAction> & { id: string }): SessionAction => ({
+    label: over.id,
+    run: () => {},
+    ...over,
+  })
 
   const mountCommands = (first: readonly SessionAction[]) => {
     const [actions, setActions] = createSignal<readonly SessionAction[]>(first)
@@ -180,8 +232,7 @@ describe('the session actions in the palette', () => {
       return stop
     })
     const registered = (): ContributedCommand[] => registerCommands.mock.lastCall![0] as ContributedCommand[]
-    const at = (id: string): ActionRow =>
-      registered().find((command) => command.id === id) as ActionRow
+    const at = (id: string): ActionRow => registered().find((command) => command.id === id) as ActionRow
     return { setActions, registered, at, disposeRoot }
   }
 
@@ -191,17 +242,19 @@ describe('the session actions in the palette', () => {
       item({ id: 'regenerate-title', label: 'Regenerate title' }),
       item({ id: 'archive', label: 'Archive session…' }),
     ])
-    expect(pane.registered().map((command) => command.id))
-      .toEqual([
-        'agents.session',
-        'agents.session.fork',
-        'agents.session.regenerate-title',
-        'agents.session.archive',
-      ])
-    expect(pane.registered()[0])
-      .toMatchObject({ kind: 'group', palette: true, scope: 'task', requires: { plugin: 'agents' } })
-    expect(pane.at('agents.session.fork'))
-      .toMatchObject({ parentId: 'agents.session', palette: true, scope: 'task' })
+    expect(pane.registered().map((command) => command.id)).toEqual([
+      'agents.session',
+      'agents.session.fork',
+      'agents.session.regenerate-title',
+      'agents.session.archive',
+    ])
+    expect(pane.registered()[0]).toMatchObject({
+      kind: 'group',
+      palette: true,
+      scope: 'task',
+      requires: { plugin: 'agents' },
+    })
+    expect(pane.at('agents.session.fork')).toMatchObject({ parentId: 'agents.session', palette: true, scope: 'task' })
     expect((pane.at('agents.session.fork').title as () => string)()).toBe('Fork session')
     pane.disposeRoot()
   })
@@ -227,8 +280,11 @@ describe('the session actions in the palette', () => {
     // A new action is a new row, so this one does register again.
     pane.setActions([item({ id: 'fork' }), item({ id: 'compact' })])
     expect(disposeCommands).toHaveBeenCalledTimes(1)
-    expect(pane.registered().map((command) => command.id))
-      .toEqual(['agents.session', 'agents.session.fork', 'agents.session.compact'])
+    expect(pane.registered().map((command) => command.id)).toEqual([
+      'agents.session',
+      'agents.session.fork',
+      'agents.session.compact',
+    ])
     pane.disposeRoot()
     expect(disposeCommands).toHaveBeenCalledTimes(2)
   })

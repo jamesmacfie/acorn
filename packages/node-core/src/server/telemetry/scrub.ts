@@ -15,7 +15,13 @@
 // nothing: the paths worth hiding are the owner's home directory and the data root, and those two
 // are named (docs/telemetry/model.md § What never leaves the machine).
 import { homedir } from 'node:os'
-import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, type TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
+import {
+  ATTRS_MAX,
+  ATTR_KEY_MAX,
+  ATTR_VALUE_MAX,
+  LOG_BODY_MAX,
+  type TelemetryAttrs,
+} from '@acorn/protocol/telemetry.ts'
 
 const TOKEN_PATTERNS = [
   /\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b/g,
@@ -51,7 +57,7 @@ const roots = (): Array<[string, string]> => {
  *  data root, so this is also what turns `/Users/sam/.acorn/worktrees/acorn-42/src/x.ts` into
  *  `<data>/worktrees/acorn-42/src/x.ts`: the repo-relative part survives and the person's disk
  *  layout does not. */
-export function collapseRoots(value: string): string {
+function collapseRoots(value: string): string {
   let out = value
   for (const [prefix, replacement] of roots()) out = out.replaceAll(prefix, replacement)
   return out
@@ -77,9 +83,10 @@ export function scrub(value: unknown, fallback = '', max = LOG_BODY_MAX): string
     // Only the last pattern has a capture group. `typeof` and not a truthiness check, because for a
     // pattern with no groups the replacer's second argument is the match offset, and a token that
     // happened to sit at index 6 would come back as `6<redacted>`. The copy in
-    // `plugins/agents/src/server/drivers/diagnostics.ts` had that bug.
+    // `plugins/agents/src/server/drivers/diagnostics.ts` makes the same check.
     message = message.replace(pattern, (_match, prefix?: unknown) =>
-      typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>')
+      typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>',
+    )
   }
   const bounded = message.trim().slice(0, max)
   return bounded || fallback

@@ -10,8 +10,7 @@ export type HeadingProps = {
   children: JSX.Element
 }
 
-/* Heading: an eyebrow over a title. The pattern linear, rollbar, github and docker each drew with
-   two divs and a pair of classes.
+/* Heading: an eyebrow over a title.
 
    `level` is the document level, not a size: the kit picks the type from the level so a pane cannot
    pick an h3 because it liked the smaller text.
@@ -21,7 +20,7 @@ export function Heading(props: HeadingProps) {
   const titleId = createUniqueId()
   const title = () => (
     <Dynamic
-      component={`h${[1, 2, 3, 4, 5, 6].includes(props.level ?? 2) ? props.level ?? 2 : 2}`}
+      component={`h${[1, 2, 3, 4, 5, 6].includes(props.level ?? 2) ? (props.level ?? 2) : 2}`}
       class="ui-heading-title"
       id={props.help ? titleId : undefined}
     >
@@ -30,7 +29,9 @@ export function Heading(props: HeadingProps) {
   )
   return (
     <div class="ui-heading" data-level={String(props.level ?? 2)}>
-      <Show when={props.eyebrow}><span class="ui-heading-eyebrow">{props.eyebrow}</span></Show>
+      <Show when={props.eyebrow}>
+        <span class="ui-heading-eyebrow">{props.eyebrow}</span>
+      </Show>
       <Show when={props.help} fallback={title()}>
         {(help) => (
           <span class="ui-titled">

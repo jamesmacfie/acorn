@@ -10,7 +10,6 @@ import {
   isCodeRow,
   maxLineCols,
   plainTokenize,
-  rowIdentityKeys,
   toBands,
   wordDiff,
   type CodeRow,
@@ -58,10 +57,7 @@ describe('diff model', () => {
 
   it('injects top/mid/bottom gaps and expands them from the head body', () => {
     const rows = buildDiffRows(
-      pullFile(
-        'src/app.ts',
-        ['@@ -10,1 +10,1 @@', '-x', '+y', '@@ -20,1 +20,1 @@', '-p', '+q'].join('\n'),
-      ),
+      pullFile('src/app.ts', ['@@ -10,1 +10,1 @@', '-x', '+y', '@@ -20,1 +20,1 @@', '-p', '+q'].join('\n')),
       plainTokenize,
     )
     const gaps = rows.filter((r): r is GapRow => r.kind === 'gap')
@@ -83,12 +79,11 @@ describe('diff model', () => {
   })
 
   it('interleaves review threads on expanded gap lines', () => {
-    const rows = buildDiffRows(
-      pullFile('src/app.ts', ['@@ -10,1 +10,1 @@', '-x', '+y'].join('\n')),
-      plainTokenize,
-    )
+    const rows = buildDiffRows(pullFile('src/app.ts', ['@@ -10,1 +10,1 @@', '-x', '+y'].join('\n')), plainTokenize)
     const gap = rows.find((r): r is GapRow => r.kind === 'gap' && r.side === 'top')!
-    const expanded = new Map([[gapId(gap), expandGap(gap, Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join('\n'), plainTokenize)]])
+    const expanded = new Map([
+      [gapId(gap), expandGap(gap, Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join('\n'), plainTokenize)],
+    ])
 
     const rendered = buildRenderableRows(
       [{ file: pullFile('src/app.ts', 'patch'), diff: rows }],
@@ -117,7 +112,16 @@ describe('diff model', () => {
 
     const rows = buildRenderableRows(parsed, [thread('src/app.ts', 2, 'LEFT'), thread('src/app.ts', 2, 'RIGHT')])
 
-    expect(rows.map((row) => row.kind)).toEqual(['file', 'normal', 'delete', 'thread', 'insert', 'thread', 'file', 'nodiff'])
+    expect(rows.map((row) => row.kind)).toEqual([
+      'file',
+      'normal',
+      'delete',
+      'thread',
+      'insert',
+      'thread',
+      'file',
+      'nodiff',
+    ])
   })
 
   it('drops body rows (but keeps the header) for collapsed files', () => {
@@ -150,43 +154,6 @@ describe('diff model', () => {
     )
 
     expect(toBands(rows).map((band) => band.kind)).toEqual(['full', 'full', 'pair', 'full'])
-  })
-
-  it('gives progressively hydrated rows distinct stable identities', () => {
-    const summary = buildRenderableRows(
-      [{ file: pullFile('src/app.ts', null), diff: [{ kind: 'load', file: pullFile('src/app.ts', null), status: 'loading' }] }],
-      [],
-    )
-    const hydrated = buildRenderableRows(
-      [
-        {
-          file: pullFile('src/app.ts', 'patch'),
-          diff: buildDiffRows(
-            pullFile(
-              'src/app.ts',
-              [
-                '@@ -1,2 +1,2 @@',
-                '-const a = 1',
-                '+const a = 2',
-                '@@ -10,2 +10,2 @@',
-                '-const b = 1',
-                '+const b = 2',
-              ].join('\n'),
-            ),
-            plainTokenize,
-          ),
-        },
-      ],
-      [],
-    )
-
-    const summaryKeys = rowIdentityKeys(summary)
-    const hydratedKeys = rowIdentityKeys(hydrated)
-
-    expect(summaryKeys[1]).toBe('load:src/app.ts:loading')
-    expect(hydratedKeys[1]).toBe('hunk:src/app.ts:@@ -1,2 +1,2 @@')
-    expect(hydratedKeys).not.toContain(summaryKeys[1])
-    expect(new Set(hydratedKeys).size).toBe(hydratedKeys.length)
   })
 
   it('measures the canvas width in columns, counting a tab to its next tab stop', () => {
@@ -299,8 +266,11 @@ describe('buildDiffRowsAsync', () => {
 
   it('produces the same rows as the synchronous builder, tokens aside', async () => {
     const sync = buildDiffRows(mixedHunk, plainTokenize)
-    const async_ = await buildDiffRowsAsync(mixedHunk, async (_p, code) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]))
-    const shape = (rows: Row[]) => rows.map((row) => (isCodeRow(row) ? `${row.kind}:${row.oldNo}:${row.newNo}:${row.raw}` : row.kind))
+    const async_ = await buildDiffRowsAsync(mixedHunk, async (_p, code) =>
+      code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]),
+    )
+    const shape = (rows: Row[]) =>
+      rows.map((row) => (isCodeRow(row) ? `${row.kind}:${row.oldNo}:${row.newNo}:${row.raw}` : row.kind))
     expect(shape(async_)).toEqual(shape(sync))
   })
 })

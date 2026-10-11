@@ -1,13 +1,20 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import {
-  edgesBetween, snapshotKey, type AttentionState, type Snapshot,
-} from './attention'
+import { edgesBetween, snapshotKey, type AttentionState, type Snapshot } from './attention'
 
 const STATES: AttentionState[] = ['working', 'blocked', 'finished', 'error', 'idle']
 
-const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot =>
-  ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, sourceId: 'agents', notifyOnFinish: true, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
+const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot => ({
+  nodeId: 'n1',
+  sessionId: 's1',
+  taskId: 't1',
+  title: 'claude',
+  state,
+  sourceId: 'agents',
+  notifyOnFinish: true,
+  target: { kind: 'managed-agent', resourceId: 's1' },
+  ...over,
+})
 
 const from = (before: Snapshot | null, after: Snapshot) =>
   edgesBetween(before ? new Map([[snapshotKey(before), before]]) : new Map(), [after])
@@ -20,17 +27,19 @@ describe('edgesBetween: three of the twenty-five pairs are news', () => {
         const [edge] = from(snap(before), snap(after))
         if (edge) news.push(`${before}->${after}:${edge.kind}`)
       }
-    expect(news.sort()).toEqual([
-      'error->blocked:agent-needs-input',
-      'finished->blocked:agent-needs-input',
-      'finished->error:agent-error',
-      'idle->blocked:agent-needs-input',
-      'idle->error:agent-error',
-      'working->blocked:agent-needs-input',
-      'working->error:agent-error',
-      'working->finished:agent-completed',
-      'blocked->error:agent-error',
-    ].sort())
+    expect(news.sort()).toEqual(
+      [
+        'error->blocked:agent-needs-input',
+        'finished->blocked:agent-needs-input',
+        'finished->error:agent-error',
+        'idle->blocked:agent-needs-input',
+        'idle->error:agent-error',
+        'working->blocked:agent-needs-input',
+        'working->error:agent-error',
+        'working->finished:agent-completed',
+        'blocked->error:agent-error',
+      ].sort(),
+    )
   })
 
   it('says what it means', () => {
@@ -39,7 +48,7 @@ describe('edgesBetween: three of the twenty-five pairs are news', () => {
     expect(from(snap('working'), snap('error'))[0].title).toBe('claude failed')
   })
 
-  // A ten-step run used to raise ten "finished" rows. The workflows plugin sends `run-done` for the
+  // A ten-step run must not raise ten "finished" rows. The workflows plugin sends `run-done` for the
   // run, which is the one notice the owner asked for.
   it('a finished turn is only news for an interactive or PTY session', () => {
     expect(from(snap('working', { notifyOnFinish: false }), snap('finished', { notifyOnFinish: false }))).toEqual([])

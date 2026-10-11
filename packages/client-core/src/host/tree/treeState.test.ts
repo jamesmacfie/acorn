@@ -11,7 +11,12 @@ const now = { schedule: (run: () => void) => (run(), 0), cancel: () => {} }
 
 const host = () => {
   const refusals: string[] = []
-  const state = createTreeState({ pluginId: 'perf', transport, scheduler: now, onRefused: (reason) => refusals.push(reason) })
+  const state = createTreeState({
+    pluginId: 'perf',
+    transport,
+    scheduler: now,
+    onRefused: (reason) => refusals.push(reason),
+  })
   return { state, refusals }
 }
 
@@ -61,7 +66,10 @@ describe('a remove takes its whole subtree with it', () => {
 
     // Both ops in one batch. The grandchild is gone with its grandparent, so patching it is the
     // sandbox and the host disagreeing about the tree, which costs the whole batch.
-    state._apply([{ op: 'remove', id: 'parent' }, { op: 'patch', id: 'grandchild', props: { value: 'x' } }])
+    state._apply([
+      { op: 'remove', id: 'parent' },
+      { op: 'patch', id: 'grandchild', props: { value: 'x' } },
+    ])
     expect(refusals.at(-1)).toContain('patch of an unknown node grandchild')
     expect(Object.keys(state.nodes)).toHaveLength(3)
   })
@@ -110,9 +118,14 @@ describe('a batch costs its own ops, not the tree', () => {
     const { state, refusals } = host()
     const size = 4_500
     for (let at = 0; at < size; at += 1_500) {
-      state._apply(Array.from({ length: Math.min(1_500, size - at) }, (_, i) => ({
-        op: 'insert' as const, parent: null, index: at + i, node: leaf(`leaf-${at + i}`),
-      })))
+      state._apply(
+        Array.from({ length: Math.min(1_500, size - at) }, (_, i) => ({
+          op: 'insert' as const,
+          parent: null,
+          index: at + i,
+          node: leaf(`leaf-${at + i}`),
+        })),
+      )
     }
     expect(refusals).toEqual([])
     expect(Object.keys(state.nodes)).toHaveLength(size)
@@ -120,7 +133,9 @@ describe('a batch costs its own ops, not the tree', () => {
     const removes: TreeMutation[] = Array.from({ length: 4_000 }, (_, i) => ({ op: 'remove', id: `leaf-${i}` }))
     const originalIterator = Map.prototype[Symbol.iterator]
     let mapVisits = 0
-    const iteratorSpy = vi.spyOn(Map.prototype, Symbol.iterator).mockImplementation(function (this: Map<unknown, unknown>) {
+    const iteratorSpy = vi.spyOn(Map.prototype, Symbol.iterator).mockImplementation(function (
+      this: Map<unknown, unknown>,
+    ) {
       const iterator = originalIterator.call(this)
       const next = iterator.next.bind(iterator)
       iterator.next = () => {
@@ -137,8 +152,8 @@ describe('a batch costs its own ops, not the tree', () => {
     }
 
     expect(Object.keys(state.nodes)).toHaveLength(size - 4_000)
-    // The pre-flight builds its child index with one scan of the projected tree. The old path
-    // scanned the whole projected map for every remove, visiting millions of entries here.
+    // The pre-flight builds its child index with one scan of the projected tree. Scanning the whole
+    // projected map for every remove would visit millions of entries here.
     expect(mapVisits).toBeLessThan(size * 4)
   })
 })

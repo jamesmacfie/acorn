@@ -1,5 +1,12 @@
 import { installPlugin, pluginDir, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins'
-import { installedPluginInfo, readClientBundle, scanInstalled, snapshotActivePlugin, type ActivePluginSnapshot, type InstalledPlugin } from '@acorn/node-core/server/plugins'
+import {
+  installedPluginInfo,
+  readClientBundle,
+  scanInstalled,
+  snapshotActivePlugin,
+  type ActivePluginSnapshot,
+  type InstalledPlugin,
+} from '@acorn/node-core/server/plugins'
 import { createPluginDevelopment, createPluginReloader } from '@acorn/node-core/server/plugins'
 import { cascadeDeletePluginData } from '@acorn/node-core/server/db/cascade.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
@@ -7,7 +14,15 @@ import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { nodePluginNames } from './composition'
-import { approvePluginReview, hasPendingPluginReview, inputGrantsStore, pendingPluginReviewIds, skillStateStore, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
+import {
+  approvePluginReview,
+  hasPendingPluginReview,
+  inputGrantsStore,
+  pendingPluginReviewIds,
+  skillStateStore,
+  pluginReviewFingerprint,
+  readPendingPluginReview,
+} from '@acorn/node-core/server/plugins'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
 // Plugins). Building it once here is what stops the two roots drifting on which build allows
@@ -41,14 +56,14 @@ export type PluginStateInput = {
   disabled(): readonly string[]
   setDisabled(names: readonly string[]): void
   // The running plugin host, for the one mutation that does not wait for a restart
-  // (@acorn/node-core/server/plugins/reload.ts). Both roots hold the `initPlugins` result already.
+  // (`createPluginReloader` in node-core). Both roots hold the `initPlugins` result already.
   reloadHost: Pick<PluginHostResult, 'reload'>
 }
 
 /** The bridge, plus the one thing it holds open: development mode's file watches. */
 export async function buildPluginStateBridge(input: PluginStateInput): Promise<PluginsBridge & { dispose(): void }> {
   const { dataDir } = input
-  // Built here, not in each root, so the two cannot drift the way install/uninstall once did. The
+  // Built here, not in each root, so the two cannot drift. The
   // built-in names come from the build (composition.ts), not the assembled graph: they only warn when
   // a disk package shadows a compiled one.
   const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
@@ -57,11 +72,25 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
   const development = createPluginDevelopment({ dataDir, reload: (id) => reloader.reload(id) })
   // Only a service that survived init and ready can claim a running identity. Keep its bytes in this
   // process even if the package is updated or removed on disk before the next restart.
-  const serving = new Set(input.roster().filter((row) => row.state === 'active' && !row.disabled).map((row) => row.name))
-  const bootSnapshots = await Promise.all(input.booted().filter((entry) => serving.has(entry.manifest.id)).map(snapshotActivePlugin))
+  const serving = new Set(
+    input
+      .roster()
+      .filter((row) => row.state === 'active' && !row.disabled)
+      .map((row) => row.name),
+  )
+  const bootSnapshots = await Promise.all(
+    input
+      .booted()
+      .filter((entry) => serving.has(entry.manifest.id))
+      .map(snapshotActivePlugin),
+  )
   const active = (): ReadonlyMap<string, ActivePluginSnapshot> => {
     const lost = new Set(reloader.lost())
-    return new Map([...bootSnapshots, ...reloader.reloaded()].filter((entry) => !lost.has(entry.id)).map((entry) => [entry.id, entry]))
+    return new Map(
+      [...bootSnapshots, ...reloader.reloaded()]
+        .filter((entry) => !lost.has(entry.id))
+        .map((entry) => [entry.id, entry]),
+    )
   }
   const installed = () => scanInstalled(dataDir).installed
   return {
@@ -75,20 +104,24 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // stops claiming a restart is pending for code that is already live.
     booted: () => [...active().values()],
     loadFailures: input.loadFailures,
-    pendingReview: (id) => readPendingPluginReview(dataDir, id) ?? (hasPendingPluginReview(dataDir, id) ? { corrupt: true } : null),
+    pendingReview: (id) =>
+      readPendingPluginReview(dataDir, id) ?? (hasPendingPluginReview(dataDir, id) ? { corrupt: true } : null),
     pendingReviewIds: () => pendingPluginReviewIds(dataDir),
     approveReview: (id, reviewId, fingerprint) => {
       const candidate = installed().find((entry) => entry.manifest.id === id && entry.dir === pluginDir(dataDir, id))
       if (!candidate) throw new Error(`No installed package '${id}' is available for review.`)
       const currentFingerprint = pluginReviewFingerprint(candidate.dir)
-      if (currentFingerprint !== fingerprint) throw new Error(`'${id}' changed since the review was opened. Reopen its review.`)
+      if (currentFingerprint !== fingerprint)
+        throw new Error(`'${id}' changed since the review was opened. Reopen its review.`)
       return approvePluginReview(dataDir, id, reviewId, currentFingerprint)
     },
     clientBundle: async (id, hash) => {
       const retained = active().get(id)?.bundle
       if (retained?.hash === hash) return retained
       const candidates = installed()
-      const candidate = candidates.find((entry) => entry.manifest.id === id && !hasPendingPluginReview(dataDir, id) && entry.client?.hash === hash)
+      const candidate = candidates.find(
+        (entry) => entry.manifest.id === id && !hasPendingPluginReview(dataDir, id) && entry.client?.hash === hash,
+      )
       if (!candidate) return null
       const bundle = await readClientBundle([candidate], id)
       // A package can change between the advertised scan and this read. The named hash is the
@@ -104,8 +137,9 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // leaves a running plugin whose state has been deleted underneath it.
     //
     // The input grant and skill approvals go before both, whether or not the data stays. They're keyed
-    // by plugin id, so a package installed later under the same id would otherwise read without asking. Dropping it
-    // first means a failed uninstall leaves a plugin that asks again, never one that kept a grant.
+    // by plugin id, so a package installed later under the same id would otherwise read without asking.
+    // Dropping them first means a failed uninstall leaves a plugin that asks again, never one that kept a
+    // grant.
     // Development mode ends first of all, so its watch doesn't outlive the package.
     uninstall: async (id, options) => {
       development.set(id, false)

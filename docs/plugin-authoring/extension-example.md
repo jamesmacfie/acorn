@@ -102,7 +102,7 @@ export default defineConfig({
   "name": "Acme review",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "3",
+  "apiVersion": "5",
   "node": "./node.js",
   "client": "./dist/client.js",
   "requires": { "plugins": [{ "id": "agents" }] },

@@ -33,6 +33,7 @@ export function hiddenCharactersIn(text: string, file: string, limit = MAX_HIDDE
 /** A bounded refusal that names the first location and counts the rest. */
 export function hiddenCharacterReason(found: readonly HiddenCharacter[]): string {
   const [first] = found
-  const more = found.length > 1 ? `, and ${found.length === MAX_HIDDEN_FINDINGS ? 'at least ' : ''}${found.length - 1} more` : ''
+  const more =
+    found.length > 1 ? `, and ${found.length === MAX_HIDDEN_FINDINGS ? 'at least ' : ''}${found.length - 1} more` : ''
   return `Hidden character ${first.codePoint} in ${first.file} line ${first.line}${more}. Remove it, ${TURN_OFF}`
 }

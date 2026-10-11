@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 const readJson = vi.hoisted(() => vi.fn())
 vi.mock('@acorn/plugin-api/client', () => ({
-  readJson, activeNodeId: () => 'selected-node', readBytes: vi.fn(), sendForm: vi.fn(), writeJson: vi.fn(),
+  readJson,
+  activeNodeId: () => 'selected-node',
+  readBytes: vi.fn(),
+  sendForm: vi.fn(),
+  writeJson: vi.fn(),
 }))
 import { managedAgentApi } from './managedClient'
 

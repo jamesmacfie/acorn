@@ -49,7 +49,7 @@ export function keyedRows<T, R extends CollectionItem>(
 }
 
 /** Items on successive lines. `virtual` is the scroll window and changes nothing else: the component
- *  is the virtualiser, because OpenTUI has none, and it draws only the rows that fit. */
+ *  is the virtualiser, because the renderer has none, and it draws only the rows that fit. */
 export function Rows<T extends CollectionItem>(props: {
   id: string
   ariaLabel?: string
@@ -66,9 +66,7 @@ export function Rows<T extends CollectionItem>(props: {
   children: (item: T, itemProps: ItemProps, selected: () => boolean, place: Record<string, never>) => JSX.Element
 }) {
   const items = createMemo(() => props.items)
-  // One collection per `Rows`, keyed by the pane's own id, which is what the host store has always
-  // been keyed by. Phase 0's stand-in was one store for every list on screen; this is the real thing
-  // (../../keys/collection.ts).
+  // One collection per `Rows`, keyed by the pane's own id (../../keys/collection.ts).
   const collection = createCellCollection({
     id: () => props.id,
     items,
@@ -91,8 +89,8 @@ export function Rows<T extends CollectionItem>(props: {
   let box: Renderable | undefined
   const [rows, setRows] = createSignal(0)
   // Where the window starts. Kept rather than derived, so it moves only when the caret would leave
-  // it: centring on the active row scrolled the whole list under the reader on every press, which is
-  // not what any list in a terminal does. lazygit's rule — the view holds still until the caret walks
+  // it: centring on the active row would scroll the whole list under the reader on every press, which
+  // is not what any list in a terminal does. lazygit's rule — the view holds still until the caret walks
   // off an edge, then follows by exactly as much as it has to.
   const [top, setTop] = createSignal(0)
   let lastActive: string | null = null
@@ -110,7 +108,10 @@ export function Rows<T extends CollectionItem>(props: {
     let next = current
     if (!props.virtual || !fit || all.length <= fit) next = 0
     else if (active !== lastActive) {
-      const at = Math.max(0, all.findIndex((item) => item.key === active))
+      const at = Math.max(
+        0,
+        all.findIndex((item) => item.key === active),
+      )
       next = Math.max(0, Math.min(Math.max(current, at - fit + 1), at, all.length - fit))
     }
     lastActive = active
@@ -162,7 +163,7 @@ export function Rows<T extends CollectionItem>(props: {
       flexDirection="row"
       // A virtual list is given its height by the panel it is in and windows to it. Left to size
       // itself it is as tall as its contents, which is the same number it then measures to decide how
-      // many rows fit — so it always fitted, always drew everything, and overflowed the frame
+      // many rows fit — so it always fits, always draws everything, and overflows the frame
       // (../../panel.tsx). Every other list keeps the kit's rule and takes the room its rows need.
       {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
       ref={(element: Renderable) => {
@@ -171,7 +172,7 @@ export function Rows<T extends CollectionItem>(props: {
         // Focusable for good, at mount, and the walk still counts the list once. `stopsIn` draws a
         // collection as the row its caret is on and falls back to the container only where there is
         // no such row, which is a virtual list whose active row is off its drawn window or a list
-        // with no rows at all (../../keys/regions.ts § stopsIn).
+        // with no rows at all (`stopsInTree`).
         element.focusable = true
         collection.attach(element)
         scheduleSettle()
@@ -196,7 +197,9 @@ export function Rows<T extends CollectionItem>(props: {
     >
       <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
         <For each={window().items}>
-          {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
+          {(item) =>
+            props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)
+          }
         </For>
       </box>
       <Show when={bar()}>

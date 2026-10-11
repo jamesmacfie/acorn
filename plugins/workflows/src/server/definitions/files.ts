@@ -30,15 +30,26 @@ const defaultCatalog = (): WorkflowValidationCatalog => ({
   stepKinds: new Set<string>(BUILTIN_STEP_KINDS),
   policies: new Set<string>(BUILTIN_POLICIES),
   profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
-  structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
-  managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.managedProvider).map((profile) => profile.id)),
-  validateStepKind: (kind, step, context) => BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
+  structuredProfiles: new Set(
+    agentProfileRegistry
+      .list()
+      .filter((profile) => profile.aiArgv)
+      .map((profile) => profile.id),
+  ),
+  managedProfiles: new Set(
+    agentProfileRegistry
+      .list()
+      .filter((profile) => profile.managedProvider)
+      .map((profile) => profile.id),
+  ),
+  validateStepKind: (kind, step, context) =>
+    BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 })
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 // Kept even when blank or mistyped, unlike `str`, so validation can name the bad field rather than
 // the step silently running without its completion condition.
-const rawGoal = (v: unknown): string | undefined => (typeof v === 'string' ? v.trim() : v as string | undefined)
+const rawGoal = (v: unknown): string | undefined => (typeof v === 'string' ? v.trim() : (v as string | undefined))
 
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
@@ -63,15 +74,17 @@ function parseTools(value: unknown): ToolCeiling | undefined {
   if (!value || typeof value !== 'object') return undefined
   const raw = value as Record<string, unknown>
   const allow = Array.isArray(raw.allow) && raw.allow.every((id) => typeof id === 'string') ? raw.allow : undefined
-  const maxRisk = typeof raw.max_risk === 'string' && ['read', 'write', 'execute'].includes(raw.max_risk) ? (raw.max_risk as ToolRisk) : undefined
+  const maxRisk =
+    typeof raw.max_risk === 'string' && ['read', 'write', 'execute'].includes(raw.max_risk)
+      ? (raw.max_risk as ToolRisk)
+      : undefined
   return allow || maxRisk ? { allow, maxRisk } : undefined
 }
 
 function parseBudget(value: unknown): WorkflowBudget | undefined {
   if (!value || typeof value !== 'object') return undefined
   const raw = value as Record<string, unknown>
-  const number = (key: string): number | undefined =>
-    typeof raw[key] === 'number' ? raw[key] : undefined
+  const number = (key: string): number | undefined => (typeof raw[key] === 'number' ? raw[key] : undefined)
   const budget = {
     maxWallTimeMs: number('max_wall_time_ms'),
     maxCostUsd: number('max_cost_usd'),
@@ -100,14 +113,21 @@ function parseInputs(value: unknown): WorkflowInput[] | undefined {
     const raw = item as Record<string, unknown>
     const name = str(raw.name)
     if (!name) return []
-    return [{
-      name,
-      ...(typeof raw.connection_json === 'string' ? { connection: JSON.parse(raw.connection_json) } : {}),
-      label: str(raw.label),
-      ...(typeof raw.schema_json === 'string' ? { schema: JSON.parse(raw.schema_json), ...(typeof raw.default_json === 'string' ? { default: JSON.parse(raw.default_json) } : {}) } : { default: str(raw.default) }),
-      description: str(raw.description),
-      ...(raw.required === true ? { required: true } : {}),
-    }]
+    return [
+      {
+        name,
+        ...(typeof raw.connection_json === 'string' ? { connection: JSON.parse(raw.connection_json) } : {}),
+        label: str(raw.label),
+        ...(typeof raw.schema_json === 'string'
+          ? {
+              schema: JSON.parse(raw.schema_json),
+              ...(typeof raw.default_json === 'string' ? { default: JSON.parse(raw.default_json) } : {}),
+            }
+          : { default: str(raw.default) }),
+        description: str(raw.description),
+        ...(raw.required === true ? { required: true } : {}),
+      },
+    ]
   })
   return inputs.length ? inputs : undefined
 }
@@ -120,25 +140,26 @@ function parseBranches(value: unknown): Record<string, string> | undefined {
 }
 
 function parseBinding(value: unknown): WorkflowValueBinding {
-  const raw = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-  if (typeof raw.binding_json !== 'string') throw new Error('Workflow bindings require binding_json with a typed address')
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+  if (typeof raw.binding_json !== 'string')
+    throw new Error('Workflow bindings require binding_json with a typed address')
   return dataBindingSchema.parse(JSON.parse(raw.binding_json))
 }
 
 function parseBindings(value: unknown): Record<string, WorkflowValueBinding> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const entries = Object.entries(value as Record<string, unknown>).map(([name, binding]) => [name, parseBinding(binding)])
+  const entries = Object.entries(value as Record<string, unknown>).map(([name, binding]) => [
+    name,
+    parseBinding(binding),
+  ])
   return entries.length ? Object.fromEntries(entries) : undefined
 }
 
 function parseChildWorkflow(value: unknown): ChildWorkflowConfig | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Record<string, unknown>
-  const ref = raw.ref && typeof raw.ref === 'object' && !Array.isArray(raw.ref)
-    ? raw.ref as Record<string, unknown>
-    : {}
+  const ref =
+    raw.ref && typeof raw.ref === 'object' && !Array.isArray(raw.ref) ? (raw.ref as Record<string, unknown>) : {}
   return { ...raw, ref, inputs: parseBindings(raw.inputs) } as ChildWorkflowConfig
 }
 
@@ -172,7 +193,10 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const name = str(o.name) ?? (workflowRef ? `→ ${workflowRef}` : `step-${i + 1}`)
   const stepId = str(o.id)
   if (!stepId) {
-    errors.push({ source, message: `${id}: step '${name}' needs an id. Add format_version = 1 and a stable id to every [[steps]] table.` })
+    errors.push({
+      source,
+      message: `${id}: step '${name}' needs an id. Add format_version = 1 and a stable id to every [[steps]] table.`,
+    })
     return null
   }
   let schema: object | undefined
@@ -190,12 +214,14 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const isolation = str(o.isolation)
   const inputsMode = str(o.inputs)
   const dataFields: Partial<WorkflowStepDef> = {}
-  if (Array.isArray(o.projection) && o.projection.every(value => typeof value === 'string')) dataFields.projection = o.projection
+  if (Array.isArray(o.projection) && o.projection.every((value) => typeof value === 'string'))
+    dataFields.projection = o.projection
   if (o.repeat && typeof o.repeat === 'object') dataFields.repeat = o.repeat as WorkflowStepDef['repeat']
   if (typeof o.incremental === 'boolean') dataFields.incremental = o.incremental
   try {
     for (const key of ['query', 'record', 'condition', 'dataset'] as const) {
-      if (typeof o[`${key}_json`] === 'string') Object.assign(dataFields, { [key]: JSON.parse(o[`${key}_json`] as string) })
+      if (typeof o[`${key}_json`] === 'string')
+        Object.assign(dataFields, { [key]: JSON.parse(o[`${key}_json`] as string) })
     }
   } catch {
     errors.push({ source, message: `${id}: step '${name}' has invalid data configuration JSON` })
@@ -218,13 +244,28 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     policy: str(o.policy),
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
-    agent: o.agent && typeof o.agent === 'object' ? (() => {
-      const a = o.agent as Record<string, unknown>
-      const unknown = Object.fromEntries(Object.entries(a).filter(([key]) => !['prompt', 'goal', 'profile', 'model', 'config_options', 'schema_json', 'on_failure'].includes(key)))
-      return { ...unknown, prompt: a.prompt as string, goal: rawGoal(a.goal), profileId: str(a.profile), model: str(a.model),
-        configOptions: parseStringTable(a.config_options), schema: typeof a.schema_json === 'string' ? JSON.parse(a.schema_json) : undefined,
-        onFailure: a.on_failure as 'continue' | 'stop' | undefined }
-    })() : undefined,
+    agent:
+      o.agent && typeof o.agent === 'object'
+        ? (() => {
+            const a = o.agent as Record<string, unknown>
+            const unknown = Object.fromEntries(
+              Object.entries(a).filter(
+                ([key]) =>
+                  !['prompt', 'goal', 'profile', 'model', 'config_options', 'schema_json', 'on_failure'].includes(key),
+              ),
+            )
+            return {
+              ...unknown,
+              prompt: a.prompt as string,
+              goal: rawGoal(a.goal),
+              profileId: str(a.profile),
+              model: str(a.model),
+              configOptions: parseStringTable(a.config_options),
+              schema: typeof a.schema_json === 'string' ? JSON.parse(a.schema_json) : undefined,
+              onFailure: a.on_failure as 'continue' | 'stop' | undefined,
+            }
+          })()
+        : undefined,
     childWorkflow: parseChildWorkflow(o.child_workflow),
     items: parseMapSource(o.items),
     itemKey: typeof o.item_key === 'string' ? o.item_key : undefined,
@@ -232,14 +273,20 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     form: parseForm(o.form),
     branches: parseBranches(o.branches),
     // Passed through unread: `[steps.with]` belongs to whichever plugin contributed the kind.
-    with: o.with && typeof o.with === 'object' && !Array.isArray(o.with) ? (o.with as Record<string, unknown>) : undefined,
+    with:
+      o.with && typeof o.with === 'object' && !Array.isArray(o.with) ? (o.with as Record<string, unknown>) : undefined,
     tools: parseTools(o.tools),
     budget: parseBudget(o.budget),
     workflowRef,
   }
 }
 
-export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'user', errors: WorkflowFileError[]): RawWorkflow | null {
+export function parseWorkflowToml(
+  text: string,
+  id: string,
+  source: 'repo' | 'user',
+  errors: WorkflowFileError[],
+): RawWorkflow | null {
   let doc: Record<string, unknown>
   try {
     doc = parseToml(text) as Record<string, unknown>
@@ -248,42 +295,55 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     return null
   }
   try {
-  const rawSteps = Array.isArray(doc.steps) ? doc.steps : []
-  if (doc.format_version !== 1 || doc.baseline !== ACORN_BASELINE) {
-    errors.push({ source: `${source}:${id}`, message: `Incompatible workflow. Set format_version = 1 and baseline = "${ACORN_BASELINE}" before loading it.` })
-    return null
-  }
-  if (!rawSteps.length) {
-    errors.push({ source: `${source}:${id}`, message: `${id}: no [[steps]] declared` })
-    return null
-  }
-  const steps = rawSteps.map((s, i) => parseStep(s, id, i, errors, `${source}:${id}`)).filter((s): s is RawStep => s != null)
-  if (steps.length !== rawSteps.length) return null
-  const posture = str(doc.posture)
-  return {
-    baseline: ACORN_BASELINE,
-    formatVersion: 1,
-    maxDescendants: doc.max_descendants as number | undefined,
-    maxConcurrency: doc.max_concurrency as number | undefined,
-    outputs: typeof doc.outputs_json === 'string' ? JSON.parse(doc.outputs_json) : undefined,
-    id,
-    name: str(doc.name) ?? id,
-    posture: posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
-    trigger: str(doc.trigger),
-    tools: parseTools(doc.tools),
-    budget: parseBudget(doc.budget),
-    inputs: parseInputs(doc.inputs),
-    steps,
-    source,
-  }
+    const rawSteps = Array.isArray(doc.steps) ? doc.steps : []
+    if (doc.format_version !== 1 || doc.baseline !== ACORN_BASELINE) {
+      errors.push({
+        source: `${source}:${id}`,
+        message: `Incompatible workflow. Set format_version = 1 and baseline = "${ACORN_BASELINE}" before loading it.`,
+      })
+      return null
+    }
+    if (!rawSteps.length) {
+      errors.push({ source: `${source}:${id}`, message: `${id}: no [[steps]] declared` })
+      return null
+    }
+    const steps = rawSteps
+      .map((s, i) => parseStep(s, id, i, errors, `${source}:${id}`))
+      .filter((s): s is RawStep => s != null)
+    if (steps.length !== rawSteps.length) return null
+    const posture = str(doc.posture)
+    return {
+      baseline: ACORN_BASELINE,
+      formatVersion: 1,
+      maxDescendants: doc.max_descendants as number | undefined,
+      maxConcurrency: doc.max_concurrency as number | undefined,
+      outputs: typeof doc.outputs_json === 'string' ? JSON.parse(doc.outputs_json) : undefined,
+      id,
+      name: str(doc.name) ?? id,
+      posture:
+        posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
+      trigger: str(doc.trigger),
+      tools: parseTools(doc.tools),
+      budget: parseBudget(doc.budget),
+      inputs: parseInputs(doc.inputs),
+      steps,
+      source,
+    }
   } catch (error) {
-    errors.push({ source: `${source}:${id}`, message: `Invalid typed workflow value: ${error instanceof Error ? error.message : String(error)}` })
+    errors.push({
+      source: `${source}:${id}`,
+      message: `Invalid typed workflow value: ${error instanceof Error ? error.message : String(error)}`,
+    })
     return null
   }
 }
 
 // Inline sub-workflow expansion with cycle rejection: see docs/workflows/execution.md § Execution model.
-export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[], catalog: WorkflowValidationCatalog = defaultCatalog()): LoadedWorkflow[] {
+function expandWorkflows(
+  raw: RawWorkflow[],
+  errors: WorkflowFileError[],
+  catalog: WorkflowValidationCatalog = defaultCatalog(),
+): LoadedWorkflow[] {
   const byId = new Map(raw.map((w) => [w.id, w]))
   const out: LoadedWorkflow[] = []
 
@@ -301,7 +361,10 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
         return null
       }
       if (chain.includes(step.workflowRef) || step.workflowRef === w.id) {
-        errors.push({ source: `${w.source}:${w.id}`, message: `${w.id}: cyclic sub-workflow reference '${chain.concat(step.workflowRef).join(' → ')}'` })
+        errors.push({
+          source: `${w.source}:${w.id}`,
+          message: `${w.id}: cyclic sub-workflow reference '${chain.concat(step.workflowRef).join(' → ')}'`,
+        })
         return null
       }
       const inner = expand(target, [...chain, step.workflowRef])
@@ -311,13 +374,16 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
         const typed = dataBindingSchema.parse(binding)
         return {
           ...typed,
-          address: typed.address.from === 'step'
-            ? { ...typed.address, stepId: `${prefix}${typed.address.stepId}` }
-            : typed.address,
+          address:
+            typed.address.from === 'step'
+              ? { ...typed.address, stepId: `${prefix}${typed.address.stepId}` }
+              : typed.address,
         }
       }
       const prefixBindings = (bindings: Record<string, WorkflowValueBinding> | undefined) =>
-        bindings ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, prefixBinding(binding)])) : undefined
+        bindings
+          ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, prefixBinding(binding)]))
+          : undefined
       steps.push(
         ...inner.map((s) => ({
           ...s,
@@ -326,15 +392,17 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
           // An absent `after` still means "the step declared before me", which after a linear
           // expansion is the previous inner step, or the step before the reference for the first one.
           after: s.after?.map((name) => `${prefix}${name}`),
-          branches: s.branches ? Object.fromEntries(Object.entries(s.branches).map(([verdict, targetName]) => [verdict, `${prefix}${targetName}`])) : undefined,
+          branches: s.branches
+            ? Object.fromEntries(
+                Object.entries(s.branches).map(([verdict, targetName]) => [verdict, `${prefix}${targetName}`]),
+              )
+            : undefined,
           prompt: s.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`),
           childWorkflow: s.childWorkflow
             ? { ...s.childWorkflow, inputs: prefixBindings(s.childWorkflow.inputs) }
             : undefined,
           items: s.items ? { ...s.items, step: `${prefix}${s.items.step}` } : undefined,
-          title: s.title
-            ? { ...s.title, bindings: prefixBindings(s.title.bindings) }
-            : undefined,
+          title: s.title ? { ...s.title, bindings: prefixBindings(s.title.bindings) } : undefined,
         })),
       )
     }
@@ -361,7 +429,8 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
         source: w.source,
       }
       const problems = validateWorkflow(workflow, catalog)
-      if (problems.length) errors.push(...problems.map((message) => ({ source: `${w.source}:${w.id}`, message: `${w.id}: ${message}` })))
+      if (problems.length)
+        errors.push(...problems.map((message) => ({ source: `${w.source}:${w.id}`, message: `${w.id}: ${message}` })))
       else out.push(workflow)
     }
   }

@@ -7,8 +7,9 @@ import { sliceToWidth, stringWidth } from '../width'
 
 // The three things every component in this package needs, and the reason each exists.
 //
-// A cell host is stricter than the DOM in one structural way: a run of text must have a `text`
-// parent. On the DOM a bare string anywhere is a text node nobody thinks about, so the kit's
+// A cell host is stricter than the DOM in one structural way: a run of text lays out only inside a
+// `text`. A bare string under a box draws at the box's origin and takes no room. On the DOM a bare
+// string anywhere is a text node nobody thinks about, so the kit's
 // element-typed props — `leading`, `trailing`, `meta`, `actions`, `icon` — are handed bare strings by
 // panes writing perfectly correct kit. That difference belongs to the host, not to the caller.
 
@@ -21,14 +22,11 @@ export const slot = (value: JSX.Element): JSX.Element => {
   }
   // An accessor, which is what Solid compiles a dynamic child to: `<Line><Icon />{count()}</Line>` is
   // an array of one element and one function. Read it and wrap what comes back, the same thing
-  // `flatten` and `hasNode` below do with the same shape — this was the one of the three that did not,
-  // so the string went through untouched, Solid inserted it raw, and a row holding a node beside a
-  // count threw "Orphan text error" from inside whatever signal had just moved. Reading it here is
-  // tracked, because `slot` is called from inside the JSX that renders it.
+  // `flatten` and `hasNode` below do with the same shape, or the string lands loose in a box. Reading
+  // it here is tracked, because `slot` is called from inside the JSX that renders it.
   if (typeof value === 'function') return slot((value as () => unknown)() as JSX.Element)
   // An array mixes the three, and a fragment is an array: `hint={<><Kbd>⌘↵</Kbd> to send</>}` is one
-  // node and one bare string, and the string on its own would land in a box, which is the shape a cell
-  // host refuses outright (docs/tui.md).
+  // node and one bare string, and the string on its own would land loose in a box (docs/tui.md).
   if (Array.isArray(value)) return value.map((item) => slot(item as JSX.Element)) as unknown as JSX.Element
   return value
 }
@@ -46,9 +44,8 @@ export const flatten = (value: unknown): string => {
  *
  *  A pane may hand a node that draws a line another kit node: a `Row` labelled with a `Text`, a `Badge`
  *  inside a `Chip`. `flatten` turns one into `[object Object]`, because a renderable has no text to
- *  read off it — which is how the pane sweep found this, on the file rows of the changes pane and the
- *  item rows of the context pane. So a line asks first, and a line whose children are a tree draws the
- *  tree instead (docs/tui.md).
+ *  read off it. So a line asks first, and a line whose children are a tree draws the tree instead
+ *  (docs/tui.md).
  *
  *  Its own function so `Line` stays one expression, and exported because `Row` asks the same question
  *  about the same children when it decides whether the `match` role is its to apply. */
@@ -67,28 +64,32 @@ export function hasNode(value: unknown): boolean {
 export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
   return (
-    <Show when={hasNode(props.children)} fallback={
-      <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>{run().text}</text>
-    }>
-      <box flexDirection="row" gap={0}>{slot(props.children)}</box>
+    <Show
+      when={hasNode(props.children)}
+      fallback={
+        <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>
+          {run().text}
+        </text>
+      }
+    >
+      <box flexDirection="row" gap={0}>
+        {slot(props.children)}
+      </box>
     </Show>
   )
 }
 
 /** One styled run *inside* a line, rather than a line of its own.
  *
- *  A `text` renderable is a box to yoga, so a row of them is a row of boxes: at a width they do not
- *  fit, each is shrunk and each clips its own content, which turned "hash but `signIn` still" into
- *  "hash bsignInstill" on the agents transcript. A `span` is a run inside one `text`, so the whole
- *  line wraps and clips as one thing — which is what a line of styled words is
- *  (docs/tui.md).
+ *  A `text` is a box to yoga, so a row of them is a row of boxes: at a width they do not fit, each is
+ *  shrunk and each clips its own content, which turns "hash but `signIn` still" into
+ *  "hash bsignInstill". A `span` is a run inside one `text`, so the whole line wraps and clips as one
+ *  thing — which is what a line of styled words is (docs/tui.md).
  *
  *  Only for a caller that owns the `text` around it. Everything else uses `Line`.
  *
  *  A span takes the same props a `text` does, because it is the same thing at a different size, and
- *  paint reads its colour off them (./roles.ts § textStyle). It used to have to be said twice — the
- *  old painter ignored every prop on a text node but `href` and `style` — and a span given only props
- *  drew in its parent's colour, which was white, on a white terminal, on every line of every diff. */
+ *  paint reads its colour off them (./roles.ts § textStyle). */
 export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
   return <span {...run().style}>{run().text}</span>
@@ -105,7 +106,12 @@ export function Rule(props: { axis?: 'x' | 'y' }) {
   const vertical = () => props.axis === 'y'
   return (
     <Show when={borderCell('divider').glyph}>
-      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={slotColor('default')} flexShrink={0} />
+      <box
+        border={vertical() ? ['left'] : ['top']}
+        borderStyle="single"
+        borderColor={slotColor('default')}
+        flexShrink={0}
+      />
     </Show>
   )
 }
@@ -121,8 +127,7 @@ export const runStyle = (role?: TextRole, tone?: Tone) => {
  *
  *  Cells, not characters. `String.length` is wrong three ways — two code units for one astral
  *  character, one cell for a wide one, a cell for a combining mark that takes none — so a column
- *  holding any of the three did not line up with the one above it. The fixture is entirely ASCII,
- *  where the two answers agree, which is why nobody has seen it (../width.ts). */
+ *  holding any of the three would not line up with the one above it (../width.ts). */
 export function ellipsise(value: string, width: number): string {
   if (width <= 0) return ''
   if (stringWidth(value) <= width) return value

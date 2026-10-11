@@ -10,19 +10,28 @@ import { Modal, ModalBody } from '../kit/grouping'
 export function SettingsHost(props: { nodeId: string; onClose: () => void; onSetup: () => void }) {
   const [component, { refetch }] = createResource(async () => (await import('./Settings')).Settings)
   return (
-    <Show when={component()} fallback={
-      <Modal onDismiss={props.onClose} title="Settings" size="wide">
-        <ModalBody>
-          <Show when={component.error} fallback={<Line role="muted">Opening settings…</Line>}>
-            <Alert>{String(component.error)}</Alert>
-            <Rows id="settings.load.actions" items={[{ key: 'retry', label: 'Retry' }, { key: 'close', label: 'Close' }]}
-              onActivate={(key) => key === 'retry' ? void refetch() : props.onClose()}>
-              {(entry, item) => <Row item={item}>{entry.label}</Row>}
-            </Rows>
-          </Show>
-        </ModalBody>
-      </Modal>
-    }>
+    <Show
+      when={component()}
+      fallback={
+        <Modal onDismiss={props.onClose} title="Settings" size="wide">
+          <ModalBody>
+            <Show when={component.error} fallback={<Line role="muted">Opening settings…</Line>}>
+              <Alert>{String(component.error)}</Alert>
+              <Rows
+                id="settings.load.actions"
+                items={[
+                  { key: 'retry', label: 'Retry' },
+                  { key: 'close', label: 'Close' },
+                ]}
+                onActivate={(key) => (key === 'retry' ? void refetch() : props.onClose())}
+              >
+                {(entry, item) => <Row item={item}>{entry.label}</Row>}
+              </Rows>
+            </Show>
+          </ModalBody>
+        </Modal>
+      }
+    >
       {(ready) => <Dynamic component={ready()} nodeId={props.nodeId} onClose={props.onClose} onSetup={props.onSetup} />}
     </Show>
   )

@@ -98,7 +98,7 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
 
 // Select by path, never by index. upsert() probes `/v1/node` and then opens the WebSocket, so the
 // call under test is never the first request the server sees. Indexing into `received` silently
-// asserts against the probe or the upgrade instead, and used to pass, because the upgrade carries the
+// asserts against the probe or the upgrade instead, and passes, because the upgrade carries the
 // same bearer.
 const requestTo = (path: string): Received => {
   const match = received.find((r) => r.path === path)
@@ -129,7 +129,7 @@ describe('broker HTTP', () => {
     const res = await broker.fetch('n1', { requestId: 'r1', path: '/v1/core/tasks' })
     expect(res.status).toBe(200)
     expect(JSON.parse(text(res.body))).toEqual({ ok: true })
-    // The renderer never supplies this: the broker exists so the token stays in main.
+    // The renderer never supplies this: the broker exists so the token stays in the helper.
     expect(requestTo('/v1/core/tasks').headers.authorization).toBe('Bearer acorn_dt_secret')
   })
 
@@ -215,8 +215,8 @@ describe('broker HTTP', () => {
     await expect(pending).rejects.toThrow()
   })
 
-  // The regression: a cancelled request was reported as a failed one, so the node went `offline` and
-  // apiClient then refused every mutation with "This node is offline" even though it was answering.
+  // A cancelled request reported as a failed one would take the node `offline`, and apiClient would
+  // then refuse every mutation with "This node is offline" even though it was answering.
   it('does not mark a node offline when the renderer cancels a request', async () => {
     const { origin } = await listen(false)
     respond = () => ({ status: 200, body: 'ok' })
@@ -230,9 +230,9 @@ describe('broker HTTP', () => {
     expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
   })
 
-  // The regression: one slow route took the whole node down. A plugin panel waiting on a credential
-  // or a third-party API passed the broker's own deadline, the timeout was read as evidence about the
-  // transport, and every other surface in the app then said the node was unreachable.
+  // One slow route must not take the whole node down. A plugin panel waiting on a credential or a
+  // third-party API can pass the broker's own deadline, and reading that timeout as evidence about the
+  // transport would make every other surface in the app say the node was unreachable.
   it('does not mark a node offline when one route passes the request deadline', async () => {
     const { origin } = await listen(false)
     const broker = makeBroker()
@@ -240,7 +240,9 @@ describe('broker HTTP', () => {
     await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
 
     respond = () => ({ status: 0, body: '' })
-    await expect(broker.fetch('n1', { requestId: 'r-slow', path: '/slow', timeoutMs: 50 })).rejects.toThrow(/did not answer within/)
+    await expect(broker.fetch('n1', { requestId: 'r-slow', path: '/slow', timeoutMs: 50 })).rejects.toThrow(
+      /did not answer within/,
+    )
     expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
 
     // Still answering, and still reachable as far as the broker is concerned.
@@ -255,8 +257,9 @@ describe('broker HTTP', () => {
     await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
 
     respond = () => ({ status: 200, body: '123456' })
-    await expect(broker.fetch('n1', { requestId: 'r-large', path: '/large' }, { maxResponseBytes: 5 }))
-      .rejects.toMatchObject({ name: 'NodeResponseTooLargeError' })
+    await expect(
+      broker.fetch('n1', { requestId: 'r-large', path: '/large' }, { maxResponseBytes: 5 }),
+    ).rejects.toMatchObject({ name: 'NodeResponseTooLargeError' })
     expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
 
     respond = () => ({ status: 200, body: 'ok' })
@@ -280,9 +283,12 @@ describe('broker HTTP', () => {
     await expect(makeBroker().fetch('nope', { requestId: 'r1', path: '/x' })).rejects.toThrow(/Unknown node/)
   })
 
-  it('marks a node revoked on the auth gate\'s 401 so it stops being retried', async () => {
+  it("marks a node revoked on the auth gate's 401 so it stops being retried", async () => {
     const { origin } = await listen(false)
-    respond = () => ({ status: 401, body: '{"error":{"code":"unauthenticated","message":"unauthenticated","requestId":"r","retryable":false}}' })
+    respond = () => ({
+      status: 401,
+      body: '{"error":{"code":"unauthenticated","message":"unauthenticated","requestId":"r","retryable":false}}',
+    })
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'stale' })
 
@@ -291,21 +297,26 @@ describe('broker HTTP', () => {
     expect(statuses.at(-1)).toMatchObject({ state: 'revoked', error: { code: 'unauthorized' } })
   })
 
-  // The regression this exists for: reading the status alone, a fresh node was marked `revoked`, a
-  // security state that also stops the socket being retried, by the ordinary 403 a never-connected
-  // GitHub integration answers with. The two-node e2e caught it as "the local node is revoked" seconds
-  // after a clean boot. Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake
-  // one status code over, so both are asserted.
+  // Reading the status alone would mark a fresh node `revoked`, a security state that also stops the
+  // socket being retried, on the ordinary 403 a never-connected GitHub integration answers with.
+  // Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake one status code
+  // over, so both are asserted.
   it('leaves the node alone for a route-level 401/403 about a third-party credential', async () => {
     const { origin } = await listen(false)
     // Scoped to the two paths under test. Answering the /v1/events upgrade with a 401 as well would
     // trip the WS's own (correct) revocation path and prove nothing about the HTTP one.
     respond = (path) => {
       if (path === '/provider-403') {
-        return { status: 403, body: '{"error":{"code":"provider_not_connected","message":"provider_not_connected","requestId":"r","retryable":false}}' }
+        return {
+          status: 403,
+          body: '{"error":{"code":"provider_not_connected","message":"provider_not_connected","requestId":"r","retryable":false}}',
+        }
       }
       if (path === '/provider-401') {
-        return { status: 401, body: '{"error":{"code":"linear_reauth","message":"linear_reauth","requestId":"r","retryable":false}}' }
+        return {
+          status: 401,
+          body: '{"error":{"code":"linear_reauth","message":"linear_reauth","requestId":"r","retryable":false}}',
+        }
       }
       return { status: 200, body: '{"ok":true}', headers: { 'content-type': 'application/json' } }
     }
@@ -335,7 +346,7 @@ describe('broker TLS pinning', () => {
     expect(res.status).toBe(200)
   })
 
-  // The security assertion of the whole phase: a changed identity must fail closed. If pinning were
+  // The security assertion of this file: a changed identity must fail closed. If pinning were
   // implemented with rejectUnauthorized:false, checkServerIdentity would never be consulted and this
   // request would succeed.
   it('refuses a certificate that does not match the pin, and reports identity_mismatch', async () => {
@@ -343,7 +354,15 @@ describe('broker TLS pinning', () => {
     const broker = makeBroker()
     // Deterministically different in the first nibble, whatever this run's certificate happens to be.
     const wrong = (fingerprint[0] === '0' ? '1' : '0') + fingerprint.slice(1)
-    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't', fingerprint: wrong, certPem })
+    broker.upsert({
+      nodeId: 'n1',
+      label: 'local',
+      endpoint: origin,
+      local: true,
+      token: 't',
+      fingerprint: wrong,
+      certPem,
+    })
 
     await expect(broker.fetch('n1', { requestId: 'r1', path: '/v1/node' })).rejects.toThrow()
     expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'identity_mismatch' } })
@@ -354,9 +373,21 @@ describe('broker TLS pinning', () => {
     const other = mkdtempSync(join(tmpdir(), 'acorn-broker-other-'))
     try {
       execFileSync('openssl', [
-        'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '3',
-        '-keyout', join(other, 'key.pem'), '-out', join(other, 'cert.pem'),
-        '-subj', '/CN=impostor', '-addext', 'subjectAltName=IP:127.0.0.1',
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-nodes',
+        '-days',
+        '3',
+        '-keyout',
+        join(other, 'key.pem'),
+        '-out',
+        join(other, 'cert.pem'),
+        '-subj',
+        '/CN=impostor',
+        '-addext',
+        'subjectAltName=IP:127.0.0.1',
       ])
       const broker = makeBroker()
       // Pinning the impostor's CA against the real server: the chain cannot validate.
@@ -382,12 +413,18 @@ describe('broker WebSocket', () => {
     const wss = new WebSocketServer({ server, path: WS_PATH })
     let closes = 0
     wss.on('connection', (socket) => {
-      socket.on('close', () => { closes++ })
+      socket.on('close', () => {
+        closes++
+      })
       socket.send(Buffer.alloc(MAX_NODE_WS_MESSAGE_BYTES + 1), { binary: true })
     })
     const frames: unknown[] = []
     const bytes: Uint8Array[] = []
-    const broker = new NodeBroker({ frame: (_n, frame) => frames.push(frame), bytes: (_n, frame) => bytes.push(frame), status: (state) => statuses.push(state) })
+    const broker = new NodeBroker({
+      frame: (_n, frame) => frames.push(frame),
+      bytes: (_n, frame) => bytes.push(frame),
+      status: (state) => statuses.push(state),
+    })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
     await waitFor(() => closes > 0, 'oversized socket closure')
@@ -406,7 +443,11 @@ describe('broker WebSocket', () => {
     })
 
     const frames: unknown[] = []
-    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: () => {}, status: (s) => statuses.push(s) })
+    const broker = new NodeBroker({
+      frame: (_n, f) => frames.push(f),
+      bytes: () => {},
+      status: (s) => statuses.push(s),
+    })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'acorn_dt_ws' })
 
@@ -421,7 +462,10 @@ describe('broker WebSocket', () => {
   // inside, does not count the frame against `seq`, and does not turn it into a string.
   it('forwards a binary frame byte for byte, and does not count it against seq', async () => {
     const { origin, server } = await listen(false)
-    const payload = Buffer.concat([Buffer.from('11111111-2222-3333-4444-555555555555', 'ascii'), Buffer.from([0x1b, 0x5b, 0x32, 0x4a, 0xf0, 0x9f, 0x8c, 0xb0])])
+    const payload = Buffer.concat([
+      Buffer.from('11111111-2222-3333-4444-555555555555', 'ascii'),
+      Buffer.from([0x1b, 0x5b, 0x32, 0x4a, 0xf0, 0x9f, 0x8c, 0xb0]),
+    ])
     const wss = new WebSocketServer({ server, path: WS_PATH })
     wss.on('connection', (socket) => {
       socket.send(JSON.stringify({ channel: 'term:status', seq: 1 }))
@@ -431,7 +475,11 @@ describe('broker WebSocket', () => {
 
     const frames: unknown[] = []
     const bytes: Uint8Array[] = []
-    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: (_n, f) => bytes.push(f), status: () => {} })
+    const broker = new NodeBroker({
+      frame: (_n, f) => frames.push(f),
+      bytes: (_n, f) => bytes.push(f),
+      status: () => {},
+    })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -439,7 +487,10 @@ describe('broker WebSocket', () => {
     expect(Buffer.from(bytes[0]).equals(payload)).toBe(true)
     // Still contiguous, and the socket is still up: a binary frame between two numbered frames is not
     // a gap.
-    expect(frames).toEqual([{ channel: 'term:status', seq: 1 }, { channel: 'tasks:changed', seq: 2 }])
+    expect(frames).toEqual([
+      { channel: 'term:status', seq: 1 },
+      { channel: 'tasks:changed', seq: 2 },
+    ])
   })
 
   it('queues frames sent before the socket opens and flushes them on open', async () => {
@@ -482,8 +533,8 @@ describe('broker WebSocket', () => {
 
   // A `ws:shed` marker is the node saying "you were behind, so I dropped some invalidation frames".
   // Shed load, not lost data. Closing the socket here would re-attach every terminal and refetch every
-  // active query at the moment the node is busiest, which is the amplification phase 5 removed
-  // (node-core/server/transport/wsHub.ts, docs/terminal/activity.md § Backpressure).
+  // active query at the moment the node is busiest (node-core/server/transport/wsHub.ts,
+  // docs/terminal/activity.md § Backpressure).
   it('does not reset the socket on a shed marker, even one that skipped a number', async () => {
     const { origin, server } = await listen(false)
     let connections = 0
@@ -521,7 +572,10 @@ describe('broker WebSocket', () => {
       connections += 1
     })
 
-    const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    const broker = new NodeBroker(
+      { frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) },
+      { pingIntervalMs: 20 },
+    )
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -545,7 +599,10 @@ describe('broker WebSocket', () => {
       const { origin, server } = await listen(false)
       const wss = new WebSocketServer({ server, path: WS_PATH, autoPong: false })
       wss.on('connection', () => {})
-      const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+      const broker = new NodeBroker(
+        { frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) },
+        { pingIntervalMs: 20 },
+      )
       brokers.push(broker)
       broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -576,7 +633,10 @@ describe('broker WebSocket', () => {
       connections += 1
     })
 
-    const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    const broker = new NodeBroker(
+      { frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) },
+      { pingIntervalMs: 20 },
+    )
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -604,9 +664,8 @@ describe('broker WebSocket', () => {
   })
 })
 
-// The version gate (docs/api-reference/transport.md § Versioning). Before this, `incompatible` and
-// `protocol_mismatch` were declared in the protocol and produced by nothing: a node that upgraded past
-// the client kept connecting, and the mismatch surfaced as an undefined deep inside a component.
+// The version gate (docs/api-reference/transport.md § Versioning). Without it, a node that upgraded
+// past the client keeps connecting, and the mismatch surfaces as an undefined deep inside a component.
 describe('broker protocol version', () => {
   const nodeInfo = (protocolVersion: number) => ({
     status: 200,
@@ -617,10 +676,17 @@ describe('broker protocol version', () => {
   it('refuses a historical numeric-1 probe without a baseline before opening a socket', async () => {
     const { origin, server } = await listen(false)
     let upgrades = 0
-    server.on('upgrade', (_req, socket) => { upgrades += 1; socket.end() })
-    respond = (path) => (path === '/v1/node'
-      ? { ...nodeInfo(NODE_PROTOCOL_VERSION), body: JSON.stringify({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: 'f'.repeat(64) }) }
-      : { status: 200, body: '{}' })
+    server.on('upgrade', (_req, socket) => {
+      upgrades += 1
+      socket.end()
+    })
+    respond = (path) =>
+      path === '/v1/node'
+        ? {
+            ...nodeInfo(NODE_PROTOCOL_VERSION),
+            body: JSON.stringify({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: 'f'.repeat(64) }),
+          }
+        : { status: 200, body: '{}' }
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
     await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition')
@@ -690,7 +756,11 @@ describe('broker protocol version', () => {
     major = NODE_PROTOCOL_VERSION + 1
     for (const client of wss.clients) client.close()
 
-    await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition on reconnect', 10_000)
+    await waitFor(
+      () => statuses.some((s) => s.state === 'incompatible'),
+      'the incompatible transition on reconnect',
+      10_000,
+    )
     expect(statuses.at(-1)?.error?.code).toBe('protocol_mismatch')
   })
 })

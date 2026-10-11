@@ -17,7 +17,9 @@ const log = createLogger('dashboards')
 
 /** The digest the query library gives a published revision, applied to inline content. */
 const contentDigest = (content: unknown): string =>
-  createHash('sha256').update(canonicalDataEncoding(parseDataValue(content))).digest('hex')
+  createHash('sha256')
+    .update(canonicalDataEncoding(parseDataValue(content)))
+    .digest('hex')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards/sampling.md § Sampling and retention for what a pass does.
@@ -92,19 +94,28 @@ export async function runSamplePass(
     if (signal.aborted) break
     if (!panel.publication) continue
     let published
-    try { published = dashboardStore(db).publishedById(panel.publication.dashboardId) }
-    catch {
+    try {
+      published = dashboardStore(db).publishedById(panel.publication.dashboardId)
+    } catch {
       result.skipped.push({ panelId: panel.id, reason: 'published dashboard unavailable' })
       continue
     }
     const principal = { kind: 'internal' as const, scope: 'service' as const, userId: env.ACTIVE_IDENTITY.get()! }
     let run
     try {
-      run = await runDashboard(env, {
-        scope: { workspaceId: published.workspaceId, ...(published.projectId ? { projectId: published.projectId } : {}) },
-        target: { kind: 'published', id: published.dashboardId, revision: published.revision },
-        mode: 'execution', evaluationTime: now,
-      }, { principal, signal })
+      run = await runDashboard(
+        env,
+        {
+          scope: {
+            workspaceId: published.workspaceId,
+            ...(published.projectId ? { projectId: published.projectId } : {}),
+          },
+          target: { kind: 'published', id: published.dashboardId, revision: published.revision },
+          mode: 'execution',
+          evaluationTime: now,
+        },
+        { principal, signal },
+      )
     } catch (error) {
       log.warn(`${panel.id} skipped: ${describeError(error).message}`)
       result.skipped.push({ panelId: panel.id, reason: 'panel unavailable' })
@@ -125,11 +136,16 @@ export async function runSamplePass(
 
     const { reset } = await appendSample(db, {
       panelId: panel.id,
-      signature: measureSignature({ ...panel, view: run.plan.view }, run.plan.sources.map((entry, index): MeasureQueryIdentity => ({
-        id: entry.id,
-        digest: run.diagnostics.sources[index]?.queryDigest ?? contentDigest(entry.reference),
-        parameters: run.diagnostics.sources[index]?.parameters ?? {}, account: run.diagnostics.sources[index]?.account ?? null,
-      })), run.plan),
+      signature: measureSignature(
+        { ...panel, view: run.plan.view },
+        run.plan.sources.map((entry, index): MeasureQueryIdentity => ({
+          id: entry.id,
+          digest: run.diagnostics.sources[index]?.queryDigest ?? contentDigest(entry.reference),
+          parameters: run.diagnostics.sources[index]?.parameters ?? {},
+          account: run.diagnostics.sources[index]?.account ?? null,
+        })),
+        run.plan,
+      ),
       // Drop `adopt` once every series has been sampled under query identity.
       adopt: measureSignature(panel),
       bucket,

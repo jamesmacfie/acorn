@@ -10,7 +10,7 @@ import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 // independent, so a plugin disabled on one node leaves its rows off that node only, and a slow
 // source cannot hold up a fast one. The cost is N resources instead of one, which for two or three
 // sources is nothing.
-export type AttentionRow = {
+type AttentionRow = {
   item: AttentionItem
   nodeId: string
   node: NodeRecord
@@ -24,19 +24,19 @@ export type AttentionInbox = {
   unavailable: FleetUnavailable[]
 }
 
-// Acknowledging a row. A finished session is a state the node keeps until someone acts on it, so it sits in "Needs you" long after they have read it. Looking at
-// it in a focused window acknowledges it, and so does "Mark all read" in the bell.
+// Acknowledging a row. A finished session is a state the node keeps until someone acts on it, so it
+// sits in "Needs you" long after they have read it. Looking at it in a focused window acknowledges it,
+// and so does "Mark all read" in the bell.
 //
-// The key is the node and the row, and deliberately not the row's `at`. A timestamped key looked like
-// it bought re-arming — a session that completes twice is news twice — but for the source that
-// raises almost every row it bought nothing of the sort: `at` there is the session's `updatedAt`, and
-// the node bumps that on every event it records, including the usage report that lands after the turn
-// ended and the controller change a reconnect writes. So the key moved when nothing had happened, the
-// ack stopped matching, and every row the owner had just cleared came back with the next frame.
+// The key is the node and the row, not the row's `at`. For the source that raises almost every row,
+// `at` is the session's `updatedAt`, which the node bumps on every event it records, including the
+// usage report that lands after the turn and the controller change a reconnect writes. A timestamped
+// key would move when nothing had happened, and every row the owner had just cleared would come back
+// with the next frame.
 //
-// What we give up is small and already covered: a session that completes again keeps its cleared row
-// hidden, but the completion still raises its own unread notice through the gate (deliver.ts), so the
-// pill still moves. The set is session-only and clears on a node switch either way.
+// So a session that completes again keeps its cleared row hidden, but the completion still raises its
+// own unread notice through the gate, so the pill still moves. The set is session-only and clears on a
+// node switch either way.
 const [seen, setSeen] = createSignal<ReadonlySet<string>>(new Set())
 
 const seenKey = (nodeId: string, itemId: string): string => `${nodeId}:${itemId}`

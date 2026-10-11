@@ -38,31 +38,19 @@ rebinding the palette in Settings doesn't change this native fallback.
 
 ## Pages
 
-<a id="the-palette-session"></a>
-
 [The palette session](./command-palette-and-shortcuts/palette.md) covers the one session both hosts
 draw: groups, search, input, and setting commands, scopes, outcomes, and when the session closes.
-
-<a id="core-and-plugin-commands"></a>
 
 [Palette commands](./command-palette-and-shortcuts/commands.md) covers core's command tree, hidden
 source openers, the last-workspace toggle, what each plugin contributes, and why every row is a
 command.
 
-<a id="palette-data"></a>
-<a id="what-the-palette-refuses"></a>
-
 [Palette data](./command-palette-and-shortcuts/palette-data.md) covers palette rows, manifest
 command kinds, the `navigate` and `surfaceAction` verbs, context-menu rows, and the decisions the
 palette refuses.
 
-<a id="pane-shortcuts"></a>
-<a id="plugin-shortcuts"></a>
-
 [Shortcuts](./command-palette-and-shortcuts/shortcuts.md) covers pane chords, plugin chords,
 precedence and conflicts, and the keys a sandboxed frame can claim.
-
-<a id="focus-and-typing"></a>
 
 [Focus and typing](./command-palette-and-shortcuts/focus-and-typing.md) covers the one keymap
 engine, intents, typing targets, focus regions, collections, scopes as layers, the terminal's

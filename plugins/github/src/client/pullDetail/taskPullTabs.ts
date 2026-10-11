@@ -2,7 +2,7 @@ import { scanContentRefs, type Task } from '@acorn/plugin-api/client'
 import type { Pull, PullDetail, TaskPullRelation } from '../../shared/api'
 import { formatPullRef, parsePullRef, type PullRef } from '../../shared/pullRef'
 
-export type RelatedPullEvidence =
+type RelatedPullEvidence =
   | { kind: 'stack'; anchorPullNumber: number; direction: 'parent' | 'child' }
   | { kind: 'mention'; sourcePullNumber: number; surface: 'description' | 'comment' | 'review' | 'thread' }
   | { kind: 'agent'; sessionId: string; requestId?: string }
@@ -24,13 +24,25 @@ const sameRepo = (a: PullRef, b: PullRef): boolean =>
 
 const evidenceKey = (evidence: RelatedPullEvidence): string => JSON.stringify(evidence)
 
-function mentions(detail: PullDetail | undefined, source: PullRef): Array<{ pull: PullRef; evidence: RelatedPullEvidence }> {
+function mentions(
+  detail: PullDetail | undefined,
+  source: PullRef,
+): Array<{ pull: PullRef; evidence: RelatedPullEvidence }> {
   if (!detail) return []
   const surfaces: Array<[RelatedPullEvidence & { kind: 'mention' }, Array<string | null | undefined>]> = [
     [{ kind: 'mention', sourcePullNumber: Number(source.number), surface: 'description' }, [detail.pull?.body]],
-    [{ kind: 'mention', sourcePullNumber: Number(source.number), surface: 'comment' }, detail.comments.map((item) => item.body)],
-    [{ kind: 'mention', sourcePullNumber: Number(source.number), surface: 'review' }, detail.reviews.map((item) => item.body)],
-    [{ kind: 'mention', sourcePullNumber: Number(source.number), surface: 'thread' }, detail.threads.flatMap((thread) => thread.comments.map((item) => item.body))],
+    [
+      { kind: 'mention', sourcePullNumber: Number(source.number), surface: 'comment' },
+      detail.comments.map((item) => item.body),
+    ],
+    [
+      { kind: 'mention', sourcePullNumber: Number(source.number), surface: 'review' },
+      detail.reviews.map((item) => item.body),
+    ],
+    [
+      { kind: 'mention', sourcePullNumber: Number(source.number), surface: 'thread' },
+      detail.threads.flatMap((thread) => thread.comments.map((item) => item.body)),
+    ],
   ]
   const found: Array<{ pull: PullRef; evidence: RelatedPullEvidence }> = []
   for (const [evidence, texts] of surfaces) {
@@ -43,7 +55,10 @@ function mentions(detail: PullDetail | undefined, source: PullRef): Array<{ pull
   return found
 }
 
-function stackNeighbours(primary: PullRef, openPulls: readonly Pull[]): Array<{ pull: PullRef; evidence: RelatedPullEvidence; title: string }> {
+function stackNeighbours(
+  primary: PullRef,
+  openPulls: readonly Pull[],
+): Array<{ pull: PullRef; evidence: RelatedPullEvidence; title: string }> {
   const byNumber = new Map(openPulls.map((pull) => [pull.number, pull]))
   if (!byNumber.has(Number(primary.number))) return []
   const visited = new Set([Number(primary.number)])
@@ -55,11 +70,12 @@ function stackNeighbours(primary: PullRef, openPulls: readonly Pull[]): Array<{ 
     if (!anchor) continue
     for (const candidate of openPulls) {
       if (candidate.number === anchorNumber) continue
-      const direction = anchor.headRef && candidate.baseRef === anchor.headRef
-        ? 'child'
-        : anchor.baseRef && candidate.headRef === anchor.baseRef
-          ? 'parent'
-          : null
+      const direction =
+        anchor.headRef && candidate.baseRef === anchor.headRef
+          ? 'child'
+          : anchor.baseRef && candidate.headRef === anchor.baseRef
+            ? 'parent'
+            : null
       if (!direction) continue
       found.push({
         pull: { owner: primary.owner, repo: primary.repo, number: String(candidate.number) },
@@ -86,13 +102,19 @@ export function buildTaskPullTabs(input: {
 }): TaskPullTab[] {
   const tabs = new Map<string, TaskPullTab>()
   const primaryKey = pullRefKey(input.primary)
-  const linkedTasks = (pull: PullRef) => input.tasks
-    .filter((task) => task.pullNumber === Number(pull.number) && !!task.github && sameRepo(pull, {
-      owner: task.github!.owner,
-      repo: task.github!.name,
-      number: String(task.pullNumber),
-    }))
-    .map(({ id, title }) => ({ id, title }))
+  const linkedTasks = (pull: PullRef) =>
+    input.tasks
+      .filter(
+        (task) =>
+          task.pullNumber === Number(pull.number) &&
+          !!task.github &&
+          sameRepo(pull, {
+            owner: task.github!.owner,
+            repo: task.github!.name,
+            number: String(task.pullNumber),
+          }),
+      )
+      .map(({ id, title }) => ({ id, title }))
   const add = (
     pull: PullRef,
     relationship: TaskPullTab['relationship'],
@@ -102,7 +124,8 @@ export function buildTaskPullTabs(input: {
     const key = pullRefKey(pull)
     const existing = tabs.get(key)
     if (existing) {
-      if (evidence && !existing.evidence.some((item) => evidenceKey(item) === evidenceKey(evidence))) existing.evidence.push(evidence)
+      if (evidence && !existing.evidence.some((item) => evidenceKey(item) === evidenceKey(evidence)))
+        existing.evidence.push(evidence)
       if (!existing.creatingAgent && extra?.creatingAgent) existing.creatingAgent = extra.creatingAgent
       if (!existing.title && extra?.title) existing.title = extra.title
       return

@@ -16,8 +16,11 @@ vi.mock('node:fs/promises', async (original) => {
     lstat: async (...args: Parameters<typeof real.lstat>) => {
       calls++
       peak = Math.max(peak, ++outstanding)
-      try { return await real.lstat(...args) }
-      finally { outstanding-- }
+      try {
+        return await real.lstat(...args)
+      } finally {
+        outstanding--
+      }
     },
   }
 })
@@ -34,8 +37,14 @@ it('bounds fresh stamps for 3,000 files and four readers while preserving exact 
   for (const name of names) writeFileSync(join(dir, name), 'fixture\n')
   const expected = names.map((name) => {
     const stat = lstatSync(join(dir, name))
-    return { path: name, status: 'untracked', staged: false, additions: null, deletions: null,
-      contentKey: `${stat.mode} ${stat.size} ${stat.mtimeMs} ${stat.ctimeMs}` }
+    return {
+      path: name,
+      status: 'untracked',
+      staged: false,
+      additions: null,
+      deletions: null,
+      contentKey: `${stat.mode} ${stat.size} ${stat.mtimeMs} ${stat.ctimeMs}`,
+    }
   })
   for (const readers of [1, 1, 4]) {
     peak = calls = outstanding = 0

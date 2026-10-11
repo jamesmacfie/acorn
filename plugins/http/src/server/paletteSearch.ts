@@ -3,14 +3,14 @@ import type { httpRequests } from '../node/schema'
 
 // Ranking the palette's saved-request rows, over the stored row rather than the opened request.
 //
-// The types say it: this file takes `SavedRequestRow`, which is what came out of SQLite, and every
-// field it touches — the name, the folder, the method — is a plaintext column. The five encrypted
-// columns are the URL, the headers, the body, the auth block and the variables, and none of them is
-// read here, so no ciphertext is opened and there is nothing in a row that could be a secret
-// (../server/storage.ts). Contrast ./agentContext.ts, which does open them and therefore carries a
+// The types say it: this file takes `SavedRequestSummary`, the stored row minus every encrypted
+// column, and every field it touches — the name, the folder, the method — is a plaintext column. The
+// five encrypted columns are the URL, the headers, the body, the auth block and the variables, and none
+// of them is read here, so no ciphertext is opened and there is nothing in a row that could be a secret
+// (./storage.ts). Contrast ./agentContext.ts, which does open them and therefore carries a
 // redaction pass and an allowlist.
 //
-// That is stronger than filtering a secret out afterwards, which is the property phase 5 asks for:
+// That is stronger than filtering a secret out afterwards, and it is what the palette promises:
 // "never headers, bodies, auth material, resolved variables, or secret values"
 // (docs/http-client/client.md § From the command palette). Not even the URL, which the
 // rail beside this also leaves out: a saved URL is regularly `?token=…` typed literally, and there is
@@ -50,7 +50,7 @@ export function savedRequestSearchScore(row: SavedRequestSummary, text: string):
 /** One row, as the palette draws it. The id is the request's own, which is the item the project
  *  surface's route captures (`/p/:projectId/x/http/requests/:requestId`), so picking a row addresses
  *  exactly what clicking it in the rail does. */
-export const savedRequestSearchItem = (row: SavedRequestSummary): CommandSearchItem => ({
+const savedRequestSearchItem = (row: SavedRequestSummary): CommandSearchItem => ({
   id: row.id,
   title: row.name.slice(0, TITLE),
   ...(row.folder ? { subtitle: row.folder.slice(0, SUBTITLE) } : {}),
@@ -78,6 +78,9 @@ export function savedRequestSearchItems(rows: readonly SavedRequestSummary[], te
  */
 export function importedRequestName(method: string, url: string): string {
   const withoutQuery = url.split(/[?#]/)[0] ?? ''
-  const segment = withoutQuery.split('/').filter((part) => part && !part.startsWith('{{')).pop()
+  const segment = withoutQuery
+    .split('/')
+    .filter((part) => part && !part.startsWith('{{'))
+    .pop()
   return `${method} ${segment ?? url}`.slice(0, 200)
 }

@@ -128,7 +128,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // Asynchronous, because the synchronous form runs the whole response on the thread that
         // delivered the request — the same thread the webview draws on — and a cold window asks for
-        // more than a hundred module scripts. Each one was a blocking `fs::read` in front of the next
+        // more than a hundred module scripts. Each would be a blocking `fs::read` in front of the next
         // request, and under `pnpm dev` a blocking HTTP call to Vite. One thread per request answers
         // them in parallel instead. The ceiling is that it is a thread rather than a pool: fine for
         // the tens of reads a launch makes, and the upgrade if that ever changes is a small pool
@@ -362,10 +362,6 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         },
         move |signal| match signal {
             Signal::CrashBudgetExhausted { reason } => show_recovery(&handle, reason.as_deref()),
-            // The credential for a preview tunnel, seeded into the pane's cookie store by
-            // src/webviews.rs. Never forwarded to the renderer.
-            Signal::TunnelOpened { port, secret } => handle.state::<Webviews<tauri::Wry>>().tunnel_opened(port, secret),
-            Signal::TunnelClosed { port } => handle.state::<Webviews<tauri::Wry>>().tunnel_closed(port),
             Signal::FootprintRequest => footprint::answer(&handle),
             Signal::Ready(_) => {}
         },

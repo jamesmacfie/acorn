@@ -8,7 +8,9 @@ const native = vi.hoisted(() => ({
   subscribe: vi.fn(async (wake: () => void) => {
     native.wake = wake
     native.onSubscribe?.()
-    return () => { native.wake = undefined }
+    return () => {
+      native.wake = undefined
+    }
   }),
 }))
 const dispatch = vi.hoisted(() => ({
@@ -24,7 +26,9 @@ vi.mock('@acorn/client-core/host/registries/commands', () => ({
   clientEvents: {
     on: (_kind: string, listener: (payload: { href: string }) => void) => {
       dispatch.listeners.add(listener)
-      return () => { dispatch.listeners.delete(listener) }
+      return () => {
+        dispatch.listeners.delete(listener)
+      }
     },
   },
   openLink: (href: string) => dispatch.open(href),
@@ -36,7 +40,10 @@ vi.mock('@acorn/client-core/host/registries/commands', () => ({
 
 import { startDesktopLinks } from './links'
 
-const receive = (href: string) => { native.pending.push(href); native.wake?.() }
+const receive = (href: string) => {
+  native.pending.push(href)
+  native.wake?.()
+}
 const click = (href: string) => {
   for (const listener of dispatch.listeners) listener({ href })
 }
@@ -60,7 +67,9 @@ it('drains pre-subscription links once, retains order through a remount wait, an
   native.onSubscribe = () => receive('acorn://node-a/settings/three')
   const stop = await startDesktopLinks()
   expect(dispatch.open.mock.calls.map(([href]) => href)).toEqual([
-    'acorn://node-a/settings/one', 'acorn://node-a/settings/two', 'acorn://node-a/settings/three',
+    'acorn://node-a/settings/one',
+    'acorn://node-a/settings/two',
+    'acorn://node-a/settings/three',
   ])
 
   receive('acorn://node-a/settings/four')
@@ -68,12 +77,16 @@ it('drains pre-subscription links once, retains order through a remount wait, an
   native.wake?.()
   await vi.waitFor(() => expect(dispatch.open).toHaveBeenCalledTimes(5))
   expect(dispatch.open.mock.calls.map(([href]) => href).slice(3)).toEqual([
-    'acorn://node-a/settings/four', 'acorn://node-a/settings/five',
+    'acorn://node-a/settings/four',
+    'acorn://node-a/settings/five',
   ])
 
   let finishRemount!: () => void
   dispatch.open.mockImplementation(async (href) => {
-    if (href.endsWith('/project')) await new Promise<void>((resolve) => { finishRemount = resolve })
+    if (href.endsWith('/project'))
+      await new Promise<void>((resolve) => {
+        finishRemount = resolve
+      })
     if (href.endsWith('/broken')) throw new Error('dispatch failed')
     return { kind: 'opened' }
   })
@@ -85,9 +98,7 @@ it('drains pre-subscription links once, retains order through a remount wait, an
   await vi.waitFor(() => expect(dispatch.open.mock.calls.at(-1)?.[0]).toBe('acorn://node-b/settings/after'))
 
   click('acorn://node-b/settings/broken')
-  await vi.waitFor(() => expect(dispatch.refusals).toEqual([
-    'dispatch failed: acorn://node-b/settings/broken',
-  ]))
+  await vi.waitFor(() => expect(dispatch.refusals).toEqual(['dispatch failed: acorn://node-b/settings/broken']))
   stop()
   expect(native.wake).toBeUndefined()
   expect(dispatch.listeners.size).toBe(0)

@@ -1,16 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type CdpAxNode } from './axTree'
+import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type CdpAxNode } from './axTree'
 
 // A trimmed real-world Accessibility.getFullAXTree payload: RootWebArea → generic wrapper →
 // form with a textbox + button, plus an ignored node.
 const FIXTURE: CdpAxNode[] = [
   { nodeId: '1', role: { value: 'RootWebArea' }, name: { value: 'Login' }, childIds: ['2'], backendDOMNodeId: 1 },
   { nodeId: '2', parentId: '1', role: { value: 'generic' }, childIds: ['3', '6'], backendDOMNodeId: 2 },
-  { nodeId: '3', parentId: '2', role: { value: 'form' }, name: { value: 'login form' }, childIds: ['4', '5'], backendDOMNodeId: 3 },
-  { nodeId: '4', parentId: '3', role: { value: 'textbox' }, name: { value: 'Email' }, value: { value: '' }, backendDOMNodeId: 4 },
+  {
+    nodeId: '3',
+    parentId: '2',
+    role: { value: 'form' },
+    name: { value: 'login form' },
+    childIds: ['4', '5'],
+    backendDOMNodeId: 3,
+  },
+  {
+    nodeId: '4',
+    parentId: '3',
+    role: { value: 'textbox' },
+    name: { value: 'Email' },
+    value: { value: '' },
+    backendDOMNodeId: 4,
+  },
   { nodeId: '5', parentId: '3', role: { value: 'button' }, name: { value: 'Sign in' }, backendDOMNodeId: 5 },
   { nodeId: '6', parentId: '2', role: { value: 'generic' }, ignored: true, childIds: ['7'], backendDOMNodeId: 6 },
-  { nodeId: '7', parentId: '6', role: { value: 'StaticText' }, name: { value: 'Forgot password?' }, backendDOMNodeId: 7 },
+  {
+    nodeId: '7',
+    parentId: '6',
+    role: { value: 'StaticText' },
+    name: { value: 'Forgot password?' },
+    backendDOMNodeId: 7,
+  },
 ]
 
 describe('buildAxTree (docs/panes.md — CDP AX payload → refs)', () => {
@@ -58,10 +78,7 @@ describe('ref resolution', () => {
 })
 
 describe('guards', () => {
-  it('ERR_ABORTED is benign; only http(s) urls are drivable', () => {
-    expect(isBenignNavError({ errno: -3, code: 'ERR_ABORTED' })).toBe(true)
-    expect(isBenignNavError(new Error('ERR_ABORTED (-3) loading'))).toBe(true)
-    expect(isBenignNavError(new Error('ERR_CONNECTION_REFUSED'))).toBe(false)
+  it('only http(s) urls are drivable', () => {
     expect(isAllowedBrowserUrl('http://localhost:5173/login')).toBe(true)
     expect(isAllowedBrowserUrl('file:///etc/passwd')).toBe(false)
     expect(isAllowedBrowserUrl('javascript:alert(1)')).toBe(false)

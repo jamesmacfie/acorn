@@ -33,15 +33,29 @@ const manyOptions = Array.from({ length: 20 }, (_, index) => ({ value: `region-$
 const httpKind: StepKindDescription = {
   label: 'HTTP request',
   description: 'One HTTP request through the project variables.',
-  icon: 'globe', output: { description: 'HTTP response.' },
+  icon: 'globe',
+  output: { description: 'HTTP response.' },
   fields: [
-    { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }] },
+    {
+      id: 'method',
+      label: 'Method',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'GET', label: 'GET' },
+        { value: 'POST', label: 'POST' },
+      ],
+    },
     { id: 'url', label: 'URL', type: 'text', required: true, hint: 'Interpolated before the scheme check.' },
     { id: 'region', label: 'Region', type: 'select', options: manyOptions },
   ],
 }
 
-const builtinKinds = BUILTIN_STEP_KINDS.map((id) => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null }))
+const builtinKinds = BUILTIN_STEP_KINDS.map((id) => ({
+  id,
+  pluginId: null,
+  describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null,
+}))
 
 const catalog = (over: Partial<WorkflowCatalog> = {}): WorkflowCatalog => ({
   kinds: [...builtinKinds, { id: 'http:request', pluginId: 'http', describe: httpKind }],
@@ -54,7 +68,8 @@ const catalog = (over: Partial<WorkflowCatalog> = {}): WorkflowCatalog => ({
 // are checked against the full thing, because a shipped example must pass every rule.
 const validation = (over: Partial<WorkflowCatalog> = {}): WorkflowValidationCatalog => ({
   ...catalogValidation(catalog(over)),
-  validateStepKind: (kind, step, context) => BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
+  validateStepKind: (kind, step, context) =>
+    BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 })
 
 const prompt = (over: Partial<WorkflowCatalog> = {}) => buildGenerateSystemPrompt({ catalog: catalog(over) })
@@ -63,7 +78,11 @@ const chain = (name: string, steps = 3): WorkflowDef => ({
   baseline: 'acorn-1' as const,
   formatVersion: 1 as const,
   name,
-  steps: Array.from({ length: steps }, (_, index) => ({ id: `step-${index + 1}`, name: `Step ${index + 1}`, prompt: 'Do the thing.' })),
+  steps: Array.from({ length: steps }, (_, index) => ({
+    id: `step-${index + 1}`,
+    name: `Step ${index + 1}`,
+    prompt: 'Do the thing.',
+  })),
 })
 
 const fanIn = (name: string): WorkflowDef => ({
@@ -158,7 +177,7 @@ describe('the two kind spellings', () => {
 
 describe('the kind list comes from the catalog', () => {
   // The point of generating this section: a plugin that adds a kind gets it into the prompt without
-  // anybody editing generate.ts.
+  // anybody editing the prompt text.
   it('carries a kind nobody wrote into the prompt, with its with keys', () => {
     const extra = {
       id: 'deploy:ship',
@@ -166,8 +185,17 @@ describe('the kind list comes from the catalog', () => {
       describe: {
         label: 'Ship it',
         description: 'Deploy the branch.',
-        icon: 'rocket', output: { description: 'Deployment result.' },
-        fields: [{ id: 'environment', label: 'Environment', type: 'select' as const, required: true, options: [{ value: 'staging', label: 'Staging' }] }],
+        icon: 'rocket',
+        output: { description: 'Deployment result.' },
+        fields: [
+          {
+            id: 'environment',
+            label: 'Environment',
+            type: 'select' as const,
+            required: true,
+            options: [{ value: 'staging', label: 'Staging' }],
+          },
+        ],
       },
     }
     const before = prompt()
@@ -207,7 +235,7 @@ describe('the kind section degrades rather than dropping a kind', () => {
   })
 
   it('falls back to one line a kind, and never fewer kinds', () => {
-    expect(oneLine).toContain('- `agent`, Ask an agent: prompt, schema')
+    expect(oneLine).toContain('- `agent`, Ask an agent: prompt, goal, schema')
     expect(oneLine).toContain('- `http:request`, HTTP request: with.method, with.url, with.region')
     for (const text of [full, noHints, noDescriptions, cappedOptions, oneLine]) expect(every(text)).toBe(true)
     // The last step is the last step: an impossible budget still lists every kind.
@@ -226,25 +254,34 @@ describe('policies and profiles come from the catalog too', () => {
   })
 
   it('names the structured profiles when the default is not one', () => {
-    const text = renderVocabulary(catalog({
-      profiles: [
-        { id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: false },
-        { id: 'codex', label: 'Codex', managed: true, structured: true },
-      ],
-    }))
+    const text = renderVocabulary(
+      catalog({
+        profiles: [
+          { id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: false },
+          { id: 'codex', label: 'Codex', managed: true, structured: true },
+        ],
+      }),
+    )
     expect(text).toContain('the default has none')
     expect(text).toContain('`codex`')
   })
 
   it('refuses decide outright when no profile has a structured mode', () => {
-    const text = renderVocabulary(catalog({ profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: false }] }))
+    const text = renderVocabulary(
+      catalog({ profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: false }] }),
+    )
     expect(text).toContain('do not write a')
     expect(text).toContain('`decide` step.')
   })
 
   it('caps a long profile list, keeping the default and the structured ones', () => {
     const profiles = [
-      ...Array.from({ length: 60 }, (_, index) => ({ id: `p-${index}`, label: `Profile ${index}`, managed: false, structured: false })),
+      ...Array.from({ length: 60 }, (_, index) => ({
+        id: `p-${index}`,
+        label: `Profile ${index}`,
+        managed: false,
+        structured: false,
+      })),
       { id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true },
     ]
     const text = renderVocabulary(catalog({ profiles }))
@@ -274,8 +311,9 @@ describe('saved child workflows in the prompt', () => {
   })
 
   it('allows item sessions without saved child workflows', () => {
-    expect(renderWorkflowTargets(catalog({ workflows: [] })))
-      .toContain('Use `workflow-map` with `agent` for separate sessions in the parent task.')
+    expect(renderWorkflowTargets(catalog({ workflows: [] }))).toContain(
+      'Use `workflow-map` with `agent` for separate sessions in the parent task.',
+    )
   })
 })
 
@@ -316,7 +354,7 @@ describe('the built-in worked examples', () => {
 
   it('teaches a stable-key structured plan without a second execution mechanism', () => {
     const second = BUILTIN_EXAMPLES[1]!.def
-    expect(second.steps.map(step => step.kind)).toEqual(['agent', 'workflow-map'])
+    expect(second.steps.map((step) => step.kind)).toEqual(['agent', 'workflow-map'])
     expect(second.steps[0]!.schema).toMatchObject({ properties: { items: { items: { required: ['id', 'title'] } } } })
   })
 })
@@ -340,9 +378,24 @@ describe('the workspace examples', () => {
   })
 
   it('leaves out the definition being edited, a one-step definition, and anything that fails the checker', () => {
-    const broken: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'broken', steps: [{ name: 'a', after: ['ghost'] }, { name: 'b' }] }
+    const broken: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'broken',
+      steps: [{ name: 'a', after: ['ghost'] }, { name: 'b' }],
+    }
     const { include, omit } = select(
-      [example('self', fanIn('being edited')), example('tiny', { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'tiny', steps: [{ name: 'only' }] }), example('broken', broken), example('keep', chain('keeper'))],
+      [
+        example('self', fanIn('being edited')),
+        example('tiny', {
+          baseline: 'acorn-1' as const,
+          formatVersion: 1 as const,
+          name: 'tiny',
+          steps: [{ name: 'only' }],
+        }),
+        example('broken', broken),
+        example('keep', chain('keeper')),
+      ],
       { excludeId: 'self' },
     )
     expect(include.map((entry) => entry.id)).toEqual(['keep'])
@@ -350,7 +403,9 @@ describe('the workspace examples', () => {
   })
 
   it('leaves parent workflows out because their protected target is not model-visible', () => {
-    const parent: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const parent: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'parent',
       steps: [
         {
@@ -375,7 +430,15 @@ describe('the workspace examples', () => {
   })
 
   it('drops a whole example rather than cutting one in half', () => {
-    const huge: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'enormous', steps: [{ name: 'a', prompt: 'x'.repeat(GENERATE_MAX_EXAMPLE_SIZE) }, { name: 'b', prompt: 'go' }] }
+    const huge: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'enormous',
+      steps: [
+        { name: 'a', prompt: 'x'.repeat(GENERATE_MAX_EXAMPLE_SIZE) },
+        { name: 'b', prompt: 'go' },
+      ],
+    }
     const examples = [example('huge', huge), example('small', fanIn('small'))]
     const text = buildGenerateSystemPrompt({ catalog: catalog(), examples, validation: validation() })
     expect(text).not.toContain('x'.repeat(200))
@@ -383,12 +446,23 @@ describe('the workspace examples', () => {
   })
 
   it('strips credentials and the loader bookkeeping from an example', () => {
-    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const def = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       id: 'repo:thing',
       source: 'repo',
       name: 'calls out',
       steps: [
-        { name: 'call', kind: 'http:request', with: { method: 'GET', url: 'https://example.com', headers: { Authorization: 'Bearer sk-secret' }, auth: 'sk-secret' } },
+        {
+          name: 'call',
+          kind: 'http:request',
+          with: {
+            method: 'GET',
+            url: 'https://example.com',
+            headers: { Authorization: 'Bearer sk-secret' },
+            auth: 'sk-secret',
+          },
+        },
         { name: 'read', after: ['call'], prompt: 'Read it.' },
       ],
     } as unknown as WorkflowDef
@@ -400,9 +474,15 @@ describe('the workspace examples', () => {
   })
 
   it('leaves every fixed section and both built-in examples standing when nothing fits', () => {
-    const text = buildGenerateSystemPrompt({ catalog: catalog(), examples: [example('a', fanIn('a'))], validation: validation(), exampleBudget: 0 })
+    const text = buildGenerateSystemPrompt({
+      catalog: catalog(),
+      examples: [example('a', fanIn('a'))],
+      validation: validation(),
+      exampleBudget: 0,
+    })
     expect(text).not.toContain('## 9.')
-    for (const heading of ['## 2.', '## 3.', '## 4.', '## 5.', '## 6.', '## 7.', '## 8.']) expect(text).toContain(heading)
+    for (const heading of ['## 2.', '## 3.', '## 4.', '## 5.', '## 6.', '## 7.', '## 8.'])
+      expect(text).toContain(heading)
     for (const builtin of BUILTIN_EXAMPLES) expect(text).toContain(JSON.stringify(builtin.def, null, 2))
   })
 })
@@ -432,26 +512,46 @@ describe('the user prompt', () => {
   })
 
   it('gives edit mode the current graph, preservation rules, and no protected values', () => {
-    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const current: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Deploy',
       trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['deploy'] },
-      steps: [{
-        name: 'ship',
-        kind: 'http:request',
-        prompt: 'Deploy the release.',
-        model: 'private-model',
-        configOptions: { reasoning: 'high' },
-        requiresRun: 'release',
-        with: { method: 'POST', url: 'https://example.com/deploy', auth: 'secret-auth', headers: { Authorization: 'Bearer secret' } },
-      }],
+      steps: [
+        {
+          name: 'ship',
+          kind: 'http:request',
+          prompt: 'Deploy the release.',
+          model: 'private-model',
+          configOptions: { reasoning: 'high' },
+          requiresRun: 'release',
+          with: {
+            method: 'POST',
+            url: 'https://example.com/deploy',
+            auth: 'secret-auth',
+            headers: { Authorization: 'Bearer secret' },
+          },
+        },
+      ],
     }
-    const text = buildGenerateUserPrompt({ mode: 'edit', description: 'Add an approval before deployment.', currentDef: current })
+    const text = buildGenerateUserPrompt({
+      mode: 'edit',
+      description: 'Add an approval before deployment.',
+      currentDef: current,
+    })
     expect(text).toContain('Add an approval before deployment.')
     expect(text).toContain('"name": "ship"')
     expect(text).toContain('"url": "https://example.com/deploy"')
     expect(text).toContain('Keep every name, step, prompt, edge, input')
-    for (const hidden of ['schedule:nightly', 'private-model', '"configOptions"', '"requiresRun"', 'secret-auth', 'Bearer secret']) {
+    for (const hidden of [
+      'schedule:nightly',
+      'private-model',
+      '"configOptions"',
+      '"requiresRun"',
+      'secret-auth',
+      'Bearer secret',
+    ]) {
       expect(text).not.toContain(hidden)
     }
   })
@@ -461,8 +561,13 @@ describe('the repair prompt', () => {
   const args = {
     userPrompt: 'Write the workflow definition for this description.\n\nFix the build.',
     def: fanIn('half right'),
-    notes: [{ code: 'unknown-kind' as const, message: "step 'review' had unknown kind 'code-review', so it is an agent step now" }],
-    problems: ['step \'both\' references \'left\', which is not one of its predecessors'],
+    notes: [
+      {
+        code: 'unknown-kind' as const,
+        message: "step 'review' had unknown kind 'code-review', so it is an agent step now",
+      },
+    ],
+    problems: ["step 'both' references 'left', which is not one of its predecessors"],
   }
 
   it('restates the goal, the definition, what was removed, and every checker message', () => {

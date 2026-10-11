@@ -9,16 +9,9 @@ import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 // The JSON Schema for `acorn-plugin.json`, generated from the Zod contract in
 // `packages/protocol/src/plugin/contract.ts` and committed beside this package's declarations, with this
 // test as the sync check. It ships in the published package, so an author who installs the types gets
-// the schema too. Regenerate with `UPDATE_PLUGIN_SCHEMA=1 pnpm test`.
-//
-// docs/future/ecosystem/README.md used to record "a JSON Schema: deliberately not built", on the
-// grounds that a second schema is a second source of truth. That refusal was against a hand-maintained
-// copy and it was right about one. Generated, there is still one source of truth: the file below cannot
-// say anything `pluginContract.ts` does not, because this test rewrites it from the contract and fails
-// if the committed bytes differ.
-//
-// What it buys is the thing prose cannot: an author editing a manifest gets completion and inline
-// errors on every contribution array from their editor, instead of finding out at the next boot.
+// the schema too, and with it editor completion and inline errors on every contribution array instead of
+// a failed boot. Regenerate with `UPDATE_PLUGIN_SCHEMA=1 pnpm test`. The contract stays the one source
+// of truth: this test rewrites the file from it and fails if the committed bytes differ.
 //
 // `io: 'input'` is the right direction: the file an author writes is the schema's input, before
 // defaults are applied, so `contributions` and every array in it are optional here and required in the
@@ -27,8 +20,9 @@ import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = join(HERE, '..', 'acorn-plugin.schema.json')
 
-// The published location, once apps/site exists (docs/future/marketing/README.md phase 3). Written into
-// the artifact now so the file a scaffold copies already points at where its updates will live.
+// The published location. Nothing serves it until the marketing site exists
+// (docs/future/marketing/README.md), but the file a scaffold copies already points where its updates
+// will live.
 const SCHEMA_URL = 'https://acorn.sh/schemas/acorn-plugin.schema.json'
 
 const generate = (): string =>

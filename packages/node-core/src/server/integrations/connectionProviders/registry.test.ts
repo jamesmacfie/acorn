@@ -45,7 +45,7 @@ describe('ConnectionProviderRegistry', () => {
     expect(registry.list()).toEqual([contribution])
   })
 
-  it('records provider ownership without exposing another plugin\'s ids', () => {
+  it("records provider ownership without exposing another plugin's ids", () => {
     const registry = new ConnectionProviderRegistry()
     registry.register(provider('alpha-one'), 'alpha')
     registry.register(provider('beta'), 'beta')
@@ -73,16 +73,19 @@ describe('ConnectionProviderRegistry', () => {
 
     const invalidConnections = provider('invalid-connections')
     invalidConnections.connection.maxConnections = 0
-    expect(() => new ConnectionProviderRegistry().register(invalidConnections)).toThrow('invalid connection count limit')
+    expect(() => new ConnectionProviderRegistry().register(invalidConnections)).toThrow(
+      'invalid connection count limit',
+    )
   })
 
   it('rejects descriptors that publish fields outside the safe projection', () => {
     const invalid = provider('unsafe')
-    invalid.toPublic = () => ({
-      ...provider('safe').toPublic(),
-      id: 'unsafe',
-      apiKey: 'plaintext',
-    } as ReturnType<typeof invalid.toPublic>)
+    invalid.toPublic = () =>
+      ({
+        ...provider('safe').toPublic(),
+        id: 'unsafe',
+        apiKey: 'plaintext',
+      }) as ReturnType<typeof invalid.toPublic>
 
     expect(() => new ConnectionProviderRegistry().register(invalid)).toThrow('unsafe or inconsistent descriptor')
   })

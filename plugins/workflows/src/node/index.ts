@@ -1,4 +1,9 @@
-import { describeError, registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
+import {
+  describeError,
+  registerDeletedTaskPurge,
+  type InternalEnvFactory,
+  type NodePlugin,
+} from '@acorn/plugin-api/node'
 import { activateWorkflowAgentTools } from '../server/agentTools/activation'
 import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
@@ -11,7 +16,12 @@ import { workflowControl, workflowGates } from '../server/runs/control'
 import { WorkflowRunner } from '../server/runs/runner'
 import { workflowDefinitions } from '../server/definitions/activation'
 import { WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/schedules/service'
-import { workflowScheduleService, workflowScheduleTarget, workflowScheduleBridge, registerWorkflowTriggers } from '../server/schedules/activation'
+import {
+  workflowScheduleService,
+  workflowScheduleTarget,
+  workflowScheduleBridge,
+  registerWorkflowTriggers,
+} from '../server/schedules/activation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
@@ -36,10 +46,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let stopScheduleRecovery: (() => void) | null = null
   let stopCheckoutActivity: (() => void) | null = null
   let agentTools: { dispose(): void } | null = null
-  // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
-  // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
-  // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
-  // a plugin does not deep-import server/notify.ts.
+  // The step stream (`WORKFLOWS_NOTICES`). It goes out on core's `workflow:` channel as a frame written
+  // here, because `ctx.events` is the seam and a plugin does not import core's notifier.
   const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
     stepEvent: (runId, stepId, event) => ctx.events.send({ channel: 'workflow:step:event', runId, stepId, event }),
   })
@@ -53,17 +61,21 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       { verb: 'child-changed', description: 'A dispatched child workflow changed durable state' },
       { verb: 'completed', description: 'A workflow run reached a terminal status' },
     ],
-    // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
-    // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
+    // This module's own URL: the chain sits at plugins/workflows/migrations, and the host's plugin
+    // storage owns open, migrate, and close from there.
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       let active = true
-      stopScheduleRecovery = () => { active = false }
+      stopScheduleRecovery = () => {
+        active = false
+      }
       // Opened and migrated by the host before init returns. The runner and the bridge below both
       // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
       const core = ctx.core
-      stopCheckoutActivity = core.checkoutAdmission.registerOwner('runs', (taskIds) => readWorkflowCheckoutActivity(store, taskIds))
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('runs', (taskIds) =>
+        readWorkflowCheckoutActivity(store, taskIds),
+      )
       const notices = buildNotices(ctx)
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first
@@ -82,7 +94,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         allows: ['observe', 'veto'],
       })
       let scheduleService: WorkflowScheduleService | null = null
-      const { runner, dispatcher } = createWorkflowExecution(store, ctx, deps.internalEnv, notices, async runId => {
+      const { runner, dispatcher } = createWorkflowExecution(store, ctx, deps.internalEnv, notices, async (runId) => {
         await scheduleService?.settleRun(runId)
       })
       live = runner
@@ -90,7 +102,10 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       const starts = workflowStartService(store, runner, ctx, deps.reconciled)
       scheduleService = workflowScheduleService(store, starts, ctx, deps.reconciled, deps.scheduler)
       ctx.schedules.registerTarget(workflowScheduleTarget(scheduleService))
-      routeCapability = ctx.capabilities.provide(WORKFLOW_ROUTE, workflowControl(store, core, runner, dispatcher, starts, deps.reconciled))
+      routeCapability = ctx.capabilities.provide(
+        WORKFLOW_ROUTE,
+        workflowControl(store, core, runner, dispatcher, starts, deps.reconciled),
+      )
       const definitions = workflowDefinitions(store, ctx, runner, starts)
       defsCapability = ctx.capabilities.provide(WORKFLOW_DEFS_ROUTE, definitions.bridge)
       schedulesCapability = ctx.capabilities.provide(WORKFLOW_SCHEDULES_ROUTE, workflowScheduleBridge(scheduleService))
@@ -100,7 +115,10 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
       ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
-      ctx.routes.register(workflowScheduleRoutes, { prefix: '/workflows/schedules', note: 'approved workflow schedules' })
+      ctx.routes.register(workflowScheduleRoutes, {
+        prefix: '/workflows/schedules',
+        note: 'approved workflow schedules',
+      })
 
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
       // the route above, so nothing here knows what else is on that list.
@@ -108,7 +126,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
-      // (server/runs/runner.ts explains the ordering).
+      // (`WorkflowsRunnerHandle` explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, {
         reconcile: async () => {
           const recovered = await dispatcher.reconcile()
@@ -119,16 +137,27 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       })
       ctx.capabilities.provide(WORKFLOW_GATES, workflowGates(store))
       registerDeletedTaskPurge(ctx, async (taskIds) =>
-        (await import('../server/runs/deletedTaskPurge')).purgeDeletedTaskRuns(store, taskIds))
+        (await import('../server/runs/deletedTaskPurge')).purgeDeletedTaskRuns(store, taskIds),
+      )
       ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
 
       // The agent tools and the owner's approvals for them (docs/agent-tools/workflow-tools.md).
-      agentTools = activateWorkflowAgentTools({ store, ctx, runner, starts, drafts: definitions.drafts, reconciled: deps.reconciled })
+      agentTools = activateWorkflowAgentTools({
+        store,
+        ctx,
+        runner,
+        starts,
+        drafts: definitions.drafts,
+        reconciled: deps.reconciled,
+      })
 
       registerWorkflowTriggers(ctx, runner)
-      await definitions.reconcileDraftQueries().catch(error => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))
-      void deps.reconciled.then(() => active ? scheduleService?.reconcile() : undefined)
-        .catch(error => ctx.log.warn(`workflow schedule recovery failed: ${describeError(error).message}`))
+      await definitions
+        .reconcileDraftQueries()
+        .catch((error) => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))
+      void deps.reconciled
+        .then(() => (active ? scheduleService?.reconcile() : undefined))
+        .catch((error) => ctx.log.warn(`workflow schedule recovery failed: ${describeError(error).message}`))
     },
     // The bridge slot is cleared explicitly rather than trusting teardown order: a second
     // startServiceRuntime in one process would otherwise serve workflow requests through the first

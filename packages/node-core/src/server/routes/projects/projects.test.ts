@@ -33,11 +33,24 @@ describe('a project’s MCP config files', () => {
     vi.mocked(getDb).mockReturnValue(t.db)
     dir = mkdtempSync(join(tmpdir(), 'acorn-project-mcp-'))
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: dir, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: dir,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
   })
 
@@ -47,9 +60,15 @@ describe('a project’s MCP config files', () => {
   })
 
   it('reads only the known candidate files in the project folder, with secrets masked', async () => {
-    writeFileSync(join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { probe: { command: 'x', env: { TOKEN: 'super-secret' } } } }))
+    writeFileSync(
+      join(dir, '.mcp.json'),
+      JSON.stringify({ mcpServers: { probe: { command: 'x', env: { TOKEN: 'super-secret' } } } }),
+    )
     writeFileSync(join(dir, 'other.json'), JSON.stringify({ mcpServers: { stray: { command: 'y' } } }))
-    const found = (await (await call('/api/projects/project-widget/mcp')).json()) as { file: string; servers: unknown[] }[]
+    const found = (await (await call('/api/projects/project-widget/mcp')).json()) as {
+      file: string
+      servers: unknown[]
+    }[]
     const own = found.find((entry) => entry.file === join(dir, '.mcp.json'))
     expect(own?.servers).toHaveLength(1)
     expect(found.some((entry) => entry.file.endsWith('other.json'))).toBe(false)
@@ -66,7 +85,10 @@ describe('a project’s MCP config files', () => {
   it('refuses a committed .mcp.json link that points nowhere, rather than writing where it points', async () => {
     const outside = join(dir, '..', `${dir.split('/').at(-1)}-outside.json`)
     symlinkSync(outside, join(dir, '.mcp.json'))
-    expect(await (await call('/api/projects/project-widget/mcp/starter', 'POST')).json()).toEqual({ ok: false, reason: '.mcp.json already exists.' })
+    expect(await (await call('/api/projects/project-widget/mcp/starter', 'POST')).json()).toEqual({
+      ok: false,
+      reason: '.mcp.json already exists.',
+    })
     expect(existsSync(outside)).toBe(false)
   })
 })

@@ -30,12 +30,21 @@ export function parsePatch(path: string, patch: string | null): PlainDiffRow[] {
       const previous = hunks[i - 1]!
       const oldEnd = previous.oldStart + previous.oldLines - 1
       const newEnd = previous.newStart + previous.newLines - 1
-      if (hunk.newStart - newEnd > 1) out.push({ kind: 'gap', side: 'mid', oldStart: oldEnd + 1, newStart: newEnd + 1, count: hunk.newStart - newEnd - 1 })
+      if (hunk.newStart - newEnd > 1)
+        out.push({
+          kind: 'gap',
+          side: 'mid',
+          oldStart: oldEnd + 1,
+          newStart: newEnd + 1,
+          count: hunk.newStart - newEnd - 1,
+        })
     }
     out.push({ kind: 'hunk', text: hunk.content || `@@ -${hunk.oldStart} +${hunk.newStart} @@` })
     for (const change of hunk.changes) {
-      if (change.type === 'normal') out.push({ kind: 'normal', oldNo: change.oldLineNumber, newNo: change.newLineNumber, raw: change.content })
-      else if (change.type === 'insert') out.push({ kind: 'insert', oldNo: null, newNo: change.lineNumber, raw: change.content })
+      if (change.type === 'normal')
+        out.push({ kind: 'normal', oldNo: change.oldLineNumber, newNo: change.newLineNumber, raw: change.content })
+      else if (change.type === 'insert')
+        out.push({ kind: 'insert', oldNo: null, newNo: change.lineNumber, raw: change.content })
       else out.push({ kind: 'delete', oldNo: change.lineNumber, newNo: null, raw: change.content })
     }
   }
@@ -43,7 +52,14 @@ export function parsePatch(path: string, patch: string | null): PlainDiffRow[] {
   // Lines after the last hunk. Its size needs the file's length (count: null); expanding it reads the
   // new side, and it collapses to nothing if the hunk already reached the end.
   const last = hunks[hunks.length - 1]
-  if (last) out.push({ kind: 'gap', side: 'bottom', oldStart: last.oldStart + last.oldLines, newStart: last.newStart + last.newLines, count: null })
+  if (last)
+    out.push({
+      kind: 'gap',
+      side: 'bottom',
+      oldStart: last.oldStart + last.oldLines,
+      newStart: last.newStart + last.newLines,
+      count: null,
+    })
   return out
 }
 

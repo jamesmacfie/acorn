@@ -1,10 +1,10 @@
 // The `http:request` workflow step (docs/workflows/step-kinds.md § Contributed step kinds), and this plugin's
 // only node-side contribution to another plugin.
 //
-// It exists here rather than in workflows for the reason the extensibility review gave: everything an
-// HTTP call needs to be safe already lives in this package — the scheme check that runs *after*
-// interpolation, the 5 MB response cap, the variable layers with their secret redaction, the command
-// deadline. A second caller in the workflows plugin would be a second, worse copy of all of it.
+// It lives here rather than in workflows because everything an HTTP call needs to be safe already
+// lives in this package — the scheme check that runs *after* interpolation, the 5 MB response cap, the
+// variable layers with their secret redaction, the command deadline. A second caller in the workflows
+// plugin would be a second, worse copy of all of it.
 import type { StepHandler, StepKindDescription, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import { bodyModes, httpMethods, type HttpSendInput, type KeyValue } from '../shared/model'
@@ -12,7 +12,10 @@ import { send, SendError } from './send'
 
 /** `ctx.audit.record`, narrowed to what this module calls. Passed in rather than taking the whole
  *  context, so the step handler stays testable without a node. */
-export type AuditRecorder = (action: string, entry: { subject: string; details: Record<string, string | number | boolean> }) => void
+export type AuditRecorder = (
+  action: string,
+  entry: { subject: string; details: Record<string, string | number | boolean> },
+) => void
 
 // What `[steps.with]` may say. Deliberately the send input minus the parts a workflow has no business
 // setting: `executionTaskId` is the run's own task, and `vars` are the project's.
@@ -61,13 +64,33 @@ export const describeHttpStep: StepKindDescription = {
   description: 'Send one request through this project’s variables and hand the response on.',
   icon: 'globe',
   fields: [
-    { id: 'method', label: 'Method', type: 'select', required: true, options: httpMethods.map((method) => ({ value: method, label: method })) },
-    { id: 'url', label: 'URL', type: 'text', required: true, templates: true, hint: 'The project’s `{{variables}}` resolve here too, after the workflow’s own.' },
+    {
+      id: 'method',
+      label: 'Method',
+      type: 'select',
+      required: true,
+      options: httpMethods.map((method) => ({ value: method, label: method })),
+    },
+    {
+      id: 'url',
+      label: 'URL',
+      type: 'text',
+      required: true,
+      templates: true,
+      hint: 'The project’s `{{variables}}` resolve here too, after the workflow’s own.',
+    },
     { id: 'headers', label: 'Headers', type: 'textarea', hint: 'One `Name: value` per line.' },
-    { id: 'bodyMode', label: 'Body type', type: 'select', options: bodyModes.map((mode) => ({ value: mode, label: mode })) },
+    {
+      id: 'bodyMode',
+      label: 'Body type',
+      type: 'select',
+      options: bodyModes.map((mode) => ({ value: mode, label: mode })),
+    },
     { id: 'body', label: 'Body', type: 'textarea', templates: true },
   ],
-  output: { description: 'The status, the response headers, and the body as text. A 4xx or 5xx is an answer, not a failure.' },
+  output: {
+    description: 'The status, the response headers, and the body as text. A 4xx or 5xx is an answer, not a failure.',
+  },
 }
 
 /** A `[steps.with.headers]` table, or the `Name: value` lines the editor's textarea produces. Both,
@@ -102,7 +125,8 @@ export function httpStepHandler(db: PluginDatabase, core: CoreServices, audit: A
     // to. A workflow run has no request identity to inherit.
     const userId = core.identity.active()
     const task = await core.tasks.load(ctx.run.taskId)
-    if (!userId || !task?.projectId) return { status: 'failed', error: 'This node has no bound owner or the run has no project.' }
+    if (!userId || !task?.projectId)
+      return { status: 'failed', error: 'This node has no bound owner or the run has no project.' }
 
     const input: HttpSendInput = {
       method: config.method.toUpperCase(),
@@ -126,7 +150,12 @@ export function httpStepHandler(db: PluginDatabase, core: CoreServices, audit: A
     }
     audit('request.sent', {
       subject: auditTarget(result.url),
-      details: { method: input.method, taskId: ctx.run.taskId, workflowRunId: ctx.run.id, ...(result.ok ? { status: result.status } : { failed: true }) },
+      details: {
+        method: input.method,
+        taskId: ctx.run.taskId,
+        workflowRunId: ctx.run.id,
+        ...(result.ok ? { status: result.status } : { failed: true }),
+      },
     })
     if (!result.ok) return { status: 'failed', error: result.error, result }
     // 4xx and 5xx are answers, not transport failures, and a workflow that wants to branch on one
@@ -135,7 +164,11 @@ export function httpStepHandler(db: PluginDatabase, core: CoreServices, audit: A
       status: 'done',
       result: { status: result.status, url: result.url, durationMs: result.durationMs },
       // The body as text, which is what a later step's `${steps.<name>.output}` interpolates.
-      structured: { status: result.status, headers: Object.fromEntries(result.headers), body: Buffer.from(result.bodyBase64, 'base64').toString('utf8') },
+      structured: {
+        status: result.status,
+        headers: Object.fromEntries(result.headers),
+        body: Buffer.from(result.bodyBase64, 'base64').toString('utf8'),
+      },
     }
   }
 }

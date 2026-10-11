@@ -5,14 +5,27 @@ import { ftsTerms } from './sessionSearch'
 type Transaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 export type HistoryRole = 'user' | 'assistant' | 'tool'
 export type HistoryHit = { seq: number; role: HistoryRole; time: number; excerpt: string }
-export type HistoryPage = { seq: number; role: HistoryRole; time: number; text: string; nextOffset: number | null; truncated: boolean }
+export type HistoryPage = {
+  seq: number
+  role: HistoryRole
+  time: number
+  text: string
+  nextOffset: number | null
+  truncated: boolean
+}
 
 const roleSql = sql<string>`CASE json_extract(e.event_json, '$.type')
   WHEN 'user_message' THEN 'user'
   WHEN 'assistant_message' THEN 'assistant'
   WHEN 'tool' THEN 'tool' END`
 
-export function searchSessionHistory(db: Transaction, sessionId: string, query: string, role: HistoryRole | undefined, limit: number): HistoryHit[] {
+export function searchSessionHistory(
+  db: Transaction,
+  sessionId: string,
+  query: string,
+  role: HistoryRole | undefined,
+  limit: number,
+): HistoryHit[] {
   const terms = ftsTerms(query)
   if (!terms) return []
   const rows = db.all<HistoryHit>(sql`
@@ -29,7 +42,12 @@ export function searchSessionHistory(db: Transaction, sessionId: string, query: 
   return rows.map((row) => ({ ...row, excerpt: row.excerpt.slice(0, 600) }))
 }
 
-export function readSessionHistory(db: Transaction, sessionId: string, seq: number, offset: number): HistoryPage | null {
+export function readSessionHistory(
+  db: Transaction,
+  sessionId: string,
+  seq: number,
+  offset: number,
+): HistoryPage | null {
   const row = db.get<{ seq: number; role: HistoryRole; time: number; text: string }>(sql`
     SELECT e.seq, ${roleSql} AS role, e.created_at AS time, e.search_text AS text
     FROM agent_events e
@@ -38,6 +56,12 @@ export function readSessionHistory(db: Transaction, sessionId: string, seq: numb
   `)
   if (!row) return null
   const end = Math.min(offset + 4_000, row.text.length)
-  return { seq: row.seq, role: row.role, time: row.time, text: row.text.slice(offset, end),
-    nextOffset: end < row.text.length ? end : null, truncated: end < row.text.length }
+  return {
+    seq: row.seq,
+    role: row.role,
+    time: row.time,
+    text: row.text.slice(offset, end),
+    nextOffset: end < row.text.length ? end : null,
+    truncated: end < row.text.length,
+  }
 }

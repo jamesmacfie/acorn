@@ -54,13 +54,18 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
             if (!abs) return bail()
             try {
               const drop = await claimEditorPty(root, path)
-              if (!mine.has(ptyId)) { drop(); return }
+              if (!mine.has(ptyId)) {
+                drop()
+                return
+              }
               const owned = claims.get(conn) ?? new Map<string, () => void>()
               owned.set(ptyId, drop)
               claims.set(conn, owned)
-              if (await core.tasks.root(taskId) !== root || core.fs.resolveInRoot(root, path) !== abs) return bail()
+              if ((await core.tasks.root(taskId)) !== root || core.fs.resolveInRoot(root, path) !== abs) return bail()
               await lstat(abs)
-            } catch { return bail() }
+            } catch {
+              return bail()
+            }
             const env = process.env as Record<string, string>
             let pty: IPty
             try {

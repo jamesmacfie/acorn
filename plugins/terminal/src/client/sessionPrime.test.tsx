@@ -17,8 +17,8 @@ const { initSessions } = await import('./sessionStore')
 
 const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0))
 
-// The client plugin host runs `activate` once per launch now, before any node has answered, so the
-// read can no longer lean on a second activation to retry it.
+// The client plugin host runs `activate` once per launch, before any node has answered, so the read
+// cannot lean on a second activation to retry it.
 it('reads once the node can answer, not at activation, and once per node', async () => {
   const fetch = vi.fn(async () => new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }))
   vi.stubGlobal('fetch', fetch)

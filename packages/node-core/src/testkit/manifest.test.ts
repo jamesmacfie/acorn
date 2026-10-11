@@ -23,7 +23,10 @@ afterEach(() => {
 
 describe('validatePluginConfig', () => {
   it('accepts a minimal config and fills the manifest the builder would stamp', async () => {
-    const root = pkg('probe', `export default { name: 'Probe', entry: 'x', factory: 'x', permissions: {}, contributions: {} }\n`)
+    const root = pkg(
+      'probe',
+      `export default { name: 'Probe', entry: 'x', factory: 'x', permissions: {}, contributions: {} }\n`,
+    )
     const result = await validatePluginConfig(root)
     expect(result.ok ? result.manifest.id : result.reason).toBe('probe')
     if (!result.ok) throw new Error(result.reason)
@@ -32,12 +35,15 @@ describe('validatePluginConfig', () => {
   })
 
   it('names the field and the path when a contribution is wrong', async () => {
-    // A frame declaring a surface the schema does not know. Today this is found by running the builder,
-    // or by a boot-time console line in a packaged app that shows it to nobody.
-    const root = pkg('probe', `export default {
+    // A frame declaring a surface the schema does not know. Without this check it is found only by
+    // running the builder, or by a boot-time console line in a packaged app that shows it to nobody.
+    const root = pkg(
+      'probe',
+      `export default {
       name: 'Probe',
       contributions: { frames: [{ target: 'nowhere', id: 'f', label: 'F' }] },
-    }\n`)
+    }\n`,
+    )
     const result = await validatePluginConfig(root)
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -48,10 +54,13 @@ describe('validatePluginConfig', () => {
   it('catches a route a plugin does not own, which is the rule nobody can check by eye', async () => {
     // The cross-field refinement: a client route may address this plugin's own `/v1/p/<id>/` prefix and
     // nothing else. Getting it wrong is a package that installs and then cannot open its own surface.
-    const root = pkg('probe', `export default {
+    const root = pkg(
+      'probe',
+      `export default {
       name: 'Probe',
       contributions: { sources: [{ id: 's', label: 'S', glyph: 'list', order: 10, items: '/v1/p/github/rail-items' }] },
-    }\n`)
+    }\n`,
+    )
     const result = await validatePluginConfig(root)
     expect(result.ok).toBe(false)
     if (result.ok) return

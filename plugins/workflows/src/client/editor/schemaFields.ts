@@ -1,7 +1,7 @@
 import type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
 
 export const FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'object', 'array'] as const
-export type EditableFieldType = typeof FIELD_TYPES[number]
+export type EditableFieldType = (typeof FIELD_TYPES)[number]
 
 export const objectSchema = (schema: unknown): DataSchema => {
   if (schema && typeof schema === 'object' && !Array.isArray(schema) && (schema as DataSchema).type === 'object') {
@@ -18,7 +18,7 @@ export function schemaForType(type: EditableFieldType): DataSchema {
 }
 
 export function schemaPrimaryType(schema: DataSchema): DataType {
-  return Array.isArray(schema.type) ? schema.type.find(type => type !== 'null')! : schema.type
+  return Array.isArray(schema.type) ? schema.type.find((type) => type !== 'null')! : schema.type
 }
 
 export function uniqueFieldName(schema: DataSchema): string {
@@ -42,7 +42,7 @@ export function setObjectField(
     else properties[name] = field
   }
   if (!Object.hasOwn(root.properties ?? {}, oldName)) properties[nextName] = value
-  const requiredFields = new Set((root.required ?? []).filter(name => name !== oldName))
+  const requiredFields = new Set((root.required ?? []).filter((name) => name !== oldName))
   if (required) requiredFields.add(nextName)
   return { ...root, properties, required: [...requiredFields] }
 }
@@ -51,5 +51,5 @@ export function removeObjectField(schema: DataSchema, name: string): DataSchema 
   const root = objectSchema(schema)
   const properties = { ...root.properties }
   delete properties[name]
-  return { ...root, properties, required: (root.required ?? []).filter(field => field !== name) }
+  return { ...root, properties, required: (root.required ?? []).filter((field) => field !== name) }
 }

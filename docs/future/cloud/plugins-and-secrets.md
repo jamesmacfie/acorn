@@ -62,14 +62,14 @@ first is an open question in [phase 5](./phases/05-cloud-task.md#open-questions)
 ## Team secrets
 
 The team Node stores team secrets encrypted, the same way any Node stores integration credentials
-([credential handling](../../security.md#credential-handling)). Admins write them. Nobody reads them
+([credential handling](../../security/credentials.md)). Admins write them. Nobody reads them
 back through the API.
 
 ## Model keys
 
 Teams supply model provider keys. This is the sharpest part of the secret story, because the agent
 CLIs that acorn drives read their key from the environment, and Acorn's
-[child environment policy](../../security.md#process-path-and-configuration-controls)
+[child environment policy](../../security/process-and-paths.md)
 deliberately keeps provider credentials out of every child process.
 
 Three options, from strongest to weakest:

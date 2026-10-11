@@ -15,8 +15,8 @@ export type AgentToolFoldPrefs = {
 }
 
 // Collapsed, because a turn that ran twenty calls is unreadable with all of them open, and the state a
-// card is in is one click away. This is a change for a provider whose calls used to open themselves
-// while they ran: `collapsed` means a command's output no longer streams into view unattended.
+// card is in is one click away. It also means a running command's output doesn't stream into view
+// unattended.
 export const defaultAgentToolFoldPrefs: AgentToolFoldPrefs = { mode: 'collapsed', last: 'collapsed' }
 
 const agentToolFoldSchema = z.strictObject({
@@ -44,16 +44,13 @@ export const foldStartsOpen = (prefs: AgentToolFoldPrefs): boolean =>
  * `sticky` learns: under the other two modes a toggle is this card's own business, and writing it
  * would quietly rewrite the setting the reader chose.
  */
-export const foldPrefsAfterToggle = (
-  prefs: AgentToolFoldPrefs,
-  open: boolean,
-): AgentToolFoldPrefs | null => {
+export const foldPrefsAfterToggle = (prefs: AgentToolFoldPrefs, open: boolean): AgentToolFoldPrefs | null => {
   if (prefs.mode !== 'sticky') return null
   const last = open ? 'expanded' : 'collapsed'
   return last === prefs.last ? null : { ...prefs, last }
 }
 
-export const saveAgentToolFoldPrefs = (qc: QueryClient, next: AgentToolFoldPrefs): Promise<boolean> =>
+const saveAgentToolFoldPrefs = (qc: QueryClient, next: AgentToolFoldPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.agentToolFold, next)
 
 /** Choose the mode without disturbing the `last` toggle beside it. The page and the palette's setting
@@ -88,9 +85,9 @@ export type AgentToolFoldSetting = {
  * A context rather than a prop, because `AgentEventCard` recurses for a subagent's stream and a card
  * that missed the prop would silently fall back to the built-in default. A context rather than a prefs
  * query inside each card, because `prefsOptions.select` runs `mergePrefs`, which scans localStorage, on
- * every observer for every prefs write: with an observer per card, one pane resize became a few hundred
- * scans of it. A transcript holds a few hundred cards and is deliberately not virtualized
- * (AgentTranscript.tsx).
+ * every observer for every prefs write: with an observer per card, one pane resize would mean a few
+ * hundred scans of it. A transcript holds a few hundred cards and is deliberately not virtualized
+ * (`AgentTranscript`).
  */
 export const createAgentToolFoldSetting = (
   prefs: () => Record<string, string> | undefined,
@@ -122,8 +119,8 @@ export const agentToolFoldSlice: PersistedStateSlice<Record<string, unknown>> = 
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }

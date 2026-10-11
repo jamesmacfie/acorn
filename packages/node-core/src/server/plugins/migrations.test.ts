@@ -61,7 +61,9 @@ describe('pluginMigrationsFolder', () => {
     mkdirSync(join(dir, 'dist/helper'), { recursive: true })
     // A `migrations` directory with no journal must not end the search either.
     mkdirSync(join(dir, 'dist/helper/migrations'), { recursive: true })
-    expect(() => pluginMigrationsFolder('nosuch', pathToFileURL(module).href)).toThrow("No migrations chain found for plugin 'nosuch'")
+    expect(() => pluginMigrationsFolder('nosuch', pathToFileURL(module).href)).toThrow(
+      "No migrations chain found for plugin 'nosuch'",
+    )
   })
 
   it('stops at a plugin package root instead of adopting an ancestor chain', () => {
@@ -96,7 +98,9 @@ describe('applied plugin migration history', () => {
     migrationChain(migrations, [first, second])
 
     const db = openPluginDb(dir, 'history', { migrationsFolder: migrations })
-    expect(db.$client.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'second'").get()).toBeTruthy()
+    expect(
+      db.$client.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'second'").get(),
+    ).toBeTruthy()
     db.close()
   })
 
@@ -106,9 +110,13 @@ describe('applied plugin migration history', () => {
     openPluginDb(dir, 'history', { migrationsFolder: migrations }).close()
     migrationChain(migrations, [{ ...first, sql: `${first.sql}\nALTER TABLE first ADD COLUMN changed text;` }, second])
 
-    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(/0000_first.*no longer matches.*recoverable reset/)
+    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(
+      /0000_first.*no longer matches.*recoverable reset/,
+    )
     const db = openPluginDb(dir, 'history', { migrationsFolder: migrationChain(migrations, [first]) })
-    expect(db.$client.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'second'").get()).toBeUndefined()
+    expect(
+      db.$client.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'second'").get(),
+    ).toBeUndefined()
     db.close()
   })
 
@@ -118,7 +126,9 @@ describe('applied plugin migration history', () => {
     openPluginDb(dir, 'history', { migrationsFolder: migrations }).close()
     migrationChain(migrations, [second, first])
 
-    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(/0001_second.*no longer matches/)
+    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(
+      /0001_second.*no longer matches/,
+    )
     migrationChain(migrations, [first, second])
     const db = openPluginDb(dir, 'history', { migrationsFolder: migrations })
     expect(db.$client.prepare('SELECT count(*) AS count FROM __drizzle_migrations').get()).toEqual({ count: 2 })
@@ -133,7 +143,9 @@ describe('applied plugin migration history', () => {
     old.exec('CREATE TABLE preserved (value text)')
     old.close()
 
-    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(/Plugin 'history' has tables without a migration history.*recoverable reset/)
+    expect(() => openPluginDb(dir, 'history', { migrationsFolder: migrations })).toThrow(
+      /Plugin 'history' has tables without a migration history.*recoverable reset/,
+    )
     const unchanged = new DatabaseSync(join(dir, 'plugins/history.sqlite'))
     expect(unchanged.prepare("SELECT name FROM sqlite_master WHERE name = 'preserved'").get()).toBeTruthy()
     unchanged.close()

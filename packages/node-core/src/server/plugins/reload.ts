@@ -37,7 +37,10 @@ export function createPluginReloader(options: {
       // that reads a manifest, confines a migrations chain, and checks an id against its bundle, so
       // duplicating a quarter of it here would be a second loader to keep in step. Only `id` is
       // considered.
-      const { loaded, installed, failures } = await loadExternalPlugins(options.dataDir, { builtins: options.builtins, reimport: [id] })
+      const { loaded, installed, failures } = await loadExternalPlugins(options.dataDir, {
+        builtins: options.builtins,
+        reimport: [id],
+      })
       const entry = loaded.find((candidate) => candidate.manifest.id === id)
       for (const candidate of loaded) if (candidate !== entry) disposeUnstartedPlugin(candidate.plugin)
       if (!entry) {

@@ -10,90 +10,156 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
-const { chromeDeps, readAnnotationMarks, readRailSearch, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
+const {
+  chromeDeps,
+  readAnnotationMarks,
+  readRailSearch,
+  sanitizeRailItem,
+  scopedSourceItemsPath,
+  unwatchChrome,
+  watchChrome,
+} = await import('./chromeData')
 const wsClient = await import('../../infra/node/wsClient')
 const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
 describe('descriptor source scope', () => {
   it('adds an encoded active project while preserving plugin query parameters', () => {
-    expect(scopedSourceItemsPath('/v1/p/board/items', 'project/one'))
-      .toBe('/v1/p/board/items?project=project%2Fone')
-    expect(scopedSourceItemsPath('/v1/p/board/items?status=open', 'project-1'))
-      .toBe('/v1/p/board/items?status=open&project=project-1')
-    expect(scopedSourceItemsPath('/v1/p/board/items', undefined))
-      .toBe('/v1/p/board/items')
+    expect(scopedSourceItemsPath('/v1/p/board/items', 'project/one')).toBe('/v1/p/board/items?project=project%2Fone')
+    expect(scopedSourceItemsPath('/v1/p/board/items?status=open', 'project-1')).toBe(
+      '/v1/p/board/items?status=open&project=project-1',
+    )
+    expect(scopedSourceItemsPath('/v1/p/board/items', undefined)).toBe('/v1/p/board/items')
   })
 })
 
 describe('descriptor source search', () => {
   beforeEach(() => readJson.mockReset())
 
-  it('sends the reader\'s text and the routed project, and sanitizes every row', async () => {
+  it("sends the reader's text and the routed project, and sanitizes every row", async () => {
     readJson.mockResolvedValueOnce({ items: [{ id: 'a:1', title: 'Crash' }, { id: 'no title' }], incomplete: true })
-    const result = await readRailSearch('linear', '/v1/p/linear/rail-search', 'node-1', 'crash', 'project-1', new AbortController().signal)
+    const result = await readRailSearch(
+      'linear',
+      '/v1/p/linear/rail-search',
+      'node-1',
+      'crash',
+      'project-1',
+      new AbortController().signal,
+    )
     expect(readJson.mock.calls[0][0]).toBe('/v1/p/linear/rail-search?project=project-1&q=crash')
     expect(result).toEqual({ items: [{ id: 'a:1', title: 'Crash' }], incomplete: true })
   })
 
   it('cuts an oversized answer and calls it incomplete', async () => {
     readJson.mockResolvedValueOnce({ items: Array.from({ length: 150 }, (_, at) => ({ id: `r${at}`, title: 'Row' })) })
-    const result = await readRailSearch('linear', '/v1/p/linear/rail-search', 'node-1', 'row', undefined, new AbortController().signal)
+    const result = await readRailSearch(
+      'linear',
+      '/v1/p/linear/rail-search',
+      'node-1',
+      'row',
+      undefined,
+      new AbortController().signal,
+    )
     expect(result.items).toHaveLength(100)
     expect(result.incomplete).toBe(true)
   })
 
-  it('refuses a search route outside the plugin\'s namespace', async () => {
-    await expect(readRailSearch('linear', '/v1/p/rollbar/rail-search', 'node-1', 'x', undefined, new AbortController().signal))
-      .rejects.toThrow('linear may not read')
+  it("refuses a search route outside the plugin's namespace", async () => {
+    await expect(
+      readRailSearch('linear', '/v1/p/rollbar/rail-search', 'node-1', 'x', undefined, new AbortController().signal),
+    ).rejects.toThrow('linear may not read')
   })
 })
 
 describe('descriptor source row parsing', () => {
-  it('strips another plugin\'s task origin without dropping the row', () => {
-    expect(sanitizeRailItem('rollbar', {
-      id: '142', title: 'Checkout failed', task: { origin: 'linear', title: 'Fix checkout' },
-    })).toEqual({
-      id: '142', title: 'Checkout failed', task: { title: 'Fix checkout' },
+  it("strips another plugin's task origin without dropping the row", () => {
+    expect(
+      sanitizeRailItem('rollbar', {
+        id: '142',
+        title: 'Checkout failed',
+        task: { origin: 'linear', title: 'Fix checkout' },
+      }),
+    ).toEqual({
+      id: '142',
+      title: 'Checkout failed',
+      task: { title: 'Fix checkout' },
     })
   })
 
   it('keeps exact and namespaced origins owned by the plugin', () => {
-    expect(sanitizeRailItem('rollbar', {
-      id: '142', title: 'Checkout failed', task: { origin: 'rollbar:error' },
-    })?.task?.origin).toBe('rollbar:error')
+    expect(
+      sanitizeRailItem('rollbar', {
+        id: '142',
+        title: 'Checkout failed',
+        task: { origin: 'rollbar:error' },
+      })?.task?.origin,
+    ).toBe('rollbar:error')
   })
 
   it('keeps positional fields, empty cells included, and drops a malformed list', () => {
-    expect(sanitizeRailItem('linear', {
-      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', ''],
-    })).toEqual({
-      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', ''],
+    expect(
+      sanitizeRailItem('linear', {
+        id: 'c:FAST-6352',
+        title: 'Planner crash',
+        fields: ['FAST-6352', ''],
+      }),
+    ).toEqual({
+      id: 'c:FAST-6352',
+      title: 'Planner crash',
+      fields: ['FAST-6352', ''],
     })
-    expect(sanitizeRailItem('linear', {
-      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', 7],
-    })).toEqual({
-      id: 'c:FAST-6352', title: 'Planner crash',
+    expect(
+      sanitizeRailItem('linear', {
+        id: 'c:FAST-6352',
+        title: 'Planner crash',
+        fields: ['FAST-6352', 7],
+      }),
+    ).toEqual({
+      id: 'c:FAST-6352',
+      title: 'Planner crash',
     })
   })
 
   it('keeps host-owned row layout and semantic severity values only', () => {
-    expect(sanitizeRailItem('rollbar', {
-      id: '142', title: 'Checkout failed', fields: ['#142'], fieldsFirst: true,
-      icon: 'circle-x', severity: 'danger', badge: '12',
-    })).toEqual({
-      id: '142', title: 'Checkout failed', fields: ['#142'], fieldsFirst: true,
-      icon: 'circle-x', severity: 'danger', badge: '12',
+    expect(
+      sanitizeRailItem('rollbar', {
+        id: '142',
+        title: 'Checkout failed',
+        fields: ['#142'],
+        fieldsFirst: true,
+        icon: 'circle-x',
+        severity: 'danger',
+        badge: '12',
+      }),
+    ).toEqual({
+      id: '142',
+      title: 'Checkout failed',
+      fields: ['#142'],
+      fieldsFirst: true,
+      icon: 'circle-x',
+      severity: 'danger',
+      badge: '12',
     })
-    expect(sanitizeRailItem('rollbar', {
-      id: '142', title: 'Checkout failed', severity: 'magenta', fieldsFirst: 'yes',
-    })).toEqual({ id: '142', title: 'Checkout failed' })
+    expect(
+      sanitizeRailItem('rollbar', {
+        id: '142',
+        title: 'Checkout failed',
+        severity: 'magenta',
+        fieldsFirst: 'yes',
+      }),
+    ).toEqual({ id: '142', title: 'Checkout failed' })
   })
 
   it('strips a malformed task link while retaining valid task fields', () => {
-    expect(sanitizeRailItem('rollbar', {
-      id: '142', title: 'Checkout failed', task: { origin: 'rollbar', link: { connectionId: 7 } },
-    })).toEqual({
-      id: '142', title: 'Checkout failed', task: { origin: 'rollbar' },
+    expect(
+      sanitizeRailItem('rollbar', {
+        id: '142',
+        title: 'Checkout failed',
+        task: { origin: 'rollbar', link: { connectionId: 7 } },
+      }),
+    ).toEqual({
+      id: '142',
+      title: 'Checkout failed',
+      task: { origin: 'rollbar' },
     })
   })
 })
@@ -103,9 +169,8 @@ describe('annotation response budget', () => {
 
   it('inspects only the generic raw-row ceiling and keeps valid rows around malformed ones', async () => {
     const rows = Array.from({ length: MAX_RAW_ANNOTATION_ROWS + 2 }, (_, index) =>
-      index === 1
-        ? { broken: true }
-        : { key: { line: index }, severity: 'info', text: `Line ${index}` })
+      index === 1 ? { broken: true } : { key: { line: index }, severity: 'info', text: `Line ${index}` },
+    )
     writeJson.mockResolvedValue({ items: rows })
 
     const marks = await readAnnotationMarks(
@@ -124,9 +189,9 @@ describe('annotation response budget', () => {
 
 // The chrome half of the `term:status` split, from the frame to the revision a descriptor read watches.
 //
-// The amplifier this pins closed: `term:status` used to be one content-free ping that a terminal
-// emitted on every idle-to-working edge, and the chrome sweep answered it by refetching every plugin's
-// rail rows, badges and collections on every connected client.
+// The amplifier this pins closed: a content-free ping on every terminal's idle-to-working edge would
+// make the chrome sweep refetch every plugin's rail rows, badges and collections on every connected
+// client.
 describe('chrome freshness hears only what names it', () => {
   const emit: ((nodeId: string, frame: unknown) => void)[] = []
 
