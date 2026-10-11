@@ -1,5 +1,5 @@
 // Local Git change wire contracts.
-// Local-changes review (docs/panes.md): one working-tree change as the ChangesPane sees it.
+// One working-tree change as the Changes pane sees it.
 // A file changed in both the index and the worktree appears once per scope (staged flag).
 // `conflicted` is git's unmerged state: it is never staged, has no line counts, and staging it is how
 // git marks the conflict resolved.

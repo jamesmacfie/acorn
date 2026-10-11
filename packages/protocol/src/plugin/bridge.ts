@@ -10,11 +10,10 @@
 // because the host bound all three when it created the frame. That is why `path` is the only
 // addressing a request has.
 //
-// Types rather than Zod schemas, unlike the HTTP wire: the parsing here is hand-rolled in the broker
-// (client-core/host/frames/broker.ts) because the trust boundary is inverted. An HTTP route
-// validates a body it will act on; the broker's job is to decide whether to act at all, which is a
-// permission check against a route table rather than a shape check. A schema in front of it would
-// validate the shape of a request it is about to deny anyway.
+// Types rather than Zod schemas, unlike the HTTP wire: client-core's frame broker parses these by hand
+// because the trust boundary is inverted. An HTTP route validates a body it will act on; the broker
+// decides whether to act at all, which is a permission check against a route table rather than a
+// shape check.
 import type { ErrorEnvelope } from '../transport/errors'
 
 // The handshake. The host posts exactly this into the frame with the port transferred alongside, and
@@ -135,8 +134,8 @@ export type PluginBridgeStateRequest =
   | { id: number; kind: 'state.get'; key: string }
   | { id: number; kind: 'state.set'; key: string; value: unknown }
 
-// The closed verb set. Not "some UI operations": these six and nothing else, because each one is a
-// thing the host does on the frame's behalf in the host's own realm.
+// The closed verb set. Not "some UI operations": these and nothing else, because each one is a thing
+// the host does on the frame's behalf in the host's own realm.
 export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'toast'; title: string; detail?: string }
   | { id: number; kind: 'ui'; op: 'copy'; text: string }
@@ -165,11 +164,9 @@ export type PluginBridgeUiRequest =
 // every other surface is denied, because there is no document on the other side of the port to
 // touch.
 //
-// Three operations, each with a proven consumer in the pane that forced this contract: `read` is the
-// Run button needing the current SQL, `write` is the saved-query picker loading one into the editor,
-// and `flush` is "make sure my write route has the latest before I act on it". Nothing about the
-// editor crosses: no cursor, no selection, no decorations. Those stay the host's, and the growth
-// rule sends anything richer to an LSP-shaped route instead.
+// `read` returns the current text, `write` replaces it, and `flush` makes sure the pane's write route
+// has the latest text before the frame acts on it. Nothing else about the editor crosses: no cursor,
+// no selection, no decorations. Anything richer belongs on an LSP-shaped route.
 export type PluginBridgeDocumentRequest =
   | { id: number; kind: 'document'; op: 'read' }
   | { id: number; kind: 'document'; op: 'write'; text: string; expectedText?: string }

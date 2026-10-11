@@ -12,7 +12,7 @@ export type NodePluginRow = {
   /** The name a person reads, such as "GitHub" or "API requests". A loaded plugin's comes from its
    * manifest `name`, and a compiled plugin's from its definition. Display text only: never key
    * anything on it. Optional so a node that predates it still parses, and so the client can fall back
-   * to the id (client-core/host/plugins/pluginLabel.ts). A loaded plugin writes its own, so trust
+   * to the id (client-core's `pluginLabel`). A loaded plugin writes its own, so trust
    * prompts keep showing the id. */
   label?: string
   /** Events this running or installed plugin declares for cross-plugin subscribers. */
@@ -32,7 +32,7 @@ export type NodePluginRow = {
   // persisted response type would need a bumped query key (docs/caching.md).
   //
   // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
-  // markup. The node caps it in node-core/server/pluginHost/state.ts.
+  // markup. node-core's `pluginState` caps it.
   reason?: string
   // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
   stage?: 'load' | 'init' | 'ready'
@@ -156,7 +156,7 @@ export type InstalledPluginRow = {
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design/icons.md § Icons.
+  // claim another's mark. See client-core's `brandMarkRegistry` and docs/ui-design/icons.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
@@ -254,11 +254,11 @@ export const corePluginSkillGrantRoute = (id: string) => `/v1/core/plugins/${enc
 export const corePluginModelGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/model-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
-// an install route the agent can reach (client-core/host/frames/scopes.ts).
+// an install route the agent can reach (client-core's frame route table refuses it).
 export const corePluginRequestRoute = (requestId: string) =>
   `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
-// task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
+// task-scoped internal token can't reach it (node-core mounts `requireDevice` over both forms).
 export const corePluginBundleRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/client.js`
 export const corePluginBundleByHashRoute = (id: string, hash: string) =>
   `/v1/core/plugins/${encodeURIComponent(id)}/bundles/${encodeURIComponent(hash)}`

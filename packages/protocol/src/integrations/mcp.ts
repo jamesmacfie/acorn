@@ -1,7 +1,6 @@
 // MCP config inspector (docs/mcp.md): pure parse and secret masking over the agents' own config
-// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only. Acorn never launches or manages
-// these servers, the agent does (orca's stance). Masking happens in main before anything crosses to
-// the renderer.
+// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only: the agent launches these servers,
+// not Acorn. Masking happens on the node before anything crosses to the renderer.
 
 export type McpServerSummary = {
   name: string
@@ -73,10 +72,10 @@ export function inspectMcpConfig(jsonText: string): McpServerSummary[] {
   return out
 }
 
-// The starter file the Settings button seeds (orca's touch).
+// The starter file the Settings button seeds.
 export const STARTER_MCP_JSON = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`
 
-// The known candidate files, relative to a root kind: the only paths main will read.
+// The known candidate files, relative to a root kind: the only paths the node will read.
 export const MCP_CANDIDATES: { rel: string; root: 'worktree' | 'home' }[] = [
   { rel: '.mcp.json', root: 'worktree' },
   { rel: '.cursor/mcp.json', root: 'worktree' },

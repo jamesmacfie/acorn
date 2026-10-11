@@ -40,9 +40,6 @@ export type NodeKeyCheck = z.infer<typeof nodeKeyCheckSchema>
 export const serviceStartConfigSchema = z.strictObject({
   baseline: z.literal(ACORN_BASELINE),
   dataDir: z.string().min(1),
-  // No clientDir: the node serves no web assets (docs/architecture-overview.md). The renderer ships with
-  // the desktop app and loads from app://acorn, so there is nothing about the renderer's layout the
-  // service needs to be told.
   version: z.string().min(1),
   isPackaged: z.boolean(),
   hostRuntimePath: z.string().min(1),

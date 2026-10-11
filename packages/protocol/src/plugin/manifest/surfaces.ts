@@ -33,7 +33,7 @@ export const documentService = z.object({ route: pluginRoute })
 
 export const documentRegion = z.object({
   // From the published vocabulary, so an unknown id is a parse error rather than a document that
-  // quietly renders as plain text. LSP's spellings (@acorn/protocol/languageIds.ts).
+  // quietly renders as plain text. LSP's spellings (`LANGUAGE_IDS`).
   languageId: z.enum(LANGUAGE_IDS).default('plaintext'),
   // GET -> { text }. The host substitutes `:taskId` and `:projectId` from the pane's scope. No other
   // parameter, because no other one is the host's to know.
@@ -42,7 +42,7 @@ export const documentRegion = z.object({
   // template in a highlighted viewer wants exactly that.
   write: pluginRoute.optional(),
   completions: documentCompletions.optional(),
-  // Hover and diagnostics, POSTed the live buffer (@acorn/protocol/documentSurface.ts). A region's own
+  // Hover and diagnostics, POSTed the live buffer (`PluginHoverRequest`). A region's own
   // routes are the only ones its document is sent to: a file-language provider never reaches it.
   hover: documentService.optional(),
   diagnostics: documentService.optional(),
@@ -72,9 +72,9 @@ export const documentServiceDescriptor = z
 // is a key of the object the bundle passed to `mountTree`. A document region is host-drawn outright:
 // the plugin contributes routes and a language id, no code.
 //
-// Two of the three run the plugin's bytes, and both require an accepted bundle hash. The host uses
-// separate frame and remote-region checks in `contract.ts`: one needs an iframe origin, the other a
-// worker port. A document region needs neither.
+// Two of the three run the plugin's bytes, and both require an accepted bundle hash. The host checks
+// them separately (`hasFrameRegion`, `hasRemoteRegion`): one needs an iframe origin, the other a worker
+// port. A document region needs neither.
 const paneRegionSource = z.union([
   z.literal('frame'),
   z.object({ kind: z.literal('remote'), entry: z.string().min(1).max(64) }).strict(),
@@ -110,12 +110,12 @@ export const frameSurface = z
     // draws it until an owner's point takes it, which is what makes "the owner consents" true of the
     // rectangle kind as well.
     target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview', 'overlay', 'coreSlot', 'inline']),
-    // Task or project, and `pane` only. `task` is the default, so every manifest written before this
-    // field behaves the same. A property rather than a fifth `target`, because `target` picks the
-    // registry and `scope` picks which of two things a pane is. See docs/panes.md § Pane scope.
+    // Task or project, and `pane` only. `task` is the default. A property rather than another `target`,
+    // because `target` picks the registry and `scope` picks which of two things a pane is. See
+    // docs/panes.md § Pane scope.
     scope: z.enum(['task', 'project']).default('task'),
     // Not namespaced by us: it becomes a persisted layout key the moment a user opens the pane, so
-    // prefixing it later would break stored layouts (registries/plugin.ts).
+    // prefixing it later would break stored layouts.
     id: z.string().min(1).max(64),
     label: z.string().min(1).max(80),
     // A Lucide name, resolved client-side; an unmatched name renders as-is.
@@ -128,7 +128,7 @@ export const frameSurface = z
     // may otherwise start work that the owner did not restore.
     readsArchived: z.boolean().optional(),
     // Task `pane` only. The owner's consent for other plugins to put status marks on this pane's
-    // switcher button through `core:pane` (@acorn/protocol/extensionPoints.ts). Absent means no marks.
+    // switcher button through `core:pane` (`CORE_PANE_POINT`). Absent means no marks.
     statusAnnotations: z.boolean().optional(),
     // Task `pane` only. A GET route that answers `{ [taskId]: boolean }` for the node's active tasks, so
     // the host can hide the pane on a task it has nothing to draw for. A task the answer leaves out is
@@ -144,16 +144,16 @@ export const frameSurface = z
     // may only name its own provider. On a task pane it additionally marks the pane as a linked-items
     // view, hidden on tasks with no link from that provider.
     providerId: z.string().min(1).max(64).optional(),
-    // `settings` only. The older placement, still read: `workspace` makes a workspace page, `general`
-    // leaves both fields below at their defaults.
+    // `settings` only. A coarser placement than the two fields below, still read: `workspace` makes a
+    // workspace page, `general` leaves both fields below at their defaults.
     group: z.enum(['general', 'workspace']).optional(),
     // `settings` only. Which rail group the page sits in, `features` when absent, and what a change on it
     // affects, `node` when absent. `settingsScope` rather than `scope`, because `scope` above is a pane's
     // and widening its enum would make an older node refuse this manifest outright.
     //
     // A value outside the list is caught rather than refused: the page still registers, in its default
-    // place, and the manifest reader reports the value (node-core/server/plugins/manifest.ts). Refusing
-    // would drop the whole plugin over where one page is filed.
+    // place, and node-core's `parsePluginManifest` reports the value. Refusing would drop the whole
+    // plugin over where one page is filed.
     category: z.enum(PLUGIN_SETTINGS_CATEGORIES).optional().catch(undefined),
     settingsScope: z.enum(SETTINGS_SCOPES).optional().catch(undefined),
     // `settings` only. What search matches besides the page's label, and the page's `SettingsSection`
@@ -196,7 +196,7 @@ export const frameSurface = z
     urlSource: z.string().min(1).max(256).optional(),
     hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
     // `pane` only. Absent means a plain frame fills the whole pane. Present, the host draws the
-    // arrangement and fills each region from `regions` below (@acorn/protocol/paneLayouts.ts).
+    // arrangement and fills each region from `regions` below (`PANE_LAYOUTS`).
     layout: z.enum(PANE_LAYOUTS).optional(),
     // `pane` only, and only alongside `layout`. Keys are region names the layout has; the cross-check
     // is in the refinement below, where both fields are visible.
@@ -239,8 +239,8 @@ export const frameSurface = z
       destinationIds.add(destination.id)
     }
     // The one cross-field rule a surface can check on its own: a layout has the regions it has. The
-    // client repeats it over a roster row, because a manifest reaches a device as bytes a node sent
-    // (client-core/host/frames/layouts.ts).
+    // client repeats it over a roster row (`paneLayoutFor`), because a manifest reaches a device as
+    // bytes a node sent.
     if (surface.regions && !surface.layout) {
       ctx.addIssue({ code: 'custom', path: ['regions'], message: 'regions need a layout to name them' })
       return
@@ -273,8 +273,7 @@ export const frameSurface = z
       ctx.addIssue({ code: 'custom', path: ['availability'], message: 'availability is only valid on a task pane' })
     }
     // These host-driven surfaces carry changing data and verbs. A rectangle cannot receive that
-    // contract, so only a remote tree may offer them; the original task-list slot remains compatible
-    // with its existing iframe providers.
+    // contract, so only a remote tree may offer them. `rail.taskList` also accepts an iframe provider.
     if (surface.target === 'coreSlot' && surface.coreSlot && surface.coreSlot !== 'rail.taskList') {
       const body = surface.regions?.body
       if (surface.layout !== 'single' || !body || typeof body !== 'object' || body.kind !== 'remote') {

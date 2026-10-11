@@ -54,10 +54,10 @@ export const parseBackendId = (backendId: string): ParsedBackendId => {
  * The connection half of the backend list: connected model providers with text generation available,
  * projected to ids and labels.
  *
- * The harness half is built in the node, because "is this CLI on PATH" is a question only the node can
- * answer (packages/node-core/src/server/modelProviders/harnessRuntime.ts). Connections come first in
- * the assembled list, so the palette fast path and the silent fallback keep spending the key the owner
- * configured on purpose; a CLI is picked for someone only when there is no key at all.
+ * The harness half is built in the node (`harnessBackends`), because "is this CLI on PATH" is a
+ * question only the node can answer. Connections come first in the assembled list, so the palette fast
+ * path and the silent fallback keep spending the key the owner configured on purpose; a CLI is picked
+ * for someone only when there is no key at all.
  */
 export const availableModelConnections = (response: IntegrationsResponse): ModelBackend[] => {
   const providers = new Map(
@@ -86,11 +86,10 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
 /**
  * Which model a backend starts on: a harness's CLI default, or a connection's declared or first model.
  *
- * Here rather than beside the picker that used to hold it, because two sides now need the same answer
- * and neither may import the other. The desktop's picker opens on it, and the Database plugin's node
- * half chooses it when the palette's `Generate SQL` generates with no picker at all — so the fast path
- * and the modal start on the same model by construction (docs/database/palette-and-workflows.md § From the command palette,
- * step 3).
+ * Shared because two sides need the same answer and neither may import the other. The desktop's
+ * picker opens on it, and the Database plugin's node half chooses it when the palette's `Generate SQL`
+ * generates with no picker at all, so the fast path and the modal start on the same model
+ * (docs/database/palette-and-workflows.md § From the command palette, step 3).
  *
  * `''` when the backend declares neither, which is a real answer: the caller omits the model and the
  * backend falls back to its own recommendation — an adapter's for a connection, the CLI's own

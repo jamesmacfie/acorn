@@ -39,7 +39,7 @@ export const dashboardMappingSchema = z
   })
   .strict()
 
-/** The panel field ids `dashboards-core/mapping.ts` projects a mapped panel onto. */
+/** The panel field ids dashboards-core projects a mapped panel onto. */
 export const dashboardPanelFieldIds = ['title', 'status', 'assignee', 'updated', 'url', 'source'] as const
 
 const dashboardPanelContentObject = z
@@ -71,9 +71,8 @@ export const isMappedDashboard = (content: Pick<DashboardContentShape, 'queries'
   content.mapping.columns.length > 0 ||
   content.queries.some((query) => !!content.mapping.fields[query.id] || !!content.mapping.values[query.id])
 
-/** Until workstream 2 replaces both with column ids, `display.fields` and `display.groupBy` name a
- * panel field on a mapped panel and a source pointer otherwise, because those are the ids each
- * projected schema carries. */
+/** `display.fields` and `display.groupBy` name a panel field on a mapped panel and a source pointer
+ * otherwise, because those are the ids each projected schema carries. */
 export const dashboardDisplayRefFits = (mapped: boolean, ref: string): boolean =>
   mapped ? (dashboardPanelFieldIds as readonly string[]).includes(ref) : ref === '' || ref.startsWith('/')
 
@@ -398,8 +397,8 @@ export type PanelPlanColumn = PanelPlan['columns'][number]
 export const dashboardContentSchema = z.union([panelPlanSchema, dashboardPanelContentSchema])
 export type DashboardContent = PanelPlan | DashboardPanelContent
 
-/** Rows written before the display rule existed may name a source pointer on a mapped panel. Reading
- * them drops what can't resolve, rather than failing the whole library list. */
+/** A stored row may name a source pointer on a mapped panel. Reading it drops what can't resolve,
+ * rather than failing the whole library list. */
 export const storedDashboardPanelContentSchema = dashboardPanelContentObject
   .transform((content) => fitDashboardDisplay(content))
   .superRefine(checkDashboardContent)

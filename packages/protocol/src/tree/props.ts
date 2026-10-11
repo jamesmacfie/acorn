@@ -6,10 +6,10 @@
 // is a function, a `class`, a `style`, or a role prop carrying a raw colour. Those are what this
 // refuses.
 //
-// ponytail: one shared schema for every node rather than one hand-written per node. The per-node
-// allowlist would be defence in depth, not the load-bearing check, and it rots on every kit change.
-// Upgrade path if a node ever does spread its leftovers: give `KIT_NODE_SCHEMAS` real per-node
-// entries — every caller already goes through it.
+// One shared schema for every node rather than one hand-written per node. A per-node allowlist would
+// be defence in depth, not the load-bearing check, and it rots on every kit change. If a node ever
+// spreads its leftovers, give `KIT_NODE_SCHEMAS` real per-node entries; every caller already goes
+// through it.
 import { z } from 'zod'
 import {
   FORBIDDEN_PROPS,
@@ -116,7 +116,7 @@ export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
     const value = entries.find(([key]) => key === 'value')?.[1]
     for (const [key] of entries) if (key !== 'value') dropped.push(key)
     if (typeof value === 'string') return { props: { value }, dropped }
-    // A bundle built before the remote root turned numbers into text sends them as numbers. A finite
+    // A bundle whose remote root does not turn numbers into text sends them as numbers. A finite
     // number is drawn as its digits. Nothing else is, so an object still cannot reach the page.
     if (typeof value === 'number' && Number.isFinite(value)) return { props: { value: String(value) }, dropped }
     return { props: { value: '' }, dropped: [...dropped, 'value'] }

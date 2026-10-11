@@ -10,13 +10,10 @@ import { z } from 'zod'
 // Transport-level codes: the floor every consumer can rely on, used verbatim for failures that have
 // no domain meaning.
 //
-// docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive
-// allowlist. 37 domain codes are already load-bearing on the client: `needs-trust` opens the
-// config-trust modal, `provider_needs_auth` rewrites the message, and collapsing them all into ten
-// would delete real behaviour. A closed set buys interop discipline across an API boundary, and there
-// isn't one here: client and Node ship from the same repo and are released together
-// (docs/api-reference/transport.md § Versioning). So a route may return its own documented code, and anything
-// without one falls back to these.
+// A closed *floor*, not an exclusive allowlist. Domain codes are load-bearing on the client:
+// `needs-trust` opens the config-trust modal and `provider_needs_auth` rewrites the message. Client
+// and Node ship from the same repo and release together (docs/api-reference/transport.md § Versioning),
+// so a route may return its own documented code, and anything without one falls back to these.
 export const ERROR_CODES = [
   'bad_request',
   'unauthorized',

@@ -1,10 +1,6 @@
-// Where one plugin may open itself to another, and where a plugin may stand in for a core surface. A
-// contract both sides read, for the same reason `contextMenus.ts` is one: the node has to reject a bad
-// `extensionPoints`, `extensions` or `coreSlot` entry at parse time, the client has to re-check the same
-// entry when it arrives inside a roster row, and the node cannot import the client.
-//
-// Two shapes, one file, because they are the two halves of one decision: what it means for a plugin's
-// surface to be filled by somebody else's declaration.
+// Where one plugin may open itself to another, and where a plugin may stand in for a core surface. Both
+// sides read this contract: the node rejects a bad `extensionPoints`, `extensions` or `coreSlot` entry at
+// parse time, the client re-checks the same entry inside a roster row, and the node cannot import the client.
 //
 //   cooperative  plugin A declares a point it hosts; plugin B declares items for it by id. Both sides
 //                are in a manifest, both are visible at install time, and the host is the only thing
@@ -12,11 +8,11 @@
 //   exclusive    a plugin declares a replacement for a designated core surface. Registering seizes
 //                nothing: the user picks the provider in settings and core is the fallback.
 //
-// What is refused belongs on the record next to what is offered: there is no uncooperative extension.
-// Nothing here lets B alter A's UI or behaviour without A's declared consent, no DOM access into another
-// realm, no patching another plugin's registrations, no reading another plugin's routes. A point that A
-// did not declare simply has nothing delivered into it. See docs/plugins/cooperative-extension-points.md § Cooperative extension
-// points and § There is no uncooperative extension.
+// There is no uncooperative extension. Nothing here lets B alter A's UI or behaviour without A's declared
+// consent: no DOM access into another realm, no patching another plugin's registrations, no reading
+// another plugin's routes. A point that A did not declare has nothing delivered into it. See
+// docs/plugins/cooperative-extension-points.md § Cooperative extension points and § There is no
+// uncooperative extension.
 
 // These host extension props are small portable projections. The full agent event and usage models
 // belong to Agents; Protocol must not import a plugin contract.
@@ -59,13 +55,11 @@ export type AgentHeaderUsage = {
  * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
  * (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
  *
- *   rows        records the host draws with its own `Row`. Shipped first, and still the default.
+ *   rows        records the host draws with its own `Row`. The default when `kind` is absent.
  *   annotation  facts pinned to items the owner already draws: a mark on a diff line, a container.
  *   remote      a tree of kit nodes the contributor's sandbox renders into a slot of the owner's.
  *   rectangle   an iframe of the contributor's, drawn as a sibling region of the owner's pane.
  *   hook        a turn in one of the owner's decisions before it happens, node-side.
- *
- * `rows` is first so an absent `kind` reads as the kind every manifest written before this one meant.
  */
 export const EXTENSION_POINT_KINDS = ['rows', 'annotation', 'remote', 'rectangle', 'hook'] as const
 
@@ -75,13 +69,11 @@ export const isExtensionPointKind = (value: unknown): value is ExtensionPointKin
   typeof value === 'string' && (EXTENSION_POINT_KINDS as readonly string[]).includes(value)
 
 /**
- * Every place the host will draw a point's contributed items. See docs/plugins/cooperative-extension-points.md § Cooperative
- * extension points for the full argument; what each contributor may put there, and why position is
- * encoded in the name rather than in an orientation knob, are covered there.
+ * Every place the host will draw a point's contributed items. The name says where, rather than an
+ * orientation knob, so there is nothing to get the wrong way round at runtime.
  *
  * The two `inline` names are where a rectangle point puts somebody else's iframe: a sibling region of
- * the owner's pane, below it or beside it. Same rule as the layout template family — the name says
- * where, so there is nothing to get the wrong way round at runtime.
+ * the owner's pane, below it or beside it.
  */
 export const EXTENSION_POINT_LOCATIONS = [
   'pane.footer',
@@ -177,7 +169,7 @@ export type PluginExtensionItems = { items: PluginExtensionItem[] }
 // contributor in one request, and the marks come back for the host to draw at the owner's site.
 
 /** One item the owner draws, as the owner's declared key fields name it. Values are scalars because a
- *  key is a lookup, not a payload: `{ file: 'src/auth.ts', line: 42, side: 'new' }`. */
+ *  key is a lookup, not a payload: `{ file: 'README.md', line: 42, side: 'new' }`. */
 export type PluginAnnotationKey = Record<string, string | number>
 
 export const ANNOTATION_SEVERITIES = ['info', 'warn', 'danger'] as const
@@ -316,19 +308,15 @@ export const isCoreHookPoint = (value: unknown): value is CoreHookPoint =>
   typeof value === 'string' && (CORE_HOOK_POINTS as readonly string[]).includes(value)
 
 /**
- * The one annotation point core owns, and the reason it is here rather than in a manifest.
+ * Core's annotation point for task rows on the rail. Core has no manifest, so it is declared here.
  *
- * A task row on the rail is an item core draws, and what another plugin knows about a task — a
- * deploy is live, an incident is open, a ticket moved — is a fact pinned to it. That is an
- * annotation, not a rail-specific contribution. docs/plugins/cooperative-extension-points.md
- * § Task annotations defines why one mechanism serves task rows and other keyed owner surfaces.
+ * What another plugin knows about a task (a deploy is live, an incident is open, a ticket moved) is a
+ * fact pinned to an item core draws, so it is an annotation rather than a rail-specific contribution
+ * (docs/plugins/rows-and-annotations.md § Task annotations). Keyed by task id alone.
  *
- * Keyed by task id alone. A row is one task and there is nothing else to disambiguate.
- *
- * The rail is 52 pixels wide, so a mark is drawn as a status marker rather than as a line of text:
- * the icon takes a free corner and the words go in the hover legend (client-core
- * tasks/taskAnnotations.ts). That is the host's decision about its own surface, and it is why the
- * mark shape carries a severity and an icon and no geometry.
+ * The rail is too narrow for text, so a mark is drawn as a status marker: the icon takes a free corner
+ * and the words go in the hover legend (`annotationRailMarkers` in client-core). That is why the mark
+ * shape carries a severity and an icon and no geometry.
  */
 export const CORE_TASK_POINT = 'core:task'
 
@@ -343,7 +331,7 @@ export const CORE_TASK_KEY = ['task'] as const
  * `statusAnnotations: true`, and the host asks only about the consenting ones it is drawing. A
  * source's `projectId` is the routed project, or `''` for a source that is not project-scoped. The
  * Node is part of the host's batch identity and never a key field, so the same ids on two Nodes stay
- * apart. Drawn as rail markers, like `core:task` (client-core annotations/statusAnnotations.ts).
+ * apart. Drawn as rail markers, like `core:task` (`requestSourceAnnotations` in client-core).
  */
 export const CORE_SOURCE_POINT = 'core:source'
 
@@ -355,11 +343,8 @@ export const CORE_PANE_KEY = ['paneId', 'taskId'] as const
 
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
-/**
- * The core surfaces a plugin may offer to replace. See docs/plugins/replacing-core-surfaces.md § Replacing a core surface.
- *
- * One member, and it stays one until a second surface has both a reason and a fallback worth writing.
- */
+/** The core surfaces a plugin may offer to replace. See docs/plugins/replacing-core-surfaces.md § Replacing a
+ *  core surface. Add a surface only when it has both a reason and a fallback worth writing. */
 export const CORE_EXCLUSIVE_SLOTS = ['rail.taskList', 'pane.switcher', 'rail', 'topbar'] as const
 
 export type CoreExclusiveSlot = (typeof CORE_EXCLUSIVE_SLOTS)[number]
@@ -373,14 +358,11 @@ export const CORE_SLOT_PROVIDER = 'core'
 
 // ── The remote half ───────────────────────────────────────────────────────────────────────────────
 //
-// Phase 3 shipped one hard-coded target, `agentToolRenderer`, so the worker and the tree renderer
-// could be proven on a real surface. There is no target list any more: a remote contribution names a
-// point like every other kind, and the agents transcript's tool card is `agents:tool-card`, an
-// ordinary `remote` point in `replace` mode keyed by tool name.
+// A remote contribution names a point like every other kind. The agents transcript's tool card is
+// `agents:tool-card`, an ordinary `remote` point in `replace` mode keyed by tool name.
 
-/** The first remote points, named here only so the host's own consumers can say them out loud without
- *  a literal per call site. A plugin's point never appears in this list; it is minted from its
- *  manifest like any other. */
+/** Named here only so the host's own consumers can say it without a literal per call site. A plugin's
+ *  own points are minted from its manifest, not listed here. */
 export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
 
 /** A section on Settings > Storage and memory. A core-owned `remote` point in `stack` mode, so a plugin

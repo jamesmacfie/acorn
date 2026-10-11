@@ -10,12 +10,12 @@ export const pluginStateKey = (pluginId: string, key: string): string => `plugin
 // else, its own frames may subscribe to it, and a frame arriving on it invalidates that plugin's
 // chrome alone. Same rule its routes follow: your own namespace is allowed, another plugin's is not.
 //
-// Here rather than beside either consumer because three sides have to agree on one spelling: the node
-// that stamps it, the renderer that routes it, and the manifest that declares it as an event grant.
+// Three sides agree on this spelling: the node that stamps it, the renderer that routes it, and the
+// manifest that declares it as an event grant.
 //
-// `plugin` is one letter from core's own `plugins` prefix (client-core/infra/node/wsClient.ts), which carries the
-// roster's `plugins:changed`. The test that pins wsChannelPrefixes() keeps that near-miss from turning
-// into a silent drop.
+// `plugin` is one letter from core's own `plugins` channel, which client-core's `wsClient` registers for
+// the roster's `plugins:changed`. The test that pins `wsChannelPrefixes()` keeps that near-miss from
+// turning into a silent drop.
 export const PLUGIN_CHANNEL_PREFIX = 'plugin'
 
 export const pluginChannel = (pluginId: string, verb: string): string => `${PLUGIN_CHANNEL_PREFIX}:${pluginId}:${verb}`

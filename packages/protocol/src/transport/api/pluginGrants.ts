@@ -16,10 +16,9 @@ export type PluginNavigationDestinationGrant = {
   noticeKind?: string
 }
 
-// The third grant: what this package's manifest says about other packages and about core's own
-// surfaces (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three
-// arrays, because they answer one question an owner asks once, "what does this reach that isn't its
-// own?", and three near-identical lists are three places to forget one.
+// What this package's manifest says about other packages and about core's own surfaces. One shape for all
+// three kinds rather than three arrays, because they answer one question an owner asks once, "what does this
+// reach that isn't its own?", and three near-identical lists are three places to forget one.
 //
 //   hosts     this package opens one of its surfaces to other packages' rows.
 //   extends   this package puts its rows inside another package's surface. `target` names that package.
@@ -27,7 +26,7 @@ export type PluginNavigationDestinationGrant = {
 //             owner picks it in settings.
 export type PluginExtensionGrant = {
   kind: 'hosts' | 'extends' | 'replaces'
-  // Which of the five things is opened, or brought (@acorn/protocol/extensionPoints.ts). Absent on
+  // Which of the five things is opened, or brought (`EXTENSION_POINT_KINDS`). Absent on
   // `replaces`, which is the exclusive slot rather than a point. On `extends` it is derived from the
   // carrier this manifest named, because a contributor cannot see the owner's declaration.
   pointKind?: ExtensionPointKind
@@ -39,19 +38,18 @@ export type PluginExtensionGrant = {
   label: string
 }
 
-// The fourth grant: periodic work the node runs for this package with no client open
+// Periodic work the node runs for this package with no client open
 // (docs/schedules.md). Recorded rather than merely shown, because the update prompt's "what's new"
 // mark is a set difference against what the owner last approved. A package that starts running itself
 // every five minutes where it used to run daily has grown its reach.
 export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence }
 
-// The fifth grant: a check this package runs when the owner archives a task, and whether it offers to
-// clean up after it (node-core/server/pluginHost/taskChecks.ts). Recorded for the same reason as the
-// fourth: `cleansUp` in the key is what lets the update prompt say a package that used to only warn
-// now does something.
+// A check this package runs when the owner archives a task, and whether it offers to clean up after
+// it. Recorded for the same reason as schedules: `cleansUp` in the key is what lets the update prompt
+// say a package that used to only warn now does something.
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
 
-// The sixth grant, and the only one under `Enforced` that names a program: a managed agent harness
+// The only grant under `Enforced` that names a program: a managed agent harness
 // this package asks acorn to run (docs/managed-agents/harnesses.md § Harnesses). The claim is exact, since the
 // host spawns the declared command with the declared args and nothing else, so the whole spawn goes
 // in the key. A version that runs a different binary, or carries more of the node's environment into

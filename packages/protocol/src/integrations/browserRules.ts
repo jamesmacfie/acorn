@@ -1,6 +1,6 @@
-// Preview-browser page-rule helpers (docs/panes.md): JSON parse and validate for the workspaces
-// `browser_rules` column, plus the URL matcher. Pure, and shared by the Hono PATCH route (validate on
-// write), the main-process preview service (parse and match on page load), and the settings editor.
+// Preview-browser page-rule helpers (docs/workspaces-and-tasks/project-config.md): JSON parse and
+// validate for the projects `browser_rules` column, plus the URL matcher. The node's project config
+// validates on write and parses on read.
 import type { BrowserRule } from '../transport/api'
 
 // Validate a renderer-supplied rule at the route boundary, and filter stored rows on read.

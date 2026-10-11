@@ -3,8 +3,8 @@ import { parseDataPointer } from './values/dataValues'
 
 // Keep the manifest carrier independent of the invocation contract. Every client parses installed
 // plugin manifests during startup, while query schemas and value validation belong to the lazy data
-// authoring/runtime paths. Pulling the complete source protocol through plugin/contract made those
-// execution-only schemas part of both clients' first-frame graph.
+// authoring/runtime paths. Pulling the complete source protocol through the plugin contract would put
+// those execution-only schemas in both clients' first-frame graph.
 const id = z.string().min(1).max(200)
 const pointer = z.string().refine((value) => parseDataPointer(value) !== null, 'Invalid data pointer')
 

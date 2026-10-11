@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_LENGTH } from '../../content/webview.ts'
 
 // This id becomes the plugin's route namespace and `<dataRoot>/plugins/<id>.sqlite`. An architecture
-// rule keeps the prefix itself out of this package; node-core/server/plugins/manifest.ts confines it.
+// rule keeps the prefix itself out of this package; node-core's `pluginManifestSchema` confines it.
 export const ID_RE = /^[a-z][a-z0-9-]{1,31}$/
 
 // Node-half permissions shape the host RPC context and the isolated worker's runtime grants. They are
@@ -20,8 +20,8 @@ const nodeFilePermission = z.object({
   access: z.enum(['read', 'read-write']).default('read'),
 })
 export const nodePermissions = z.object({
-  // pluginPermissions.ts validates these tokens. An unknown one means a facet this build doesn't
-  // have, so it's skipped rather than treated as a bad manifest.
+  // node-core's `NODE_CORE_FACETS` lists the known tokens. An unknown one means a facet this build
+  // doesn't have, so it's skipped rather than treated as a bad manifest.
   core: z.array(z.string().min(1)).max(64).default([]),
   capabilities: z.array(z.string().min(1)).max(64).default([]),
   // Use-scoped credential access through ctx.core.secrets.

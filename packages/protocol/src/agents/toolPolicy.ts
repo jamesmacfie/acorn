@@ -34,9 +34,8 @@ export function isToolWithinCeiling(tool: { name: string; risk: ToolRisk }, ceil
 }
 
 // base64url via web-standard APIs rather than Buffer. Protocol is the one package both runtimes
-// import, so it may not depend on Node globals. Today's callers happen to be node-side, but a
-// renderer importing this would have hit `Buffer is not defined` at runtime. btoa/atob and
-// TextEncoder/TextDecoder exist in both Node and the browser.
+// import, so it may not depend on Node globals: a renderer importing this would hit `Buffer is not
+// defined` at runtime.
 function toBase64Url(text: string): string {
   const bytes = new TextEncoder().encode(text)
   let binary = ''

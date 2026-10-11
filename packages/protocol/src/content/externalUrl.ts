@@ -1,14 +1,13 @@
-// One policy for "a plugin asked the host to open this URL", used by both places that answer: a
+// One policy for "a plugin asked the host to open this URL", shared by both places that answer: a
 // manifest's `openUrl` descriptor verb when the node parses it, and the frame bridge's `ui.openUrl`
-// verb when a sandboxed frame sends one. Otherwise it'd be two `startsWith('https://')` calls in two
-// packages that can't import each other, and one would eventually gain an exception the other didn't.
+// verb when a sandboxed frame sends one. The two live in packages that can't import each other.
 //
-// `https` and nothing else, narrower than the shell's own external-URL allowlist
-// (apps/desktop/src-tauri/src/external_urls.rs), which also permits `http` and `mailto` for links in
-// GitHub bodies and Linear tickets. That list decides what a person's click may reach; this one
-// decides what plugin code may hand the machine unprompted. Anything else is a downgrade or a scheme
-// handler, meaning an arbitrary application launch. `app-plugin://`, the frame's own origin, is refused
-// by the same clause, so a frame can't ask the host to open another plugin's bundle.
+// `https` and nothing else, narrower than the shell's own external-URL allowlist (`open_external_url`
+// in the desktop shell), which also permits `http` and `mailto` for links in GitHub bodies and Linear
+// tickets. That list decides what a person's click may reach; this one decides what plugin code may
+// hand the machine unprompted. Anything else is a downgrade or a scheme handler, meaning an arbitrary
+// application launch. `app-plugin://`, the frame's own origin, is refused by the same clause, so a
+// frame can't ask the host to open another plugin's bundle.
 //
 // Parsed rather than prefix-matched, because a bridge message is untrusted input and `new URL` is the
 // same parse the navigation layer does later. A caller passing something that isn't a URL gets `false`.

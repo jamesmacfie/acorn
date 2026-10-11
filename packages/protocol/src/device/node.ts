@@ -28,7 +28,7 @@ export const nodeAttachmentSchema = z.strictObject({
 export type NodeAttachment = z.infer<typeof nodeAttachmentSchema>
 
 // `node.json` in the data root: a Node's durable identity, written once on first start. See
-// docs/data-layer/data-root.md § `node.json` for why its schema tolerates unknown keys and no longer carries a
+// docs/data-layer/data-root.md § `node.json` for why its schema tolerates unknown keys and carries no
 // protocol version.
 export const nodeIdentitySchema = z.object({
   baseline: z.literal(ACORN_BASELINE),
@@ -37,7 +37,7 @@ export const nodeIdentitySchema = z.object({
   // Absent until the first successful bind. 0 is never persisted: it means "pick an ephemeral port".
   port: z.number().int().min(1).max(65535).optional(),
   // The host(s) this node answers to besides loopback, comma-separated. Set once, when the operator
-  // confirms it on first boot (server/transport/advertise.ts). Its presence is what makes the listener bind
+  // confirms it on first boot (`confirmAdvertiseHost`). Its presence is what makes the listener bind
   // beyond 127.0.0.1, so it records an exposure decision rather than a cached lookup. The empty
   // string is a real answer meaning "loopback only, stop asking".
   advertiseHost: z.string().optional(),

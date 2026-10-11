@@ -13,8 +13,8 @@ import { pluginRoute } from './manifestFields.ts'
 // isn't here: it needs a headless frame lifecycle the shell doesn't have.
 
 export const chromeAction = z.discriminatedUnion('verb', [
-  // A pane the same manifest declares under `frames`, checked by the node's manifest refinement. The clicked row's id rides along
-  // as a pane intent (client-core/host/registries/commands/clientEvents.ts).
+  // A pane the same manifest declares under `frames`, checked by the node's manifest refinement. The
+  // clicked row's id rides along as a pane intent (the `presentation:pane-intent` client event).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   // Go to the task the click names and stop there, for a row whose thing IS a task. Only a dashboard
   // row carries one, so elsewhere the host refuses it out loud.
@@ -118,7 +118,7 @@ export const sourceDescriptor = z
     label: z.string().min(1).max(80),
     glyph: z.string().min(1).max(64).default('puzzle'),
     // Required, like SourceContribution.order. Rail position is declared, never derived from plugin
-    // load order (registries/sources.ts).
+    // load order.
     order: z.number().int().min(0).max(100_000),
     // Optional gate on a connected integration, same as a first-party source.
     providerId: z.string().min(1).max(64).optional(),
@@ -139,30 +139,30 @@ export const sourceDescriptor = z
     // Does this rail read the routed project? Opt in, so an older manifest and a plugin that never
     // thought about projects both land on `false`, which is true of most of them. Declaring it turns on
     // the shell's project picker for this source and adds `?project=` to the items route
-    // (client-core/host/chrome/ChromeSourcePanel.tsx).
+    // (client-core's `ChromeSourcePanel`).
     projectScoped: z.boolean().optional(),
     // Whether the desktop rail draws this source's icon before the user has chosen. Absent means `true`,
     // so every older manifest keeps its icon. A default, not a gate: the source still registers and
-    // opens from the palette, and the user's switch in Settings wins over it
-    // (client-core/features/tabs/railVisibility.ts).
+    // opens from the palette, and the user's switch in Settings wins over it (client-core's
+    // `shownInRail`).
     showInRailByDefault: z.boolean().optional(),
     // Draw this source only while the active workspace has a project that is a git repository. For a
     // source about git itself, whose rail would sit empty in a workspace of plain folders. Absent means
-    // the source draws whatever the workspace holds (client-core/features/tabs/railSources.ts).
+    // the source draws whatever the workspace holds (client-core's `availableSources`).
     requiresGitProject: z.boolean().optional(),
     // The owner's consent for other plugins to put status marks on this source's rail icon through
-    // `core:source` (@acorn/protocol/extensionPoints.ts). Absent means no marks.
+    // `core:source` (`CORE_SOURCE_POINT`). Absent means no marks.
     statusAnnotations: z.boolean().optional(),
-    // The pane a task this source tracks opens on the first time it is activated
-    // (client-core/host/registries/sources/sources.ts). Has to be one of this plugin's own declared task
-    // panes, re-checked on the device the way a content link's `openPane` is.
+    // The pane a task this source tracks opens on the first time it is activated (client-core's
+    // `defaultPaneForTask`). Has to be one of this plugin's own declared task panes, re-checked on the
+    // device the way a content link's `openPane` is.
     defaultPane: z.string().min(1).max(64).optional(),
     onSelect: chromeAction.optional(),
     // Shown when the route answered with no items, not when it failed. An unreachable node has its own
     // banner, and "nothing is assigned to you" after a timeout is a lie told on the plugin's behalf.
     emptyState: emptyStateDescriptor.optional(),
     // A dashboard region beside this source's rail list, composed by the user under the constraints above.
-    // Mutually exclusive with a `navigate` onSelect, checked in node-core/server/plugins/manifest.ts: the
+    // Mutually exclusive with a `navigate` onSelect, checked by node-core's `pluginManifestSchema`: the
     // detail half of a master/detail browse occupies the same rectangle.
     panels: panelRegion.optional(),
     refresh,
@@ -195,10 +195,10 @@ export const slotDescriptor = z.object({
   refresh,
 })
 
-// A row on a host-drawn context menu (@acorn/protocol/contextMenus.ts holds the location vocabulary and
-// the facts a `when` may name). Takes the narrow `contextFreeAction` union: the thing under the cursor
-// is a core resource, and the two missing verbs both need something only a rail source has.
-// See docs/plugins/menus-and-markers.md § Context menus.
+// A row on a host-drawn context menu (`CONTEXT_MENU_LOCATIONS` holds the location vocabulary, and
+// `unknownWhenFacts` checks the facts a `when` may name). Takes the narrow `contextFreeAction` union: the
+// thing under the cursor is a core resource, and the two missing verbs both need something only a rail source
+// has. See docs/plugins/menus-and-markers.md § Context menus.
 export const contextMenuDescriptor = z
   .object({
     id: z.string().min(1).max(64),

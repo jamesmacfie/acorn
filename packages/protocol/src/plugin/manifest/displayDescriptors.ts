@@ -73,7 +73,8 @@ export const contentLinkDescriptor = z
   .refine((value) => !value.match || !!value.item, { message: 'URL targets need an item capture', path: ['item'] })
 
 // An entry in the agent composer's "add Acorn context" list, served by two routes on the plugin's own
-// node half (@acorn/protocol/agentContext.ts holds the response schemas).
+// node half (`pluginAgentContextOptionsSchema` and `pluginAgentContextSnapshotsSchema` hold the
+// response schemas).
 //
 // `revision?()` gets no manifest form: it's a synchronous number the composer reads while assembling
 // its cache key, and a descriptor answers across a fetch. The invalidation ping the rest of the chrome
@@ -91,7 +92,7 @@ export const agentContextDescriptor = z.object({
 
 // One batch-enrichment route, so a surface holding identifiers of this plugin's items can display them
 // without importing this plugin. The host POSTs `{ identifiers }` and parses the answer against
-// @acorn/protocol/refResolvers.ts. There's no single-identifier form: ask for an array of one.
+// `pluginRefResolutionsSchema`. There's no single-identifier form: ask for an array of one.
 // See docs/plugins/descriptors.md § Descriptors.
 export const refResolverDescriptor = z.object({
   id: z.string().min(1).max(64),

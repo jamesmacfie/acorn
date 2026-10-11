@@ -113,8 +113,8 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 
 // --- Owner-initiated fleet mutations ---
 //
-// Membership is the helper's to change, so the renderer asks. Each of these is Zod-parsed in
-// `helperServer.ts` exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
+// Membership is the helper's to change, so the renderer asks. The desktop helper server Zod-parses
+// each of these exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
 // compromised renderer asked for…" reasoning about the files that hold device tokens.
 //
 // There are two routes into the fleet, and this is the whole of what each requires.
@@ -122,7 +122,7 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 // Probe-then-pair, below, is the human one: the owner reads a fingerprint off the node itself and
 // confirms it, and no shape here lets a caller skip that by supplying its own token.
 //
-// Adoption, `nodeAdoptRequestSchema`, is the unattended one, added for provisioned nodes
+// Adoption, `nodeAdoptRequestSchema`, is the unattended one, for provisioned nodes
 // (docs/plugins/node-providers.md § Node providers). It is narrower than it looks: the renderer names a provider and
 // a node id, and the host asks the node that listed it for the endpoint, the fingerprint and the
 // credential, then probes that endpoint and refuses a certificate whose fingerprint is not the one

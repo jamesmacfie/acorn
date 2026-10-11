@@ -45,7 +45,7 @@ describe('isPluginOpenableUrl', () => {
 
   it('agrees with the parse every downstream consumer will do', () => {
     // Surrounding whitespace is stripped by the WHATWG parser, so this is `https://example.com` to this
-    // predicate AND to `new URL` in main's external-URL guard AND to `window.open`. Pinned rather than
+    // predicate AND to the shell's external-URL guard AND to `window.open`. Pinned rather than
     // trimmed here: a normalisation of its own would be a second interpretation of the same string,
     // which is exactly the class of disagreement this shared module exists to prevent.
     expect(isPluginOpenableUrl('  https://example.com  ')).toBe(true)

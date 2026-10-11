@@ -11,14 +11,14 @@ export type ToolPermissions = z.infer<typeof toolPermissionsSchema>
 // installation is in for a tool that ships in a later release.
 //
 // `execute` is denied. It covers the tools that run a command in the worktree, and a `true` fallback
-// meant that adding one granted it to every existing installation, silently, on upgrade — the owner
-// had approved a list that no longer described what the agent could do. Denied by default, a new
-// execute tool is inert until someone turns the tier on in Settings → Tools and permissions.
+// would grant a newly added one to every existing installation, silently, on upgrade. Denied by
+// default, a new execute tool is inert until someone turns the tier on in Settings → Tools and
+// permissions.
 //
-// `read` and `write` stay allowed, and are written out rather than left implicit so the next tier
-// added has to say which it is. Read has no side effects. Write reaches notes and memory proposals,
-// both of which are acorn's own records rather than the machine, and memory proposals stay behind the
-// human review gate whatever this says.
+// `read` and `write` are allowed, and written out rather than left implicit so the next tier added has
+// to say which it is. Read has no side effects. Write reaches notes and memory proposals, both of which
+// are acorn's own records rather than the machine, and memory proposals stay behind the human review
+// gate whatever this says.
 export const TOOL_TIER_DEFAULTS: Record<z.infer<typeof toolRiskSchema>, boolean> = {
   read: true,
   write: true,

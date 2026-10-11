@@ -18,7 +18,8 @@ import { pluginRoute } from './manifestFields.ts'
 // A declares the point it hosts, B declares the contribution, and the host fetches B's items from B's
 // own node route and draws them inside the strip A's layout reserved. What crosses is a descriptor plus
 // a verb from the closed set: never a component, never a callback, never code.
-// See docs/plugins/cooperative-extension-points.md § Cooperative extension points and @acorn/protocol/extensionPoints.ts.
+// See docs/plugins/cooperative-extension-points.md § Cooperative extension points and the header of
+// chrome/extensionPoints.ts.
 
 // What a hook's payload is declared to hold: field name to type, in the tree's prop vocabulary. Bounded
 // because a payload is a decision's subject, not a document.
@@ -40,15 +41,15 @@ export const extensionPointDescriptor = z.object({
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'extension point id must be lower-case alphanumeric with dashes'),
   // What the owner is opening, in the owner's words. Shown at trust time to both sides.
   label: z.string().min(1).max(80),
-  // Which of the five things a contributor may bring (@acorn/protocol/extensionPoints.ts). Defaults to
-  // `rows`, so every manifest written before this field parses to the kind it meant.
+  // Which of the five things a contributor may bring (`EXTENSION_POINT_KINDS`). Defaults to `rows`,
+  // which is what a manifest without the field means.
   kind: z.enum(EXTENSION_POINT_KINDS).default('rows'),
   // `rows` and `rectangle`: where on the owner's surface, and which of the owner's surfaces. Required
   // for those two and refused for the rest by the node's manifest check: a hook has nothing to draw and
   // an annotation draws at a site the owner registered in code, so neither has a location to name.
   location: z.enum(EXTENSION_POINT_LOCATIONS).optional(),
   surface: z.string().min(1).max(64).optional(),
-  // `pane.aside` only, checked in node-core/server/plugins/manifest.ts. The aside's contributor is the
+  // `pane.aside` only, checked by node-core's `pluginManifestSchema`. The aside's contributor is the
   // user rather than another plugin, so it needs composition constraints rather than a route to read.
   // Absent means the defaults: this plugin's own sources, every view, four panels.
   panels: panelRegion.optional(),
@@ -57,7 +58,7 @@ export const extensionPointDescriptor = z.object({
   // contributor's mark happens to carry.
   key: z.record(z.string().min(1).max(64), z.enum(['string', 'number'])).optional(),
   // `remote` and `rectangle`: who fills the box when more than one contributor could
-  // (@acorn/protocol/extensionPoints.ts § ARBITRATION_MODES).
+  // (`ARBITRATION_MODES`).
   mode: z.enum(ARBITRATION_MODES).optional(),
   // `replace` only: what the owner passes as the key when it opens the box, named so the developer
   // view and the settings picker can say what the arbitration is over ('mime', 'path', 'tool').
@@ -75,7 +76,7 @@ export const extensionPointDescriptor = z.object({
   //
   // Names, not handlers. The owner binds a handler of the same name per `Slot` it draws, and the host
   // refuses a request that is not in both lists. An empty declaration is the default and means a
-  // contributor may draw and nothing else, which is what every point shipped before this field meant.
+  // contributor may draw and nothing else.
   actions: z
     .array(
       z
@@ -102,8 +103,7 @@ export const extensionPointDescriptor = z.object({
   // ── The hook fields (docs/plugins/hooks.md § Hooks) ──
   // Required for `kind: 'hook'` and refused elsewhere.
   payload: hookPayloadShape.optional(),
-  // The subset of observe | transform | veto this owner permits. A handler asking for anything else
-  // gets nothing.
+  // The subset of `HOOK_MODES` this owner permits. A handler asking for anything else gets nothing.
   allows: z.array(z.enum(HOOK_MODES)).min(1).max(HOOK_MODES.length).optional(),
   // How long one handler may take. Beyond it a veto is treated as `onTimeout` says and everything else
   // is skipped, because a plugin that stalls must not brick a push.
@@ -129,7 +129,7 @@ export const extensionDescriptor = z
     order: z.number().int().min(0).max(100_000).default(500),
     // Exactly one carrier, checked below. Which one is right depends on the owner's `kind`, which this
     // manifest cannot see, so the shape rule here is "name one way in" and the match against the point's
-    // kind happens where both are visible (client-core/host/registries/extensionPoints/extensionPoints.ts).
+    // kind happens where both are visible (client-core's `carrierFits`).
     //
     //   items   `rows` and `annotation`: a route in this plugin's namespace (confined by the node).
     //   remote  a key of the object this plugin's bundle passed to `mountTree`.

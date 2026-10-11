@@ -1,6 +1,6 @@
-// Shared host grammar and URL policy for host-owned plugin webviews. The manifest parser, renderer
-// broker and Electron redirect guard all call this independently; changing the grant in one layer
-// therefore cannot silently widen another.
+// Shared host grammar and URL policy for host-owned plugin webviews. The manifest parser and the
+// renderer broker both call this, so changing the grant in one layer cannot silently widen the other.
+// The shell's navigation guard is a Rust twin (`is_allowed_webview_url`) and must change with it.
 export const WEBVIEW_HOST_MAX_LENGTH = 253
 export const WEBVIEW_HOST_MAX_COUNT = 32
 

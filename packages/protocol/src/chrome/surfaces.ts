@@ -1,5 +1,5 @@
+// Data and host verbs supplied to replacement chrome. No renderer or DOM types cross this boundary.
 import type { WorkspaceAppearance } from '../appearance/workspaceAppearance.ts'
-/** Data and host verbs supplied to replacement chrome. No renderer or DOM types cross this boundary. */
 import type { WorkspacesMode } from '../projects/workspacesMode.ts'
 export type SlotRef = string & { readonly __slotRef: unique symbol }
 

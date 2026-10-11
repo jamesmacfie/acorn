@@ -23,8 +23,7 @@ export type PluginRailItem = {
   id: string
   title: string
   /** One pre-joined line of secondary text. For several facts use `fields`, which the host lays out as
-   *  columns. linear and rollbar both built a facts array and flattened it with ` · `, and that's what
-   *  stopped their lists reading like github's aligned one. */
+   *  columns, so the list reads aligned. */
   subtitle?: string
   /** Ordered secondary facts, one per column. The host reserves the same track width for each, so
    *  the Nth fact lines up down the whole list. Wins over `subtitle` when both are present. */
@@ -40,8 +39,9 @@ export type PluginRailItem = {
    *
    *  Its own field rather than the first of `fields`, because the two answer different questions.
    *  `fields` is what lines up in columns down an expanded list, and the fact a source happens to put
-   *  first is not always the one that identifies a row: rollbar's is the occurrence count. A source that sends neither this nor `icon` still draws a reachable row, marked with a dot
-   *  and named by its tooltip. */
+   *  first is not always the one that identifies a row: rollbar's is the occurrence count. A source
+   *  that sends neither this nor `icon` still draws a reachable row, marked with a dot and named by
+   *  its tooltip. */
   short?: string
   task?: PluginRailTask
 }
@@ -58,8 +58,7 @@ export const MAX_RAIL_SEARCH_ITEMS = 100
 // workspaces can share a team prefix, so the connection travels with it.
 //
 // Percent-encoded around a single `:` because either half may contain the delimiter. Here rather than
-// in each plugin because round-tripping a rail id is the host's contract; linear and rollbar had each
-// written the same twenty lines.
+// in each plugin because round-tripping a rail id is the host's contract.
 export const railItemId = (connectionId: string, identifier: string): string =>
   `${encodeURIComponent(connectionId)}:${encodeURIComponent(identifier)}`
 

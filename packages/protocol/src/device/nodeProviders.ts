@@ -2,9 +2,8 @@ import { z } from 'zod'
 import type { ToolRisk } from '../transport/api'
 
 // The node-provider wire shapes: what a plugin's provider answers with, and what the client reads
-// back off `/v1/core/nodes`. The contribution type itself is node-side
-// (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
-// stays a pure sink.
+// back off `/v1/core/nodes`. The contribution type itself is node-side (`NodeProviderContribution`),
+// because a provider is code and this module stays a pure sink.
 //
 // See docs/plugins/node-providers.md § Node providers for the seam and docs/architecture/control-plane.md § The three
 // parties for why a provider is the second door into the fleet.
@@ -40,8 +39,8 @@ export type ProvidedNode = z.infer<typeof providedNodeSchema>
 export const NODE_LIFECYCLE_VERBS = ['create', 'destroy', 'start', 'stop'] as const
 export type NodeLifecycleVerb = (typeof NODE_LIFECYCLE_VERBS)[number]
 
-/** How much confirmation each verb is owed, in the vocabulary `nodeActions` already uses (api.ts's
- *  `ToolRisk`). Core's decision, not the provider's: a provider that could call its own destroy
+/** How much confirmation each verb is owed, in the `ToolRisk` vocabulary `nodeActions` already uses.
+ *  Core's decision, not the provider's: a provider that could call its own destroy
  *  `read` would be choosing how loudly acorn warns about it. Destroying a node is the most
  *  consequential button in the product, so it sits at the top tier with nothing above it. */
 export const NODE_LIFECYCLE_RISK: Record<NodeLifecycleVerb, ToolRisk> = {

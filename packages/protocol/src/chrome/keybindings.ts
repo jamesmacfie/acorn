@@ -34,8 +34,8 @@ export const isPluginShortcutChord = (chord: string): boolean => isNormalizedCho
 
 // Clipboard, undo and select-all are implemented by the browser (on macOS, by the Edit menu's roles)
 // against whatever is selected or focused. They carry a command modifier, so anything that cancels
-// "modified chords" on principle cancels these too. That is why copying out of a sandboxed frame
-// silently did nothing. Shift is ignored so redo (meta+shift+z) is covered with undo.
+// "modified chords" on principle cancels these too, and copying out of a sandboxed frame then silently
+// does nothing. Shift is ignored so redo (meta+shift+z) is covered with undo.
 const EDITING_CHORD_KEYS = new Set(['a', 'c', 'v', 'x', 'z', 'y'])
 export const isBrowserEditingChord = (chord: string): boolean => {
   const parsed = parseChord(chord)
@@ -86,8 +86,7 @@ export function eventChord(event: KeyboardEventShape): string | null {
 }
 
 // Structural rather than instanceof-based: this runs in the shell, a sandboxed frame, and Node
-// tests. It intentionally recognizes the same EditContext surface a code editor uses as the old client-only
-// predicate did.
+// tests. `editContext` covers a code editor that takes input through the EditContext API.
 export function isTypingTarget(target: unknown): boolean {
   if (!target || typeof target !== 'object') return false
   const element = target as {

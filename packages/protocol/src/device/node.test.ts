@@ -10,8 +10,8 @@ import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, nodeInfoSchema, pairRequestS
 const FINGERPRINT = 'a'.repeat(64)
 
 describe('the handshake tolerates a newer node', () => {
-  // The case that broke: all three of these were strictObject, so the first field a future node added to
-  // any of them made every older client report "did not answer like an acorn node".
+  // If any of these were strictObject, the first field a future node added to it would make every
+  // older client report "did not answer like an acorn node".
   it('parses a node info response carrying fields it has never heard of', () => {
     const parsed = nodeInfoSchema.safeParse({
       baseline: 'acorn-1',

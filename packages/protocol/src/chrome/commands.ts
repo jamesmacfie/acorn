@@ -3,18 +3,13 @@ import { z } from 'zod'
 // The host-neutral half of the command contract: the vocabulary both clients spell the same way, and
 // the bounds a loaded plugin's route answer is held to.
 //
-// What is here and what is not. This module holds words and wire facts — a kind, a scope, the numbers
-// a search is allowed to ask for, and the shape of a result row. It holds no execution context, no
-// outcome and no registry, because those carry host functions and Solid state and belong to the client
-// (packages/client-core/src/host/registries/commands/commands.ts). Protocol is a pure sink
-// (docs/architecture/packages.md § Package boundaries), so nothing here may reach for a client, a
-// router or a plugin implementation type.
-//
-// Nothing in `plugin/contract.ts` reads these yet. A manifest command is still an action with a
-// context-free verb, and it stays that way until a palette can render an interactive one
-// (docs/command-palette-and-shortcuts.md).
+// This module holds words and wire facts: a kind, a scope, the numbers a search is allowed to ask for,
+// and the shape of a result row. It holds no execution context, no outcome and no registry, because
+// those carry host functions and Solid state and belong to the client's command registry
+// (`CommandExecutionContext` in client-core). Protocol is a pure sink (docs/architecture/packages.md
+// § Package boundaries), so nothing here may reach for a client, a router or a plugin implementation type.
 
-/** What an entry in the command graph is. `action` is the only kind a manifest may declare today. */
+/** What an entry in the command graph is. */
 export const COMMAND_KINDS = ['action', 'group', 'search', 'input', 'setting'] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -103,8 +98,7 @@ export type CommandSettingOption = z.infer<typeof commandSettingOptionSchema>
 // ── What a plugin route may answer ────────────────────────────────────────────────────────────────
 
 // Loose on the envelope, strict on the row. A newer node answering with a sibling key alongside
-// `items` must not cost the reader every result, which is the same tolerance every other descriptor
-// response keeps (@acorn/protocol/api.ts § the roster).
+// `items` must not cost the reader every result, the same tolerance every other descriptor response keeps.
 const commandSearchEnvelope = z.looseObject({ items: z.array(z.unknown()) })
 
 /**
@@ -126,8 +120,8 @@ export function acceptCommandSearchItems(body: unknown): CommandSearchItem[] {
 }
 
 /** What a submit route answers: it worked, optionally with a row for the success action and a line to
- *  show. A failure uses the ordinary error envelope (@acorn/protocol/errors.ts) rather than `ok: false`, so there is
- *  one way for a route to fail. */
+ *  show. A failure uses the ordinary error envelope (`errorEnvelopeSchema`) rather than `ok: false`, so
+ *  there is one way for a route to fail. */
 export const commandInputResultSchema = z.object({
   ok: z.literal(true),
   item: commandSearchItemSchema.optional(),

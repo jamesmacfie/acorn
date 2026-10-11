@@ -1,17 +1,17 @@
 // What one telemetry record looks like, and what a batch of them looks like on the wire.
 //
-// Here rather than in node-core because from phase 1 the renderer, the terminal client and the
-// desktop helper all build batches and post them to the node, and protocol is the one package every
-// runtime imports (docs/telemetry/model.md § The five kinds).
+// Here rather than in node-core because the renderer, the terminal client and the desktop helper all
+// build batches and post them to the node, and protocol is the one package every runtime imports
+// (docs/telemetry/model.md § The five kinds).
 //
-// The field names are OpenTelemetry's and none of its code is here. That is the whole reason a
-// second exporter is cheap: Better Stack, Coralogix and Datadog all take OTLP, so a sink that speaks
-// one of them maps these names across rather than inventing a translation.
+// The field names are OpenTelemetry's and none of its code is here. Better Stack, Coralogix and Datadog
+// all take OTLP, so a sink that speaks one of them maps these names across rather than inventing a
+// translation.
 //
-// Two rules run through every shape below, and both come from the audit trail
-// (node-core server/audit.ts § AuditEntry.details): an attribute is a scalar, and a record never
-// quotes the work it describes. A record that carried a prompt, a diff or a query would be a second
-// copy of the thing it is supposed to be measuring.
+// Two rules run through every shape below, and both come from the audit trail (node-core's
+// `AuditEntry.details`): an attribute is a scalar, and a record never quotes the work it describes. A record
+// that carried a prompt, a diff or a query would be a second copy of the thing it is supposed to be
+// measuring.
 import { z } from 'zod'
 
 /** The one node preference that turns collection on. Off unless the row says `'1'`. */

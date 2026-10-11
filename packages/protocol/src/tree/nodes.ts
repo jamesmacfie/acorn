@@ -5,9 +5,10 @@
 // declared nodes at install; the client validates the stream at runtime; neither may reach for the
 // other's copy. See docs/plugins/tree-contract.md § The tree contract.
 //
-// The lists are duplicated from `client-core/src/kit/tokens/{support,tokens}.ts`, which own them, and a
-// test over there fails the moment the two disagree. Protocol is a pure sink (tools/arch/boundaries.test.ts),
-// so an import is not available and a duplicate with a lock is the honest alternative.
+// The lists are duplicated from the kit's `NODE_SUPPORT` and `ROLE_ENUMS` in client-core, which own
+// them, and a test over there fails the moment the two disagree. Protocol is a pure sink (an
+// architecture boundary rule), so an import is not available and a duplicate with a lock is the
+// honest alternative.
 
 /**
  * Version of the tree protocol, sent in the handshake. A mismatch is a placeholder, not a crash.

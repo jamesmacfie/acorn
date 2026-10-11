@@ -82,9 +82,8 @@ const customAgentDescriptor = z.object({
   maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
 
-// `api` and `events` are enforced by the UI bridge (client-core/host/plugins/frames). `contributions` stays
-// loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
-// to parse.
+// `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
+// written for a newer acorn should contribute less on an older one rather than fail to parse.
 //
 // The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
 // and four is "a handful"; a package that wants more is describing an app rather than an integration.
@@ -104,12 +103,11 @@ const contributionsShape = z.looseObject({
   styles: z.array(styleDescriptor).max(8).default([]),
   // A plugin can declare more than eight rail surfaces; keep the total bounded.
   contextMenus: z.array(contextMenuDescriptor).max(32).default([]),
-  // Raised from four and eight when the one key grew from rows to five kinds: a plugin that opens a
-  // pane, a slot in it, a hook before it acts and an annotation on its rows is describing one
-  // integration, not four, and the old caps were sized for rows alone.
+  // Higher than the other caps: a plugin that opens a pane, a slot in it, a hook before it acts and an
+  // annotation on its rows is describing one integration, not four.
   extensionPoints: z.array(extensionPointDescriptor).max(16).default([]),
   extensions: z.array(extensionDescriptor).max(16).default([]),
-  // Hover and diagnostics for Editor's files in one language (./manifest/surfaces.ts).
+  // Hover and diagnostics for Editor's files in one language (`documentServiceDescriptor`).
   documentServices: z.array(documentServiceDescriptor).max(8).default([]),
   dataSources: z.array(dataSourceRegistrationSchema).max(32).optional(),
   dataSourceDiscoveries: z.array(dataSourceDiscoverySchema).max(8).optional(),
@@ -135,8 +133,8 @@ const contributionsShape = z.looseObject({
 // Every contribution kind a manifest may declare, as a runtime list.
 //
 // Derived from the schema rather than typed out beside it, so the two cannot drift. Two consumers: the
-// forward-compatibility report, which needs to know which of a loose object's keys this build actually
-// understands (node-core/server/plugins/manifest.ts), and the contribution-kind table in
+// forward-compatibility report in node-core's `parsePluginManifest`, which needs to know which of a
+// loose object's keys this build understands, and the contribution-kind table in
 // docs/contribution-kinds.md, which a test holds against this list.
 export const CONTRIBUTION_KINDS = Object.keys(contributionsShape.shape).sort() as readonly string[]
 
@@ -172,8 +170,8 @@ export const pluginEmitSchema = z.object({
 export type PluginEmit = z.infer<typeof pluginEmitSchema>
 
 const manifestShape = z.object({
-  // The JSON Schema an editor validates this file against (./pluginSchema.test.ts generates it, and
-  // create-acorn-plugin writes the key). Declared so it is a known key rather than one the
+  // The JSON Schema an editor validates this file against (plugin-types' pluginSchema test generates it,
+  // and create-acorn-plugin writes the key). Declared so it is a known key rather than one the
   // forward-compatibility report has to name on every scaffolded plugin. Nothing reads it at load time.
   $schema: z.string().max(200).optional(),
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
@@ -241,16 +239,14 @@ const manifestShape = z.object({
   permissions: manifestPermissions.prefault({}),
   contributions,
 })
-// `pluginManifestSchema` in node-core/server/plugins/manifest.ts wraps this with the cross-field
-// refinements (route confinement, surface reachability, id uniqueness), which need `id` and the frame
-// list and so can't live on the fields.
+// `pluginManifestSchema` in node-core wraps this with the cross-field refinements (route confinement, surface
+// reachability, id uniqueness), which need `id` and the frame list and so can't live on the fields.
 export const pluginManifestShape = manifestShape
 export type PluginManifestShape = z.infer<typeof manifestShape>
 
 // The permissions block on its own, because the desktop parses it a second time. It arrives there
-// over IPC and is written into the trust store, where it used to be accepted by `z.custom<...>()`, a
-// cast wearing a Zod costume that accepts anything. That's the one place where a wrong shape doesn't
-// crash: it shows the owner a security disclosure and records their consent against it.
+// over IPC and goes into the trust store, where a wrong shape would not crash: it would show the owner
+// a security disclosure and record their consent against it.
 export const pluginPermissionsSchema = manifestPermissions
 
 // ── Surface classification ────────────────────────────────────────────────────────────────────────
@@ -292,7 +288,7 @@ export const hasDocumentRegion = (frame: { regions?: Record<string, unknown> }):
 
 /** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,
  *  no click site of its own and no verb that opens it. The user's arbitration is the only thing that
- *  ever puts one on screen (@acorn/protocol/extensionPoints.ts). */
+ *  ever puts one on screen (`CORE_EXCLUSIVE_SLOTS`). */
 export const isCoreSlotSurface = (frame: { target: string }): boolean => frame.target === 'coreSlot'
 
 // ── The wire projection ───────────────────────────────────────────────────────────────────────────
@@ -338,7 +334,7 @@ export type PluginFrameSurface = Omit<
 > & {
   scope?: 'task' | 'project'
   // Wider than the parse: a newer node can know a group or scope this build does not, and the client
-  // places the page by its own lists (client-core/host/frames/register.ts).
+  // places the page by its own lists (`isPluginSettingsCategory`, `isSettingsScope`).
   category?: string
   settingsScope?: string
   claimsKeys?: string[]
