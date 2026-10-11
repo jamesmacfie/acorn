@@ -253,8 +253,8 @@ describe('the shell', () => {
       expect(frame).toContain('[Notes +1]')
       expect(frame).toContain('Saved a minute ago')
       expect(frame).not.toContain('Quiet +')
-      // One batch: the shipped Changes pane consents too, and the quiet pane is never asked about.
-      expect(asked).toEqual([[{ paneId: 'changes', taskId: TASK.id }, { paneId: 'status-pane', taskId: TASK.id }]])
+      // One batch: the shipped Git pane consents too, and the quiet pane is never asked about.
+      expect(asked).toEqual([[{ paneId: 'git', taskId: TASK.id }, { paneId: 'status-pane', taskId: TASK.id }]])
     } finally {
       screen.done()
       for (const registration of registrations) registration.dispose()

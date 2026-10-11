@@ -39,7 +39,7 @@ The archive confirmation is the shell's will-phase dialog (`WillConfirmationHost
 
 1. The confirm button becomes a split button: **Archive task** with a chevron, drawn the way the
    commit footer draws **Commit** and its options (`Toolbar.Group joined` in
-   `plugins/changes/src/client/ChangesPane.tsx`).
+   `plugins/git/src/client/changes/ChangesPane.tsx`).
 2. The chevron menu offers **Archive task** and **Delete task**.
 3. Choosing **Delete task** relabels the button **Delete task**, gives it the danger tone, and adds a
    warning above the buttons: "Deleting removes this task, its subtasks, and their agent

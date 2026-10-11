@@ -48,7 +48,7 @@ const SURFACES: Surface[] = [
   { name: 'browse', until: '#42' },
   { name: 'agents', pane: 'agents', until: 'MANAGED SESSIONS' },
   { name: 'pr', pane: 'pr', until: '#42' },
-  { name: 'changes', pane: 'changes', until: 'Tracked' },
+  { name: 'git', pane: 'git', until: 'Tracked' },
   { name: 'notes', pane: 'notes', until: 'Repro steps' },
   { name: 'context', pane: 'context', until: 'Working tree' },
   { name: 'editor', pane: 'editor', until: 'Edit in your terminal editor' },

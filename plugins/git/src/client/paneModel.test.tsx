@@ -10,6 +10,7 @@ const subscriptions = {
   reconnect: new Set<() => void>(),
 }
 const invalidateQueries = vi.fn()
+const consumePaneIntent = vi.fn((): unknown => undefined)
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { queryKey: readonly unknown[] }) => ({
     get data() { return options().queryKey[0] === 'git-history' ? { commits: [], refs: [], nextCursor: null } : { worktrees: rows() } },
@@ -23,7 +24,11 @@ vi.mock('@acorn/plugin-api/client', () => ({ onScopeEvicted: () => () => {},
   nodeReady: () => true,
   wsOnNodeEvent: (_channel: string, cb: () => void) => { subscriptions.worktree.add(cb); return () => subscriptions.worktree.delete(cb) },
   wsOnReconnect: (cb: () => void) => { subscriptions.reconnect.add(cb); return () => subscriptions.reconnect.delete(cb) },
-  clientEvents: { on: (_channel: string, cb: () => void) => { subscriptions.tasks.add(cb); return () => subscriptions.tasks.delete(cb) } },
+  clientEvents: { on: (channel: string, cb: () => void) => {
+    if (channel === 'presentation:pane-intent') return () => {}
+    subscriptions.tasks.add(cb); return () => subscriptions.tasks.delete(cb)
+  } },
+  consumePaneIntent,
 }))
 
 const { createGitPaneModel } = await import('./paneModel')
@@ -81,4 +86,14 @@ it('invalidates for worktree, local and remote task, and reconnect events for it
   expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['git-history', 'node-a', 'project', null, 'message', ''] })
   dispose()
   expect(Object.values(subscriptions).every((callbacks) => callbacks.size === 0)).toBe(true)
+})
+
+it('opens on Changes, and on the tab another pane asked for before it mounted', () => {
+  const first = createRoot((stop) => { dispose = stop; return createGitPaneModel({ id: 'fresh', projectId: 'project' } as never) })
+  expect(first.section()).toBe('changes')
+  dispose()
+  consumePaneIntent.mockReturnValueOnce({ kind: 'plugin:select', item: 'stashes' })
+  const asked = createRoot((stop) => { dispose = stop; return createGitPaneModel({ id: 'asked', projectId: 'project' } as never) })
+  expect(consumePaneIntent).toHaveBeenLastCalledWith('asked', 'git')
+  expect(asked.section()).toBe('stashes')
 })

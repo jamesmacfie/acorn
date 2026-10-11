@@ -61,13 +61,13 @@ to `max: 4`.
 | `agents:composer-actions` | remote, stack 4 | none |
 | `agents:session-header` | remote, stack 2 | agent-cost (loaded) |
 | `agents:request-card` | remote, stack 2 | none |
-| `changes:push-actions` | remote, stack 2 | github (compiled) |
+| `git:push-actions` | remote, stack 2 | github (compiled) |
 | `github:summary-badges` | remote, stack 4 | none |
 | `docker:stats-beside` | remote, stack 2 | none |
 | `context:section` | remote, stack 2, key section id | none |
 | `editor:document` | remote, replace, key basename | none |
 | `core:storage`, `core:security`, `core:plugin-page` | remote, stack 4 | agents (compiled) |
-| `changes:diff-line`, `github:diff-line` | annotation, key `file`, `line`, `side` | none |
+| `git:diff-line`, `github:diff-line` | annotation, key `file`, `line`, `side` | none |
 | `docker:container` | annotation, key `container` | none |
 | `core:task` | annotation, key `task`, 256 accepted marks | none |
 

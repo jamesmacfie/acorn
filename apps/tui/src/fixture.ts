@@ -497,7 +497,7 @@ const json = (value: unknown) => ({
       if (path === '/v1/core/plugins') return json({
         restartRequired: false,
         requests: [],
-        plugins: ['agents', 'browser', 'changes', 'docker', 'editor', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
+        plugins: ['agents', 'browser', 'docker', 'editor', 'git', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
           .map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
       })
       if (path === '/v1/core/integrations') return json({
@@ -551,10 +551,10 @@ const json = (value: unknown) => ({
       if (path.startsWith('/v1/p/agents/sessions/search?')) return json(agentSessions())
       if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
       if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
-      if (path === `/v1/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
-      if (path === `/v1/p/changes/tasks/${TASK.id}/review-notes`) return json([])
-      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
-      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
+      if (path === `/v1/p/git/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
+      if (path === `/v1/p/git/tasks/${TASK.id}/review-notes`) return json([])
+      if (path === `/v1/p/git/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
+      if (path === `/v1/p/git/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
       if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
       if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
       if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })

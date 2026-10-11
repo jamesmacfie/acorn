@@ -9,6 +9,7 @@ import { worktreesKey } from './worktreeClient'
 import { RevisionView } from './RevisionView'
 import { watchWorktreeInventory } from './worktreeInvalidation'
 import { createStashSubmission } from './stashSubmission'
+import { GIT_PANE, openChangesTab } from './gitPane'
 import { ExplainView } from './ExplainView'
 import { createGitViewSignal } from './viewState'
 
@@ -124,7 +125,7 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
   }
   const openChanges = (targetId: string) => {
     const target = (tasks.data ?? []).find((item) => item.id === targetId)
-    if (target) { activateTaskSignals(target, { pane: 'changes' }); navigate(pathForTask(target)) }
+    if (target) { activateTaskSignals(target, { pane: GIT_PANE }); openChangesTab(target.id); navigate(pathForTask(target)) }
   }
   createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { close(); setFeedback(null); setError('') }, { defer: true }))
   return <Stack gap="section">

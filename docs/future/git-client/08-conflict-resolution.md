@@ -1,11 +1,56 @@
 # Phase 08: three-way conflict resolution
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 7, 2026. Status: implemented October 11, 2026. Shipped behavior is in
+[Git conflict resolution](../../git-client/conflicts.md).
 Depends on [phase 07](./07-operations.md).
 Read the [full implementation context](./README.md), especially
 [conflict handling](./README.md#operations-and-conflict-handling),
 [mutation contracts](./README.md#mutation-contracts), and
 [verification](./README.md#verification-strategy).
+
+## Acceptance evidence: October 11, 2026
+
+The desktop fixture was `/tmp/acorn-conflict-fixture/repo`: a merge that stops on a text conflict
+(`shared`), a modify/delete conflict (`gone`), and a binary conflict (`bin`). The terminal fixture
+was `/tmp/acorn-conflict-fixture/tui`, the same three files stopped in a rebase. Each session's task
+was a null-branch `tasks` row inserted into the session's `core.sqlite`.
+
+- `plugins/git/src/server/conflicts.test.ts` uses real repositories for merge, rebase, cherry-pick,
+  revert, and stash conflicts, add/add and modify/delete, an absent working file, a name with
+  glob characters, a symbolic link, path escape, binary, and oversized input. It changes the
+  working file and the index after a read and checks that the save refuses and the newer content
+  stays. It covers a staging failure after a save, the retry, a busy checkout, and a cancelled read.
+- `plugins/git/src/client/ConflictResolver.test.tsx` uses the real custody owner. It covers taking a
+  side, the save request and acknowledgement, typing in Editor between edits, an Editor draft made
+  against another version, the saved-but-unstaged retry, a confirmed deletion, and unsupported input.
+- Desktop, `pnpm dev:agent -- --session git-resolve --project <fixture>`: saving the untouched
+  result was refused with `unresolved_markers`. After **Use theirs**, the file was changed outside
+  Acorn and the save was refused as stale with the outside text intact. **Reload** then reported the
+  leftover draft as made against another version, and Editor showed the same draft with its own
+  **Changed on disk** warning. **Discard draft**, **Use theirs**, and **Save and stage** staged
+  `shared`. **Take deletion** removed and staged `gone`. `bin` showed the terminal recipe, was
+  finished with `git checkout --theirs` and `git add`, and **Continue** created the merge commit.
+- Terminal, `pnpm dev:tui:agent -- --session git-resolve-tui --project <fixture> --cols 120 --rows 60`:
+  the rebase labels read **Rebased so far onto** for ours and **Task commit being replayed** for
+  theirs. Keyboard presses took theirs and saved and staged `shared`, confirmed **Take deletion** on
+  `gone`, opened the `bin` guidance, and **Continue** finished the rebase.
+
+The terminal run found one defect, fixed before the evidence above. Down wraps inside a kit list and
+Tab leaves the region, so a stop placed after a list can't be reached by keyboard. The first layout
+put a side picker list and the banner's conflict list above the resolver's buttons. The resolver
+replaces the banner while it's open and draws every side as plain stops.
+
+Gates: `pnpm test --filter=@acorn/plugin-git` passes, 122 tests. The full `pnpm test` and
+`pnpm lint` reds all predate this phase: the 15 dead doc links, `CoreServices` lacking
+`checkoutAdmission` in lint, the Editor pane, terminal chrome, and Workflows tests, the plugin-disable
+golden, and worker tests that need the patched Node. `apps/node/test/integration/routeRegistry.snapshot.json`
+was regenerated. It gained the conflict routes, phase 07's operation routes, and a Workflows route
+that was already missing.
+
+Cache and lifetime: a conflict read is one query keyed by Node, task, and path, with no refetch timer
+and no retry. Its response holds at most four texts of 512 KiB each. The read is cancelled when the
+view unmounts. The resolver holds the file's custody only while mounted. A dirty draft stays in
+memory and device recovery after it closes, the same as an Editor draft.
 
 ## Deliverable
 

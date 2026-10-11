@@ -58,7 +58,7 @@ manifest's inputs. This is the one template with dependencies and a build
 ([derived sources](./derived-sources.md)).
 
 To extend another plugin's UI after your own pane works, add an `extensions` entry for one of its
-published points. For example, `agents:tool-card` accepts a tree, and `changes:diff-line` accepts
+published points. For example, `agents:tool-card` accepts a tree, and `git:diff-line` accepts
 route-backed annotations ([extensions](./extensions.md)). The scaffold's `README.md` names where the
 running host lists points, and [an extension example](./extension-example.md) fills nine places,
 seven of them points.

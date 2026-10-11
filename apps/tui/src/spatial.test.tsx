@@ -76,11 +76,11 @@ describe('spatial focus', () => {
     // Left jumped past both frames to the rail. A column is an integer counted left to right now and
     // the layout declares both of its own (./keys/regions.ts § moveColumn).
     //
-    // The changes pane rather than the pull request pane the report named. `github`'s PR surface is a
+    // The git pane, on its Changes tab, rather than the pull request pane the report named. `github`'s PR surface is a
     // `single` layout holding one kit node, because "the halves are one surface", as `PrPane.tsx`
     // says, so it has one region and no two frames for a key to cross between. The panes that really
-    // are `list-detail` are changes, notes and agents.
-    const screen = await renderFixture({ width: 120, height: 40, pane: 'changes' })
+    // are `list-detail` are git, notes and agents.
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'git' })
     try {
       await screen.until('Tracked')
       // Tab in, and Tab only. Walking with `↓` reaches the Menu, and landing in the Menu selects the

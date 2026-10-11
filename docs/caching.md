@@ -135,7 +135,7 @@ active Node's shell, so identical IDs on two Nodes can't cross.
 
 No diff segment, parsed row, token, or whole patch is in the query cache. A pull request's document sits
 under a `files` key that isn't persisted (`['files', owner, repo, number, 'diff']`). Each provider keeps
-up to 64 MB of parsed patches per plugin process on the Node, by digest. The Changes plugin also records
+up to 64 MB of parsed patches per plugin process on the Node, by digest. The git plugin's Changes tab also records
 which digest the last document gave each file, and refuses a segment request for any other.
 
 **The persisted cache has no version buster.** An entry written before a response gained a required

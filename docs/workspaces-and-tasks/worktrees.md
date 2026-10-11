@@ -102,12 +102,12 @@ The copy follows these rules:
 
 The rail and footer show a dirty marker and a changed-file count for each task. Both come from
 `git status --porcelain=v2 --branch` in each active worktree. Every client asks for that sweep, and
-the changes pane asks the same question for its list. Two clients over four worktrees would cost 16
+the Changes tab asks the same question for its list. Two clients over four worktrees would cost 16
 processes for each poll.
 
 `worktreeStatus.ts` runs one process per worktree per two seconds (`WORKTREE_STATUS_TTL_MS`).
 Concurrent callers join the run in flight, and a caller inside the window gets that run's output.
-The changes pane reads the same output, which is why the command carries `--branch`. The pane's two
+The Changes tab reads the same output, which is why the command carries `--branch`. The pane's two
 `git diff --numstat -z` counts and its `rev-parse --git-dir` go through the same window by argument
 list, in `worktreeGitText`.
 

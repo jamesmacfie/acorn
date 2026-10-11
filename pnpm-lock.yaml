@@ -201,9 +201,6 @@ importers:
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
-      '@acorn/plugin-changes':
-        specifier: workspace:*
-        version: link:../../plugins/changes
       '@acorn/plugin-context':
         specifier: workspace:*
         version: link:../../plugins/context
@@ -285,9 +282,6 @@ importers:
       '@acorn/plugin-browser':
         specifier: workspace:*
         version: link:../../plugins/browser
-      '@acorn/plugin-changes':
-        specifier: workspace:*
-        version: link:../../plugins/changes
       '@acorn/plugin-docker':
         specifier: workspace:*
         version: link:../../plugins/docker
@@ -394,9 +388,6 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@acorn/plugin-changes':
-        specifier: workspace:*
-        version: link:../../plugins/changes
       '@acorn/plugin-context':
         specifier: workspace:*
         version: link:../../plugins/context
@@ -1053,70 +1044,6 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.1))
 
-  plugins/changes:
-    dependencies:
-      '@acorn/diff-document':
-        specifier: workspace:*
-        version: link:../../packages/diff-document
-      '@acorn/plugin-agents':
-        specifier: workspace:*
-        version: link:../agents
-      '@acorn/plugin-api':
-        specifier: workspace:*
-        version: link:../../packages/plugin-api
-      '@acorn/plugin-editor':
-        specifier: workspace:*
-        version: link:../editor
-      '@acorn/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      '@tanstack/solid-query':
-        specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
-      gitdiff-parser:
-        specifier: ^0.3.1
-        version: 0.3.1
-      hono:
-        specifier: 4.13.5
-        version: 4.13.5
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
-      yaml:
-        specifier: ^2.9.1
-        version: 2.9.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
-    devDependencies:
-      '@acorn/client-core':
-        specifier: workspace:*
-        version: link:../../packages/client-core
-      '@acorn/node-core':
-        specifier: workspace:*
-        version: link:../../packages/node-core
-      '@types/node':
-        specifier: ^26.0.0
-        version: 26.0.0
-      drizzle-kit:
-        specifier: ^0.31.10
-        version: 0.31.10
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vite:
-        specifier: ^8.0.16
-        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.1)
-      vite-plugin-solid:
-        specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.1))
-      vitest:
-        specifier: ^4.1.11
-        version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.1))
-
   plugins/context:
     dependencies:
       '@acorn/plugin-api':
@@ -1330,34 +1257,58 @@ importers:
       '@acorn/diff-document':
         specifier: workspace:*
         version: link:../../packages/diff-document
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@acorn/plugin-changes':
+      '@acorn/plugin-editor':
         specifier: workspace:*
-        version: link:../changes
+        version: link:../editor
       '@acorn/plugin-workflows':
         specifier: workspace:*
         version: link:../workflows
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
         version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
       hono:
         specifier: 4.13.5
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
       zod:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

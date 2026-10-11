@@ -10,7 +10,7 @@ The remote roster includes fetch and push URLs and the last fetch success or fai
 
 Mutation responses include the Git command result and whether their post-state roster is fresh. If Git changes a ref or remote but the final inspection fails, the response retains the last observation from the original repository, marks it unavailable as post-state, and asks the client to refresh. The client does not cache that earlier observation as a fresh roster. Ref and remote commands invalidate mounted Git and Changes reads even when a fetch reports failure or is aborted, since some tracking refs may already have moved.
 
-Task pull and push remain Changes operations. Git uses Changes' public remote contract and selects a task explicitly. Changes retains its before-push hooks, fast-forward or rebase pull behavior, and force-with-lease checks. A force push carries the remote object ID observed by the person as an explicit lease; a later fetch cannot silently broaden that lease.
+Task pull and push are the Changes tab's operations. The Git source selects a task explicitly and calls the same `/v1/p/git/tasks/:id/local/pull` and `/push` routes, so it keeps the `git:before-push` hook, fast-forward or rebase pull behavior, and force-with-lease checks. A force push carries the remote object ID observed by the person as an explicit lease; a later fetch cannot silently broaden that lease.
 
 ## Pinned comparisons
 

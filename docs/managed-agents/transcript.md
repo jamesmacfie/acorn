@@ -92,10 +92,10 @@ Some presentation rules:
 ### File tool cards
 
 A file tool opens onto its recorded diffs. The transcript matches per-file changes to a tool by turn
-and change ID and passes them through `agents:tool-card` as `fileChanges`. The Changes plugin's card
+and change ID and passes them through `agents:tool-card` as `fileChanges`. The git plugin's card
 and the generic fallback draw them with `StackedDiff`, with an **Open in Changes** button. Excerpts
 leave line numbers blank, and oversized or missing patches say so. The standalone file-change row
-hides only once its tool can show it. The patch describes the edit when it ran; the changes pane reads
+hides only once its tool can show it. The patch describes the edit when it ran; the Changes tab reads
 the working tree ([file changes](./activity.md#file-changes)).
 
 ## Goal turns

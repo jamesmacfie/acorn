@@ -180,7 +180,7 @@ records the profile, seed, digest, counts, and IDs. `--reuse` keeps the fixture 
 generating it again.
 
 `flow NAME` runs that file from `apps/desktop/scripts/agent/flows/`. The `large-surfaces` flow opens
-the Changes pane cold, sweeps the diff, opens a comment composer, deletes a note, resizes the window,
+the Changes tab cold, sweeps the diff, opens a comment composer, deletes a note, resizes the window,
 collapses files, switches to split view, and jumps to a file. Then it opens the transcript, checks
 that it mounted no more than 400 turns, presses **Show earlier**, and checks again. After each stage it
 reads the health snapshot described in [telemetry](../telemetry.md) § Rendered-surface health. It waits

@@ -10,10 +10,10 @@ Regions of one pane mount independently, so anything two of them share has to ou
 Collapsing the Notes library mustn't take the open note with it, and switching from Overview to Files
 mustn't lose the pull request you'd chosen.
 
-The changes pane shows why. You type the commit message in the `list-footer`, and below 80 columns
+The Changes tab shows why. You type the commit message in the `list-footer`, and below 80 columns
 `list-detail` shows one side at a time. Typing half a message and then looking at the diff unmounts
 the field. So the draft lives on the pane's model, above every region
-(`plugins/changes/src/client/commitState.ts`). The two commit chords are registered there too,
+(`plugins/git/src/client/changes/commitState.ts`). The two commit chords are registered there too,
 because a shortcut that comes and goes with a column isn't a shortcut.
 
 The host holds the shared state. A compiled pane declares a `model` beside its regions. The host
@@ -51,7 +51,7 @@ root before a retry.
 The host calls `model(task, pane)`, and `pane.shown()` is true only while a mounted pane is drawing
 that task. It's false on another task, behind a rail source such as Home, and while the same task
 shows a different pane. An effect that polls, or marks something as seen, reads it first. The agent
-pane marks sessions read and acknowledges finished turns only while it's drawn. The changes pane
+pane marks sessions read and acknowledges finished turns only while it's drawn. The Changes tab
 skips its status poll while hidden and fetches once when it's drawn again.
 
 ## Closing and opening again

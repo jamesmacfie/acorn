@@ -2130,7 +2130,7 @@ describe('a toolbar', () => {
   // own, so the whole bar re-ran as a unit whenever anything in it changed — and re-running a
   // callback-form `<Show>` reads its accessor again after the condition went false, which Solid
   // refuses. The changes pane's bar has two of those and drew `Stale read from <Show>.` in place of
-  // the pane (plugins/changes/src/client/ChangesPane.tsx). Nothing may re-scope a bar's children.
+  // the pane (plugins/git/src/client/changes/ChangesPane.tsx). Nothing may re-scope a bar's children.
   it('does not re-run a narrowed Show when a sibling changes', async () => {
     const [label, setLabel] = createSignal('one')
     const [detail, setDetail] = createSignal<string | undefined>('here')

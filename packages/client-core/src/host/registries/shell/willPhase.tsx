@@ -186,7 +186,7 @@ export function WillConfirmationHost() {
               fallback={<Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>{selected(current).label}</Button>}
             >
               {/* Drawn the way the commit footer draws Commit and its options
-                  (plugins/changes/src/client/ChangesPane.tsx), with both halves solid. Keyed on the chosen
+                  (plugins/git/src/client/changes/ChangesPane.tsx), with both halves solid. Keyed on the chosen
                   action, so both are drawn again in its tone: Button reads its tone once, and Delete has
                   to turn them red. */}
               <Show when={selected(current)} keyed>

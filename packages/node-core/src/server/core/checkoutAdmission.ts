@@ -74,6 +74,15 @@ export function createCheckoutAdmission(
     }
     return matches
   }
+  const activityOn = async (checkoutKey: string) => {
+    if (!['turns', 'runs', 'setup'].every((owner) => readers.has(owner))) {
+      throw new BridgeError(503, 'checkout_activity_unavailable', 'Checkout activity is unavailable. Reconnect the work owners before writing.')
+    }
+    const taskIds = await owners(checkoutKey)
+    const activity = await Promise.all(['turns', 'runs', 'setup'].map((owner) => readers.get(owner)!(taskIds)))
+      .then((rows) => rows.flat(), () => { throw new BridgeError(503, 'checkout_activity_unavailable', 'Cannot verify owner activity for this checkout.') })
+    return { taskIds, activity }
+  }
   return {
     registerOwner(owner: string, reader: CheckoutActivityReader) {
       if (readers.has(owner)) throw new Error(`${owner} checkout activity is already registered.`)
@@ -87,6 +96,10 @@ export function createCheckoutAdmission(
         return action()
       })
     },
+    /** Activity on the task's checkout, for display before a write. Only `write` decides admission. */
+    async activity(taskId: string): Promise<CheckoutActivity[]> {
+      return (await activityOn(await identity(taskId))).activity
+    },
     async write<T>(taskId: string, action: (checkout: string) => Promise<T>): Promise<T> {
       const checkoutKey = await identity(taskId)
       const repositoryKey = await lockKey(taskId)
@@ -94,16 +107,11 @@ export function createCheckoutAdmission(
         if (await lockKey(taskId) !== repositoryKey || await identity(taskId) !== checkoutKey) {
           throw new BridgeError(409, 'checkout_moved', 'Target checkout or repository moved. Refresh and try again.')
         }
-        if (!['turns', 'runs', 'setup'].every((owner) => readers.has(owner))) {
-          throw new BridgeError(503, 'checkout_activity_unavailable', 'Checkout activity is unavailable. Reconnect the work owners before writing.')
-        }
-        const taskIds = await owners(checkoutKey)
+        const { taskIds, activity } = await activityOn(checkoutKey)
         if (!taskIds.includes(taskId) || !(await tasks.active()).some((task) => task.id === taskId)) {
           throw new BridgeError(409, 'task_inactive', 'Target task is no longer active.')
         }
         if (taskIds.some(isTaskArchiving)) throw new BridgeError(409, 'task_archiving', 'Task archive is in progress for this checkout.')
-        const activity = await Promise.all(['turns', 'runs', 'setup'].map((owner) => readers.get(owner)!(taskIds)))
-          .then((rows) => rows.flat(), () => { throw new BridgeError(503, 'checkout_activity_unavailable', 'Cannot verify owner activity for this checkout.') })
         if (activity.length) throw new BridgeError(409, 'checkout_busy', `Checkout is busy: ${activity.map((item) => `${item.taskId} ${item.description}`).join(', ')}.`)
         const task = await tasks.load(taskId)
         if (!task) throw new BridgeError(409, 'task_inactive', 'Target task is no longer active.')

@@ -110,7 +110,7 @@ it('aborts pending discovery after preference persistence even when readback fai
   failReadback = true
   const disabled = await preference(false)
   expect(disabled.status).toBe(503)
-  expect((await disabled.json()).error).toContain('Preference saved, but Git settings readback failed')
+  expect((await disabled.json()).error.message).toContain('Preference saved, but Git settings readback failed')
   expect(await service.prefs.read('owner', 'git.autoFetch')).toBe('false')
   expect(discoverySignal?.aborted).toBe(true)
   release()

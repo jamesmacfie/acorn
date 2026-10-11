@@ -55,7 +55,7 @@ All five kinds follow the same four rules:
 
 Core's own points and the first-party points core's consumers name, such as `agents:*` and `core:*`,
 are in `@acorn/protocol/extensionPoints.ts`, because both ends compile against protocol. A plugin's
-own points, such as `changes:diff-line` and `docker:container`, are in that plugin's own
+own points, such as `git:diff-line` and `docker:container`, are in that plugin's own
 `extensionPoints.ts`. A contributor in another plugin spells the string, because it can't import the
 owner's module. A typo shows up on the plugin's page as a contribution whose point nobody declares.
 

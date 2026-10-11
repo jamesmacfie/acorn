@@ -1,10 +1,10 @@
 import { isAbsolute, resolve } from 'node:path'
-import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, type CompiledCoreServices } from '@acorn/plugin-api/node'
 import type { RemoteChange, RemoteChangeResult, RemoteRoster } from '../shared/api'
 import { repositoryFor } from './history'
 import { canonicalPath } from './worktreeRoster'
 
-type Core = Pick<CoreServices, 'git' | 'projects' | 'repositoryMetadata'>
+type Core = Pick<CompiledCoreServices, 'git' | 'projects' | 'repositoryMetadata'>
 export const REMOTE_TIMEOUT_MS = 120_000
 export const REMOTE_FETCH_ARGS = ['-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always', '-c', 'protocol.ssh.allow=always',
   '-c', 'protocol.https.allow=always', '-c', 'protocol.git.allow=always'] as const

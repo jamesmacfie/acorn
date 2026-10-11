@@ -1,31 +1,12 @@
 import { createHash } from 'node:crypto'
-import { access } from 'node:fs/promises'
-import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, type CompiledCoreServices, type CoreServices } from '@acorn/plugin-api/node'
 import type { Stash, StashApply, StashCreate, StashDrop, StashResult, StashRoster, StashSelection } from '../shared/api'
 import { repositoryFor } from './history'
-import { canonicalPath, parseRoster } from './worktreeRoster'
+import { dirtyStatus, firstLine, mutateRepository, readOperation, targetCheckout } from './checkout'
 
-type Core = Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>
+type Core = Pick<CoreServices, 'git' | 'projects' | 'tasks'> & Pick<CompiledCoreServices, 'checkoutAdmission'>
 type ReadCore = Pick<CoreServices, 'git' | 'projects'>
 const sha = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-const firstLine = (text: string) => text.trim().split('\n')[0] || 'Git refused the stash operation.'
-const queue = new Map<string, Promise<void>>()
-async function inRepository<T>(repository: string, action: () => Promise<T>): Promise<T> {
-  const before = queue.get(repository) ?? Promise.resolve()
-  let release!: () => void
-  const done = new Promise<void>((resolve) => { release = resolve })
-  const tail = before.then(() => done)
-  queue.set(repository, tail)
-  await before
-  try { return await action() }
-  finally { release(); if (queue.get(repository) === tail) queue.delete(repository) }
-}
-
-async function mutateRepository<T>(core: Core, repository: string, action: () => Promise<T>): Promise<T> {
-  const common = await core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repository, maxOutputBytes: 8192 })
-  if (common.code !== 0) throw new BridgeError(422, 'git_failed', firstLine(common.stderr))
-  return inRepository(await canonicalPath(common.stdout.trim()), action)
-}
 
 export async function stashRoster(core: ReadCore, projectId: string, signal?: AbortSignal): Promise<StashRoster> {
   const repository = await repositoryFor(core, projectId, signal)
@@ -76,49 +57,13 @@ function selected(roster: StashRoster, selection: StashSelection): Stash {
   return stash
 }
 
-async function targetCheckout(core: Core, repository: string, taskId: string, expectedPath: string, checkout: string) {
-  const task = await core.tasks.load(taskId)
-  if (!task) throw new BridgeError(404, 'task_missing', 'Target task is unavailable.')
-  if (task.branch && !task.worktreePath) throw new BridgeError(409, 'checkout_missing', 'Target task checkout has not been created. Open the task first.')
-  const targetRepository = await repositoryFor(core, task.projectId)
-  const targetProject = await core.projects.byId(task.projectId)
-  if ((task.worktreePath ?? targetProject?.path) !== expectedPath) throw new BridgeError(409, 'checkout_moved', 'Target checkout moved. Close and reopen this action.')
-  const expectedRepository = await core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repository, maxOutputBytes: 8192 })
-  const actualRepository = await core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: checkout, maxOutputBytes: 8192 })
-  if (expectedRepository.code !== 0 || actualRepository.code !== 0 ||
-    await canonicalPath(expectedRepository.stdout.trim()) !== await canonicalPath(actualRepository.stdout.trim())) {
-    throw new BridgeError(409, 'wrong_repository', 'Target task belongs to a different repository.')
-  }
-  const root = await core.git.git(['rev-parse', '--show-toplevel'], { cwd: checkout, maxOutputBytes: 8192 })
-  if (root.code !== 0 || await canonicalPath(root.stdout.trim()) !== await canonicalPath(checkout)) throw new BridgeError(409, 'checkout_moved', 'Target checkout moved or is unavailable.')
-  const registered = await core.git.git(['worktree', 'list', '--porcelain', '-z'], { cwd: targetRepository, maxOutputBytes: 1 << 20 })
-  const checkoutPath = await canonicalPath(checkout)
-  let ownsCheckout = false
-  if (registered.code === 0) for (const entry of parseRoster(registered.stdout)) {
-    if (!entry.prunable && !entry.locked && await canonicalPath(entry.path) === checkoutPath) ownsCheckout = true
-  }
-  if (!ownsCheckout) {
-    throw new BridgeError(409, 'checkout_moved', 'Target checkout is no longer a registered, available worktree.')
-  }
-  const operation = await core.git.git(['ls-files', '-u', '-z'], { cwd: checkout, maxOutputBytes: 256 << 10 })
-  if (operation.code !== 0) throw new BridgeError(422, 'git_failed', firstLine(operation.stderr))
-  if (operation.stdout) throw new BridgeError(409, 'conflicted_checkout', 'Resolve checkout conflicts in Changes before writing a stash.')
-  for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'REBASE_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer']) {
-    const path = await core.git.git(['rev-parse', '--path-format=absolute', '--git-path', marker], { cwd: checkout, maxOutputBytes: 8192 })
-    if (path.code !== 0) throw new BridgeError(422, 'git_failed', firstLine(path.stderr))
-    const present = await access(path.stdout.trim()).then(() => true, (error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return false
-      throw new BridgeError(503, 'operation_unavailable', 'Cannot inspect Git operation state.')
-    })
-    if (present) throw new BridgeError(409, 'operation_active', 'Finish the Git operation before creating a stash.')
-  }
+async function writableCheckout(core: Core, repository: string, taskId: string, expectedPath: string, checkout: string) {
+  await targetCheckout(core, repository, taskId, expectedPath, checkout)
+  const state = await readOperation(core, checkout)
+  if (state.conflicts.length) throw new BridgeError(409, 'conflicted_checkout', 'Resolve checkout conflicts in Changes before writing a stash.')
+  if (state.operation) throw new BridgeError(409, 'operation_active', 'Finish the Git operation before creating a stash.')
 }
 
-async function status(core: Core, checkout: string) {
-  const result = await core.git.git(['status', '--porcelain=v1', '-z', '--untracked-files=all'], { cwd: checkout, maxOutputBytes: 1 << 20 })
-  if (result.code !== 0) throw new BridgeError(422, 'git_failed', firstLine(result.stderr))
-  return result.stdout
-}
 async function conflicts(core: Core, checkout: string): Promise<string[]> {
   const result = await core.git.git(['diff', '--name-only', '--diff-filter=U', '-z'], { cwd: checkout, maxOutputBytes: 256 << 10 })
   if (result.code !== 0) throw new BridgeError(503, 'conflicts_unavailable', firstLine(result.stderr))
@@ -148,8 +93,8 @@ async function observed(core: Core, projectId: string, checkout: string | null, 
 export async function createStash(core: Core, projectId: string, input: StashCreate): Promise<StashResult> {
   const repository = await repositoryFor(core, projectId)
   return mutateRepository(core, repository, () => core.checkoutAdmission.write(input.taskId, async (checkout) => {
-    await targetCheckout(core, repository, input.taskId, input.expectedPath, checkout)
-    const before = await status(core, checkout)
+    await writableCheckout(core, repository, input.taskId, input.expectedPath, checkout)
+    const before = await dirtyStatus(core, checkout)
     const relevant = before.split('\0').filter(Boolean).some((entry) => input.includeUntracked || !entry.startsWith('??'))
     if (!relevant) return result(false, 'There are no changes to stash with these options.', [], await stashRoster(core, projectId), false)
     const args = ['stash', 'push', '-m', input.message, ...(input.includeUntracked ? ['--include-untracked'] : []), ...(input.keepIndex ? ['--keep-index'] : [])]
@@ -160,10 +105,10 @@ export async function createStash(core: Core, projectId: string, input: StashCre
 export async function applyStash(core: Core, projectId: string, input: StashApply, pop: boolean): Promise<StashResult> {
   const repository = await repositoryFor(core, projectId)
   return mutateRepository(core, repository, () => core.checkoutAdmission.write(input.taskId, async (checkout) => {
-    await targetCheckout(core, repository, input.taskId, input.expectedPath, checkout)
+    await writableCheckout(core, repository, input.taskId, input.expectedPath, checkout)
     const roster = await stashRoster(core, projectId)
     const stash = selected(roster, input.selection)
-    if (await status(core, checkout)) return result(false, 'Target checkout has changes. Commit or stash them in Changes first.', [], roster, false)
+    if (await dirtyStatus(core, checkout)) return result(false, 'Target checkout has changes. Commit or stash them in Changes first.', [], roster, false)
     const applied = await observed(core, projectId, checkout,
       await command(core, ['stash', 'apply', ...(input.restoreIndex ? ['--index'] : []), stash.objectId], checkout))
     if (!applied.ok || !pop) return applied

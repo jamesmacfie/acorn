@@ -12,8 +12,8 @@ These plugins own SQLite files under `<data-root>/plugins/` and a migration chai
 | --- | --- |
 | `agents.sqlite` | Managed sessions, turns, the event ledger, operation records, the delegation spawn ledger, requests, attachments, artifacts, webhooks, MCP servers, and full-text search |
 | `browser.sqlite` | Browser captures and screenshot bytes |
-| `changes.sqlite` | Review notes and plugin-local change state |
 | `database.sqlite` | Project-scoped saved SQL queries and the per-task scratch document. A loaded plugin |
+| `git.sqlite` | The Changes tab's review notes. Moved from `changes.sqlite` once at startup when changes became part of git |
 | `github.sqlite` | The repository and pull request mirror, PR children in provider order, file patch state and digest, freshness and file completeness, viewed files, and pinned repositories |
 | `http.sqlite` | Project-scoped requests and variables, with encrypted request fields. A loaded plugin |
 | `terminal.sqlite` | Terminal session metadata. PTY output isn't stored here |
@@ -97,4 +97,4 @@ The diff viewer's documents are generated data, not tables ([the document](../di
 A pull request's segment descriptors are a blob per patch, keyed by the patch digest and the
 diff-document version and written beside the patch body. A new segmenter version reads a different key
 and cuts again. Segment rows are cut from the patch body on request and never stored. A working tree's
-documents live in the Changes plugin's memory and are lost on restart.
+documents live in the git plugin's memory and are lost on restart.

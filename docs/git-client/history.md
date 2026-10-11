@@ -6,9 +6,9 @@ read-only revision contracts used by the repository source and task Git pane.
 ## Browse history
 
 Open **Git > History** for the selected Git project. The project selector chooses the mapped
-repository; Git does not accept a working directory from the client. The task Git pane opens on
-history reachable from its recorded branch. If that branch is unavailable, the pane names the
-condition and falls back to repository refs and HEAD. **Worktrees** remains a separate section.
+repository; Git does not accept a working directory from the client. The task Git pane's History tab
+shows history reachable from its recorded branch. If that branch is unavailable, the tab names the
+condition and falls back to repository refs and HEAD. **Worktrees** remains a separate tab.
 Select a commit and press **Explain commit** for an explicit model-generated summary. See
 [Git explanations](./explanations.md) for model choice, context limits, and cancellation.
 

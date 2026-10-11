@@ -2,7 +2,6 @@
   "full": {
     "panes": [
       "agents",
-      "changes",
       "context",
       "docker",
       "editor",
@@ -20,7 +19,6 @@
       "source.agents.open",
       "agents.sessions.mark-read",
       "agents.sessions.find",
-      "changes.open",
       "context.open",
       "source.docker.open",
       "docker.find",
@@ -31,6 +29,7 @@
       "editor.navigation.go-to-line",
       "editor.search.open",
       "source.github.open",
+      "changes.open",
       "memory.search",
       "notes.find",
       "notes.create",
@@ -82,8 +81,6 @@
       "agents:composer-actions",
       "agents:session-header",
       "agents:request-card",
-      "changes:diff-line",
-      "changes:push-actions",
       "context:section",
       "docker:stats-beside",
       "docker:container",
@@ -91,6 +88,8 @@
       "editor:file",
       "github:diff-line",
       "github:summary-badges",
+      "git:diff-line",
+      "git:push-actions",
       "preview:toolbar-actions",
       "terminal:toolbar-actions",
       "workflows:step-body"
@@ -99,8 +98,8 @@
       "agents.storage",
       "agents.security",
       "agents.loop-coverage",
-      "changes.tool-card",
       "github.push-actions",
+      "changes.tool-card",
       "memory.tool-card",
       "workflows.tool-card"
     ],
@@ -120,19 +119,19 @@
     ],
     "railMarkers": [
       "agents",
-      "changes",
       "docker",
+      "changes",
       "workflows.task-groups"
     ],
     "persistedStateSlices": [
       "agents.tool-fold",
       "agents.session-order",
       "agents.composer-expansion",
-      "changes.view",
       "context.section-selection",
       "docker.prefs",
       "editor.open-files",
-      "github.pr-filters"
+      "github.pr-filters",
+      "changes.view"
     ],
     "nodeStats": [
       "agents.active"
@@ -158,27 +157,6 @@
     ]
   },
   "owned": {
-    "changes": {
-      "panes": [
-        "changes"
-      ],
-      "commands": [
-        "changes.open"
-      ],
-      "extensionPoints": [
-        "changes:diff-line",
-        "changes:push-actions"
-      ],
-      "extensions": [
-        "changes.tool-card"
-      ],
-      "railMarkers": [
-        "changes"
-      ],
-      "persistedStateSlices": [
-        "changes.view"
-      ]
-    },
     "context": {
       "panes": [
         "context"
@@ -295,12 +273,28 @@
       "panes": [
         "git"
       ],
+      "commands": [
+        "changes.open"
+      ],
       "sources": [
         "git"
       ],
       "settingsPages": [
         "git",
         "git-display"
+      ],
+      "extensionPoints": [
+        "git:diff-line",
+        "git:push-actions"
+      ],
+      "extensions": [
+        "changes.tool-card"
+      ],
+      "railMarkers": [
+        "changes"
+      ],
+      "persistedStateSlices": [
+        "changes.view"
       ]
     },
     "onboarding": {

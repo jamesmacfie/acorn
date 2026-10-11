@@ -1,5 +1,5 @@
-import { Hono } from 'hono'
-import { BridgeError, requireDevice, type AppEnv, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, requireDevice, type CoreServices } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { history } from '../history'
 import { fileText, revisionFor, search, segments } from '../revision'
 import { readGate } from '../readGate'
@@ -20,7 +20,7 @@ const body = async <T extends z.ZodTypeAny>(read: () => Promise<unknown>, schema
 
 export function historyRoutes(core: Core) {
   const limited = readGate()
-  return new Hono<AppEnv>()
+  return gitRouter()
     .use('/projects/:projectId/history', requireDevice)
     .use('/projects/:projectId/revisions/*', requireDevice)
     .get('/projects/:projectId/history', async (c) => {

@@ -31,10 +31,10 @@ global task-switching chords while focus is in that pane and hands them back whe
 
 ### A chord gated on a focused field
 
-The changes pane's commit chord (`plugins/changes/src/client/commands.ts`) shows how to scope a chord
+The Changes tab's commit chord (`plugins/git/src/client/changes/commands.ts`) shows how to scope a chord
 to a field without a key handler:
 
-- The binding is `when: 'pane'` with `pane: 'changes'`, so it's live while the keys are in that pane.
+- The binding is `when: 'pane'` with `pane: 'git'`, so it's live while the keys are in that pane.
   Its `active` check is the message field's own focus, because the pane is wider than its field, and
   Cmd+Enter in the diff's comment box belongs to that box. The field reports focus through the kit's
   `Textarea`, which both hosts support.

@@ -1,5 +1,4 @@
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
-import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
 import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
 import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
 import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
@@ -35,7 +34,6 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 export function installRoster(): void {
   initClientPlugins([
     agentsClientPlugin,
-    changesClientPlugin,
     contextClientPlugin,
     dockerClientPlugin,
     editorClientPlugin,

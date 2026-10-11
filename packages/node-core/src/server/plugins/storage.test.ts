@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { PLUGIN_DB_DIR, openPluginDb } from './storage'
+import { PLUGIN_DB_DIR, adoptRenamedPluginDb, openPluginDb } from './storage'
+import { openSqlite } from '../storage/sqlite'
 
 // The per-plugin database factory has ten-plus production consumers and had no direct test: every
 // plugin's storage goes through it, covered only incidentally by integration suites.
@@ -83,5 +84,22 @@ describe('plugin storage', () => {
     } finally {
       db.close()
     }
+  })
+
+  it('moves a renamed plugin\'s rows to its new id once, and never over a database the new id has', () => {
+    expect(adoptRenamedPluginDb(dir, 'before', 'after')).toBe(false)
+    const old = openPluginDb(dir, 'before', { migrationsFolder: migrations })
+    old.$client.exec("CREATE TABLE notes (body TEXT); INSERT INTO notes VALUES ('kept')")
+    old.close()
+    expect(adoptRenamedPluginDb(dir, 'before', 'after')).toBe(true)
+    expect(existsSync(join(dir, PLUGIN_DB_DIR, 'before.sqlite'))).toBe(false)
+    const adopted = openSqlite(join(dir, PLUGIN_DB_DIR, 'after.sqlite'), { readonly: true })
+    try {
+      expect(adopted.prepare('SELECT body FROM notes').all()).toEqual([{ body: 'kept' }])
+    } finally {
+      adopted.close()
+    }
+    openPluginDb(dir, 'before', { migrationsFolder: migrations }).close()
+    expect(adoptRenamedPluginDb(dir, 'before', 'after')).toBe(false)
   })
 })

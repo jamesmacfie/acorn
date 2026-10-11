@@ -13,7 +13,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
 | [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
-| [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Implementation not started. |
+| [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Phases 01 to 08 implemented by October 11, 2026. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
@@ -269,7 +269,7 @@ for agents, a commit history, and a warning on archive about unpushed commits.
 [panes.md](../panes/models.md) § Pane models has the commit draft outliving its region, and
 [state-ownership.md](../state-ownership.md) § Scope rules has where the draft, the view preference and
 the model pick live. [plugins.md](../plugins.md) § Hooks has `amend` and `force` on the two payloads,
-and § Cooperative extension points has `changes:push-actions` with its props beside the other
+and § Cooperative extension points has `git:push-actions` with its props beside the other
 first-party remote points. [security.md](../security.md) § Process, path, and configuration controls has
 the lease and the abort verb; [integrations.md](../integrations.md) § Model providers has the commit
 message beside the database plugin's SQL as the two `generateText` consumers;

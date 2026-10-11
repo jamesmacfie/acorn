@@ -4,9 +4,9 @@ This plan describes a built-in Git client for Acorn. Read it before implementing
 the product decisions, repository research, ownership boundaries, and acceptance requirements that
 the phase files rely on.
 
-Date: October 7, 2026. Status: planned; implementation not started. Source baseline:
-`293d9bb697fe83afc8ace33fcc1f9fbade949bc8`. The exploratory implementation was reverted; these
-documents do not describe shipped behavior. Recheck the source before building.
+Date: October 7, 2026. Status: phases 01 to 08 implemented by October 11, 2026. Source baseline:
+`293d9bb697fe83afc8ace33fcc1f9fbade949bc8`. The exploratory implementation was reverted. These
+documents are the plan. Each phase file links to the shipped docs that describe its behavior.
 
 ## Goal
 
@@ -96,6 +96,11 @@ Keep **Changes** as the owner of working files, staging, unstaging, discarding, 
 provides history, stash management, metadata, and operation orchestration. Link to Changes for WIP;
 do not build another commit composer. Reuse Changes' remote actions and hooks where applicable.
 
+On 2026-10-11 the changes plugin became part of git. Changes is now the first tab of the task's Git
+pane, and its routes, hooks, and points carry the `git` id
+([the Changes tab](../../diff-rendering/changes-pane.md)). The split above still holds inside the
+plugin: staging and committing stay on the Changes tab.
+
 ### Both hosts
 
 Desktop and terminal support the first release. Desktop draws compact connected lanes beside the
@@ -131,9 +136,9 @@ baseline, not promises that the file remains at that line.
 | Plugin composition | `apps/node/src/composition/plugins.ts`, `apps/desktop/src/client/plugins.ts`, and `apps/tui/src/roster.ts` | Register the compiled plugin on Node and both clients; update corresponding app dependencies and roster tests. |
 | Public facade | `packages/plugin-api/src/node.ts`, `packages/plugin-api/src/client.ts`, and `packages/plugin-api/src/ui/index.ts` | Import public services, registries, transport, and UI; extend only demonstrated missing seams. |
 | Source layout | `packages/client-core/src/host/registries/sources/sources.ts`, line 40 | Declare `projectScoped`, `requiresGitProject`, routes, and list/detail regions. |
-| Pane layout | `plugins/changes/src/client/paneContribution.ts`, line 15 | Use a task model and declared list/detail regions; the host owns the split and collapse. |
+| Pane layout | `plugins/git/src/client/paneContribution.ts`, line 15 | Use a task model and declared list/detail regions; the host owns the split and collapse. |
 | Shared drawing | `packages/client-core/src/kit/components/content/Graph.tsx`, line 56 | Put graph pixels and keyboard ownership in the kit, with terminal support in `apps/tui/src/kit/ui.ts`. |
-| Working Git | `plugins/changes/src/server/routes/localGit.ts`, line 66, and `plugins/changes/src/server/localDiff.ts`, lines 331–365 | Preserve remote command semantics and the Changes capability/route owner. Extract a public contract before consuming another plugin's service. |
+| Working Git | `plugins/git/src/server/changes/routes/localGit.ts`, line 66, and `plugins/git/src/server/changes/localDiff.ts`, lines 331–365 | Preserve remote command semantics and the Changes capability/route owner. Extract a public contract before consuming another plugin's service. |
 | Task creation | `packages/client-core/src/features/tabs/taskDraftStore.ts`, line 20, and `packages/node-core/src/server/routes/projects/tasks.ts`, line 188 | Reuse draft forms, creation, branch reservation, attachment, setup, navigation, and archive. |
 | Starting point | `packages/node-core/src/server/worktrees/taskBranch.ts`, lines 32–100 | The baseline supports `baseBranch`, captures its commit, reserves a branch, and creates the worktree lazily. Add pinned commit support here. |
 | Task wire contract | `packages/protocol/src/transport/api/projects.ts` | Extend TaskSeed and availability consistently; do not bypass core with raw worktree creation. |

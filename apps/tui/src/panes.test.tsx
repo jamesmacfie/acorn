@@ -87,8 +87,8 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('Description')
   }, 60_000)
 
-  it('changes: the tracked group, its counts, and the commit line at the foot', async () => {
-    const frame = await screenFor('changes', { until: 'Tracked' })
+  it('git: the Changes tab\'s tracked group, its counts, and the commit line at the foot', async () => {
+    const frame = await screenFor('git', { until: 'Tracked' })
     // Groups by what a file is, not by which staging area it is in: staging is the checkbox on the
     // row now, and the fixture's three files are two tracked edits and one new file.
     expect(frame).toContain('Tracked')

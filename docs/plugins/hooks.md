@@ -47,7 +47,7 @@ await push(verdict.payload)   // transformed, or the original if nobody transfor
 A contributor registers a handler and names the owner:
 
 ```json
-{ "id": "scan-push", "point": "changes:before-push", "label": "Secret scan",
+{ "id": "scan-push", "point": "git:before-push", "label": "Secret scan",
   "route": "/v1/p/secret-scan/push", "mode": "veto", "priority": 50 }
 ```
 
@@ -75,7 +75,7 @@ These rules have no exceptions:
   verdict only when nothing vetoed. A timed-out ask asked nothing.
 - A transform's output is validated against the same shape as its input.
 - Both directions appear in the trust prompt with host-owned copy, such as "can stop a push in the
-  changes plugin". A handler that changes, stops, or holds another plugin's decision is a high grant.
+  git plugin". A handler that changes, stops, or holds another plugin's decision is a high grant.
   An ask reads "Make a tool wait for you before agents can “run any tool”", apart from a veto's line.
 
 An owner can ask which plugins handle one of its points with `ctx.hooks.handlers(id)`, to skip work
@@ -95,8 +95,8 @@ Core declares five hooks, because core owns those choke points:
 | core | `core:task-deleted` | observe | Purging a plugin's rows for deleted tasks. The payload is `taskIds`. Use `registerDeletedTaskPurge`, which also adds a daily catch-up ([deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task)) |
 | core | `core:before-tool-call` | observe, veto | Approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these |
 | core | `core:before-snapshot` | observe, transform, veto | Budget shaping and PII stripping. The payload is section names |
-| changes | `changes:before-commit` | observe, transform, veto | Commit lint and message helpers |
-| changes | `changes:before-push` | observe, veto | Secret scanning, changesets, and branch protection |
+| changes | `git:before-commit` | observe, transform, veto | Commit lint and message helpers |
+| changes | `git:before-push` | observe, veto | Secret scanning, changesets, and branch protection |
 | agents | `agents:before-send` | observe, transform, veto | Prompt policy, redaction, and context injectors. Required [instruction checks](../security.md#instruction-file-checks-and-review) run separately in the dispatcher. |
 | agents | `agents:before-tool` | observe, veto, ask | Every tool call a bridged harness makes, before it runs. A veto denies it with a reason the model reads, and an ask holds it on a card. Install order, 5 seconds, `onTimeout: allow` ([harness bridges](../managed-agents/loop-hooks.md)) |
 | agents | `agents:after-tool` | observe, transform | Every tool call a bridged harness finished. A transform's `note` reaches the model beside the result ([harness bridges](../managed-agents/loop-hooks.md)) |
@@ -105,11 +105,11 @@ Core declares five hooks, because core owns those choke points:
 | workflows | `workflows:before-step` | observe, veto | "No deploys today" from an incident tool |
 | editor | `editor:before-save` | observe, transform, veto | Format and lint on save |
 
-A payload's booleans are part of the decision. `changes:before-commit` carries
-`{ taskId, branch, message, amend }`, and `changes:before-push` carries `{ taskId, branch, force }`.
+A payload's booleans are part of the decision. `git:before-commit` carries
+`{ taskId, branch, message, amend }`, and `git:before-push` carries `{ taskId, branch, force }`.
 A commit-lint handler usually leaves a reword of an existing commit alone, and a branch-protection
 handler refuses only the push that replaces commits. Payload matching is exact, so every call carries
-every declared field (`CHANGES_HOOKS` in `plugins/changes/src/server/localGit.ts`).
+every declared field (`CHANGES_HOOKS` in `plugins/git/src/server/changes/localGit.ts`).
 
 ## What isn't a hook
 

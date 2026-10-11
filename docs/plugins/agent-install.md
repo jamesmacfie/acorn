@@ -108,7 +108,7 @@ with the same arguments to collect the answer, then iterate with `action: 'updat
 so approval ends in a reload.
 
 **Settings > Plugins > Installed > Create a plugin** drafts that starting prompt into the current
-task's agent composer through `sendReferenceToAgent`, the seam the editor and Changes panes use. It's
+task's agent composer through `sendReferenceToAgent`, the seam the Editor pane and the Changes tab use. It's
 a draft, not a send. It doesn't open a new task, because `TaskSeed` has no prompt field and Settings
 has no project in scope. **Build a data source from your connections** beside it asks what one row is
 and which of the Node's sources it reads, then drafts `dataSourceStarterPrompt` the same way. That

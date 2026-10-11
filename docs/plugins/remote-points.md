@@ -49,7 +49,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
 | `editor:document` | `replace`, keyed by lowercased file basename | `{ taskId, path, text?, revision }`. See [file renderers](../editor/file-renderers.md) |
 | `workflows:step-body` | `replace`, keyed by the step's exact kind | `{ taskId, projectId, runId, stepId, kind, status, inputs, inputsTruncated, output, outputTruncated, tail?, revision }`. A step's result in the run pane. See [contributed step bodies](../workflows/routes-and-ui.md#contributed-step-bodies) |
-| `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
+| `git:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
 | `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
@@ -61,8 +61,8 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `preview:toolbar-actions`, `terminal:toolbar-actions` | `stack`, up to four | Page or selected-session facts, with `reload` or `interrupt`. See [toolbar actions](./toolbar-actions.md) |
 | `linear:issue-summary`, `rollbar:item-summary` | `stack`, up to two | `{ surface, item?, refId?, projectId? }`. Above a loaded owner's detail view, drawn by the host. See [detail regions](./detail-regions.md) |
 
-Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
-branch bar, and its props are the five scalars the bar draws. The Changes plugin can't say "pull
+Read `git:push-actions` before you open a point of your own. It sits under the Changes tab's
+branch bar, and its props are the five scalars the bar draws. The git plugin can't say "pull
 request". The GitHub plugin fills the point with **Open pull request** and reads the task's pull
 number from its own query. An owner that modeled its filler's job would have to import it. With
 nobody filling it, a slot draws nothing and takes no space.

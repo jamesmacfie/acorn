@@ -4,7 +4,6 @@
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { browserPlugin } from '@acorn/plugin-browser/node/index.ts'
-import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
@@ -35,7 +34,6 @@ export type NodePluginDeps = {
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
   agentsPlugin(dataDir, deps.agents),
   browserPlugin(),
-  changesPlugin(),
   dockerPlugin(),
   editorPlugin(),
   githubPlugin(),

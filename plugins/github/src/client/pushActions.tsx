@@ -5,11 +5,11 @@ import { setSelectedSource, tasksOptions } from '@acorn/plugin-api/client'
 import { Button } from '@acorn/plugin-api/ui'
 import { githubCreateRoute } from './clientRoutes'
 
-// What this plugin offers under the Changes pane's branch bar, once a task's branch is on its remote
+// What this plugin offers under the Changes tab's branch bar, once a task's branch is on its remote
 // (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `remote` kind). One button, and it opens this
 // plugin's own create form with the head branch already chosen.
 //
-// The changes plugin declared the point and knows none of this. It could not import this plugin, and
+// The git plugin declared the point and knows none of this. It could not import this plugin, and
 // should not have to learn what a pull request is to leave room for one; it hands over the branch,
 // the upstream and the two ids, and every word here is written on this side.
 
@@ -17,7 +17,7 @@ import { githubCreateRoute } from './clientRoutes'
  *  that boundary is the reason the point exists. The string is the contract, the host mints it from
  *  the manifest it was read under, and a typo shows up on this plugin's page as a contribution whose
  *  point nobody declares. */
-export const CHANGES_PUSH_ACTIONS_POINT = 'changes:push-actions'
+export const GIT_PUSH_ACTIONS_POINT = 'git:push-actions'
 
 /**
  * What the owner hands a contributor, in the owner's own words.

@@ -56,7 +56,7 @@ back to comparing text. A failed send keeps its draft.
 
 A diff pane can name an `annotation` extension point, and the host draws every contributor's marks
 under the code row they name ([plugins](../plugins.md) § Cooperative extension points). The two
-points are `changes:diff-line` over the working tree and `github:diff-line` over a pull request. Both
+points are `git:diff-line` over the working tree and `github:diff-line` over a pull request. Both
 are keyed `{ file, line, side }` with the fields in the same order, and both hand the point's name to
 `DiffPane`, so a contributor that answers one can answer the other. `side` is the row's own kind, not
 the view mode: a mark on line 42 of the new file means the new side in split or unified mode.

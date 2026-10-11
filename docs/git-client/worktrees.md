@@ -9,8 +9,10 @@ For commit browsing and revision diffs, see [Git history](./history.md).
 `plugins/git/src/server/worktreeRoster.ts` reads Git's NUL-delimited worktree roster on the selected
 Node. The route resolves a project ID through core, then asks Git for the repository root. It does
 not accept a client-supplied working directory. The Git source registers a project-scoped list and
-detail region; the task pane has one model per task and shows its recorded branch beside its own
-checkout branch and HEAD. Inspecting another worktree labels it separately.
+detail region. The task's Git pane has one model per task and four tabs: **Changes**, **History**,
+**Stashes**, and **Worktrees**. It opens on Changes, the task's uncommitted work
+([the Changes tab](../diff-rendering/changes-pane.md)). Its Worktrees tab shows the recorded branch
+beside the checkout's own branch and HEAD. Inspecting another worktree labels it separately.
 
 The plugin uses the public core facade for project mappings, active task projections, and Git
 subprocesses. Core remains the owner of task creation and archive. Open a task from its worktree row

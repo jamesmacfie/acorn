@@ -69,7 +69,7 @@ method that allows an exception. An allowance does not bypass other vetoes. The 
 
 ## Git
 
-`plugins/changes/src/server/secretCheck.ts` selects what each Git operation publishes. It reads Git
+`plugins/git/src/server/changes/secretCheck.ts` selects what each Git operation publishes. It reads Git
 objects, never the disk, and loads only while blocking is on or when you press a check button.
 
 A commit check reads the blobs the next commit adds over its parent. The parent is HEAD, or HEAD's

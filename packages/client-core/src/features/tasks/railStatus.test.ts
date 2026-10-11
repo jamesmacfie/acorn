@@ -23,7 +23,7 @@ describe('railStatusMarkers', () => {
     expect(markers.every((m) => m.label && !!m.icon !== !!m.dotTone && m.placements.length)).toBe(true)
   })
 
-  it('leaves uncommitted changes to the changes plugin', () => {
+  it('leaves uncommitted changes to the git plugin', () => {
     expect(railStatusMarkers(inputs({ status: status({ dirty: true, dirtyCount: 1 }) }))).toEqual([])
   })
 

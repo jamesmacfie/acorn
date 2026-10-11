@@ -1,6 +1,6 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, requireDevice, type AppEnv, type CoreServices, type NodePlugin } from '@acorn/plugin-api/node'
+import { BridgeError, requireDevice, type CompiledCoreServices, type NodePlugin } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { applyStash, createStash, dropStash, stashRoster } from '../stashes'
 
 const objectId = z.string().regex(/^[0-9a-f]{40,64}$/)
@@ -13,12 +13,12 @@ async function body<T extends z.ZodTypeAny>(read: () => Promise<unknown>, schema
   if (!parsed.success) throw new BridgeError(400, 'bad_request', 'Invalid stash request.')
   return parsed.data
 }
-export function stashRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>, events: Pick<Parameters<NonNullable<NodePlugin['init']>>[0]['events'], 'worktreeStatus'>) {
+export function stashRoutes(core: Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>, events: Pick<Parameters<NonNullable<NodePlugin['init']>>[0]['events'], 'worktreeStatus'>) {
   const attempted = async <T extends { changed: boolean }>(taskId: string, action: () => Promise<T>) => {
     try { return await action() }
     finally { events.worktreeStatus(taskId) }
   }
-  return new Hono<AppEnv>()
+  return gitRouter()
     .use('/projects/:projectId/stashes', requireDevice)
     .use('/projects/:projectId/stashes/*', requireDevice)
     .get('/projects/:projectId/stashes', async (c) => c.json(await stashRoster(core, c.req.param('projectId'), c.req.raw.signal)))

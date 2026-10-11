@@ -1,6 +1,7 @@
 import { activeNodeId, clientCapability, requestTaskLaunch, toast } from '@acorn/plugin-api/client'
 import { WORKFLOW_GIT_LAUNCH } from '@acorn/plugin-workflows/contract/gitLaunch.ts'
-import type { Worktree } from '../shared/api'
+import type { OperationKind, Worktree } from '../shared/api'
+import { operationChoices } from './operationClient'
 
 export function sameGitActionScope(nodeId: string | null, projectId: string, currentProjectId: string): boolean {
   if (activeNodeId() === nodeId && projectId === currentProjectId) return true
@@ -21,8 +22,8 @@ export function launchWorkflowAtCommit(nodeId: string | null, projectId: string,
   workflow.open({ nodeId, projectId, commitId, title })
 }
 
-export function commitActionRequest(commit: { id: string; subject: string; refs: string[] }, nodeId: string | null, projectId: string,
-  currentProjectId: () => string, onSelect: (id: string) => void) {
+export function commitActionRequest(commit: { id: string; subject: string; refs: string[]; parents: string[] }, nodeId: string | null, projectId: string,
+  currentProjectId: () => string, onSelect: (id: string) => void, operate: (operation: OperationKind) => void) {
   const valid = () => sameGitActionScope(nodeId, projectId, currentProjectId())
   const launchTask = () => { if (valid()) requestTaskLaunch({ nodeId, projectId, title: commit.subject, baseCommit: commit.id }) }
   const launchWorkflow = () => { if (valid()) launchWorkflowAtCommit(nodeId, projectId, commit.id, commit.subject) }
@@ -34,6 +35,7 @@ export function commitActionRequest(commit: { id: string; subject: string; refs:
       { id: `task:${ref}`, label: `Start task at ${ref.slice(11)} tip`, run: launchTask },
       { id: `workflow:${ref}`, label: `Start workflow at ${ref.slice(11)} tip`, run: launchWorkflow },
     ]),
+    ...operationChoices(commit.parents.length).map((choice) => ({ id: choice.operation, label: choice.label, run: () => { if (valid()) operate(choice.operation) } })),
   ] }
 }
 

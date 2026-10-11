@@ -1,13 +1,13 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, isProviderOperationError, ownerId, requireDevice, respondError, type AppEnv, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, isProviderOperationError, ownerId, requireDevice, respondError, type CoreServices } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { explain } from '../explain'
 
 const id = /^[0-9a-f]{40,64}$/
 const body = z.object({ backendId: z.string().min(1).max(256), modelId: z.string().max(256), base: z.string().regex(id).nullable() }).strict()
 
 export function explanationRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'models'>) {
-  return new Hono<AppEnv>()
+  return gitRouter()
     .use('/projects/:projectId/explanations/*', requireDevice)
     .post('/projects/:projectId/explanations/:kind/:id', async (c) => {
       const kind = c.req.param('kind')

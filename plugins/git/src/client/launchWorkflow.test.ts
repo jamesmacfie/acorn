@@ -32,10 +32,12 @@ it('refuses a menu action after its Node or project changes', () => {
 it('keeps a branch-tip menu pinned and refuses it after a project switch', () => {
   let projectId = 'project'
   const select = vi.fn()
+  const operate = vi.fn()
   const commit = { id: 'a'.repeat(40), subject: 'Pinned tip', refs: ['refs/heads/main'], parents: [] }
-  const request = commitActionRequest(commit as Parameters<typeof commitActionRequest>[0], 'node', projectId, () => projectId, select)
+  const request = commitActionRequest(commit, 'node', projectId, () => projectId, select, operate)
   projectId = 'other-project'
   for (const action of request.actions) action.run()
+  expect(operate).not.toHaveBeenCalled()
   expect(calls.task).not.toHaveBeenCalled()
   expect(calls.open).not.toHaveBeenCalled()
   expect(select).not.toHaveBeenCalled()
@@ -46,6 +48,17 @@ it('keeps a branch-tip menu pinned and refuses it after a project switch', () =>
   request.actions.find((action) => action.id === 'workflow:refs/heads/main')?.run()
   expect(calls.task).toHaveBeenCalledWith({ nodeId: 'node', projectId: 'project', title: 'Pinned tip', baseCommit: commit.id })
   expect(calls.open).toHaveBeenCalledWith({ nodeId: 'node', projectId: 'project', commitId: commit.id, title: 'Pinned tip' })
+  request.actions.find((action) => action.id === 'revert')?.run()
+  expect(operate).toHaveBeenCalledWith('revert')
+})
+
+it('offers no cherry-pick or revert for a merge commit', () => {
+  const commit = { id: 'a'.repeat(40), subject: 'Merge', refs: [], parents: ['b'.repeat(40), 'c'.repeat(40)] }
+  const ids = commitActionRequest(commit, 'node', 'project', () => 'project', vi.fn(), vi.fn()).actions.map((action) => action.id)
+  expect(ids).toContain('merge')
+  expect(ids).toContain('rebase')
+  expect(ids).not.toContain('cherry-pick')
+  expect(ids).not.toContain('revert')
 })
 
 it('refuses stale worktree attachment and Open task callbacks', () => {

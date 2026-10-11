@@ -95,3 +95,38 @@ export type GitSettings = { repository: string; name: IdentityValue; email: Iden
 export type IdentityWrite = { scope: 'local' | 'global'; name: string; email: string }
 export type IdentityWriteResult = { name: { ok: boolean; error: string | null }; email: { ok: boolean; error: string | null }; settings: GitSettings; readbackError: string | null }
 export const gitSettingsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/settings`
+
+export type OperationKind = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
+/** Index stages present for an unresolved path: 1 base, 2 ours, 3 theirs. A missing stage is a deletion on that side. */
+export type OperationConflict = { path: string; stages: number[] }
+/** `operation` null with conflicts is an unresolved index with nothing to continue, such as a conflicted stash apply. */
+export type OperationState = {
+  taskId: string; checkout: string; branch: string | null; head: string | null
+  operation: OperationKind | null; source: string | null; conflicts: OperationConflict[]
+  /** Owner activity that would refuse a checkout write now. Advisory: the write checks again. */
+  busy: string[]
+}
+export type OperationStart = { expectedPath: string; expectedHead: string; operation: OperationKind; source: string }
+export type OperationControlAction = 'continue' | 'skip' | 'abort'
+export type OperationControl = { expectedPath: string; operation: OperationKind }
+/** `state` is the observation after the attempt; null when it could not be read, and `error` says so. */
+export type OperationResult = { ok: boolean; error: string | null; state: OperationState | null }
+export const operationRoute = (taskId: string) => `/v1/p/git/tasks/${encodeURIComponent(taskId)}/operation`
+
+/** One index stage of a conflicted path. `present: false` means that side deleted the file. */
+export type ConflictSide = { stage: 1 | 2 | 3; label: string; present: boolean; objectId: string | null; mode: string | null; text: string | null }
+/** The working file Git left. `present: false` means the checkout has no file at the path. */
+export type ConflictResult = { present: boolean; revision: string | null; text: string | null }
+export type ConflictDetail = {
+  path: string; operation: OperationKind | null; sides: ConflictSide[]; result: ConflictResult
+  /** Covers the path's index stages and the working file. A save carries it back unchanged. */
+  fingerprint: string
+  /** Why Acorn can't edit this conflict as text, with what to do instead. Null when it can. */
+  unsupported: string | null
+}
+export type ConflictResolution = { kind: 'text'; text: string } | { kind: 'delete' }
+export type ConflictResolve = { expectedPath: string; path: string; fingerprint: string; resolution: ConflictResolution }
+/** `saved` means the working file changed. A saved but unstaged result has `ok: false` and can be retried. */
+export type ConflictResolveResult = { ok: boolean; saved: boolean; error: string | null; revision: string | null; state: OperationState | null }
+export const conflictRoute = (taskId: string, path?: string) =>
+  `/v1/p/git/tasks/${encodeURIComponent(taskId)}/conflict${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`

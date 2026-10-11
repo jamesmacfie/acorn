@@ -80,9 +80,9 @@ Three members cover what a caller draws that the viewer has no concept of:
 - `threads` are inline conversations, complete when the topology is, placed by line number.
 - `lineExtra` puts content under a code row. `anchors` names every line that has some, up front, so
   the document reserves space before the segment loads. `render` draws one line's content inside the
-  segment, so its height is measured with it. The Changes pane uses it for review notes.
+  segment, so its height is measured with it. The Changes tab uses it for review notes.
 - `lineAction` adds a click action on a code line. Its `title` is the second line of the **Ask
-  agent** button's tip. The Changes pane uses it for Alt-click to send a line reference to the agent.
+  agent** button's tip. The Changes tab uses it for Alt-click to send a line reference to the agent.
 
 The Changes source and a task's GitHub source also supply `openLine`. An added line then shows a hover
 button in its first gutter that opens the task's file at that line in the editor. Repository pull
@@ -96,7 +96,7 @@ measured-block path as review notes. Repository browsing omits it, because no ta
 session. Inline chat stays separate from review notes and GitHub review comments.
 
 `plugins/github/src/client/DiffForPull.tsx`, `plugins/github/src/client/ComparePreview.tsx`, and
-`plugins/changes/src/client/changesModel.tsx` are the three implementations, and each is short enough
+`plugins/git/src/client/changes/changesModel.tsx` are the three implementations, and each is short enough
 to read in one sitting.
 
 ## Data flow
@@ -113,7 +113,7 @@ and answers segments by patch key on request:
   digest and returns a document, so the preview loads segments through the same two routes.
 - A **working tree**'s document is read by path and status key (`POST …/local/document`), diffed in
   batches of paths, and held in a process-local cache
-  (`plugins/changes/src/server/localDocument.ts`). [The Changes pane](./changes-pane.md#working-tree-documents)
+  (`plugins/git/src/server/changes/localDocument.ts`). [The Changes tab](./changes-pane.md#working-tree-documents)
   owns the details.
 
 The GitHub task pane and repository browsing read the same document. The file list beside them reads

@@ -283,9 +283,9 @@ describe('disabling a node plugin', () => {
     // `enabled` plus `skipped` isn't the list Settings → Plugins needs. It says nothing about which
     // names are `required` and therefore not togglable, and a disabled plugin still has to appear as a
     // row. Pick any two optional plugins, in roster order.
-    const { roster } = await start(['changes', 'docker'])
+    const { roster } = await start(['docker', 'git'])
     expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
     expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())
-    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['changes', 'docker'])
+    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'git'])
   })
 })

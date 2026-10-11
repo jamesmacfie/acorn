@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, type CompiledCoreServices, type CoreServices } from '@acorn/plugin-api/node'
 import type { GitRef, RefChange, RefChangeResult, RefRoster, WorktreeOwner } from '../shared/api'
 import { repositoryFor } from './history'
 import { canonicalPath, parseRoster } from './worktreeRoster'
@@ -66,7 +66,7 @@ async function commitExists(core: Core, repository: string, id: string): Promise
   return type.code === 0 && type.stdout.trim() === 'commit'
 }
 
-export async function changeRef(core: Core & Pick<CoreServices, 'repositoryMetadata'>, projectId: string, change: RefChange, changed: () => void = () => {}): Promise<RefChangeResult> {
+export async function changeRef(core: Core & Pick<CompiledCoreServices, 'repositoryMetadata'>, projectId: string, change: RefChange, changed: () => void = () => {}): Promise<RefChangeResult> {
   return core.repositoryMetadata.write(projectId, async (observedRepository, observedCommon) => {
     let roster = await refRoster(core, projectId)
     const refuse = (reason: string): RefChangeResult => ({ ok: false, reason, roster, postState: 'fresh', command: null })

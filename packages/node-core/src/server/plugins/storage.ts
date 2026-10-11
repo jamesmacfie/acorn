@@ -8,14 +8,14 @@
 //      manifest. Core owns the file either way.
 //   2. The handle stays in the owning plugin's closure, not on `Env`. `c.env` reaches every core and
 //      plugin route, so a per-plugin DB there would be readable by all of them.
-import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync } from 'node:fs'
+import { closeSync, constants, existsSync, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, renameSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import type { PluginStorage } from '../pluginHost/types'
 import { assertPluginMigrationHistory, pluginMigrationsFolder } from './migrations'
 import { drizzleOverSqlite, openSqlite } from '../storage/sqlite'
 import { installPluginStoragePolicy } from './storagePolicy'
-import { securePluginDbFiles, validatePluginDbFiles } from './pluginDbFiles'
+import { pluginDbFiles, securePluginDbFiles, validatePluginDbFiles } from './pluginDbFiles'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
 // (docs/data-layer/backup-and-retention.md § Backup and import), and so `plugins/` stays visibly separate from core.sqlite.
@@ -29,6 +29,22 @@ export type PluginDatabase = ReturnType<typeof drizzleOverSqlite> & {
 }
 
 export const pluginDbPath = (dataDir: string, plugin: string): string => join(resolve(dataDir), PLUGIN_DB_DIR, `${plugin}.sqlite`)
+
+/** Give a renamed built-in the database it had under its old id. Moves the files once, before
+ *  anything opens either one, and does nothing when there is no old database or the new id already
+ *  has one, so a fresh install and every later boot are no-ops. The write-ahead log and shared-memory
+ *  files move before the database, so a crash halfway leaves the database where the next boot retries. */
+export function adoptRenamedPluginDb(dataDir: string, from: string, to: string): boolean {
+  const source = pluginDbPath(dataDir, from)
+  const target = pluginDbPath(dataDir, to)
+  if (!existsSync(source) || existsSync(target)) return false
+  const sources = pluginDbFiles(source)
+  const targets = pluginDbFiles(target)
+  for (let index = sources.length - 1; index >= 0; index--) {
+    if (existsSync(sources[index]!)) renameSync(sources[index]!, targets[index]!)
+  }
+  return true
+}
 
 /** Create the three exact paths an isolated plugin realm may read and write. The realm is never
  * granted the containing directory, because that would also grant every other plugin database. */

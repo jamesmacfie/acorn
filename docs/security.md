@@ -2,7 +2,7 @@
 
 This page is the map of acorn's security model: the trust boundaries, what's out of scope, and which
 page owns each control. Read it before you change anything that crosses a boundary.
-For the device-only **Check this node** report, see [security diagnostics](./security/security-diagnostics.md). For advisory npm and pnpm change review, see [the Changes pane](./diff-rendering/changes-pane.md#the-file-list).
+For the device-only **Check this node** report, see [security diagnostics](./security/security-diagnostics.md). For advisory npm and pnpm change review, see [the Changes tab](./diff-rendering/changes-pane.md#the-file-list).
 Managed MCP needs device consent for execution and separate actual-connection catalogue approval; installed code retains device authority. See [managed MCP servers](./mcp/managed-servers.md).
 Acorn checks for likely secrets before its own commit, push, transcript export, and attachment send, and an optional per-Node setting blocks them. See [secret checks before publication](./security/secret-publication.md).
 acorn is single-owner software. A paired device has full owner authority for its Node. So the controls

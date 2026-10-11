@@ -10,8 +10,6 @@
       "agents/data/sessions",
       "agents/data/usage",
       "browser/captures",
-      "changes/tasks",
-      "changes/tasks",
       "docker",
       "editor/tasks",
       "editor/tasks",
@@ -23,6 +21,10 @@
       "git",
       "git",
       "git",
+      "git",
+      "git",
+      "git/tasks",
+      "git/tasks",
       "github",
       "github",
       "github/data/actions",
@@ -37,6 +39,7 @@
       "terminal",
       "workflows",
       "workflows",
+      "workflows/workflows/invocation",
       "workflows/workflows/schedules"
     ],
     "tools": [
@@ -72,7 +75,16 @@
       "run_stop",
       "run_targets",
       "session_history_read",
-      "session_history_search"
+      "session_history_search",
+      "workflow_cancel",
+      "workflow_catalog",
+      "workflow_draft",
+      "workflow_get",
+      "workflow_read",
+      "workflow_run",
+      "workflow_validate",
+      "workflow_wait",
+      "workflows_list"
     ],
     "sections": [
       "task-scripts",
@@ -106,17 +118,18 @@
       "agents.sessionExecute",
       "agents.sessions",
       "agents.standingContext.v1",
+      "agents.toolCaller",
       "agents.transcriptMedia",
       "agents.turns",
       "agents.usageRoute",
       "browser.captures",
-      "changes.localGit",
-      "changes.staticDependencyPolicy",
       "core.scheduler",
       "docker.route",
       "editor.files",
       "editor.route",
       "editor.searchRoute",
+      "git.localGit",
+      "git.staticDependencyPolicy",
       "github.mirror",
       "memory.knowledgeRoute",
       "memory.library",
@@ -133,6 +146,7 @@
       "terminal.taskSessionsRoute",
       "workflows.defs",
       "workflows.gates",
+      "workflows.invocation",
       "workflows.notices",
       "workflows.route",
       "workflows.runner",
@@ -141,7 +155,7 @@
     "databases": [
       "agents.sqlite",
       "browser.sqlite",
-      "changes.sqlite",
+      "git.sqlite",
       "github.sqlite",
       "terminal.sqlite",
       "workflows.sqlite"
@@ -165,24 +179,6 @@
       ],
       "databases": [
         "browser.sqlite"
-      ]
-    },
-    "changes": {
-      "routes": [
-        "changes/tasks",
-        "changes/tasks"
-      ],
-      "tools": [
-        "git_log",
-        "local_changes",
-        "local_diff"
-      ],
-      "capabilities": [
-        "changes.localGit",
-        "changes.staticDependencyPolicy"
-      ],
-      "databases": [
-        "changes.sqlite"
       ]
     },
     "docker": {
@@ -245,7 +241,23 @@
         "git",
         "git",
         "git",
-        "git"
+        "git",
+        "git",
+        "git",
+        "git/tasks",
+        "git/tasks"
+      ],
+      "tools": [
+        "git_log",
+        "local_changes",
+        "local_diff"
+      ],
+      "capabilities": [
+        "git.localGit",
+        "git.staticDependencyPolicy"
+      ],
+      "databases": [
+        "git.sqlite"
       ]
     },
     "preview": {
@@ -261,11 +273,24 @@
       "routes": [
         "workflows",
         "workflows",
+        "workflows/workflows/invocation",
         "workflows/workflows/schedules"
+      ],
+      "tools": [
+        "workflow_cancel",
+        "workflow_catalog",
+        "workflow_draft",
+        "workflow_get",
+        "workflow_read",
+        "workflow_run",
+        "workflow_validate",
+        "workflow_wait",
+        "workflows_list"
       ],
       "capabilities": [
         "workflows.defs",
         "workflows.gates",
+        "workflows.invocation",
         "workflows.notices",
         "workflows.route",
         "workflows.runner",

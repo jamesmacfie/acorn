@@ -25,7 +25,6 @@
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
-    "@acorn/plugin-changes": "workspace:*",
     "@acorn/plugin-context": "workspace:*",
     "@acorn/plugin-docker": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
