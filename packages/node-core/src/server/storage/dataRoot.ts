@@ -3,6 +3,7 @@ import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readF
 import { join } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
+import { SEALED_NODE_KEYS_FILE } from '@acorn/protocol/serviceProtocol.ts'
 
 const IDENTITY_FILE = 'node.json'
 const LOCK_FILE = 'node.lock'
@@ -185,8 +186,9 @@ export function openDataRoot(dir: string): DataRoot {
     )
   }
 
-  // An old root without node.json must not acquire a fresh baseline marker over existing state.
-  if (existsSync(dir) && !existsSync(join(dir, IDENTITY_FILE)) && readdirSync(dir).some((name) => name !== LOCK_FILE)) {
+  // An old root without node.json must not acquire a fresh baseline marker over existing state. The
+  // desktop helper seals this Node's keys before its first start, so that file isn't state.
+  if (existsSync(dir) && !existsSync(join(dir, IDENTITY_FILE)) && readdirSync(dir).some((name) => name !== LOCK_FILE && name !== SEALED_NODE_KEYS_FILE)) {
     throw new Error(`${dir} contains unmarked state. Reset it before opening the acorn-1 baseline.`)
   }
   const identityPath = join(dir, IDENTITY_FILE)

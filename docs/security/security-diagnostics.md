@@ -60,6 +60,10 @@ Revision-specific dependency changes appear in [Changes](../diff-rendering/chang
 The plugin host reports counts of active executable grants, enabled development modes, enabled
 approved and unapproved skills, and pending changed packages. It does not expose package names or
 declarations.
+The `host.keys` finding says whether the desktop app delivered the Node's keys sealed, or the Node read
+them from files or its environment, and names any plain key file still in the data root. A standalone
+Node, or a plain file left behind, is a warning, because agents on the Node can read it
+([Node keys](./credentials.md#node-keys)).
 Admission retains at most one recent passed, blocked, or incomplete outcome per task for up to 100 tasks
 in this Node process; it has no persistence or report history. No observation remains after a restart.
 Current approval status remains unknown because validation would decrypt stored instruction bodies.

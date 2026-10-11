@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { ACORN_BASELINE } from '../../packages/protocol/src/baseline.ts'
 
-const NODE_FILES = new Set(['core.sqlite', 'core.sqlite-wal', 'core.sqlite-shm', 'acorn.sqlite', 'acorn.sqlite-wal', 'acorn.sqlite-shm', 'node.json', 'node.lock', 'internal-token', 'active-identity', 'session.key', 'disabled-plugins.json'])
+const NODE_FILES = new Set(['core.sqlite', 'core.sqlite-wal', 'core.sqlite-shm', 'acorn.sqlite', 'acorn.sqlite-wal', 'acorn.sqlite-shm', 'node.json', 'node.lock', 'internal-token', 'active-identity', 'session.key', 'node-keys.sealed', 'disabled-plugins.json'])
 const NODE_DIRS = new Set(['plugins', 'blobs', 'tls', 'logs', 'notes', 'memory-proposals', 'agent-objects', 'agent-artifacts', 'agent-usage-probe'])
 // Keep the pre-baseline names in the reset inventory. The reset is the supported way to recover and
 // remove that state, while the baseline-qualified names are what the running custody stores write.

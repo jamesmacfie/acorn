@@ -1,5 +1,5 @@
 import { createAdaptorServer, type Http2Bindings, type HttpBindings, type ServerType } from '@hono/node-server'
-import type { ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
+import type { NodeKeys, ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { createServer as createHttpsServer } from 'node:https'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -268,8 +268,9 @@ export async function drainWithDeadline(
 // the composition root, which reads it from the packaged app and passes it in ServiceStartConfig. The
 // plain-Node entry has no packaged version, and saying so is more useful than parsing a package.json
 // that will not exist beside the bundled artifact.
-export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry(), serviceInstanceId?: string): RuntimeBindings {
+export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry(), serviceInstanceId?: string, keys?: NodeKeys): RuntimeBindings {
   return makeBindings({
+    keys,
     dbPath: resolveDatabasePath(root.dir),
     blobsDir: resolve(root.dir, 'blobs'),
     nodeId: root.nodeId,

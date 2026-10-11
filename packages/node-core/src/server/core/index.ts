@@ -95,6 +95,8 @@ export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'mo
   agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
   /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
   pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
+  /** Where this Node's keys came from and whether plain copies remain; supplied by the composition root. */
+  nodeKeys?: { snapshot(): import('../sessionKey').NodeKeyCustody }
   /** The optional secret publication gate. Loaded plugins receive no grant for it. */
   secretPublication?: SecretPublicationGate
   checkoutAdmission: CheckoutAdmission

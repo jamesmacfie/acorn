@@ -15,6 +15,7 @@ import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/server/transport/listener.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/server/storage'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
+import { checkSessionKey, nodeKeyCustody } from '@acorn/node-core/server/bindings.ts'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { configureAcornMcp, launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools'
@@ -120,7 +121,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   mark('bundled-packages')
   const capabilities = new CapabilityRegistry()
   try {
-    runtime = makeRuntime(dataRoot, config.version, capabilities)
+    runtime = makeRuntime(dataRoot, config.version, capabilities, undefined, config.keys)
   } catch (error) {
     dataRoot.release()
     stateChanged('failed', error instanceof Error ? error.message : String(error))
@@ -196,7 +197,11 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       ACORN_NODE_ID: runtime.NODE_ID,
       ACORN_DATA_DIR: config.dataDir,
       NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
-    }))
+    }), config.keys.previousSigningKey)
+    // Whether the delivered session key opens a stored credential. The helper keeps the plain
+    // session.key unless it does (docs/security/credentials.md § Node keys).
+    const keyCheck = await checkSessionKey(db, runtime.SECRETS)
+    mark('key-check')
     const internalEnv = credentials.internalEnv
     stopInternalCredentials = credentials.dispose
 
@@ -251,6 +256,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       reloadHost: plugins,
     })
     const provided = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
+    core.nodeKeys = nodeKeyCustody(config.dataDir, 'desktop', keyCheck)
     core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
     pluginStateCapability = { dispose: () => { provided.dispose(); pluginStateBridge.dispose() } }
 
@@ -318,6 +324,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
         // steady state is one device row per install rather than one per launch. The service never
         // persists it; custody stays with the client.
         deviceToken: await resolveDeviceToken(runtime.DEVICES, config.deviceToken, 'This computer'),
+        keyCheck,
       },
     }
   } catch (error) {

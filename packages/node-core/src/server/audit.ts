@@ -70,6 +70,9 @@ export type CoreAuditAction =
   | 'plugins.development.stopped'
   // Data leaving or entering the node.
   | 'backup.created'
+  // The desktop delivered a session key that opened none of the stored credentials, so the helper kept
+  // the plain session.key (docs/security/credentials.md § Node keys).
+  | 'keys.check.failed'
 
 // ── The plugin half of the vocabulary ─────────────────────────────────────────────────────────────
 //

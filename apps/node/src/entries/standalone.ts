@@ -22,6 +22,7 @@ import { buildPluginDeps } from '../composition/pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from '../composition/pluginState'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
+import { nodeKeyCustody } from '@acorn/node-core/server/bindings.ts'
 import { closeSync, readFileSync, writeSync } from 'node:fs'
 import { installBackgroundLog } from './background'
 
@@ -57,6 +58,10 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 await confirmAdvertiseHost(root)
 const capabilities = new CapabilityRegistry()
 const runtime = makeRuntime(root, undefined, capabilities, background ? process.env.ACORN_CLI_SERVICE_ID : undefined)
+// A standalone Node has no keychain, so its keys are files in the data root or SESSION_ENC_KEY in its
+// environment. Agents it runs share its OS user and can read both (docs/security.md § What task scope
+// does and doesn't protect against).
+log.warn(`this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`)
 const disabledPlugins = disabledPluginsStore(root.dir)
 // The disabled-plugin list a standalone node reads (docs/node-distribution.md § Plugins). There is
 // no start-config override here: only the supervised host passes one.
@@ -124,6 +129,7 @@ const pluginStateBridge = await buildPluginStateBridge({
   reloadHost: plugins,
 })
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
+core.nodeKeys = nodeKeyCustody(root.dir, 'files')
 core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
 
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure

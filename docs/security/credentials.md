@@ -54,8 +54,9 @@ whatever else it read while failing.
 ## Internal tokens
 
 Internal tokens are stateless HMAC credentials with a 48-hour expiry. Verification returns the same
-null result for expired, malformed, and forged tokens. The signing key persists across restarts;
-rotating it revokes every outstanding token. The Node accepts these tokens only from a loopback TCP
+null result for expired, malformed, and forged tokens. The signing key persists across restarts
+([Node keys](#node-keys)). Rotating it revokes every outstanding token, except the session files the
+one-time migration re-signs. The Node accepts these tokens only from a loopback TCP
 peer, even when its listener is advertised. Forwarded headers do not establish that peer.
 
 Two scopes exist:
@@ -96,6 +97,61 @@ The agent-tool route reads session identity and tool limits from the verified pr
 `x-acorn-session-id` and `x-acorn-tool-ceiling` headers grant nothing. Session-required tools drop
 out of `tools/list` without a signed session claim. A per-call UUID is used only after the signed
 owner and tool name scope it as an idempotency key.
+
+## Node keys
+
+A Node has two secrets. The session key, `SESSION_ENC_KEY`, encrypts stored credentials. The signing
+key signs internal tokens. An agent runs shell commands as the same OS user as the Node, so file modes
+don't keep either from it. A key in the data root or in the Node's start environment is one `cat` or
+`ps eww` away from any agent.
+
+A Node the desktop app starts keeps neither in plain form:
+
+1. The helper keeps both in `node-keys.sealed` in the data root, encrypted with AES-256-GCM under the
+   data key Rust holds in the OS keychain ([keys and custody](../shell/process.md#keys-and-custody)).
+2. At each start, the helper unseals the file and sends both keys in the `service.start` message over
+   the IPC channel. The Node refuses a start message without them and never reads a key file
+   (`packages/custody/src/custody/nodeKeys.ts`).
+3. The helper starts the Node without `SESSION_ENC_KEY`, `INTERNAL_TOKEN`, or `GITHUB_CLIENT_SECRET`
+   in its environment. A variable a `.env` file supplied whose name ends in `_KEY`, `_SECRET`, or
+   `_TOKEN` stays out too. Variables from the environment the app was launched with stay in, because
+   every ancestor process already shows them and a harness may pass one to its agent
+   (`serviceEnvironment` in `packages/custody/src/supervision/serviceHost.ts`).
+
+A `SESSION_ENC_KEY` from a `.env` file wins over the sealed key, as it won over `session.key`, and
+travels the same IPC route.
+
+The sealed file is only as safe as the data key. On a packaged build with the key in the keychain,
+another process can't read it without a prompt the person sees. A development build, or a machine
+where the keychain refused the item, keeps the data key in a plain `data.key` file in the custody
+root, and an agent can read that file too.
+
+### Upgrading a Node with plain key files
+
+The first desktop start after the upgrade migrates the plain files:
+
+1. The helper seals the existing `session.key` as it is, because a new session key would leave every
+   stored credential unreadable. It mints a new signing key, because any agent that ran before could
+   have read the old one.
+2. The Node boots with the sealed keys. Its first refresh pass re-signs every session token file
+   that verifies under the old key, keeping the same task, session, and tool ceiling. Only that pass
+   accepts the old key, so a token signed with it fails from then on.
+3. The Node tries the session key on its stored credentials and reports `ok`, `none`, or `failed` in
+   its start result.
+4. The helper deletes `internal-token`. It deletes `session.key` only when that file holds the key
+   the Node used and the check answered `ok` or `none`. On `failed`, the file stays and the Node
+   records `keys.check.failed` in the audit trail.
+
+A crash between steps is safe: the next start finds the sealed file and the plain files, and
+finishes the same migration. If the data key changes, for example because the keychain item was
+lost, the helper reseals from a plain `session.key` if one is left. With none, it refuses to start
+the Node and says why, rather than minting a key that orphans every stored credential.
+
+A standalone Node has no keychain. It keeps `session.key` and `internal-token` in its data root, or
+takes `SESSION_ENC_KEY` from its environment, and warns at boot that agents on it can read them. It
+refuses to mint a session key on a root that has a sealed file but no plain `session.key`.
+**Check this node** reports where the keys came from and any plain key file still in the data root
+([security diagnostics](./security-diagnostics.md)).
 
 ## Owner identity and provider access
 

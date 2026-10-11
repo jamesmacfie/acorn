@@ -154,7 +154,8 @@ source on Linux, which needs the usual build tools. If installation skipped life
 a later `npm rebuild` still works.
 
 `SESSION_ENC_KEY` is optional. Unset, the Node generates one into `session.key` in the data root at mode
-`0600` and never mints it again. A damaged key file is an error, because a silent replacement would turn
+`0600` and never mints it again. Agents on a standalone Node run as its user and can read that file,
+and the Node warns about it at boot ([Node keys](./security/credentials.md#node-keys)). A damaged key file is an error, because a silent replacement would turn
 "this file is wrong" into "every stored credential is gone". GitHub uses acorn's public client ID unless
 `GITHUB_CLIENT_ID` overrides it ([connecting](./github-integration.md#connecting)).
 

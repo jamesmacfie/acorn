@@ -44,6 +44,12 @@ describe('openDataRoot', () => {
     expect(existsSync(join(dir, 'node.lock'))).toBe(false)
   })
 
+  it('opens a fresh root that holds only the keys the desktop sealed before the first start', () => {
+    const dir = freshDir()
+    writeFileSync(join(dir, 'node-keys.sealed'), 'sealed')
+    expect(openTracked(dir).nodeId).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
   it('mints a stable identity and reuses it across reopen', () => {
     const dir = freshDir()
     const first = openTracked(dir)

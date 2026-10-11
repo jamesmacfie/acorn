@@ -140,6 +140,16 @@ it('reports bounded plugin counts and observed admission without external text',
   expect(JSON.stringify(report)).not.toContain(secret)
 })
 
+it('warns when the Node read its keys from files, or a plain key file is still in the data root', async () => {
+  const keyFinding = async (snapshot: { delivery: 'desktop' | 'files'; keyCheck: 'ok' | 'none' | 'failed' | null; plainFiles: string[] }) =>
+    (await collectSecurityDiagnostics(ports({ core: { ...ports().core, nodeKeys: { snapshot: () => snapshot } } as never }),
+      'node-1', 'owner', {}, new AbortController().signal)).findings.find((finding) => finding.id === 'host.keys')
+  expect(await keyFinding({ delivery: 'desktop', keyCheck: 'ok', plainFiles: [] })).toMatchObject({ state: 'observed', severity: 'info' })
+  expect(await keyFinding({ delivery: 'desktop', keyCheck: 'failed', plainFiles: ['session.key'] })).toMatchObject({ severity: 'warning', repair: expect.stringContaining('Audit log') })
+  expect(await keyFinding({ delivery: 'files', keyCheck: null, plainFiles: ['session.key', 'internal-token'] })).toMatchObject({ severity: 'warning' })
+  expect((await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)).findings.some((finding) => finding.id === 'host.keys')).toBe(false)
+})
+
 it('does not inspect encrypted approval bodies during a passive project check', async () => {
   const report = await collectSecurityDiagnostics(ports(), 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
   expect(report.findings.find((finding) => finding.id === 'instructions.approval')).toMatchObject({ state: 'unknown' })

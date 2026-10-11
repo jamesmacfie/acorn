@@ -96,8 +96,11 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
 
 // Node-owned credential files are the sole caller. This preserves every signed scope and ceiling;
 // it cannot turn an expired task token into a service token or change its task.
-export function renewInternalToken(key: string, token: string): string | null {
-  const claims = signedClaims(key, token)
+//
+// `previousKey` is for the one-time signing key rotation (docs/security/credentials.md § Node keys): a
+// token signed under the old key comes back signed under `key`, with the same claims.
+export function renewInternalToken(key: string, token: string, previousKey?: string): string | null {
+  const claims = signedClaims(key, token) ?? (previousKey ? signedClaims(previousKey, token) : null)
   if (!claims) return null
   const { expiresAt: _expiresAt, ...sameClaims } = claims
   return mintInternalToken(key, sameClaims)

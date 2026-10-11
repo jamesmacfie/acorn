@@ -22,8 +22,9 @@ exclusive `node.lock` protects it, so only one process opens it.
   logs/
   node.json
   node.lock
-  internal-token               the internal token signing key
-  session.key                  SESSION_ENC_KEY, when the environment doesn't supply it
+  node-keys.sealed             both keys below, sealed by the desktop helper
+  internal-token               the internal token signing key, on a standalone Node
+  session.key                  SESSION_ENC_KEY, on a standalone Node without it in the environment
   active-identity              the node-owner id
 ```
 

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -10,6 +10,7 @@ import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { HELPER_PROTOCOL, type HelperMethod, type WireFetchBody, type WireFetchResponse } from '../src/shell/wire'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { SEALED_NODE_KEYS_FILE } from '@acorn/protocol/serviceProtocol.ts'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
 // The boot test (docs/testing/desktop.md § The desktop boot test): does the shell's world come up.
@@ -44,6 +45,7 @@ const nodeBinary = (): string => {
 type Ready = { port: number; secret: string; nodeVersion: string; protocol: number }
 
 let helper: ChildProcess
+const PINNED_SESSION_KEY = 'c'.repeat(64)
 let dataDir: string
 let ready: Ready
 let socket: WebSocket
@@ -100,6 +102,10 @@ beforeAll(async () => {
   // them is an assertion below. They are still echoed, so a failing run reads the same as before.
   // First-run boot must work without host tools such as OpenSSL. Remove every spelling of PATH
   // because Windows treats environment variable names as case-insensitive.
+  // A developer's pinned key and a secret-shaped variable, from a `.env` file the way `pnpm dev` loads
+  // them. Neither may reach the node's environment.
+  const envFile = join(dataDir, 'boot.env')
+  writeFileSync(envFile, `SESSION_ENC_KEY=${PINNED_SESSION_KEY}\nBOOT_TEST_API_TOKEN=boot-test-leak\n`)
   const bootEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== 'PATH'))
   helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
     cwd: dataDir,
@@ -138,7 +144,7 @@ beforeAll(async () => {
       userDataDir: join(dataDir, 'shell'),
       serviceEntry: join(STAGING, 'service.js'),
       mcpEntry: join(STAGING, 'mcp.js'),
-      envFiles: [],
+      envFiles: [envFile],
       version: '0.0.0-test',
       isPackaged: Boolean(resources),
       ...(resources ? { bundledPluginsDir: join(resources, 'plugins') } : {}),
@@ -226,6 +232,23 @@ describe('the Tauri shell boots its world', () => {
     // Exactly one, and it cannot be unpaired: the app's own data root is what defines it.
     expect(local).toHaveLength(1)
     expect(local[0].nodeId).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('keeps the node keys sealed and out of the node environment', () => {
+    const files = readdirSync(join(dataDir, 'node'))
+    expect(files).toContain(SEALED_NODE_KEYS_FILE)
+    expect(files).not.toContain('session.key')
+    expect(files).not.toContain('internal-token')
+    if (process.platform === 'win32') return
+    // `ps eww` shows a process's start environment to anything running as the same user, which is
+    // exactly what an agent can run.
+    const environments = execFileSync('pgrep', ['-P', String(helper.pid)], { encoding: 'utf8' }).trim().split('\n')
+      .map((pid) => execFileSync('ps', ['eww', '-o', 'command=', '-p', pid], { encoding: 'utf8' }))
+    const node = environments.find((line) => line.includes('service.js'))
+    expect(node).toContain('ACORN_PERF=1')
+    expect(node).not.toContain('SESSION_ENC_KEY')
+    expect(node).not.toContain(PINNED_SESSION_KEY)
+    expect(node).not.toContain('BOOT_TEST_API_TOKEN')
   })
 
   it('carries a /v1 request through the broker to the node', async () => {

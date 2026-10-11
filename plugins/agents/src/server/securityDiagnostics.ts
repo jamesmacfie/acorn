@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
 import { isToolWithinCeiling, parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
-import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 import type { StaticDependencyPolicy } from '@acorn/protocol/dependencyPolicy.ts'
 import type { AgentSession } from '../contract/wire.ts'
 import type { AgentProviderDescriptor } from '../contract/wire.ts'
@@ -34,7 +34,7 @@ function releaseAgeLabel(minutes: number | null): string {
 }
 
 export type SecurityDiagnosticPorts = {
-  core: Pick<CoreServices, 'projects' | 'tasks' | 'fs' | 'prefs' | 'agentTools' | 'pluginSecurity'>
+  core: Pick<CompiledCoreServices, 'projects' | 'tasks' | 'fs' | 'prefs' | 'agentTools' | 'pluginSecurity' | 'nodeKeys'>
   defaults(userId: string): Promise<AgentSessionDefaults>
   session(id: string): Promise<AgentSession | null>
   managedMcp(): Promise<AgentMcpServer[]>
@@ -44,7 +44,7 @@ export type SecurityDiagnosticPorts = {
 }
 
 export async function securityScopeChoices(
-  core: Pick<CoreServices, 'projects' | 'tasks'>,
+  core: Pick<CompiledCoreServices, 'projects' | 'tasks'>,
   listSessions: () => Promise<AgentSession[]>,
 ): Promise<SecurityScopeChoices> {
   const projects = (await core.projects.checkouts()).slice(0, 100)
@@ -256,6 +256,30 @@ export async function collectSecurityDiagnostics(
   } catch {
     add('plugins.grants', 'core', 'failed', 'attention', 'core plugin host state', 'Plugin host facts could not be read.',
       'A failed read does not mean grants are absent.', 'Settings > Plugins.')
+  }
+
+  const keys = ports.core.nodeKeys?.snapshot()
+  if (keys) {
+    const sealed = keys.delivery === 'desktop'
+    const exposed = !sealed || keys.plainFiles.length > 0
+    add('host.keys', 'core', 'observed', exposed ? 'warning' : 'info', 'core key custody',
+      sealed
+        ? `The desktop app delivered this Node's keys in its start message. Plain key files in the data root: ${keys.plainFiles.join(', ') || 'none'}. Session key check: ${keys.keyCheck ?? 'not run'}.`
+        : `This Node reads its signing and encryption keys from files in its data root (${keys.plainFiles.join(', ') || 'not yet written'}) or from SESSION_ENC_KEY in its environment.`,
+      "Agents run as the same OS user as the Node and can read the rest of the data root, including other sessions' token files and the task database. Sealed keys are only as safe as the desktop's data key, which a dev build keeps in a plain data.key file.",
+      !sealed ? 'Run untrusted work on a Node the desktop app starts.'
+        : keys.plainFiles.length ? 'Restart Acorn. If a file stays, Settings > Audit log says why.' : 'No action needed.', {
+        title: "This Node's keys",
+        description: !sealed
+          ? 'Agents on this Node can read the keys that sign its internal tokens and decrypt its stored credentials.'
+          : keys.plainFiles.length
+            ? 'The keys are sealed, but a plain copy is still in the data root, where agents can read it.'
+            : 'The keys are sealed under the desktop app\'s keychain key. No plain copy is in the data root.',
+        facts: [
+          { label: 'Keys from', value: sealed ? 'Desktop app, sealed' : 'Files or environment' },
+          { label: 'Plain key files', value: keys.plainFiles.join(', ') || 'None' },
+        ],
+      })
   }
 
   try {

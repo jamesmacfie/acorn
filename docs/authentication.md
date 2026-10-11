@@ -96,8 +96,9 @@ Device administration is device-only:
 
 ## Internal tokens
 
-The Node keeps an internal signing key in `internal-token` and mints stateless HMAC tokens with these
-scopes:
+The Node mints stateless HMAC tokens with an internal signing key. The desktop helper delivers that key
+sealed, and a standalone Node keeps it in `internal-token` in its data root
+([Node keys](./security/credentials.md#node-keys)). The tokens have these scopes:
 
 - `service`: the Node's own loopback orchestration, never put in a child process.
 - `task`: a PTY, agent, workflow step, or MCP process bound to one `taskId`, optionally a `sessionId`,
@@ -160,6 +161,8 @@ run ping and pong watchdogs, and revocation closes device sockets ([WebSocket](.
 ## Encryption key
 
 `SESSION_ENC_KEY` is the 32-byte AES-256-GCM key for integration credentials and HTTP client fields, and
-must be exactly 64 hexadecimal characters (`packages/node-core/src/server/secretBox.ts`). The Node
-generates it into `session.key` in its data root when the environment doesn't supply it. A database
-without usable key material fails closed.
+must be exactly 64 hexadecimal characters (`packages/node-core/src/server/secretBox.ts`). A Node the
+desktop starts receives it in its start message, sealed at rest in `node-keys.sealed`. A standalone
+Node generates it into `session.key` in its data root when the environment doesn't supply it
+([Node keys](./security/credentials.md#node-keys)). A database without usable key material fails
+closed.

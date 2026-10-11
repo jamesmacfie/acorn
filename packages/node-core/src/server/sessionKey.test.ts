@@ -2,7 +2,11 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ensureSessionKey } from './sessionKey'
+import { SEALED_NODE_KEYS_FILE } from '@acorn/protocol/serviceProtocol.ts'
+import { checkSessionKey, ensureSessionKey } from './sessionKey'
+import { SecretService } from './core/secrets'
+import { makeTestDb } from '../testkit/db'
+import { seedProviderConnection } from '../testkit/integration'
 
 const roots: string[] = []
 const root = (): string => {
@@ -44,5 +48,29 @@ describe('the secret-encryption key', () => {
     // Silently re-minting here turns a recoverable "this file is wrong" into an unrecoverable
     // "every stored credential is gone", so it has to be loud.
     expect(() => ensureSessionKey(dir)).toThrow(/64-hex/)
+  })
+
+  it('refuses to mint a key on a root the desktop has sealed', () => {
+    delete process.env.SESSION_ENC_KEY
+    const dir = root()
+    writeFileSync(join(dir, SEALED_NODE_KEYS_FILE), 'sealed')
+    expect(() => ensureSessionKey(dir)).toThrow(/sealed by the desktop app/)
+    expect(() => statSync(join(dir, 'session.key'))).toThrow()
+  })
+})
+
+describe('the session key check', () => {
+  it('answers none with nothing stored, ok when one credential opens, and failed when none does', async () => {
+    const test = makeTestDb()
+    try {
+      const key = 'b'.repeat(64)
+      expect(await checkSessionKey(test.db, new SecretService(key))).toBe('none')
+      await seedProviderConnection(test.db, 'github', 'owner', 'ghp_example', 'c'.repeat(64))
+      expect(await checkSessionKey(test.db, new SecretService(key))).toBe('failed')
+      await seedProviderConnection(test.db, 'linear', 'owner', 'lin_example', key)
+      expect(await checkSessionKey(test.db, new SecretService(key))).toBe('ok')
+    } finally {
+      test.cleanup()
+    }
   })
 })

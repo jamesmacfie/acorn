@@ -76,9 +76,8 @@ SESSION_ENC_KEY=<64 hexadecimal characters>
 GitHub connects with acorn's public client ID and needs no configuration. Set `GITHUB_CLIENT_ID` only
 to use your own app. [GitHub integration](./github-integration.md#connecting) covers app setup.
 
-`SESSION_ENC_KEY` is optional. A Node without one generates its own key into the data root. Setting it
-pins a stable key across throwaway data roots. [Node distribution](./node-distribution.md) covers the
-key.
+`SESSION_ENC_KEY` is optional. Setting it pins a stable key across throwaway data roots. The helper
+sends it in the Node's start message, never its environment ([Node keys](./security/credentials.md#node-keys)).
 
 | Variable | Effect |
 | --- | --- |

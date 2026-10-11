@@ -78,6 +78,7 @@ describe('supervised service runtime', () => {
         hostRuntimePath: process.execPath,
         mcpEntry: '/unused/mcp.js',
         deviceToken: opts.deviceToken,
+        keys: { sessionKey: '0'.repeat(64), signingKey: 'runtime-test-signing-key-0123456789' },
       },
       stateChanged: (state) => opts.onState?.(state),
     })

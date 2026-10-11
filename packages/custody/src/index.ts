@@ -4,6 +4,7 @@ import { helperMark } from './bootMarks'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins/bundledPluginTrust'
 import { recordCrash } from './supervision/crashBudget'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type TokenCipher } from './custody/deviceTokenStore'
+import type { NodeKeyCustody } from './custody/nodeKeys'
 import { FleetStore, toNodeRecord } from './broker/fleetStore'
 import { NodeBroker, type BrokerEvents } from './broker/nodeBroker'
 import { PluginCache } from './plugins/pluginCache'
@@ -34,7 +35,13 @@ const log = createLogger('service-host')
 export type HelperOptions = {
   // The staged service.js, and the config it starts with. @acorn/protocol specs the config.
   serviceEntry: string
-  service: Omit<ServiceStartConfig, 'deviceToken'>
+  service: Omit<ServiceStartConfig, 'deviceToken' | 'keys'>
+  // The node's keys, sealed under the host's data key and sent in each start message
+  // (custody/nodeKeys.ts).
+  nodeKeys: NodeKeyCustody
+  // The environment the node starts with. The host strips secrets out of it (serviceEnvironment in
+  // supervision/serviceHost.ts).
+  serviceEnv: NodeJS.ProcessEnv
   // Custody root: fleet.json, the encrypted device tokens, the plugin cache and the trust store. The
   // node's own data root is `service.dataDir`.
   userDataDir: string
@@ -112,7 +119,7 @@ export function createHelper(options: HelperOptions): Helper {
   // Beside the plugin cache in the custody root, because both are this app's disposable copies. The
   // node's data root is the owner's data, and the app bundle is signed and read-only.
   const compileCacheRoot = join(userDataDir, 'compile-cache')
-  const service = new ServiceHost(options.serviceEntry, options.service, {
+  const service = new ServiceHost(options.serviceEntry, options.service, options.serviceEnv, {
     stateChanged: (state: ServiceState, detail?: string) => {
       log.info(`${state}${detail ? `: ${detail}` : ''}`, { 'service.state': state })
       if (state === 'failed' && detail) lastFailure = detail
@@ -206,7 +213,9 @@ export function createHelper(options: HelperOptions): Helper {
   // fresh result, since the endpoint can change across restarts.
   const start = async (): Promise<ServiceStartResult> => {
     lastFailure = undefined
-    const started = await service.start(tokens.read(LOCAL_TOKEN_SCOPE))
+    const keys = options.nodeKeys.prepare()
+    const started = await service.start(tokens.read(LOCAL_TOKEN_SCOPE), keys)
+    options.nodeKeys.settle(keys, started.keyCheck)
     // The node's own `[service:boot]` lines land in front of this one, so the two accounts read as one
     // timeline: everything the node printed, then how long the helper waited for all of it.
     helperMark('service.start')

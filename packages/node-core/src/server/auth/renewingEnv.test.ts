@@ -37,6 +37,33 @@ describe('internal credential renewal', () => {
     second.dispose()
   })
 
+  it('re-mints old-key session files under a rotated key once, keeping their claims', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-11T00:00:00Z'))
+    const root = mkdtempSync(join(tmpdir(), 'acorn-credentials-'))
+    roots.push(root)
+    const oldKey = 'old-signing-key'
+    const before = renewingInternalEnv(oldKey, root, () => ({}))
+    const claims = { scope: 'task' as const, taskId: 'task-1', sessionId: 'session-1', toolCeiling: { allow: ['task_current'], maxRisk: 'read' as const } }
+    const path = before.internalEnv(claims).ACORN_API_TOKEN_FILE
+    const other = before.internalEnv({ ...claims, taskId: 'task-2', sessionId: 'session-2' }).ACORN_API_TOKEN_FILE
+    before.dispose()
+
+    const rotated = renewingInternalEnv(KEY, root, () => ({}), oldKey)
+    for (const [file, taskId, sessionId] of [[path, 'task-1', 'session-1'], [other, 'task-2', 'session-2']]) {
+      const token = readFileSync(file, 'utf8')
+      expect(verifyInternalToken(KEY, token)).toEqual({ ...claims, taskId, sessionId })
+      expect(verifyInternalToken(oldKey, token)).toBeNull()
+    }
+
+    // Only the boot pass accepts the old key. A file forged with it afterwards is left to fail.
+    const forged = mintInternalToken(oldKey, claims)
+    writeFileSync(path, forged)
+    vi.advanceTimersByTime(12 * 60 * 60 * 1000)
+    expect(readFileSync(path, 'utf8')).toBe(forged)
+    rotated.dispose()
+  })
+
   it('renews a running workflow child and removes its file when the child ends', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-09T00:00:00Z'))

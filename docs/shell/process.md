@@ -77,8 +77,9 @@ root from the same application-data path, and fixture resets run only in debug b
 `a_release_build_ignores_the_data_dir_variable` in `apps/desktop/src-tauri/src/lib.rs` checks this.
 
 Secrets load from `.env` in two places, in order: the build's own file, then a `.env` inside the data
-directory, which wins. Without `SESSION_ENC_KEY` in either, the Node generates its own, before the
-listener accepts connections.
+directory, which wins. The helper loads them, and keeps secrets out of the environment it starts the
+Node with. The Node's keys reach it in its start message, sealed at rest under the data key
+([Node keys](../security/credentials.md#node-keys)).
 
 `tauri_plugin_single_instance` makes a second launch focus the running window. The data root's
 exclusive lock (`packages/node-core/src/server/storage/dataRoot.ts`) is the real guard, and the
@@ -101,7 +102,9 @@ There's one key, not one per token, because per-token keychain items mean a prom
 access-list churn on every rebuild. On macOS, a keychain item's access list binds to the code
 signature, so while the app is ad-hoc signed every rebuild re-prompts or loses access. The fallback is
 a `0600` file beside the fleet, and a development build always uses the file. That's the same stance
-`deviceTokenStore.ts` takes, with the same blast radius as the Node's `session.key`.
+`deviceTokenStore.ts` takes. The helper seals the Node's keys under the same data key, so with the
+file fallback an agent that can read `data.key` can open them too
+([Node keys](../security/credentials.md#node-keys)).
 
 The helper opens only this installation's custody root, and reads no credentials from another root.
 

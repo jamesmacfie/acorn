@@ -131,7 +131,6 @@ describe('the service as a spawned child process', () => {
   async function boot(): Promise<{ started: ServiceStartResult; service: ServiceChild }> {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-'))
     const service = new ServiceChild({
-      SESSION_ENC_KEY: '0'.repeat(64),
       GITHUB_CLIENT_ID: 'test-client',
       // The parent inherits vitest's environment, and an ACORN_PORT leaking in would pin the port and
       // hide the ephemeral path this whole phase depends on.
@@ -146,6 +145,7 @@ describe('the service as a spawned child process', () => {
       isPackaged: false,
       hostRuntimePath: process.execPath,
       mcpEntry: join(dataDir, 'unused-mcp.js'),
+      keys: { sessionKey: '1'.repeat(64), signingKey: 'spawn-test-signing-key-0123456789' },
     })
     return { started: serviceStartResultSchema.parse(result), service }
   }
@@ -159,6 +159,16 @@ describe('the service as a spawned child process', () => {
     expect(readdirSync(dataDir)).toEqual([])
   })
 
+  // A supervised node never falls back to key files: no keys in the start message is a refusal that
+  // says so, with nothing written.
+  it('refuses a start message without keys, naming them', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-keyless-'))
+    child = new ServiceChild({ GITHUB_CLIENT_ID: 'test-client', ACORN_PORT: '' })
+    const config = { baseline: ACORN_BASELINE, dataDir, version: 'spawn-test', isPackaged: false, hostRuntimePath: process.execPath, mcpEntry: join(dataDir, 'unused-mcp.js') }
+    await expect(child.request('service.start', config)).rejects.toThrow(/keys/)
+    expect(readdirSync(dataDir)).toEqual([])
+  })
+
   it('boots over IPC, reports its endpoint and pin, serves TLS, and drains on request', async () => {
     const { started, service } = await boot()
 
@@ -166,6 +176,10 @@ describe('the service as a spawned child process', () => {
     expect(started.nodeId).toMatch(/^[0-9a-f-]{36}$/)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
     expect(started.deviceToken).toMatch(/^acorn_dt_/)
+    expect(started.keyCheck).toBe('none')
+    // The keys came in the start message, so neither lands in the data root in plain form.
+    expect(readdirSync(dataDir!)).not.toContain('session.key')
+    expect(readdirSync(dataDir!)).not.toContain('internal-token')
 
     // A real request over the wire, validated against the pin the child just handed back, which covers
     // the whole chain at once: the certificate on disk, the listener serving it, the port in the result,

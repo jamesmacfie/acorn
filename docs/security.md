@@ -73,6 +73,35 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
 [review-2026-10-11.md](./security/review-2026-10-11.md).
 
+## What task scope does and doesn't protect against
+
+A task token reaches only its own task's routes and can't spend a provider credential. That holds at
+the Node's HTTP surface. It doesn't stop an agent from reading files: an agent runs shell commands as
+the same OS user as the Node, and file modes don't stop the owner's own processes.
+
+What a Node the desktop app starts keeps from its agents:
+
+- The signing key and the session key. Neither is in plain form on disk or in the Node's start
+  environment. The helper seals both under its keychain data key and sends them in the start message
+  ([Node keys](./security/credentials.md#node-keys)).
+- Tokens signed before that change. The first start after the upgrade rotates the signing key and
+  re-signs live session files, so a key an agent read earlier stops working.
+
+What stays readable to an agent:
+
+- Its own token. An agent can always read the token it was given, which reaches only its task.
+- Everything else in the data root, including other sessions' token files under
+  `internal-credentials/`, `core.sqlite` with task and transcript data, and the TLS private key. Acorn
+  starts no harness with a read block on the data root. Claude Code blocks a shell command's reads
+  only inside its sandbox, which also sends network traffic through an allowlist that starts empty
+  and limits writes to the working directory and a temporary directory.
+- The sealed keys, wherever the desktop's data key is a plain `data.key` file. That's every
+  development build, and a packaged build whose keychain refused the item.
+- Every key on a standalone Node, which has no keychain and warns about this at boot.
+
+**Check this node** shows which case applies to the Node it checks
+([security diagnostics](./security/security-diagnostics.md)).
+
 ## Instruction file checks and review
 
 [Instruction checks and review](./security/instruction-review.md) covers hidden characters, changed

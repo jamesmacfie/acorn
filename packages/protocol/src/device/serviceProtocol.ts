@@ -20,6 +20,26 @@ export const serviceStateEventSchema = z.strictObject({
   detail: z.string().optional(),
 })
 
+// The Node's two secrets: the key that encrypts stored credentials and the key that signs internal
+// tokens. The desktop helper keeps them sealed under its keychain data key and sends them here, so
+// neither sits in plain form on disk, in an environment, or on a command line where an agent running
+// as the same user could read it (docs/security/credentials.md § Node keys).
+//
+// The sealed file's name in the data root. The helper owns it. The Node only checks that it exists.
+export const SEALED_NODE_KEYS_FILE = 'node-keys.sealed'
+export const nodeKeysSchema = z.strictObject({
+  sessionKey: z.string().regex(/^[0-9a-fA-F]{64}$/, 'sessionKey must be 64 hex characters'),
+  signingKey: z.string().min(32),
+  // The signing key from before the one-time rotation. The Node re-mints the session token files it
+  // signed under the sealed key, then forgets it. Absent once the plain key file is gone.
+  previousSigningKey: z.string().min(1).optional(),
+})
+export type NodeKeys = z.infer<typeof nodeKeysSchema>
+
+// Whether the delivered session key opened a stored credential. `none` means there was nothing to try.
+export const nodeKeyCheckSchema = z.enum(['ok', 'none', 'failed'])
+export type NodeKeyCheck = z.infer<typeof nodeKeyCheckSchema>
+
 export const serviceStartConfigSchema = z.strictObject({
   baseline: z.literal(ACORN_BASELINE),
   dataDir: z.string().min(1),
@@ -40,6 +60,8 @@ export const serviceStartConfigSchema = z.strictObject({
   // never persists it.
   deviceToken: z.string().min(1).optional(),
   disabledPlugins: z.array(z.string().min(1)).optional(),
+  // Required: a supervised Node never falls back to key files in its data root.
+  keys: nodeKeysSchema,
 })
 export type ServiceStartConfig = z.infer<typeof serviceStartConfigSchema>
 
@@ -63,6 +85,8 @@ export const serviceStartResultSchema = z.strictObject({
   // unconditionally, and an optional pin is a pin that silently is not one.
   fingerprint: z.string().min(1),
   certPem: z.string().min(1),
+  // The helper deletes a plain key file only after the Node confirms the sealed key works.
+  keyCheck: nodeKeyCheckSchema,
 })
 export type ServiceStartResult = z.infer<typeof serviceStartResultSchema>
 

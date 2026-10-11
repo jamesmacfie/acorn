@@ -15,6 +15,7 @@ type Handshake = { nodeId: string; endpoint: string; deviceToken: string }
 
 class StandaloneNode {
   readonly child: ChildProcess
+  stderr = ''
   private readonly handshake: Promise<Handshake>
 
   constructor(dataDir: string) {
@@ -31,7 +32,10 @@ class StandaloneNode {
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ignore'],
     })
-    this.child.stderr?.on('data', (chunk: Buffer) => console.error(`[standalone] ${chunk.toString().trimEnd()}`))
+    this.child.stderr?.on('data', (chunk: Buffer) => {
+      this.stderr += chunk.toString()
+      console.error(`[standalone] ${chunk.toString().trimEnd()}`)
+    })
     this.handshake = new Promise<Handshake>((resolveHandshake, reject) => {
       const timer = setTimeout(() => reject(new Error('standalone printed no handshake line')), 90_000)
       timer.unref?.()
@@ -93,6 +97,8 @@ describe('a standalone node drains on SIGTERM', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-standalone-'))
     node = new StandaloneNode(dataDir)
     await node.ready()
+    // A standalone Node has no keychain, so it says where its keys are (docs/security.md).
+    expect(node.stderr).toContain('agents it runs can read them')
 
     const code = await node.terminate(EXIT_BUDGET_MS)
     expect(code).toBe(0)

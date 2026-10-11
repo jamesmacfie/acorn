@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { createHelper, type Helper } from '@acorn/custody/runtime'
+import { createHelper, nodeKeyCustody, serviceEnvironment, type Helper } from '@acorn/custody/runtime'
 import { helperMark } from '@acorn/custody/runtime'
 import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
@@ -95,6 +95,7 @@ const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
   const tokenCipher = dataKeyCipher(handshake.dataKey)
+  const inherited = new Set(Object.keys(process.env))
   for (const file of handshake.envFiles) {
     try {
       process.loadEnvFile(file)
@@ -103,6 +104,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       // keychain.
     }
   }
+  const fromEnvFiles = new Set(Object.keys(process.env).filter((name) => !inherited.has(name)))
 
   let server: HelperServer | null = null
   const helper = createHelper({
@@ -120,6 +122,10 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     },
     userDataDir: handshake.userDataDir,
     tokenCipher,
+    // The node's keys are sealed under the same data key and reach it only in its start message. The
+    // `.env` key, if a developer set one, takes the same route rather than the node's environment.
+    nodeKeys: nodeKeyCustody(handshake.dataDir, tokenCipher, process.env.SESSION_ENC_KEY?.trim() || undefined),
+    serviceEnv: serviceEnvironment(process.env, fromEnvFiles),
     viewerMultiplexing: true,
     // Looked up rather than captured, because the listener does not exist yet and there may be no
     // renderer attached when a frame arrives.

@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, string> = {
   'secrets.publication.allowed': 'Publication allowed once',
   'plugins.disabled.changed': 'Plugins changed',
   'backup.created': 'Backup created',
+  'keys.check.failed': 'Node key check failed',
 }
 
 // A device is named by what it was called when it paired, which `device.paired` records in its

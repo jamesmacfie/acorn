@@ -9,6 +9,7 @@ import {
   type PreviewBrowserRule,
   type ServiceMessage,
   type ServiceMessageTransport,
+  type NodeKeys,
   type ServiceStartConfig,
   type ServiceStartResult,
   type ServiceState,
@@ -33,6 +34,21 @@ const KILL_ESCALATION_MS = 5_000
 // quit open for it forever is worse than the orphan.
 const GIVE_UP_MS = 2_000
 
+// Never in the node's environment, wherever they came from. The node takes its keys from the start
+// message, and nothing reads the GitHub client secret, because the device grant uses none.
+const SECRET_NAMES = new Set(['SESSION_ENC_KEY', 'INTERNAL_TOKEN', 'GITHUB_CLIENT_SECRET'])
+const SECRET_SHAPED = /_(KEY|SECRET|TOKEN)$/
+
+// The environment the node starts with, which `ps eww` shows to any process running as this user for
+// as long as the node runs. `fromEnvFiles` names the variables the host loaded from `.env` files: those
+// appear nowhere else, so a secret-shaped one stays out. A variable the person's own launch
+// environment already held is visible on every ancestor process anyway, and a harness may pass it on
+// to its agent (`envPassthrough`), so it stays in.
+export function serviceEnvironment(env: NodeJS.ProcessEnv, fromEnvFiles: ReadonlySet<string>): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([name]) =>
+    !SECRET_NAMES.has(name) && !(fromEnvFiles.has(name) && SECRET_SHAPED.test(name))))
+}
+
 export class ServiceHost {
   private child: ChildProcess | null = null
   private peer: ServiceRpcPeer | null = null
@@ -40,19 +56,22 @@ export class ServiceHost {
 
   constructor(
     private readonly entry: string,
-    private readonly config: ServiceStartConfig,
+    private readonly config: Omit<ServiceStartConfig, 'deviceToken' | 'keys'>,
+    // Already stripped by `serviceEnvironment`.
+    private readonly env: NodeJS.ProcessEnv,
     private readonly events: ServiceHostEvents = {},
     // The parent of the service's compile cache (./compileCache.ts). Without one, every start
     // compiles the whole bundle from scratch.
     private readonly compileCacheRoot?: string,
   ) {
-    serviceStartConfigSchema.parse(config)
+    serviceStartConfigSchema.omit({ deviceToken: true, keys: true }).parse(config)
   }
 
   // Resolves with where the service bound, who it is, and the bearer to reach it with, which is
   // everything the connection broker needs. The caller supplies the remembered device token so the
-  // service reuses it instead of creating a device row on every launch.
-  async start(rememberedDeviceToken?: string): Promise<ServiceStartResult> {
+  // service reuses it instead of creating a device row on every launch, and the node's keys, which
+  // travel only in this message (custody/nodeKeys.ts).
+  async start(rememberedDeviceToken: string | undefined, keys: NodeKeys): Promise<ServiceStartResult> {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
     // Worked out here rather than in the constructor, so the old build's cache is removed after the
@@ -65,7 +84,7 @@ export class ServiceHost {
       // (server/taskEnv.ts), so the compile cache variable does not reach them. A Node program that
       // inherits it anyway, through one of the few tools spawned with the full environment, only adds
       // its own entries, because Node keeps each runtime version apart.
-      env: { ...process.env, ...(compileCache ? { NODE_COMPILE_CACHE: compileCache } : {}) },
+      env: { ...this.env, ...(compileCache ? { NODE_COMPILE_CACHE: compileCache } : {}) },
       // stdin closed, because the service never reads it. stdout and stderr inherited, so its logs
       // land wherever the app's do. fd 3 is the IPC channel that gives the child `process.send`.
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
@@ -112,7 +131,7 @@ export class ServiceHost {
     })
     child.on('exit', (code) => this.handleExit(child, code ?? 0))
     await spawned
-    const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken }, 60_000)
+    const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken, keys }, 60_000)
     // Parsed, not cast. A malformed handoff would otherwise surface much later as an unreachable node
     // with no explanation.
     return serviceStartResultSchema.parse(result)

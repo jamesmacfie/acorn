@@ -16,6 +16,10 @@ import { SecretService } from './core/secrets'
 import { drizzleOverSqlite, openSqlite } from './storage/sqlite'
 import { assertMigrationHistory } from './storage/migrationHistory'
 import { ensureSessionKey } from './sessionKey'
+// The composition roots check the delivered session key and report key custody beside the bindings
+// they build from it.
+export { checkSessionKey, nodeKeyCustody } from './sessionKey'
+import type { NodeKeys } from '@acorn/protocol/serviceProtocol.ts'
 import { ensureCert } from './transport/tls'
 import { chargeInterruptedModelCalls } from './modelProviders/grantSchema'
 
@@ -53,9 +57,8 @@ export type RuntimeBindings = {
   // used to sit here directly, and it is the seam that scrubs a credential out of a provider error
   // before it reaches a log or a client.
   SECRETS: SecretService
-  // Bearer for loopback callers with no device token: the acorn MCP server and other spawned
-  // children (docs/mcp.md § Launch environment). Injected into task session env as
-  // ACORN_API_TOKEN; auth middleware maps it to the machine's single owner.
+  // The key that signs internal tokens (server/auth/internalTokens.ts). Spawned children get a token
+  // signed with it as ACORN_API_TOKEN, never the key itself (docs/mcp.md § Launch environment).
   INTERNAL_TOKEN: string
   // The machine's bound owner identity: an opaque `owner-<uuid>` minted at first boot
   // (ensureBoundIdentity below), read by every principal. Installs that bound a GitHub login under
@@ -196,8 +199,8 @@ export function openDb(dbPath: string): AppDatabase {
   return withBatch
 }
 
-// Persist the loopback bearer across boots (docs/mcp.md § Launch environment). Store it next to
-// the database (like session.key, mode 0600), reuse it, and mint one only on first run.
+// The internal token signing key, for a standalone Node (docs/mcp.md § Launch environment). Stored
+// next to the database (like session.key, mode 0600), reused, and minted only on first run.
 function loadOrCreateInternalToken(dataDir: string): string {
   const file = join(dataDir, 'internal-token')
   try {
@@ -224,20 +227,21 @@ export type BindingsOptions = {
   appVersion: string
   serviceInstanceId?: string
   capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
+  // The desktop helper's delivered keys. Without them, a standalone Node reads or mints its key files.
+  keys?: NodeKeys
 }
 
 // Build the bindings object once at startup. The desktop shell resolves the data root, the OS
 // application-data path when packaged and the repo-local apps/node/.acorn in a checkout, and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
-export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInstanceId, capabilities }: BindingsOptions): RuntimeBindings {
+export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInstanceId, capabilities, keys }: BindingsOptions): RuntimeBindings {
   const databasePath = resolve(dbPath)
   const blobCachePath = resolve(blobsDir)
   const db = openDb(databasePath)
   const dataDir = dirname(databasePath)
-  // Was a required environment variable that threw at boot. It still wins when set, since the
-  // desktop puts a safeStorage-backed value there before this runs, but a headless node now mints
-  // its own into the data root instead of refusing to start (server/sessionKey.ts).
-  const encKey = ensureSessionKey(dataDir)
+  // Delivered by the desktop helper, or read and minted in the data root by a standalone Node
+  // (server/sessionKey.ts). Never both: a supervised Node doesn't fall back to the files.
+  const encKey = keys?.sessionKey ?? ensureSessionKey(dataDir)
   const activeIdentity = activeIdentityStore(dataDir)
   // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows. Before this ran at
   // boot, the identity was bound as a side effect of connecting GitHub, and every internal caller
@@ -258,7 +262,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInst
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     SECRETS: new SecretService(encKey),
-    INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
+    INTERNAL_TOKEN: keys?.signingKey ?? loadOrCreateInternalToken(dataDir),
     ACTIVE_IDENTITY: activeIdentity,
     DEVICES: deviceService(db),
     IDEMPOTENCY: idempotencyStore(db),

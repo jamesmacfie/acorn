@@ -26,8 +26,7 @@ const EXCLUDED = [
   'credentials (integrations.encrypted_credentials)',
   'device tokens (the devices table)',
   'the TLS private key',
-  'the session encryption key (session.key)',
-  'the loopback internal token',
+  'the session encryption key and the internal token signing key (node-keys.sealed, or session.key and internal-token)',
   'the blob cache (content-addressed, refetchable)',
   'worktrees (git checkouts, clone instead)',
 ]
