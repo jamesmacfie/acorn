@@ -7,12 +7,12 @@ import type {
   ProjectConfigResponse,
   SetupTrigger,
 } from '@acorn/protocol/api.ts'
-import type { AppDatabase } from './db'
+import type { AppDatabase } from '../db'
 import { eq } from 'drizzle-orm'
-import { schema } from './db'
+import { schema } from '../db'
 import { getProject } from './projects'
 import { readCommittedConfig } from './runConfig'
-import { broadcastProjectChanged } from './notify'
+import { broadcastProjectChanged } from '../notify'
 
 const runTargetWireSchema = z
   .object({

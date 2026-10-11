@@ -11,7 +11,7 @@ import { workspaces } from './workspaces'
 import { prefs } from '../prefs'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
 import type { Env } from '../../bindings'
-import { createProjectRef } from '../../projects'
+import { createProjectRef } from '../../projects/projects'
 
 vi.mock('../../db', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../db')>()),

@@ -1,7 +1,7 @@
 import { dedupeBranch, isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeAvailability } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
-import { getProject, type ProjectRow } from '../projects'
+import { getProject, type ProjectRow } from '../projects/projects'
 import { git, gitOrThrow, gitText } from '../core/git'
 import { branchExists } from './worktrees'
 import { worktreeAvailability, worktreeNameConflict } from './worktreeAvailability'

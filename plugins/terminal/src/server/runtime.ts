@@ -39,7 +39,7 @@ export type RuntimeDeps = {
   retireSession(sessionId: string): void
   // Run a short-lived script (stop / url_command) in cwd; ok + trimmed stdout.
   runScript(taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }>
-  // Throws when the repo's configuration has not been acknowledged (server/repoConfigTrust.ts). Required
+  // Throws when the repo's configuration has not been acknowledged (server/projects/repoConfigTrust.ts). Required
   // for the same reason `repoTargetIds` is. The expected hash must match the current approved snapshot.
   authorizeRepoConfig(taskId: string, expectedHash: string): Promise<void>
   // A declared target started or stopped through this service (docs/plugins/events.md § Hearing a core event

@@ -3,9 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../testkit/db'
-import { schema } from './db'
-import { taskRunConfig } from './worktrees/taskWorktree'
+import { makeTestDb, type TestDb } from '../../testkit/db'
+import { schema } from '../db'
+import { taskRunConfig } from '../worktrees/taskWorktree'
 import {
   acknowledgeRepoConfig,
   assertProjectRepoConfigTrusted,

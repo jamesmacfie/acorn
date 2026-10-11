@@ -10,7 +10,7 @@ const loader = createRequire(new URL('apps/desktop/package.json', root)).resolve
 // Each caller with the assertions for a malformed document, then for a large valid one.
 const callers = [
   [
-    'packages/node-core/src/server/runConfig.ts',
+    'packages/node-core/src/server/projects/runConfig.ts',
     `
     const result = caller.loadRepoConfig(null, null, { devScript: 'owner-command' }, text)
     assert.equal(result.errors.length, 1)

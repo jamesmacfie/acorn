@@ -12,7 +12,7 @@ import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult } from '@acorn/protocol/task.ts'
-import { getProjectConfig } from '../projectConfig'
+import { getProjectConfig } from '../projects/projectConfig'
 import {
   getWorktreesRoot,
   isDir,

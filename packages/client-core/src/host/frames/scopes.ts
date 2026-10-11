@@ -110,7 +110,7 @@ const RULES: readonly RouteRule[] = [
   {
     path: shape(`/v1/core/projects/${SEG}/config`),
     scopes: { GET: 'core.projects:config' },
-    note: 'GET reads setup/dev/teardown/db-url scripts, which frequently carry credentials. PUT writes those scripts for the Node to execute and is permanently unmappable (server/repoConfigTrust.ts).',
+    note: 'GET reads setup/dev/teardown/db-url scripts, which frequently carry credentials. PUT writes those scripts for the Node to execute and is permanently unmappable (server/projects/repoConfigTrust.ts).',
   },
   {
     path: shape(`/v1/core/projects/${SEG}/run-targets`),

@@ -1,8 +1,8 @@
 // Captured executable configuration bytes and their approval identity.
 import { createHash } from 'node:crypto'
 import { closeSync, constants, fstatSync, lstatSync, openSync, opendirSync, readSync, realpathSync } from 'node:fs'
-import { resolveInRoot } from './core/fs'
-import type { schema } from './db'
+import { resolveInRoot } from '../core/fs'
+import type { schema } from '../db'
 
 export type RepoConfigSnapshot = { hash: string; text: string; files: Array<{ path: string; content: string }> }
 

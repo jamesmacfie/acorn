@@ -5,7 +5,7 @@ import { taskScripts } from '../taskScripts/service'
 import { and, eq, isNull, lt, max, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
-import type { LayoutRecipe, RunTarget } from '../runConfig'
+import type { LayoutRecipe, RunTarget } from '../projects/runConfig'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
@@ -21,7 +21,7 @@ import {
   workspaceIdFor,
   type TaskRef,
 } from '../worktrees/taskWorktree'
-import { getProject, normalizeGithubPart } from '../projects'
+import { getProject, normalizeGithubPart } from '../projects/projects'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,

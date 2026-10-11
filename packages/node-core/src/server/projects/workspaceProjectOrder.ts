@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
-import type { AppDatabase } from './db'
-import { schema } from './db'
-import { broadcastProjectChanged } from './notify'
+import type { AppDatabase } from '../db'
+import { schema } from '../db'
+import { broadcastProjectChanged } from '../notify'
 
 /** Reject stale membership and save the complete order in one transaction. */
 export function reorderWorkspaceProjects(db: AppDatabase, workspaceId: string, projectIds: readonly string[]) {

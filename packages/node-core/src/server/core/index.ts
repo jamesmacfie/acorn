@@ -17,7 +17,7 @@ import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
 import type { SecretPublicationGate } from '../secretChecks/gate'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
-import { getProject } from '../projects'
+import { getProject } from '../projects/projects'
 import type { CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodeKeyCustody } from '../sessionKey'
 import { realpathSync } from 'node:fs'
@@ -234,7 +234,7 @@ export type { IdentityService } from './identity'
 export type { CompiledProjectService, ProjectService } from './projectRefs'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
 // and they carry no core config columns and no database handle.
-export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'
+export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects/projects'
 // The same arrangement one entity over: what TaskService hands back and takes in. A few fields off the
 // `tasks` row, and no database handle.
 export type { TaskRef } from '../worktrees/taskWorktree'

@@ -4,10 +4,10 @@
 // behind the device-only gate on the write path (docs/security/process-and-paths.md § Process, path, and configuration
 // controls).
 import { and, desc, eq, isNotNull } from 'drizzle-orm'
-import type { AppDatabase } from './db'
-import { schema } from './db'
+import type { AppDatabase } from '../db'
+import { schema } from '../db'
 import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
-import { isDir, loadTask, projectForTask } from './worktrees/taskWorktree'
+import { isDir, loadTask, projectForTask } from '../worktrees/taskWorktree'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from './repoConfigSnapshot'
 export { readRepoConfigSnapshot, type ProjectExecutableConfig } from './repoConfigSnapshot'
 

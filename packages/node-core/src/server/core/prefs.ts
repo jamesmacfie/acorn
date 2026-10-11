@@ -17,7 +17,7 @@ import { and, eq } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { projectCount, storedWorkspacesMode } from '../workspacesMode'
+import { projectCount, storedWorkspacesMode } from '../projects/workspacesMode'
 import { broadcastWorkspacesModeChanged } from '../notify'
 
 export class PreferenceWriteError extends Error {

@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY, workspacesMode, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
-import type { AppDatabase } from './db'
-import { schema } from './db'
+import type { AppDatabase } from '../db'
+import { schema } from '../db'
 
 type ModeDatabase = Pick<AppDatabase, 'select' | 'insert'>
 

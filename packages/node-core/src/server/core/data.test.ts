@@ -11,7 +11,7 @@ import { createProjectService } from './projectRefs'
 import { memoryIdentityStore } from '../activeIdentity'
 import * as coreProc from './proc'
 import { createTaskService } from './tasks'
-import { RepoConfigTrustError } from '../repoConfigTrust'
+import { RepoConfigTrustError } from '../projects/repoConfigTrust'
 import { dataReadOnlyRefusal, hasTaskDataSource, resolveTaskDataUrl } from './data'
 
 describe('dataReadOnlyRefusal', () => {

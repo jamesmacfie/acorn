@@ -6,8 +6,15 @@ import { z } from 'zod'
 import type { Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
-import { createProject, detectProject, getProject, listProjects, patchProject, type ProjectRow } from '../../projects'
-import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projectConfig'
+import {
+  createProject,
+  detectProject,
+  getProject,
+  listProjects,
+  patchProject,
+  type ProjectRow,
+} from '../../projects/projects'
+import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projects/projectConfig'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
@@ -230,7 +237,7 @@ export const projects = new Hono<AppEnv>()
     const db = getDb(c.env)
     if (!(await getProject(db, c.req.param('id')))) return respondError(c, 404, 'not_found', ['No such project.'])
     // Row only. The folder and any worktrees on disk are never touched from here.
-    const { deleteProject } = await import('../../projectDeletion')
+    const { deleteProject } = await import('../../projects/projectDeletion')
     await deleteProject(db, c.req.param('id'), ownerId(c))
     return c.json({ ok: true })
   })

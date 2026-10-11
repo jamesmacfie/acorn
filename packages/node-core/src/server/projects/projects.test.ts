@@ -3,9 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from './db'
+import { schema } from '../db'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
-import { makeTestDb, type TestDb } from '../testkit/db'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import {
   createProject,
   createProjectRef,

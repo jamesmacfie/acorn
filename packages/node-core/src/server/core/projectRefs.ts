@@ -10,10 +10,10 @@ import {
   type ProjectCreateRefInput,
   type ProjectRef,
   type ProjectUpdateRefInput,
-} from '../projects'
+} from '../projects/projects'
 import type { ProjectConfigResponse } from '@acorn/protocol/api.ts'
-import { getProjectConfig } from '../projectConfig'
-import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../repoConfigTrust'
+import { getProjectConfig } from '../projects/projectConfig'
+import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../projects/repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../worktrees/taskWorktree'
 import type { ActiveIdentityStore } from '../activeIdentity'
 

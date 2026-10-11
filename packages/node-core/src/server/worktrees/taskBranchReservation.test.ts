@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { makeTestDb } from '../../testkit/db'
 import { schema } from '../db'
-import { getProject } from '../projects'
+import { getProject } from '../projects/projects'
 import { withBranchReservation } from './taskBranch'
 
 const deferred = () => {

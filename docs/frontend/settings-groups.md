@@ -51,7 +51,7 @@ its binding. Docker's tab is the example (`plugins/docker/src/client/DockerProje
 A value a project's committed `.acorn/config.toml` sets is read-only on the project page, labeled
 **From .acorn/config.toml**, with the file's value above this machine's own. The project config read
 carries `repoConfig`, only what the file sets (`readCommittedConfig` in
-`packages/node-core/src/server/runConfig.ts`), so the page never parses repository files. Those values
+`packages/node-core/src/server/projects/runConfig.ts`), so the page never parses repository files. Those values
 are the dev script and restart command when the file declares a `dev` run target, the database
 connection script, the preview mode and value, and the run targets. A machine target with a repository
 target's name says the repository replaces it. The file wins whether or not it's trusted: trust decides

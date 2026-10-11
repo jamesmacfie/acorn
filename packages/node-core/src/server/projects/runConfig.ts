@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import { readConfigFileSync } from './core/fs'
+import { readConfigFileSync } from '../core/fs'
 import type { PreviewMode, ProjectRepoConfig } from '@acorn/protocol/api.ts'
 
 export type RunTarget = {

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { ProjectBranches } from '@acorn/protocol/api.ts'
 import { schema, type AppDatabase } from '../db'
-import type { ProjectRow } from '../projects'
+import type { ProjectRow } from '../projects/projects'
 import { gitText } from '../core/git'
 
 export async function localBranches(checkout: string): Promise<Array<{ name: string; committedAt: number }>> {

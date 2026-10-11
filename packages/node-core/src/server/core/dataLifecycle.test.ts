@@ -70,7 +70,7 @@ vi.mock('node:fs/promises', () => ({
     return `DATABASE_URL=${driver.url}`
   },
 }))
-vi.mock('../runConfig', () => ({ loadRepoConfig: () => ({}) }))
+vi.mock('../projects/runConfig', () => ({ loadRepoConfig: () => ({}) }))
 import { createDataSourceService, dataSourceFor } from './data'
 
 const core = {

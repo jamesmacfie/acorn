@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { acknowledgeRepoConfig, repoConfigTrustReview } from '../../repoConfigTrust'
+import { acknowledgeRepoConfig, repoConfigTrustReview } from '../../projects/repoConfigTrust'
 import { auditRequest } from '../../auditRequest'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'

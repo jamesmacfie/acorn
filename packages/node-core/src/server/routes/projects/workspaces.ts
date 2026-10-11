@@ -9,7 +9,7 @@ import { respondError } from '../../respond'
 import type { Workspace, WorkspaceProjectRef, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { broadcastProjectChanged, broadcastWorkspaceChanged } from '../../notify'
 import { workspaceProjectOrderBody } from '@acorn/protocol/api.ts'
-import { nodeWorkspacesMode, WORKSPACES_OFF_MESSAGE } from '../../workspacesMode'
+import { nodeWorkspacesMode, WORKSPACES_OFF_MESSAGE } from '../../projects/workspacesMode'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
@@ -130,7 +130,7 @@ export const workspaces = new Hono<AppEnv>()
         return respondError(c, 400, 'bad_request', ['Choose a valid workspace icon and background.'])
       if (appearance.data?.kind === 'icon' && !(await isWorkspaceIconName(appearance.data.icon)))
         return respondError(c, 400, 'bad_request', ['Choose an icon from the catalogue.'])
-      const { saveWorkspaceAppearance } = await import('../../workspaceImages')
+      const { saveWorkspaceAppearance } = await import('../../projects/workspaceImages')
       try {
         if (!saveWorkspaceAppearance(db, id, appearance.data)) return respondError(c, 404, 'not_found')
       } catch (error) {
@@ -155,7 +155,7 @@ export const workspaces = new Hono<AppEnv>()
   .put('/:id/project-order', async (c) => {
     const parsed = workspaceProjectOrderBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['Supply each project ID once.'])
-    const { reorderWorkspaceProjects } = await import('../../workspaceProjectOrder')
+    const { reorderWorkspaceProjects } = await import('../../projects/workspaceProjectOrder')
     const result = reorderWorkspaceProjects(getDb(c.env), c.req.param('id'), parsed.data.projectIds)
     if (result === 'not_found') return respondError(c, 404, 'not_found')
     if (result === 'membership_changed')
@@ -175,7 +175,7 @@ export const workspaces = new Hono<AppEnv>()
       .from(schema.projects)
       .where(eq(schema.projects.workspaceId, id))
     const defaultWorkspace = await ensureDefault(db)
-    const { removeWorkspaceRows, notifyWorkspaceRemoved } = await import('../../workspaceRemoval')
+    const { removeWorkspaceRows, notifyWorkspaceRemoved } = await import('../../projects/workspaceRemoval')
     // Reassign this workspace's projects back to Default rather than orphaning them.
     const removedProviders = db.transaction((tx) => {
       tx.update(schema.projects)

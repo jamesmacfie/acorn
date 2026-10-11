@@ -9,7 +9,7 @@ import {
   type WorkspaceAppearance,
   type WorkspaceImageCrop,
 } from '@acorn/protocol/workspaceAppearance.ts'
-import { schema, type AppDatabase } from './db'
+import { schema, type AppDatabase } from '../db'
 
 let decoding = 0
 

@@ -1,10 +1,10 @@
 import { eq, inArray } from 'drizzle-orm'
-import type { AppDatabase } from './db'
-import { schema } from './db'
+import type { AppDatabase } from '../db'
+import { schema } from '../db'
 import { getProject } from './projects'
-import { taskScripts } from './taskScripts/service'
-import { retireTaskHead } from './worktrees/taskHeadObserver'
-import { broadcastProjectChanged, broadcastTasksChanged } from './notify'
+import { taskScripts } from '../taskScripts/service'
+import { retireTaskHead } from '../worktrees/taskHeadObserver'
+import { broadcastProjectChanged, broadcastTasksChanged } from '../notify'
 import { nodeWorkspacesMode } from './workspacesMode'
 
 /** Delete rows together; folders and task worktrees remain on disk. */

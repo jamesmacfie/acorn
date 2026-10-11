@@ -11,11 +11,11 @@ import { schema } from '../db'
 import type { TaskStatus } from '@acorn/protocol/task.ts'
 import type { ProjectWorktree } from '@acorn/protocol/api.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
-import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
-import { getProject, type ProjectRow } from '../projects'
+import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../projects/runConfig'
+import { getProject, type ProjectRow } from '../projects/projects'
 import { gitText } from '../core/git'
-import { getProjectConfig } from '../projectConfig'
-import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
+import { getProjectConfig } from '../projects/projectConfig'
+import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../projects/repoConfigSnapshot'
 import {
   copyWorktreeFiles,
   ensureWorktree,

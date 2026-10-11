@@ -20,7 +20,7 @@ import { isProviderOperationError, ProviderOperationError } from '../../integrat
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
-import { getProject, type ProjectRow } from '../../projects'
+import { getProject, type ProjectRow } from '../../projects/projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects

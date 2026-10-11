@@ -84,7 +84,7 @@ Read these before changing the corresponding boundary:
 | Loaded declarations | `packages/protocol/src/plugin/contract.ts`, `packages/node-core/src/server/plugins/manifestValidation/node.ts` | Add a bounded browser contribution kind with owner-confined provider routes. |
 | Compiled contributors | `packages/node-core/src/server/pluginHost/types.ts`, `plugins/github/src/node/index.ts` | Supply the same contribution contract through a compiled-plugin declaration seam. Core remains provider-independent. |
 | Task promotion | `packages/node-core/src/server/routes/projects/tasks.ts`, `packages/protocol/src/transport/api/projects.ts` | Reuse task seeds, connection-stamped links, and task creation behavior. |
-| Project settings | `packages/node-core/src/server/projectConfig.ts`, `packages/node-core/src/server/routes/projects/projects.ts` | Persist site associations with project configuration on Node. |
+| Project settings | `packages/node-core/src/server/projects/projectConfig.ts`, `packages/node-core/src/server/routes/projects/projects.ts` | Persist site associations with project configuration on Node. |
 | Attention | `docs/notifications/rows-and-targets.md` | Derive pending-request presentation from authoritative agent state; do not add a second notification database. |
 
 Also read [architecture](../../architecture-overview.md), [plugin map](../../plugin-map.md),

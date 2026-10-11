@@ -59,7 +59,7 @@ enumerated set: `tools/arch/boundaries.test.ts` lists every file allowed to impo
 Executable configuration is hash-gated: the repository's own `.acorn/config.toml`, workflow files,
 and URL scripts, **and the project row's script columns**. The exact snapshot must be acknowledged
 before execution, and a changed snapshot fails closed with `needs-trust` or `config-changed`
-(`server/repoConfigTrust.ts`).
+(`server/projects/repoConfigTrust.ts`).
 
 The project row is in the snapshot because the gate assumes only the owner can write the database.
 `PUT /v1/core/projects/:id/config` is device-only, so that holds, and the row in the hash is the belt
@@ -80,7 +80,7 @@ gone back to acknowledged bytes. A running instance keeps its admitted URL and s
 Snapshots accept regular files inside the repository root, including internal symlink aliases.
 Nonblocking opens reject special files before reading. Each file and the project settings entry are
 capped at 1 MiB, the formatted snapshot at 8 MiB, and the snapshot at 256 files
-(`server/repoConfigSnapshot.ts`). Workflow directory scans stop after 1,024 entries. Unsafe or
+(`server/projects/repoConfigSnapshot.ts`). Workflow directory scans stop after 1,024 entries. Unsafe or
 oversized input fails closed. These static checks don't remove a path swap between check and use.
 
 The parsers read the same files again on their own. Run-target resolution reads each

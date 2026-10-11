@@ -6,7 +6,7 @@ import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/d
 import type { Env } from '../bindings'
 import { gitText } from '../core/git'
 import { getDb, schema } from '../db'
-import { parseGithubRemote } from '../projects'
+import { parseGithubRemote } from '../projects/projects'
 import { worktreeCounts } from './localGitRead'
 import { createDataSelectionPager, selectDataRecords } from './selection'
 

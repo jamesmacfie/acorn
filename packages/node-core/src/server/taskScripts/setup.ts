@@ -1,6 +1,6 @@
 import type { AppDatabase } from '../db'
-import { getProject } from '../projects'
-import { getProjectConfig } from '../projectConfig'
+import { getProject } from '../projects/projects'
+import { getProjectConfig } from '../projects/projectConfig'
 import { taskScripts } from './service'
 
 /** Record intentional non-execution when a task cycle begins; a configured lazy setup stays unrequested. */

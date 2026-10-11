@@ -6,7 +6,7 @@ import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { broadcastWorkspaceChanged } from '../../notify'
 import { workspaceImageCropSchema, WORKSPACE_IMAGE_UPLOAD_BYTES } from '@acorn/protocol/workspaceAppearance.ts'
-import { normalizeWorkspaceImage, saveWorkspaceAppearance, workspaceImageId } from '../../workspaceImages'
+import { normalizeWorkspaceImage, saveWorkspaceAppearance, workspaceImageId } from '../../projects/workspaceImages'
 
 export const limitWorkspaceUpload = bodyLimit({
   maxSize: WORKSPACE_IMAGE_UPLOAD_BYTES + 16 * 1024,

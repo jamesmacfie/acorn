@@ -2,7 +2,7 @@
 
 A project's scripts, run targets, preview, and database settings live on its `projects`
 row, and a `.acorn/config.toml` can override most of them. This page covers the layers, the run
-target merge, and layout recipes. `loadRepoConfig` in `packages/node-core/src/server/runConfig.ts`
+target merge, and layout recipes. `loadRepoConfig` in `packages/node-core/src/server/projects/runConfig.ts`
 does the merge.
 
 ## The project row

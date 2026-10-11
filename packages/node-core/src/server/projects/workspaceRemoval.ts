@@ -1,9 +1,9 @@
 import { and, eq, inArray } from 'drizzle-orm'
-import type { AppDatabase } from './db'
-import { schema } from './db'
-import { deleteWorkspaceDatasets } from './datasets/store'
+import type { AppDatabase } from '../db'
+import { schema } from '../db'
+import { deleteWorkspaceDatasets } from '../datasets/store'
 import { pruneWorkspaceImages } from './workspaceImages'
-import { broadcastWorkspaceChanged, broadcastWorkspaceProjectsChanged } from './notify'
+import { broadcastWorkspaceChanged, broadcastWorkspaceProjectsChanged } from '../notify'
 
 /** Database half of workspace removal. Call inside the owning transaction. */
 export function removeWorkspaceRows(
