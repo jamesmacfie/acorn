@@ -173,6 +173,10 @@ generated npm manifest, because npm doesn't read pnpm's settings. For a direct d
 reference uses that dependency's declared patched range. Hono's catalog floor and other direct runtime
 floors move with the policy.
 
+`pnpm audit --prod` reports no advisories. When an advisory has no fixed release and Acorn doesn't call
+the affected code, `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` lists it beside a comment that
+gives the reason and says when to remove it. A fix that ships replaces the entry.
+
 The root manifest's `acornStandalone` policy pins the keymap provider to the release tested in the
 workspace, and its optional Solid adapter peer follows the standalone Solid dependency through a
 package-specific override. The test checks the pin against the source declaration and the lockfile.
