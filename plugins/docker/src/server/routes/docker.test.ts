@@ -147,6 +147,16 @@ describe('the docker daemon surface is device-only', () => {
     expect(daemonRoutes.map((r) => r.path)).toContain('/task-summary')
   })
 
+  // The 403 test below passes on the pinned Hono even without a bare gate, because its trailing `/*`
+  // matches the bare path. This one reads the gates themselves, so it holds on any Hono version.
+  it('gates each route by its exact path or by a subtree it sits strictly inside', () => {
+    const gates = docker.routes.filter((r) => r.method === 'ALL').map((r) => r.path)
+    for (const { path } of daemonRoutes) {
+      const covered = gates.some((gate) => gate === path || (gate.endsWith('/*') && path.startsWith(gate.slice(0, -1))))
+      expect(covered, path).toBe(true)
+    }
+  })
+
   it('403s each of them for a task-scoped credential, without reaching the bridge', async () => {
     const touched: string[] = []
     // Every method records rather than answers, so "403" cannot be a bridge error in disguise.

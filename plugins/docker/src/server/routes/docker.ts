@@ -67,13 +67,20 @@ const ref = (c: { req: { param(k: string): string } }): string | null => {
 //
 // Subtrees are enumerated rather than exempting the `/tasks/` path string, because the router mounts
 // under `/v1/p/docker` and a full-path guard would depend on the mount prefix. The route test walks
-// Hono's route table and fails if a daemon-wide path arrives without a device gate. Hono's trailing
-// `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
+// Hono's route table and fails if a daemon-wide path arrives without a device gate.
+//
+// Each subtree with a bare list route is gated in both forms. The Hono this repo pins lets a trailing
+// `/*` match the bare path too, but that has changed between Hono versions, so the gate doesn't rely
+// on it. Core and the notes plugin write their mounts the same way.
 export const docker = new Hono<AppEnv>()
   .use('/info', requireDevice)
+  .use('/containers', requireDevice)
   .use('/containers/*', requireDevice)
+  .use('/images', requireDevice)
   .use('/images/*', requireDevice)
+  .use('/volumes', requireDevice)
   .use('/volumes/*', requireDevice)
+  .use('/networks', requireDevice)
   .use('/networks/*', requireDevice)
   .use('/prune', requireDevice)
   .use('/compose/*', requireDevice)
