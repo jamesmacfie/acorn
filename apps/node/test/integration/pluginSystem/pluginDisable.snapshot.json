@@ -139,6 +139,7 @@
       "terminal.route",
       "terminal.runRoute",
       "terminal.runTargets",
+      "terminal.runtime",
       "terminal.sendToAgent",
       "terminal.sessions",
       "terminal.taskCreatedHook",

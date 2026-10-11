@@ -9,6 +9,7 @@
 import { execFile } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { listProfileDefs, type ProfileDef } from './profiles'
 
 export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
 
@@ -101,4 +102,34 @@ export async function registerAcornMcp(
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, reason: msg.includes('ENOENT') ? `'${add.file}' CLI not found on PATH.` : msg.slice(0, 300) }
   }
+}
+
+// The registration lives in the person's own Claude and Codex config, which every checkout shares. An
+// isolated `dev:agent` session sets this so its throwaway build doesn't take the `acorn-dev` entry
+// over and leave it pointing at a worktree that is later removed.
+const registrationAllowed = (): boolean => !process.env.ACORN_SKIP_MCP_REGISTRATION
+
+// Profiles whose registration succeeded this run, so a session spawn can skip the CLI round trip.
+const registeredProfiles = new Set<string>()
+
+async function registerProfile(profile: ProfileDef, name: string, launcher: Launcher): Promise<void> {
+  try {
+    if ((await profile.mcpRegistration?.(name, launcher))?.ok) registeredProfiles.add(profile.id)
+  } catch {
+    // Not recorded, so the next spawn tries again.
+  }
+}
+
+// Before a session spawns a harness's CLI, once per profile per run. Failures are swallowed.
+export function registerAcornMcpBeforeSpawn(profile: ProfileDef, name: string, launcher: Launcher): void {
+  if (!profile.mcpRegistration || !registrationAllowed() || registeredProfiles.has(profile.id)) return
+  void registerProfile(profile, name, launcher)
+}
+
+// Boot-time re-registration for every profile that declares one (docs/mcp.md § Configuration). Spawn
+// already registers; this covers restored and tmux-reattached sessions, which never respawn. Remove
+// then add, so it's idempotent, and it never rejects.
+export async function refreshAcornMcpRegistrations(name: string, launcher: Launcher): Promise<void> {
+  if (!registrationAllowed()) return
+  await Promise.all(listProfileDefs().map((profile) => registerProfile(profile, name, launcher)))
 }

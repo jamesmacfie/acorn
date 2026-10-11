@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import { envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName, type McpCommands } from './mcpRegister'
+import { agentProfileRegistry } from './agentProfiles'
+import {
+  envFlags,
+  launcherSpec,
+  refreshAcornMcpRegistrations,
+  registerAcornMcp,
+  registerAcornMcpBeforeSpawn,
+  resolveMcpEntry,
+  serverName,
+  type McpCommands,
+} from './mcpRegister'
 
 const launcher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js', 'acorn')
 const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js', 'acorn-dev')
@@ -57,5 +67,33 @@ describe('register/remove round-trip through a stubbed exec', () => {
       ok: false,
       reason: "'toy' CLI not found on PATH.",
     })
+  })
+})
+
+describe('registration bookkeeping shared by boot and spawn', () => {
+  it('a spawn skips a profile the boot refresh registered, and retries one that failed', async () => {
+    const outcomes = { toy: true, broken: false }
+    const register = vi.fn(async (id: 'toy' | 'broken') => ({ ok: outcomes[id] }))
+    const profile = (id: 'toy' | 'broken') =>
+      ({
+        id,
+        label: id,
+        kind: 'agent',
+        command: id,
+        backendPreference: 'node-pty',
+        transport: 'pty',
+        mcpRegistration: () => register(id),
+      }) as const
+    const undo = [agentProfileRegistry.register(profile('toy')), agentProfileRegistry.register(profile('broken'))]
+    try {
+      await refreshAcornMcpRegistrations('acorn', launcher)
+      expect(register.mock.calls).toEqual([['toy'], ['broken']])
+
+      registerAcornMcpBeforeSpawn(profile('toy'), 'acorn', launcher)
+      registerAcornMcpBeforeSpawn(profile('broken'), 'acorn', launcher)
+      expect(register.mock.calls).toEqual([['toy'], ['broken'], ['broken']])
+    } finally {
+      for (const dispose of undo) dispose()
+    }
   })
 })

@@ -14,9 +14,8 @@ import { closeListener, makeRuntime, startListener, type Listener } from '@acorn
 import type { DataRoot } from '@acorn/node-core/server/storage'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
-import { configureAcornMcp, type Launcher } from '@acorn/node-core/server/mcpRegister.ts'
+import { configureAcornMcp, type Launcher, refreshAcornMcpRegistrations } from '@acorn/node-core/server/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools'
-import { refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
 import { createLogger, describeError, installPerfSink } from '@acorn/node-core/server/telemetry'
 import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
@@ -284,7 +283,8 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     mark('scheduler')
 
     if (options.mcp && process.env.NODE_ENV !== 'test') {
-      void refreshAcornMcpRegistrations().catch((error) =>
+      const { name, launcher } = options.mcp
+      void refreshAcornMcpRegistrations(name, launcher).catch((error) =>
         bootLog.warn(`MCP re-register failed: ${describeError(error).message}`),
       )
     }

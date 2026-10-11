@@ -98,7 +98,7 @@ vi.mock('@acorn/plugin-api/node', () => ({
   serverName: () => 'fixture',
   resolveMcpEntry: () => 'fixture',
   childEnv: () => ({}),
-  listProfileDefs: () => [],
+  registerAcornMcpBeforeSpawn() {},
   listProfiles: () => [],
 }))
 import { disposeTerminal, registerTerminalChannel, terminalRunGlue, sendToAgent, reconcileTmux } from './terminal'

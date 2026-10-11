@@ -16,10 +16,10 @@ import {
   interactiveProfile,
   invalidateWorktreeStatus,
   launcherSpec,
-  listProfileDefs,
   listProfiles,
   type CompiledPluginBroadcast,
   type PluginDatabase,
+  registerAcornMcpBeforeSpawn,
   rendererBaseCheckout,
   resolveCommand,
   resolveMcpEntry,
@@ -678,14 +678,7 @@ async function spawnOne(
     exitCode: null,
   }
 
-  if (profile.mcpRegistration && mcpRegistrationAllowed() && !mcpRegistered.has(profile.id)) {
-    void profile
-      .mcpRegistration(mcpName(), mcpLauncher())
-      .then((res) => {
-        if (res?.ok) mcpRegistered.add(profile.id)
-      })
-      .catch(() => undefined)
-  }
+  registerAcornMcpBeforeSpawn(profile, mcpName(), mcpLauncher())
 
   // Profile launchArgs apply only to the profile's own binary; a command override is a different
   // program. meta.command stays the bare line the UI shows, and the args are launch-only.
@@ -759,9 +752,6 @@ async function spawnOne(
   return meta
 }
 
-// Profiles whose MCP registration succeeded this app run, so spawnOne can skip the CLI round trip.
-const mcpRegistered = new Set<string>()
-
 // The acorn MCP server launcher and build-flavoured name. Whether and how a CLI registers it is declared
 // by that profile contribution rather than a second profile-id lookup table.
 // The fallback name is the packaged one: a plain Node process has no build flavour of its own, and the
@@ -770,30 +760,6 @@ const mcpName = () => acornMcp()?.name ?? serverName(true)
 const mcpLauncher = () =>
   acornMcp()?.launcher ??
   launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
-// The registration lives in the person's own Claude and Codex config, which every checkout shares. An
-// isolated `dev:agent` session sets this so its throwaway build doesn't take the `acorn-dev` entry
-// over and leave it pointing at a worktree that is later removed.
-const mcpRegistrationAllowed = () => !process.env.ACORN_SKIP_MCP_REGISTRATION
-
-// Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
-// this covers restored and tmux-reattached sessions, which never respawn. Idempotent (remove then
-// add), failures swallowed.
-export async function refreshAcornMcpRegistrations(): Promise<void> {
-  if (!mcpRegistrationAllowed()) return
-  const name = mcpName()
-  const launcher = mcpLauncher()
-  await Promise.all(
-    listProfileDefs()
-      .filter((p) => p.mcpRegistration)
-      .map((p) =>
-        p.mcpRegistration!(name, launcher)
-          .then((res) => {
-            if (res.ok) mcpRegistered.add(p.id)
-          })
-          .catch(() => undefined),
-      ),
-  )
-}
 
 // Killing a tmux session's attach PTY only detaches it and the session keeps running. Stopping a tmux
 // agent means killing the tmux session itself, which then EOFs the PTY and fires onExit.

@@ -11,6 +11,7 @@ import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
+import { TERMINAL_RUNTIME } from '../contract/runtime'
 import { TERMINAL_LAUNCH_CONTEXT } from '../contract/launchContext'
 import { deliverLaunchContext, readLaunchContext } from '../server/launchContext'
 import { runAgentTools } from '../server/agentTools'
@@ -19,6 +20,7 @@ import { commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
 import {
   disposeTerminal,
+  reconcileTmux,
   registerTerminalChannel,
   sendToAgent,
   sessionControl,
@@ -161,6 +163,9 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // handoff. Published as a capability so agents resolves it directly instead of reaching through
       // an app-layer bridge slot.
       ctx.capabilities.provide(TERMINAL_SESSIONS, sessionControl)
+      // terminal.runtime (contract/runtime.ts): the tmux reconcile pass, which the composition root runs
+      // after the listener binds.
+      ctx.capabilities.provide(TERMINAL_RUNTIME, { reconcile: reconcileTmux })
     },
     // Everything init touched, in reverse: the engine's idle-watch timer, its session displays and
     // session map, and the four slots it filled. Not the SQLite handle, which the host closes right
@@ -177,8 +182,3 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     },
   }
 }
-
-// The composition hooks apps/node calls around plugin init: the MCP launcher, the boot-time MCP
-// re-registration, and the tmux reconcile pass. Exported from the entrypoint because they are
-// cross-package by definition and the engine that implements them must stay out of contract/.
-export { reconcileTmux, refreshAcornMcpRegistrations } from '../server/terminal'

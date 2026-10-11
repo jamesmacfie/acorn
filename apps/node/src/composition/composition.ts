@@ -15,7 +15,7 @@ import { adoptRenamedPluginDb, reconcileBundledPlugins } from '@acorn/node-core/
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
-import { reconcileTmux } from '@acorn/plugin-terminal/node/index.ts'
+import { TERMINAL_RUNTIME } from '@acorn/plugin-terminal/contract/runtime.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 import { nodePlugins, type NodePluginDeps } from './plugins'
@@ -141,7 +141,7 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
   ).catch((error) => storageLog.warn(`footprint failed: ${describeError(error).message}`))
 
   try {
-    await reconcileTmux()
+    await capabilities.get(TERMINAL_RUNTIME)?.reconcile()
     mark('reconcile.tmux')
   } catch (error) {
     reconcileLog.warn(`tmux reconcile failed: ${describeError(error).message}`)

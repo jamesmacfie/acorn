@@ -217,6 +217,7 @@ export {
   envFlags,
   launcherSpec,
   registerAcornMcp,
+  registerAcornMcpBeforeSpawn,
   resolveMcpEntry,
   serverName,
 } from '@acorn/node-core/server/mcpRegister.ts'

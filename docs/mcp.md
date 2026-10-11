@@ -94,8 +94,11 @@ before they reach the agent.
 The profile launchers and the Node's `mcp` entry (`apps/node/src/entries/mcp.ts`, built as `mcp.js`
 beside the service) register acorn's server. Which CLI a harness registers through, and what that CLI
 wants on its command line, is the harness's own declaration
-(`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns only the shape of the exchange: remove,
-then add, through a login shell, with a failure turned into a sentence.
+(`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns the shape of the exchange: remove,
+then add, through a login shell, with a failure turned into a sentence. Core also runs it, since it holds
+the profile registry: the terminal calls `registerAcornMcpBeforeSpawn` before it starts a harness's CLI,
+and the boot calls `refreshAcornMcpRegistrations`. Both share one record of which profiles registered,
+so a spawn after a successful boot refresh skips the CLI round trip.
 
 An ACP harness without CLI registration receives acorn's server through the protocol, on `session/new`
 and again on load or resume. Claude Code uses its CLI registration. Managed Codex receives it through

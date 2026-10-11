@@ -613,6 +613,7 @@ node: readDataPointer
 node: recordSkillDelivery
 node: redactSecretText
 node: registerAcornMcp
+node: registerAcornMcpBeforeSpawn
 node: registerDeletedTaskPurge
 node: rendererBaseCheckout
 node: requireDevice

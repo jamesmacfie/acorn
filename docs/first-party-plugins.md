@@ -53,7 +53,7 @@ plugins.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **terminal** | Owns the PTY stream handlers and a WebSocket channel prefix, and carries `node-pty`. It's required, publishes capabilities four other plugins consume, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin | A, B, D, F, G |
+| **terminal** | Owns the PTY stream handlers and a WebSocket channel prefix, and carries `node-pty`. It's required, publishes capabilities four other plugins consume and `TERMINAL_RUNTIME`, whose tmux reconcile the composition root runs, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin | A, B, D, F, G |
 | **agents** | Required. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, and the harness registry, and owns the managed-agent session model that core's context assembler and the transcript both read | D, E, F |
 | **docker** | Owns a WebSocket channel prefix for container log and event streams. Its footer badge is a component contribution | A, B |
 | **memory** | Required. Publishes `KNOWLEDGE` and `MEMORY_KNOWLEDGE`, and contributes task-context sections core's assembler depends on | D, F |
