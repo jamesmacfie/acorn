@@ -1,8 +1,7 @@
 // One tick for every spinner on screen.
 //
-// `Spinner` drew a static frame through phase 1, with the reason written next to it: a spinner that
-// redraws on a timer of its own keeps the renderer awake for as long as anything on screen is busy,
-// and five spinners would be five timers. So the shell starts one interval and every spinner reads
+// A spinner that redraws on a timer of its own keeps the renderer awake for as long as anything on
+// screen is busy, and five spinners would be five timers. So the shell starts one interval and every spinner reads
 // the same counter — the same argument the DOM makes by putting the animation in CSS, where the
 // compositor owns the clock.
 //

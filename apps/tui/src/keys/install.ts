@@ -1,11 +1,9 @@
 // The keymap, installed once on the renderer.
 //
-// `client-core/host/keys/install.ts` names this file's seam in its own header: "its terminal adapter,
-// which we do not use yet, is in the same package". Same engine, same `intentKeys` table, the same
-// tiers ordered by priority, a different pair of type parameters: `Keymap<Renderable, KeyEvent>`
+// The terminal half of client-core's `installKeymap`: same engine, same `intentKeys` table, the same
+// tiers ordered by priority, and a different pair of type parameters, `Keymap<Renderable, KeyEvent>`
 // where the DOM's is `Keymap<HTMLElement, HtmlKeymapEvent>`. The host adapter the engine is built
-// from is this package's own, because where the engine asks who has the keys is the one thing the
-// package's own terminal adapter got wrong (./keymapHost.ts).
+// from is this package's own, so the engine asks the region store who has the keys (./keymapHost.ts).
 //
 // The tiers and the sentence for each are in ./tiers.ts, which is the one file in this package that
 // spells a priority. This one registers the `REGION` tier: region, pane and column movement, global,
@@ -96,9 +94,7 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
 //
 // Through an appending stream rather than `appendFileSync`, because the second thing this flag is for
 // is measuring, and a synchronous `open`, `write` and `close` on the loop that draws is a trace that
-// measures itself: on this machine it is about a fifth of a millisecond per key, on the same loop
-// that has to answer the key. A stream opened once and written to buffers the line and flushes it
-// when the loop is idle, which is what a log wants and what a measurement needs.
+// measures itself. A stream opened once buffers the line and flushes it when the loop is idle.
 
 /**
  * Clear whatever transient feedback is on screen, and say whether there was any.
@@ -107,11 +103,10 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
  * pane. It reads the toast store rather than asking the shell, because `keys/` may not import
  * `chrome/` (tools/arch/boundaries.test.ts § the terminal focus store knows the keyboard and not the
  * screen) and because the store is where the answer is: a toast is not focusable and has nowhere to
- * hold a layer of its own, so the shell only ever drew it (../chrome/Notifications.tsx).
+ * hold a layer of its own, so the shell only draws it (../chrome/Notifications.tsx).
  *
- * It was a second layer at this tier, registered by the shell's root box. Two layers at one priority
- * fall back to the order they registered in, which is the reconciler's business and not a rule
- * anybody wrote down, so which Escape a reader got was luck
+ * A function in the region layer rather than a second layer at this tier, because two layers at one
+ * priority answer in the order they registered, and then which Escape a reader gets is luck
  * (./tiers.ts).
  */
 const clearNotifications = (): boolean => {
@@ -121,8 +116,8 @@ const clearNotifications = (): boolean => {
 }
 
 /** Where the log goes. The XDG state directory, which is for data a program keeps across runs and
- *  can regenerate — exactly what a key log is. Not `configDir()`, which is `../node/paths.ts` and is
- *  node-side; this folder may not reach it. */
+ *  can regenerate — exactly what a key log is. Not `configDir()`, which is node-side; this folder may
+ *  not reach it. */
 const logPath = (): string => {
   const state = process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state')
   return join(state, 'acorn', 'keys.log')
@@ -156,9 +151,9 @@ const openLog = (): WriteStream | null => {
 
 function installKeyIntercepts(engine: TuiKeymap): void {
   const file = process.env.ACORN_TUI_KEYS_TRACE ? openLog() : null
-  // When the key arrived, for the histogram below. A module-level `let` rather than a map keyed by
-  // the event: dispatch is synchronous, so the `key:after` that reads this is always the one for the
-  // `key` that wrote it.
+  // When the key arrived, for the histogram below. A `let` rather than a map keyed by the event:
+  // dispatch is synchronous, so the `key:after` that reads this is always the one for the `key` that
+  // wrote it.
   let pressedAt = 0
   onCleanup(
     engine.intercept('key', () => {
@@ -179,9 +174,6 @@ function installKeyIntercepts(engine: TuiKeymap): void {
         if (walkSteps.counting()) recordDuration('core', 'tui.key.steps', steps, { reason: ctx.reason })
       }
       if (!file) return
-      // The store, which is the only answer there is: the line used to carry an `agree` field beside
-      // this, for the renderer's own idea of focus, and a disagreement was the commonest bug this app
-      // had. There is nothing left to disagree (./regions.ts § The one owner).
       const node = focusedRenderable()
       const region = focusedRegion()
       const depth = scopeDepth()
@@ -191,9 +183,8 @@ function installKeyIntercepts(engine: TuiKeymap): void {
         `focused=${node ? `${node.constructor.name}#${node.id}` : 'none'}`,
         `region=${region ? `${region.paneId}/${region.regionId}` : 'none'}`,
         `scope=${depth === 1 ? 'screen' : `overlay:${depth}`}`,
-        // How many renderables the walks behind this key visited. The number the phase 9 work is
-        // about: a key press should cost the depth of the focus tree and not the size of the region
-        // (./regions.ts § The step counter).
+        // How many renderables the walks behind this key visited. A key press should cost the depth
+        // of the focus tree and not the size of the region (./regions.ts § The step counter).
         `steps=${steps}`,
       ]
       file.write(`${stamp(new Date())} ${fields.join(' ')}\n`)
@@ -203,14 +194,11 @@ function installKeyIntercepts(engine: TuiKeymap): void {
 
 // ── The typing shadow ─────────────────────────────────────────────────────────────────────────
 //
-// While an `Input` or a `Textarea` has the keys, the bare keys type. That used to be said once per
-// binding, as `active: () => !typing()` on every bare key of every control on screen, and the engine
-// counts a binding with a runtime matcher as a reason to switch its active-key cache off — for the
-// whole process, not for that layer. The footer asks the engine what is live on every render, so the
-// cost of saying it that way was a full collect over every active layer per render, forever
-// (./tiers.ts § TYPING).
+// While an `Input` or a `Textarea` has the keys, the bare keys type. Saying that per binding, as
+// `active: () => !typing()` on every bare key, would switch the engine's active-key cache off for the
+// whole process (./tiers.ts § TYPING).
 //
-// Said once instead, as a layer that is registered when a field takes the keys and unregistered when
+// So it is said once, as a layer that is registered when a field takes the keys and unregistered when
 // it loses them. `preventDefault: false` is the whole trick: the binding claims the key *inside* the
 // keymap, so nothing below the shadow's tier ever sees it, and the key still gets typed. That is the
 // same shape as a `Modal`'s key claim — a scope, not a swallow — with one difference worth stating:
@@ -218,50 +206,40 @@ function installKeyIntercepts(engine: TuiKeymap): void {
 // thing a field" is a fact about focus (./regions.ts § The one owner, docs/tui/focus.md § Focus regions).
 
 /** The keys a field types. The shared table, so the shadow cannot name a key the bindings below it
- *  do not, which is the drift that made the old swallow layer leak Tab (./trap.ts). */
+ *  do not. */
 const SHADOWED = [...BARE_KEYS]
 
 /** The live shadow's disposer, or null while nobody is typing. Module state for the same reason
  *  `installRegions`'s subscription is: a suite builds a renderer per test. */
 let stopShadow: (() => void) | null = null
 
-/** Is the thing with the keys a field? The one question the shadow and the hand-off both ask, and
- *  `./regions.ts § isField` is where it is answered: the two `instanceof`s that used to be here were
- *  false under our painter, which is why nothing typed under it. */
+/** Is the thing with the keys a field? The one question the shadow and the hand-off both ask
+ *  (./regions.ts § isField). */
 const isTypingTarget = (node: Renderable | null): boolean => !!node && isField(node)
 
 /**
  * Type the key into the field that has the keys, once nothing else has claimed it.
  *
- * The hand-off. A key used to reach an edit buffer because the *renderer* had focused it: `focus()`
- * installs a handler that calls `handleKeyPress`, and the renderer runs those only after every
- * ordinary listener and only while nothing has called `preventDefault`. With the store owning focus
- * that route is a coincidence — it works while the caret mirror happens to agree — so the dispatcher
- * says it instead. A field's own `handleKeyPress` reads the key and nothing else — it has no focus
- * of its own to check — so calling it directly is the whole of typing
- * (docs/tui/keys.md § The five key groups).
+ * The hand-off. The renderer routes no key to a renderable itself, so the dispatcher does. A field's
+ * own `handleKeyPress` reads the key and nothing else (it has no focus of its own to check), so
+ * calling it directly is the whole of typing (docs/tui/keys.md § The five key groups).
  *
- * Claimed afterwards, so the renderer's own route does not type the same key a second time into the
- * node the caret mirror focused. A key some binding took arrives prevented and is left alone, and the
- * typing shadow's bindings carry `preventDefault: false` for exactly this reason: a bare `j` is
- * claimed inside the keymap, so nothing below the shadow's tier answers it, and it still gets typed
- * (§ The typing shadow).
+ * A key some binding took arrives prevented and is left alone, and the typing shadow's bindings carry
+ * `preventDefault: false` for exactly this reason: a bare `j` is claimed inside the keymap, so nothing
+ * below the shadow's tier answers it, and it still gets typed (§ The typing shadow).
  */
 const typeInto = (event: KeyEvent): void => {
   if (event.defaultPrevented) return
   const node = focusedRenderable()
   if (!node || !isTypingTarget(node)) return
-  // Whichever painter drew it, the field answers the same call. OpenTUI's edit buffer has
-  // `handleKeyPress` from `TextareaRenderable`; ours is installed on the node by the component that
-  // owns the model, from its `ref`, which is where a widget's imperative API goes under this painter
-  // (../kit/asking/fieldRef.ts § api).
+  // Installed on the node by the component that owns the model, from its `ref`, which is where a
+  // widget's imperative API goes under this painter (../kit/asking/fieldRef.ts § api).
   const typed = node.handleKeyPress?.(event)
   // A multi-line field answers Up and Down by moving the caret a row, and says `false` where there is
   // no row to move to (../kit/field.ts § byRow). At that edge the key is the stop walk's, which is
   // what makes a message box something a reader can get out of the way they came into it: the agents
-  // composer sits between a transcript and an action bar, and while every arrow was swallowed here
-  // the header above it could not be reached from the keyboard at all. Down at the last line leaves
-  // the same way, which is the shape every editor with a form under it has.
+  // composer sits between a transcript and an action bar, and swallowing every arrow here would leave
+  // the header above it unreachable from the keyboard. Down at the last line leaves the same way.
   if (typed === false && (event.name === 'up' || event.name === 'down') && moveStop(event.name === 'down' ? 1 : -1)) {
     event.preventDefault()
     return
@@ -272,10 +250,7 @@ const typeInto = (event: KeyEvent): void => {
 /**
  * Hand a bracketed paste to whatever has the keys and can take one.
  *
- * The same hand-off as `typeInto` one event over, and it is registered only under our painter because
- * OpenTUI already has a route: its renderer delivers a paste to the renderable *it* has focused, and
- * the caret mirror has focused the same field, so a second listener would paste twice. Phase 4 leaves
- * this one (./regions.ts § paintCaret).
+ * The same hand-off as `typeInto`, one event over.
  *
  * `isTypingTarget` is deliberately not the gate here, where it is the gate for a key. Two things
  * install a `handlePaste`: a field, and the box of a `pty` rectangle, which brackets the text for the
@@ -320,9 +295,9 @@ const syncTypingShadow = (engine: TuiKeymap): void => {
  * the caller's, which on this host is the process ending.
  */
 export function installKeymap(renderer: Renderer): TuiKeymap {
-  // Which renderable has the keys is half of installing a keyboard, so the region store's
-  // subscription to the renderer's focus event goes on here rather than at each of the three call
-  // sites: the app, the shell harness and the kit's own renderer (./regions.ts § The one owner).
+  // Which renderable has the keys is half of installing a keyboard, so the region store attaches to
+  // the renderer here rather than at each of the three call sites: the app, the shell harness and the
+  // kit's own renderer (./regions.ts § installRegions).
   installRegions(renderer)
 
   // The engine, from this package's own host adapter, plus the three addons the package's
@@ -340,7 +315,7 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
   // An entered PTY is the other typing target, and a stricter one: every key is its input, chords
   // included, until Escape. That one does not go through this predicate — the rectangle takes the
   // keys before dispatch instead, because a predicate can only hold off the bindings that ask
-  // (../kit/rectangle.tsx § The Rectangle contract).
+  // (docs/tui/traps.md § The Rectangle contract).
   setKeymap(engine, {
     // Ctrl, whatever platform this is. The engine reports the *platform's* primary modifier and on
     // macOS that is Cmd, which a terminal emulator keeps for itself and never delivers — so Cmd+Return
@@ -361,8 +336,7 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
   onFocusMove(() => syncTypingShadow(engine))
 
   // And the keys a field types, handed to it after the engine has had its say (§ typeInto). An
-  // ordinary listener, so it runs after the engine's prepended one and before the renderer routes
-  // anything to a renderable of its own.
+  // ordinary listener, so it runs after the engine's prepended one.
   renderer.keyInput.on('keypress', typeInto)
   // …and a whole paste beside it, on the same stream, because that is where the parser puts one
   // (§ pasteInto).
@@ -417,10 +391,11 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
 }
 
 /**
- * A layer bound to one renderable, for the layouts and the traps.
+ * A layer bound to one renderable, for layouts and kit nodes.
  *
  * The same shape `bindIntents` gives a kit node, minus the `onMount` deferral: the DOM keymap refuses
- * a target that is not in the document and OpenTUI has no such rule, so a ref can register directly.
+ * a target that is not in the document and this host's adapter has no such rule, so a ref can
+ * register directly.
  */
 export function bindKeys(
   target: Renderable,

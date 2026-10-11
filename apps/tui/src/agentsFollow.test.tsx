@@ -5,13 +5,13 @@ import { openFirstSession } from './agentsDriving'
 
 // Its own file, for the reason ./workspaceFocus.test.tsx is: the managed-session store is module
 // state and its snapshots outlive a render, so a case that wants a different transcript from the one
-// its neighbours read has to be the only case in the process. Run beside them it was handed the short
-// snapshot the previous case had already cached, and failed naming the scroll position.
+// its neighbours read has to be the only case in the process. Run beside them, it gets the short
+// snapshot the previous case already cached.
 
 describe('a transcript that is still growing', () => {
-  // The composer is the last thing in the detail column, so a transcript taller than the pane used to
-  // push it under the fold and leave every turn costing a page-down to find the box again. The
-  // viewport follows the transcript's newest content now (../kit/scrolling.tsx § followViewport).
+  // The composer is the last thing in the detail column, so a transcript taller than the pane can push
+  // it under the fold. The viewport follows the transcript's newest content (`stickToBottom` on the
+  // kit's `Viewport`).
   it('keeps the newest turn and the composer on screen', async () => {
     process.env.ACORN_FIXTURE_LONG_TRANSCRIPT = '1'
     try {
@@ -27,13 +27,12 @@ describe('a transcript that is still growing', () => {
 
         // And the composer stays there when the reader goes back through the history, because the
         // transcript is the scroller and the composer is its sibling rather than its last line
-        // (../kit/grouping/timeline.tsx § Timeline, ../layouts/ListDetail.tsx). This is the half that a
-        // viewport merely held at its foot could not give: scrolling up used to take the message box
-        // off the screen with it.
+        // (./kit/grouping/timeline.tsx § Timeline, ./layouts/ListDetail.tsx). A composer inside the
+        // scroller would leave the screen as soon as the reader scrolled up.
         await screen.press('l')
         // Into the transcript, then page back through the history. Up in a field moves the caret a row
         // and leaves the field at its first one, which is what puts the keys among the turns
-        // (../keys/install.ts § typeInto); the page keys then scroll the viewport those keys are
+        // (./keys/install.ts § typeInto); the page keys then scroll the viewport those keys are
         // inside without moving them, which is the cleanest way to ask this question — nothing about
         // what stays on screen is then a side effect of the caret having gone somewhere.
         for (let step = 0; step < 6; step += 1) await screen.press('ARROW_UP')

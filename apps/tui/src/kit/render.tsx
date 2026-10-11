@@ -183,8 +183,7 @@ export async function renderCells(
   }
   // No wait between the press and the frame. A test constructs the event and pushes it onto the key
   // stream, so there is no byte parser in front of the dispatcher to hold a lone Escape while it
-  // waits to see whether a sequence follows — the wait that used to be here was for one
-  // (../input/parser.ts, ../keyEvent.ts § pressedKey).
+  // waits to see whether a sequence follows (../input/parser.ts, ../keyEvent.ts § pressedKey).
   const press = async (
     key: string,
     modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },

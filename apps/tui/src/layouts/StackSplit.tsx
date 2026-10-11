@@ -14,10 +14,10 @@ import { regionFocus } from '../keys/regions'
 // was drawn from — the region you resize is the one you are looking at.
 //
 // Both regions stay in the pane's one column. A column is a left-to-right position, and this layout
-// stacks: `top` is above `bottom` and neither is beside the other, so Left and Right here cross to
-// the rail as they do from any single-column pane, and Escape is what climbs (../keys/regions.ts
-// § moveColumn). The axis is `'y'` at every call below and there is no prop that changes it, which is
-// why this is a sentence rather than a condition.
+// stacks: `top` is above `bottom` and neither is beside the other, so Left and Right here cross to the
+// rail as they do from any single-column pane, and Escape is what climbs
+// (../keys/regions.ts § moveColumn). The axis is `'y'` at every call below and there is no prop that
+// changes it, which is why this is a sentence rather than a condition.
 
 const DEFAULT_BOTTOM_LINES = 10
 const MIN_BOTTOM_LINES = 3
@@ -49,9 +49,9 @@ export function StackSplit(props: LayoutProps) {
       onSizeChange={() => setLines(box?.height ?? 0)}
     >
       {/* Each region's border carries its own name rather than the pane's: this layout has two, and
-          which one has the keys is the thing a reader needs to know. The rule that used to sit
-          between them is gone — two frames already meet there, and a rule beside a border is two
-          lines saying one thing (../panel.tsx). */}
+          which one has the keys is the thing a reader needs to know. No rule between them: two
+          frames already meet there, and a rule beside a border is two lines saying one thing
+          (../panel.tsx). */}
       <Panel grow scroll title="Top" onBox={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
         {props.regions.top?.()}
       </Panel>

@@ -40,9 +40,9 @@ import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/fe
 // (client-core/host/registries/sources/sources.ts § regions).
 //
 // The marks on a task or source row are the same ones the desktop draws around a rail control
-// (`core:task`, `core:source`, features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the placement is dropped and
-// the glyphs sit in the row's trailing slot in the order the allocator put them — same data, same
-// order, one dimension fewer.
+// (`core:task`, `core:source`, features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the
+// placement is dropped and the glyphs sit in the row's trailing slot in the order the allocator put
+// them — same data, same order, one dimension fewer.
 
 /** Cells across, from the shell's own width: about a third of it, between a floor and a ceiling.
  *
@@ -269,8 +269,8 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
           that has not declared regions keeps its whole surface in the main panel and this panel says
           so, which is the honest answer and not an error. */}
       {/* `scroll`, because a source's list is as long as the source says and the rail is one column
-          of a fixed screen: without a viewport the rows past the fold were drawn nowhere and the
-          caret walked off the bottom of the panel (../kit/scrolling.tsx,
+          of a fixed screen: without a viewport the rows past the fold are drawn nowhere and the
+          caret walks off the bottom of the panel (../kit/scrolling.tsx,
           docs/tui/scrolling.md § Scrolling viewports). */}
       <Panel title="Browse" grow scroll>
         <Show
@@ -290,8 +290,7 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
               ref={regionFocus(BROWSE, BROWSE_ORDER, { x: RAIL, enterMainOnActivate: true, pickOnEnter: true })}
             >
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
-                  panel draws for each of those rather than the blank frame both used to leave
-                  (../panel.tsx). */}
+                  panel draws for each of those rather than a blank frame (../panel.tsx). */}
               <PanelBody name="browse" nodeId={props.nodeId}>
                 <Dynamic component={list()} />
               </PanelBody>

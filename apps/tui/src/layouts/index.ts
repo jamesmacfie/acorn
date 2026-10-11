@@ -12,9 +12,8 @@ import { Wizard } from './Wizard'
 // reason as the DOM's (docs/panes/layout.md § Layout model). `document-over-frame` and
 // `frame-beside-document` are one component with the axis in the name.
 //
-// Handed to the pane registry through `setLayouts` at boot, which is the seam terminal phase 2 added
-// so `paneContributions()` stops handing a second host a component it cannot use
-// (client-core/host/layouts/table.ts, docs/tui.md).
+// Handed to the pane registry through `setLayouts` at boot, so `paneContributions()` does not hand
+// this host a DOM component it cannot use (client-core/host/layouts/table.ts, docs/tui.md).
 //
 // A pane declares a name and fills the regions; nothing here is exported to a plugin, and each layout
 // is drawn from the terminal projection written beside its desktop one.

@@ -99,7 +99,7 @@ export function Sections(props: {
         </For>
       </box>
       {/* `minWidth={0}` on both halves, because a flex child's floor is its own content and a diff is
-          routinely wider than its share (../layouts/ListDetail.tsx). */}
+          routinely wider than its share (the `list-detail` layout). */}
       <Show when={wide() && props.main}>
         {(main) => (
           <box flexDirection="column" flexGrow={1} minWidth={0}>

@@ -1,11 +1,12 @@
 // The terminal's sandbox, from the inside: what runs before a stranger's bundle does.
 //
-// A terminal has no iframe, so rung 0 of docs/security/node-plugin-security.md § The containment ladder is a
-// `node:worker_threads` worker started under `--permission` with read access to two files and nothing
-// else — this one and the bundle. The permission model covers the filesystem, child processes, native
-// addons and workers. Node 22 and 24 do not cover the network, so the builtin policy and deleted
-// globals apply before bundle evaluation. A bundle reaches the host through its scoped ports,
-// which is the same choke point the DOM worker has under `connect-src 'none'`.
+// A terminal has no iframe, so rung 0 of the containment ladder is a `node:worker_threads` worker
+// started under `--permission` with read access to two files and nothing else — this one and the
+// bundle (docs/security/node-plugin-security.md § The containment ladder). The permission model covers
+// the filesystem, child processes, native addons and workers. Node 22 and 24 do not cover the network,
+// so the builtin policy and deleted globals apply before bundle evaluation. A bundle reaches the host
+// through its scoped ports, which is the same choke point the DOM worker has under
+// `connect-src 'none'`.
 //
 // Plain JavaScript, not TypeScript, and no imports from the rest of this app: it is loaded by path
 // from a worker with almost no filesystem, so it has to be one file the runtime can read on its own.

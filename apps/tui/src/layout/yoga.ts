@@ -13,16 +13,13 @@ import { measureField, measureRun } from './measure'
 // The one thing it forbids is `require()` from CommonJS, and nothing in this package requires
 // anything.
 //
-// **Why the same engine the old painter used.** 153 boxes already say `flexDirection`, `flexGrow`
-// and `gap`, and the old painter laid them out with Yoga. Using the same engine is what let the
-// frames it drew be compared cell for cell against ours, and the eight layouts port without redesign. Speed is not the reason
-// and not a worry: a 1,708-node list-detail lays out in 0.19 ms warm and 1.9 ms with every row
-// changed, against a 5 ms budget.
+// **Why Yoga.** The kit's boxes say `flexDirection`, `flexGrow` and `gap`, which is Yoga's
+// vocabulary, so the layouts need no translation.
 //
 // **Two things Yoga does that a caller has to respect.** Attaching a child to a node with a measure
 // function aborts the wasm module — catchable, and the module survives, but it prints two lines to
-// stderr, which in a TUI paints straight over the frame. So `../tree/renderer.ts` asserts against it
-// rather than discovering it in a pane. And `free()` on a still-attached node does not throw; it
+// stderr, which in a TUI paints straight over the frame. So `insertNode` asserts against it rather
+// than discovering it in a pane. And `free()` on a still-attached node does not throw; it
 // leaves the parent holding a freed pointer. So freeing unlinks first, both from the parent and from
 // the children, each of which is freed by its own owner.
 
@@ -31,9 +28,9 @@ import { measureField, measureRun } from './measure'
 export function createYogaNode(node: Node): YogaNode | null {
   if (!laysOut(node.kind)) return null
   const yoga = Yoga.Node.create()
-  // A node with no props yet starts able to shrink, which is where the old painter started every
-  // renderable that was not given a size in cells. `./props.ts § flexShrinkFor` is the rule and
-  // `../tree/renderer.ts § setProperty` re-derives it as the props arrive.
+  // A node with no props yet starts able to shrink, as a node given no size in cells does.
+  // `./props.ts § flexShrinkFor` is the rule and `../tree/renderer.ts § setProperty` re-derives it
+  // as the props arrive.
   yoga.setFlexShrink(1)
   // A `text` is a leaf to Yoga and measures its own content, which is also why nothing may be
   // attached under it. A `textarea` is the same arrangement over its wrapped value, and it is the

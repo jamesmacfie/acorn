@@ -12,8 +12,8 @@ import { focusedRegion, focusedRenderable, isField } from './keys/regions'
 // It is slow and it is worth it. Four separate things have to hold for the last line to pass: the
 // router shim resolving `:number` off a path (./kit/router.ts), the source contract carrying two
 // regions to two places (client-core § SourceContribution.regions), select-on-move firing `onSelect`
-// without an activate, and every `lazy()` under the surface carrying a `Suspense` of its own. Each of
-// the four broke this flow once while it was being built, and three of them broke it silently.
+// without an activate, and every `lazy()` under the surface carrying a `Suspense` of its own. Most of
+// them fail silently.
 
 const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('›')) ?? ''
 
@@ -103,9 +103,8 @@ describe('browsing a source', () => {
       // Down enters the active panel's first real control. Escape returns to the strip (proved by
       // Left changing tabs), and the next Escape restores the Browse row in the left column.
       await screen.press('ARROW_DOWN')
-      // Through the store's own question rather than an `instanceof`, because a field under our
-      // painter is a plain object with a `kind` and no shim can be an instance of somebody else's
-      // class (../keys/regions.ts § isField).
+      // Through the store's own question rather than an `instanceof`, because a field here is a plain
+      // object with a `kind` (./keys/regions.ts § isField).
       expect(isField(focusedRenderable()!)).toBe(true)
       await screen.press('ESCAPE')
       await screen.press('ARROW_LEFT')
@@ -120,10 +119,9 @@ describe('browsing a source', () => {
   it('lets the Menu leave a source whose path is still showing', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 
-    // Browse into GitHub far enough that the path names a pull — the shape that used to pin the
-    // Menu: the rail-follows-path effect read the selection inside its own tracked scope, so every
-    // Menu choice re-ran it, the path's owner was still GitHub, and the choice was snapped straight
-    // back (../chrome/routing.ts).
+    // Browse into GitHub far enough that the path names a pull. If the rail-follows-path effect read
+    // the selection inside its own tracked scope, every Menu choice would re-run it while the path's
+    // owner is still GitHub, and snap the choice straight back (./chrome/routing.ts).
     expect(await caretOn(screen, 'GitHub')).toBe(true)
     await screen.until('Invalidate')
     expect(await caretOn(screen, 'Invalidate')).toBe(true)

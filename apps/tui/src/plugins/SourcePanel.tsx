@@ -31,9 +31,8 @@ import { openPromotion } from '../chrome/promotionStore'
 // A descriptor source's rail list, in cells.
 //
 // `client-core/host/chrome/ChromeSourcePanel.tsx` is the DOM's, and it cannot be this one: it is
-// `<main class="panes">` around `<section>`s and the DOM kit's primitives, so registering it here
-// handed the reconciler a `main` and it refused — which is what selecting Linear in `acorn` did before
-// this file existed (../../../packages/client-core/src/host/chrome/sourcePanel.ts).
+// `<main class="panes">` around `<section>`s and the DOM kit's primitives, which the reconciler
+// refuses. This host supplies its own through the `setSourcePanel` seam.
 //
 // The halves that are not drawing are shared and are imported rather than rewritten: `readRailItems`
 // and `chromeKey` are the query, `runChromeAction` is what a row press does, and
@@ -273,7 +272,7 @@ type CachedSourcePanel = {
 
 // Chrome contributions are rebuilt when distribution, trust, or the node's plugin roster changes.
 // SourceContribution treats region functions as component identities, so minting new closures on
-// every rebuild remounted both halves and discarded their caret, window, and query subscriptions.
+// every rebuild would remount both halves and discard their caret, window, and query subscriptions.
 // Descriptor identity is stable within one plugin; current descriptor data stays reactive beneath
 // the stable functions.
 const panels = new Map<string, CachedSourcePanel>()

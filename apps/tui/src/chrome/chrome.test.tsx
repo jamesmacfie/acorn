@@ -155,7 +155,7 @@ describe('the shell', () => {
     const frame = await screen.frame()
     screen.done()
 
-    // Wide enough for the rail to be a rail rather than a strip of marks.
+    // Wide enough for the rail and the pane strip to draw their labels whole.
     expect(frame).toContain('fix-login')
     expect(frame).toContain('[Notes]')
     for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
@@ -371,9 +371,7 @@ describe('the shell', () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     expect(await screen.frame()).toContain('Browse')
 
-    // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
-    // it below 100 cells went with the icons, because the strip only said anything when every row had
-    // a mark and many of those marks drew nothing.
+    // One way to lose the column, and it is a chord.
     await screen.press('b', { ctrl: true })
     const hidden = await screen.frame()
     expect(hidden).not.toContain('Browse')
@@ -664,9 +662,8 @@ describe('the shell', () => {
       width: 100,
       height: 28,
       starting: true,
-      // Seeded into the same per-node client the shell renders under, which is the whole of this
-      // phase: `App` used to mint one of its own, so a restored snapshot was invisible to it and every
-      // start was cold (client-core/infra/node/fleet.ts § clientFor).
+      // Seeded into the same per-node client the shell renders under, so a restored snapshot is what
+      // the shell reads on a warm start (client-core/infra/node/fleet.ts § clientFor).
       cache: (client) => client.setQueryData(tasksKey, cached),
     })
     const frame = await screen.frame()
@@ -761,8 +758,8 @@ describe('the shell', () => {
 
     // Enter on the first row quits. The overlay is still drawn afterwards and that is right: the real
     // `onQuit` takes the terminal back and ends the process, so there is no frame after it to close
-    // anything in. A list inside a `Modal` answering Enter at all is what the swallow layer used to
-    // break, and a scope cannot: it names no keys (../keys/trap.ts).
+    // anything in. A list inside a `Modal` can answer Enter because a scope names no keys
+    // (../keys/trap.ts).
     await started.press('RETURN')
     started.done()
     expect(started.quits()).toBe(1)
@@ -772,9 +769,8 @@ describe('the shell', () => {
 // ── What the footer costs ─────────────────────────────────────────────────────────────────────
 //
 // The footer is drawn on every frame the shell draws, and its list comes from a walk of every active
-// keymap layer. Asking per render was the cost; asking per change is the fix, and "per change" has to
-// mean the four things that actually move the answer
-// (./bindings.ts § When the answer moves).
+// keymap layer, so it is asked per change rather than per render, and "per change" has to mean the
+// things that actually move the answer (./bindings.ts § When the answer moves).
 
 describe('the footer asks the keymap once per change', () => {
   it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
@@ -802,12 +798,12 @@ describe('the footer asks the keymap once per change', () => {
         // And a key that moves the keys is a change, so the answer is asked for again. A handful
         // rather than one, because Tab into another region mounts the controls in it and each of them
         // registering a layer is a real change to what the footer can offer — but a handful bounded
-        // by the move rather than one per frame for the rest of the run, which is what it was.
+        // by the move rather than one per frame for the rest of the run.
         await screen.press('TAB')
         await screen.frame()
         expect(asks - idle).toBeGreaterThan(0)
         // The bound tracks the number of controls in the region tabbed into, so it moves when the
-        // rail gains a row. Memory (70) took it from eight to nine.
+        // rail gains a row.
         expect(asks - idle).toBeLessThanOrEqual(9)
       } finally {
         engine.getActiveKeys = real
@@ -883,10 +879,10 @@ describe('the rail keeps the rows a change did not touch', () => {
 
 // ── The way out, at every depth ───────────────────────────────────────────────────────────────
 //
-// Last in the file, and that is not taste. The measurement above is of one screen's collects after
-// one Tab, and it counts nine rather than eight when a `pr` fixture ran before it: opening that pane
-// leaves something registered that the next screen's Tab pays for once. Worth finding and not worth
-// finding here, so this case sits after the count rather than in front of it.
+// Last in the file, and that is not taste. The count above is of one screen's collects after one Tab,
+// and it counts one more when a `pr` fixture ran before it: opening that pane leaves something
+// registered that the next screen's Tab pays for once. So this case sits after the count rather than
+// in front of it.
 
 describe('the footer says how to get out', () => {
   it('says how to get out at every depth, behind a menu and behind a modal', async () => {
@@ -894,8 +890,7 @@ describe('the footer says how to get out', () => {
     await screen.until('#42', 45)
     // The scopes are a stack and Escape pops it, and the footer's `esc` is the only thing on this host
     // that draws the depth at all. It has to survive the cut: the footer ellipsises rather than
-    // wrapping, and this row used to sit last in reading order, so the line ran out before it every
-    // time (./bindings.ts § specs).
+    // wrapping, so a row late in reading order never reaches the screen (./bindings.ts § specs).
     expect(footer(await screen.frame())).toContain('esc back')
 
     // Two deep, inside a `MenuList`'s scope. Nothing behind the menu is in scope, so most of what the

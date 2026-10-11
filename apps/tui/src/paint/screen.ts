@@ -16,8 +16,7 @@ import { paint } from './paint'
 // **Layout runs on every frame rather than when something is dirty**, and those are the same set: a
 // frame only happens because an operation on the tree asked for one, and every one of those
 // operations is a change Yoga has to be asked about. Yoga is asked in turn — it only re-measures the
-// nodes it marked dirty — so the check would be ours to keep and Yoga's to make anyway. A 1,708-node
-// pane lays out in 0.19 ms warm, against a 5 ms budget.
+// nodes it marked dirty — so the check would be ours to keep and Yoga's to make anyway.
 //
 // **The sink is injectable and that is not only for tests.** Paint writes to one function that takes
 // a string, so the test harness reads frames without a terminal and the real boot hands it
@@ -65,9 +64,9 @@ export function openScreen(options: {
   write?: Sink
   /** A root of the caller's own, for a test that built one by hand. */
   root?: Renderable
-  /** Told how long each half of every frame took. Four `performance.now()` reads on the paint path,
-   *  about 160 ns against a 5 ms frame budget, which is why it is unconditional rather than gated:
-   *  a gate here would be a branch of its own and a second code path to keep right. */
+  /** Told how long each half of every frame took. Four `performance.now()` reads on the paint path
+   *  cost next to nothing against a frame, which is why it is unconditional rather than gated: a gate
+   *  here would be a branch of its own and a second code path to keep right. */
   onPhases?: (phases: FramePhases) => void
 }): Screen {
   let cols = Math.max(0, Math.trunc(options.cols))

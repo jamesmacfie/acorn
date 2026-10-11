@@ -102,7 +102,7 @@ export function ListColumn(props: { label?: string; scroll?: boolean; scrollKey?
   return (
     <box flexDirection="column" flexGrow={1}>
       {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out
-          of the label: a one-line run given half a line lands on the line above it, which drew this
+          of the label: a one-line run given half a line lands on the line above it, which draws this
           column's own name over the heading under it
           (docs/tui.md). */}
       <Show when={props.label}>

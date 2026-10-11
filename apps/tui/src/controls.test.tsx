@@ -10,12 +10,10 @@ import { recordedRequests } from './fixture'
 // keys onto a control at all, and that pressing it reaches the node
 // (docs/tui/keys.md § Keys and focus).
 //
-// The worked example in that folder's focus-model.md is the sequence below. Phase 0 reached the first
-// stop of a panel; phase 2 reaches the rest of them, so the merge method — the second stop in Details,
-// after `[Merge]` — is asserted here too, along with the wall at the end of the panel and the Escape
-// that climbs out.
+// The sequence below walks past the first stop of a panel to the merge method, the second stop in
+// Details after `[Merge]`, then to the wall at the end of the panel and the Escape that climbs out.
 
-/** Every run drawn in the focused form: `strong` in the `accent` tone (../kit/roles.ts § litControl).
+/** Every run drawn in the focused form: `strong` in the `accent` tone (./kit/roles.ts § litControl).
  *
  *  Accent is the palette's own sixth slot and the default foreground is white, so a red channel below
  *  the green is "this is the accent slot" without naming a colour (./appearance.ts). */
@@ -28,7 +26,7 @@ const litRuns = async (screen: {
     .map((run) => run.text)
 
 /** What the pane asked the node to do, as distinct from what it read. The diff reads its segments
- *  with a POST, because a batch of them is a body, so method alone no longer says "a write". */
+ *  with a POST, because a batch of them is a body, so method alone doesn't say "a write". */
 const posted = () =>
   recordedRequests().filter((request) => request.method === 'POST' && !request.path.endsWith('/diff/segments'))
 
@@ -46,19 +44,18 @@ describe('the pull request from the keyboard', () => {
       await screen.press('ARROW_DOWN')
       expect(focusedRegion()).toEqual({ paneId: 'pr', regionId: 'body' })
 
-      // …and Down again into the panel under the strip, where before this phase there was nothing
-      // focusable at all: `[Merge]` is the panel's first stop.
+      // …and Down again into the panel under the strip: `[Merge]` is the panel's first stop.
       await screen.press('ARROW_DOWN')
       expect(await litRuns(screen)).toContain('[Merge]')
 
-      // Down again reaches the panel's second stop, which is the whole of phase 2: the arrows move
-      // between the stops of one panel in reading order. The merge method sits beside `[Merge]`.
+      // Down again reaches the panel's second stop: the arrows move between the stops of one panel in
+      // reading order. The merge method sits beside `[Merge]`.
       await screen.press('ARROW_DOWN')
       expect(await litRuns(screen)).toContain('[ Squash and merge ▾ ]')
 
       // The footer says `open`, because this control opens a list. A plain button beside it would
       // say `press`, and a row in the rail would say `open` for the other reason
-      // (../chrome/bindings.ts § WORDS).
+      // (./chrome/bindings.ts § WORDS).
       const onControl = await screen.frame()
       expect(onControl).toContain('enter open')
 
@@ -129,10 +126,10 @@ describe('the pull request from the keyboard', () => {
   }, 180_000)
 
   it('tabs out of the composer onto the rest of the panel', async () => {
-    // The arrows type in a field, so the walk of a panel used to end at its first one: on this pane
-    // the `[Comment]` button, the review box under it and its verbs could not be reached at all.
-    // Tab is the next control before it is the next region, and it says so in the footer
-    // (../kit/asking/fieldRef.ts § step, docs/tui/keys.md § The five key groups).
+    // The arrows type in a field, so arrows alone can't walk a panel past its first one: on this pane
+    // the `[Comment]` button, the review box under it and its verbs sit beyond the field. Tab is the
+    // next control before it is the next region, and it says so in the footer
+    // (./kit/asking/fieldRef.ts § step, docs/tui/keys.md § The five key groups).
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
     try {
       await screen.until('[Merge]', 45)

@@ -14,12 +14,11 @@ import type { Node } from './tree/node'
 // model: without it End on a wrapped row and Home on the row below are the same number, and End
 // followed by Home does not come back. CodeMirror carries the same field for the same problem.
 //
-// **The cache is here rather than in `./layout/measure.ts`, and the reason is a byte count.** That
-// module imports `MeasureMode` from `yoga-layout`, which is a runtime value, so a static import of it
-// from `./kit/asking/fieldRef.ts` — which `./main.tsx` reaches eagerly — put the whole own-painter layout
-// module and Yoga's wasm binary into the startup closure of the *OpenTUI* build: 41 KB of chunk and an
-// `await loadYoga()` before the first frame, in a build that never lays a node out with it. Same trap
-// `./keyEvent.ts` exists to avoid, one module over (`../scripts/check-startup-graph.mjs`).
+// **The cache is here rather than in `./layout/measure.ts`, because of the startup graph.** That
+// module imports `MeasureMode` from `yoga-layout`, which is a runtime value, and
+// `./kit/asking/fieldRef.ts` is reached eagerly from `./main.tsx`, so a static import of it from there
+// pulls the layout module into the startup closure. Same trap `./keyEvent.ts` exists to avoid
+// (`../scripts/check-startup-graph.mjs`).
 //
 // **This is not `./layout/measure.ts § wrapLines`, and the two are not merging.** That one answers
 // "what lines does this run of text occupy", which is a question about characters, and it drops the
@@ -120,9 +119,9 @@ const cache = new WeakMap<Node, Wrapped>()
  * `./kit/asking/fieldRef.ts` asks which row the caret is on so that Up and Down can move between them. A
  * second wrap anywhere would draw a caret on a row the reader is not looking at.
  *
- * Which is also why the rows are held beside the model rather than rebuilt per frame: a wrap of a
- * 400-line note is 163 microseconds, affordable per keystroke and wasteful per frame, so a frame that
- * moved nothing wraps nothing and a keystroke that only moved the caret is a cache hit.
+ * Which is also why the rows are held beside the model rather than rebuilt per frame: a wrap is
+ * affordable per keystroke and wasteful per frame, so a frame that moved nothing wraps nothing and a
+ * keystroke that only moved the caret is a cache hit.
  *
  * There is no invalidator beside this, unlike `./layout/measure.ts § invalidateRun`, and the
  * difference is where the text comes from: a run's characters are its `#text` children, which the
@@ -133,8 +132,8 @@ const cache = new WeakMap<Node, Wrapped>()
  */
 export function measuredField(node: Node, limit: number): Wrapped {
   const text = typeof node.props.value === 'string' ? node.props.value : ''
-  // An `input` never wraps, the way `InputRenderable` forces `wrapMode: 'none'` on the buffer it
-  // inherits, so it is one row however long its content is and its component scrolls it sideways.
+  // An `input` never wraps, so it is one row however long its content is and its component scrolls
+  // it sideways.
   const width = node.kind === 'input' ? Infinity : limit
   const key = `${width} ${text}`
   const hit = cache.get(node)

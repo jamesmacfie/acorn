@@ -6,8 +6,7 @@ import { HOST_KEYS } from '../keys/install'
 import { openTerminal } from './terminal'
 import type { InputEvent, KeyEvent } from './events'
 
-// The input parser, on its own. No OpenTUI anywhere in this file, so it runs on the Node the repo
-// pins with no FFI and no flag, and every case is a byte sequence in and an event out.
+// The input parser, on its own: every case is a byte sequence in and an event out.
 //
 // The load-bearing case is the last one. Everything else here is a sequence somebody could have
 // mistyped; `no key is respelled` reads the app's own binding tables and insists that every key they
@@ -80,7 +79,7 @@ describe('the legacy forms', () => {
     expect(chord(keys('\x1b[1;5A')[0]!)).toBe('ctrl+up')
     // `ctrl+meta+right`, which is `nextPane`. `meta` is the keymap's spelling for Option and Alt,
     // and it is the one word the two vocabularies disagree about
-    // (packages/client-core/src/kit/keys/keymap.ts § MODIFIER_SPELLING).
+    // (client-core's `MODIFIER_SPELLING`).
     expect(chord(keys('\x1b[1;7C')[0]!)).toBe('ctrl+meta+right')
     expect(chord(keys('\x1b[6;5~')[0]!)).toBe('ctrl+pagedown')
   })
@@ -196,7 +195,7 @@ describe('the kitty forms', () => {
   })
 
   it('reads a key in the CSI u form even from a terminal that never replied', () => {
-    // Deliberate, and a departure from the phase design: a gate here cannot fail safe. A terminal
+    // Deliberate: a gate here cannot fail safe. A terminal
     // that speaks the protocol and leaves the query unanswered would have every key it sends this
     // way dropped, and those keys include Escape. Nothing else ends a CSI sequence with `u`.
     const events: InputEvent[] = []
@@ -369,9 +368,8 @@ describe('the terminal', () => {
   })
 
   it('asks for event reporting, which is what makes a release possible', () => {
-    // `../main.tsx` asks OpenTUI for `{ disambiguate: true }` and gets flags 1 and 4: its
-    // `buildKittyKeyboardFlags` sets 2 only for `events: true`, which nothing passes. So no terminal
-    // has ever sent this app a key release. 7 is 1, 2 and 4 (./terminal.ts § KITTY_FLAGS).
+    // Flag 2 is event reporting, and without it no terminal sends a key release. 7 is 1, 2 and 4
+    // (./terminal.ts § KITTY_FLAGS).
     const { stdin, stdout, written } = fake()
     const terminal = openTerminal({ stdin: stdin as never, stdout })
     expect(written.join('')).toContain('\x1b[>7u')

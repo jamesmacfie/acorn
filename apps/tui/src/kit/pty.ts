@@ -2,14 +2,13 @@ import { onCleanup } from 'solid-js'
 import type { PtyIo } from '@acorn/client-core/kit/lib'
 import type { CellTerminal } from './rectangle'
 
-// The terminal host's answer to "fill this `pty` rectangle", and the sibling of
-// `client-core/features/terminal/attachPty.ts`.
+// The terminal host's answer to "fill this `pty` rectangle", and the sibling of client-core's DOM
+// `attachPty`.
 //
-// The DOM builds an xterm on an element; here the emulator is OpenTUI's and is already drawn, so this
-// is only the plumbing between it and the channel the caller described. The caller's source is the same
-// either way, which is the point: docker's exec panel and the editor's `$EDITOR` window are unchanged
-// files that now work on a host with no browser in it
-// (docs/tui/rectangles.md § Rectangles).
+// The DOM builds an xterm on an element; here the emulator is the rectangle's own and is already
+// drawn, so this is only the plumbing between it and the channel the caller described. The caller's
+// source is the same either way, which is the point: docker's exec panel and the editor's `$EDITOR`
+// window run unchanged on a host with no browser in it (docs/tui/rectangles.md § Rectangles).
 
 export function attachPty(handle: unknown, io: PtyIo): void {
   const term = handle as CellTerminal

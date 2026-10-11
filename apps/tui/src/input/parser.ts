@@ -24,8 +24,7 @@ import { CONTROL_KEYS, KITTY_KEYS, KITTY_TEXT, LETTER_KEYS, SS3_ONLY, SS3_TEXT, 
 // sequence being read; a completed unit advances the cursor and everything before it is dropped at
 // the end of the scan.
 //
-// **The lone-ESC timeout is 20 ms**, which is what OpenTUI's own parser waits: its
-// `DEFAULT_TIMEOUT_MS` is 20 and its renderer passes `timeoutMs: 20` explicitly at 0.5.9. An ESC byte
+// **The lone-ESC timeout is 20 ms**, which is what OpenTUI's own parser waits. An ESC byte
 // is the first byte of every escape sequence there is, so pressing Escape and pressing Down are the
 // same first byte and only time tells them apart. A terminal that answered the kitty request sends
 // `CSI 27 u` for the Escape key and never a bare ESC, which is the ambiguity that flag exists to
@@ -186,8 +185,8 @@ export function createParser(emit: (event: InputEvent) => void, options: ParserO
 
   /** Kitty's `CSI <codepoint>[:shifted:base];<modifiers>[:<event>];<text> u`.
    *
-   *  **Decoded whenever it arrives, not only once the terminal has answered the query.** The phase
-   *  design gates this on the answer, and a gate here cannot fail safe: a terminal that speaks the
+   *  **Decoded whenever it arrives, not only once the terminal has answered the query.** A gate on
+   *  the answer cannot fail safe: a terminal that speaks the
    *  protocol but leaves the query unanswered would have every key it sends this way dropped, and
    *  those keys include Escape. Nothing else in any terminal's vocabulary ends a CSI sequence with
    *  `u`, so the sequence arriving *is* the answer — and it says so, which is what `kittyAnswered`
@@ -241,8 +240,8 @@ export function createParser(emit: (event: InputEvent) => void, options: ParserO
       emit({ type: 'mouse', x, y, button: 'none', action: 'wheel', wheel, ...modifiers })
       return
     }
-    // Motion, with or without a button held. Which button is dragging is the hit test's business in
-    // phase 3, and it knows because it saw the press.
+    // Motion, with or without a button held. Which button is dragging is the hit test's business,
+    // and it knows because it saw the press.
     const action: MouseAction = (code & 32) !== 0 ? 'move' : final === 'M' ? 'press' : 'release'
     // A low field of 3 means "no button", which is the old encoding's release and a bare move here.
     const button = action === 'move' && low === 3 ? 'none' : (BUTTONS[low] ?? 'none')
@@ -461,7 +460,7 @@ export function createParser(emit: (event: InputEvent) => void, options: ParserO
   function flushTimeout(): void {
     clearTimer()
     if (state === 'ground' || state === 'paste') return
-    // A lone ESC waited its 20 ms and nothing followed, so it was the key. An unfinished CSI or SS3
+    // A lone ESC waited out the timeout and nothing followed, so it was the key. An unfinished CSI or SS3
     // is a sequence that was cut off, and there is nothing to do with half of one but forget it.
     if (state === 'esc' && pending.length === 1) key('escape', '', NO_MODIFIERS)
     state = 'ground'

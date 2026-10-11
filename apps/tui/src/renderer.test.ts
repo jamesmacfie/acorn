@@ -8,12 +8,10 @@ import { openRenderer, type Renderer } from './renderer'
 
 // What the terminal says, arriving where the app listens for it.
 //
-// The one case that matters here is the first, and it is the whole reason this file exists. Our enter
-// sequence asks the kitty keyboard protocol for event reporting, which `./main.tsx` has never asked
-// for: OpenTUI's `useKittyKeyboard: { disambiguate: true }` builds flags 1 and 4 and never 2, so no
-// terminal has ever sent this app a key release. Now every key arrives twice on a terminal that
-// speaks the protocol, once as a press and once as a release, and a subscription that does not split
-// them fires every binding twice and types every character twice
+// The one case that matters here is the first. Our enter sequence asks the kitty keyboard protocol for
+// event reporting, so every key arrives twice on a terminal that speaks the protocol, once as a press
+// and once as a release, and a subscription that does not split them fires every binding twice and
+// types every character twice
 // (./input/terminal.ts § KITTY_FLAGS, ./keys/install.ts § typeInto).
 //
 // Bytes in rather than events constructed, because the split is the routing's and a test that pushed
@@ -131,8 +129,7 @@ describe('the terminal, wired to the dispatcher', () => {
       send(stdin, '\x1b[200~one\ntwo\x1b[201~')
       expect(pastes).toEqual(['one\ntwo'])
       // DEC 1004, which is the difference between a notice that lands read and one that raises a
-      // banner. Under the two names OpenTUI's renderer raised them by, because `./main.tsx`
-      // subscribes to those (§ route).
+      // banner. As the `focus` and `blur` events `./main.tsx` subscribes to (§ route).
       send(stdin, '\x1b[O')
       send(stdin, '\x1b[I')
       expect(focus).toEqual(['out', 'in'])

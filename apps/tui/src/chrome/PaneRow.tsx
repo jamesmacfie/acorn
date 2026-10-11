@@ -125,7 +125,7 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
         >
           {/* Clipped, not shrunk. A pane taller than the screen is the normal case at 24 rows, and yoga
               answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
-              half a line lands on the line above it, and the PR pane came out as two screens interleaved
+              half a line lands on the line above it, and a tall pane draws as two screens interleaved
               character by character. Clipping is the honest answer and it is the one a terminal gives
               (docs/tui.md).
               A scroll box was the other candidate and is refused: its content box is free-sized, so every
@@ -148,8 +148,8 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
                 {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
                     set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
                     an empty string — which a cell host refuses outright where the DOM would have drawn a
-                    text node nobody sees. A pending `lazy()` region is an empty string. The
-                    layout mount path already has this guard; a component pane does not go through it. */}
+                    text node nobody sees. The layout mount path has this guard already; a component pane
+                    does not go through it. */}
                 <PaneIdContext.Provider value={pane.id}>
                   <LinkMenuContext.Provider value={linkMenu}>
                     <Suspense fallback={null}>

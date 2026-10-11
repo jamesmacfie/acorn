@@ -5,9 +5,9 @@
 // understands, and Warp, iTerm2 and Kitty already turn it into a badge or an OS notification of
 // their own — so what a bell means is the emulator's decision, which is the right place for it.
 //
-// The switch both channels read moved to ./notify.ts when phase 5 added the OSC half, because the
-// platform seam imports that file and may not import this one: this one reaches client-core, which
-// reaches the node, and the seam is built before the node is reachable (../platform.ts).
+// The switch both channels read lives in ./notify.ts, because the platform seam imports that file and
+// may not import this one: this one reaches client-core, which reaches the node, and the seam is built
+// before the node is reachable (../platform.ts).
 import { registerNoticeSink } from '@acorn/client-core/features/notifications/deliver.ts'
 import { BEL, notifyMode, type NotifyMode } from './notify'
 

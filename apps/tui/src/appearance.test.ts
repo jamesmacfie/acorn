@@ -3,10 +3,10 @@ import { paletteFor, reportsTruecolor, slotColor, TERMINAL_PALETTE } from './app
 import { osc52, supportsClipboard } from './kit/copy'
 
 // The two places this host decides something about the terminal rather than about the kit. Neither
-// needs a renderer, so neither is skipped on an older Node.
+// needs a renderer.
 
 describe('the palette', () => {
-  // The light-terminal bug, as an assertion. Every slot is a question for the terminal rather than a
+  // Light terminals, as an assertion. Every slot is a question for the terminal rather than a
   // colour of ours: the reader's own foreground, or one of their sixteen numbered slots. A hex here
   // would be acorn's theme drawn over the one they chose (./colour.ts).
   it('asks the terminal for every slot, including the one no role names', () => {

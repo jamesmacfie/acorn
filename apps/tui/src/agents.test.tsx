@@ -10,15 +10,13 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 
 // Driving the agent pane, rather than reading it.
 //
-// `panes.test.tsx` already asks whether the four things an agents transcript is for are on the first
-// screen. This file asks the other question: can a reader at a terminal actually run an agent — open
-// a run, answer what it is blocked on, say something back, and start another one. Each case ends at a
-// recorded POST, because what a pane draws and what it sends are different claims and only the second
-// one is the feature (./controls.test.tsx § posts a comment typed into the composer).
+// `panes.test.tsx` asks whether an agents transcript has what it needs on the first screen. This file
+// asks whether a reader at a terminal can run an agent: open a run, answer what it is blocked on, say
+// something back, and start another one. Each case ends at a recorded POST, because what a pane sends
+// is the feature, and what it draws is not proof of that.
 //
 // 120 by 40 throughout. Below 80 cells `list-detail` draws one column at a time, so the composer and
-// the approval are behind the layout's group switch and a case about them would be a case about the
-// switch (../layouts/ListDetail.tsx).
+// the approval sit behind the layout's group switch (./layouts/ListDetail.tsx).
 
 const posts = () =>
   recordedRequests()
@@ -105,7 +103,7 @@ describe('running an agent from a terminal', () => {
 
   // Where the keys go when a reader opens a run. A chat surface is one you arrive at to write, so the
   // message box is what the column hands them to, and everything else is a step away from it
-  // (../keys/regions.ts § markEntry).
+  // (./keys/regions.ts § markEntry).
   it('puts the keys in the message box when the run opens', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -116,7 +114,7 @@ describe('running an agent from a terminal', () => {
       // box. What is being claimed is that the keys are in the message box, and the kind says it.
       expect(focusedRenderable()?.kind).toBe('textarea')
       // And the header above it is still a walk away, because an arrow at the field's first line
-      // leaves the field rather than being swallowed (../keys/install.ts § typeInto).
+      // leaves the field rather than being swallowed (./keys/install.ts § typeInto).
       await stopSaying(screen, 'New')
       expect((await screen.caret()).text).toContain('New')
     } finally {
@@ -124,9 +122,9 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // `onSubmit` on the shared props is documented as "Enter without a modifier. Absent leaves Enter as
-  // a newline", and the DOM half reads exactly that. This host had it on the `commit` chord alone, so
-  // the composer's own hint — "Shift+Enter for newline" — described a keyboard nobody had.
+  // `onSubmit` on the shared props means "Enter without a modifier. Absent leaves Enter as a newline",
+  // and the composer's own hint says "Shift+Enter for newline". Binding it to the `commit` chord alone
+  // would make that hint describe a keyboard nobody has.
   it('sends on Enter and keeps Shift+Enter for a newline', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -157,11 +155,10 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // The create-a-run control, and the reason this file exists. `New` is a `Picker`, which on this host
-  // is a `Menu` with a filter field over provider rows — and inside the header's `Toolbar` its panel
-  // used to be laid out in the few cells the trigger was given, so `Claude Code` and `Available`
-  // collided into `ClaAv` and a reader could not tell what they were choosing
-  // (../kit/grouping/blocks.tsx § Toolbar).
+  // The create-a-run control. `New` is a `Picker`, which on this host is a `Menu` with a filter field
+  // over provider rows. Inside the header's `Toolbar`, a panel laid out in the few cells the trigger
+  // has runs `Claude Code` and `Available` together, and a reader can't tell what they are choosing
+  // (./kit/grouping/blocks.tsx § Toolbar).
   it('starts a new run from the header, and the provider row is readable', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -182,8 +179,8 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  // The whole session-actions menu, which is the same clipping bug and the same fix: six rows that
-  // read as words rather than as the first six cells of one.
+  // The session-actions menu has the same clipping trap: its rows must read as words rather than as
+  // the first few cells of one.
   it('offers the session actions as whole words', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {

@@ -1,6 +1,6 @@
 // shiki, as this host's answer: a throw.
 //
-// The eighth alias in the host switch (../vite.config.ts). Every `shiki` specifier resolves here —
+// An alias in the host switch (`apps/tui/vite.config.ts`). Every `shiki` specifier resolves here —
 // `shiki/core`, both engines, every `shiki/langs/*.mjs`, every `shiki/themes/*.mjs`, and the wasm.
 //
 // **Why it cannot be here.** shiki turns code into HTML or into tokens carrying hex colours, and this
@@ -9,10 +9,10 @@
 // terminal plugin's `TerminalPanel`. This host's own diff pane drops the highlighter and says so
 // (./showing/diffPane.tsx § DiffPane), and its own markdown draws roles rather than a palette.
 //
-// **The grammars were already lazy and that hid the problem.** `client-core/src/infra/highlight/langs.ts`
-// loads each grammar behind an `import()`, so the `langs` chunk this host does load needed none of
-// them — right up until the moment something asked for one, which would then have been a
-// module-not-found from inside a surface rather than the missing highlighter it is.
+// **The grammars are lazy, and that hides the problem.** `client-core/src/infra/highlight/langs.ts`
+// loads each grammar behind an `import()`, so the `langs` chunk this host does load needs none of
+// them — until something asks for one, which without this alias is a module-not-found from inside a
+// surface rather than the missing highlighter it is.
 //
 // **Why an alias rather than a dependency.** The bundle externalises every bare import, so without
 // this shiki has to stay installed for three surfaces that cannot draw here

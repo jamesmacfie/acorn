@@ -9,12 +9,11 @@ import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 
 // Starting a node and owning its lifetime, for the case where nothing holds the data root yet.
 //
-// This is not `packages/custody/src/supervision/serviceHost.ts`, and that is a departure from the
-// plan. The helper's supervisor drives `service.js` over an fd-3 RPC channel it opens before the
-// service has bound anything; a standalone node announces itself with one JSON line on stdout and
-// speaks no RPC at all (apps/node/src/entries/standalone.ts). Two protocols in one class would be
-// worse than the forty lines below, and the part worth sharing — SIGTERM then SIGKILL — is six of
-// them.
+// This is not `packages/custody/src/supervision/serviceHost.ts`. The helper's supervisor drives
+// `service.js` over an fd-3 RPC channel it opens before the service has bound anything; a standalone
+// node announces itself with one JSON line on stdout and speaks no RPC at all
+// (apps/node/src/entries/standalone.ts). Two protocols in one class would be worse than the forty lines
+// below, and the part worth sharing — SIGTERM then SIGKILL — is six of them.
 
 /** The node's boot line, as the standalone entry prints it. */
 export type Handshake = {
@@ -59,8 +58,7 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
   const agentEntry = process.env.ACORN_TUI_NODE_ENTRY
   if (agentEntry) return { command: process.execPath, args: [agentEntry] }
   // Two candidates rather than one, because this file may end up in `dist/` or in `dist/chunks/`
-  // depending on how rollup splits it, and `standalone.js` sits in `dist/`. Phase 7 pins that layout
-  // and can drop whichever of these it does not use.
+  // depending on how rollup splits it, and `standalone.js` sits in `dist/`.
   const packaged = ['./standalone.js', '../standalone.js'].map((at) => fileURLToPath(new URL(at, import.meta.url)))
   const built = packaged.find((candidate) => existsSync(candidate))
   if (built) return { command: process.execPath, args: [built] }

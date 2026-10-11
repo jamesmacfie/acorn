@@ -17,13 +17,13 @@ import { Icon } from './marks'
 
 /** reduced: no intra-line word highlight. The gutter is the change, the colour is the direction.
  *
- *  One `text` with two runs in it, and `flexShrink={0}` on it, and both halves of that are the same
- *  bug in two directions. A row of two `Line`s is a row of two boxes, so a line wider than the column
- *  shrank both and each clipped its own content, which put the gutter's last digit against the `+`
- *  and lost the space between them; a run inside one `text` clips once, at the end, where a reader
- *  expects it (../cells.tsx § Run). And a column of rows taller than the panel shrank every row
- *  instead of scrolling, so four hundred diff lines were drawn into thirty rows on top of each other
- *  — the smear this node shipped with. A diff row is one line high and never less. */
+ *  One `text` with two runs in it, and `flexShrink={0}` on it, and both halves of that guard the same
+ *  failure in two directions. A row of two `Line`s is a row of two boxes, so a line wider than the
+ *  column shrinks both and each clips its own content, which puts the gutter's last digit against the
+ *  `+` and loses the space between them; a run inside one `text` clips once, at the end, where a reader
+ *  expects it (../cells.tsx § Run). And a column of rows taller than the panel would shrink every row
+ *  instead of scrolling, drawing hundreds of diff lines on top of each other. A diff row is one line
+ *  high and never less. */
 export function DiffLine(props: { r: CodeRow; canAdd?: boolean; highlight?: unknown }) {
   const mark = () => (props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '-' : ' ')
   const tone = () => (props.r.kind === 'insert' ? 'ok' : props.r.kind === 'delete' ? 'danger' : undefined)

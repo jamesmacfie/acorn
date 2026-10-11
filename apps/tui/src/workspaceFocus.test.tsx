@@ -27,8 +27,7 @@ describe('workspace focus handoff', () => {
 
       // Two waits and no polling. The topbar says the switch landed; the Browse list says the new
       // workspace's default source was chosen, which is the model's own effect and the settle it
-      // schedules (./chrome/model.ts § defaultSource). Before those existed this loop asked twenty
-      // times whether the caret had caught up yet.
+      // schedules (./chrome/model.ts § defaultSource).
       await screen.until('second > second-project')
       const switched = await screen.until('Pull requests')
       expect(focusedRegion()?.regionId).toBe('menu')

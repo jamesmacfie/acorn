@@ -24,13 +24,13 @@
 //                                     `kpenter` is `return`), so by the time a key reaches here
 //                                     there is nothing left to tell apart — and no first-party
 //                                     surface in this app is driven from a numeric keypad.
-//   modifyOtherKeys and kitty         Neither exists to honour. `IModes` in @xterm/headless 5.5.0
-//                                     reports ten modes and neither of those is among them, so a
-//                                     chord is encoded the legacy way: the C0 byte for Ctrl, an
-//                                     `ESC` prefix for Alt, and the xterm modifier parameter on the
-//                                     keys that take parameters. A program that asked for either
-//                                     protocol gets the encoding every terminal falls back to,
-//                                     which is the encoding it has to handle anyway.
+//   modifyOtherKeys and kitty         Neither exists to honour. `IModes` in @xterm/headless
+//                                     reports neither of them, so a chord is encoded the legacy
+//                                     way: the C0 byte for Ctrl, an `ESC` prefix for Alt, and the
+//                                     xterm modifier parameter on the keys that take parameters. A
+//                                     program that asked for either protocol gets the encoding
+//                                     every terminal falls back to, which is the encoding it has to
+//                                     handle anyway.
 //
 // **A modifier is a parameter on the keys that have one and a prefix on the keys that do not.**
 // `ESC [ 1 ; 5 A` is Ctrl+Up and every terminal since xterm 216 sends it; there is no such spelling

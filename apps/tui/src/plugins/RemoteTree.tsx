@@ -36,8 +36,8 @@ import { fenceScope } from '@acorn/client-core/host/markdownFences/fenceViewers.
 // The terminal's sibling of `client-core/host/tree/RemoteTree.tsx`, and the same division of labour:
 // this is lifecycle and wiring, the broker decides every bridge call, and ./TreeHost.tsx applies every
 // mutation. Everything below the bridge is shared with the desktop — the same fourteen effects, the
-// same three pushes, the same worker host — and what differs is the four answers a terminal has to
-// give differently, each marked where it is given.
+// same three pushes, the same worker host — and what differs is the few answers a terminal has to
+// give differently.
 
 export type RemoteTreeProps = {
   contribution: RemoteContribution
@@ -123,8 +123,8 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const bound = binding()
   // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
   // it, so a tree mounting for the first time gets its selection in `context` rather than racing
-  // its own mount against an event that has already fired — the same split a frame region makes
-  // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+  // its own mount against an event that has already fired — the same split client-core's
+  // `PluginFrame` makes for a frame region. A routed item wins, because for a project-scoped surface it IS the
   // current selection rather than a one-shot.
   const opened =
     scope().item ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
@@ -137,8 +137,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     ...(bound.projectId ? { projectId: bound.projectId } : {}),
     ...(item ? { item } : {}),
     // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
-    // and no theme id to resolve until the appearance layer publishes its colours as data
-    // (../appearance.ts, docs/tui.md).
+    // and no theme id for a tree to resolve (../appearance.ts, docs/tui.md).
     theme: 'terminal',
     style: 'terminal',
     claimsKeys: [],
@@ -162,7 +161,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     ),
   })
 
-  // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
+  // Where a terminal answers differently. An owner action is host-agnostic and goes through
   // the shared check; a companion overlay is a rectangle over the window, and this host has none, so it
   // says so rather than pretending. A plugin catches `unsupported_host` and leaves its static preview
   // up, which is why the owner's chip is what a reader sees here (docs/tui/rectangles.md § Rectangles).

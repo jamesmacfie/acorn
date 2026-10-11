@@ -20,7 +20,7 @@ import { nodeSentence, nodeStarting } from './nodeState'
 
 /** What an entered rectangle says instead of the hints, because while it is entered they are all
  *  false: it has taken every key, and the only two that mean anything are these
- *  (../kit/rectangle.tsx § The Rectangle contract). */
+ *  (docs/tui/traps.md § The Rectangle contract). */
 const ENTERED = 'esc leave · esc esc send escape'
 
 export function Footer(props: { nodeId: string }) {

@@ -55,8 +55,7 @@ export type FlexProps = {
   visible?: boolean
 }
 
-/** A wheel event over a box, as `./hit.ts § wheelAt` delivers one. The later slice that wires the
- *  input parser's mouse events to the same walk changes where it comes from and not its shape. */
+/** A wheel event over a box, as `./hit.ts § wheelAt` delivers one. */
 type Scroll = Wheel
 
 export type BoxProps = FlexProps & {
@@ -94,7 +93,7 @@ export type TextProps = FlexProps & {
 }
 
 /** A styled stretch inside one `text`. Takes the same props a `text` does, because it is the same
- *  thing at a different size — which is the `spanStyle` special case made unnecessary. */
+ *  thing at a different size. */
 export type SpanProps = TextProps
 
 export type ScrollBoxProps = FlexProps & {
@@ -112,8 +111,7 @@ export type ScrollBoxProps = FlexProps & {
   children?: SolidJSX.Element
 }
 
-/** The two editable widgets and the PTY rectangle, whose content props phase 3 owns. To layout they
- *  are boxes, which is all this slice needs them to be. */
+/** The two editable widgets and the PTY rectangle. To layout they are boxes. */
 export type InputProps = FlexProps & {
   ref?: Ref<Renderable>
   value?: string

@@ -18,20 +18,18 @@ import type { Color } from './colour'
 /** The six colours a role can ask for. `default` is the terminal's own foreground. */
 export type Palette = Record<Slot, Color>
 
-/** The terminal's own slots, as `./colour.ts`'s three answers: the terminal's own foreground, or one
- *  of its sixteen numbered slots. Either way the colour comes from the theme the person chose rather
- *  than from us.
+/** The terminal's own slots, in two of `./colour.ts`'s three answers: the terminal's own foreground,
+ *  or one of its sixteen numbered slots. Either way the colour comes from the theme the person chose
+ *  rather than from us.
  *
- *  Both have to be said out loud, and that is the whole of the light-terminal bug — under the painter
- *  we are leaving. A run with no colour was not the terminal's foreground to OpenTUI, it was opaque
- *  white, which on a light background is white on white; and a colour *named* was worse, because it
- *  read `cyan` as the CSS colour and sent `#00FFFF`. Our painter writes `39` for `default` and
- *  `30 + n` for a slot, so the class is answered where the colour is emitted
+ *  Both are said out loud rather than left unset or named. An unset colour is easy to paint as opaque
+ *  white, which on a light background is white on white, and a named one is easy to read as the CSS
+ *  colour (`cyan` as `#00FFFF`). The painter writes `39` for `default` and `30 + n` for a slot
  *  (./paint/flush.ts). */
 export const TERMINAL_PALETTE: Palette = {
   default: 'default',
   // Slot 8, the palette's own grey, is what `muted` is instead of the `dim` attribute: dim blends a
-  // run toward the background, so on a light terminal it drew white on white
+  // run toward the background, so on a light terminal it draws white on white
   // (client-core/kit/tokens/roles.ts § tone).
   muted: 8,
   accent: 6,
@@ -72,7 +70,7 @@ const fromHex = (hex: string): Color => {
   return [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16)) as unknown as Color
 }
 
-/** A theme's palette as the five slots. Truecolor passes the theme's own value through; anything else
+/** A theme's palette as the six slots. Truecolor passes the theme's own value through; anything else
  *  falls back to the terminal's slot, including a colour written as `oklch(...)`, which a terminal
  *  cannot take at all. */
 export function paletteFor(theme: Readonly<Record<string, string | undefined>>, truecolor: boolean): Palette {

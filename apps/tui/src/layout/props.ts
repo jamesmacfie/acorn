@@ -4,11 +4,9 @@ import type { Node as YogaNode } from 'yoga-layout'
 // One table from a prop name to the Yoga setter that answers it, and nothing else in the layout pass
 // knows a prop name.
 //
-// The kit hands `<box>` and `<text>` 24 distinct props once `ref`, `title` and the event handlers are
-// set aside. 21 of them are Yoga's; the other three are `borderStyle` and `borderColor`, which are
-// paint, and `wrapMode`, which is an input to the measure function. `NOT_YOGA` below names every one
-// of the rest and why, because a prop that is in neither list is a prop that silently does nothing —
-// and `./layout.test.ts` is the check that neither list has fallen behind the kit.
+// Every prop the kit hands an intrinsic is either here or in `NOT_YOGA` below with the reason it is
+// not Yoga's, because a prop that is in neither list is a prop that silently does nothing — and
+// `./layout.test.ts` is the check that neither list has fallen behind the kit.
 //
 // A value the kit does not pass yet still gets a setter where Yoga has one and the cost is a line:
 // all four padding and margin edges, `justifyContent`, `maxWidth`, `maxHeight`. An incomplete table
@@ -75,16 +73,15 @@ const OVERFLOWS: Record<string, Overflow> = {
 /**
  * What `flexShrink` is where nobody said, and the three props that decide it.
  *
- * Yoga starts a node at 0 and every renderable in the old painter derived it, so we derive it the
- * same way: a box given a width or a height in cells does not shrink, and everything else does. That
- * is what the old painter's `Renderable.setupYogaProperties` did, and the kit is written against it —
- * which is why 153 of its boxes say `flexShrink={0}` out loud and none says 1. A percentage is not a
- * number here, deliberately: the old painter asked `typeof width === 'number'` too.
+ * Yoga starts a node at 0. The kit is written against OpenTUI's rule instead: a box given a width or
+ * a height in cells does not shrink, and everything else does — which is why its boxes say
+ * `flexShrink={0}` out loud and none says 1. A percentage is not a number here, deliberately, as it
+ * is not in OpenTUI's `typeof width === 'number'`.
  *
  * The difference shows up wherever the children of a row want more room than the row has: at 0 they
  * all keep their full size and the last of them is clipped, at 1 they give the overflow up between
- * them. A `TableRow`'s caret marker was clipped outside its panel, and both halves of a `Sections`
- * strip took the whole row each, because a viewport's content box is 100% wide and hands its half
+ * them. At 0, a `TableRow`'s caret marker clips outside its panel, and both halves of a `Sections`
+ * strip take the whole row each, because a viewport's content box is 100% wide and hands its half
  * that as a floor to grow from (../kit/scrolling.tsx § viewportBox).
  *
  * A blanket 1 also passes every test in this package. The derived rule is here anyway, because it is
@@ -160,10 +157,8 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   style: "a run's colour and attributes, read by paint",
   fg: "a run's foreground, read by paint",
   attributes: "a run's bold, dim, underline and inverse bits, read by paint",
-  // The same four bits again, one prop each. `../kit/roles.ts § textStyle` answers both ways because
-  // a `span` under the old painter reads its weight out of a `style` object and ignores a mask, and a
-  // spread of that answer onto a `text` therefore carries these too. Paint reads the mask; phase 4
-  // drops the four (../kit/cells.tsx § Run).
+  // The same four bits again, one prop each. `textStyle` returns them beside the mask, so a spread of
+  // its answer onto a `text` carries them. Paint reads only the mask.
   bold: "a run's weight, said as a boolean for a span",
   dim: "a run's dimness, said as a boolean for a span",
   underline: "a run's underline, said as a boolean for a span",

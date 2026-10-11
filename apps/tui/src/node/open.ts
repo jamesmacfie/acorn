@@ -12,10 +12,10 @@ import { startNode, type Handshake } from './supervise'
 // module built.
 
 // The TUI has no keychain to hand a token to, so it writes the bytes and leans on the file mode. That
-// is the third column in docs/security.md's summary table as 06-isolation.md designs it: exposure is
-// "a process on this machine with the user's uid", mitigation is 0600, which is exactly what the node
-// beside it gives its own TLS private key and session key. Encrypting under a key stored in the same
-// directory would look like more and be the same.
+// is the third column in docs/security.md's summary table: exposure is "a process on this machine with
+// the user's uid", mitigation is 0600, which is exactly what the node beside it gives its own TLS
+// private key and session key. Encrypting under a key stored in the same directory would look like more
+// and be the same.
 export { custody, type Custody } from '@acorn/custody/local'
 
 export type OpenedNode = {

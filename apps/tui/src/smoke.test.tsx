@@ -2,7 +2,7 @@
 import { expect, test } from 'vitest'
 import { renderFixture } from './harness'
 
-// The one test phase 0 owes: a first-party pane, unchanged, drawn to a cell buffer at 80 by 24.
+// A first-party pane, unchanged, drawn to a cell buffer at 80 by 24.
 //
 // It asserts what a reader would look for on the screen rather than a snapshot of every cell: the
 // group labels the list column drew, the note titles under them, and the body of the note the detail
@@ -10,8 +10,8 @@ import { renderFixture } from './harness'
 // broken promise names itself (docs/testing/layers.md § Test layers). The chrome around the pane has its own
 // file (chrome/chrome.test.tsx); this one is about the pane.
 //
-// Since phase 4 the pane is inside a shell, so getting to it takes two presses of Tab — rail, pane
-// strip, pane. That is the shell behaving, and it is asserted in the file that owns it.
+// The pane is inside a shell, so getting to it takes two presses of Tab — rail, pane strip, pane.
+// That is the shell behaving, and it is asserted in the file that owns it.
 const intoPane = async (screen: { press: (key: string) => Promise<void> }): Promise<void> => {
   await screen.press('TAB')
   await screen.press('TAB')
@@ -19,8 +19,8 @@ const intoPane = async (screen: { press: (key: string) => Promise<void> }): Prom
 
 test('the notes pane draws its list at 80 by 24', async () => {
   const screen = await renderFixture({ pane: 'notes' })
-  // `until`, not `frame`: the pane's rows are a query away and the shell has more to draw than it
-  // used to, so reading the first frame is a race that passes alone and fails beside eleven other
+  // `until`, not `frame`: the pane's rows are a query away and the shell has a lot to draw, so
+  // reading the first frame is a race that passes alone and fails beside eleven other
   // files (./harness.tsx § until).
   const frame = await screen.until('TASK')
   screen.done()
@@ -34,8 +34,8 @@ test('the notes pane draws its list at 80 by 24', async () => {
   for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(80)
 }, 30_000)
 
-// The other half of what phase 0 set out to prove: the pane handles no keys, and the arrows still
-// walk it. `j` is `next` in the one table both hosts read (kit/keys/keymap.ts), and the caret is
+// The pane handles no keys, and the arrows still walk it. `j` is `next` in the one table both hosts
+// read (client-core/kit/keys/keymap.ts), and the caret is
 // where this host draws the collection's active row.
 test('j moves the caret down the list', async () => {
   const screen = await renderFixture({ pane: 'notes' })
@@ -53,7 +53,7 @@ test('j moves the caret down the list', async () => {
 // And Enter opens what the caret is on. Worth its own test because the wiring is not obvious: a `Row`
 // on the DOM is a button, so Enter on it raises a click and `onPress` runs by itself. There is no
 // element here, so the row hands its press to the collection and the intent routes it
-// (keys/collection.ts).
+// (./keys/collection.ts).
 //
 // The `l` at the end is the shell's doing rather than the pane's, and it is a real finding: the
 // chrome spends three cells on the rail and its rule, so at 80 columns the pane is 77 and
@@ -76,9 +76,8 @@ test('enter opens the row the caret is on', async () => {
 // columns above 80 cells and one below it, and a pane that reads at 80 by 24 has to keep reading when
 // the window is bigger rather than leaving a column stranded.
 //
-// Notes rather than the http pane, which is what phase 1 asked for: http ships only a tree bundle
-// (plugins/http/src/tree/, no client/), so drawing it means the worker sandbox and that is phase 5.
-// See docs/tui.md.
+// Notes rather than the http pane: http ships only a tree bundle (plugins/http/src/tree/, no
+// client/), so drawing it means the worker sandbox (docs/tui.md).
 test('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
   const wide = await renderFixture({ width: 120, height: 40, pane: 'notes' })
   const frame = await wide.frame()

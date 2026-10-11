@@ -105,7 +105,7 @@ export type { HistoryNode, HistorySlot } from '@acorn/client-core/kit/components
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
 export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The other half of a `pty` rectangle: the caller says what the channel is and the host draws the
-// emulator. On the DOM that is an xterm on an element; here it is OpenTUI's, already drawn
+// emulator. On the DOM that is an xterm on an element; here it is the rectangle's own, already drawn
 // (./pty.ts, client-core/features/terminal/attachPty.ts).
 export { attachPty } from './pty'
 export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'

@@ -17,8 +17,8 @@ export function HeaderBodyFooter(props: LayoutProps) {
     <box flexDirection="column" flexGrow={1}>
       {/* `flexShrink={0}` on both strips, the rule every block node in the kit keeps: yoga answers a
           height deficit by taking it out of every child that will give, and these two are the only
-          children here that would. Once the body took a frame — which refuses to shrink, as a frame
-          must — a squeezed header drew no rows at all, and a pane whose list is in its header opened
+          children here that would. The body is a frame, which refuses to shrink as a frame must, so a
+          squeezed header would draw no rows at all and a pane whose list is in its header would open
           with no caret in it (../kit/grouping.tsx). */}
       <Show when={props.regions.header}>
         <box flexDirection="column" flexShrink={0} ref={regionFocus({ paneId: props.stateKey, regionId: 'header' }, 0)}>

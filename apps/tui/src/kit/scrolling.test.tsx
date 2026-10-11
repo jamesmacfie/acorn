@@ -331,15 +331,15 @@ describe('scrolling detail viewports', () => {
 
   // ── A list longer than the region it is drawn in ─────────────────────────────────────────────
   //
-  // The three cases below are one reported fault with two causes in it, and both are fixed: the List
-  // region of every `list-detail` was a yoga clip rather than a viewport, and the page keys moved
-  // modulo the list length (docs/tui/scrolling.md § Scrolling viewports).
+  // The three cases below guard two causes of one fault: the List region of a `list-detail` has to be
+  // a viewport rather than a Yoga clip, and the page keys have to clamp rather than move modulo the
+  // list length (docs/tui/scrolling.md § Scrolling viewports).
 
   it('follows the caret down a list longer than its list-detail region', async () => {
-    // A non-virtual `Rows` of 30 in a region eight rows tall. This is the shape eight of the nine
-    // plugin lists are, and until the List region became a viewport the caret simply walked off the
-    // bottom of the panel: the clip round it hid the rows below the fold and owned no offset for the
-    // reveal to move (./scrolling.tsx, docs/tui/scrolling.md § Scrolling viewports).
+    // A non-virtual `Rows` of 30 in a region eight rows tall, which is the shape most plugin lists
+    // are. Behind a clip rather than a viewport the caret walks off the bottom of the panel: the clip
+    // hides the rows below the fold and owns no offset for the reveal to move (./scrolling.tsx,
+    // docs/tui/scrolling.md § Scrolling viewports).
     const screen = await renderCells(
       () => (
         <ListDetail
@@ -373,9 +373,9 @@ describe('scrolling detail viewports', () => {
   }, 30_000)
 
   it('lands a page key on the last row of a short list and hands the next one to the viewport', async () => {
-    // `PAGE` is ten rows, and it used to move modulo the list length: PageDown in a three-row list
-    // moved one row and in a ten-row list moved nowhere, which a reader cannot tell from a dead key.
-    // It clamps now, and once the caret is on the last row the collection hands the key back, so the
+    // `PAGE` is ten rows, and it clamps rather than moving modulo the list length, which in a
+    // three-row list would move one row and in a ten-row list nowhere — a reader cannot tell that
+    // from a dead key. Once the caret is on the last row the collection hands the key back, so the
     // document viewport around the list scrolls it. That is the sentence the footer promises: arrows
     // move, page keys scroll (client-core kit/keys/collectionIntents.ts).
     for (const count of [3, 10]) {
@@ -420,12 +420,11 @@ describe('scrolling detail viewports', () => {
   }, 60_000)
 
   it('reveals the caret in a list that has only just mounted', async () => {
-    // The reveal reads a child's laid-out `y`, and a row built in this tick still carries last
-    // tick's geometry or none at all. So entering a region whose rows have only just arrived
-    // scrolled by the wrong delta and nothing corrected it: with the reveal's second half taken out
-    // this case leaves the caret on row 30 and the viewport showing rows 1 to 10, which is a lit
-    // border, no caret and dead-looking arrows. The store reveals on the renderer's next frame,
-    // which is the first moment the numbers are real (../keys/regions.ts § The reveal).
+    // The reveal reads a child's laid-out `y`, and a row built in this tick still carries last tick's
+    // geometry or none at all. Revealed in the same tick, entering a region whose rows have only just arrived
+    // scrolls by the wrong delta: the caret is on row 30 and the viewport shows rows 1 to 10, which is a lit
+    // border, no caret and dead-looking arrows. The store reveals on the renderer's next frame, which is the
+    // first moment the numbers are real (../keys/regions.ts § The reveal).
     //
     // Built the way a reader meets it. They read to the end of a list, look at the detail beside it,
     // the list is replaced under them by a refresh, and they Tab back: the region remembers the row
@@ -479,8 +478,7 @@ describe('scrolling detail viewports', () => {
     // also manage: scroll too far and the row is still drawn, just not where the reader is looking.
     // This one is the same scenario judged by where the row landed. The reveal runs between the
     // layout and the paint of one frame, so a row revealed from below lands exactly at the bottom
-    // edge it came in from: Row 30 is the last row drawn, and no row is drawn twice. That is the
-    // promise one reveal makes and two never could, because the second was correcting the first
+    // edge it came in from: Row 30 is the last row drawn, and no row is drawn twice
     // (../keys/regions.ts § The reveal).
     const [ready, setReady] = createSignal(true)
     const screen = await renderCells(

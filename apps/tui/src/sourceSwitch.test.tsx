@@ -8,7 +8,7 @@ import { Heading, Text } from './kit/showing'
 
 it('replaces a resolved source when the next lazy source starts a resource', async () => {
   // Install the roster before the shell mounts, as production does. This test is about switching
-  // lazy surfaces; registering after render let End run against the old Menu rows.
+  // lazy surfaces; registering after render lets End run against stale Menu rows.
   const { sourceRegistry } = await import('@acorn/client-core/host/registries/sources')
   const first = sourceRegistry.register({
     id: 'first-probe',

@@ -55,9 +55,6 @@ import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 // cooperative-extension nodes — and the DOM's copies of them are backdrops, portals and `<ul>`s. A
 // pane imports the same names on both hosts and a different component answers each, which is the
 // same switch ./ui.ts makes and the reason a pane's source is unchanged here.
-//
-// Phase 5 left this barrel uncrossed because nothing in that phase's roster used one
-// (docs/tui.md). The pane sweep is the phase with the roster.
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
@@ -185,11 +182,10 @@ export { RefPanelBoxDefault as RefPanelBox }
 
 /** Promote a row to a task, with the optional workflow step above it.
  *
- *  Absent, and it says so, for the same reason `RefPanelTaskLink` below is: the box needs the routed
- *  project and the source's registered `promotion`, and this host has no router. The surface that
- *  opens it is a row menu on a descriptor source's list, and this host's source panel draws no row
- *  menu (../plugins/SourcePanel.tsx, docs/tui/plugin-losses.md § What a plugin loses here). Nothing here mounts an
- *  `overlay` slot either, so this stands in for a build, not for a screen. */
+ *  Absent, and it says so. The surface that opens it is a row menu on a descriptor source's list, and
+ *  this host's source panel draws no row menu
+ *  (../plugins/SourcePanel.tsx, docs/tui/plugin-losses.md § What a plugin loses here). Nothing here
+ *  mounts an `overlay` slot either, so this stands in for a build, not for a screen. */
 export function PromoteToTaskModal(_props: {
   providerId: string
   item: unknown
@@ -209,8 +205,7 @@ export type { PromoteTaskAction } from '@acorn/client-core/features/integrations
 
 /** The Config files section of the agents plugin's MCP page.
  *
- *  Absent, and it says so. Core draws the list with the desktop's own controls, and it had no terminal
- *  form when it was a page of its own either. */
+ *  Absent, and it says so: core draws the list with the desktop's own controls. */
 export function McpConfigFiles() {
   return (
     <Line role="muted">
@@ -222,8 +217,7 @@ export function McpConfigFiles() {
 /** "Is there a task for this thing, and if not, start one".
  *
  *  Absent, and it says so. The DOM control is a `Select` of repos and a create button wired to the
- *  router — and there is no router here, which is the same reason `RemoteTree` passes an empty
- *  `navigate`. A reader who wants a task for this reference makes one in the rail, which is two keys
+ *  desktop's router. A reader who wants a task for this reference makes one in the rail, which is two keys
  *  away and does not need this line to be a lie. */
 export function RefPanelTaskLink(_props: { target: unknown }) {
   return <Line role="muted">Start a task for this from the rail.</Line>

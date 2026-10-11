@@ -35,8 +35,8 @@ import {
 // keys after a mount, an unmount, a dialog or a walk. The real thing is exercised end to end in
 // ../browse.test.tsx and swept as a property in ../reachability.test.tsx.
 //
-// The fakes model what is left of the renderer, which is two things: the caret it draws when the
-// store tells it to, and the root a mouse event bubbles up to. Focus itself is the store's, so a fake
+// The fakes model the renderer as two things: the caret it draws when the store tells it to, and the
+// root a mouse event bubbles up to. Focus itself is the store's, so a fake
 // does not decide anything about it — what it has to get right is that a `focus` call moves the caret
 // off whatever had it, because one caret is invariant 3 (./regions.ts § The one owner).
 
@@ -55,8 +55,8 @@ type Fake = {
 const asFake = (box: Renderable): Fake => box as unknown as Fake
 
 /** The renderer, as far as focus is concerned: the caret it is told to draw, and the root a click
- *  bubbles up to. `CliRenderer.focusRenderable` records the new node and blurs the one it displaces,
- *  which is why one call is one caret; `blurRenderable` clears it.
+ *  bubbles up to. A fake node's `focus` records itself here and unmarks the node it displaces, which
+ *  is why one call is one caret; its `blur` clears it.
  *
  *  `currentFocusedRenderable` is a getter that counts, because the store must never ask it anything:
  *  asking the renderer where the keys are is what a second owner does, and the count is how a case
@@ -105,9 +105,9 @@ const node = (children: Renderable[] = []): Renderable => {
     focused: false,
     isDestroyed: false,
     getChildren: () => children,
-    // `Renderable.focus` refuses a destroyed, already focused or unfocusable node and does not look
-    // at `visible` at all, and `blur` refuses a node that is not focusable. Both are the caret mirror
-    // now and neither decides anything (./regions.ts § paintCaret).
+    // `focus` refuses a destroyed, already focused or unfocusable node and does not look at `visible`
+    // at all, and `blur` refuses a node that is not focusable. Both are the caret mirror and neither
+    // decides anything (./regions.ts § paintCaret).
     focus: () => {
       if (box.isDestroyed || box.focused || !box.focusable) return
       const previous = renderer.held()
@@ -137,8 +137,8 @@ const control = (): Renderable => {
  *  (../kit/showing/row.tsx § Row). `markItem` marks a row; it does not make one focusable. */
 const item = (): Renderable => control()
 
-/** What `Renderable.destroy` does that focus can see: the flag, and the blur it ends with, so the
- *  keys are nowhere rather than on a corpse and the pass has the region's claim to go on. */
+/** A destroyed renderable as focus sees one: the flag, and the blur it ends with, so the keys are
+ *  nowhere rather than on a corpse and the pass has the region's claim to go on. */
 const destroy = (box: Renderable): void => {
   asFake(box).isDestroyed = true
   box.blur()
@@ -168,10 +168,9 @@ const opened = (box: Renderable): (() => void) => {
 /**
  * Draw a row into a box and hand back what unmounts it.
  *
- * Unmounting is two things a turn apart, and the fake keeps them apart on purpose: Solid disposes the
- * reactive scope now, and the reconciler destroys the renderable on `process.nextTick`. So the
- * cleanups run while the row still reports itself live, which is the state the pass has to survive
- * without depending on (./regions.ts § scheduleSettle).
+ * Unmounting disposes the reactive scope before the renderable goes, so the cleanups run while the
+ * row still reports itself live, which is a state the pass has to survive without depending on
+ * (./regions.ts § scheduleSettle).
  */
 const row = (parent: Renderable, children: Renderable[], identity?: string): (() => void) => {
   const box = item()
@@ -216,9 +215,8 @@ describe('focus regions', () => {
   // ── The landing rule, as properties ─────────────────────────────────────────────────────────
   //
   // One question and four steps, so the thing worth asserting is not a path through them but the
-  // sentence they are there to keep true. The pass they replaced had seven ordered steps and the bug
-  // it produced was always two of them running in an order nobody had pictured, which is exactly the
-  // kind of bug a scenario per path cannot find (./regions.ts § The landing rule,
+  // sentence they are there to keep true. The bug to fear is two steps running in an order nobody
+  // pictured, which a scenario per path cannot find (./regions.ts § The landing rule,
   // docs/tui/focus.md § Focus regions).
 
   /** Invariants 6, 9 and 10 about whatever holds the keys, asked after a pass. */
@@ -234,8 +232,7 @@ describe('focus regions', () => {
 
   it('keeps the keys somewhere they can answer, through any order of mounts, dialogs and walks', async () => {
     // Every sequence of four of the five things that move the keys or the tree under them. The
-    // ordering is the point: each of these was a settle step of its own, and the steps' side effects
-    // were each other's inputs.
+    // ordering is the point: each one's side effects are another's inputs.
     const world = () => {
       const rowsA: Renderable[] = []
       const rowsB: Renderable[] = []
@@ -299,8 +296,8 @@ describe('focus regions', () => {
     moveRegion(1)
     expect(focusedRenderable()).toBe(browse)
 
-    // Out, the list arrives, back in. Before this was fixed the frame stayed remembered for the rest
-    // of the run, so the border lit and `j` did nothing.
+    // Out, the list arrives, back in. A remembered frame would keep the border lit with `j` doing
+    // nothing for the rest of the run.
     moveRegion(1)
     const gone = row(browse, rows)
     moveRegion(1)
@@ -356,8 +353,8 @@ describe('focus regions', () => {
     const original = rows[0]
     expect(focusedRenderable()).toBe(original)
 
-    // A refetch draws the same logical row as a new renderable and destroys the old one, which takes
-    // the renderer's focus with it. On a host with no pointer nothing else would put it back.
+    // A refetch draws the same logical row as a new renderable and destroys the old one, with the keys
+    // on it. On a host with no pointer nothing else would put them back.
     row(browse, rows, 'browse one')
     first()
     await settle()
@@ -432,10 +429,9 @@ describe('focus regions', () => {
 
   // ── The pointer ─────────────────────────────────────────────────────────────────────────────
   //
-  // A click is a hit test into the store and nothing else. It used to be the renderer's: `autoFocus`
-  // walks up from the renderable a left click hit and focuses the first focusable ancestor itself,
-  // which is a focus move nothing asked for and the second opinion this store exists to be the only
-  // one of. The flag is off everywhere a renderer is built (./regions.ts § Clicks are hit tests).
+  // A click is a hit test into the store and nothing else: the renderer never moves focus on its own,
+  // because that would be a second opinion about where the keys are
+  // (./regions.ts § Clicks are hit tests).
 
   /** A left click on a renderable, as the renderer delivers one: bubbled to the root, carrying what
    *  it hit. */
@@ -484,7 +480,7 @@ describe('focus regions', () => {
 
     // The row is on screen, focusable and registered, and it is behind the scope — which is the one
     // reason the hit test refuses. A click that reached it would put the keys behind a dialog the
-    // reader still has open, which is what Tab used to do (§ Scopes).
+    // reader still has open (§ Scopes).
     click(rows[0])
     expect(focusedRenderable()).toBe(inside)
     expect(focusedInScope()).toBe(true)
@@ -503,16 +499,15 @@ describe('focus regions', () => {
     focusRenderable(rows[0])
 
     // The shell's main row and a `TabPanel` hide a subtree rather than unmounting it, and `visible`
-    // is per node in OpenTUI: the row inside goes on reporting itself visible, so the pass is what
-    // notices (./regions.ts § onScreen, ../kit/grouping.tsx).
+    // is per node: the row inside goes on reporting itself visible, so the pass is what notices
+    // (./regions.ts § onScreen, ../kit/grouping.tsx).
     const blurs = renderer.blurs()
     asFake(list).visible = false
     await settle()
     expect(focusedRenderable()).toBe(beside)
     expect(onScreen(focusedRenderable())).toBe(true)
-    // And nothing was blurred on the way. A blur used to be how the keys left a node, and a blur on
-    // a node that had lost its `focusable` flag was refused — which is how the keys got stuck on a
-    // hidden subtree in the first place (./regions.ts § The one owner).
+    // And nothing was blurred on the way. The store moves the keys by deciding, not by a blur the
+    // node could refuse once it lost its `focusable` flag (./regions.ts § The one owner).
     expect(renderer.blurs()).toBe(blurs)
   })
 
@@ -551,9 +546,8 @@ describe('focus regions', () => {
     await settle()
     expect(focusedRenderable()).toBe(yes)
 
-    // The region's list arrives. Before this was fixed the pass took the keys off the region holding
-    // its frame and put them on the new row, behind a trap that swallowed every intent but
-    // `dismiss`, so the modal was on screen and could not be answered.
+    // The region's list arrives. The pass must not take the keys off the modal and put them on the
+    // new row behind it, which would leave the modal on screen with nothing able to answer it.
     row(browse, rows)
     await settle()
     expect(focusedRenderable()).toBe(yes)
@@ -576,8 +570,8 @@ describe('focus regions', () => {
     expect(focusedRenderable()).toBe(first)
 
     // A modal that redraws its own list — the trust prompt advancing to the next bundle in the queue
-    // is one — destroys the row the keys were on, and there is no region behind it to re-enter. The
-    // keys used to stay on the corpse, which is a dialog nothing answers.
+    // is one — destroys the row the keys were on, and there is no region behind it to re-enter. Keys
+    // left on the corpse would be a dialog nothing answers.
     const replacement = control()
     asFake(replacement).parent = modal
     choices[0] = replacement
@@ -609,8 +603,7 @@ describe('focus regions', () => {
     // A `Menu` trigger, which is what this asks about: the list is drawn inside the region the
     // trigger sits in, so a region that remembered the list's rows would come back to a destroyed row
     // and fall through to its entry stop, which is the filter above the trigger and never the
-    // trigger itself. The
-    // region remembers its own stops only, and the list remembers the list's
+    // trigger itself. The region remembers its own stops only, and the list remembers the list's
     // (./regions.ts § The one owner).
     const filter = control()
     const trigger = control()
@@ -685,10 +678,8 @@ describe('focus regions', () => {
   it('crosses to the nearest column in the direction asked, and remembers each one', () => {
     // Three columns, because two frames drawn side by side inside one pane are two of them: the rail
     // at 0 and a `list-detail`'s list and detail at 1 and 2. One rule crosses the rail-to-pane edge
-    // and the list-to-detail edge alike, which is what the integer buys over the `'rail' | 'main'`
-    // pair it replaced — under that pair every region a layout registered was `'main'`, so Right in a
-    // `list-detail` had nothing to cross to and did nothing at all
-    // (docs/tui/focus.md § Focus regions).
+    // and the list-to-detail edge alike, which is what an integer column buys over a rail-or-main
+    // pair (docs/tui/focus.md § Focus regions).
     const railRow = item()
     const rail = node([railRow])
     const listRow = item()
@@ -719,9 +710,8 @@ describe('focus regions', () => {
 
   it('answers how many regions are in scope reactively, without focus having to move', () => {
     // The footer offers `tab region` only where Tab goes somewhere, and it asks this. `groups` is a
-    // plain array, so a region registering or unregistering while the keys stay put left the answer
-    // at whatever the last render happened to see. Hiding the rail moves focus as well, which is why
-    // nobody caught it (../chrome/bindings.ts § activeHints).
+    // plain array, so the count has to read a signal of its own or it misses a region registering or
+    // unregistering while the keys stay put (../chrome/bindings.ts § activeHints).
     const first = node()
     registerRegion(first, { paneId: 'chrome', regionId: 'menu' }, 0)
     createRoot((stop) => {
@@ -1047,8 +1037,8 @@ describe('focus regions', () => {
 
 // ── What a key press costs ────────────────────────────────────────────────────────────────────
 //
-// The model's answers are the same whether the store scans arrays or reads maps, which is what every
-// case above is about. This is the other half: how much of the tree a move has to look at.
+// Every case above is about where the keys go. This is the other half: how much of the tree a move has
+// to look at.
 
 describe('a key press costs the depth of the tree', () => {
   beforeEach(fresh)
@@ -1081,9 +1071,9 @@ describe('a key press costs the depth of the tree', () => {
       // the walk sees the list once and never its two hundred rows (./regions.ts § stopsIn).
       moveStop(1)
       const steps = walkSteps.take()
-      // The bound the phase asked for: depth times four, where depth is the nesting above the stop.
-      // Generous on purpose — what it forbids is the number growing with the rows, which is what a
-      // scan of the registries inside the walk did.
+      // Depth times four, where depth is the nesting above the stop. Generous on purpose: what it
+      // forbids is the number growing with the rows, which is what a scan of the registries inside the
+      // walk would do.
       expect(steps).toBeLessThan(64)
 
       // And the same move in a region with ten times the rows costs the same, which is the property

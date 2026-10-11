@@ -2,8 +2,7 @@
 //
 // Every operation that changes the tree asks for a frame, and a burst of signal writes in one update
 // pass therefore costs one paint rather than one paint each. `setImmediate` rather than a timer,
-// because there is no frame rate here: nothing runs when nothing changed, which is what the current
-// renderer's `requestRender` gives us and what we are keeping.
+// because there is no frame rate here: nothing runs when nothing changed.
 //
 // The paint pass registers the callback. Where none is registered, asking for a frame is a flag and a
 // scheduled no-op, which is exactly what the tree's own tests want to read.

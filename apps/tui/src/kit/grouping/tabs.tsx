@@ -64,8 +64,8 @@ export function Tabs(props: {
             // a strip is one stop from outside, so its own tabs are not what Up walks. `walkStops`
             // answers false where the strip is the first stop in the box around it, which is the
             // bubble the contract asks for (docs/tui/keys.md § The five key groups). Without this a strip
-            // was the one stop on the screen with no Up at all: a reader who reached a `Sections` strip
-            // by walking down to it had no arrow that took them back off it.
+            // is the one stop on the screen with no Up at all: a reader who reaches a `Sections` strip
+            // by walking down to it has no arrow that takes them back off it.
             ...['up', 'k'].map((key) => ({ key, cmd: () => walkStops(element, -1) })),
           ],
           PARENT,
@@ -76,7 +76,7 @@ export function Tabs(props: {
       <For each={props.tabs}>
         {(tab) => (
           // `height={1}`, because a wrapped flex line is as tall as its tallest child and a child
-          // with no height of its own takes the container's — which drew the second row of tabs three
+          // with no height of its own takes the container's, which draws the second row of tabs three
           // rows below the first.
           <box flexShrink={0} height={1}>
             <Line

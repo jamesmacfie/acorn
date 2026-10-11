@@ -1,15 +1,12 @@
 // Every key name this parser can produce, in one file.
 //
-// A name is a binding. `intentKeys` in `packages/client-core/src/kit/keys/keymap.ts` spells the ones
-// both hosts share — `down`, `up`, `home`, `end`, `pagedown`, `pageup`, `right`, `left`, `return`,
-// `space`, `escape`, `menu`, `delete`, `backspace`, `f6`, `f10` — and `../keys/install.ts` adds `tab`
-// and `shift+tab` for this host. A key spelled `pgdn` here would be a binding that silently never
-// fires, which is the worst thing this slice could do, so `./parser.test.ts` drives the check off
-// those two tables rather than off a copy of them.
+// A name is a binding. Client-core's `intentKeys` spells the ones both hosts share, and `HOST_KEYS`
+// adds `tab` and `shift+tab` for this host. A key spelled `pgdn` here would be a binding that silently
+// never fires, so `./parser.test.ts` drives the check off those tables rather than off a copy of them.
 //
-// The spellings are OpenTUI's, taken from its `keyName`, `tildeKeyMap` and kitty tables at 0.5.9,
-// because the bindings were written against them and a rename would be a rewrite of the app's
-// keyboard rather than of its parser (docs/tui/keys.md § Keys and focus).
+// The spellings are OpenTUI's, from its `keyName`, `tildeKeyMap` and kitty tables, because the
+// bindings were written against them and a rename would be a rewrite of the app's keyboard rather
+// than of its parser (docs/tui/keys.md § Keys and focus).
 
 /** `CSI <number> ~`. Two numbers mean `home` and two mean `end`, which is not a mistake: the VT and
  *  the PC layouts disagreed and terminals still send both. */

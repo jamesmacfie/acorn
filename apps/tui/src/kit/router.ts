@@ -1,24 +1,19 @@
 // What `@solidjs/router` is on this host: one path in a signal, matched against the patterns the
 // desktop's Router is built from.
 //
-// The third alias in the host switch, beside `@acorn/plugin-api/ui` and `@acorn/plugin-api/ui/host`
-// (vite.config.ts). The first two swap a component for a component; this one replaces a package.
+// An alias in the host switch (`apps/tui/vite.config.ts`), beside `@acorn/plugin-api/ui` and
+// `@acorn/plugin-api/ui/host`. Those two swap a component for a component; this one replaces a package.
 //
-// The package itself still has to go, and for the reason it always did: `lifecycle.js` reads
+// The package itself cannot load here: `lifecycle.js` reads
 // `window.history.state` at module scope, so importing it in this process throws before a line of
 // ours runs. Answering that with a `history` on the platform seam's `window` is the failure that file
 // warns about in its own header — a `window` that answers every question is worse than none, because
 // the next library to probe it finds a browser's name over a Node process's globals.
 //
-// What changed is the second half of the old argument. This file used to say there was nothing behind
-// the router to answer, so every hook returned this host's emptiness: no params, no match, and a
-// navigation that did not happen. That was the right answer during the pane sweep, where an honest
-// blank column beat a plausible wrong one. It stopped being the right answer when browse became a
-// surface a reader drives from the shell, because a browse surface carries its project and its
-// selected item in the path and nowhere else: `plugins/github/src/client/GithubBrowse.tsx` reads
-// `params.projectId` to decide it has a repository at all, and `PullList` opens a pull by navigating
-// to it. With an inert shim under them both, the GitHub surface in a terminal drew "Select a project"
-// forever.
+// Hooks that answer nothing are not enough, because a browse surface carries its project and its
+// selected item in the path and nowhere else: `GithubBrowse` reads `params.projectId` to decide it has
+// a repository at all, and `PullList` opens a pull by navigating to it. With an inert shim under them
+// both, the GitHub surface in a terminal draws "Select a project" forever.
 //
 // So the path is real and the matching is shared. `matchRoute` is client-core's, the same function
 // the source registry resolves a path with, so the two hosts cannot disagree about what
@@ -60,10 +55,10 @@ export const useLocation = (): { readonly pathname: string } => ({
  *
  *  Both contributed tables, not one. A descriptor plugin's surface registers its pattern with
  *  `projectSurfaceRegistry` rather than as a source route — the desktop mounts those as `<Route>`s of
- *  their own (apps/desktop/src/client/index.tsx) — and this host had only the source half. So a Linear
- *  or Rollbar row navigated to a path nothing here could match: the surface got no item, and the
- *  shell's own "keep the path on a project this workspace has" effect saw a path with no project in it
- *  and navigated away from what the reader had just chosen (../chrome/routing.ts). */
+ *  their own (apps/desktop/src/client/index.tsx). With only the source half, a Linear or Rollbar row
+ *  navigates to a path nothing here can match: the surface gets no item, and the shell's own "keep
+ *  the path on a project this workspace has" effect sees a path with no project in it and navigates
+ *  away from what the reader just chose (../chrome/routing.ts). */
 const patterns = (): string[] => [
   CREATE_TASK_ROUTE,
   PROJECT_ROUTE,
@@ -95,7 +90,7 @@ export const useNavigate = (): ((to: string | number, options?: NavigateOptions)
  * A proxy rather than a plain object, and that is load-bearing. Every caller reads a field inside a
  * memo — `GithubBrowse` does `const params = useParams()` once and then `params.projectId` in three
  * derivations — so the reactivity has to be in the property read. An object built at call time would
- * resolve once and never change again, which is the shim's old behaviour wearing a better disguise.
+ * resolve once and never change again.
  */
 export const useParams = <T extends Record<string, string>>(): T =>
   new Proxy({} as T, {
@@ -106,7 +101,7 @@ export const useParams = <T extends Record<string, string>>(): T =>
   }) as T
 
 /**
- * The query string, as the router's read/write pair. Still empty and still inert.
+ * The query string, as the router's read/write pair. Empty and inert.
  *
  * Carrying it would be a few more lines, and no caller needs them: the surfaces that keep view state
  * in the query on the desktop already pass `router: false` here and keep it in a signal, and the

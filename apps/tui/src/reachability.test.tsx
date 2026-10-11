@@ -19,9 +19,9 @@ import { topology } from './chrome/topology'
 // The focus model's invariants as properties over the pane roster, rather than one scenario per bug
 // (docs/tui/keys.md § Keys and focus).
 //
-// A scenario pins one path, and every bug the fourteen fix commits chased was a path nobody had
-// written a scenario for. This walks every stop on every pane's first screen and asks the same five
-// questions after every press, so a new pane or a new control joins the property the day it lands.
+// A scenario pins one path, and a bug lives on a path nobody wrote a scenario for. This walks every
+// stop on every pane's first screen and asks the same five questions after every press, so a new pane
+// or a new control joins the property the day it lands.
 //
 // The invariants this file owns are 1 (every stop is reachable), 3 (one caret), 4 (Escape is
 // bounded), 6 (focus never sits on a corpse), 8 (the footer tells the truth), 9 (there is one focus
@@ -91,10 +91,9 @@ const SURFACES: Surface[] = [
 /**
  * The two sizes, and why only one of them runs by default.
  *
- * Eight surfaces walked at eighty presses each is about a minute on a warm worker, and doubling
- * it buys one thing: the layouts that split at a hundred cells draw both their columns. That is worth
- * running and it is not worth paying for on every save, so CI sets `ACORN_TUI_WIDE`
- * (docs/testing/layers.md § Test layers).
+ * Nine surfaces walked at eighty presses each is slow, and doubling it buys one thing: the layouts that
+ * split at a hundred cells draw both their columns. That is worth running and it is not worth paying
+ * for on every save, so CI sets `ACORN_TUI_WIDE` (docs/testing/layers.md § Test layers).
  */
 const SIZES: { width: number; height: number }[] = process.env.ACORN_TUI_WIDE
   ? [
@@ -137,12 +136,10 @@ const labelOf = (node: Renderable, frame: string): string =>
 const invariants = (where: string, caret: Caret, frame: string, renderer: Renderer): void => {
   // 9. There is one focus value, and it names a node that is really there.
   //
-  //    This used to be "the renderer and the store agree about what has the keys", because focus was
-  //    the renderer's and the store was a view of it: a disagreement was a lit thing that did not
-  //    answer, which is what symptoms B and D looked like from the reader's seat. The store owns focus
-  //    now and the renderer holds no opinion to disagree with, so what is left to ask is whether the
-  //    one value is honest — the node is in the tree under the root, and it is still something that
-  //    can hold the keys (./keys/regions.ts § The one owner, docs/tui/reporting.md § The invariants).
+  //    The store owns focus and the renderer holds no opinion to disagree with, so what is left to ask
+  //    is whether the one value is honest: the node is in the tree under the root, and it is still
+  //    something that can hold the keys
+  //    (./keys/regions.ts § The one owner, docs/tui/reporting.md § The invariants).
   const drawn = focusedRenderable()
   expect(attached(drawn, renderer.root), `${where}: the keys are on ${name(drawn)}, which is not in the tree`).toBe(
     true,
@@ -151,9 +148,8 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
 
   // 10. Focus is inside the top scope. With a dialog open, no key moves the keys out of it: the
   //     store answers every question inside the scope, so there is nothing behind the dialog for a
-  //     key to reach. Tab used to reach it, because the layer that contained the keys named the keys
-  //     it contained and named the wrong ones (./keys/regions.ts § Scopes, docs/tui/traps.md § Traps). On
-  //     a surface with no dialog the screen is the scope, and then this is true of everything.
+  //     key to reach (./keys/regions.ts § Scopes, ./keys/trap.ts). On a surface with no dialog the
+  //     screen is the scope, and then this is true of everything.
   expect(focusedInScope(), `${where}: ${name(drawn)} has the keys from outside the open scope`).toBe(true)
 
   // 3. One caret. The `›` is the caret and nothing else draws one, so counting them is the whole
@@ -189,10 +185,9 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   // whole of what a reader is told about where they are and how to get out, so it has to be on the
   // line at every depth the walk reaches.
   //
-  // Read off the drawn frame and not off `activeHints()` on purpose. The hint was in the list all
-  // along; it was last in reading order and the footer cuts rather than wraps, so the line ran out
-  // before it on every screen, the cheat sheet's own footer included. A list a reader never sees is
-  // the same as no list (./chrome/bindings.ts § specs, docs/tui/footer.md § The footer).
+  // Read off the drawn frame and not off `activeHints()` on purpose. The footer cuts rather than
+  // wraps, so a hint last in reading order can be in the list and never drawn. A list a reader never
+  // sees is the same as no list (./chrome/bindings.ts § specs, docs/tui/footer.md § The footer).
   const footer = frame.split('\n').slice(-2)[0] ?? ''
   expect(footer, `${where}: the footer never says how to get out: "${footer.trim()}"`).toContain('esc')
 }
@@ -205,9 +200,8 @@ const content = (frame: string): string => frame.split('\n').slice(0, -2).join('
  * Invariant 11 for the horizontal pair: press `l` and `h` and ask whether the footer's word came true.
  *
  * Invariant 8 by pressing rather than by reading. Reading catches a word that does not match the
- * table; only a press catches a table that does not match the app, which is what symptom C was — the
- * footer said `fold` on every kind, three of them folded nothing, and two of the five layers that
- * claimed the key moved nothing at all.
+ * table; only a press catches a table that does not match the app, such as a footer that says `fold`
+ * on a kind that folds nothing.
  *
  * Each word promises one of two outcomes, because the contract says an edge bubbles
  * (docs/tui/keys.md § The five key groups):
@@ -220,8 +214,8 @@ const content = (frame: string): string => frame.split('\n').slice(0, -2).join('
  * and in every case, bubbling instead. A bubbled cross key has exactly one meaning at the region
  * tier, which is the column move, so "it bubbled" and "there was no column that way, and there is no
  * wrap" are the same escape and both are honest. For `column` that escape is the whole check: with a
- * column in that direction the keys must be in it afterwards, which is the assertion a `list-detail`
- * pane used to fail (./keys/regions.ts § moveColumn, docs/tui/focus.md § Focus regions).
+ * column in that direction the keys must be in it afterwards (./keys/regions.ts § moveColumn,
+ * docs/tui/focus.md § Focus regions).
  *
  * A field is skipped. Its `h` and `l` type, the footer never offers the pair there because the
  * bindings are inactive while somebody is typing, and pressing would put an `l` in a filter box and
@@ -313,9 +307,9 @@ describe('every stop is reachable, and the invariants hold on the way', () => {
 /**
  * How many Escapes the climb out of here is allowed to take.
  *
- * `focus-model.md` said `depth + 1`, counting only the parent stops above the caret. That is short by
- * the region chain, and it is short by two on every task pane: a pane's own region climbs to the pane
- * strip and the strip climbs to Tasks, and neither hop is a parent stop. The bound is the parent
+ * Not `depth + 1`, counting only the parent stops above the caret. That is short by the region chain,
+ * and short by two on every task pane: a pane's own region climbs to the pane strip and the strip
+ * climbs to Tasks, and neither hop is a parent stop. The bound is the parent
  * stops plus the chain `chrome/topology.ts` names, plus the one press that leaves the last stop.
  */
 const escapesFrom = (node: Renderable | null): number => {
@@ -327,7 +321,7 @@ const escapesFrom = (node: Renderable | null): number => {
 
 describe('escape is bounded', () => {
   // The screen surfaces only. Escape inside a scope closes the scope, which is the trap's own
-  // contract and ../keys/keys.test.tsx's case; it is not the climb this property is about, and a
+  // contract and ./keys/keys.test.tsx's case; it is not the climb this property is about, and a
   // surface that opens a dialog would spend its first Escape closing it (./keys/trap.ts).
   const climbs = SURFACES.filter((surface) => !surface.open)
   it.each(climbs.map((surface) => [surface.name, surface] as const))(

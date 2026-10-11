@@ -4,10 +4,10 @@
 // a focusable flag, an exact-node key layer, a press handler, and a visible focus mark. DOM buttons
 // provide most of these behaviors directly.
 //
-//   focusable   the renderer's own flag, the same one a `Row` sets (./collection.ts)
+//   focusable   the node's own flag, the same one a kit `Row` sets
 //   the keys    one layer bound to the exact renderable, so Enter on a button inside a row belongs
 //               to the button and Enter on the row belongs to the row
-//   the press   the handler the prop already carried and nobody called
+//   the press   the handler the prop carries
 //   the mark    `focused()`, which the node draws with `litControl` (../kit/roles.ts)
 //
 // Nothing here decides which node is a stop and nothing here draws. The node asks for a press and is
@@ -66,8 +66,7 @@ const pressListeners = new Set<(box: Renderable) => void>()
  * Whether a person pressed a stop inside `container` within the last `windowMs`.
  *
  * The terminal's answer to the desktop's trusted pointerdown and keydown on a tree's element
- * (client-core host/tree/hostRequests.ts § createGestureClock). Call it once per mount; `dispose`
- * stops listening.
+ * (client-core's `createGestureClock`). Call it once per mount; `dispose` stops listening.
  */
 export function pressedWithin(
   container: () => Renderable | undefined,
@@ -109,12 +108,7 @@ export function pressable(box: Renderable, options: StopOptions): void {
     // The flag is the store's own declaration of what can hold the keys, so a control that goes
     // disabled while it has them is a node the landing rule has to take them off. Nothing else on
     // this turn would notice: a screen with one region cannot Tab out of it, and there is no blur
-    // event any more for anybody to hear (./regions.ts § The landing rule).
-    //
-    // It used to blur the box before clearing the flag, because `blur()` refuses a node that is not
-    // focusable and a control that lost the flag while focused kept the keys for the rest of the run.
-    // The order does not matter now: the store decides where the keys are and reads the flag when it
-    // does (./regions.ts § The one owner).
+    // event for anybody to hear (./regions.ts § The landing rule).
     //
     // Untracked, because this effect is about `disabled` and nothing else. Tracked, every control on
     // screen would re-run it on every focus move and rewrite a flag that had not changed.
@@ -136,10 +130,10 @@ export function pressable(box: Renderable, options: StopOptions): void {
     // `SegmentedControl` is a whole collection reached through `on` and answers them itself; a node
     // that declines gets the walk.
     //
-    // At the stop's own priority rather than at the collection tier below it, which the design asked
-    // for. `moveStop` returns false for anything it does not own, so a `Button` drawn inside a `Row`
-    // hands the arrows straight back to the list. A second layer one number lower would buy the same
-    // answer and one more layer per control on screen.
+    // At the stop's own priority rather than at the collection tier below it. `moveStop` returns false
+    // for anything it does not own, so a `Button` drawn inside a `Row` hands the arrows straight back
+    // to the list. A second layer one number lower would buy the same answer and one more layer per
+    // control on screen.
     next: () => given.next?.() || moveStop(1),
     prev: () => given.prev?.() || moveStop(-1),
   }

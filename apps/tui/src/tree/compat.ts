@@ -12,7 +12,7 @@ import { isFieldKind, laysOut, type Kind, type Node } from './node'
 // a plain node without keeping another copy of focus state.
 //
 // **A prototype per kind, not fields per node.** An accessor per node would be ten `defineProperty`
-// calls on every one of the 1,708 nodes a pane builds. A named constructor function per kind also
+// calls on every node a pane builds. A named constructor function per kind also
 // gives each node a `constructor.name`, which is what the focus path in a key trace reads.
 //
 // **What is deliberately not answered.** `instanceof` — these are not instances of any class the
@@ -59,8 +59,8 @@ export interface Renderable extends Node {
   scrollChildIntoView?: (childId: unknown) => void
 }
 
-/** The name each kind's constructor carries, which is what a focus path in a key trace reads. Still
- *  OpenTUI's spelling of them, because the traces and the docs are written in it. */
+/** The name each kind's constructor carries, which is what a focus path in a key trace reads. OpenTUI's
+ *  spelling of them, because the traces and the docs are written in it. */
 const CLASS: Readonly<Record<Kind, string>> = {
   box: 'BoxRenderable',
   text: 'TextRenderable',
@@ -79,11 +79,10 @@ let minted = 0
 /**
  * The tops of the subtrees Solid has removed and not put back.
  *
- * The one thing the store still needs that "a node is data" does not answer by itself. Nothing here
- * is destroyed, which is the fault class this painter exists to end — `Suspense` hands the same
- * object back on resolve and it has to still work — but a node whose subtree was removed and never
- * re-inserted is not on the screen either, and the store's whole question about a node is whether it
- * can still hold the keys.
+ * The one thing the store needs that "a node is data" does not answer by itself. Nothing here is destroyed —
+ * `Suspense` hands the same object back on resolve and it has to still work — but a node whose subtree was
+ * removed and never re-inserted is not on the screen either, and the store's whole question about a node is
+ * whether it can still hold the keys.
  *
  * Only the top of a removed subtree is unlinked, so this holds only tops and the question is asked of
  * the end of a parent walk (`../keys/regions.ts § onScreen`). A `WeakSet` rather than a field for the
@@ -104,7 +103,7 @@ export const markInserted = (node: Node): void => {
 }
 
 /** Is this node the top of a subtree that is no longer in the tree? Asked of the end of a parent
- *  walk, and false for anything the old painter drew, because nothing ever marks one of those. */
+ *  walk. */
 export const isRemoved = (node: unknown): boolean => removed.has(node as Node)
 
 const accessors = {
@@ -142,25 +141,23 @@ const accessors = {
       this.props.visible = value
     },
   },
-  // Nothing is ever destroyed here, which is the fault class this painter exists to end: a plain
-  // object has no lifecycle to be on the wrong side of (./node.ts).
+  // Nothing is ever destroyed here: a plain object has no lifecycle to be on the wrong side of
+  // (./node.ts).
   isDestroyed: {
     get() {
       return false
     },
   },
-  // What can hold the keys. An ordinary property everywhere else — `../keys/stops.ts` and five
+  // What can hold the keys. An ordinary property everywhere else — `../keys/stops.ts` and a few
   // components write it on the node they built, and `../invariants.test.ts` counts those places — and
-  // an accessor here for the three kinds that arrive with a default of their own. OpenTUI's
-  // `ScrollBoxRenderable` is focusable unless told otherwise, which is what makes a viewport the stop
-  // of last resort for a document with no controls in it (`../keys/regions.ts § stopsIn`). Without it
-  // a `list-detail` narrow enough to show one half at a time had nothing to put the keys on, so `l`
-  // never reached the layer that switches the halves. An `input` and a `textarea` are the other two,
-  // through the flag `EditBufferRenderable` sets true on itself, and they are why nothing typed under
-  // this painter before phase 3's second slice: no component asks a field to be focusable, so the
-  // store would not give it the keys and there was nothing for the hand-off to type into
-  // (`../keys/install.ts § typeInto`). Backed by `props`, so a write lands where the getter reads it
-  // rather than shadowing the accessor.
+  // an accessor here for the three kinds that arrive with a default of their own. A `scrollbox` is
+  // focusable unless told otherwise, which makes a viewport the stop of last resort for a document
+  // with no controls in it (`stopsInTree`). Without it a `list-detail` narrow enough
+  // to show one half at a time has nothing to put the keys on, so `l` never reaches the layer that
+  // switches the halves. An `input` and a `textarea` are the other two: no component asks a field to
+  // be focusable, so without the default the store never gives a field the keys and there is nothing
+  // for the hand-off to type into (`../keys/install.ts § typeInto`). Backed by `props`, so a write
+  // lands where the getter reads it rather than shadowing the accessor.
   focusable: {
     get(this: Node) {
       const said = this.props.focusable as boolean | undefined
@@ -171,8 +168,8 @@ const accessors = {
     },
   },
   // The caret, which is the one thing about focus the store still asks a renderable for
-  // (`../keys/regions.ts § paintCaret`). Still no-ops rather than absences, because the store calls
-  // them unconditionally — and deliberately so now that there is a caret to draw. A field asks the
+  // (`../keys/regions.ts § paintCaret`). No-ops rather than absences, because the store calls them
+  // unconditionally. A field asks the
   // store whether it has the keys and writes the answer into its own props, where paint reads it, so
   // the mirror stays one-way: nothing here holds focus state for the store to disagree with
   // (`../kit/asking/fieldRef.ts § fieldRef`, `../paint/paint.ts § drawField`).

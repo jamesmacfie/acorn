@@ -5,8 +5,8 @@
 // Why it exists. The facade's real half is a grammar per language and a stylesheet built from CSS
 // custom properties, and neither means anything in cells: this host's `editor` rectangle draws the
 // file read-only and hands the reader's own `$EDITOR` a PTY when they want to type (./rectangle.tsx,
-// docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, `EditorPane.tsx` reached the real
-// module and the terminal client carried seventeen CodeMirror grammars and a colour theme it has no
+// docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, the editor pane reaches the
+// real module and the terminal client carries every CodeMirror grammar and a colour theme it has no
 // way to draw.
 //
 // A module rather than an empty alias, with the facade's names and the facade's types, so the
@@ -41,7 +41,7 @@ export const languageForPath = (_path: string): Promise<Extension> => Promise.re
  *  can make the same guard decision without importing the DOM host's grammar table. */
 export const shouldHighlightDocument = (_characters: number): boolean => false
 
-/** The palette is already the terminal's: OpenTUI paints from the same theme tokens the rest of this
+/** The palette is already the terminal's: paint draws from the same theme tokens the rest of this
  *  host reads (./roles.ts), and there is no second stylesheet to hand a colour list to. */
 export const editorTheme = (): Extension => []
 

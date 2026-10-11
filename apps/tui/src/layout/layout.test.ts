@@ -6,8 +6,7 @@ import { measureMisses, measuredRun, wrapLines } from './measure'
 import { clampRect, layoutTree, readBack } from './pass'
 import { NOT_YOGA, SETTERS } from './props'
 
-// The layout pass, on its own. No OpenTUI anywhere in this file, so it runs on the Node the repo pins
-// with no FFI and no flag.
+// The layout pass, on its own.
 
 /** A box of a known size to hang a case off. */
 const root = (width: number, height: number) => {
@@ -42,8 +41,7 @@ describe('the prop table', () => {
       'fg',
       'attributes',
       'transform',
-      // …and the four `textStyle` says twice, because a span reads its weight out of the `style`
-      // object rather than off the mask (../kit/roles.ts § textStyle).
+      // …and the four `textStyle` says twice, as booleans beside the mask.
       'style',
       'bold',
       'dim',
@@ -55,7 +53,7 @@ describe('the prop table', () => {
   })
 
   it('maps the flex props the kit actually spends onto Yoga', () => {
-    // The twenty-one with a setter, spelled out, so a rename of one of Yoga's setters fails here
+    // The setters the kit spends, spelled out, so a rename of one of Yoga's setters fails here
     // rather than in a whole frame.
     const box = createElement('box')
     setProperty(box, 'flexDirection', 'row')
@@ -133,9 +131,8 @@ describe('the layout read-back', () => {
   })
 
   it('clamps the rectangle of a node that joined the tree after the pass', () => {
-    // This is what the old render guard guarded, moved to the one place a rectangle is read. The fault
-    // is Yoga's rather than OpenTUI's: an unmeasured node's computed width and height are `NaN`, and
-    // it survives the move to wasm unchanged.
+    // An unmeasured node's computed width and height are `NaN` in Yoga, and the read-back is the one
+    // place a rectangle is read.
     const box = root(40, 10)
     insertNode(box, createElement('box'))
     layoutTree(box, 40, 10)
@@ -154,13 +151,11 @@ describe('the layout read-back', () => {
   })
 
   it('keeps a negative left rather than moving the run', () => {
-    // Measured: an overflowing child under `alignItems: center` reports left -15 at width 40 inside a
+    // An overflowing child under `alignItems: center` reports left -15 at width 40 inside a
     // 10-cell parent. Clamping that to 0 would slide the run sideways; clipping it is paint's job, and
     // paint can only clip what it is told the truth about. So the invariant holds for the size half
     // only — four finite integers, of which the width and the height are non-negative.
-    // A column, so `alignItems` centres across the width and the overflow is horizontal. The kit sets
-    // `alignItems` once and `justifyContent` never, so this is a corner — but it is a corner the
-    // clamp has to leave alone.
+    // A column, so `alignItems` centres across the width and the overflow is horizontal.
     const parent = root(10, 1)
     setProperty(parent, 'alignItems', 'center')
     const wide = createElement('box')
@@ -245,8 +240,8 @@ describe('the text measure', () => {
     insertNode(span, createTextNode('signIn'))
     insertNode(text, createTextNode(' still'))
 
-    // One run, not three boxes. A row of independently shrunk `text` nodes is what turned "hash but
-    // `signIn` still" into "hash bsignInstill" on the agents transcript.
+    // One run, not three boxes. A row of independently shrunk `text` nodes turns "hash but `signIn`
+    // still" into "hash bsignInstill".
     expect(measuredRun(text, Infinity).lines).toEqual(['hash but signIn still'])
   })
 

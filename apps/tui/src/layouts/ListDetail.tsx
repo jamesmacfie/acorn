@@ -93,9 +93,9 @@ export function ListDetail(props: LayoutProps) {
             onBox={regionFocus({ paneId: props.stateKey, regionId: 'list' }, 0, { x: LIST_COLUMN })}
           >
             {props.regions['list-header']?.()}
-            {/* A real viewport, where this was a yoga clip. A clip hides the rows below the fold and
-                owns no offset for the caret's reveal to move, so `j` past the twentieth row of a
-                thirty-row list walked the caret off the screen. Round the list region only, not the
+            {/* A real viewport, not a yoga clip. A clip hides the rows below the fold and owns no
+                offset for the caret's reveal to move, so `j` past the last visible row would walk the
+                caret off the screen. Round the list region only, not the
                 header and footer strips: those are the list's own chrome and do not scroll with it
                 (../kit/scrolling.tsx, docs/tui/scrolling.md § Scrolling viewports). */}
             <ScrollViewport>{props.regions.list?.()}</ScrollViewport>
@@ -110,11 +110,9 @@ export function ListDetail(props: LayoutProps) {
         <box flexDirection="column" flexGrow={1} minWidth={0}>
           {/* The detail column clips; what is in it scrolls. That is the DOM's rule for this region
               too — `.layout-region-detail` is `overflow: hidden` and the pane's own timeline, diff or
-              rows is the scroller (client-core/infra/styles/shell.css) — and the terminal deviated
-              from it by wrapping the whole region in one viewport. The cost of the deviation was the
-              agents pane: its composer is the column's last child, so it scrolled away with the
-              transcript and a reader had to go looking for the message box after every turn. Both
-              panes that use this layout own their scroll, the transcript through `Timeline follow`
+              rows is the scroller (client-core/infra/styles/shell.css). One viewport round the whole
+              region would scroll the agents pane's composer, the column's last child, away with the
+              transcript. Both panes that use this layout own their scroll, the transcript through `Timeline follow`
               and the diff through `DiffPane` (../kit/grouping.tsx, ../kit/showing/diffPane.tsx). */}
           <Panel
             grow

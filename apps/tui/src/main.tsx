@@ -59,9 +59,9 @@ if (values.link !== undefined) {
   }
 }
 
-// Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
-// no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
-// soon as the child is spawned, and the shell draws from the persisted cache while it boots
+// Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. The
+// renderer doesn't wait for a node this run started: `openNode` returns as soon as the child is
+// spawned, and the shell draws from the persisted cache while it boots
 // (./node/open.ts, docs/tui/process.md § Attach or start).
 const opened = await openNode(
   link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node,
@@ -106,7 +106,7 @@ setCacheStorage(fileCacheStorage())
 
 // Which node this run addresses, said out loud before the fleet is read. `selectActiveNode` keeps a
 // selection it still recognises and otherwise prefers the home node, which is the LOCAL one — so
-// without this line `acorn --node <remote>` opened a remote node's broker connection and then sent
+// without this line `acorn --node <remote>` opens a remote node's broker connection and then sends
 // every request to the machine's own node. It also makes `activeCacheId()` and the client below the
 // same partition, which is what the watchers write into.
 setActiveNode(opened.nodeId)
@@ -116,9 +116,7 @@ setActiveNode(opened.nodeId)
 if (!opened.starting) await selectActiveNode()
 
 // One client and one persister per node, and this host reads the same pair every other host does
-// (docs/caching.md § Renderer query cache). `App` used to mint a second `QueryClient` of its own, so
-// the shell read a cache nothing persisted and nothing invalidated: every start was cold, and a task
-// created anywhere else never appeared. `clientFor` hands back both halves, so there is nothing to
+// (docs/caching.md § Renderer query cache). `clientFor` hands back both halves, so there is nothing to
 // build here beyond driving them.
 const { client, persistence } = clientFor(opened.nodeId)
 const cacheLease = persistence.acquire()
@@ -156,20 +154,20 @@ const stopClientRuntime = await startClientRuntime({
 // `installPlatform` has run, or `send` finds no transport and falls back to global `fetch` with a
 // relative path. The suite's harness imports it the same way (./harness.tsx).
 //
-// What is NOT in here any more is the roster. Those twelve plugin barrels were 224 KB of this graph
-// and every one of their `init` and `activate` passes ran before a cell was drawn; they load after
-// the first frame now (./roster.ts, scripts/check-startup-graph.mjs).
+// The roster is not in here: its plugin barrels and their `init` and `activate` passes load after the
+// first frame (./roster.ts, ../scripts/check-startup-graph.mjs).
 const { App } = await import('./App')
 bootMark('App imported')
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
 //
-// `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
-// the PTY's, which is the whole reason a rectangle owns its keys (docs/tui/process.md § Signals and exit).
-// The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
-// The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
-// the cells, and the screen closes first on the way out so the last frame lands while the alternate
+// Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is the PTY's, which is the
+// whole reason a rectangle owns its keys (docs/tui/process.md § Signals and exit). The terminal half
+// handles `SIGWINCH` itself, so nothing here listens for a resize.
+//
+// The surface is two halves composed. The terminal owns the modes and the bytes, the screen owns the
+// cells, and the screen closes first on the way out so the last frame lands while the alternate
 // screen is still ours (./input/terminal.ts § The two halves compose, ./renderer.ts).
 //
 // The kitty keyboard protocol is asked for there and not assumed: a terminal that does not know the
@@ -241,7 +239,7 @@ async function fillIn(): Promise<void> {
 
   pluginWorkersInstalled()
 
-  // The node's arrival, which is behind the first frame now. Everything the shell asked for while a
+  // The node's arrival, which is behind the first frame. Everything the shell asked for while a
   // node it had just spawned was booting came back as `ECONNREFUSED`, and the first non-offline state
   // is when those are worth asking again. The desktop's composition root holds the same effect for the
   // same reason (apps/desktop/src/client/index.tsx).
@@ -343,7 +341,7 @@ async function quit(code = 0): Promise<never> {
 }
 
 // `q` is the shell's, registered as a command with a confirm when this TUI is the thing that started
-// the node (chrome/Shell.tsx). `Ctrl+C` is not: it is the signal a terminal sends to say stop now,
+// the node (./chrome/Shell.tsx). `Ctrl+C` is not: it is the signal a terminal sends to say stop now,
 // and it stops now. Inside an entered rectangle it never reaches here at all, which is the whole
 // point of the Rectangle contract.
 engine.registerLayer({
@@ -396,7 +394,7 @@ await render(
         log.warn(`No task ${id} on this node.`)
         // Not from here. A warm cache answers the tasks query on the first tick, so this callback can
         // fire inside `render()` — and `renderer.destroy()` from inside a render pass throws, which
-        // took the exit path with it and printed nothing at all. Let the frame finish, then leave.
+        // takes the exit path with it and prints nothing at all. Let the frame finish, then leave.
         setTimeout(() => void quit(1))
       }}
       onQuit={() => void quit()}

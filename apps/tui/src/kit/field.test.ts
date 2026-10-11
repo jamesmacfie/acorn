@@ -2,13 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { fromVisual, toVisual, wrapRows } from '../wrap'
 import { byChar, byGroup, create, edit, paste, setValue, type Field, type Press } from './field'
 
-// The field model and the wrap under it, on their own. No painter, no Yoga and no OpenTUI, so this
-// file runs on the Node the repo pins with no flag — which is the point of the model being a string
-// and two numbers rather than somebody's edit buffer.
-//
-// While the model was being chosen it was written twice, once over `@codemirror/state` and once over
-// a string, against one file of 40 assertions; this is that file's shape kept, against the version
-// that shipped (./field.ts).
+// The field model and the wrap under it, on their own: no painter and no Yoga, because the model is a
+// string and two numbers rather than somebody's edit buffer (./field.ts).
 
 /** A key as the dispatcher hands one over: a name, and the character it types where it types one. */
 const key = (name: string, modifiers: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}): Press => ({
@@ -128,7 +123,7 @@ describe('a field', () => {
   })
 
   it('puts Home and End on the visual line rather than the document', () => {
-    // The deliberate departure from `defaultTextareaKeyBindings`, where both are the whole buffer and
+    // The deliberate departure from OpenTUI's `defaultTextareaKeyBindings`, where both are the whole buffer and
     // the line boundaries sit on Ctrl+A and Ctrl+E. Both spellings reach the visual line here, because
     // that is what a reader in a wrapped composer means by the key (./field.ts).
     const text = 'one two three'

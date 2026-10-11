@@ -6,14 +6,12 @@ import { renderFixture } from './harness'
 // warm list from an earlier test in the same worker would hide exactly what this one is about.
 //
 // What this one is about: a transport slow enough that a `Suspense` which has already shown content
-// suspends again and stays suspended past the next tick. That is the shape the app lives in and the
-// zero-latency fixture never reached — the caches were warm before the first key press, so nothing
-// ever suspended after first paint, and both browse tests passed while the app drew blank panels.
-// Under that shape, OpenTUI used to destroy the removed subtree and refuse it back ("was already
-// destroyed, skipping add"), leaving the panel empty forever, and the reconciler patch phase 4
-// deleted is what answered it. So this walks the caret past the prefetch horizon, where every landing mounts uncached
-// queries, and asserts the two things a reader actually loses: the detail still draws, and the list
-// is still there to come back to.
+// suspends again and stays suspended past the next tick. That is the shape the app lives in, and a
+// zero-latency fixture never reaches it: the caches are warm before the first key press, so nothing
+// suspends after first paint. A renderer that destroys the removed subtree and refuses it back
+// ("already destroyed") leaves the panel empty for ever under that shape. So this walks the caret
+// past the prefetch horizon, where every landing mounts uncached queries, and asserts the two things
+// a reader actually loses: the detail still draws, and the list is still there to come back to.
 const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('›')) ?? ''
 
 const caretOn = async (
@@ -47,7 +45,7 @@ describe('browsing over a slow transport', () => {
         await screen.until('Invalidate')
         expect(await caretOn(screen, 'Invalidate')).toBe(true)
 
-        // Every line OpenTUI logs about a destroyed renderable is a subtree that will never draw
+        // Every line logged about a destroyed renderable is a subtree that will never draw
         // again; the walk below is long enough to slide the window and outrun the prefetch, so each
         // landing suspends the detail and mounts uncached row queries under the Browse panel.
         const logged: string[] = []
@@ -63,7 +61,7 @@ describe('browsing over a slow transport', () => {
 
           // The detail resolved and drew. The branch pair is text only the loaded detail has — the
           // fixture answers every pull number with the same detail, so this is purely "drawn, not
-          // blank" (browse.test.tsx says why neither `PULL REQUEST` nor `#42` can stand in for it).
+          // blank" (./browse.test.tsx says why neither `PULL REQUEST` nor `#42` can stand in for it).
           const opened = await screen.until('(fix-login) → (main)', 45)
           // The Browse list survived its own re-suspensions: the caret is still on a row.
           expect(caretLine(opened)).toContain('Older pull')

@@ -5,7 +5,7 @@ import { _resetRouter, useLocation, useMatch, useNavigate, useParams, useSearchP
 
 // The router shim, which is the whole of what `@solidjs/router` is on this host.
 //
-// No FFI and no renderer: this is a path in a signal matched against the patterns the desktop's Router
+// No renderer: this is a path in a signal matched against the patterns the desktop's Router
 // is built from, and every case here is about the answers a pane gets back. What it is *for* is one
 // step further out — a browse surface reads its project and its open item off these — and that half is
 // the shell's, in ../chrome/routing.ts.
@@ -71,9 +71,9 @@ describe('the router shim', () => {
 
   it('reads a project surface pattern, which is the other table a plugin can register one in', () => {
     // A descriptor plugin's surface is not a source route: it registers with the project-surface
-    // registry, which the desktop mounts as `<Route>`s of its own. This host had only the source table,
-    // so a Linear row navigated to a path nothing matched — the surface never saw its item, and the
-    // shell read the path as carrying no project at all (../chrome/routing.ts).
+    // registry, which the desktop mounts as `<Route>`s of its own. Matching only the source table, a
+    // Linear row navigates to a path nothing matches — the surface never sees its item, and the shell
+    // reads the path as carrying no project at all (../chrome/routing.ts).
     const surface = projectSurfaceRegistry.register({
       id: 'board-issue',
       path: '/p/:projectId/x/linear/board/:issue',

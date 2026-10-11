@@ -169,12 +169,10 @@ export function Shell(props: {
   const [strip, setStrip] = createSignal<Renderable | undefined>()
   // The shell's own width, so the left column can take a share of it rather than a fixed number of
   // cells (./Rail.tsx § railCells). The one width anything in the chrome reads, and it is this box's
-  // rather than the terminal's — the same rule a layout keeps (docs/tui/rectangles.md § What the TUI never does).
+  // rather than the terminal's — the same rule a layout keeps
+  // (docs/tui/rectangles.md § What the TUI never does).
   const [cells, setCells] = createSignal(80)
-  // One way to lose the left column: a reader asked, on `ctrl+b`. There used to be a second —
-  // collapsing to a two-cell strip
-  // of marks below 100 columns — and it went with the icons: the strip only ever said anything
-  // because each row had a glyph in it, and many of those glyphs drew nothing.
+  // One way to lose the left column: a reader asked, on `ctrl+b`.
   const [hidden, setHidden] = createSignal(false)
   const firstSetupStep = (): SetupStep => {
     if (!prefs.data?.[WORKSPACES_PREF_KEY] && !model.projects()?.length) return 'mode'
@@ -294,10 +292,10 @@ export function Shell(props: {
   onCleanup(() => setTopology(null))
 
   // Hiding the main row is one of the two ways the keys can go off screen without anybody being told.
-  // `visible` is per node in OpenTUI: setting it false here blurs this box and leaves a focused
-  // descendant of it reporting itself focused and visible, so the landing rule never hears that its
-  // node has gone behind the overlay. Asking for a pass is the whole fix, because the pass already
-  // walks the parents before it decides (../keys/regions.ts § The landing rule, § onScreen).
+  // `visible` is per node: hiding this box leaves a focused descendant with its own `visible` still
+  // true, so nothing tells the landing rule its node has gone behind the overlay. Asking for a pass is
+  // the whole fix, because the pass walks the parents before it decides
+  // (../keys/regions.ts § The landing rule, § onScreen).
   createEffect(() => {
     if (topOverlay() || activeConfirmation()) scheduleSettle()
   })
@@ -322,8 +320,7 @@ export function Shell(props: {
         taskActive: () => !!model.task(),
         // Always undefined, so a `pane`-scoped binding never fires here. The scope means "the keys are
         // in this pane and no other", and this host draws one pane at a time; a binding scoped to the
-        // pane on screen would be a binding scoped to everything. Phase 6 revisits it if a pane in the
-        // sweep turns out to want one.
+        // pane on screen would be a binding scoped to everything.
         focusedPane: () => undefined,
       })
     }
@@ -534,8 +531,8 @@ export function Shell(props: {
       ])
       onCleanup(() => bindings.dispose())
     })
-    // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
-    // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
+    // Go to task, switch workspace, go to project and switch node, as one group of searches. A search
+    // rather than one command per paired node, which would put the whole roster in the root.
     const navigation = registerNavigationCommands(shellNavigation(model, words))
     onCleanup(() => {
       navigation.dispose()
@@ -548,8 +545,8 @@ export function Shell(props: {
   // same request the desktop's shell answers (./settingsPages.tsx, ./settingsStore.ts).
   //
   // The desktop's palette rows for each page and section are not registered here. Every one of them
-  // carries the Settings breadcrumb and a low order, so they ranked level with or above this shell's
-  // own commands: `notifications` opened the settings page instead of the inbox, and `new task` opened
+  // carries the Settings breadcrumb and a low order, so they rank level with or above this shell's
+  // own commands: `notifications` would open the settings page instead of the inbox, and `new task`
   // Keyboard shortcuts. **Open settings** is the one row, and the route's lists reach every page.
   //
   // The pages register behind a loader, because the table and the page graph are not needed to draw the
@@ -596,8 +593,8 @@ export function Shell(props: {
           <Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} />
         </Show>
         <box flexDirection="column" flexGrow={1}>
-          {/* The strip is a region only while a task gives it something to draw. Keeping the ref
-              outside this Show left an empty, focusable box in the source-view Tab cycle. */}
+          {/* The strip is a region only while a task gives it something to draw. A ref outside this
+              Show would leave an empty, focusable box in the source-view Tab cycle. */}
           <Show when={model.task()}>
             {(task) => (
               <box
@@ -615,16 +612,16 @@ export function Shell(props: {
           {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
               resolves to an empty string — which a cell host refuses outright, where the DOM would
               have shrugged and drawn a text node nobody sees. The same guard the pane mount path
-              already has for the same reason (../layouts/index.ts). It carries the error boundary too, so a surface that
-              throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
+              already has for the same reason (../layouts/index.ts). It carries the error boundary
+              too, so a surface that throws says what it threw rather than leaving the main panel
+              blank (../panel.tsx). */}
           <PanelBody name="main" nodeId={props.nodeId} region={SOURCE}>
             <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
               {/* A source that declared regions has its list in the Browse panel already, so the
-                  main panel is its detail alone. One that did not keeps its whole surface here,
-                  which is every source that has not been migrated
+                  main panel is its detail alone. One that did not keeps its whole surface here
                   (client-core/host/registries/sources/sources.ts § regions). */}
               {/* A new source owns a new region lifetime. Reusing the Match while a lazy source
-                  starts a resource retained the previous tree and disposed the new focus claim. */}
+                  starts a resource would retain the previous tree and dispose the new focus claim. */}
               <Match when={source()?.regions?.detail} keyed>
                 {(detail) => (
                   <SourceRegion>
@@ -645,9 +642,8 @@ export function Shell(props: {
         </box>
       </box>
       {/* The overlay layer is a sibling of the row, not a child of the pane column. An overlay
-          belongs to the screen: mounted in the column it drew in the pane's width with the rail
-          still beside it, so the trust prompt read as one more panel rather than the thing being
-          asked. `flexGrow` here keeps the footer at the bottom; the `Modal` inside stays at its
+          belongs to the screen: mounted in the column it would draw in the pane's width with the
+          rail still beside it, and read as one more panel rather than the thing being asked. `flexGrow` here keeps the footer at the bottom; the `Modal` inside stays at its
           own content height (../kit/grouping.tsx). */}
       <Show when={topOverlay()}>
         {(name) => (
@@ -748,11 +744,11 @@ export function Shell(props: {
 
 /** A browse surface in the main panel, as a region the keys can be in.
  *
- *  A pane registers its regions from its layout, and a browse source has no layout — so the main
- *  panel was the one place on this screen Tab could not reach. Everything in it was unreachable with
- *  it: the diff had no way to scroll and a `Sections` strip had no way to hear `h`
- *  (../kit/grouping.tsx). Order 0, which is where a layout's first region sits, so the cycle still
- *  reads down the screen: Menu, Browse, Tasks, then this.
+ *  A pane registers its regions from its layout, and a browse source has no layout — so without this
+ *  the main panel would be the one place on this screen Tab can't reach, and nothing in it could be
+ *  driven: the diff couldn't scroll and a `Sections` strip couldn't hear `h` (../kit/grouping.tsx).
+ *  Order 0, which is where a layout's first region sits, so the cycle still reads down the screen:
+ *  Menu, Browse, Tasks, then this.
  */
 function SourceRegion(props: { children: JSX.Element }) {
   return (
@@ -789,8 +785,8 @@ function QuitConfirm(props: { onQuit: () => void }) {
 }
 
 /** The project picker. `p` where `w` is the workspace, and an overlay for the same reason: the whole
- *  screen changes when a row is chosen, and a list drawn under the topbar left the keys wherever they
- *  already were.
+ *  screen changes when a row is chosen, and a list drawn under the topbar leaves the keys wherever
+ *  they already are.
  *
  *  Choosing writes a path rather than a signal. Every project-scoped surface reads `params.projectId`
  *  — that is what makes the GitHub browse list know which repository it is listing — so there has to
@@ -829,8 +825,8 @@ function ProjectPicker(props: { model: ShellModel }) {
 
 /** The workspace picker, as an overlay rather than a list under the topbar: it is the shell's chord
  *  that opens it, the whole screen changes when a row is chosen, and a list drawn under the topbar
- *  left the keys wherever they already were — so the reader saw a list they could not drive. An
- *  overlay is the shape that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
+ *  leaves the keys wherever they already are, a list the reader can't drive. An overlay is the shape
+ *  that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
 function WorkspacePicker(props: { model: ShellModel; words: () => ReturnType<typeof workspaceWords> }) {
   const close = () => closeOverlay('workspace')
   const rows = keyedRows(

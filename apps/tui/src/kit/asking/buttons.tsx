@@ -9,8 +9,8 @@ import { litControl } from '../roles'
 /** `[ label ]`. `bare` drops the brackets, for a control that is a word inside a sentence. */
 export function Button(props: ButtonProps) {
   // A terminal draws the button's words, not its glyph. An icon-only button's child is a node with no
-  // text to read off it — `flatten` would print `[object Object]`, which is how the agents pane's
-  // header read before the sweep — and the kit makes such a button carry `label`, which is the words
+  // text to read off it — `flatten` would print `[object Object]` — and the kit makes such a button
+  // carry `label`, which is the words
   // (docs/ui-design/closed-kit.md § The closed kit).
   const body = () => (hasNode(props.children) ? (props.label ?? '') : flatten(props.children) || props.label || '')
   const control = stop({

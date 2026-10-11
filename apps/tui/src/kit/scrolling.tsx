@@ -18,12 +18,10 @@ import type { Node } from '../tree/node'
 // free-sized pane wrapper makes those layouts measure a width that is not on screen
 // (../chrome/PaneRow.tsx).
 //
-// **The component owns the scrolling.** The offset, the bar, wheel acceleration and the clamp are all
-// here, and the node carries the offset as a prop that paint translates its children by. OpenTUI's
-// `ScrollBoxRenderable` owned all four instead, which is why the contract below is a shape rather
-// than a class: it was what let the keys, the reveal and `DiffPane` be one piece of code while both
-// painters existed, and it is worth keeping as the one place this app says what it wants of a
-// viewport (§ Viewport).
+// **The component owns the scrolling.** The offset and its clamp are here, and the node carries the
+// offset as a prop that the read-back translates its children by and paint draws the bar from. The
+// contract below is a shape rather than a class, so the keys, the reveal and `DiffPane` reach a
+// viewport through the one place this app says what it wants of one (§ Viewport).
 
 /**
  * What this app asks of a viewport.
@@ -47,7 +45,7 @@ export type Viewport = {
 }
 
 // The arrows, while the viewport itself is the stop. It only is one where it holds no other stop
-// (../keys/regions.ts § stopsIn), so these fire exactly where nothing better could have: a document of
+// (`stopsInTree`), so these fire exactly where nothing better could have: a document of
 // text with no controls in it.
 const KEY_SCROLLS: readonly { key: string; move: (box: Viewport) => void }[] = [
   { key: 'up', move: (box) => box.scrollBy(-1 / 5, 'viewport') },
@@ -118,8 +116,8 @@ type ViewportProps = {
 
 /** The node under this one carrying that id, or nothing.
  *
- *  The store's reveal names the child by id, because OpenTUI's `scrollChildIntoView` took one and an
- *  id is minted per node per render (../tree/compat.ts). */
+ *  The store's reveal names the child by id, and an id is minted per node per render
+ *  (../tree/compat.ts). */
 const descendant = (at: Node, id: unknown): Node | null => {
   if ((at as { id?: unknown }).id === id) return at
   for (const child of at.children) {
@@ -130,7 +128,7 @@ const descendant = (at: Node, id: unknown): Node | null => {
 }
 
 /**
- * Our painter's viewport: two nodes, and the offset lives in the component.
+ * The viewport: two nodes, and the offset lives in the component.
  *
  * The content is a node of its own because the two have to measure differently — the viewport takes
  * the height its flex parent gives it, and the content takes the height its own children need.
@@ -141,15 +139,15 @@ const descendant = (at: Node, id: unknown): Node | null => {
  *
  * `flexGrow={1}` beside it is the other half and it is not decoration either: a virtual `Rows` asks
  * its parent for a height and windows to it, and inside a box only as tall as its children a
- * `flexGrow` child gets nothing, so the list drew no rows at all. Grown, the content is exactly the
+ * `flexGrow` child gets nothing, so the list draws no rows at all. Grown, the content is exactly the
  * viewport's height while it fits and its own height once it does not, which is the pair of answers
  * this needs.
  *
- * OpenTUI said that second half as `minHeight: '100%'`, and a percentage cannot say it here: the
- * viewport's own height comes from `flexGrow` inside its column, and Yoga resolves a percentage
- * against the height its *grandparent* offered rather than the height the viewport ended up with. So
- * the content came out one row taller than the viewport everywhere, which is a bar on every panel
- * that fits and a row of scroll in every document that does not — the `editor` pane's frame caught it.
+ * `minHeight: '100%'` cannot say that second half: the viewport's own height comes from `flexGrow`
+ * inside its column, and Yoga resolves a percentage against the height its *grandparent* offered
+ * rather than the height the viewport ended up with. The content comes out one row taller than the
+ * viewport everywhere, which is a bar on every panel that fits and a row of scroll in every document
+ * that does not.
  *
  * Nothing on the node knows how to scroll. The offset is a signal here and a prop there, so a node
  * cannot be in a scroll state the component disagrees with, and paint reads one number
@@ -224,8 +222,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
 
   /** Show a child that is above or below the fold, from this frame's rectangles.
    *
-   *  Which is the whole reason there is one reveal under this painter and two under the old one. The
-   *  child's `y` already carries this viewport's offset, because the read-back is where the
+   *  The child's `y` already carries this viewport's offset, because the read-back is where the
    *  translation happens, and the read-back ran in the frame that is about to paint — so the
    *  comparison is against geometry that exists (../layout/pass.ts § A viewport moves its children,
    *  ../keys/regions.ts § The reveal). */
@@ -264,9 +261,8 @@ function viewportBox(props: ViewportProps): JSX.Element {
 
   // The offset into the node's props, where paint reads it, and a frame to draw the move.
   //
-  // Written from an effect rather than spelled as a JSX attribute, which is a leftover of the two
-  // painters and could now be either: it lands where a JSX attribute would land and asks for the
-  // frame `setProperty` would have asked for.
+  // Written from an effect rather than spelled as a JSX attribute. Either works: it lands where a JSX
+  // attribute would land and asks for the frame `setProperty` would have asked for.
   createEffect(() => {
     const node = box
     if (!node) return

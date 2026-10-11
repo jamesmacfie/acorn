@@ -34,8 +34,8 @@ const navigate = useNavigate()
  *
  *  Read off the path when no pattern matched, rather than through `params` alone. A path is only
  *  parameters if something registered its shape, and a plugin surface nothing here knows about is
- *  still plainly a path about a project — so answering `null` for it made the effect below navigate
- *  away from the project the reader had just been looking at, on every row they moved to. The
+ *  still plainly a path about a project — so answering `null` for it would make the effect below
+ *  navigate away from the project the reader is looking at, on every row they move to. The
  *  parameter is still the answer wherever there is one; this is the floor under it. */
 export const routedProjectId = (): string | null => {
   const routed = params.projectId
@@ -49,7 +49,7 @@ export const routedProjectId = (): string | null => {
  *
  *  The settle is for the Browse list, which is project-scoped: its rows are replaced wholesale, and
  *  the one that had the keys goes with them. Focus returns to where it was if that renderable
- *  survived and re-enters the region by identity if it did not (../keys/regions.ts § settle). */
+ *  survived and re-enters the region by identity if it did not (../keys/regions.ts § scheduleSettle). */
 export const chooseProject = (projectId: string): void => {
   navigate(projectPath(projectId))
   scheduleSettle()
@@ -63,8 +63,8 @@ export const chooseProject = (projectId: string): void => {
  */
 export function installRouting(model: ShellModel): void {
   // A path that names a task opens it. This is what makes promoting a pull to a task work in a
-  // terminal: `PullList` finishes by navigating to the new task, and with an inert router that was a
-  // task created and never shown (plugins/github/src/client/PullList.tsx).
+  // terminal: `PullList` finishes by navigating to the new task, which without this would be a task
+  // created and never shown (plugins/github/src/client/PullList.tsx).
   createEffect(() => {
     const taskId = params.taskId
     if (!taskId) return
@@ -77,9 +77,8 @@ export function installRouting(model: ShellModel): void {
   // through the same function.
   //
   // The selection is read untracked, because this effect answers path changes and nothing else.
-  // Tracked, it also ran on every Menu choice — and since choosing a source does not rewrite the
-  // path, the path's owner was still the old source, and the choice was snapped straight back: once
-  // a reader had browsed into any source-claimed path, the Menu stopped working.
+  // Tracked, it would also run on every Menu choice — and since choosing a source does not rewrite the
+  // path, the path's owner would still be the old source and the choice would snap straight back.
   createEffect(
     on(currentPath, (path) => {
       const owner = untrack(() => sourceIdForPath(path))

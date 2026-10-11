@@ -24,8 +24,8 @@ const log = createLogger('fleet')
 // globals under a browser's name.
 //
 // The broker runs in this process, which the desktop's does not (docs/security.md § Trust
-// boundaries). That is the trade 06-isolation.md records: the token lives in this module and reaches
-// no kit component, a module boundary where the desktop has a process boundary. Everything below
+// boundaries). That is the trade: the token lives in this module and reaches no kit component, a
+// module boundary where the desktop has a process boundary. Everything below
 // hands out a `NodeRecord`, which `toNodeRecord` strips of the certificate and the device row, and no
 // token crosses into anything the renderer can read.
 
@@ -174,9 +174,9 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
         throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
       await stop()
       // A restarted node binds a fresh port and may mint a fresh token, so the fleet row is rewritten
-      // from the new handshake rather than reused. What is not here is the desktop's `onNodeReplaced`
-      // push: nothing in this build is holding a view of the old endpoint to invalidate. Phase 4 draws
-      // the chrome that would need telling.
+      // from the new handshake rather than reused. Unlike the desktop, nothing here sends an
+      // `onNodeReplaced` push.
+      //
       // Awaited here, unlike the start at boot: nothing is waiting on a frame, and the caller asked
       // for a node it can use. The restarted child's stderr is piped and dropped rather than held —
       // the hold in `main.tsx` belongs to the child this process spawned at boot.

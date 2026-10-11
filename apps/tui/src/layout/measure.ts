@@ -8,8 +8,8 @@ import { measuredField } from '../wrap'
 //
 // A `text` node is a leaf to Yoga with a measure function on it. The function concatenates its `#text`
 // and `span` children in order, wraps or truncates the result at the width Yoga is offering, and
-// answers with the widest line and the number of lines. `wrapMode` decides which, exactly as
-// `../kit/cells.tsx` § Line passes it today.
+// answers with the widest line and the number of lines. `wrapMode` decides which, and the kit's
+// `Line` is what sets it.
 //
 // Cached on the node by the width and the text, so a frame that moved nothing measures nothing. Yoga
 // only calls a measure function on a node it considers dirty, but the same node is measured more than
@@ -19,10 +19,9 @@ import { measuredField } from '../wrap'
 // Paint reads the same lines out of the same cache, so the run it draws is the run that was measured.
 // If those two ever disagreed, every wrapped paragraph in the app would be a line out.
 //
-// A field's rows are the same arrangement one question over, and the cache for them is in `../wrap.ts`
-// rather than here: `../kit/asking/fieldRef.ts` reads it too, and a static import of this module from there
-// would put `yoga-layout` in the eager graph of the build that does not use it
-// (../wrap.ts § The cache is here rather than in ./layout/measure.ts).
+// A field's rows are the same arrangement one question over, and their cache is `measuredField`
+// rather than here: `fieldRef` reads it too, and a static import of this module from there would put
+// `yoga-layout` in the eager graph of the build that does not use it.
 
 type Measured = { key: string; lines: readonly string[]; width: number }
 
@@ -100,9 +99,9 @@ export function measuredRun(node: Node, limit: number): Measured {
 
 /** The measure function a `textarea` is a leaf to Yoga with: as tall as its wrapped rows are.
  *
- *  OpenTUI's edit buffer answers the same way, and it was measured rather than assumed — a textarea
- *  stacked between two lines of text moves the line below it down one row per line of content, which
- *  is also why a `Textarea` without `grow` is exactly as tall as what is in it. */
+ *  OpenTUI's edit buffer answers the same way: a textarea stacked between two lines of text moves the
+ *  line below it down one row per line of content, which is also why a `Textarea` without `grow` is
+ *  exactly as tall as what is in it. */
 export const measureField =
   (node: Node): MeasureFunction =>
   (width, widthMode) => {

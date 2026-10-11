@@ -49,8 +49,8 @@ export function Log(props: {
 }) {
   return (
     <box flexDirection="column" flexGrow={1}>
-      {/* A viewport, where this was a yoga clip. A clip owns no offset, so a log longer than its
-          frame drew its first screenful and nothing could reach the tail (../scrolling.tsx,
+      {/* A viewport, not a yoga clip. A clip owns no offset, so a log longer than its frame draws
+          its first screenful and nothing can reach the tail (../scrolling.tsx,
           docs/tui/scrolling.md § Scrolling viewports). The find bar stays outside it, so it is on the bottom
           line wherever the lines above it have been scrolled to. */}
       <ScrollViewport scrollOffset={props.scrollOffset} onChange={props.onChange}>
@@ -74,7 +74,7 @@ export function Lines(props: { lines: MarkdownLine[] }) {
           <Show when={!line.rule} fallback={<Line role="muted">{rule(40)}</Line>}>
             {/* One `text` with a `span` per run, not a row of `Line`s: a row of text renderables is a
                 row of boxes to yoga, and at a width they do not fit each one is shrunk and clips its
-                own content — which cut three letters out of every run of a wrapped paragraph
+                own content, cutting letters out of every run of a wrapped paragraph
                 (../cells.tsx § Run). `width` and `minWidth` make yoga measure the same wrap width
                 the text buffer draws; without them it reserves one row for an unwrapped line while
                 the buffer paints several, and the next paragraph overwrites those rows. */}
@@ -97,7 +97,7 @@ export function Lines(props: { lines: MarkdownLine[] }) {
 }
 
 /** reduced: no images, and a link is its text with the URL beside it in dim. The policy is the
- *  shell's; this draws what it decided (./markdown.ts). `thumb` is a size, so on a host with no
+ *  shell's; this draws what it decided (../markdown.ts). `thumb` is a size, so on a host with no
  *  images it means what the other two mean here: the alt text on a line. */
 export function Markdown(props: {
   text: string

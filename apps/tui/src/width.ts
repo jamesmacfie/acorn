@@ -1,33 +1,26 @@
 // How many cells a string takes. The one question a painter cannot get wrong, so it has one answer
 // and both halves of the frame read it: layout asks it to wrap a run, paint asks it to place one.
 //
-// `String.length` is what the kit truncates by today, and it is wrong three ways: two code units for
-// one astral character, one cell for a wide one, and a cell for a combining mark that takes none. The
-// fixture never reaches any of the three, which is why nobody has seen it.
+// `String.length` is wrong three ways: two code units for one astral character, one cell for a wide
+// one, and a cell for a combining mark that takes none.
 //
 // So: `Intl.Segmenter` for the cluster boundaries and a hand table of the East Asian Width `W` and
-// `F` ranges for how wide each cluster's base is. We weighed that against `string-width` and picked
-// this one. `string-width` asks `emoji-regex` first, which matches a bare
-// text-presentation emoji, so it calls `▶`, `☑`, `⚠`, `⌨`, `☺`, `👁` and `🏷` two cells each —
-// against the standard, against xterm, and against seven names the rail and the footer draw every
-// frame. It also only arrived in the tree as a dependency of the old painter and left with it, so
-// taking it would be a new dependency rather than the reuse it looked like.
+// `F` ranges for how wide each cluster's base is, rather than `string-width`. That package asks
+// `emoji-regex` first, which matches a bare text-presentation emoji, so it calls `▶`, `☑`, `⚠`, `⌨`,
+// `☺`, `👁` and `🏷` two cells each — against the standard and against xterm.
 //
-// The ASCII branch in front is not an optimisation we are being clever about, it is the difference
-// between 1,946 us and 163 us on a 400-line wrap. Everything the fixture draws is ASCII and every
-// pane's own text mostly is, so the segmenter is the exception path and it should look like one.
+// The ASCII branch in front matters: everything the fixture draws is ASCII and every pane's own text
+// mostly is, so the segmenter is the exception path and it should look like one.
 //
-// This file knows nothing about OpenTUI and nothing about Yoga, so it runs on the Node the repo pins
-// with no flag.
+// This file knows nothing about Yoga or the tree.
 
-/** A string with nothing in it a terminal has to think about. One cell per character, and the answer
- *  agrees with the segmenter on all 125 samples it was measured against. */
+/** A string with nothing in it a terminal has to think about. One cell per character, which is what
+ *  the segmenter answers for it too. */
 const PLAIN = /^[\x20-\x7e]*$/
 
 /** A cluster that starts with a mark or a format character has no base of its own, so it costs
- *  nothing: it is drawn over whatever came before it. This is the class OpenTUI's paint got wrong
- *  while its own layout got it right, which is how an accented name drew a column too wide per mark
- *  and clobbered the cell beside it. */
+ *  nothing: it is drawn over whatever came before it. Counting it a cell draws an accented name a
+ *  column too wide per mark and clobbers the cell beside it. */
 const MARKLESS = /^[\p{Mn}\p{Me}\p{Cf}\u200b\u2060\ufeff]/u
 
 /** East Asian Width `W` and `F`, as code point ranges, inclusive both ends.
@@ -36,13 +29,12 @@ const MARKLESS = /^[\p{Mn}\p{Me}\p{Cf}\u200b\u2060\ufeff]/u
  *  get argued in: when a terminal draws a character at a width this says it is not, the argument is
  *  a line here and the cells it lands in, not an upgrade of somebody else's regex.
  *
- *  Two entries worth naming, because both were measured. U+2630 to U+2637 moved to `W` in Unicode 16,
- *  so `☰` is two cells by the standard and one
- *  cell in any terminal with an older table. That is a glyph whose width the layout cannot predict,
- *  so the kit avoids using it. And the astral pictographs OpenTUI widens (U+1F5C0, U+1F5CE,
- *  U+1F5D2, U+1F5C3, U+1F5B5 among 279 code points) are deliberately absent: the standard, xterm and
- *  `string-width` all call them one cell, and phase 3 puts an xterm-measured rectangle on the same
- *  screen, so the two halves of one frame have to count alike. */
+ *  Two entries worth naming. U+2630 to U+2637 moved to `W` in Unicode 16, so `☰` is two cells by the
+ *  standard and one cell in any terminal with an older table. That is a glyph whose width the layout
+ *  cannot predict, so the kit avoids using it. And the astral pictographs some renderers widen
+ *  (U+1F5C0, U+1F5CE, U+1F5D2, U+1F5C3, U+1F5B5 among 279 code points) are deliberately absent: the
+ *  standard, xterm and `string-width` all call them one cell, and an xterm-measured rectangle draws on
+ *  the same screen, so the two halves of one frame have to count alike. */
 const WIDE: readonly (readonly [number, number])[] = [
   [0x1100, 0x115f],
   [0x231a, 0x231b],
@@ -250,8 +242,7 @@ export type Cluster = { text: string; from: number; width: number }
  * inside an astral character or between a base and its accent.
  *
  * The ASCII branch matters more here than it does in `stringWidth`, because the wrap in `./wrap.ts`
- * runs this walk over every line it touches. With the branch a wrap of a 400-line note is 163
- * microseconds; without it, 1,946.
+ * runs this walk over every line it touches.
  */
 export function clusters(value: string): Cluster[] {
   const out: Cluster[] = []

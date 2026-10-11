@@ -69,14 +69,6 @@ export async function bootFixture(): Promise<{ task: typeof TASK; transport: Ret
   return { task: TASK, transport }
 }
 
-/** The whole shell, rendered to a cell buffer at 80 by 24, with the keymap installed on it.
- *
- *  The smoke and chrome tests assert on what comes back and drive it with keys; `capture.tsx` prints
- *  one frame. Both go through the same function, so the screenshot is of the thing under test.
- *
- *  What it draws is the fixture node's one task and its notes pane, because that is the roster
- *  `App.tsx` registers. The chrome around it is real: the same rail, strip, palette and footer a
- *  person gets. */
 /** One run of cells in a captured frame: what it says, what colour it says it in, and how many
  *  columns it takes.
  *
@@ -131,7 +123,7 @@ type Surface = {
 
 /** A screen with no terminal under it, read straight out of the cell buffer.
  *
- *  No FFI and no flag: this draws on the Node the repo pins
+ *  It draws on the Node the repo pins
  *  (./paint/screen.ts, docs/tui/process.md § The runtime floor). */
 function openSurface(size: { width: number; height: number }): Surface {
   const renderer = openRenderer({ cols: size.width, rows: size.height })
@@ -179,9 +171,8 @@ function openSurface(size: { width: number; height: number }): Surface {
       renderer.screen.resize(width, height)
       renderer.frame()
     },
-    // Straight onto the key stream. The parser is not wired to the dispatcher until phase 3, and it
-    // is not what a test wants either: a harness that constructs the event has no bytes to get wrong
-    // (./renderer.ts § The key stream is a queue).
+    // Straight onto the key stream, past the byte parser: a harness that constructs the event has no
+    // bytes to get wrong (./renderer.ts § The key stream is a queue).
     pressKey: (key, modifiers) => {
       renderer.keyInput.emit('keypress', pressedKey(key, modifiers))
     },
@@ -199,13 +190,19 @@ function openSurface(size: { width: number; height: number }): Surface {
 // (./tree/renderer.ts § render).
 let previous: (() => void) | null = null
 
+/** The whole shell, rendered to a cell buffer (80 by 24 unless a test asks for another size), with the
+ *  keymap installed on it.
+ *
+ *  The smoke and chrome tests assert on what comes back and drive it with keys; `capture.tsx` prints
+ *  one frame. Both go through the same function, so the screenshot is of the thing under test. The
+ *  chrome is real: the same rail, strip, palette and footer a person gets. */
 export async function renderFixture(
   size: {
     width?: number
     height?: number
     supervised?: boolean
     /** Draw as if this run had spawned the node and its handshake had not landed yet: the footer says
-     *  so and the broker has reported nothing (../chrome/nodeState.ts). */
+     *  so and the broker has reported nothing (./chrome/nodeState.ts). */
     starting?: boolean
     pane?: string
     /** Seed the node's query cache before the shell mounts, which is what a warm start reads. Handed
@@ -270,16 +267,13 @@ export async function renderFixture(
   _resetPluginDistribution()
   if (size.trust?.length) _seedPendingTrust(size.trust)
   const { transport } = await bootFixture()
-  // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
-  // rather than the only one there is, and a test that does not make it gets whatever the task's saved
-  // layout puts first (../chrome/panes.ts § shownPane).
+  // Which pane the fixture task opens on (./chrome/panes.ts § shownPane).
   if (size.pane) {
     const { dispatchLayout } = await import('@acorn/client-core/features/tasks/tasks.ts')
     const { activateTaskSignals } = await import('@acorn/client-core/features/tasks/activate.ts')
     const { paneContribution } = await import('@acorn/client-core/host/registries/panes/panes.ts')
-    // Naming a pane is also an explicit request for the fixture task. Production now defaults to
-    // the first Menu source, so tests of a task pane must state the other half of their setup rather
-    // than relying on the old startup side effect in Shell.
+    // Naming a pane is also an explicit request for the fixture task. Production opens on the first
+    // Menu source, so a test of a task pane states the other half of its setup.
     activateTaskSignals(TASK)
     dispatchLayout(TASK.id, { type: 'show', pane: size.pane })
     // …and wait for its code, the pane's and every region's. A pane and each of its regions is a
@@ -307,17 +301,16 @@ export async function renderFixture(
   installFixtureExtensions()
   const disposeRegistrations = size.register?.()
 
-  // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
-  // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
-  // their layer as they draw, and a layer registered against no engine is silently dropped.
   // Whatever the last render left behind. A test that fails an assertion before its `done()` never
   // tears its renderer down, so the Solid root stays mounted, its `onCleanup` never runs, and the
   // next render in the same worker throws "command contribution already registered" from the shell's
-  // `onMount` — one red test turning into three, none of which names the first. Tearing down here
-  // costs nothing when the previous test was tidy.
+  // `onMount` — one red test turning into three, none of which names the first.
   previous?.()
   const width = size.width ?? 80
   const height = size.height ?? 24
+  // The renderer first and the tree second. The keymap has to be installed before anything mounts: a
+  // layout, a collection and a trap all register their layer as they draw, and a layer registered
+  // against no engine is silently dropped.
   const surface = openSurface({ width, height })
   const { renderer, flush, captureCharFrame, captureSpans, resize } = surface
   installKeymap(renderer)
@@ -354,8 +347,8 @@ export async function renderFixture(
   }
   previous = tearDown
 
-  // A deadline that rejects an unsettled tree and clears its timer on success. The old race returned
-  // a frame on timeout and left its losing timer alive after every capture.
+  // A deadline that rejects an unsettled tree and clears its timer on success, so no losing timer
+  // outlives a capture.
   const settle = async (ms: number): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
@@ -370,15 +363,12 @@ export async function renderFixture(
     }
   }
   await settle(3000)
-  // Twenty more turns of the loop, and it is measured rather than inherited: taking it out reds
-  // `./browseSlow.test.tsx`'s re-suspending case and `browse at 80 by 24` in
-  // `./reachability.test.tsx`, and nothing else in the suite. A pane's own data is a route and a
-  // store rather than a prop, and the first render in a fresh worker also pays for compiling every
-  // module the pane pulls in — so the settle above comes back before the pane has anything in it,
-  // and the first test in every file was asserting on an empty pane. That is a Vite cost rather than
-  // a painter one, which is why one painter did not end it. Each turn is cheap: `flush` resolves as
-  // soon as the tree stops asking for frames, so this is twenty chances for a promise to land rather
-  // than four seconds of waiting (docs/tui.md).
+  // Twenty more turns of the loop. A pane's own data is a route and a store rather than a prop, and
+  // the first render in a fresh worker also pays for compiling every module the pane pulls in, so the
+  // settle above can come back before the pane has anything in it. Taking this out reds
+  // `./browseSlow.test.tsx`'s re-suspending case and `browse at 80 by 24` in `./reachability.test.tsx`.
+  // Each turn is cheap: `flush` resolves as soon as the tree stops asking for frames, so this is
+  // twenty chances for a promise to land rather than four seconds of waiting (docs/tui.md).
   for (let turn = 0; turn < 20; turn += 1) await settle(200)
   const frame = async (): Promise<string> => {
     await settle(500)
@@ -432,8 +422,7 @@ export async function renderFixture(
    * `Row` puts the caret there and a `Button` draws itself lit there. The columns matter because a
    * terminal row is the width of the screen and the screen is the rail beside a pane: at 120 cells a
    * rail row's line carries the pane's text as well, so a match against the whole row answers for
-   * something the keys are nowhere near. That is what made a `reach` on a wide screen stop on the
-   * wrong thing and pass a precondition it had not met.
+   * something the keys are nowhere near, and a `reach` on a wide screen stops on the wrong thing.
    *
    * The row holding a `\u203a` is the fallback, for the moment focus is on a region's own box and
    * nothing is lit at all. That one keeps its full width, because there is no node to take columns
@@ -454,10 +443,10 @@ export async function renderFixture(
    * moving, then Tab to the next region and start again. A failure is therefore reproducible by
    * hand — press the same keys in the same order and the same thing is under the caret.
    *
-   * Down rather than a breadth-first fan of Down, Right and Enter, which the design asked for.
-   * What the property is over is `_allStops()`, and that is `stopsIn` per region: a panel's contents
-   * are the level below and are not in it. Right and Enter only reach that level, so they would cost
-   * presses and prove nothing (docs/tui/reporting.md § The invariants).
+   * Down rather than a breadth-first fan of Down, Right and Enter. What the property is over is
+   * `_allStops()`, and that is `stopsIn` per region: a panel's contents are the level below and are not
+   * in it. Right and Enter only reach that level, so they would cost presses and prove nothing
+   * (docs/tui/reporting.md § The invariants).
    *
    * `each` returning `true` ends the walk where it stands, which is how `reach` stops on what it
    * came for rather than spending the whole budget behind it.
@@ -517,17 +506,16 @@ export async function renderFixture(
       return drawn
     },
     // A single character is itself; a named key is the parser's own spelling for one, which is upper
-    // case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently,
-    // which is a good hour to save the next person — and a chord is the key plus a modifiers object,
-    // never the string `'ctrl+k'`, which types five letters and a `k` (./keyEvent.ts § pressedKey).
+    // case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently.
+    // A chord is the key plus a modifiers object, never the string `'ctrl+k'`, which types five
+    // letters and a `k` (./keyEvent.ts § pressedKey).
     press,
     /** The frame as coloured runs rather than characters.
      *
-     *  `frame()` answers what is on the screen and nothing about what colour it is, so every rule in
-     *  the role table — the accent on a focused border, the green on an inserted line, the grey on a
-     *  muted one — was untested. A terminal that draws the right characters in the wrong colour is a
-     *  terminal a reader cannot use, which is the whole of the light-background bug
-     *  (./appearance.ts). */
+     *  `frame()` answers what is on the screen and nothing about what colour it is, so the rules in
+     *  the role table (the accent on a focused border, the green on an inserted line, the grey on a
+     *  muted one) are tested through this. A terminal that draws the right characters in the wrong
+     *  colour is a terminal a reader can't use (./appearance.ts). */
     spans: async (): Promise<Span[][]> => {
       await settle(500)
       return captureSpans()

@@ -35,7 +35,7 @@ export const isField = (node: Renderable): boolean => node.kind === 'input' || n
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
  *  is the one: the column at the far left is the chrome's and has no pane behind it, which is what
  *  makes a pane cycle from there a cycle of a pane the reader is not in (§ movePane). Which regions
- *  are there is still the shell's to declare, and it declares it by passing this (../chrome/Rail.tsx). */
+ *  are there is still the shell's to declare, and it declares it by passing 0 (../chrome/Rail.tsx). */
 const RAIL_COLUMN = 0
 
 /** Where a region that says nothing sits: one column right of the rail. Every region a layout
@@ -56,17 +56,15 @@ export type Topology = {
 type RegionOptions = {
   /** Which column, left to right, spatial left/right navigation treats this region as belonging to.
    *
-   *  An integer rather than the pair `'rail' | 'main'` it replaced, because two frames drawn side by
-   *  side inside one pane are two columns and the pair could not say so: every region a layout
-   *  registered was `'main'`, so Right in a `list-detail` had nothing to cross to and did nothing at
-   *  all (docs/tui/focus.md § Focus regions). The rail's three panels pass 0, a layout's
-   *  regions default to 1, and a layout with side-by-side regions declares the second one 2. Nothing
-   *  reads the number except `moveColumn`, which walks to the nearest one in the direction asked, so
-   *  the values only have to be ordered and not contiguous. */
+   *  An integer, because two frames drawn side by side inside one pane are two columns
+   *  (docs/tui/focus.md § Focus regions). The rail's three panels pass 0, a layout's regions default
+   *  to 1, and a layout with side-by-side regions declares the second one 2. Nothing reads the number
+   *  except `moveColumn`, which walks to the nearest one in the direction asked, so the values only
+   *  have to be ordered and not contiguous. */
   x?: number
   /** Activating a row in this region also hands the keys to the main column. Rail lists opt in. */
   enterMainOnActivate?: boolean
-  /** Landing on one of this region's rows also selects it. Browse is the sole caller. */
+  /** Landing on one of this region's rows also selects it. The rail's Menu and Browse opt in. */
   pickOnEnter?: boolean
 }
 
@@ -105,8 +103,7 @@ let visited = 0
  *  reader is a `key:after` intercept; `read()` leaves it alone, which is what a test wants.
  *
  *  `count` is the test seam. The flag is read at import and a suite cannot set an environment
- *  variable before its own imports run, so a case that is about the number turns it on for itself
- *  (../keys/regions.test.ts). */
+ *  variable before its own imports run, so a case that is about the number turns it on for itself. */
 export const walkSteps = {
   take: (): number => {
     const at = visited
@@ -124,17 +121,14 @@ export const walkSteps = {
   },
 }
 
-/** One node visited. Inlined by shape rather than by a helper at every call site: the walks below
- *  call this once per node and nothing else does. */
 const step = (): void => {
   if (counting) visited += 1
 }
 // How many times a region has come or gone, as a signal, because the footer's answers depend on the
 // list and not only on where the keys are: the rail hides on Ctrl+B, the pane strip draws only while
 // a task is open, and neither has to move focus to change what Tab can reach. A counter rather than a
-// signal holding the list, because nothing reads the list reactively — the questions are "how many"
-// and "which columns" — and copying an array on every mount to answer them would be a cost per region
-// for no reader (§ regionsInScope, ../chrome/bindings.ts § activeHints).
+// signal holding the list, because nothing reads the list reactively: the questions are "how many"
+// and "which columns" (§ regionsInScope, ../chrome/bindings.ts § activeHints).
 const [mounted, setMounted] = createSignal(0)
 const lastByColumn = new Map<number, Group>()
 let focused: RegionRef | null = null
@@ -320,9 +314,9 @@ export function enterParent(parent: Renderable): boolean {
 
 /** Cache visible regions by registry version and scope identity; key handling reads this order repeatedly. */
 const ordered = (): Group[] => {
-  // Cached until the registry or the scope stack moves, which is what makes it safe to ask this on
+  // Cached until the registry or the scope stack moves, which is what makes it cheap to ask this on
   // every key: `moveColumn` asks twice, `movePane` twice more, the landing rule once and the footer
-  // once per render, and each ask used to copy and sort the whole list (§ registryChanged).
+  // once per render (§ registryChanged).
   const at = scopes()
   if (orderedCache && orderedCache.at === registryVersion && orderedCache.scopes === at) return orderedCache.groups
   const found = groups.filter((group) => inScope(group.box)).sort((a, b) => a.order - b.order)
@@ -396,7 +390,7 @@ const regionOf = (node: Renderable): Group | undefined => {
  *
  *  A landing on a frame is never remembered. The frame is the last resort, taken when the thing had
  *  nothing in it yet, and remembering it pins the keys to a border for the rest of the run: a reader
- *  who looked into Browse before choosing a source came back to a lit border with dead arrows
+ *  who looks into Browse before choosing a source comes back to a lit border with dead arrows
  *  (§ enter, docs/tui/focus.md § Focus regions). */
 const remember = (of: Memory, node: Renderable, frame: Renderable | null): void => {
   if (node === frame) return
@@ -466,14 +460,14 @@ let pendingReveal: Renderable | null = null
 
 // ── Clicks are hit tests ──
 // The renderer reports the hit node; this store decides which ancestor receives focus.
+/** The left button, as `Press` numbers one. */
+const LEFT_BUTTON = 0
+
 /** Focus the nearest thing above a left click that could hold the keys, or nothing at all.
  *
  *  `reachable` is the whole of "is this a stop": a stop, a collection row, a region's frame and a
  *  scope's box are the focusable things in the tree and nothing else is. It answers for the top scope
  *  too, so a click behind an open dialog reaches nothing rather than past it (§ Scopes). */
-/** The left button, as `../tree/hit.ts` numbers one. */
-const LEFT_BUTTON = 0
-
 const focusClicked = (event: Press): void => {
   if (event.button !== LEFT_BUTTON) return
   for (let at: Renderable | null = event.target; at; at = at.parent) {
@@ -504,9 +498,8 @@ export function installRegions(renderer: Renderer): void {
   // `onMouseDown` is one slot per renderable rather than a listener list, so one handler for the
   // screen is also all there is room for.
   renderer.root.onMouseDown = focusClicked
-  // `frame` fires once per render-loop iteration and after the render, which is the side of layout
-  // where a child's geometry is real: `onLifecyclePass` and `setFrameCallback` both run before it and
-  // would read the same stale numbers a synchronous reveal reads (§ The reveal).
+  // `frame` fires after layout and paint, which is the side of layout where a child's geometry is
+  // real. A synchronous reveal would read last frame's numbers (§ The reveal).
   const afterFrame = (): void => {
     const node = pendingReveal
     pendingReveal = null
@@ -585,15 +578,6 @@ export const focusedExpands = (): boolean => collectionExpands(focusedNode(), st
 const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined =>
   firstInTree(box, take, step)
 
-/**
- * Where entering a box lands: its first parent stop, else its first collection's roving row, else its
- * first stop. The caller falls back to the box itself.
- *
- * The middle step is a terminal's own departure. The DOM does not need it, because a reader arrives
- * at a pane with a pointer and clicks what they meant; here the first thing focused is the thing the
- * bare keys drive, and landing in a filter box means `j` types a `j`. A filter strip owns no panels,
- * so it is not a parent and the rows below it still win.
- */
 /** Nodes that have asked to be what entering their region lands on (§ entryStop). */
 const entryMarks = new WeakSet<Renderable>()
 
@@ -610,6 +594,15 @@ const activeRowIn = (box: Renderable): Renderable | undefined => {
   return walk(box, (child) => isItem(child))
 }
 
+/**
+ * Where entering a box lands: a node marked with `markEntry`, else its first parent stop, else its
+ * first collection's roving row, else its first stop. The caller falls back to the box itself.
+ *
+ * The collection step is a terminal's own departure. The DOM does not need it, because a reader
+ * arrives at a pane with a pointer and clicks what they meant; here the first thing focused is the
+ * thing the bare keys drive, and landing in a filter box means `j` types a `j`. A filter strip owns
+ * no panels, so it is not a parent and the rows below it still win.
+ */
 const entryStop = (box: Renderable): Renderable | undefined =>
   walk(box, (child) => entryMarks.has(child)) ??
   walk(box, (child) => !!parentEntry(child)?.panels().length) ??
@@ -673,14 +666,13 @@ export function moveStop(delta: 1 | -1): boolean {
   if (!node || isItem(node)) return false
   const box = boxAround(node)
   if (!box) return false
-  // One walk. The membership question and the move are the same list, and asking twice was a subtree
-  // walk per key press for nothing (§ walkStops).
+  // One walk serves both the membership question and the move (§ walkStops).
   const stops = stopsIn(box)
   if (!stops.includes(node)) return false
   if (walkStops(node, delta, { within: box, stops })) return true
   // Up from the first stop of a panel is the strip that owns it, because Down from the strip is how
-  // the reader got in: the two are one door, and a wall at the top of a panel left Escape as the only
-  // way back to the tabs. The bottom edge stays a wall (docs/tui/keys.md § The five key groups).
+  // the reader got in: the two are one door, and a wall here would leave Escape as the only way back
+  // to the tabs. The bottom edge stays a wall (docs/tui/keys.md § The five key groups).
   if (delta < 0 && isPanel(box)) focusRenderable(ownerOf(box)?.node)
   return true
 }
@@ -770,9 +762,9 @@ export function movePane(delta: 1 | -1): boolean {
   const current = groupAt(focused)
 
   // Every column on screen is spatially before the pane the chord would replace, so a column move
-  // answers first: Ctrl+Option+Right advertised "the pane to the right", but from Menu/Browse/Tasks
-  // it used to call the task-pane cycler instead. A browse source has no active task, so the chord
-  // did nothing at all. The reverse edge restores the column group the reader last used.
+  // answers first. Otherwise Ctrl+Option+Right from Menu/Browse/Tasks would reach the task-pane
+  // cycler, which does nothing on a browse source with no active task. The reverse edge restores the
+  // column group the reader last used.
   if (current && moveColumn(delta)) return true
   // And the left edge is the rail, where there is nothing further left to reach and no pane to the
   // left of the one on screen either: a pane cycle from here would replace the pane a reader is not

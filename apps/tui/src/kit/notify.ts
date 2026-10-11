@@ -16,8 +16,8 @@ import { createSignal } from 'solid-js'
  *  than writing a preference of its own (../chrome/TerminalNotifications.tsx). Anything unrecognised
  *  reads as `both`, which is the default.
  *
- *  Here rather than in ./bell.ts, where phase 3 left it, because both channels read it and this is
- *  the file the platform seam may import. `bell.ts` re-exports it. */
+ *  Here rather than in ./bell.ts because both channels read it and this is the file the platform seam
+ *  may import. `bell.ts` re-exports it. */
 export type NotifyMode = 'off' | 'bell' | 'terminal' | 'both'
 
 export function notifyMode(env: NodeJS.ProcessEnv = process.env): NotifyMode {

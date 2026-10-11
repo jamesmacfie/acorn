@@ -7,9 +7,9 @@ import { Select } from './choices'
  *
  *  Structurally typed rather than importing `ModelBackend`, like every other node in this file: the
  *  terminal kit is a second implementation of the vocabulary, not a consumer of the shell's types.
- *  What it must match is the behaviour, and until this rename it did not — it always drew the model
- *  select and never reset the model when the backend changed. Both are fixed here, because two hosts
- *  that draw the same node and answer differently is a bug a plugin author cannot see coming. */
+ *  What it must match is the behaviour: the model select only where there are models to choose, and
+ *  a backend change resets the model. Two hosts that draw the same node and answer differently is a
+ *  bug a plugin author cannot see coming. */
 export function ModelBackendPicker(props: {
   backends: readonly {
     id: string

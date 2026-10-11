@@ -1,14 +1,13 @@
 // CodeMirror's grammar half, as this host's answer: a throw.
 //
-// The sixth alias in the host switch (../vite.config.ts), and the third that replaces a package
-// rather than swapping a component for one. Two sets of specifiers resolve here — every
-// `@codemirror/lang-*` and every `@codemirror/legacy-modes/mode/*`.
+// An alias in the host switch (`apps/tui/vite.config.ts`) that replaces a package rather than
+// swapping a component for one. Two sets of specifiers resolve here — every `@codemirror/lang-*` and
+// every `@codemirror/legacy-modes/mode/*`.
 //
-// **`@codemirror/language` is not one of them, and the reason is worth keeping.** It was, for an
-// afternoon, and it broke the editor pane: `codemirror` depends on it, the `editor` pane imports
-// `basicSetup` from `codemirror`, and under vitest — where `ssr.noExternal` inlines node_modules —
-// the stub was handed to a package that works here. It is a declared dependency instead. A stub may
-// only stand in front of a specifier no working surface reaches.
+// **`@codemirror/language` is not one of them.** `codemirror` depends on it, the `editor` pane imports
+// `basicSetup` from `codemirror`, and under vitest — where `ssr.noExternal` inlines node_modules — a
+// stub would be handed to a package that works here, which breaks the editor pane. It is a declared
+// dependency instead. A stub may only stand in front of a specifier no working surface reaches.
 //
 // **Why they cannot be here.** All of them are reached from one surface, client-core's
 // `features/editor/DocumentSurface.tsx`, which holds an `HTMLElement` and mounts a CodeMirror
@@ -18,15 +17,14 @@
 // (./rectangle.tsx, ./editor.ts).
 //
 // **Why an alias rather than a dependency.** The bundle externalises every bare import, so leaving
-// these to the runtime means Node resolves them when the chunk loads — which needs seventeen packages
-// installed for a surface that cannot draw. Aliasing them here is what lets `package.json` drop the
+// these to the runtime means Node resolves them when the chunk loads — which needs every grammar
+// package installed for a surface that cannot draw. Aliasing them here is what lets `package.json` drop the
 // lot without turning a surface that fails into a chunk that will not load
 // (docs/tui/host-switch.md § The host switch).
 //
-// **Everything here throws, and that is the point.** A stub that answers plausibly is how this host
-// ended up with an editor pane pulling seventeen grammars it could never highlight. If a surface ever
-// does reach one of these, the message says which host it is on and where to look, rather than
-// drawing an empty box that somebody has to bisect.
+// **Everything here throws, and that is the point.** A stub that answers plausibly hides a surface pulling
+// grammars it can never highlight. If a surface ever does reach one of these, the message says which host it
+// is on and where to look, rather than drawing an empty box that somebody has to bisect.
 
 const absent = (what: string): never => {
   throw new Error(

@@ -24,9 +24,10 @@ import { Line } from '../kit/cells'
 // `recordTrustDecision`. What is here is the arrangement: a `Modal` where the pane would go, drawn
 // with the kit.
 //
-// The tier split is a security claim and the three lists may never be merged (docs/security/plugin-storage-and-supply-chain.md §
-// Design rules, rule 6): `Enforced` is a fence the bridge holds, `Declared` is a disclosure the
-// plugin can ignore entirely, and a strong claim must not lend credibility to a weaker one beside it.
+// The tier split is a security claim and the three lists may never be merged
+// (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the
+// bridge holds, `Declared` is a disclosure the plugin can ignore entirely, and a strong claim must not
+// lend credibility to a weaker one beside it.
 //
 // Escape is "not now" and records nothing, exactly as on the desktop: a rejection is remembered, so a
 // stray keypress must not permanently disable a plugin with no surface anywhere to undo it.

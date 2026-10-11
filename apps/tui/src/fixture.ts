@@ -241,7 +241,7 @@ const event = (seq: number, value: unknown) => ({
 })
 
 // A transcript longer than any pane is tall, so a case can ask whether the viewport stayed on the
-// newest turn and kept the composer under it (../kit/scrolling.tsx § followViewport). Behind a flag
+// newest turn and kept the composer under it (`stickToBottom` on the kit's `Viewport`). Behind a flag
 // because every other agents case reads a screen it can hold in its head, and thirty turns of filler
 // would make each of those assert against a scroll position instead of against a pane.
 // A function rather than a constant: a test sets the flag inside its own body, which is long after
@@ -519,10 +519,9 @@ const PULL_DETAIL = {
 
 /** A patch as long as a test asks for, in place of the short one below.
  *
- *  A diff longer than the panel it draws in is its own case, and it is the case the terminal diff
- *  shipped broken: a column of rows that does not fit is shrunk rather than scrolled, so four hundred
- *  lines were drawn into thirty rows on top of each other (./diffLong.test.tsx). The lines are long
- *  as well as many, because the other half of the same bug is horizontal. */
+ *  A diff longer than the panel it draws in is its own case: a column of rows that does not fit is
+ *  shrunk rather than scrolled, so the rows draw on top of each other (./diffLong.test.tsx). The lines
+ *  are long as well as many, because the other half of the same trap is horizontal. */
 const longPatch = (): string | null => {
   const lines = Number(process.env.ACORN_FIXTURE_PATCH_LINES ?? 0)
   if (!lines) return null
@@ -538,9 +537,8 @@ const longPatch = (): string | null => {
 }
 
 /** A real patch body on one of the two changed files, so the diff column has something to draw.
- *
- *  Both files answered `patch: null` before, which is the legitimate shape for a binary or an
- *  over-large file — and it meant every test that opened a pull was asserting on "no changes". */
+ *  `patch: null` is the legitimate shape for a binary or an over-large file, but with no patch at all
+ *  every test that opens a pull would be asserting on "no changes". */
 const LOGIN_PATCH = [
   '@@ -1,4 +1,5 @@',
   ' export async function signIn(email: string, password: string) {',
@@ -717,10 +715,9 @@ export function stubTransport(): {
     fetch: async (_nodeId, request) => {
       pending += 1
       try {
-        // A transport that answers in a microtask can never hold a `Suspense` open past the tick that
-        // destroys its subtree, so the failure the real app lives with — content removed, destroyed,
-        // then handed back dead — was unreachable from a
-        // test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
+        // A transport that answers in a microtask can never hold a `Suspense` open past the next tick,
+        // so without a delay the shape the real app lives with (content removed, then handed back)
+        // can't be reached from a test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
         const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
         if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
         const path = request.path
@@ -730,10 +727,9 @@ export function stubTransport(): {
         //
         // One integration, and it is GitHub, because the rail gates a browse source on the integration
         // behind it being connected (features/tabs/railSources.ts) — with none, the Menu holds only the
-        // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
-        // were always answered here; this is the row that lets a reader reach them.
+        // sources that need no provider and the Browse panel has nothing to draw.
         if (path === '/v1/core/prefs') return json({})
-        // Compiled client contributions now require the node's running roster. The fixture mirrors
+        // Compiled client contributions require the node's running roster. The fixture mirrors
         // the built-in services its pane routes below represent; there are no loaded client bundles.
         if (path === '/v1/core/plugins')
           return json({

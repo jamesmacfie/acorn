@@ -7,9 +7,7 @@ import { renderFixture } from './harness'
 //   pnpm --filter @acorn/tui capture notes     one pane by name
 //
 // No `--` before the name. pnpm passes it straight through to the script, so it lands in `argv[2]`
-// and the pane name lands in `argv[3]` — which drew whatever the task's saved layout puts first and
-// looked like the name being ignored. Skipped rather than only documented, because the habit is
-// older than this script.
+// and the pane name in `argv[3]`. The script skips a stray `--` anyway, because the habit is common.
 //
 // A pane's own data is a route and a store rather than a prop, so the frame is taken again until
 // something is in the pane, the same bounded wait the suite does (./panes.test.tsx § screenFor).

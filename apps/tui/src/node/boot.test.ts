@@ -18,12 +18,11 @@ import { installPlatform, type Platform } from '../platform'
 // It runs the real thing — a real standalone node against a fresh data root, the real fleet store and
 // device-token files in a fresh config directory, the real broker over pinned TLS — and then asks the
 // first questions the renderer asks: is there a node, can a `/v1` request reach it, and did the event
-// socket authenticate. It draws nothing, so unlike the rest of this package's suite it needs no FFI
-// and never skips.
+// socket authenticate. It draws nothing, so it needs no renderer.
 //
-// The desktop's twin is apps/desktop/test/boot.test.ts, and the shapes differ for the reason
-// 03-process-model.md gives: the desktop has a helper process to talk to over a wire, and this is one
-// process, so the test calls the functions directly.
+// The desktop's twin is apps/desktop/test/boot.test.ts, and the shapes differ: the desktop has a
+// helper process to talk to over a wire, and this is one process, so the test calls the functions
+// directly.
 
 const BUDGET_MS = 180_000
 
@@ -115,9 +114,9 @@ describe('acorn against a node it started', () => {
     expect(lockedBy(dataDir())).toBe(holder)
 
     // …and the row it wrote is one the next launch can read. A fleet row is parsed back with a strict
-    // schema, so the attach path spreading the running node's `pid` into it made the whole file
-    // unreadable next time: an empty fleet, nothing for `connect` to connect, and a shell stuck on
-    // "the node is unreachable". A fresh store, because the one above has the rows in memory.
+    // schema, so one extra field, such as the running node's `pid`, makes the whole file unreadable
+    // next time: an empty fleet, nothing for `connect` to connect, and a shell stuck on "the node is
+    // unreachable". A fresh store, because the one above has the rows in memory.
     expect(custody(join(root, 'config')).fleet.get(opened.nodeId)?.endpoint).toBeDefined()
   }, 30_000)
 
@@ -143,8 +142,6 @@ describe('acorn against a node it started', () => {
   }, 30_000)
 
   // The caching contract, end to end against a real node id (docs/caching.md § Renderer query cache).
-  // Before this the TUI installed the file store and never drove a persister, so the directory was
-  // empty on every run and every start was cold.
   it('writes one cache file named by the partition key, and reads the rows back out of it', async () => {
     const cacheDir = join(root, 'config', 'cache')
     setCacheStorage(fileCacheStorage(cacheDir))

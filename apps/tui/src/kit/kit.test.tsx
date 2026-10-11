@@ -989,8 +989,8 @@ const CASES: Case[] = [
     check: (frame) => {
       has(frame, '[Delete]')
       lacks(frame, '[object Object]')
-      // Arming is a press, and a button becomes a focus stop in phase 2. The armed label is
-      // `createArmedConfirm`'s, which client-core tests directly.
+      // Arming is a press, and nothing here presses. The armed label is `createArmedConfirm`'s,
+      // which client-core tests directly.
       lacks(frame, 'Delete?')
     },
   },
@@ -1161,7 +1161,7 @@ const CASES: Case[] = [
     ),
     // Taller than most cases: a `pty` rectangle is a real emulator with a real screen in it and grows
     // to fill what it is given, so two rectangles stacked in ten lines leave the second one no interior
-    // at all — and since the pane sweep nothing in the kit shrinks to make room, it clips instead.
+    // at all — and nothing in the kit shrinks to make room, so it clips instead.
     size: { width: 40, height: 30 },
     check: (frame) => {
       has(frame, 'Terminal')
@@ -1210,23 +1210,22 @@ const CASES: Case[] = [
 ]
 
 /**
- * What the new painter cannot draw yet, case by case, and what each is waiting for.
+ * What this painter cannot draw yet, case by case, and what each is waiting for.
  *
- * Two entries are left and neither is a widget, because all five widgets are built. Both are the
- * same measured Yoga-build difference, recorded below with everything that was tried, and neither is
- * above the layout pass.
+ * Both entries are the same Yoga difference, recorded below with everything that was tried, and
+ * neither is above the layout pass.
  *
  * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
  */
 const HELD: Readonly<Record<string, string>> = {
-  // Not a widget's fault, and not the painter's either: the two Yoga builds disagree about what a
-  // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
-  // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
-  // contributes the child's content, so the same tree comes out one row tall. No `Config` knob in
-  // yoga-layout 3.2.1 reproduces it — web defaults, every errata and the web-flex-basis feature were
-  // each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the app does:
-  // every viewport it draws is inside a `Panel` or a grown column, where the two agree.
+  // Not a widget's fault, and not the painter's either: the cases expect OpenTUI's Yoga build, which
+  // disagrees with yoga-layout about what a `flexBasis: 0` child contributes to a parent whose own
+  // height is `auto`. Ours contributes the basis, so the box is nought tall and nothing inside it is
+  // drawn; OpenTUI's contributes the child's content, so the same tree comes out one row tall. No
+  // yoga-layout `Config` knob reproduces it — web defaults, every errata and the web-flex-basis
+  // feature were each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the
+  // app does: every viewport it draws is inside a `Panel` or a grown column, where the two agree.
   'TabPanel: the rows under the tab strip, and nothing for a panel that is not current':
     'a viewport in a parent with no height of its own',
   'is a parent stop: Down enters the panel it is showing, Escape comes back':
@@ -1361,13 +1360,13 @@ describe('the kit in cells', () => {
   })
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
-    // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare
-    // string anywhere is a text node nobody thinks about, so `<Stack>{count()}</Stack>` is correct kit
-    // that used to throw — out of `insertNode`, inside a signal write, which aborts the update pass
-    // and stops the screen following with nothing to say why.
+    // The class, not an instance. On the DOM a bare string anywhere is a text node nobody thinks about,
+    // so `<Stack>{count()}</Stack>` is correct kit. Here it has to draw rather than throw out of
+    // `insertNode` inside a signal write, which would abort the update pass and stop the screen
+    // following with nothing to say why.
     //
-    // Every case below is one that reached a reader before the reconciler patch answered it in one
-    // place. They stay together because what is being tested is the boundary, not the six components.
+    // Every case below is a shape that has reached a reader. They stay together because what is being
+    // tested is the boundary, not the six components.
     const [count, setCount] = createSignal(7)
     const cases: [string, () => JSX.Element][] = [
       ['loose text in a Stack', () => <Stack>hello</Stack>],
@@ -1402,13 +1401,11 @@ describe('the kit in cells', () => {
 
   it('draws a node beside a value that changes, and keeps drawing it when it does', async () => {
     // The shape every element-typed prop and every mixed line is: one node and one dynamic string.
-    // Solid compiles the string half to an accessor, and `slot` used to hand that straight back — so
-    // the renderer inserted a bare string into a box, which is the one structure a cell host refuses.
-    // It threw from inside whatever signal had just moved, which on a row holding a count meant the
-    // whole update pass died and the screen stopped following (./cells.tsx § slot).
+    // Solid compiles the string half to an accessor, and `slot` reads it and wraps the string, so the
+    // renderer never puts a bare string loose in a box (./cells.tsx § slot).
     //
     // Reactive, not just first paint: reading the accessor inside `slot` has to be a tracked read, or
-    // the fix trades a crash for a number that never changes.
+    // the number never changes.
     _resetCollections()
     const [count, setCount] = createSignal(7)
     const frame = await renderCells(
@@ -1589,8 +1586,8 @@ const BEHAVIOURS: Behaviour[] = [
     does: 'toggles on Space and on Enter, because both are activate',
     render: (record) => <Checkbox label="Include" onChange={(checked) => record(String(checked))} />,
     drive: async (screen, pressed) => {
-      // A literal space, because `KeyCodes` has no name for it — a named key there is one with an
-      // escape sequence, and space is a character.
+      // A literal space, because the harness names only keys with an escape sequence, and space is a
+      // character (../keyEvent.ts § pressedKey).
       const spaced = await screen.press(' ')
       expect(pressed).toEqual(['true'])
       await spaced.press('RETURN')
@@ -1912,9 +1909,8 @@ const BEHAVIOURS: Behaviour[] = [
     size: { width: 30, height: 5 },
     drive: async (screen, pressed) => {
       await screen.press('a')
-      // The last value, not the only one: an OpenTUI textarea raises one content change as it mounts,
-      // with the text it was built with. Harmless — the value it reports is the value it was given —
-      // and pre-existing, so it is not this phase's to change.
+      // The last value, not the only one: a textarea may report the text it was built with as it
+      // mounts. Harmless — the value it reports is the value it was given.
       expect(pressed.at(-1)).toBe('a')
     },
   },
@@ -2462,10 +2458,9 @@ describe('every control is a stop', () => {
     'lets go of the keys when the control holding them goes disabled',
     async () => {
       // The flag is the store's declaration of what can hold the keys, so a control that loses it while
-      // it has them is a node the landing pass has to leave. It used to be worse than a stuck caret:
-      // `blur()` refuses a node that is not focusable, so the keys stayed for the rest of the run and
-      // every box above went on reporting a focused descendant, and the reader saw a dialog whose
-      // buttons were lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
+      // it has them is a node the landing pass has to leave. Otherwise the keys stay for the rest of the
+      // run, every box above reports a focused descendant, and the reader sees a dialog whose buttons
+      // are lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
       const [off, setOff] = createSignal(false)
       const pressed: string[] = []
       const screen = await renderCells(
@@ -2530,7 +2525,7 @@ describe('every control is a stop', () => {
       expect(held, 'nothing holds the keys').not.toBe(null)
       expect(held!.isDestroyed).toBe(false)
       // And what holds them can give them up, which is the whole point of not clearing the flag on a
-      // node that has the keys (./regions.ts § paintCaret).
+      // node that has the keys (../keys/regions.ts § paintCaret).
       expect(held!.focusable, 'the keys are on a node that cannot be blurred').toBe(true)
     } finally {
       screen.done()

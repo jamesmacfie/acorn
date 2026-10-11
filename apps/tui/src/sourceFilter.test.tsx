@@ -12,11 +12,11 @@ import { regionFocus } from './keys/regions'
 // Its own file, and drawn as one region rather than through the whole shell, because nothing that
 // contributes a source *by descriptor* is wired into this host's fixture: no connection, no roster
 // entry, no chrome contribution. Building one to reach the panel would make the test a plugin
-// integration first and an assertion second, which is the call phase 3 already made about a Linear
-// case. So the panel is asked for directly, the way `plugins/plugins.test.tsx` asks for it, and it is
-// drawn inside a region so that the two walks the filter uses — Down into the rows and Escape out of
-// the panel — have a region to walk (../keys/regions.ts § moveStop). The list's search reads a query
-// client, which the shell provides per node, so each render brings its own.
+// integration first and an assertion second. So the panel is asked for directly, the way
+// `plugins/plugins.test.tsx` asks for it, and it is drawn inside a region so that the two walks the
+// filter uses — Down into the rows and Escape out of the panel — have a region to walk
+// (./keys/regions.ts § moveStop). The list's search reads a query client, which the shell provides per
+// node, so each render brings its own.
 
 const caretLine = (screen: Cells): string => screen.lines.find((line) => line.includes('›')) ?? ''
 

@@ -8,10 +8,9 @@ import { ATTRS, bufferLines, cellAt, createBuffer } from './buffer'
 import { openScreen, type Screen } from './screen'
 import { paint } from './paint'
 
-// The paint pass, on its own. No OpenTUI anywhere in this file, so it runs on the Node the repo pins
-// with no FFI and no flag — which is also why every case here builds its tree by hand rather than
-// rendering a component: what is under test is the walk, the clip and the diff, and a component would
-// only be a slower way to make a box.
+// The paint pass, on its own. Every case builds its tree by hand rather than rendering a component:
+// what is under test is the walk, the clip and the diff, and a component would only be a slower way
+// to make a box.
 
 /** A node with its props set and its children attached, in one expression. */
 function el(kind: string, props: Record<string, unknown> = {}, children: Node[] = []): Node {
@@ -89,8 +88,7 @@ describe('a box', () => {
 
   it('paints a loose run of text at its content origin', () => {
     // A `#text` directly under a `box` is legal here and draws as one default-styled line inside the
-    // border. It used to throw from inside whatever signal had just moved, and four crashes in one
-    // week were a bare `{count()}` under a `<Stack>` (../tree/renderer.ts).
+    // border, so a bare `{count()}` under a `<Stack>` draws rather than throws (../tree/renderer.ts).
     const box = boxOf(9, 3, { border: true }, [createTextNode('loose')])
     expect(drawn(box, 9, 3)).toEqual(['┌───────┐', '│loose  │', '└───────┘'])
   })
@@ -136,10 +134,8 @@ describe('a run of text', () => {
   })
 
   it('keeps a span its own colour inside a sentence', () => {
-    // The `span` fault, from the other side: a colour handed to one was dropped in silence, so the
-    // run inherited its parent's — and a parent given none drew opaque white, which on a light
-    // terminal was every line of every diff. A span is a stretch inside one `text` rather than a box
-    // of its own, so the line still wraps as one thing.
+    // A colour handed to a span is its own, not its parent's. A span is a stretch inside one `text`
+    // rather than a box of its own, so the line still wraps as one thing.
     const buffer = createBuffer(21, 1)
     const span = el('span', { style: { fg: 6, bold: true } }, [createTextNode('signIn')])
     const text = el('text', { fg: 8 }, [createTextNode('hash but '), span, createTextNode(' still')])
@@ -220,8 +216,8 @@ describe('a field', () => {
     layoutTree(root, 8, 1)
     paint(root, buffer)
     expect(bufferLines(buffer)).toEqual(['Find…   '])
-    // The slot rather than the `#666666` OpenTUI's own placeholder invents, which is none of the
-    // sixteen a terminal has (../appearance.ts § TERMINAL_PALETTE).
+    // The slot the kit names rather than a fixed grey, which would be none of the sixteen a terminal
+    // has (../appearance.ts § TERMINAL_PALETTE).
     expect(cellAt(buffer, 0, 0)?.fg).toBe(8)
     setProperty(hint, 'value', 'x')
     expect(drawn(root, 8, 1)).toEqual(['x       '])
@@ -425,9 +421,8 @@ describe('the flush', () => {
   })
 
   it("names the terminal's own colours rather than a white of its own", () => {
-    // The white-on-white class, fixed where the colour is emitted: `39` and `49` are the foreground
-    // and the background the person's terminal already has, and there is no way to say that to
-    // OpenTUI at all (../colour.ts).
+    // `39` and `49` are the foreground and the background the person's terminal already has, so a
+    // default colour never draws white on a white terminal (../colour.ts).
     const { screen } = screenOf(3, 1)
     try {
       const text = el('text', { fg: 4 }, [createTextNode('abc')])

@@ -182,7 +182,7 @@ describe('keys and focus in cells', () => {
       const first = caretRow(frame.lines)
       expect(first).toBeGreaterThanOrEqual(0)
 
-      // `j` is `next` in the one table both hosts read (client-core kit/keys/keymap.ts).
+      // `j` is `next` in the one table both hosts read (`intentKeys`).
       expect(caretRow((await frame.press('j')).lines)).toBe(first + 1)
       expect(caretRow((await frame.press('k')).lines)).toBe(first)
       // Wraps, because a list you cannot fall off the end of is a list you never have to look at.
@@ -267,8 +267,7 @@ describe('keys and focus in cells', () => {
       expect(before).toBeGreaterThanOrEqual(0)
 
       // A modal lands the keys as well as containing them, so the caret leaves the list behind it
-      // (./regions.ts § pushScope). One that only contained them left the reader looking at a dialog
-      // whose every key the trap then swallowed.
+      // (./regions.ts § pushScope).
       setOpen(true)
       const up = await frame.frame()
       expect(up.text).toContain('a question')
@@ -278,10 +277,8 @@ describe('keys and focus in cells', () => {
       // on a host with no scrim: with the modal's box on the scope stack no region is in scope, so
       // the region cycle has nowhere to go (./regions.ts § Scopes).
       //
-      // Both keys, because on this host `f6` and `tab` are the same intent (./install.ts § HOST_KEYS)
-      // and the swallow this replaced contained only one of them. It named its keys from the shared
-      // table, where `nextRegion` is `f6` alone, so Tab walked the keys onto the list behind the
-      // dialog. That is the whole of symptom A (../symptoms.test.tsx).
+      // Both keys, because on this host `f6` and `tab` are the same intent (./install.ts § HOST_KEYS),
+      // and the shared table, where `nextRegion` is `f6` alone, names only one of them.
       for (const key of ['F6', 'TAB']) {
         const held = await frame.press(key)
         expect(held.text, key).toContain('a question')
@@ -301,13 +298,10 @@ describe('keys and focus in cells', () => {
   // ── A dialog holds the keys because nothing outside it is in scope ──────────────────────────
   //
   // The two cases below drive the whole shell rather than one node, because the fault they prevent
-  // was in what the shell and the store said to each other about the dialog. A trap used to contain
-  // the keys by swallowing a named list of them, and the list it named came from `keysFor()`, where
-  // `nextRegion` is `f6` alone, while `install.ts` binds `hostKeysFor()`, which adds `tab` for this
-  // host. So Tab was swallowed nowhere: it walked the keys onto a rail row behind the dialog and the
-  // swallow then ate everything but Escape, which made the one key the footer advertised the one key
-  // that broke the dialog. A dialog is a scope now, so nothing behind it is in the universe a walk
-  // sees, and there is no list to leak (./regions.ts § Scopes, ./trap.ts).
+  // lives in what the shell and the store say to each other about the dialog. Tab is bound through
+  // `hostKeysFor()` while the shared `keysFor()` names only `f6`, so any containment that names keys
+  // leaks Tab onto a rail row behind the dialog. A dialog is a scope, so nothing behind it is in the
+  // universe a walk sees (./regions.ts § Scopes, ./trap.ts).
 
   it('answers the plugin trust prompt after a Tab', async () => {
     const screen = await renderFixture({ width: 100, height: 28, trust: [TRUST] })
@@ -320,12 +314,9 @@ describe('keys and focus in cells', () => {
       const before = focusedRenderable()
       const region = focusedRegion()
 
-      // Both halves are asserted, because the keys used to recover and that is what made this hard
-      // to see. The walk moved them onto a rail row behind the dialog and the next landing, which a
-      // query arriving supplies sooner or later, handed them back. What never recovered is the
-      // store's idea of which region has them, so the region had silently moved to the rail while
-      // the keys were in the dialog. Both halves are the store's own now: there is one focus value
-      // and this reads it (./regions.ts § The one owner).
+      // Both halves are asserted, because a leak can hide: the next landing, which a query arriving
+      // supplies sooner or later, can hand the keys back while the region claim stays on the rail
+      // (./regions.ts § The one owner).
       await screen.press('TAB')
       expect(focusedRenderable()).toBe(before)
       expect(focusedRegion()).toEqual(region)
@@ -360,11 +351,10 @@ describe('keys and focus in cells', () => {
   }, 60_000)
 
   it('offers Tab only where Tab goes somewhere', async () => {
-    // The footer used to advertise a key that did nothing. `moveRegion` returns false with fewer than
-    // two regions in scope, and the hint was drawn from "is Tab bound", which it always is. The hint
-    // asks the store how many regions the keys can reach instead, so a one-region screen does not
-    // offer it. The case is a disjunction because either answer is honest: Tab may move, or the
-    // footer may stay quiet, and only offering it while it does nothing is the bug
+    // `moveRegion` returns false with fewer than two regions in scope, and Tab is always bound, so the
+    // hint asks the store how many regions the keys can reach rather than whether Tab is bound. The
+    // case is a disjunction because either answer is honest: Tab may move, or the footer may stay
+    // quiet, and only offering it while it does nothing is the bug
     // (../chrome/bindings.ts, ./regions.ts § regionsInScope).
     const screen = await renderFixture({ width: 100, height: 28 })
     try {
@@ -490,12 +480,10 @@ describe('keys and focus in cells', () => {
 
   // ── An entered rectangle that goes off screen ───────────────────────────────────────────────
   //
-  // Being entered used to be a flag, set by Enter and cleared by Escape or by unmounting. Neither of
-  // those happens when a subtree is hidden without being unmounted, which is what a tab switch and
-  // an overlay both do here, so a rectangle nobody could see went on consuming every key in the app,
-  // `Ctrl+C` included, since the intercept sits above every layer there is. It is a derived fact now:
-  // entered means the box has the keys, is on screen, and Enter was pressed since it last lost them,
-  // so the answer changes the moment the screen does and there is no flag to be stale
+  // A tab switch and an overlay hide a subtree without unmounting it, so a flag set by Enter and
+  // cleared by Escape or unmounting would leave a rectangle nobody can see consuming every key in the
+  // app, `Ctrl+C` included, since the intercept sits above every layer there is. Entered is derived
+  // instead: the box has the keys, is on screen, and Enter was pressed since it last lost them
   // (../kit/rectangle.tsx § entered).
 
   it('stops taking the keys the moment an entered rectangle goes off screen', async () => {
@@ -532,8 +520,8 @@ describe('keys and focus in cells', () => {
       typed.length = 0
 
       // Hidden from outside the keyboard, and by a bare `visible` that asks for nothing else: this is
-      // the intercept's own guard, with no landing pass involved. `visible` is per node in OpenTUI,
-      // so the box below still reports itself focused and visible, and asking it alone was the bug.
+      // the intercept's own guard, with no landing pass involved. `visible` is per node, so the box
+      // below still reports itself focused and visible, and asking it alone is not enough.
       setShown(false)
       await frame.frame()
       await frame.press('j')
@@ -550,8 +538,8 @@ describe('keys and focus in cells', () => {
     // The path a reader actually meets: a terminal on one tab of a pane, entered, and the tab
     // switched by something other than the keyboard, such as a route change or a task activating
     // from a notification. `TabPanel` hides its panel rather than unmounting it so the panel keeps its
-    // state, so the hidden rectangle keeps the renderer's focus, and a viewport whose flag has gone
-    // false asks for a landing pass for exactly this reason (../kit/scrolling.tsx).
+    // state, so the hidden rectangle keeps the keys until a landing pass, and a viewport whose flag
+    // has gone false asks for one for exactly this reason (../kit/scrolling.tsx).
     const [tab, setTab] = createSignal('term')
     const typed: string[] = []
     const frame = await renderCells(
@@ -618,9 +606,9 @@ describe('keys and focus in cells', () => {
   }, 30_000)
 
   it('gets back to the strip from inside a panel with Up, and switches tabs from inside with Left and Right', async () => {
-    // The path the report named: a tabbed pane whose panel holds a row of controls. Down enters the
-    // panel; from there Up used to be a wall and Left used to be the column move, which from any
-    // control on the pane put the reader in the rail (./regions.ts § crossParent, § moveStop).
+    // A tabbed pane whose panel holds a row of controls. Down enters the panel; from there Up has to
+    // reach the strip rather than wall, and Left has to be the strip's rather than a column move into
+    // the rail (./regions.ts § crossParent, § moveStop).
     const [tab, setTab] = createSignal('one')
     const frame = await renderCells(
       () => (

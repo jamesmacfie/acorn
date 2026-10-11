@@ -14,10 +14,11 @@ import { markdownFences } from '../kit/host'
 // Everything that decides anything is `client-core/host/tree/treeState.ts` — the store, the whole-batch
 // pre-flight check, the prop sanitiser, and the one place a handler id becomes a closure. This file is
 // the shell around it, and it is the shell that differs: a different table of components behind each
-// name, and the renderer's tick in place of a frame (docs/tui/rectangles.md § Unknown nodes and failed trees).
+// name, and the renderer's tick in place of a frame
+// (docs/tui/rectangles.md § Unknown nodes and failed trees).
 //
 // So a loaded plugin and a compiled one are indistinguishable here, which is what the tree protocol
-// exists to make true. `plugins.test.ts` is the twin of client-core's `twoPaths.test.tsx`.
+// exists to make true (./plugins.test.tsx § Two paths, one kit).
 
 export function TreeHost(props: TreeHostProps) {
   const state = createTreeState({
@@ -72,9 +73,8 @@ export function TreeHost(props: TreeHostProps) {
         {/* One boundary per root, the same shape client-core's TreeHost takes. Every entry in this
             host's table is a component today, so nothing suspends; the boundary is here because the
             table's type allows a loader and because the kit is drawn from one set of names on both
-            hosts. It was safe under the old painter only because a reconciler patch tied a node's
-            destruction to its creating owner rather than to being detached; a node here is a plain
-            object with no destruction to be on the wrong side of. */}
+            hosts. Suspending is safe here: a node is a plain object with no destruction to be on the
+            wrong side of. */}
         <For each={state.roots()}>
           {(id) => (
             <Suspense fallback={null}>

@@ -26,7 +26,7 @@ const log = createLogger('plugins')
 // hash-mismatch is refused. A second implementation would be a second set of security decisions.
 //
 // Under the TUI's config directory rather than the node's data root, because a decision to run code is
-// this device's and not that node's (03-process-model.md § Where the TUI keeps things).
+// this device's and not that node's (docs/tui/process.md § Where the TUI keeps things).
 
 const pluginsDir = (): string => join(configDir(), 'plugins')
 

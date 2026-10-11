@@ -211,10 +211,10 @@ describe('the layouts in cells', () => {
   }, 30_000)
 
   it('the tabs layout switches on Ctrl+N, and the strip and the chord agree', async () => {
-    // Ctrl rather than the desktop's Cmd: macOS terminal emulators keep Cmd and never deliver it, so
-    // the chord as written on the desktop is one nobody can press here (../keys/commandLayer.ts §
-    // asCtrl). Both the chord and the strip's own arrows write the same stored selection, so a reader
-    // who switches one way and then the other does not find two answers (./Tabs.tsx).
+    // Ctrl rather than the desktop's Cmd: macOS terminal emulators keep Cmd and never deliver it, so the
+    // chord as written on the desktop is one nobody can press here (../keys/commandLayer.ts § asCtrl). Both
+    // the chord and the strip's own arrows write the same stored selection, so a reader who switches one way
+    // and then the other does not find two answers (./Tabs.tsx).
     const frame = await draw(
       CASES.find((entry) => entry.layout === 'tabs')!,
       { width: 80, height: 24 },

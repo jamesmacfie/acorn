@@ -10,15 +10,13 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { renderCells } from '../kit/render'
 import { Text } from '../kit/showing'
 
-// What phase 5 promises, tested at the two levels it can be: the sandbox for real, and the drawing in
-// cells (docs/tui.md).
+// Loaded plugins in the terminal, tested at the two levels they can be: the sandbox for real, and the
+// drawing in cells (docs/tui.md).
 //
-// The sandbox half never skips. It starts a real `node:worker_threads` worker under `--permission`,
+// The sandbox half starts a real `node:worker_threads` worker under `--permission`,
 // hands it a bundle out of a real content-addressed cache, and asserts both halves of the containment
 // claim: the batch it sends arrives, and the file it was not granted does not open. None of that needs
-// a terminal, so it runs on whatever Node the repo is on.
-//
-// The drawing half skips without `node:ffi`, like every other test that renders (../ffi.ts).
+// a terminal.
 
 let config: string
 
@@ -196,10 +194,9 @@ test('a descriptor source keeps its region identity across chrome refreshes', as
 })
 
 test('a descriptor source draws its list and its detail in cells', async () => {
-  // What `client-core/host/chrome/sourcePanel.ts` exists for. The chrome registry used to name
-  // `ChromeSourcePanel` directly, which is `<main class="panes">` and DOM kit primitives all the way
-  // down, so selecting a descriptor source here threw "[Reconciler] Unknown component type: main"
-  // instead of drawing anything. Both regions render, which is the whole claim.
+  // What the `setSourcePanel` seam exists for. The DOM's `ChromeSourcePanel` is `<main class="panes">`
+  // and DOM kit primitives all the way down, and the reconciler throws "Unknown component type: main"
+  // on it. Both regions render, which is the whole claim.
   const { sourcePanel } = await import('./SourcePanel')
   const descriptor = {
     id: 'issues',
@@ -359,10 +356,10 @@ test('a worker that dies at module scope fails its slot rather than hanging', as
 // ── Reserved regions ──────────────────────────────────────────────────────────────────────────────
 
 test('a pane that reserved a footer draws the rows delivered into it', async () => {
-  // What `client-core/host/chrome/extendedPane.ts` exists for. The frame registry wrapped a loaded
-  // plugin's pane in the DOM's `ExtendedPane` — a `div` around an `aside` holding a `PanelGrid` — so a
-  // pane that declared a `pane.footer` or a `pane.aside` was refused by the reconciler rather than
-  // drawn. This host's wrapper puts both under the owner's own tree (./ExtendedPane.tsx).
+  // What the `setExtendedPane` seam exists for. The DOM's `ExtendedPane` is a `div` around an `aside`
+  // holding a `PanelGrid`, which the reconciler refuses. This host's wrapper puts a `pane.footer` and a
+  // `pane.aside` under the owner's own tree (./ExtendedPane.tsx).
+  //
   // A node, because a contributor's rows come through the fleet fan-out and a fan-out over no nodes
   // answers with none (client-core/infra/node/fanout.ts).
   const { bootFixture } = await import('../harness')
@@ -408,8 +405,8 @@ test('a pane that reserved a footer draws the rows delivered into it', async () 
     expect(drawn.text).toContain('ACORN-14')
     expect(drawn.text).toContain('Tracked items')
     expect(drawn.text).toContain('tracker')
-    // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and its terminal
-    // projection is the dashboards programme's question (docs/tui/plugin-losses.md § What a plugin loses here).
+    // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and it has no
+    // terminal projection (docs/tui/plugin-losses.md § What a plugin loses here).
     expect(drawn.text).toContain('board:card-links is a dashboard')
   } finally {
     rows.dispose()

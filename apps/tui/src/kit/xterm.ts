@@ -1,6 +1,6 @@
 // The browser xterm.js and its two addons, as this host's answer: a throw.
 //
-// The seventh alias in the host switch (../vite.config.ts). Four specifiers resolve here —
+// An alias in the host switch (`apps/tui/vite.config.ts`). Four specifiers resolve here —
 // `@xterm/xterm`, its stylesheet, `@xterm/addon-fit` and `@xterm/addon-webgl`.
 //
 // **`@xterm/headless` is not one of them and must never be.** That is the emulator behind this host's

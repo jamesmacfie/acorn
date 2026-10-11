@@ -6,11 +6,11 @@ import type { Color } from './colour'
 // three in `./colour.ts`'s own three answers, so nothing between them needs converting. What is left
 // here is the one place a colour becomes something else: the `{ r, g, b }` triple in nought to one
 // that the two harnesses report a run's foreground as, and that a test asserting "this run is the
-// accent" compares (`../kit/kit.test.tsx`, `./diffLong.test.tsx`).
+// accent" compares (`./kit/kit.test.tsx`, `./diffLong.test.tsx`).
 //
-// The numbers are the standard sixteen at their usual values, which is what the old painter's `RGBA`
-// answered and therefore what the assertions were written against: `default` is 1, 1, 1, a slot below
-// eight is a half-intensity primary, and slot 8 is 0.502 grey.
+// The numbers are the standard sixteen at their usual values, which is what the assertions are written
+// against: `default` is 1, 1, 1, a slot below eight is a half-intensity primary, and slot 8 is 0.502
+// grey.
 
 /** The sixteen slots as nought-to-one triples, in the usual order: black, red, green, yellow, blue,
  *  magenta, cyan, white, then the bright eight. */

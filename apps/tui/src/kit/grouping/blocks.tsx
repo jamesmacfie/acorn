@@ -170,15 +170,14 @@ export function Card(props: {
  *  fit onto the next line before it shrinks anything, so an overfull bar costs a line instead of its
  *  words, and a bar that fits is laid out exactly as it was.
  *
- *  The gap is the column gap alone. Yoga's `gap` sets both axes, so a wrapped bar gained a blank row
- *  between its lines.
+ *  The gap is the column gap alone. Yoga's `gap` sets both axes, so a wrapped bar would gain a blank
+ *  row between its lines.
  *
  *  Nothing here wraps `props.children`. A context provider around them would put them inside a memo
- *  of Solid's own, and re-running a toolbar's children as a unit used to break the changes pane: a
- *  callback-form `<Show>` in that bar had its accessor read again after its condition went false,
- *  which stock Solid refuses as `Stale read from <Show>`. Our copy holds the last value instead
- *  (patches/README.md), but the bar still has no reason to re-run its children. An open panel widens
- *  itself instead (§ `Menu`). */
+ *  of Solid's own and re-run the bar's children as a unit, and a callback-form `<Show>` among them
+ *  then has its accessor read again after its condition went false, which stock Solid refuses as
+ *  `Stale read from <Show>`. Our copy holds the last value instead (patches/README.md), but the bar
+ *  still has no reason to re-run its children. An open panel widens itself instead (§ `Menu`). */
 type ToolbarProps =
   | { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }
   | {

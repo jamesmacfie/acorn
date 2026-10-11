@@ -11,8 +11,7 @@ import { PANE } from '../../keys/tiers'
 /** The fewest cells a row's own words are worth. Below it the row stops giving and runs off the right
  *  edge instead, where the frame cuts it — so in a twenty-eight cell rail a pull request reads as its
  *  number and its title, and the timestamp and the row actions are simply not there. The alternative
- *  is a row where every field is present and none of them is legible, which is what this host drew
- *  while its parts still shrank. */
+ *  is a row where every field is present and none of them is legible. */
 const TITLE_CELLS = 16
 
 /** The order a row gives up cells in when it is wider than the panel it is drawn in: the trailing
@@ -26,9 +25,8 @@ const SHRINK = { title: 1, meta: 20, trailing: 100 }
  *  A component rather than a function returning JSX, and the difference matters on a retained
  *  renderer: a function called from inside the row's JSX runs again whenever the row's props are read
  *  again, and each run tries to put the caller's *same* renderables inside a *new* box — reparenting
- *  the whole part on every read, which used to surface as "already destroyed, skipping add" and now
- *  is merely churn the retained tree never needed. The `Show` builds the box once and only the
- *  contents move. */
+ *  the whole part on every read, which is churn the retained tree never needs. The `Show` builds the
+ *  box once and only the contents move. */
 function Part(props: { shrink: number; children: JSX.Element }) {
   return (
     <Show when={props.children}>
@@ -46,9 +44,9 @@ function Part(props: { shrink: number; children: JSX.Element }) {
  *
  *  `collapsed` is the other prop this host answers by ignoring. It is the row at the width of the
  *  DOM shell's icon rails, and it is legible there only because the name it drops comes back as a
- *  tooltip on hover. There is no hover here and no `tip` in this host's facade (./ui.ts), so a rail
+ *  tooltip on hover. There is no hover here and no `tip` in this host's facade (../ui.ts), so a rail
  *  row in cells would be a column of marks with no way left to read them. The terminal narrows by
- *  showing one region at a time instead (../layouts/ListDetail.tsx), which loses no names. */
+ *  showing one region at a time instead (the `list-detail` layout), which loses no names. */
 export function Row(props: {
   item?: ItemProps
   metaFields?: number
@@ -90,8 +88,8 @@ export function Row(props: {
   // The parts of a row that keep their cells when the row is wider than the panel it is in. A `text`
   // is a box to yoga, so a row of them at a width they do not fit is a row of boxes each shrunk and
   // each clipping its own content — the failure ../cells.tsx § Run already names, one level up:
-  // `[ST]` drew as `[ST`, the gaps closed, and the one-cell caret column shrank to nothing, so a
-  // focused list looked exactly like an unfocused one. Only the title gives; everything else holds
+  // `[ST]` draws as `[ST`, the gaps close, and the one-cell caret column shrinks to nothing, so a
+  // focused list looks exactly like an unfocused one. Only the title gives; everything else holds
   // its width and the row clips at the frame.
   return (
     <box
@@ -235,9 +233,8 @@ export function TreeRow(props: {
 /** The row's actions at the right end, always drawn, never on hover.
  *
  *  Its children are a render prop taking the menu's own context, because a `Menu.Item` needs it to
- *  close the list — and drawing them directly handed that function to Solid, which called it with
- *  nothing and left every item with `context: undefined`. Found by the pane sweep, on the agents
- *  session list (docs/tui.md).
+ *  close the list — and drawing them directly would hand that function to Solid, which calls it with
+ *  nothing and leaves every item with `context: undefined` (docs/tui.md).
  *
  *  The DOM's is an ellipsis button opening a menu. Here the items are labeled controls. There is no
  *  pointer to open a hover menu with, so the context they are handed

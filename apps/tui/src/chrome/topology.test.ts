@@ -6,9 +6,9 @@ import { BROWSE, MENU, PANES, SOURCE, TASKS, topology } from './topology'
 
 // The shell's answers to the three questions the keys module cannot answer for itself.
 //
-// Worth a test of its own because every one of them used to be a literal somewhere else, and because
-// each is a pure function of two signals: what is selected and whether the selected source draws a
-// list. A render test would have to reach five regions to say what these four cases say.
+// Worth a test of its own because each is a pure function of two signals: what is selected and whether
+// the selected source draws a list. A render test would have to reach five regions to say what these
+// four cases say.
 
 const source = (id: string, list: boolean): Disposable =>
   sourceRegistry.register({

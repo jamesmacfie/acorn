@@ -18,9 +18,8 @@ export type Style = {
   /** A `../colour.ts` colour: the terminal's own foreground, one of its sixteen slots, or a triple. */
   fg: Color
   attributes: number
-  /** The same four bits as booleans. Not a second answer: a `span` under the old painter reads its
-   *  colour and its weight out of one object and ignores an `attributes` prop entirely, so a run
-   *  inside a line has to be told both ways (§ Run). */
+  /** The same four bits as booleans, carried beside the mask. Paint reads only `attributes`
+   *  (../paint/paint.ts § styleOf). */
   bold?: true
   dim?: true
   underline?: true
@@ -43,9 +42,7 @@ function attributes(cell: CellStyle): number {
 /**
  * A run of text: its colour, its weight, and whether the role changes the characters themselves.
  *
- * One answer for a `text` and for a `span`, which used to be two. The shapes differ, not the
- * decision: a `text` takes `fg` and a mask as props and a `span` takes one object with booleans in
- * it, so this returns both and each caller spends the half it needs (§ Run, ./cells.tsx).
+ * One answer for a `text` and for a `span`, which take the same props (§ Run, ./cells.tsx).
  */
 export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   const text = roleCell('text', role ?? 'body')
@@ -79,11 +76,7 @@ export const spaceLines = (space: Space | undefined): number => {
   return isCompact() ? 0 : lines
 }
 
-/** The border props for a box drawing a border role, and no colour at all where it draws no box.
- *
- *  Two things about OpenTUI a caller has to answer for. Its own border colour is opaque white, the
- *  same trap a run of text has; and a `borderColor` handed to a box with no border switches the border
- *  back on, so the colour has to be absent exactly when the box is. */
+/** The border props for a box drawing a border role, and no colour at all where it draws no box. */
 export const boxBorder = (
   border: Border,
   opts: { when?: boolean; tone?: Tone } = {},

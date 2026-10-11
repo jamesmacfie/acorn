@@ -67,16 +67,15 @@ export type FocusedKind = 'item' | 'parent' | 'field' | 'opens' | 'viewport' | '
 
 export const focusedKind = (): FocusedKind => {
   const node = focusedRenderable()
-  // Through the store's own question rather than an `instanceof`, the same treatment `isViewport`
-  // needed one slice earlier: under our painter a field is a plain object with a `kind`, and a footer
-  // that read it as a stop told a reader Enter would press what they were typing into
-  // (../keys/regions.ts § isField).
+  // Through the store's own question rather than an `instanceof`: a field is a plain object with a
+  // `kind`, and a footer that reads it as a stop tells a reader Enter presses what they are typing
+  // into (../keys/regions.ts § isField).
   if (node && isField(node)) return 'field'
   if (focusedItem()) return 'item'
   if (isParentStop(node)) return 'parent'
   if (focusedOpens()) return 'opens'
-  // Through the store's own question rather than an `instanceof`, because under our painter a
-  // viewport is a plain object and this row is what tells a reader the arrows scroll here
+  // Through the store's own question rather than an `instanceof`, because a viewport is a plain
+  // object and this row is what tells a reader the arrows scroll here
   // (../keys/regions.ts § isViewport).
   if (node && isViewport(node)) return 'viewport'
   return 'stop'
@@ -116,9 +115,8 @@ export const WORDS: Record<FocusedKind, Words> = {
 /**
  * The words for what has the keys, with the cross word resolved.
  *
- * `h` and `l` are the one pair whose meaning is not settled by the kind alone, and the footer said
- * `fold` for every kind, which was true of one of them. Two questions settle it, and both are the
- * store's rather than the kind's:
+ * `h` and `l` are the one pair whose meaning is not settled by the kind alone. Three questions settle
+ * it, and all are the store's rather than the kind's:
  *
  *   does this collection fold?     a tree's rows expand and collapse; a plain list's decline the
  *                                  intent, and it bubbles to the region tier, which moves a column
@@ -149,9 +147,8 @@ const specs = (): Spec[] => {
     { probe: bare('next', 1), keys: says.moveKeys, label: says.move, detail: 'and the arrows' },
     { probe: bare('activate'), keys: 'enter', label: says.act, detail: 'or space' },
     // Third, and never further down. Escape is the way out and the one key a reader who is lost has
-    // to be able to find, and the footer cuts rather than wraps — so while this sat last in reading
-    // order the line ran out before it on every screen we draw, the cheat sheet included. Nothing was
-    // wrong with the list; the reader never saw the row (./Footer.tsx, docs/tui/footer.md § The footer).
+    // to be able to find, and the footer cuts rather than wraps, so a hint late in reading order never
+    // reaches the screen (./Footer.tsx, docs/tui/footer.md § The footer).
     { probe: bare('dismiss'), keys: 'esc', label: 'back' },
     {
       probe: bare('expand', 1),
@@ -161,9 +158,9 @@ const specs = (): Spec[] => {
       // A bubbled `h` or `l` has one meaning and it is the column move, so where the word is `column`
       // the hint is true only while there is a second region to move to — the question Tab's hint
       // already asks, for the same reason. A layer knows nothing about scopes, so inside a `Modal` or
-      // an open `Menu` the region layer's pair is still registered and still reported live, and the
-      // footer offered `h/l column` over a dialog with no columns behind it. The other three words —
-      // `fold`, `move`, `tab` — are answered inside the scope, so they are ungated
+      // an open `Menu` the region layer's pair is still registered and still reported live, and an
+      // ungated footer would offer `h/l column` over a dialog with no columns behind it. The other
+      // three words — `fold`, `move`, `tab` — are answered inside the scope, so they are ungated
       // (../keys/regions.ts § Scopes).
       when: () => says.cross !== 'column' || regionsInScope() > 1,
     },
@@ -191,9 +188,8 @@ const LEADING = 3
 
 // ── When the answer moves ─────────────────────────────────────────────────────────────────────
 //
-// This file's header used to say the engine has no signal for "the active layers changed". It has
-// one: `state`, which the engine emits when focus moves and when a layer is registered or
-// unregistered, and both of those are exactly when a hint appears or goes. Reading it as a signal is
+// The engine emits `state` when focus moves and when a layer is registered or unregistered, and both
+// of those are exactly when a hint appears or goes. Reading it as a signal is
 // what makes the cache below safe — a control mounting adds a key without focus, an overlay or a
 // region moving anything, and the footer has to say so.
 //
@@ -214,8 +210,8 @@ const watchLayers = (engine: { on: (name: 'state', fn: () => void) => () => void
  *
  *  The footer draws once per render and a render happens for reasons that have nothing to do with the
  *  keyboard — a task list arriving, a terminal frame, a toast. `getActiveKeys` walks every active
- *  layer, so asking it per render was the cost this cache removes: the answer only moves when one of
- *  the four things below moves, and each of them is a signal or an identity. */
+ *  layer, so it is asked again only when one of the fields below moves, and each of them is a signal
+ *  or an identity. */
 let last: {
   node: Renderable | null
   overlays: readonly unknown[]
@@ -232,8 +228,7 @@ let last: {
  * Empty before the keymap is installed, which is every render in a suite that never installed one.
  */
 export function activeHints(): Hint[] {
-  // The engine has no signal for "the active layers changed", and the two things that change them are
-  // both signals here: where the keys are, and whether an overlay has taken them. Read so that a
+  // Where the keys are, and whether an overlay has taken them: both signals here. Read so that a
   // caller drawing this list re-draws when the answer moves — without them the footer is whatever was
   // true at the render that happened to build it.
   const node = focusedRenderable()
@@ -264,9 +259,9 @@ export function activeHints(): Hint[] {
   )
     return last.hints
 
-  // One ask, with the metadata. It was two — the plain list and then the same collect again for the
-  // descriptions — and the second answers the first as well, because `includeMetadata` enriches the
-  // same keys rather than choosing different ones (`@opentui/keymap` § ActiveKeysCaches).
+  // One ask, with the metadata: `includeMetadata` enriches the same keys rather than choosing
+  // different ones, so one collect answers both the list and its descriptions
+  // (`@opentui/keymap` § ActiveKeysCaches).
   const active = engine.getActiveKeys({ includeMetadata: true })
   const live = new Set(active.map((key) => engine.formatKey(key.display)))
   const shown = specs()
