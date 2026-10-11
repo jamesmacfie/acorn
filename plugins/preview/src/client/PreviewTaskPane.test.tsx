@@ -65,7 +65,8 @@ it('binds same-ID task reads to the originating Node and rejects late URLs', asy
   )
   const Pane = pane()
   disposers.push(render(() => <Pane task={task('same')} />, host))
-  await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())
+  // The pane reads only after its cold lazy draw, so this wait needs the same allowance as `drawn`.
+  await vi.waitFor(() => expect(read).toHaveBeenCalledOnce(), { timeout: 5_000 })
   setNodeId('node-b')
   await drawn('same')
   expect(read).toHaveBeenLastCalledWith(expect.any(String), { nodeId: 'node-b' })
