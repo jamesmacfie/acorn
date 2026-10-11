@@ -139,7 +139,12 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // remote point's `mounts`, which runs on every manifest parse at boot. The `plugin_authoring` brief
 // loads on first use, so its text isn't counted. No module moved into the boot graph. The ceiling
 // keeps about 2 KB of margin.
-const limits = { ceiling: 1_759_000, floor: 1_000_000 }
+// 2026-10-11: 1,764,586 B after the security review (docs/security/review-2026-10-11.md). smol-toml
+// 1.9.0 adds about 10 KB of source for its linear key parser, which is the fix for the quadratic parse.
+// Run config parses `.acorn/config.toml` synchronously and is statically reachable, so the parser
+// stays in the boot graph.
+// The bounded config read adds about 1 KB. The ceiling keeps about 2 KB of margin.
+const limits = { ceiling: 1_766_500, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)
