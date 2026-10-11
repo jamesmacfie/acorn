@@ -63,9 +63,8 @@ export const sessionModelSummary = (session: AgentSession): string | undefined =
  * only reports its models and reasoning levels once a session is running, so there is nowhere else to
  * read them from before one starts.
  *
- * Bounded by whatever sessions the caller passes, which is the 50 most recent. A provider you have not
- * run in that many sessions shows no pickers until you run it again. Cache the advertised list per
- * provider if that starts to bite.
+ * Bounded by whatever sessions the caller passes, which is one page of the most recent. A provider you
+ * have not run in that many sessions shows no pickers until you run it again.
  */
 export function advertisedOptionsByProvider(sessions: readonly AgentSession[]): Record<string, AgentConfigOption[]> {
   const byProvider: Record<string, AgentConfigOption[]> = {}

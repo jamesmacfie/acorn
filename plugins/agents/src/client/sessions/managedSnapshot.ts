@@ -15,7 +15,7 @@ const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] =
 
 // Events merge by id like everything else, with one exception: a usage line.
 //
-// Both sides now hand over one usage record a turn, folded, and both keep the first update's id — so
+// Both sides hand over one usage record a turn, folded, and both keep the first update's id — so
 // the same id can carry two different running totals. The HTTP read is the authority on which events
 // exist; the socket is ahead of it on a counter, because a frame can land while the request is in
 // flight. Union the two, socket first, so no reported field is lost either way.

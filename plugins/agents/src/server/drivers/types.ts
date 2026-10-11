@@ -78,7 +78,7 @@ export type AgentDriverMcpServer =
  *  `command args… <harness> <event>` and does what it prints. */
 export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool: boolean; afterTool: boolean }
 
-/** Keeps a session out of acorn's data root, for a driver with `readBlock` (./readBlock.ts,
+/** Keeps a session out of acorn's data root, for a driver with `readBlock` (`dataRootReadBlock`,
  *  docs/managed-agents/read-block.md). Paths are absolute. */
 export type AgentDriverReadBlock = {
   dataDir: string
@@ -91,7 +91,7 @@ export type AgentDriverReadBlock = {
    *  commit from a linked worktree writes. */
   writable: string[]
   /** Git files it may never write, even inside `writable` or the worktree, because the Node's own
-   *  unsandboxed git would act on them (./readBlock.ts § gitWrites). Concrete paths, never globs. */
+   *  unsandboxed git would act on them (`gitWrites`). Concrete paths, never globs. */
   writeDenied: string[]
   /** Data root paths holding nothing the agent works in, for the harness's own file tools, which its
    *  shell sandbox doesn't cover. */
@@ -99,7 +99,7 @@ export type AgentDriverReadBlock = {
   /** `host:port` of the Node's loopback API, for the task CLI. */
   loopback: string | null
   /** The program that checks each of the harness's own file tool calls against this block
-   *  (@acorn/node-core/mcp/fileGuard.ts). */
+   *  (`packages/node-core/src/mcp/fileGuard.ts`). */
   fileGuard: { command: string; args: string[] }
 }
 
@@ -117,11 +117,11 @@ export type AgentDriverStartOptions = {
    *  § Configuration), followed by the user's servers this session has switched on (docs/mcp.md § Your
    *  own servers). Empty is a real answer, never a forgotten one. */
   mcpServers: readonly AgentDriverMcpServer[]
-  /** The folder of each skill this start may point the agent at (./skillIndex.ts). A driver whose harness
+  /** The folder of each skill this start may point the agent at (`prepareSkillStart`). A driver whose harness
    *  needs a grant to read outside the worktree gives one for these and nothing else. The index itself
    *  goes ahead of the first turn, from the lifecycle. Absent means none. */
   skillFolders?: readonly string[]
-  /** For a driver with `nativeSkills`: the plugin folders of this start's skill copy (./skillFolder.ts),
+  /** For a driver with `nativeSkills`: the plugin folders of this start's skill copy (`writeSkillFolder`),
    *  for the harness to load as its own. Absent means none. */
   skillPlugins?: readonly string[]
   /** acorn's harness bridge for this start, for a driver with `loopHooks`. Absent when no point has a

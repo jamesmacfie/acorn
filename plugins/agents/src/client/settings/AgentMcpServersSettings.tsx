@@ -64,12 +64,12 @@ export function consentSource(server: AgentMcpServer): string {
   }
 }
 
-// Settings → Agents → MCP, Servers section (docs/mcp.md § Your own servers): the servers acorn hands every agent
-// session, whichever harness runs it. A list, then one server's editor in the same pane, which the
-// settings header names and offers the way back from (useSettingsDetail). A server's switch saves when
-// it changes. Adding or editing one is a form with Save and Cancel, because a command, its arguments
-// and its secrets only work together. Remove sits in the editor's danger zone. The section matches the
-// one `../index.ts` declares for search. ./McpSettingsPage.tsx draws it above Config files.
+// Settings → Agents → MCP, Servers section (docs/mcp.md § Your own servers): the servers acorn hands
+// every agent session, whichever harness runs it. A list, then one server's editor in the same pane,
+// which the settings header names and offers the way back from (useSettingsDetail). A server's switch
+// saves when it changes. Adding or editing one is a form with Save and Cancel, because a command, its
+// arguments and its secrets only work together. The section matches the one the plugin's registration
+// declares for search.
 export default function AgentMcpServersSettings() {
   const queryClient = useQueryClient()
   const servers = createQuery(() => agentMcpServersOptions())

@@ -112,7 +112,7 @@ describe('the delegated session sidebar', () => {
     expect(rowNamed('Nested child').dataset.nested).toBe('')
     expect(rowNamed('Parent').dataset.nested).toBeUndefined()
     expect(rowNamed('Nested child').textContent).toContain('waiting')
-    // The attention mark is an icon now, so what a reader gets is its name rather than a pill's words.
+    // The attention mark is an icon, so what a reader gets is its accessible name.
     expect(rowNamed('Nested child').querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe(
       'Wants permission',
     )
@@ -125,8 +125,8 @@ describe('the delegated session sidebar', () => {
   })
 
   it('leads a resting session with a queued prompt on its queue, and a busy one on its motion', () => {
-    // The whole point of moving the queue into the leading slot: a session held behind the concurrency
-    // limit rests at `ready`, and the resting mark alone would draw it as simply done.
+    // Why the queue takes the leading slot: a session held behind the concurrency limit rests at
+    // `ready`, and the resting mark alone would draw it as simply done.
     const waiting = session('waiting-on-limit', { title: 'Holding a prompt', queuedTurns: 2 })
     const busy = session('busy', { title: 'Running one', runtimeState: 'working', queuedTurns: 1 })
     mount([waiting, busy], {})

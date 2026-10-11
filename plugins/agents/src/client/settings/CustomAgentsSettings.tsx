@@ -25,15 +25,15 @@ import ProviderGlyph from '../sessions/ProviderGlyph'
 import { advertisedOptionsByProvider } from './agentConfigOptions'
 import { customAgentsOptions, deleteCustomAgent, saveCustomAgent } from './customAgentsClient'
 
-// Settings -> Agents -> Custom agents: saved starts for a managed session (docs/managed-agents/custom-agents.md §
-// Custom agents). A list, then one agent's editor in the same pane, which the settings header names
-// and offers the way back from (useSettingsDetail). The editor is a form with Save and Cancel rather
-// than saving on each change, unlike the rest of Settings, because an agent is a record that needs a
-// name and a harness before it can exist at all. Delete sits in the editor's danger zone. The
-// sections match the ones `../index.ts` declares.
+// Settings -> Agents -> Custom agents: saved starts for a managed session
+// (docs/managed-agents/custom-agents.md § Custom agents). A list, then one agent's editor in the same
+// pane, which the settings header names and offers the way back from (useSettingsDetail). The editor is
+// a form with Save and Cancel rather than saving on each change, unlike the rest of Settings, because an
+// agent is a record that needs a name and a harness before it can exist at all. The sections match the
+// ones the plugin's registration declares.
 
 // The harnesses whose system prompt acorn can add to. Every other one gets the instructions as context
-// at the start of the session instead (server/drivers/acpDriver.ts).
+// at the start of the session instead (the ACP session's context block).
 const SYSTEM_PROMPT_HARNESSES: ReadonlySet<string> = new Set(['claude', 'codex'])
 
 const TOOL_ACCESS = [

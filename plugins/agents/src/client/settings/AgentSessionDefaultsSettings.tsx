@@ -54,11 +54,12 @@ const harnessState = (provider: AgentProviderDescriptor): string | undefined => 
 }
 
 // Settings -> Agents -> Harnesses and defaults: the harnesses this node can run, and what a new session
-// of each one starts on (docs/managed-agents/defaults.md § New-session defaults). Every control saves when it
-// changes, and a failure is said on the row that failed. A default seeds new sessions only; each row
-// that is one says which control changes a session already open. The fixed sections match the ones
-// `../index.ts` declares for search; the one per harness depends on what is installed, so search does
-// not list it.
+// of each one starts on (docs/managed-agents/defaults.md § New-session defaults). Every control saves
+// when it changes, and a failure is said on the row that failed. A default seeds new sessions only;
+// each row that is one says which control changes a session already open. The fixed sections match the
+// ones the plugin's registration declares for search; the one per harness depends on what is
+// installed, so search does not list it.
+//
 // The one piece of the settings page context this page uses. Optional, so the page draws on its own
 // in a test.
 type PageContext = { navigate: (target: string) => void }
@@ -79,12 +80,13 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   // added since, and a Select with no value draws blank until the refetch lands.
   const record = (): AgentSessionDefaults => ({ ...defaultAgentSessionDefaults(), ...stored.data })
 
-  // Pickers only for what a recent session advertised (./agentConfigOptions.ts says why).
+  // Pickers only for what a recent session advertised (`advertisedOptionsByProvider` says why).
   const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
 
   // Each change is the save, through the shared writer the palette's setting command also uses
-  // (./sessionDefaultsClient.ts holds the cache rule). What this page adds is where the failure goes:
+  // (`writeAgentSessionDefaults` holds the cache rule). What this page adds is where the failure goes:
   // the row's own save state, which the writer's rethrow feeds.
+  //
   // Not before the record is read: a patch carries whole `pinned` and `inline` objects built from it, and
   // built from the defaults it would wipe every other harness's pins on the node.
   const save = async (patch: Partial<AgentSessionDefaults>) => {

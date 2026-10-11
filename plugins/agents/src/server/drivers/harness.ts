@@ -2,7 +2,7 @@
 // See docs/managed-agents/harnesses.md § Harnesses for the two driver tiers and which one a new agent belongs in.
 //
 // The internal shape. Its data-only twin is the `harnesses` manifest contribution
-// (@acorn/protocol/plugin/contract.ts), which the delivery seam converts into one of these. They differ
+// (`PluginHarnessDescriptor` in @acorn/protocol), which the delivery seam converts into one of these. They differ
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
 import type { AgentCapability, AgentSession } from '../../contract/wire.ts'
@@ -85,7 +85,7 @@ export type HarnessLaunchSpec = {
 }
 
 // What any ACP harness can carry, because the protocol defines these update kinds and the shared
-// normalizer maps all of them (./acpNormalizer.ts). A descriptor is built before the child
+// normalizer maps all of them (`normalizeAcpUpdate`). A descriptor is built before the child
 // is spawned, so this is what the protocol guarantees, not what one agent negotiated.
 //
 // The negotiated set is narrower and arrives at `initialize`. The model and mode pickers read
@@ -96,7 +96,7 @@ const ACP_BASELINE: readonly AgentCapability[] = [
   'tool_calls',
   'plans',
   'permissions',
-  // Both, because the generic driver answers ACP's form elicitation (./acpDriver.ts). A harness that
+  // Both, because the generic driver answers ACP's form elicitation. A harness that
   // never asks a question simply never sends one.
   'questions',
   'elicitations',

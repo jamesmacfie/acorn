@@ -1,6 +1,6 @@
 // The completion condition of one workflow step attempt (docs/workflows/agent-steps.md § Completion
 // conditions). It holds the attempt's counters and last verdict, runs the shared judge, and saves each
-// verdict against the exact turns it read. The loop that queues turns stays in ./sessionExecute.ts.
+// verdict against the exact turns it read. The loop that queues turns stays in createSessionExecute.
 import type { HeadlessResult } from '@acorn/plugin-api/node'
 import type { AgentExecuteGoalStatus, AgentExecuteGoalSummary } from '../../contract/sessionExecute'
 import type { AgentEventRecord, AgentGoalVerdict } from '../../contract/wire.ts'

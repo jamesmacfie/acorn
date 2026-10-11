@@ -10,7 +10,7 @@ import { MAX_PLUGIN_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 //
 // Read-only on purpose. Stored media is the record of what a turn held or produced, and its bytes
 // never change. The unsent composer draft has its own point and capability
-// (./draftAttachments.ts), and neither of these reaches it.
+// (`agents.draftAttachments`), and neither of these reaches it.
 
 /** The body of a sent attachment's tile, keyed by its media type. `replace`. The tile's filename,
  *  size, and download stay this plugin's. */

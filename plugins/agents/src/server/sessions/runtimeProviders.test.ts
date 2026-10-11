@@ -6,7 +6,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 
 // The providers answer is served from memory and probed again behind the caller once it is old
-// (runtimeEngine.ts § providers). A probe starts CLI binaries, which is why the pane must not wait on one.
+// (ProviderCatalogue). A probe starts CLI binaries, which is why the pane must not wait on one.
 
 /** A fake whose probes are counted and answered by hand, so a case can hold one open. */
 class CountedDriver extends FakeAgentDriver {

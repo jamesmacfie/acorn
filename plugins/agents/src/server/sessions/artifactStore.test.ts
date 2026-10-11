@@ -8,8 +8,7 @@ import * as schema from '../../node/schema'
 import { AgentArtifactStore } from './artifactStore'
 
 // This plugin's own migrated SQLite file, not core's. Not "makeTestDb with extra tables": a test that
-// could still see core's schema would keep passing after this store started reading a table it no longer
-// owns (server/routes/testDb.ts).
+// could still see core's schema would keep passing if this store read a table it doesn't own.
 let testDb: TestPluginDb
 let dataDir: string
 let store: AgentArtifactStore

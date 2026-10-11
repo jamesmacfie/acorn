@@ -16,7 +16,7 @@ import type { AgentWsFrame } from '../contract/wire.ts'
 export type AgentWebhookEventType = 'completion' | 'attention'
 
 // The one reduction of the session firehose to human-scale edges. Webhooks deliver these two kinds
-// externally, and `agent-session:changed` (@acorn/protocol/nodeEvents.ts) carries the same two
+// externally, and `agent-session:changed` (@acorn/protocol's node events) carries the same two
 // inward, so there is exactly one vocabulary for "the agent did something a person cares about".
 export const webhookEventKind = (frame: AgentWsFrame): AgentWebhookEventType | null => {
   if (frame.channel !== 'agent:event') return null

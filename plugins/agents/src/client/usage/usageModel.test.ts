@@ -51,8 +51,8 @@ describe('agent usage health and tooltip', () => {
     expect(usageHealth(percent)).toBe(health)
   })
 
-  // The order is the node's, which is the collector registration order (server/usage/collectors.ts).
-  // Reordering here would have to know the whole harness set, which is the thing that is now open.
+  // The order is the node's, which is the collector registration order. Reordering here would have to
+  // know the whole harness set, which the client does not.
   it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
     expect(usageSummaryEntries(snapshot)).toEqual([

@@ -37,7 +37,7 @@ export function searchSessions(
     : sql``
   const eventMatches = taskIds
     ? // The join to `agent_sessions` stays: it is this plugin's own table, and it is what carries
-      // the task id the filter needs. What left is the pair of core tables behind it.
+      // the task id the filter needs.
       db.all<{ sessionId: string; rank: number }>(sql`
           SELECT agent_events_fts.session_id AS sessionId, min(agent_events_fts.rank) AS rank
           FROM agent_events_fts
@@ -83,9 +83,6 @@ export function searchSessions(
   const textMatch = matchedIds.length
     ? or(like(schema.agentSessions.title, escapedLike), inArray(schema.agentSessions.id, matchedIds))
     : like(schema.agentSessions.title, escapedLike)
-  // One query now, not two. The workspace-scoped branch existed only to reach core workspace membership
-  // through `tasks`; with the ids in hand the filter is an ordinary predicate on this plugin's own
-  // column, so the join, the `{ session: … }` projection and the `.map` that unwrapped it all go.
   const rows = db
     .select()
     .from(schema.agentSessions)
@@ -109,7 +106,7 @@ export function searchSessions(
     .map(mapAgentSession)
 }
 
-// The search provider's answer (server/pluginHost/search.ts in node-core): one hit per session in the
+// The search provider's answer (a core SearchProvider): one hit per session in the
 // given tasks, best match first, with an excerpt of the event that matched. Archived sessions and
 // sessions retired with their task count, because the caller already chose the tasks.
 //

@@ -114,7 +114,7 @@ export class AgentLifecycle {
       .catch((error: unknown) => log.warn(`failed to announce activity: ${describeError(error).message}`))
   }
 
-  /** The frames' items rebuilt from the ledger (./activity.ts). */
+  /** The frames' items rebuilt from the ledger. */
   async activity(ref: { taskId: string; sessionId: string }): Promise<AgentActivityState | null> {
     return (await this.#activityModule()).readActivity(this.db, ref)
   }

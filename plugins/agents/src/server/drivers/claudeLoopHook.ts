@@ -1,7 +1,6 @@
 // Claude Code's half of the harness bridge (docs/managed-agents/loop-hooks.md): its command-hook input
 // as acorn's tool subject, and acorn's answer in Claude's hook output. Recorded against Claude Code
-// 2.1.292. Loaded with the bridge call, not at boot; the settings that install it are in
-// ./claudeHarness.ts.
+// 2.1.292. Loaded with the bridge call, not at boot; `claudeLoopHookSettings` installs it.
 import type { AgentPermissionSubject } from '../../contract/permissionHook.ts'
 import type { AgentLoopHookEvent } from '../../contract/loopHook.ts'
 

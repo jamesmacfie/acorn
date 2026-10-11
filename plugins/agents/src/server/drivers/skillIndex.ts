@@ -1,7 +1,7 @@
 // The skills a provider receives at every start and resume (docs/managed-agents/skills.md § Delivery).
 //
 // A harness with its own skill support gets a copy of every skill in a folder it loads natively
-// (./skillFolder.ts). Everything else goes in the index: names, descriptions and the absolute path of
+// (`writeSkillFolder`). Everything else goes in the index: names, descriptions and the absolute path of
 // each `SKILL.md`, under one fixed sentence from acorn. The agent reads a body only when a task matches,
 // so ten skills cost ten lines.
 //

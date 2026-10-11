@@ -1,5 +1,4 @@
-// Agents' half of the WebSocket, moved out of @acorn/client-core/infra/node/wsClient.ts with the open envelope
-// (finding 2). Core routes on the `agent` prefix and never looks inside a frame.
+// Agents' half of the WebSocket. Core routes on the `agent` prefix and never looks inside a frame.
 import { registerWsChannel, wsConnect } from '@acorn/plugin-api/client'
 import type { AgentServerFrame } from '../../shared/wsFrames'
 
@@ -9,8 +8,8 @@ const agentFrameSubs = new Set<AgentFrameCb>()
 let channel: ReturnType<typeof registerWsChannel> | null = null
 
 // No reattach hook: agent frames are pushed, never subscribed to per id, so there is nothing to restore
-// after a reconnect. A shown conversation reads on from its held events on the reconnect signal instead
-// (./AgentConversation.tsx).
+// after a reconnect. A shown conversation (`AgentConversation`) reads on from its held events on the
+// reconnect signal instead.
 // Subscribe to every agent frame; returns an unsubscribe.
 export function wsOnAgentFrame(cb: AgentFrameCb): () => void {
   // Loading a lazy surface must not claim transport. A dev module can be evaluated again while
@@ -29,7 +28,7 @@ export function wsOnAgentFrame(cb: AgentFrameCb): () => void {
   }
 }
 
-// Test seam: the set is a module singleton, and core's _resetWsClient no longer knows about it.
+// Test seam: the set is a module singleton, and core's _resetWsClient doesn't know about it.
 export const _resetAgentWsChannel = (): void => {
   agentFrameSubs.clear()
   channel?.dispose()

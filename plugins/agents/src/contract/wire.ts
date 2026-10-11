@@ -285,7 +285,7 @@ export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' |
 /**
  * One subagent a session spawned, as a projection rather than a session row of its own: a subagent is
  * not something you can address, resume, or send a turn to, so making it a session would be a lie in
- * every table that reads one. docs/managed-agents/subagents.md, states the model.
+ * every table that reads one. docs/managed-agents/subagents.md states the model.
  *
  * `id` is whatever the harness makes stable from the moment the subagent starts, which differs by
  * harness: Claude's spawning tool call, Codex's child thread. `providerAgentRef` is the harness's own
@@ -419,7 +419,7 @@ export type AgentSession = {
   config: Record<string, unknown>
   parentSessionId: string | null
   parentTurnId: string | null
-  /** Projected from the session's own `subagent` events by the repository, so every surface that reads
+  /** Projected from the session's own `subagent` events by `AgentStore`, so every surface that reads
    *  a session row sees the live roster without loading its transcript. */
   subagents: AgentSubagent[]
   /** How many follow-up turns are queued and waiting to dispatch. Counted onto the list read model so a
@@ -471,7 +471,7 @@ export type AgentEventRecord = {
    *  socket leave it out, since no client reads it and on a tool row it repeats the output. */
   searchText?: string | null
   createdAt: number
-  /** Present on a record the node folded later rows into (../shared/usageFold.ts, ../shared/toolFold.ts):
+  /** Present on a record the node folded later rows into (`foldUsageEvents`, `foldToolEvents`):
    *  the seq of the last row it absorbed. A reader pages on from here, and treats a row at or below it
    *  for the same card as already applied. */
   foldedThroughSeq?: number
@@ -554,8 +554,8 @@ export type AgentFootprint = {
 }
 
 // `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
-// Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
-// per row — to learn that one turn had closed or one permission request had been answered
+// Without them a client would refetch the whole snapshot, a JSON body parsed per event row, to learn
+// that one turn closed or one permission request was answered
 // (docs/managed-agents/transcript-store.md § The transcript store).
 export type AgentWsFrame =
   | { channel: 'agent:event'; event: AgentEventRecord }

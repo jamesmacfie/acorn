@@ -7,11 +7,9 @@ import { mergeToolCall } from '../../shared/toolFold'
 // A tool call or a file change is stored as two rows: the one that opened its card, and one that
 // holds its whole latest state. docs/managed-agents/transcript-store.md § How the ledger stores a tool call says why.
 //
-// A harness reports a tool call as a run of updates on one id, and each used to stay in the ledger as
-// its own row. On this developer's database that was 196,000 tool rows for 39,000 calls, 300 MB of
-// JSON for cards every reader folds into one. So when an update arrives, the node folds the card's
-// rows and the update into one state, writes it at the next sequence, and deletes the rows it
-// supersedes, all in the event's own transaction.
+// A harness reports a tool call as a run of updates on one id, which every reader folds into one card.
+// So when an update arrives, the node folds the card's rows and the update into one state, writes it at
+// the next sequence, and deletes the rows it supersedes, all in the event's own transaction.
 //
 // Why a new row and not an update in place: a client that holds a session reads on from its mark,
 // because nothing below the mark can change. A row rewritten below the mark would never reach it.
@@ -35,7 +33,7 @@ export type CardKeyFields = {
 /**
  * Which card a row updates, within its turn, or `null` for a row that is a moment of its own.
  *
- * The same keys the transcript folds on (client/sessions/conversationItems.ts): a tool call by its id,
+ * The same keys the client's transcript folds on: a tool call by its id,
  * and a file change by its change id and path. A file change with no change id is never folded there,
  * so it is not folded here either.
  */
@@ -104,7 +102,7 @@ const KEPT_TURNS = 64
  * Held per turn, because a card is keyed by turn. A turn this process has not written to yet is read
  * from the ledger once, which also covers a call that was running when the node last stopped. The map
  * is a cache of what the ledger says. A row it names that has since gone, because the background pass
- * (./ledgerCompaction.ts) folded it, is skipped.
+ * (compactLedgers) folded it, is skipped.
  */
 export class LedgerFold {
   readonly #turns = new Map<string, Map<string, Card>>()

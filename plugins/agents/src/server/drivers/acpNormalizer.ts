@@ -167,12 +167,12 @@ function unfenced(text: string): string {
 }
 
 // ACP's `_meta` is an open extension bag, typed `{[key: string]: unknown}`, and `claudeCode` is Claude
-// Code's namespace inside it. Read here in the shared normalizer rather than behind a harness quirk on
-// purpose: another harness's namespace is simply absent, so the branches below cost nothing, and
-// HarnessQuirks says a quirk joins that list when a SECOND harness needs one.
+// Code's namespace inside it. It is read here in the shared normalizer rather than behind a harness quirk:
+// another harness's namespace is simply absent, so the branches below cost nothing, and a quirk joins
+// HarnessQuirks only when a second harness needs one.
 //
-// What the adapter puts there, confirmed against a live capture on Claude Code 2.1.241 with adapter
-// 0.54.1 (drivers/__fixtures__/claudeSubagentWire.json):
+// What the adapter puts there, as captured from Claude Code 2.1.241 with adapter 0.54.1 in
+// __fixtures__/claudeSubagentWire.json:
 //   toolName          the CLI's own name for the tool, on every tool_call and most updates
 //   parentToolUseId   the spawning `Agent` call, on everything a subagent did
 //   toolResponse      the structured result; for a subagent it names the agent and reports its usage,
@@ -231,16 +231,14 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
 }
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
-// Claude Code's two web tools, read into the provider-neutral shape
-// (@acorn/plugin-agents/contract/wire § AgentWebActivity) so a search reads the same here as it does
-// on the Codex path. Held to `_meta.claudeCode.toolName` and `rawInput`, never to ACP's `kind`:
-// WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository grep
-// `search`. A harness whose tool identity this file does not know keeps the generic card.
+// Claude Code's two web tools, read into the provider-neutral `AgentWebActivity` so a search reads the
+// same here as on the Codex path. Keyed on `_meta.claudeCode.toolName` and `rawInput`, never on ACP's
+// `kind`: WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository
+// grep `search`. A harness whose tool identity this file does not know keeps the generic card.
 //
-// Captured on Claude Code 2.1.241 with adapter 0.54.1
-// (./__fixtures__/claudeWebSearchWire.json). Three updates make up one call: the opening `tool_call`
-// with an empty rawInput, a refining update carrying the request, and a later one carrying the
-// result. Each maps only what it holds, and the transcript's fold puts them back together.
+// Three updates make up one call (see __fixtures__/claudeWebSearchWire.json): the opening `tool_call`
+// with an empty rawInput, a refining update carrying the request, and a later one carrying the result.
+// Each maps only what it holds, and the transcript's fold puts them back together.
 
 const strings = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) return undefined
@@ -298,8 +296,8 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     const url = str(input?.url)
     const prompt = str(input?.prompt)
     // The status rides the response update, which carries no request. A 404 still arrives as a
-    // completed call, with `code: 404` and a note in place of the page (checked against Claude Code's
-    // own structured result on 2026-09-28), so this is the only thing that says the page was missing.
+    // completed call, with `code: 404` and a note in place of the page, so this is the only thing that
+    // says the page was missing.
     const code = num(meta.response?.code)
     const text = str(meta.response?.codeText)
     const status = code != null ? { code, ...(text ? { text } : {}) } : undefined
@@ -329,11 +327,11 @@ const CLAUDE_WEB_TOOLS = new Map<string, AgentWebAction['type']>([
  * The row for Claude Code loading a deferred tool, which it does before the first use of any tool
  * it has not described to the model yet.
  *
- * The adapter titles it `ToolSearch`, sends `{ "query": "select:WebFetch", "max_results": 1 }` as its
- * input and `Tool: WebFetch` as its output, so the card opened onto two restatements of one name. The
- * names are on the response as `matches`, and they become the title; input and output are dropped
- * unless the call failed, so the row renders flat. The completion update names the tool too, and it
- * returns '' here so the fold keeps the title the response set.
+ * The adapter titles it `ToolSearch`, with `{ "query": "select:WebFetch", "max_results": 1 }` as input
+ * and `Tool: WebFetch` as output: two restatements of one name. The names are on the response as
+ * `matches`, and they become the title; input and output are dropped unless the call failed, so the
+ * row renders flat. The completion update names the tool too, and it returns '' here so the fold keeps
+ * the title the response set.
  */
 function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | undefined {
   if (meta.toolName !== 'ToolSearch') return undefined
@@ -350,22 +348,15 @@ function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | 
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /**
- * Four calls whose parameters are a document rather than arguments, and which field of each holds it.
+ * Calls whose parameters are one markdown document rather than arguments, and which field holds it:
+ * the plan Claude hands over when it leaves plan mode, the brief a subagent is spawned with, and the
+ * report that subagent hands back. `toolInput` would render each as JSON with every line break spelled
+ * out as `\n`, so the document is posted as a message instead. It renders as markdown, stays in view
+ * when the reader asks for chat only, and is searchable as prose. The call keeps its title and outcome
+ * and drops its parameters.
  *
- * `toolInput` below argues against reading parameters per tool, and it is right about the general
- * case. These are not it. Each carries one markdown document as its whole payload — the plan
- * Claude hands over when it leaves plan mode, the brief a subagent is spawned with, the report that
- * subagent hands back — and `toolInput` renders each as pretty-printed JSON with every line break
- * spelled out as `\n`. Unreadable, and in each of them the document is the one thing anybody opened the
- * call to read.
- *
- * So it comes back out as somebody talking, which renders as markdown, stays in view when the reader
- * has asked for chat only, and is searchable as prose. The call keeps its title and its outcome and
- * loses its parameters, because the document is now above it.
- *
- * A brief is posted as a `user_message` because that is the role the parent plays for its child: the
- * child's stream then reads as a conversation, brief in and report out, the same shape as the
- * session's own. Both of the subagent ones carry the subagent's id, so they land in its stream.
+ * A brief is a `user_message` because the parent plays the user for its child, so the child's stream
+ * reads as brief in, report out. Both subagent entries carry the subagent's id, so they land in its stream.
  */
 const PROSE_TOOLS = new Map<string, { field: string; as: 'user_message' | 'assistant_message' }>([
   ['ExitPlanMode', { field: 'plan', as: 'assistant_message' }],
@@ -375,16 +366,14 @@ const PROSE_TOOLS = new Map<string, { field: string; as: 'user_message' | 'assis
 ])
 
 /**
- * The document this call is carrying, if it is one of the four.
+ * The document this call carries, if it is one of the PROSE_TOOLS.
  *
- * From whichever update carries the parameters rather than from the `tool_call` alone, which is what
- * this used to read. The capture in `__fixtures__/claudeSubagentWire.json` settles it: an `Agent`
- * call arrives with an empty parameter bag and a placeholder title, and the first update after it
- * carries both the real title and the whole brief. Reading only the call found nothing.
+ * Read from whichever update carries the parameters, not from the `tool_call` alone: in
+ * `__fixtures__/claudeSubagentWire.json` an `Agent` call arrives with an empty parameter bag and a
+ * placeholder title, and the next update carries the real title and the whole brief.
  *
- * The CLI sends a call's parameters once, so nothing posts twice. If one ever repeated them
- * the reader would see the same document again; dedupe in the driver, which is the only layer that
- * sees more than one update, rather than here, which is pure.
+ * The CLI sends a call's parameters once, so nothing posts twice. If that changes, dedupe in the
+ * driver, the only layer that sees more than one update, rather than here, which is pure.
  */
 const toolProse = (
   update: SessionUpdate,
@@ -398,15 +387,13 @@ const toolProse = (
 }
 
 /**
- * A call's own parameters, so a card has something to show before its output arrives. Without this the
- * only thing the ACP path ever filled in was output, which lands on the completion update, so a
- * running call had nothing to disclose and its card could not honour the reader's fold setting until
- * it had finished.
+ * A call's own parameters, so a running card has something to disclose before its output arrives on the
+ * completion update, and can honour the reader's fold setting while it runs.
  *
  * Pretty-printed JSON rather than a per-tool reading of it: every tool names its parameters
  * differently, and a table of which field to pull for which tool name would need an entry for every
- * tool a harness adds. The bounds are the materializer's, which promotes anything past 64 KiB to an
- * artifact, so a call that carries a whole file in its parameters does not land in SQLite.
+ * tool a harness adds. The materializer promotes anything past 64 KiB to an artifact, so a call that
+ * carries a whole file in its parameters does not land in SQLite.
  */
 const toolInput = (rawInput: unknown): string | undefined => {
   if (rawInput == null || typeof rawInput !== 'object' || Array.isArray(rawInput)) return undefined
@@ -471,8 +458,8 @@ function acpFileChanges(
 }
 
 // `harness` is the label of the agent whose events these are. A parameter, not a constant, because
-// this file is the shared half of the generic driver (./acpDriver.ts) and it writes the
-// label into three user-visible strings.
+// this file is the shared half of the generic ACP driver and it writes the label into three
+// user-visible strings.
 export function normalizeAcpUpdate(update: SessionUpdate, harness: string): AgentNormalizedEvent[] {
   switch (update.sessionUpdate) {
     case 'user_message_chunk':
@@ -541,9 +528,8 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
             },
           ]
         : []
-      // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
-      // it rendered in the parent's stream while the Edit call that produced it sat inside the
-      // subagent's, so a subagent's run showed the tool and not what it changed.
+      // A diff belongs to whoever made the edit, the same as the call it arrived on. Unattributed, a
+      // subagent's diff renders in the parent's stream, apart from the Edit call that produced it.
       const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId).map((change) => ({
         ...change,
         summary: `${harness} updated a file.`,
@@ -566,7 +552,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
             // Empty rather than a made-up name: a tool_call always names itself, an update need not,
             // and the fold keeps the name the call arrived with. A web call is the exception: its row
             // is named after what it did, so the adapter's `"query" (allowed: host)` title never
-            // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
+            // reaches a card and a Claude row reads like a Codex one.
             title: webAction ? webToolTitle(webAction) : (toolSearch ?? update.title ?? ''),
             kind: update.kind ?? undefined,
             status,
@@ -640,7 +626,7 @@ function subagentFromToolCall(
   const usage: AgentUsage | undefined = summary?.totalTokens == null ? undefined : { contextUsed: summary.totalTokens }
   // `async_launched` is the launch receipt of a backgrounded `Agent` call: a summary arrives at the
   // moment the child starts, so reading it as a finish marks the child done before it has done
-  // anything. It means running. Any other summary status is a genuine end, so keep the earlier rule.
+  // anything. It means running. Any other summary status is a genuine end.
   const launched = summary?.status === 'async_launched'
   return {
     id: toolCallId,

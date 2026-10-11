@@ -11,11 +11,10 @@ import {
 import { AGENT_TRANSCRIPT_ATTACHMENT_POINT, type TranscriptMediaProps } from '../../contract/transcriptMedia.ts'
 import type { AgentAttachment } from '../../contract/wire.ts'
 
-// A sent attachment's tile and the `agents:transcript-attachment` point inside it
-// (../../contract/transcriptMedia.ts). Slot arbitration is client-core's to test. What is this
-// plugin's: the tile resolves the attachment before it picks a renderer, keys it by media type, hands
-// over the transcript's own task and session, and keeps the filename, size and download outside
-// whatever a plugin draws.
+// A sent attachment's tile and the `agents:transcript-attachment` point inside it. Slot arbitration is
+// client-core's to test. What is this plugin's: the tile resolves the attachment before it picks a renderer,
+// keys it by media type, hands over the transcript's own task and session, and keeps the filename, size and
+// download outside whatever a plugin draws.
 
 const attachment = vi.fn()
 const attachmentPreview = vi.fn()

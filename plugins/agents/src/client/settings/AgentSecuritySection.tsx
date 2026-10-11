@@ -8,12 +8,12 @@ import InstructionReviewPanel from './InstructionReviewPanel'
 const SecurityDiagnosticsPanel = lazy(() => import('./SecurityDiagnosticsPanel'))
 
 // This plugin's section of Settings > Security and backup, drawn in core's `core:security` point. The
-// switches enable required checks in the managed-turn dispatcher on the selected Node.
-// (../../server/sessions/instructionCheck.ts). The value is one field of the session defaults record,
-// whose write route takes only a device, so an agent can't turn the check off.
+// switches enable required checks in the managed-turn dispatcher on the selected node. Each value is a
+// field of the session defaults record, whose write route takes only a device, so an agent can't turn
+// a check off.
 //
 // It follows the settings header's node switcher, so it reads and writes the named node's record
-// directly. ./sessionDefaultsClient.ts always means the active node.
+// directly. `agentSessionDefaultsOptions` always means the active node.
 
 const LABEL = 'Check instruction files before each agent turn'
 

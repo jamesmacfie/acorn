@@ -1,6 +1,6 @@
 // The usage fold, at the seam it happens on, against a real migrated database.
 //
-// The rule itself is unit-tested in ../../shared/usageFold.test.ts. What only a database can answer is
+// The rule itself is unit-tested beside `foldUsageEvents`. What only a database can answer is
 // that the HTTP snapshot a client reads is folded while the ledger every other reader goes through is
 // not: pricing, the usage settings page and workflow execution all count the rows.
 import { randomUUID } from 'node:crypto'
@@ -59,8 +59,7 @@ describe('the snapshot a client reads', () => {
       idempotencyKey: 'k1',
     })
     await store.recordEvent(session.id, turn.id, { type: 'user_message', text: 'go' })
-    // 58 updates in one turn is what this machine's database averages: `usage` is a quarter of 66,264
-    // events across 114 sessions.
+    // Dozens of usage updates in one turn is ordinary for a real session.
     for (let at = 1; at <= 58; at++) {
       await store.recordEvent(session.id, turn.id, { type: 'usage', usage: { contextUsed: at * 100, inputTokens: at } })
     }
@@ -100,7 +99,7 @@ describe('the snapshot a client reads', () => {
       effectivePolicy: {},
       idempotencyKey: 'k1',
     })
-    // A running call under a turn that never started reads back as `unknown` (../sessions/commandLifecycle.ts).
+    // A running call under a turn that never started reads back as `unknown` (`commandStatus`).
     await store.startTurn(turn.id)
     await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } })
     await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Listing.' })
@@ -112,7 +111,7 @@ describe('the snapshot a client reads', () => {
     }
     await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Done.' })
 
-    // The ledger holds the call as its opener and its latest state (../sessions/ledgerFold.ts), and a
+    // The ledger holds the call as its opener and its latest state (`LedgerFold`), and a
     // reader that does not ask gets both as stored.
     const tools = (events: { event: { type: string } }[]) => events.filter((event) => event.event.type === 'tool')
     expect(tools((await bridge().snapshot(session.id)).events).map((event) => event.event)).toEqual([

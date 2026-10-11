@@ -30,10 +30,9 @@ import SessionGoal from './SessionGoal'
 // (client-core infra/styles/shell.css). Wrapping any of this in a `Stack` puts the pane's header and
 // composer inside the scroll and clips the rest, `grow` or not.
 //
-// Addressed by session id and nothing else, so a surface that has one can draw it: the Agent pane
-// (./AgentPane.tsx) and the Workflows run pane, through the capability in
-// ../../contract/conversation.ts. Everything it used to take from the Agent pane's model is a read of
-// the store or a pure function of the snapshot, so the two surfaces cannot disagree about a session.
+// Addressed by session id and nothing else, so a surface that has one can draw it: the Agent pane and
+// the Workflows run pane, through `AGENTS_CONVERSATION`. Everything else is a read of the store or a
+// pure function of the snapshot, so the two surfaces cannot disagree about a session.
 
 export default function AgentConversation(
   props: AgentConversationProps & {
@@ -76,7 +75,7 @@ function SessionConversation(input: {
   const [goalEditorTick, setGoalEditorTick] = createSignal(0)
   // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
   // `onControls`, while the filter and collapse-all push down as a signal and a counter. The filter is
-  // kept per session in ./managedSelection.ts, so it survives leaving the session and coming back. The
+  // kept per session (`managedChatsOnly`), so it survives leaving the session and coming back. The
   // desktop draws buttons above the composer; the terminal registers shortcuts for the same actions.
   const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
   const chatsOnly = () => managedChatsOnly(sessionId())
@@ -89,9 +88,9 @@ function SessionConversation(input: {
   const session = createMemo(() => stored() ?? snapshot()?.session)
   const previousAutomaticContext = createMemo(() => latestAutomaticTaskContext(snapshot()?.turns ?? []))
 
-  // The selection write above tells us whether switching sessions blocked the current JavaScript
-  // turn. This second opt-in point starts when the chosen snapshot becomes renderable and adds only
-  // counts already held by the store; it never walks the transcript DOM or copies its content.
+  // `selectManagedSession` measures whether switching sessions blocked the current JavaScript turn.
+  // This second point starts when the chosen snapshot becomes renderable and adds only counts already
+  // held by the store; it never walks the transcript DOM or copies its content.
   let measuredSnapshot = ''
   createEffect(
     on(snapshot, (next) => {
@@ -118,7 +117,7 @@ function SessionConversation(input: {
       onCleanup(view.dispose)
       // Every mount reads, a return to a session the store already holds included. That read resumes
       // where the held events end, so it brings the turns, the requests and whatever the socket missed,
-      // not the transcript again (./managedStore.ts § loadSnapshot).
+      // not the transcript again (`loadSnapshot`).
       void managedAgentStore
         .loadSnapshot(id)
         .then(() => view.ready())
@@ -201,8 +200,8 @@ function SessionConversation(input: {
       {/* Gone while a subagent's run owns the window. The composer only ever addresses the session, so
           leaving it under a subagent's transcript would read as "reply to this subagent", which is not
           a thing either harness offers. The draft survives: it lives in a module map keyed by session
-          (../composer/composerState.ts, ./managedDrafts.ts) plus localStorage, not in the component, so
-          stepping into a subagent and back leaves half-typed text alone. */}
+          plus localStorage, not in the component, so stepping into a subagent and back leaves half-typed
+          text alone. */}
       <Show when={!selectedManagedSubagent(sessionId()) ? session() : undefined}>
         {(current) => (
           <>

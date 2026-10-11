@@ -34,11 +34,10 @@ const log = createLogger('agents', 'agents')
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [delegations, setDelegations] = createSignal<Record<string, AgentSessionDelegation>>({})
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
-// Each task's sessions, for readers that ask about one task. The rail marker runs once per task row,
-// and it filtered the whole roster twice on every roster change. With 30 tasks and 100 sessions that
-// was 6,000 comparisons for each event a streaming agent sent. A slice is its own signal, written
-// only when that task's rows change, so rows for other tasks don't run at all. A slice is made on
-// first read and kept, because a reader may still hold it. There is one per task anyone asked about.
+// Each task's sessions, for readers that ask about one task, such as the rail marker on every task
+// row. A slice is its own signal, written only when that task's rows change, so a roster change wakes
+// only that task's readers. A slice is made on first read and kept, because a reader may still hold
+// it. There is one per task anyone asked about.
 const taskSlices = new Map<string, Signal<readonly AgentSession[]>>()
 // The store's contents since the last `clear()`. A clear aborts it, so reads and holds from before
 // the clear stop writing.
@@ -63,9 +62,9 @@ let subscribers = 0
 let disposeSocket: (() => void) | null = null
 const snapshotRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const deletedSessionIds = new Set<string>()
-// Per-session bookkeeping that used to be a scan of the whole event list on every streamed frame. A
-// long session holds a few thousand events and the node coalesces text deltas at 40 ms, so this ran
-// about 25 times a second against thousands of rows (docs/managed-agents/transcript-store.md § The transcript store).
+// Per-session bookkeeping, so a streamed frame never scans the whole event list: a long session holds
+// thousands of events, and frames arrive about 25 times a second
+// (docs/managed-agents/transcript-store.md § The transcript store).
 const seenEventIds = new Map<string, Set<string>>()
 const usageLines = new Map<string, { at: number; turnId: string | null }>()
 // How far each held snapshot's event list is known to be whole: every seq at or below this one is in
@@ -74,10 +73,9 @@ const usageLines = new Map<string, { at: number; turnId: string | null }>()
 // the very next seq. So a frame the socket lost leaves the mark at the gap, where the next read finds
 // it, and a later frame can't hide it.
 const completeThrough = new Map<string, number>()
-// A projected event used to mean "refetch the whole snapshot", which is up to 2,000 event rows and a
-// JSON body parsed per row, to learn one fact. The node now sends the turn or the request that
-// changed (server/sessions/runtimeEngine.ts § emitProjection). `error` is the one type left, because
-// it also expires this session's pending requests and no frame names that set.
+// The events that still refetch the snapshot. For the rest, the node sends the turn or the request
+// that changed as its own frame (`emitProjection`). `error` is the one type left, because it also
+// expires this session's pending requests and no frame names that set.
 const REFETCH_EVENT_TYPES = new Set(['error'])
 
 // How long a task's session list is served without asking the node again. See loadTask below.
@@ -91,14 +89,11 @@ const delegationLoads = new Map<string, Promise<void>>()
 // two panes open on the same session are.
 const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 
-// Which snapshots the store keeps. It used to keep every session it had read until the session was
-// deleted or the node switched, so a morning of opening agent tasks held every transcript seen: eight
-// real sessions came to 46 MB of JSON. Now a session keeps its snapshot while something draws it
-// (`hold`), and the three most recently drawn beyond those keep theirs too, which is what makes going
-// back to one of them a short read (see loadSnapshot). The rest drop their events and keep their row,
-// so the rail, Agent Center and notices draw them as before, and opening one reads it from the start.
-// Three because a snapshot can be large. Those eight averaged 6 MB of JSON each and one 1,200-event
-// Codex session was 10 MB, so five kept would be 30 MB or more before the heap's own overhead.
+// Which snapshots the store keeps. A session keeps its snapshot while something draws it (`hold`),
+// and the three most recently drawn beyond those keep theirs too, which is what makes going back to
+// one of them a short read (see loadSnapshot). The rest drop their events and keep their row, so the
+// rail, Agent Center and notices still draw them, and opening one reads it from the start. Only three,
+// because one long session's snapshot can run to megabytes of JSON.
 const KEEP_RECENT = 3
 const holds = new Map<string, number>()
 // Every stored snapshot's id, least recently drawn first. A load and a release both move one to the end.
@@ -187,17 +182,16 @@ function upsertSession(session: AgentSession): void {
   })
   // Notices come from the row, not from the events. The node projects `attention` from the driver's
   // own events and broadcasts the row whenever an event changes it, so the client reads a state instead
-  // of guessing one per event — which is why a ten-step workflow used to raise ten "completed" rows.
+  // of guessing one per event.
   observeAttention([fromManagedSession(session, activeNodeId() ?? '')])
 }
 
 /**
  * A page of sessions in one update, instead of one update per row.
  *
- * Every loader below reads a page and then walked it a row at a time. Each row re-sorted the roster
- * and notified, so a workspace with forty sessions cost forty update cycles, and the Agents rail
- * rebuilds its whole list on each one. The per-row merge rule is `newestManagedSession`, the same one
- * `upsertSession` applies, so the two cannot drift.
+ * Every loader below reads a page. Upserting it a row at a time would re-sort the roster and notify
+ * once per row, and the Agents rail rebuilds its whole list on each notify. The per-row merge rule is
+ * `newestManagedSession`, the same one `upsertSession` applies, so the two cannot drift.
  */
 function upsertSessions(incoming: readonly AgentSession[]): void {
   const wanted = incoming.filter((session) => !deletedSessionIds.has(session.id))
@@ -242,11 +236,11 @@ function replaceDelegations(pageSessions: readonly AgentSession[], incoming: rea
 
 function removeSession(sessionId: string): void {
   deletedSessionIds.add(sessionId)
-  // The unsent turn goes with the session it addressed (../composer/composerState.ts). Nothing else
+  // The unsent turn goes with the session it addressed. Nothing else
   // reaps that map, and an attachment id in it names a row the node has dropped.
   clearComposerDraft(sessionId)
   clearComposerExpansion(sessionId)
-  // And where the reader was left in it, for the same reason (./readingPlaceStore.ts).
+  // And where the reader was left in it, for the same reason.
   clearReadingPlaces(sessionId)
   forgetSnapshot(sessionId)
   eventSeqs.delete(sessionId)
@@ -284,10 +278,8 @@ const pageReach = (events: AgentEventRecord[]): number =>
 // Walk the event pages the snapshot route left behind.
 //
 // That route caps its event list, so a session past the cap arrives with its *oldest* events and
-// nothing after them. Live that went unnoticed, because the socket appends each new event to the
-// store as it lands; a reload dropped the in-memory half and refilled from the capped read, so a long
-// transcript reopened at the cap and every message after it looked lost. They were never lost: the
-// node writes each event to SQLite as it arrives, and this is the read catching up to the write.
+// nothing after them. Without this walk a long transcript reopens at the cap, and every message after
+// it looks lost even though the node's ledger holds it.
 //
 // `lastEventSeq` on the session row counts the whole ledger, so it is what says whether there is more
 // to fetch. A page that comes back empty ends the walk too, so a ledger whose rows were pruned below
@@ -315,10 +307,9 @@ async function pageToEnd(
   return events
 }
 
-// Seat one event in a seq-ordered array. Almost always a push: events arrive in order, so the old
-// `[...events, event].sort()` was copying a few thousand rows and sorting an already-sorted array on
-// every frame. A reconnect replay can still deliver one out of order, and that has to stay correct,
-// so it walks back from the tail to its seat.
+// Seat one event in a seq-ordered array. Almost always a push, because events arrive in order, so no
+// copy and no sort per frame. A reconnect replay can still deliver one out of order, so it walks back
+// from the tail to its seat.
 function seatEvent(events: AgentEventRecord[], event: AgentEventRecord): boolean {
   const last = events.at(-1)
   if (!last || last.seq < event.seq) {
@@ -332,11 +323,10 @@ function seatEvent(events: AgentEventRecord[], event: AgentEventRecord): boolean
 }
 
 // Each session's newest event seq, from its event frames, and kept off the roster. The node sends the
-// whole row only when an event changes something else on it (server/sessions/runtimeEngine.ts
-// § record), so a held row's `lastEventSeq` and `updatedAt` stop at its last change. Moving them on the
-// row per event woke every reader of the roster about 25 times a second: Agent Center redrew every
-// row, and the streaming task's sidebar every one of its rows, to show nothing new. The pane's read mark
-// is the one reader that needs the live number, and it asks here (`lastEventSeq` below).
+// whole row only when an event changes something else on it (`SessionFrames.rowChanged`), so a held
+// row's `lastEventSeq` and `updatedAt` stop at its last change. Moving them on the row per event would
+// wake every reader of the roster about 25 times a second to show nothing new. The pane's read mark is
+// the one reader that needs the live number, and it asks here (`lastEventSeq` below).
 const eventSeqs = new Map<string, Signal<number>>()
 
 function eventSeq(sessionId: string): Signal<number> {
@@ -399,11 +389,11 @@ function appendEvent(event: AgentEventRecord): void {
     void managedAgentStore.loadSnapshot(event.sessionId).catch(() => undefined)
 }
 
-// A harness reports usage as a running snapshot, about 58 rows a turn, and the transcript has always
-// drawn one line a turn from them. Merging on arrival keeps the event list the size of the
-// conversation instead of a quarter usage rows, which is what every later projection walks. The node's
-// HTTP snapshot folds by the same rule (../../shared/usageFold.ts), and conversationItems.ts still
-// folds defensively. Returns true when the event was absorbed rather than seated.
+// A harness reports usage as a running snapshot, many rows a turn, and the transcript draws one line a
+// turn from them. Merging on arrival keeps the event list the size of the conversation, which is what
+// every later projection walks. The node's HTTP snapshot folds by the same rule (`mergeAgentUsage`),
+// and the transcript's projection still folds defensively. Returns true when the event was absorbed
+// rather than seated.
 function foldUsage(sessionId: string, events: AgentEventRecord[], event: AgentEventRecord): boolean {
   if (event.event.type !== 'usage') return false
   const line = usageLines.get(sessionId)
@@ -520,7 +510,7 @@ export const managedAgentStore = {
   /**
    * Start a session on this provider and put the row in the store.
    *
-   * Two surfaces open a session now — the pane's New picker and the palette's "New agent session" —
+   * Two surfaces open a session — the pane's New picker and the palette's "New agent session" —
    * and neither may be the one that knows what a create looks like. The provider is named by its two
    * ids rather than by its descriptor, because the palette only carries a picked row. A custom agent
    * is named by id alone: the node reads it and applies what it keeps.
@@ -587,7 +577,7 @@ export const managedAgentStore = {
   /**
    * This task's sessions, from the node, deduplicated over a short window.
    *
-   * Two callers now ask for the same list at almost the same moment: the pane model when the task
+   * Two callers ask for the same list at almost the same moment: the pane model when the task
    * opens, and the rail's hover prefetch a fraction of a second earlier. The window is what makes the
    * second one free — and it is short because the socket, not this call, is what keeps the roster
    * current once a pane is watching.
@@ -635,12 +625,12 @@ export const managedAgentStore = {
    *
    * A session the store already holds is read on from where its events are whole
    * (`completeThrough`), not from the start. The ledger appends, and when it drops a tool call's
-   * superseded row the call's new state lands past every mark (server/sessions/ledgerFold.ts). So
-   * every row below the mark is one the store has already, and reading them again was the whole cost
-   * of switching back to a task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of
-   * paging for a 16,000-event one. The turns, the requests and the row still come back whole, because they change in ways no
-   * frame reports: a turn queued from another window, a request expired by a stop. So this answers
-   * what a full read would, for the size of the turns and requests plus whatever the socket missed.
+   * superseded row the call's new state lands past every mark (`LedgerFold` on the node). So every row
+   * below the mark is one the store has already, and reading them again would be the whole cost of
+   * switching back to a task. The turns, the requests and the row still come back whole, because they
+   * change in ways no frame reports: a turn queued from another window, a request expired by a stop.
+   * So this answers what a full read would, for the size of the turns and requests plus whatever the
+   * socket missed.
    */
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
     const inflight = snapshotLoads.get(sessionId)
@@ -719,16 +709,16 @@ export const managedAgentStore = {
   upsertSession,
   upsertSessions,
   removeSession,
-  // Drop every node-scoped entry. Called on a node switch (apps/desktop's scopedEviction.ts): sessions,
-  // snapshots and session ids are all minted by one node, and two nodes may hold the same UUID
-  // (docs/architecture/fleet.md § Fan-out and partial results). Without this, the Agent Center renders node A's
-  // roster under node B and `loadSnapshot` merges B's transcript into A's cached snapshot for a
-  // colliding id.
+  captureRead,
+  // Drop every node-scoped entry. Called on a node switch (the `onScopeEvicted` listener below):
+  // sessions, snapshots and session ids are all minted by one node, and two nodes may hold the same UUID
+  // (docs/architecture/fleet.md § Fan-out and partial results). Without this, the Agent Center renders
+  // node A's roster under node B and `loadSnapshot` merges B's transcript into A's cached snapshot for
+  // a colliding id.
   //
   // `deletedSessionIds` goes too: suppressing an upsert is a judgement about one node's ids, and
   // keeping it would silently swallow the new node's first events for any id that collided. The
   // attention gate clears itself on the same event (client-core deliver.ts).
-  captureRead,
   clear(): void {
     storeContents.next()
     holds.clear()
@@ -756,12 +746,12 @@ export const managedAgentStore = {
 export function activateManagedAgentNotifications(): () => void {
   const release = managedAgentStore.activate()
   // The prime waits for a node that can answer rather than firing at activation. `acorn` draws the
-  // shell in front of a node it started and has not heard from yet (docs/tui/process.md § Attach or start),
-  // so a prime at activation failed with ECONNREFUSED on every launch, for a request that was never
-  // going to land — and printed a stack onto a terminal the renderer owns.
+  // shell in front of a node it started and has not heard from yet
+  // (docs/tui/process.md § Attach or start), so a prime at activation would fail with ECONNREFUSED and
+  // print a stack onto a terminal the renderer owns.
   //
   // Keyed on the node rather than run once, so switching nodes primes the new one. `onScopeEvicted`
-  // below clears the store on that switch and nothing refilled it until Agent Center was opened.
+  // below clears the store on that switch, and nothing else refills it until Agent Center opens.
   //
   // Still caught. A node that is reachable can still refuse this — its agents plugin may be disabled
   // — and the rejection has nothing between it and an unhandled promise rejection. An empty roster is
@@ -784,8 +774,8 @@ export function activateManagedAgentNotifications(): () => void {
   }
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in the shell, so this signal and the thing that clears it are one edit
+// apart (the reasoning sits on `onScopeEvicted` in client-core).
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') managedAgentStore.clear()
 })

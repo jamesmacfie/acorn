@@ -7,7 +7,7 @@ import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
-// point the agent asked, by the card for its own `request` event (./AgentEventCard.tsx), so that
+// point the agent asked, by the card for its own `request` event (`AgentEventCard`), so that
 // answering it happens where the reader is already looking and the thread keeps the interruption in
 // order. The task sidebar's "Needs you" list is how a reader reaches one in a session they are not on.
 export default function AgentRequestCard(props: {

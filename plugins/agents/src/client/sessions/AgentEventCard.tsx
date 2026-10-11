@@ -196,11 +196,10 @@ export default function AgentEventCard(props: {
       {/*
         Every branch below uses Show's callback child form, `{(_shown) => ...}`, and reads the event
         through a getter. Solid calls that callback untracked, which is the whole point: Show reads its
-        children inside its own memo, so a branch that touched `event()` while building itself made the
-        memo depend on it — and the projection hands out a fresh event object for every card an event
-        changes, and for every card on a rebuild, so arriving messages rebuilt the DOM of those cards.
-        Anything the reader had opened went with it: an open fold snapped shut, and the fold state
-        below reseeded from the new event.
+        children inside its own memo, so a branch that touched `event()` while building itself would make
+        the memo depend on it. The projection hands out a fresh event object for every card an event
+        changes, and for every card on a rebuild, so arriving messages would rebuild those cards' DOM,
+        shutting any open fold and reseeding the fold state below from the new event.
       */}
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
@@ -226,7 +225,7 @@ export default function AgentEventCard(props: {
                     </Text>
                   </Inline>
                   {/* The reader's own message has no menu of its own. It gets the Copy menu only when
-                      another plugin offers a row on it, so with none the card is as it always was. */}
+                      another plugin offers a row on it. */}
                   <Show when={transcriptMenuRows(messageTarget()).length}>
                     <CopyOutputMenu
                       text={() => shownMessageText(message(), props.turn)}
@@ -387,9 +386,9 @@ export default function AgentEventCard(props: {
                 </Button>
               }
             >
-              {/* `Index`, not `For`, for the reason AgentTranscript states: a child an event changed
-                  is a new object, and a rebuild makes every child one, so reference keying would
-                  replace this DOM, and any selection in it, as the run streams. */}
+              {/* `Index`, not `For`: a child an event changed is a new object, and a rebuild makes
+                  every child one, so reference keying would replace this DOM, and any selection in it,
+                  as the run streams. */}
               <Stack gap="row">
                 <Index each={children()}>
                   {(child) => (
@@ -568,7 +567,7 @@ export default function AgentEventCard(props: {
                     {asked().title}
                   </Heading>
                   {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
-                    grant who holds it. An older row has no approval and reads as it always did. */}
+                    grant who holds it. A row stored without an approval draws no app line. */}
                   <Show when={appApprovalOf(asked().approval)}>
                     {(approval) => (
                       <Stack gap="row">
@@ -651,8 +650,8 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'turn_completed'}>
         {/* The turn's own footer: what ended it on the left, how much of the model's context window it
             had used on the right. The figure is stamped onto the item by the fold, because the usage
-            that carries it is a separate event and often arrives after this one
-            (./conversationItems.ts § stampTurnContext). A declined turn also says so in words, because
+            that carries it is a separate event and often arrives after this one (`stampTurnContext`).
+            A declined turn also says so in words, because
             a safety refusal otherwise looks like a turn that finished with a short answer. */}
         <Show
           when={(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason === 'refusal'}

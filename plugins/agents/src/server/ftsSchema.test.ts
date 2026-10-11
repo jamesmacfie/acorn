@@ -7,8 +7,8 @@ import { AgentSearchProjection } from './sessions/searchProjection'
 // FTS5 schema drift guard. See docs/data-layer/migrations.md § Migrations for why this table and its triggers are
 // hand-written into the migration instead of the Drizzle schema.
 //
-// Uses a per-plugin database, because the migration chain that creates these four objects
-// (migrations/0000_*.sql) is this plugin's own.
+// Uses a per-plugin database, because the migration chain that creates these four objects is this
+// plugin's own.
 describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 

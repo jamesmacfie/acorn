@@ -290,8 +290,8 @@ export function validateAgentPricingPreferences(
   }
 
   const claudePricing = readProvider('Claude', claude, claudePriceCatalog)
-  // Version 1 originally held Claude alone. An absent Codex block is an old valid value, not a reason
-  // to throw away the owner's Claude overrides.
+  // A version 1 value may hold Claude alone. An absent Codex block is valid, not a reason to throw
+  // away the owner's Claude overrides.
   const codexPricing =
     root.codex === undefined
       ? { overrides: [], customModels: [] }

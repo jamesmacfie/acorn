@@ -3,8 +3,8 @@
 // A `.tsx` rather than a case in `./managedStore.test.ts`, because this is the one thing in the store
 // that is reactive. The `logic` project runs `.test.ts` in bare Node with no `browser` condition, so
 // solid-js resolves to its server build and every effect there is dead on arrival; the `hosts`
-// project runs `.tsx` under jsdom with the browser build (plugins/vitest.shared.ts). Same split
-// `toolFoldPrefs` already uses, and the reason its two files sit beside each other.
+// project runs `.tsx` under jsdom with the browser build (plugins/vitest.shared.ts). `toolFoldPrefs`
+// splits its tests the same way.
 import { describe, expect, it, vi } from 'vitest'
 import { createEffect, createRoot, createSignal } from 'solid-js'
 import type { AgentSession } from '../../contract/wire.ts'
@@ -47,9 +47,9 @@ describe('priming the managed-session roster', () => {
     setTestNodeState('offline')
     activateManagedAgentNotifications()
     await settle()
-    // The regression this exists for: `acorn` draws its shell in front of a node it just started
-    // (docs/tui/process.md § Attach or start), so a prime at activation was a request that could only come
-    // back ECONNREFUSED, with a stack printed onto a terminal the renderer owns.
+    // `acorn` draws its shell in front of a node it just started
+    // (docs/tui/process.md § Attach or start), so a prime at activation could only come back
+    // ECONNREFUSED, with a stack printed onto a terminal the renderer owns.
     expect(sessionCalls).toHaveLength(0)
 
     setTestNodeState('online')
@@ -65,7 +65,7 @@ describe('priming the managed-session roster', () => {
     expect(sessionCalls).toHaveLength(1)
 
     // A switch is the one thing that does re-prime. `onScopeEvicted` clears the store on that switch,
-    // and nothing refilled it until somebody opened Agent Center.
+    // and nothing else refills it until somebody opens Agent Center.
     setTestNodeId('node-b')
     await settle()
     expect(sessionCalls).toHaveLength(2)
@@ -98,8 +98,8 @@ describe('a page of sessions', () => {
     await settle()
 
     // The number that matters is how many times the roster published, not what it holds. Agent Center
-    // rebuilds and re-sorts its list on every publish, so a page walked row by row cost one rebuild
-    // per session in the workspace.
+    // rebuilds and re-sorts its list on every publish, so a page walked row by row would cost one
+    // rebuild per session in the workspace.
     expect(lengths).toEqual([0, 3])
     expect(managedAgentStore.sessions().map((session) => session.id)).toEqual(['s1', 's2', 's3'])
   })

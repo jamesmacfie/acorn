@@ -40,7 +40,7 @@ import { agentProvidersOptions, refreshAgentProviders } from '../providersClient
 // The pane is a `list-detail` layout, so the sidebar and the conversation are two components the host
 // mounts side by side (docs/panes/models.md § Pane models). Which session is open, what went wrong, and
 // which dialog is up are shared between them, so none of it can live in either. Held once per task,
-// the same shape github's PR pane uses for the pull it is showing (github/pullDetail/prTabs.ts).
+// the same shape github's PR pane uses for the pull it is showing (`prTabsModel`).
 
 export type SessionAction = {
   id: string
@@ -150,10 +150,10 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
     .finally(() => setRosterSettled(true))
 
-  // No snapshot load here. The conversation owns that, because it is the thing that needs one and it
-  // is mounted in two panes now (./AgentConversation.tsx). Loading it here as well made two requests
-  // for the same few thousand event rows every time a session opened. What is left is clearing the
-  // pane's own error when the reader moves on.
+  // No snapshot load here. The conversation (`AgentConversation`) owns that, because it is the thing
+  // that needs one and it can be mounted in two panes. Loading it here as well would make two requests
+  // for the same event rows every time a session opened. What is left is clearing the pane's own error
+  // when the reader moves on.
   createEffect(on(selectedSessionId, () => setError('')))
 
   // Acknowledge on view. The node keeps `attention: completed` until the owner speaks again, so a

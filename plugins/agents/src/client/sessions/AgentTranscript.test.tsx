@@ -4,11 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentEventRecord, AgentNormalizedEvent, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
 import type { TimelineControls } from '@acorn/plugin-api/ui'
 
-// How a row finds its turn.
-//
-// The row body used to call `props.snapshot.turns.find(...)`, which is rows times turns on every
-// render of the list — and the list re-renders about 25 times a second while a session streams. One
-// memoized map above the `Index` answers the same question once per turn.
+// How a row finds its turn: through one memoized map above the list, not a `turns.find(...)` per row,
+// which would cost rows times turns on every render while a session streams.
 
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: undefined }),
@@ -205,7 +202,7 @@ describe('a surviving transcript row keeping its identity', () => {
   })
 })
 
-// A streaming session sends about 25 events a second, and each one used to wake every card in the list.
+// A streaming session sends about 25 events a second, and each one must not wake every card in the list.
 describe('a streamed event reaching the transcript', () => {
   it('wakes only the card whose item it changed', () => {
     ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver

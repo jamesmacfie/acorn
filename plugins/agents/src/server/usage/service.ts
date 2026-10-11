@@ -24,8 +24,8 @@ export type AgentUsageServiceOptions = {
   ttlMs?: number
   now?: () => number
   pricingForUser?: PricingReader
-  // Read per refresh, never captured. Harnesses arrive and leave with the plugins that contribute them
-  // (./collectors.ts), so resolving the list at construction would freeze the boot-time set.
+  // Read per refresh, never captured. Harnesses arrive and leave with the plugins that contribute them,
+  // so resolving the list at construction would freeze the boot-time set.
   collectors?: AgentUsageCollectorRegistry
   /** A fresh snapshot landed; a consumer re-reads the route rather than running its own poll. */
   onRefreshed?: () => void

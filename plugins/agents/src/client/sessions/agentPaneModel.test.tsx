@@ -115,7 +115,7 @@ it('marks read up to the newest event frame, which the row no longer carries', a
   })
   vi.useFakeTimers()
   for (let seq = 5; seq <= 9; seq++) deliver({ channel: 'agent:event', event: event(seq) })
-  // The row stays as the node last sent it: rewriting it per event woke every roster reader.
+  // The row stays as the node last sent it: rewriting it per event would wake every roster reader.
   expect(managedAgentStore.sessions()[0]).toBe(session)
   await vi.advanceTimersByTimeAsync(350)
   expect(patch).toHaveBeenCalledTimes(1)

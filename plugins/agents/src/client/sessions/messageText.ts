@@ -6,7 +6,7 @@ import type { AgentInputPart, AgentNormalizedEvent, AgentTurn } from '../../cont
 type MessageEvent = Extract<AgentNormalizedEvent, { type: 'user_message' | 'assistant_message' }>
 
 // The turn's text names each attachment as `[Attachment: <id>]`, which is what the harness is sent
-// (server/sessions/runtimeContext.ts). Once the card draws the attachments itself, the
+// (`agentTurnInputText`). Once the card draws the attachments itself, the
 // placeholder is the same fact twice, and the uglier of the two. Dropped only when there are cards to
 // draw: a truncated replay can reach a card with no turn behind it, and a reader who loses the line
 // entirely has no idea anything was attached.

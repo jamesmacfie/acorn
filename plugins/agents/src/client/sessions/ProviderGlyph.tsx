@@ -5,14 +5,13 @@ import { Icon } from '@acorn/plugin-api/ui'
 // picker's rows, and each harness's row and block in Settings -> Harnesses and defaults.
 //
 // The name comes off the descriptor, which is the node's answer rather than this file's guess, so a
-// contributed harness gets the same treatment as the two built-in ones. It may be a `brand:` mark, a
+// contributed harness gets the same treatment as the built-in ones. It may be a `brand:` mark, a
 // Lucide name, or nothing at all, which is why the label's first letter is the fallback and why the
-// mark goes through Icon: an unmatched name renders as text (docs/ui-design.md section Icons).
+// mark goes through Icon: an unmatched name renders as text (docs/ui-design/icons.md § Icons).
 //
 // `tone="brand"` is the kit asking the mark for its own colour, held to the theme's contrast. The
-// title is for the one place the mark stands alone — the session header, where it replaced a
-// "CLAUDE" eyebrow over the title — and stays off everywhere else, where the label beside it
-// already says which provider this is.
+// title is for the one place the mark stands alone, the session header, and stays off everywhere
+// else, where the label beside it already says which provider this is.
 export default function ProviderGlyph(props: { glyph?: string; label: string; title?: string }) {
   return <Icon name={props.glyph ?? props.label.slice(0, 1).toUpperCase()} tone="brand" title={props.title} />
 }

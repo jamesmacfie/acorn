@@ -158,8 +158,8 @@ describe('Codex response and TTY parsing', () => {
   })
 
   it('blames the flags, not the output, when the CLI rejects an option', () => {
-    // What codex 0.154 printed after it dropped `untrusted` from --ask-for-approval. Read as a plain
-    // parse failure, this said "/status had no limits", which sent the search to the wrong place.
+    // What codex 0.154 prints for the dropped `untrusted` value of --ask-for-approval. Read as a plain
+    // parse failure, it says "/status had no limits", which points the search at the wrong place.
     const rejected = "error: invalid value 'untrusted' for '--ask-for-approval <APPROVAL_POLICY>'"
     expect(() => parseCodexTtyOutput(rejected)).toThrowError(
       expect.objectContaining({ code: 'execution_failure', message: expect.stringContaining('rejected the options') }),

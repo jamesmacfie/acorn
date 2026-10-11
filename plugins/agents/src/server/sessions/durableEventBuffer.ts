@@ -15,8 +15,7 @@ export const isAppendDelta = (event: AgentNormalizedEvent): event is DeltaEvent 
   (event.type === 'assistant_message' || event.type === 'reasoning') && event.append === true
 
 // Two events are one streamed message when both are append deltas of the same kind, turn and message id.
-// The buffer coalesces on this, and the repository indexes each such message once for search
-// (store.ts § recordEvent).
+// The buffer coalesces on this, and AgentStore.recordEvent indexes each such message once for search.
 export const continuesStream = (
   previous: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
   next: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,

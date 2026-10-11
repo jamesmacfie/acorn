@@ -195,8 +195,8 @@ export async function startCodexSession(
       }
       // Routed before it is normalized as the session's own. A Codex subagent is a full app-server
       // thread on this same connection, so an unrouted child `turn/completed` would end the parent's
-      // turn and an unrouted child status would flip the parent's state (drivers/codexChildRouting.ts
-      // states the hazards and the capture they came from).
+      // turn and an unrouted child status would flip the parent's state (CodexChildRouter states the
+      // hazards and the capture they came from).
       const routed = childRouter.route(notification)
       if (routed.to === 'subagent') {
         for (const event of routed.events) emit(event.type === 'tool' ? { ...event, acornTurnId: null } : event)

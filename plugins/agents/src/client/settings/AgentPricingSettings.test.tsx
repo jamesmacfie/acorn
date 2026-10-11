@@ -1,10 +1,10 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Settings → Limits and cost, its pricing sections. The tables are the reason the kit's row nodes take children rather than
-// data: every price cell is an `Input` with a handler, and a row's Reset has to find its own row. Each
-// price saves when its field is committed, and the stored record is a signal here so a save is seen by
-// the page the way the query cache would show it.
+// Settings → Limits and cost, its pricing sections. The tables are the reason the kit's row nodes take
+// children rather than data: every price cell is an `Input` with a handler, and a row's Reset has to
+// find its own row. Each price saves when its field is committed, and the stored record is a signal
+// here so a save is seen by the page the way the query cache would show it.
 
 const saveAgentPricing = vi.fn(async (preferences: unknown) => preferences)
 const cache = vi.hoisted(() => ({ set: (_value: unknown) => {}, get: (): unknown => undefined }))

@@ -1,7 +1,7 @@
 // A long managed-agent session for the large-surface fixture (docs/testing/desktop.md § The large-surface fixture).
 //
 // Generated from a seed and written through this plugin's own store, the way an imported transcript
-// is (../server/sessions/runtime.ts § importTranscript): a session row, then per turn an enqueue, a
+// is (`importTranscript`): a session row, then per turn an enqueue, a
 // dispatch, a start, its events, and `turn_completed`. So the session, turn, event and request rows
 // relate exactly as they do for a real run, and the client's `loadSnapshot` pages through it the same
 // way. The session ends `stopped` and every request is resolved, so a node booting over it has

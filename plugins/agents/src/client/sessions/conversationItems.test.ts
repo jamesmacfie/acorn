@@ -236,10 +236,8 @@ describe('conversation projection', () => {
 
   it('folds an untagged mid-call update into the subagent that opened the call', () => {
     // Claude's adapter tags a subagent's `tool_call` and its final `tool_call_update` with the owning
-    // agent and leaves the one in between untagged. This used to be looked up per stream, so that
-    // middle update could not find its card and opened a second one at the top level, titled with the
-    // raw tool id because a mid-call update carries no title either. Seven of them in a two-subagent
-    // capture.
+    // agent and leaves the one in between untagged. Looked up per stream, that middle update would miss
+    // its card and open a second one at the top level, titled with the raw tool id.
     const items = buildConversationItems([
       event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
       event(2, {
@@ -289,8 +287,8 @@ describe('conversation projection', () => {
   })
 
   it('puts a subagent\u2019s file change in the subagent\u2019s run', () => {
-    // A subagent's run has to show what it changed, not only which tool it ran. The diff used to render
-    // in the parent's stream while the Edit call that produced it sat inside the subagent's card.
+    // A subagent's run has to show what it changed, not only which tool it ran, so the diff must not
+    // land in the parent's stream while the Edit call that produced it sits inside the subagent's card.
     const items = buildConversationItems([
       event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
       event(2, { type: 'tool', tool: { id: 'edit-1', title: 'Edit src/a.ts', subagentId: 'sub-1' } }),
@@ -611,7 +609,7 @@ describe('a transcript the node folded', () => {
 
 describe('the projection a streaming transcript keeps', () => {
   // What a card sees when one more event arrives: the object it already has, unless that event is its.
-  // The array is the store's, which grows in place (managedStore.ts § appendEvent).
+  // The array is the store's, which grows in place (`appendEvent`).
   const before = () => [
     event(1, { type: 'user_message', text: 'go' }, 'turn-1'),
     event(2, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } }, 'turn-1'),
@@ -661,7 +659,7 @@ describe('the projection a streaming transcript keeps', () => {
 
   it('takes the store merging a usage update into the line in place', () => {
     const { events, project, held } = open()
-    // What managedStore.ts § foldUsage does: same id, same seq, a new running total.
+    // What the store's `foldUsage` does: same id, same seq, a new running total.
     events[3] = { ...events[3], event: { type: 'usage', usage: { contextUsed: 1_200 } } }
     const items = project(events)
     expect(items).toEqual(buildConversationItems(events))

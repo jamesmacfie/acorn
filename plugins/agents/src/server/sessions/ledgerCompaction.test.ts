@@ -1,5 +1,5 @@
 // The background pass over rows stored before the ledger fold, against a real migrated database. The
-// ledger here is written the old way, one row per update, so the pass has something to do.
+// ledger here is written one row per update, unfolded, so the pass has something to do.
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { asc, eq, sql } from 'drizzle-orm'
@@ -46,7 +46,7 @@ describe('ledger compaction', () => {
     ctx.cleanup()
   })
 
-  // A session whose ledger was written one row per update, the way it was before the fold.
+  // A session whose ledger was written one row per update, unfolded.
   const oldSession = async (events: Array<[turnId: string | null, event: AgentNormalizedEvent]>) => {
     const { id } = await store.createSession(
       {

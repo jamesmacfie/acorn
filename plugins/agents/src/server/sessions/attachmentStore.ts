@@ -57,8 +57,8 @@ const TEXT_EXTENSIONS = new Set([
   'log',
 ])
 
-/** The two image families the editor seam accepts, sniffed rather than believed
- *  (../../contract/draftAttachments.ts).
+/** The two image families the editor seam (AGENTS_DRAFT_ATTACHMENTS) accepts, sniffed rather than
+ *  believed.
  *
  *  Deliberately narrower than what `upload` takes. GIF and WebP may be animated, so a plugin that
  *  decoded one to a canvas and re-encoded it would silently flatten it to a single frame, and a PDF is
@@ -325,7 +325,7 @@ export class AgentAttachmentStore {
   }
 
   /** Did a turn of this session claim this attachment? An attachment belongs to a task, and this is
-   *  what ties it to one session's transcript (../../contract/transcriptMedia.ts). */
+   *  what ties it to one session's transcript (AGENTS_TRANSCRIPT_MEDIA). */
   async sentIn(sessionId: string, id: string): Promise<boolean> {
     const [reference] = await this.db
       .select({ attachmentId: schema.agentAttachmentRefs.attachmentId })

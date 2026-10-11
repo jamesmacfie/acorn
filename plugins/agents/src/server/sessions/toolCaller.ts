@@ -8,7 +8,7 @@ const log = createLogger('agents:tool-caller', 'agents')
 const SETTLED = new Set<string>(['completed', 'cancelled', 'failed', 'interrupted'])
 
 /** The `agents.toolCaller` capability over this plugin's own session rows, plus the feed the lifecycle
- *  publisher calls for each turn change (../../node/index.ts). */
+ *  publisher calls for each turn change. */
 export function createToolCallers(store: Pick<AgentStore, 'getSession' | 'activeTurn'>) {
   const listeners = new Set<(turn: AgentSettledTurn) => void>()
   const lookup: AgentToolCallerLookup = {

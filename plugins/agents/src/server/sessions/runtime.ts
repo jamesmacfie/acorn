@@ -35,9 +35,8 @@ import { agentDriverRegistry } from '../drivers/registry'
 import { ProviderCatalogue } from './providerCatalogue'
 import { isActiveSubagent } from './stateMachine'
 
-// Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
-// synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
-// 95th percentile, about 22,000 rows a second. A step of 500 doubled the median for little gain.
+// Events deleted per step by removeArchivedHistory. Each is a row and its search row. A step this size
+// holds the node for milliseconds, and a larger one holds it longer for little gain.
 const HISTORY_BATCH = 200
 
 /**
@@ -58,9 +57,8 @@ const assertOfferedOption = (request: AgentRequest, resolution: unknown): void =
 /**
  * The managed-agent runtime: the one object routes, capabilities, and the composition root talk to.
  * Its methods are the session commands and lifecycle steps. Its fields are the collaborators a caller
- * reaches directly, each the owner of what it does. ManagedAgentEngine (./runtimeEngine.ts) runs
- * provider processes, records events, and schedules turns underneath, and nothing outside this folder
- * sees it.
+ * reaches directly, each the owner of what it does. ManagedAgentEngine runs provider processes, records
+ * events, and schedules turns underneath, and nothing outside this folder sees it.
  *
  * A test that drives the engine directly builds one and passes it in.
  */
@@ -82,8 +80,8 @@ export class ManagedAgentRuntime {
   private readonly telemetry: AgentRuntimeOptions['telemetry']
   private readonly startTerminalHandoff: AgentRuntimeOptions['startTerminalHandoff']
   private readonly terminalHandoffRunning: AgentRuntimeOptions['terminalHandoffRunning']
-  // Bridge asks waiting on the person, by request id (./loopHooks.ts § holdAsk). loopHook() holds
-  // them and resolveRequest() answers them.
+  // Bridge asks waiting on the person, by request id. holdAsk, reached through loopHook(), holds them
+  // and resolveRequest() answers them.
   private readonly loopAsks = new Map<string, (resolution: unknown) => void>()
 
   constructor(
@@ -114,7 +112,7 @@ export class ManagedAgentRuntime {
   /**
    * Recovers what the last process left: sessions it was running are stopped, children it never heard
    * finish go idle, and turns it queued start draining. Called from the composition root after the
-   * listener binds, because it interrupts every unsettled session (../../contract/runtime.ts).
+   * listener binds, because it interrupts every unsettled session (AGENTS_RUNTIME).
    */
   async reconcile(): Promise<void> {
     for (const session of await this.store.unsettledSessions()) {
@@ -151,7 +149,7 @@ export class ManagedAgentRuntime {
     this.engine.compactLedgersInBackground()
   }
 
-  /** One bridge call, for the session and task the caller's token names (./loopHooks.ts). */
+  /** One bridge call, for the session and task the caller's token names. */
   async loopHook(
     caller: { taskId: string; sessionId: string },
     request: AgentLoopHookRequest,
@@ -235,7 +233,7 @@ export class ManagedAgentRuntime {
   /**
    * Interactive HTTP creation is acknowledged once the row is durable. The provider handshake keeps
    * running under runtime ownership and publishes its lifecycle over the existing agent WebSocket.
-   * Internal workflow callers keep using createSession(), whose ready-on-return contract is unchanged.
+   * Internal workflow callers use createSession(), which returns once the session is ready.
    */
   async acceptSession(input: CreateAgentSessionInput, idempotencyKey?: string): Promise<AgentSession> {
     if (input.kind !== 'interactive' && input.kind !== 'delegated') return this.createSession(input, idempotencyKey)
@@ -316,7 +314,7 @@ export class ManagedAgentRuntime {
    * apply once the provider has listed its own, and the tool ceiling. A ceiling the caller already set
    * is narrowed by the agent's, never replaced. A session with no `customAgentId` keeps whatever
    * `config` it was given, which is how a fork carries its source's snapshot; the HTTP route is where a
-   * client's own `customAgent` is dropped (../routes/managed.ts).
+   * client's own `customAgent` is dropped.
    */
   private async withCustomAgent(input: CreateAgentSessionInput): Promise<CreateAgentSessionInput> {
     if (!input.customAgentId) return input
@@ -585,7 +583,7 @@ export class ManagedAgentRuntime {
     if (!claim.claimed) return claim.request
     const session = await this.store.requireSession(sessionId)
     try {
-      // A bridge's ask is held here, not parked in the harness (./loopHooks.ts).
+      // A bridge's ask is held here, not parked in the harness (holdAsk).
       const answerAsk = this.loopAsks.get(providerRequestId)
       if (answerAsk) answerAsk(resolution)
       else {
@@ -743,7 +741,7 @@ export class ManagedAgentRuntime {
     if (locked) throw new Error(locked)
     const known = new Set((await this.mcpServers.list()).map((server) => server.name))
     const unknown = enabled.filter((name) => !known.has(name))
-    // Worded for the bridge's status mapping (../routes/managedBridge.ts): "not found" is a 404.
+    // Worded for the bridge's status mapping: "not found" is a 404.
     if (unknown.length) throw new Error(`MCP server not found: ${unknown.join(', ')}.`)
     const previous = sessionMcpSelection(before.config)
     const next = [...new Set(enabled)].sort()
@@ -842,9 +840,9 @@ export class ManagedAgentRuntime {
 
   /**
    * Removes the stored history of the sessions of the tasks `taskIds` names, for the retention
-   * schedule (docs/data-layer/backup-and-retention.md § Retention). The rows stay, each with `note` as its transcript, so
-   * the task still lists them. Provider-side sessions are left alone: deleting one would mean
-   * starting its CLI, and the node's disk is what this is for.
+   * schedule (docs/data-layer/backup-and-retention.md § Retention). The rows stay, each with `note` as
+   * its transcript, so the task still lists them. Provider-side sessions are left alone: deleting one
+   * would mean starting its CLI, and the node's disk is what this is for.
    *
    * SQLite is synchronous here and a first pass can have a million rows to delete, so each step is one
    * small transaction and the node gets a turn between steps. `taskIds` is asked again before each
@@ -886,14 +884,13 @@ export class ManagedAgentRuntime {
       }
       await new Promise((resolve) => setImmediate(resolve))
     }
-    // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts says what merging
-    // gets back).
+    // Each deleted event left a tombstone in the search index until a merge (mergeSearchIndex).
     if (totals.events && !this.engine.isStopped) await mergeSearchIndex(this.db, undefined, options.signal)
     return totals
   }
 
-  /** Deletes everything this plugin holds for deleted tasks (./deletedTaskPurge.ts). Loaded on first
-   *  use, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs). */
+  /** Deletes everything this plugin holds for deleted tasks. Loaded on first use, to stay inside the
+   *  service boot budget (apps/node/scripts/check-service-budget.mjs). */
   async purgeDeletedTasks(taskIds: readonly string[], signal?: AbortSignal): Promise<number> {
     const { purgeDeletedTasks } = await import('./deletedTaskPurge')
     return purgeDeletedTasks(
@@ -959,7 +956,7 @@ export class ManagedAgentRuntime {
   }
 
   /** An export is publication: with blocking on, the exact serialized bytes pass the secret gate
-   *  first (./secretPublication.ts). */
+   *  first. */
   async exportSession(
     sessionId: string,
     format: 'json' | 'markdown',

@@ -9,14 +9,13 @@ import type { Component } from 'solid-js'
 // plugin's client half provides the component, lazily, the same way it registers a settings page.
 //
 // The key lives here, with the provider, which is the ordinary case: workflows already imports this
-// plugin's contracts, so declaring it here creates no import that was not there
-// (client-core infra/node/clientCapabilities.ts states the rule). WORKFLOW_CONTROL, next door, is the
-// exception in the other direction.
+// plugin's contracts, so declaring it here adds no import (client-core infra/node/clientCapabilities.ts
+// states the rule). WORKFLOW_CONTROL, next door, is the exception in the other direction.
 //
 // A consumer holds no session ids of its own until a step finishes, so it may name the step instead.
-// Resolving that is this plugin's own business: it writes `config.workflowStepId` on the session when
-// a step starts it (../server/sessions/sessionExecute.ts), and the client roster carries every session
-// on the node, so the answer needs no request and arrives while the step is still running.
+// This plugin writes `config.workflowStepId` on the session when a step starts it, and the client
+// roster carries every session on the node, so the answer needs no request and arrives while the step
+// is still running.
 
 export type AgentConversationProps = {
   /** The session to draw, when the caller knows it. */

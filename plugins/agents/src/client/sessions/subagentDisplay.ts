@@ -24,7 +24,7 @@ export const subagentStatusLabel = (status: AgentSubagentStatus | undefined): st
  * unless the spawn asked for another one. It only shows when the harness has not named the child's own
  * model: Codex never does, and Claude only does once the child has finished.
  *
- * ponytail: an inherited model is an assumption, not a report. Codex does carry a model on the
+ * An inherited model is an assumption, not a report. Codex does carry a model on the
  * `collabAgentToolCall` item that spawns a child, so read that if a session ever runs children on a
  * model the parent is not on.
  */

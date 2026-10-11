@@ -107,7 +107,7 @@ export async function acpPrompt(
               mimeType: attachment.mediaType,
             }
           }
-          // The store decodes every text attachment to UTF-8 (attachmentStore.ts).
+          // The attachment store decodes every text attachment to UTF-8.
           if (capabilities.embeddedContext && attachment.mediaType.startsWith('text/')) {
             return {
               type: 'resource',
@@ -260,8 +260,9 @@ export async function startAcpSession(
   // Read the spec here, not through `this` below. The returned literal's methods rebind `this` to
   // the literal.
   const { id, label, quirks } = spec
-  // The SDK loads here, not at the top of the file. Building its generated schemas takes about 30 ms,
-  // the node loads this module on every boot, and most launches never start an ACP session.
+  // The SDK loads here, not at the top of the file. Building its generated schemas is a startup cost
+  // (measureAgentStartup records it), the node loads this module on every boot, and most launches never
+  // start an ACP session.
   const { ClientSideConnection, ndJsonStream, RequestError } = await measureAgentStartup(
     options,
     'driver.load',
@@ -289,9 +290,9 @@ export async function startAcpSession(
       ...launch.env,
     },
   })
-  // The node's log, not the transcript. An adapter writes its startup banner here, so this used to put
-  // a permanent row in the reader's conversation on every spawn, saying only how many bytes it could
-  // not show them. The content stays unlogged either way (docs/security.md, credential handling).
+  // The node's log, not the transcript: an adapter writes its startup banner here, which would put a
+  // useless row in the reader's conversation on every spawn. The content stays unlogged
+  // (docs/security.md, credential handling).
   child.stderr.on('data', (chunk: Buffer) => {
     if (chunk.byteLength) log.warn(providerStderrNotice(label, chunk.byteLength))
   })
@@ -438,8 +439,8 @@ export async function startAcpSession(
         : await measureAgentStartup(options, 'provider.session.load', async () => agent.loadSession!(reference))
       configOptions = reconnected?.configOptions ?? []
     } catch (error) {
-      // The agent no longer holds the session this row points at. Claude Code, for one, keys its
-      // store by working directory, so a checkout that moved or a pruned transcript both land here.
+      // The agent doesn't hold the session this row points at. Claude Code, for one, keys its store
+      // by working directory, so a checkout that moved or a pruned transcript both land here.
       // Without the fallback the row's dead reference is retried on every start, the queued turn
       // never dispatches, and the session is stuck reporting provider_start_failed.
       //

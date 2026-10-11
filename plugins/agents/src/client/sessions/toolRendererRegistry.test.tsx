@@ -188,7 +188,7 @@ it('honours the reader’s fold setting rather than the call’s status', () => 
 })
 
 it('still draws a historic status-only row as the flat one it has always been', () => {
-  // Every Codex web call recorded before this change: normalization threw the rest away, and no
+  // An older stored Codex web call holds only a status: normalization dropped the rest, and no
   // migration puts it back.
   const host = draw({ id: 't', title: 'Web search', kind: 'search', status: 'completed' })
   expect(host.querySelector('details')).toBeNull()

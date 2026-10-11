@@ -1,7 +1,7 @@
 import type { AgentNormalizedEvent, AgentRequest } from '../../contract/wire.ts'
 
 // What the agent asked and what it was told, for the card that keeps the exchange in the thread
-// (./AgentEventCard.tsx). Two sources on purpose: the event is what was asked, and it never changes,
+// (`AgentEventCard`). Two sources on purpose: the event is what was asked, and it never changes,
 // while the request row carries what happened to it and keeps changing until somebody answers.
 
 export type AgentAskedQuestion = {
@@ -18,7 +18,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value != null ? (value as Record<string, unknown>) : {}
 
 // One answer, one or many, as the card wrote it: labels, because that is what both harnesses record as
-// what the person said (./AgentRequestCard.tsx).
+// what the person said (`AgentRequestCard`).
 const picked = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
   return typeof value === 'string' && value ? [value] : []

@@ -19,9 +19,9 @@ describe('the claude-code profile', () => {
     })
   })
 
-  // Asserts the whole array, not `toContain` per flag. A per-flag check missed a dropped `-p`, which
+  // Asserts the whole array, not `toContain` per flag. A per-flag check misses a dropped `-p`, which
   // leaves the headless runner waiting forever on a prompt, and a dropped `--verbose`, which
-  // `-p --output-format stream-json` requires. It also let an inserted
+  // `-p --output-format stream-json` requires. It also lets an inserted
   // `--dangerously-skip-permissions --add-dir /` through, widening what a headless agent may do.
   //
   // Only the no-options invocation gets full equality, because it is the one case with a fixed answer.
@@ -31,7 +31,7 @@ describe('the claude-code profile', () => {
     expect(file).toBe('claude')
     // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; `auto` is why
     // a headless agent neither blocks on the first tool approval with nobody there to answer it nor has every
-    // acorn tool denied out from under it, which is what `dontAsk` did. The prompt is last and positional; a
+    // acorn tool denied out from under it, which is what `dontAsk` does. The prompt is last and positional; a
     // flag inserted after it would be read as part of it.
     expect(args).toEqual([
       '-p',
@@ -77,8 +77,8 @@ describe('the claude-code profile', () => {
   })
 
   it('resumes by session reference, which is what the terminal handoff spawns', () => {
-    // plugins/agents' handoff runs this in a real PTY (contract/sessionsClient.ts § create), so the shape has
-    // a second consumer beyond the headless runner.
+    // plugins/agents' handoff runs this in a real PTY through the terminal plugin's sessions client, so
+    // the shape has a second consumer beyond the headless runner.
     expect(claudeCodeProfile.resumeArgv!('claude', 'sess-1')).toEqual({ file: 'claude', args: ['--resume', 'sess-1'] })
   })
 

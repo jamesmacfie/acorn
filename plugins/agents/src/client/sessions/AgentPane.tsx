@@ -55,9 +55,8 @@ import { AGENT_PANE_ID } from '../paneIdentity'
 export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   const pricing = createQuery(() => agentPricingOptions())
-  // A session a workflow started says so, and the chip opens the run that started it. The session row
-  // has carried `kind` and `workflowRunId` since the runtime wrote them; nothing read either until
-  // the run pane existed to open (docs/managed-agents/sessions.md § Sessions).
+  // A session a workflow started says so, and the chip opens the run that started it
+  // (docs/managed-agents/sessions.md § Sessions).
   //
   // Resolved per call, never captured: a node with workflows disabled answers `undefined` here, and
   // the chip is simply absent.
@@ -67,9 +66,8 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   )
   return (
     <Toolbar ariaLabel="Agent session">
-      {/* The provider's mark, then the title, on one line. It used to be a "CLAUDE" eyebrow stacked
-          over the title, which made the bar two lines tall for a fact the mark carries in one
-          glyph. The mark takes the title here because nothing beside it names the provider. */}
+      {/* The provider's mark, then the title, on one line. The mark takes the title here because
+          nothing beside it names the provider. */}
       <Show when={model.selected()?.providerId}>
         {(providerId) => (
           <ProviderGlyph glyph={providerMarkName(providerId())} label={providerId()} title={providerId()} />
@@ -155,8 +153,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               >
                 Stop
               </Button>
-              {/* Was a Picker — a filter input over five or six actions, which is the wrong
-                affordance: nobody types to find "Rename session". A Menu is the shape. */}
+              {/* A Menu, not a Picker: nobody types to find "Rename session" among a handful of actions. */}
               <Menu
                 ariaLabel="Session actions"
                 placement="bottom-end"
@@ -172,7 +169,8 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
                   >
                     {(item) => (
                       <>
-                        {/* The one destructive action is last, below a rule (docs/ui-design/interaction.md § Menus and right-click). */}
+                        {/* The one destructive action is last, below a rule
+                            (docs/ui-design/interaction.md § Menus and right-click). */}
                         <Show when={item.tone === 'danger'}>
                           <Menu.Separator />
                         </Show>
@@ -283,8 +281,8 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
   )
 }
 
-/** Rename and archive. Both are dialogs rather than `window.prompt` and `window.confirm`, which are
- *  unstyled in the shell and suppressed outright in a sandboxed frame. */
+/** Summary, rename and archive. Rename and archive are dialogs rather than `window.prompt` and
+ *  `window.confirm`, which are unstyled in the shell and suppressed outright in a sandboxed frame. */
 function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
@@ -340,7 +338,7 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
 export default function AgentPaneDetail(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   const archived = () => props.task.status !== 'active'
-  // The header's ••• menu, in the palette too, for as long as this region is mounted (../commands.ts).
+  // The header's ••• menu, in the palette too, for as long as this region is mounted.
   // Not for an archived task: most of those actions start work, and the preview has nowhere to run it.
   if (!archived()) registerSessionActionCommands(model)
   // Usable once the session list has answered and the reader can see either the open session's
@@ -357,10 +355,10 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
     <>
       <AgentDetailHeader task={props.task} model={model} />
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-      {/* The transcript, the queue and the composer, addressed by session id alone
-          (./AgentConversation.tsx). The run pane draws the same three through a capability, so a
-          session reads the same way wherever you found it. This pane focuses the composer whenever
-          the reader navigates to a session or returns to its task. */}
+      {/* The transcript, the queue and the composer, addressed by session id alone. The run pane
+          draws the same three through a capability, so a session reads the same way wherever you
+          found it. This pane focuses the composer whenever the reader navigates to a session or
+          returns to its task. */}
       {/* An archived task opens read-only in the archive page's preview. Its transcripts are all still
           here, but it has no worktree to start or continue a session in, so there is nothing to type
           into and no new session to offer. */}

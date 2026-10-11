@@ -71,7 +71,7 @@ type InsertChoice = {
 //
 // The field is the kit's `MentionTextarea` (docs/ui-design/closed-kit.md § The closed kit): `@file`,
 // `/command` and `$skill` are three `sources`, and the colour behind the text is `segments`. What
-// this file still owns is what those three mean here — the worktree walk, the commands the session
+// this file owns is what those three mean here: the worktree walk, the commands the session
 // advertised, and which spans of the draft the turn will actually send as file parts.
 //
 // A colour per kind, so a path does not read as a command.
@@ -95,15 +95,14 @@ export default function AgentComposer(props: {
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
 }) {
-  // The turn's own payload and the guards over sending it belong to the session, because a session can
-  // be open in two panes and both draw a composer (./composerState.ts). Read through `shared()` on
+  // The turn's own payload and the guards over sending it belong to the session (`composerDraftState`),
+  // because a session can be open in two panes and both draw a composer. Read through `shared()` on
   // every access rather than destructured once: `props.session.id` changes without a remount, and a
   // captured pair would go on writing the previous session's draft.
   //
-  // `replacing` is the sharpest of them. It is the id of an attachment mid-swap, and submit is
-  // disabled for the duration: the editor overlay normally covers the composer, but a turn must not be
-  // able to enqueue an id that is being replaced, and correctness here cannot depend on what is on
-  // top — or on which pane the reader happens to be looking at.
+  // `replacing` is the id of an attachment mid-swap, and submit is disabled for the duration. The
+  // editor overlay normally covers the composer, but a turn must not enqueue an id that is being
+  // replaced whatever is on top or whichever pane the reader is looking at.
   const shared = createMemo(() => composerDraftState(props.session.id, activeNodeId()))
   const capture = () => {
     const state = shared()
@@ -140,7 +139,7 @@ export default function AgentComposer(props: {
   const commands = createMemo(() => {
     const value = props.session.config.commands
     const advertised = Array.isArray(value) ? (value as Array<{ name: string; description?: string }>) : []
-    // acorn answers `/mcp` itself (../sessions/AgentMcpPanel.tsx), so it is offered to every harness and
+    // acorn answers `/mcp` itself (`AgentMcpPanel`), so it is offered to every harness and
     // described as what it does here. Claude Code advertises its own, which in a session like this
     // only prints a one-line count.
     return props.onMcp
@@ -618,10 +617,9 @@ export default function AgentComposer(props: {
             // lets the selecting click reach the new backdrop and dismiss the modal immediately.
             //
             // Bare, not `window.setTimeout`: the terminal host defines `window` as an object holding
-            // `acorn` and nothing else, on the grounds that a `window` answering every question is
-            // worse than none (docs/tui/host-switch.md § Booting client-core under Node). Reaching through it
-            // threw a TypeError out of a keymap handler and this row did nothing there. The global is
-            // the same function on both hosts, and only the DOM has the delegation this defers past.
+            // `acorn` and nothing else (docs/tui/host-switch.md § Booting client-core under Node), so
+            // reaching through it throws a TypeError out of a keymap handler. The global is the same
+            // function on both hosts, and only the DOM has the delegation this defers past.
             clearTimeout(pickerTimer)
             const owner = capture()
             pickerTimer = setTimeout(() => {
@@ -650,8 +648,8 @@ export default function AgentComposer(props: {
           placement="top-start"
         />
         <Show when={contexts().length}>
-          {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own overflow
-              clipped. Popover portals it and adds Escape + outside-click. */}
+          {/* A Popover, not a <details> with an absolutely-positioned <pre>, which the composer's own
+              overflow clips. Popover portals it and adds Escape + outside-click. */}
           <Popover
             placement="top-start"
             ariaLabel="Sent context preview"

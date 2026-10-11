@@ -51,7 +51,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   uploadAttachment.mockClear()
   readJson.mockClear()
-  // The draft outlives the render now: it is the session's, in a module map (./composerState.ts), so
+  // The draft outlives the render: it is the session's, in a module map (`composerDraftState`), so
   // one test's attachment is the next one's starting state.
   clearComposerDrafts()
 })
@@ -167,8 +167,8 @@ describe('attaching files', () => {
 
     await vi.waitFor(() => expect(second.textContent).toContain('notes.md'))
     expect(first.textContent).toContain('notes.md')
-    // One upload, and one durable draft. Two component copies of the array meant two writers of the
-    // session's localStorage key and an upload that vanished when the other pane saved.
+    // One upload, and one durable draft. Two component copies of the array would mean two writers of
+    // the session's localStorage key, and an upload that vanishes when the other pane saves.
     expect(uploadAttachment).toHaveBeenCalledTimes(1)
   })
 

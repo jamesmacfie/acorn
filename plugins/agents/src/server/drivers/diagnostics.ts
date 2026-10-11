@@ -14,7 +14,7 @@ export function safeProviderMessage(value: unknown, fallback: string, secrets: I
   for (const pattern of TOKEN_PATTERNS) {
     // Only the last pattern has a capture group. `typeof` and not a truthiness check, because for a
     // pattern with no groups the replacer's second argument is the match offset, so a token at
-    // index 6 used to come back as `6<redacted>`. Core's copy of these rules is
+    // index 6 would come back as `6<redacted>`. Core's copy of these rules is
     // `packages/node-core/src/server/telemetry/scrub.ts`, and a change to either belongs in both.
     message = message.replace(pattern, (_match, prefix?: unknown) =>
       typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>',

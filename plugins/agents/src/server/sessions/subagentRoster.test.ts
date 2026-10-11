@@ -116,8 +116,7 @@ describe('subagent roster on the session row', () => {
 })
 
 // Web activity through the index, against the real FTS5 table rather than against the string the
-// protocol builds. A query is often the only durable record of why a run went the way it did, and
-// before this the Codex path discarded it at normalization, so there was nothing to find.
+// protocol builds. A query is often the only durable record of why a run went the way it did.
 describe('finding a run by what it did on the web', () => {
   let ctx: TestNodeContext
   let store: AgentStore

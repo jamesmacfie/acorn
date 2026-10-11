@@ -90,8 +90,8 @@ export function providerMetaLine(provider: AgentProviderUsage, now = Date.now())
     .join(' · ')
 }
 
-// Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row
-// (shared/usage.ts), so a harness the client has never heard of still gets named.
+// Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row,
+// so a harness the client has never heard of still gets named.
 export function usageSummaryEntries(snapshot: AgentUsageSnapshot | null): UsageSummaryEntry[] {
   return (snapshot?.providers ?? []).map((provider) => {
     const quota = sessionQuota(provider)

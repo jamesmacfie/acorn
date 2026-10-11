@@ -1,6 +1,6 @@
 // The one projection from ledger items to the public activity items (docs/managed-agents/session-events.md
 // § Activity). The frames and the rebuild read both go through it, so they can't disagree. Loaded on the
-// first activity event or read (./lifecycle.ts), to stay inside the service boot budget.
+// first activity event or read (AgentLifecycle), to stay inside the service boot budget.
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'

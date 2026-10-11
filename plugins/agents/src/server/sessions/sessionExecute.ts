@@ -1,8 +1,4 @@
-// The agents.sessionExecute implementation (contract/sessionExecute.ts).
-//
-// Moved from apps/node/src/wiring/managedWorkflowStep.ts, which existed in the app only because
-// workflows couldn't import agents. It's agents' code: every line touches ManagedAgentRuntime, its
-// session store and its turn lifecycle.
+// The agents.sessionExecute implementation (AGENTS_SESSION_EXECUTE).
 import { randomUUID } from 'node:crypto'
 import { describeError, HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
@@ -28,8 +24,8 @@ import {
 } from './sessionGoal'
 import { StepGoal, type GoalDecision } from './stepGoal'
 
-// The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
-// calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
+// The profile-to-driver map lives in the contract, so a caller can ask before it calls whether a
+// profile has a managed path at all. Nothing imports this re-export.
 export { managedProviderForProfile }
 
 function turnEvents(snapshot: AgentSessionSnapshot, turnIds: readonly string[]): StreamEvent[] {

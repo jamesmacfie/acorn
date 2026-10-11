@@ -31,9 +31,9 @@ import { sessionOrderSlice } from './sessions/sessionOrder'
 import { composerExpansionSlice } from './composer/composerPrefs'
 import { sessionContextContribution } from './sessionContextContribution'
 
-// The conversation, for whoever else has a session to draw (../contract/conversation.ts). Lazy like
-// the settings pages below: the Workflows run pane is the only other caller and most windows never
-// open one, and the terminal client holds a byte ceiling over what loads at startup
+// The conversation, for whoever else has a session to draw (`AGENTS_CONVERSATION`). Lazy like the
+// settings pages below: the Workflows run pane is the only other caller and most windows never open
+// one, and the terminal client holds a byte ceiling over what loads at startup
 // (apps/tui/scripts/check-startup-graph.mjs).
 const AgentConversation = lazy(() => import('./sessions/AgentConversation'))
 const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
@@ -56,13 +56,13 @@ export const agentsClientPlugin: ClientPlugin = {
       target: (item) => ({ kind: 'agents.session', item, pane: 'agent' }),
       presentations: ['pane'],
     })
-    // The harnesses' own marks, so a provider reads as itself wherever it is named. The node's
-    // descriptors point their `glyph` at these names (server/drivers/claudeHarness.ts, codexDriver.ts).
+    // The harnesses' own marks, so a provider reads as itself wherever it is named. The node's harness
+    // descriptors point their `glyph` at these names.
     //
     // Same artwork as `brand:model-providers/anthropic` and `brand:model-providers/openai`, copied
     // rather than borrowed: a mark belongs to the plugin that draws it, and naming another package's
     // would put the literal string `brand:model-providers/openai` on screen the moment that package is
-    // disabled. See docs/ui-design.md section Icons. From simple-icons (CC0 artwork; each trademark
+    // disabled (docs/ui-design/icons.md § Brand marks). From simple-icons (CC0 artwork; each trademark
     // remains its owner's).
     ctx.brandMarks.register({
       id: 'agents/claude',
@@ -89,10 +89,11 @@ export const agentsClientPlugin: ClientPlugin = {
       isStale,
       Card: InlineDiffCard,
     })
-    // The places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative
-    // extension points). The tool card is keyed by the harness's own name for what a call did; the
-    // attachment chip by the file's media type; the composer's action bar takes everyone who has
-    // something to offer a draft, up to the owner's ceiling because it is the owner's bar.
+    // The places another plugin may come into this pane
+    // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The tool card is
+    // keyed by the harness's own name for what a call did; the attachment chip by the file's media type;
+    // the composer's action bar takes everyone who has something to offer a draft, up to the owner's
+    // ceiling because it is the owner's bar.
     ctx.extensionPoints.register({
       id: 'tool-card',
       label: 'Agent tool call',
@@ -100,11 +101,11 @@ export const agentsClientPlugin: ClientPlugin = {
       mode: 'replace',
       max: 1,
     })
-    // `replace` is the one thing a contributor may ask this pane to do (docs/plugins/remote-points.md § Asking the
-    // owner). An editor that draws an attachment has to be able to hand back an altered one, and props
-    // are data, so without a declared action it could draw the button and never do anything with it.
-    // The composer binds the handler per attachment and decides whether to accept
-    // (./composer/AgentComposer.tsx).
+    // `replace` is the one thing a contributor may ask this pane to do
+    // (docs/plugins/remote-points.md § Asking the owner). An editor that draws an attachment has to be
+    // able to hand back an altered one, and props are data, so without a declared action it could draw
+    // the button and never do anything with it. The composer binds the handler per attachment and
+    // decides whether to accept.
     ctx.extensionPoints.register({
       id: 'attachment',
       label: 'Agent turn attachment',
@@ -113,9 +114,8 @@ export const agentsClientPlugin: ClientPlugin = {
       max: 1,
       actions: ['replace'],
     })
-    // The body of a sent attachment's tile and of an artifact card, keyed by media type
-    // (../contract/transcriptMedia.ts). No actions: stored media is read-only, and the card keeps its
-    // name, size and download outside the slot.
+    // The body of a sent attachment's tile and of an artifact card, keyed by media type. No actions:
+    // stored media is read-only, and the card keeps its name, size and download outside the slot.
     ctx.extensionPoints.register({
       id: 'transcript-attachment',
       label: 'Sent attachment',
@@ -145,7 +145,7 @@ export const agentsClientPlugin: ClientPlugin = {
       max: 2,
     })
     // A note on a request waiting for the person, such as a policy plugin's warning. Below the card's
-    // own buttons, which stay the owner's (./sessions/AgentRequestCard.tsx).
+    // own buttons, which stay the owner's (`AgentRequestCard`).
     ctx.extensionPoints.register({
       id: 'request-card',
       label: 'Agent request card',
@@ -153,8 +153,8 @@ export const agentsClientPlugin: ClientPlugin = {
       mode: 'stack',
       max: 2,
     })
-    // The task row's agent state, in the rail's top-right corner (railMarkerContribution.ts). The host
-    // owns the corner and the collision rules; this plugin only says what is true.
+    // The task row's agent state, in the rail's top-right corner. The host owns the corner and the
+    // collision rules; this plugin only says what is true.
     ctx.railMarkers.register(agentRailMarkerContribution)
     ctx.sources.register(agentCenterSourceContribution)
     ctx.contextMenus.register({
@@ -169,16 +169,16 @@ export const agentsClientPlugin: ClientPlugin = {
         void markAgentsRead()
       },
     })
-    // A terminal running one of this plugin's harness CLIs (./terminalProfileCommands.ts). The shell
-    // keeps the drawer toggle and the plain shell; it no longer knows a harness by name.
+    // A terminal running one of this plugin's harness CLIs. The shell keeps the drawer toggle and the
+    // plain shell, and knows no harness by name.
     for (const contribution of harnessTerminalCommands) ctx.commands.register(contribution)
-    // Agent Center, and a search over this task's managed sessions (./commands.ts).
+    // Agent Center, and a search over this task's managed sessions.
     for (const contribution of agentsCommands) ctx.commands.register(contribution)
     // The two agent defaults the palette can change. A mounted component rather than a line here,
-    // because both write through accessors that take a query client (./AgentCommands.tsx).
+    // because both write through accessors that take a query client.
     ctx.slots.register(agentCommandsSlotContribution)
-    // How a transcript's tool cards start out (toolFoldPrefs.ts). This device's, so the slice is
-    // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
+    // How a transcript's tool cards start out. This device's, so the slice is declared here and the key
+    // is listed as device-owned in client-core's `DEVICE_KEYS`.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
     ctx.persistedStateSlices.register(sessionOrderSlice)
     ctx.persistedStateSlices.register(composerExpansionSlice)
@@ -249,8 +249,8 @@ export const agentsClientPlugin: ClientPlugin = {
       component: AgentSessionDefaultsSettings,
     })
     // Saved starts for a session: a harness, its options, instructions and tool access
-    // (docs/managed-agents/custom-agents.md § Custom agents). "From plugins" is left out: it is only drawn while a
-    // plugin contributes an agent.
+    // (docs/managed-agents/custom-agents.md § Custom agents). "From plugins" is left out: it is only
+    // drawn while a plugin contributes an agent.
     ctx.settingsPages.register({
       id: 'custom-agents',
       label: 'Custom agents',
@@ -263,8 +263,8 @@ export const agentsClientPlugin: ClientPlugin = {
       sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
     })
-    // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself,
-    // which was core's MCP config files page. Its old id is an alias for the config files section.
+    // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself.
+    // `mcp` is an alias for the config files section, so a link to that page id lands there.
     ctx.settingsPages.register({
       id: 'agent-mcp-servers',
       label: 'MCP',
@@ -292,7 +292,7 @@ export const agentsClientPlugin: ClientPlugin = {
       component: McpSettingsPage,
     })
     // This plugin's numbers on core's Settings > Storage and memory page: running agents, their
-    // memory, and the stop for idle ones (./settings/AgentStorageSection.tsx).
+    // memory, and the stop for idle ones.
     ctx.extensions.register({
       id: 'agents.storage',
       point: CORE_STORAGE_POINT,
@@ -301,8 +301,7 @@ export const agentsClientPlugin: ClientPlugin = {
       requires: { plugin: 'agents' },
       component: AgentStorageSection,
     })
-    // The instruction file check's switch, on core's Settings > Security and backup page
-    // (./settings/AgentSecuritySection.tsx).
+    // The instruction file check's switch, on core's Settings > Security and backup page.
     ctx.extensions.register({
       id: 'agents.security',
       point: CORE_SECURITY_POINT,
@@ -311,7 +310,7 @@ export const agentsClientPlugin: ClientPlugin = {
       requires: { plugin: 'agents' },
       component: AgentSecuritySection,
     })
-    // Which harnesses a plugin's tool hooks reach, on that plugin's own page (./settings/LoopCoverageSection.tsx).
+    // Which harnesses a plugin's tool hooks reach, on that plugin's own page.
     ctx.extensions.register({
       id: 'agents.loop-coverage',
       point: CORE_PLUGIN_PAGE_POINT,
@@ -320,7 +319,7 @@ export const agentsClientPlugin: ClientPlugin = {
       requires: { plugin: 'agents' },
       component: LoopCoverageSection,
     })
-    // Concurrency and pricing, which were two pages. Their old ids are aliases, so an old link, a
+    // Concurrency and pricing. `agent-concurrency` and `agent-pricing` are aliases, so a link, a
     // remembered page or another plugin's `openSettings('agent-pricing')` lands on its section here.
     // "Unpriced models" is left out: it is only drawn while recent usage names a model with no price.
     ctx.settingsPages.register({

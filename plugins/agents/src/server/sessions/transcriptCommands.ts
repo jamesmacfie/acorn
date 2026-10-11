@@ -141,7 +141,7 @@ export class TranscriptCommands {
     }
     const lines = [`# ${snapshot.session.title}`, '', `Provider: ${snapshot.session.providerId}`, '']
     // One line per tool call with its last status. The ledger keeps a call's opener beside its latest
-    // state (./ledgerFold.ts), and listing both would say the call was still pending.
+    // state, and listing both would say the call was still pending.
     const events = foldToolEvents(snapshot.events)
     for (const turn of snapshot.turns) {
       lines.push('## User', '', agentTurnInputText(turn), '')

@@ -60,8 +60,8 @@ const complete = (row: PendingModel) =>
 // Settings → Agents → Limits and cost, the pricing sections. Every price saves when its field is
 // committed, on blur or Enter. The route takes the whole pricing record, so each commit writes the
 // stored record with that one change, and the writes run one after another so a second commit starts
-// from what the first one stored. The sections match the ones `../index.ts` declares for search;
-// ./AgentLimitsSettings.tsx puts them on the page after the concurrency ceilings.
+// from what the first one stored. The sections match the ones the plugin's registration declares for
+// search.
 export default function AgentPricingSettings() {
   const queryClient = useQueryClient()
   const pricing = createQuery(() => agentPricingOptions())
@@ -148,7 +148,7 @@ export default function AgentPricingSettings() {
 
   const unpricedModels = createMemo(() => {
     // The one `'claude'` left on the client, and it is not a branch on a closed harness set. The whole
-    // pricing table is Anthropic's model catalogue (shared/pricing.ts) and the preferences it edits are
+    // pricing table is Anthropic's model catalogue and the preferences it edits are
     // keyed `claude`, so the id names the pricing namespace rather than the harness.
     const claude = agentUsageStore.snapshot()?.providers.find((provider) => provider.provider === 'claude')
     const observed = [
@@ -301,7 +301,8 @@ export default function AgentPricingSettings() {
                           </TableRow>
                           <Index each={current()[provider.id].customModels}>
                             {(row) => {
-                              // Found by the model id it was stored under, because an edit to the id itself changes it.
+                              // Found by the model id it was stored under, because an edit to the id itself
+                              // changes it.
                               const edit = (
                                 change: (
                                   entry: AgentPricingDraft[AgentPricingProvider]['customModels'][number],
@@ -315,8 +316,9 @@ export default function AgentPricingSettings() {
                                 })
                               }
                               return (
-                                // Keyed by the entry, so a field's kept draft never outlives its row: after a Remove above it,
-                                // this slot holds the next model, and a blur must not write the old text into that one.
+                                // Keyed by the entry, so a field's kept draft never outlives its row: after a
+                                // Remove above it, this slot holds the next model, and a blur must not write the
+                                // old text into that one.
                                 <Show when={row().id} keyed>
                                   {(_entry) => (
                                     <TableRow>

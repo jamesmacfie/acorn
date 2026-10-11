@@ -87,10 +87,9 @@ export function codexGeneratedArtifact(notification: JsonRpcNotification): Agent
 }
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
-// Codex's `webSearch` thread item, read into the provider-neutral shape
-// (@acorn/plugin-agents/contract/wire § AgentWebActivity). A live capture of both a search and a page
-// open is in ./__fixtures__/codexWebSearchWire.json, and it is why nothing here is read off
-// `item/started`: that notification carries an empty query and two nulls. Everything a card shows
+// Codex's `webSearch` thread item, read into the provider-neutral `AgentWebActivity`. A capture of both a
+// search and a page open is in __fixtures__/codexWebSearchWire.json, and it is why nothing here is read
+// off `item/started`: that notification carries an empty query and two nulls. Everything a card shows
 // arrives on `item/completed`, and the transcript's fold is what keeps the two as one card.
 
 /** The queries a search ran, in the order Codex listed them and without the repeats. Three places
@@ -206,8 +205,7 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
       }
     // The parent's own inter-agent tool, NOT the spawn: a live capture shows `tool: "wait"` with a null
     // prompt and an empty receiver list while the session blocks on its children. The spawn arrives as
-    // a `subAgentActivity` item, which codexChildRouting.ts owns. This used to be titled "Agent wait"
-    // with `kind: 'subagent'`, which named the wrong thing twice.
+    // a `subAgentActivity` item, which CodexChildRouter owns, so this is not a subagent row.
     case 'collabAgentToolCall': {
       const tool = stringValue(item.tool)
       return {
@@ -354,7 +352,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
     case 'item/fileChange/patchUpdated':
       return codexFileChanges(params.changes, stringValue(params.itemId))
     // The whole turn's diff so far, sent again every time it grows. One id per turn, so the thread
-    // keeps only the latest (client/sessions/conversationItems.ts § fileChangeCards).
+    // keeps only the latest (`fileChangeCards` in the client's conversation items).
     case 'turn/diff/updated': {
       const turnId = stringValue(params.turnId)
       return [

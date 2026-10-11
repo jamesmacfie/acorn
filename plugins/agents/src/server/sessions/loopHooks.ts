@@ -37,8 +37,8 @@ const log = createLogger('agents', 'agents')
 /** How the person answered an ask. `expired` is nobody answering before the hold ran out. */
 export type LoopAskAnswer = 'allowed' | 'refused' | 'expired'
 
-/** What a bridge call needs from the engine. `asks` is the engine's own map of held asks, which
- *  `resolveRequest` answers through `answerLoopAsk`. */
+/** What a bridge call needs from the engine. `asks` is the runtime's own map of held asks, keyed by
+ *  request id, which `resolveRequest` answers. */
 export type LoopHookPorts = {
   hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   session(sessionId: string): Promise<AgentSession | null>

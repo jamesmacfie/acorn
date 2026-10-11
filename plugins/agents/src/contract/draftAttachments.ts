@@ -13,7 +13,7 @@ import type { AgentAttachment } from './wire.ts'
 // "delete the source". The unsent draft is an array in the composer's client state; the node does not
 // own it, cannot transact with it, and deleting a source before the client has committed its swap
 // would lose the reader's only valid attachment. This capability produces a candidate; the composer
-// decides whether to keep it (plugins/agents/src/client/composer/AgentComposer.tsx).
+// (`AgentComposer`) decides whether to keep it.
 
 export type DraftAttachmentBytes = {
   attachment: AgentAttachment

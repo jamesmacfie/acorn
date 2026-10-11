@@ -46,9 +46,9 @@ export const initialAgentMachineState = (): AgentMachineState => ({
 //
 // `turnId` is null for an event that belongs to no turn Acorn dispatched, which is why it gates the
 // turn-scoped cases below. A harness can stream after the prompt call it was answering has already
-// returned: Claude Code did, five minutes past an `end_turn`, and the trailing message projected
-// 'working' onto a session with no turn left to complete it. `turn_completed` is the only event that
-// clears 'working', and it only fires as sendTurn's return value, so nothing was coming.
+// returned, as Claude Code does minutes past an `end_turn`. Projecting 'working' from that trailing
+// message strands the session: `turn_completed` is the only event that clears 'working', and it only
+// fires as sendTurn's return value, so nothing is coming.
 export function projectAgentEvent(event: AgentNormalizedEvent, turnId: string | null): AgentSessionProjection {
   switch (event.type) {
     case 'session_state':
@@ -114,10 +114,8 @@ export const isActiveSubagent = (entry: AgentSubagent): boolean => ACTIVE_SUBAGE
  * How long a background child may go quiet before its row stops claiming to be running.
  *
  * A background child never reports that it finished, so the end of a row is always inferred from
- * silence. The number comes from a captured Claude Code run on Sonnet: across two children and 126
- * events, the longest pause between two events from a child that was still working was 16 seconds.
- * A minute is about four times that. Raise it if a child that runs one long command starts flipping
- * to `idle` and back.
+ * silence. A minute is several times the longest pause seen between events from a child that was still
+ * working. Raise it if a child that runs one long command starts flipping to `idle` and back.
  */
 export const SUBAGENT_QUIET_MS = 60_000
 
@@ -172,10 +170,10 @@ export const quietedSubagents = (roster: AgentSubagent[], quietBefore: number): 
     .filter((entry) => entry.background && isActiveSubagent(entry) && entry.updatedAt <= quietBefore)
     .map((entry) => entry.id)
 
-// ponytail: keep every in-flight entry plus the last 20 settled ones. The session row is re-serialised
-// and broadcast whenever the roster changes, so an unbounded roster would grow every frame; the full
-// history stays in the event ledger, which is what the transcript reads. Give the roster its own table and
-// route if a session ever needs more than this at a glance.
+// Keeps every in-flight entry plus the last 20 settled ones. The session row is re-serialised and
+// broadcast whenever the roster changes, so an unbounded roster would grow every frame; the full history
+// stays in the event ledger, which is what the transcript reads. Give the roster its own table and route
+// if a session ever needs more than this at a glance.
 const RETAINED_SETTLED_SUBAGENTS = 20
 
 function capSubagentRoster(roster: AgentSubagent[]): AgentSubagent[] {

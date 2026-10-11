@@ -107,7 +107,7 @@ const eventReadColumns = (client: boolean) => ({
  *
  * The event transaction lives here because it is the authority that advances the session sequence
  * and all query projections atomically. It appends, and folds a tool call's or a file change's
- * superseded rows into the new one in the same step (./ledgerFold.ts).
+ * superseded rows into the new one in the same step (LedgerFold).
  *
  * See docs/managed-agents/sessions.md § Session model for how a workspace-scoped read resolves task ids
  * through core before filtering this plugin's own tables.
@@ -115,7 +115,7 @@ const eventReadColumns = (client: boolean) => ({
 export class AgentStore {
   private readonly lifecycle: AgentLifecycle
   private searchProjectionPromise: Promise<AgentSearchProjection> | undefined
-  // Which rows each open tool call and file change has, so an update can supersede them (./ledgerFold.ts).
+  // Which rows each open tool call and file change has, so an update can supersede them.
   private readonly ledgerFold = new LedgerFold()
 
   constructor(
@@ -203,9 +203,9 @@ export class AgentStore {
           : projection.configJson
       // The subagent roster projected onto the row in the same transaction as the event insert, so a
       // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
-      // row rather than in a table of its own because runtimeEngine.record() broadcasts the row
-      // whenever an event changes it, which is what makes the sidebar's sub-rows live for a session nobody
-      // has opened (docs/managed-agents/subagents.md § Subagents).
+      // row rather than in a table of its own because ManagedAgentEngine.record() broadcasts the row
+      // whenever an event changes it, which is what makes the sidebar's sub-rows live for a session
+      // nobody has opened (docs/managed-agents/subagents.md § Subagents).
       // An event the harness attributed to a child marks that child heard from, which is what keeps a
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
       // clock the roster has is one that stopped ticking minutes ago.
@@ -236,7 +236,7 @@ export class AgentStore {
 
       // A tool call or file change update lands as the card's whole state, and the rows it supersedes
       // go in this transaction. The opener stays where it is, with no search text of its own, so the
-      // call is indexed once (./ledgerFold.ts).
+      // call is indexed once.
       const stream = this.streamTransition(tx, sessionId, current.lastEventSeq, turnId, event)
       const fold = this.ledgerFold.plan(tx, sessionId, turnId, event)
       const stored = fold?.stored ?? event
@@ -262,7 +262,7 @@ export class AgentStore {
       const changed = this.applyEventProjection(tx, sessionId, turnId, event, timestamp)
       return {
         // What the socket and the node's listeners get: the update as the provider reported it, so a
-        // frame stays the size of the change. The stored row folds to the same card (./ledgerFold.ts).
+        // frame stays the size of the change. The stored row folds to the same card.
         row: {
           ...values,
           eventJson: JSON.stringify(event),
@@ -661,10 +661,10 @@ export class AgentStore {
     return { attachmentIds, artifactObjects }
   }
 
-  // Removing a session's history, for the retention pass (docs/data-layer/backup-and-retention.md § Retention). It works in
-  // three steps so the caller can yield between them: find a session, delete its events a batch at a
-  // time, then finish it. The session row stays, so an archived or restored task still lists the
-  // session, and its transcript says what happened to it.
+  // Removing a session's history, for the retention pass (docs/data-layer/backup-and-retention.md §
+  // Retention). It works in three steps so the caller can yield between them: find a session, delete its
+  // events a batch at a time, then finish it. The session row stays, so an archived or restored task
+  // still lists the session, and its transcript says what happened to it.
 
   /**
    * The oldest session of these tasks whose history is still stored. Never one in `live`, the sessions
@@ -676,7 +676,7 @@ export class AgentStore {
   }
 
   /** The same, with or without stored history, for deleting a deleted task's sessions outright
-   *  (runtime.ts § purgeDeletedTasks). */
+   *  (purgeDeletedTasks). */
   idleSessionOfTasks(taskIds: readonly string[], live: ReadonlySet<string>): string | null {
     return this.idleSessionOf(taskIds, live, false)
   }
@@ -878,8 +878,8 @@ export class AgentStore {
    * SQLite transaction, so no other turn lands between the decision and the write. `decide` gets `null`
    * when the session has no turn yet, and throws to refuse. It returns the config to save, the new
    * turn's input, and the policy values the turn asks for. A turn already queued under
-   * `idempotencyKey` comes back as it is, with `inserted` false. The Codex plan handoff is the caller
-   * (../drivers/codexPlanHandoff.ts).
+   * `idempotencyKey` comes back as it is, with `inserted` false. The Codex plan handoff
+   * (acceptCodexPlan) is the caller.
    */
   async enqueueAfterLatestTurn(
     sessionId: string,
@@ -1420,8 +1420,7 @@ export class AgentStore {
 
   /**
    * One turn row by id, or `null` if it has gone. This is what a `turn_completed` frame carries, so a
-   * client learns the turn's status, stop reason and usage without refetching the session
-   * (../../client/sessions/managedStore.ts).
+   * client learns the turn's status, stop reason and usage without refetching the session.
    */
   async turn(turnId: string): Promise<AgentTurn | null> {
     const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).limit(1)
@@ -1746,8 +1745,7 @@ export class AgentStore {
   }
 
   // Sessions whose roster still holds a child that claims to be working. Filtered in memory after a
-  // narrow SQL cut because the roster is a JSON column: on a real installation `!= '[]'` took 278 rows
-  // down to 23, and this runs once, at boot.
+  // narrow SQL cut (`!= '[]'`) because the roster is a JSON column, and this runs once, at boot.
   async sessionsWithActiveSubagents(): Promise<AgentSession[]> {
     const rows = await this.db
       .select()
@@ -1825,7 +1823,7 @@ export class AgentStore {
     return Number(row?.count ?? 0)
   }
 
-  /** The plugin notes that joined one unattended operation, in queue order (./turnFollowUps.ts). */
+  /** The plugin notes that joined one unattended operation, in queue order. */
   async followUpTurns(sessionId: string, originTurnId: string): Promise<AgentTurn[]> {
     const rows = await this.db
       .select()

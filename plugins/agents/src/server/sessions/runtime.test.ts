@@ -345,8 +345,8 @@ class DeferredStartDriver implements AgentDriver {
   }
 }
 
-/** Keeps streaming after the prompt call it was answering has already returned. Claude Code did this
- *  five minutes past an `end_turn`, and the trailing message stranded the session in 'working'. */
+/** Keeps streaming after the prompt call it was answering has already returned. Claude Code can do this
+ *  minutes past an `end_turn`, and the trailing message must not strand the session in 'working'. */
 class TrailingEventDriver extends FakeAgentDriver {
   #emit: AgentDriverStartOptions['onEvent'] | null = null
 
@@ -456,9 +456,9 @@ describe('managed agent runtime conformance', () => {
   // `pluginDb` is this plugin's own migrated file, holding every `agent_*` table and the
   // `agent_events_fts` virtual table the workspace search case exercises.
   //
-  // The workspace-scoping case below is the load-bearing one: before the split it passed through a SQL
-  // join across these two, and it still passes through an id round trip. If `idsForWorkspace` ever
-  // returned the wrong set, or fell back to unfiltered on an empty workspace, this is what fails.
+  // The workspace-scoping case below is the load-bearing one: it passes through an id round trip across
+  // these two. If `idsForWorkspace` ever returned the wrong set, or fell back to unfiltered on an empty
+  // workspace, this is what fails.
   let testDb: TestDb
   let pluginDb: TestPluginDb
   let core: CompiledCoreServices
@@ -2741,7 +2741,6 @@ describe('managed agent runtime conformance', () => {
     ).rejects.toThrow("runs on 'codex'")
   })
 
-  // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
   // The skills index is read at every start, like the MCP servers, and rides ahead of the first turn
   // after it. It counts as delivered once that turn ran (docs/managed-agents/skills.md § Delivery).
   it('sends each start the approved, switched-on skills ahead of its first turn, and withdraws them', async () => {
@@ -2927,6 +2926,7 @@ describe('managed agent runtime conformance', () => {
     }
   })
 
+  // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
   // Settings at creation, only the MCP route changes it, and every start hands the harness the list.
   it('starts a session with the servers switched on in Settings and restarts it when they change', async () => {
     const seed = await seedTask(testDb, dataDir)

@@ -264,7 +264,7 @@ describe('agents.sessionExecute config options', () => {
   })
 
   // A manifest harness registers its profile with its own runtime id as the managed provider
-  // (../harnessRegistry.ts), so a step names it the way it names Claude. A profile that names no
+  // (createHarnessRegistry), so a step names it the way it names Claude. A profile that names no
   // driver still answers null, which is the caller's cue to run its headless fallback.
   it('runs a contributed harness profile as a managed session, and answers null for one with no driver', async () => {
     const contributed = new ConfigDriver('acme:agent', 'acme:agent')

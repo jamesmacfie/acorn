@@ -121,8 +121,8 @@ export default function AgentCenter() {
       return page.sessions
     },
   )
-  // Asked for only when the archived filter is chosen. This used to load on every visit and every
-  // workspace switch, which is a second full session page fetched to fill a list nobody had opened.
+  // Asked for only when the archived filter is chosen, so a visit or a workspace switch does not fetch
+  // a second full session page to fill a list nobody opened.
   const [archived, { refetch: refetchArchived }] = createResource(
     () =>
       stateFilter() === 'archived' && workspaceId()
@@ -171,9 +171,9 @@ export default function AgentCenter() {
   const rows = createMemo<AgentRow[]>(() =>
     agentTelemetry.measure('agents.center.rows', () => {
       if (fleetScope()) {
-        // Per node, because a task id is only meaningful on its own node (docs/architecture/fleet.md § Fan-out and partial results:
-        // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
-        // another node's session.
+        // Per node, because a task id is only meaningful on its own node
+        // (docs/architecture/fleet.md § Fan-out and partial results: two nodes may hold the same UUID). A
+        // single flat map would resolve one node's task title against another node's session.
         const tasksByNode = new Map(
           fleetTasks().rows.map((row) => [row.nodeId, new Map(row.data.map((task) => [task.id, task]))]),
         )
@@ -242,13 +242,13 @@ export default function AgentCenter() {
   // § Fan-out and partial results).
   const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
   // Key to row. `Rows` runs its body once per row, and the body below reads its own row about a dozen
-  // times: as a `find` per read that is a scan of the list per field, and a session frame lands about
-  // 25 times a second while an agent is working (../sessions/managedStore.ts § the transcript store).
+  // times: as a `find` per read that is a scan of the list per field, on every session frame that lands
+  // while an agent is working.
   const shownByKey = createMemo(() => new Map(shown().map((row) => [rowKey(row), row])))
 
   // Two targets on one row, because a workflow session has two homes and neither is the obvious one:
   // the body opens the session, this opens the run it belongs to. Row ignores a click that landed on a
-  // control inside it, so there is nothing to stop here (client-core kit RowActions.tsx).
+  // control inside it, so there is nothing to stop here.
   function openRun(row: AgentRow, run: { runId: string; stepId?: string }) {
     if (!row.task) return setError('The session’s task is no longer available.')
     if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
@@ -351,7 +351,7 @@ export default function AgentCenter() {
           </Inline>
 
           {/* Not a `Toolbar`: this is a page, and a toolbar is a chrome strip with a background and a
-              rule that reaches the surface's edges. In the middle of a padded column it read as a
+              rule that reaches the surface's edges. In the middle of a padded column it reads as a
               stray band. */}
           <Inline wrap gap="row">
             <Input

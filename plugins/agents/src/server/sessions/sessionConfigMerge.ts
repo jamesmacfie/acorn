@@ -12,7 +12,7 @@ const serverOwnedKeys = [
   'customAgent',
   'standingContext',
   'initialAttendance',
-  // The skill names the agent was last told about, natively or in the index (../drivers/skillIndex.ts).
+  // The skill names the agent was last told about, natively or in the index.
   'skillIndex',
 ] as const
 

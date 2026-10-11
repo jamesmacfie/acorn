@@ -25,12 +25,11 @@ export const saveAgentSessionDefaults = (patch: Partial<AgentSessionDefaults>) =
 /**
  * The write with its cache handling, so a page and a command change this record the same way.
  *
- * Each change is the save. The query cache carries it so every reader moves at once. A write that
- * fails puts back what the cache held before it, but only when it is the latest write, so the first of
- * two quick changes cannot undo the second, and then refetches. Refetching alone left the unsaved value
- * on screen whenever the node was the thing that failed, since the read failed too. The failure is
- * rethrown, because the two callers report it differently — the page has an alert and the palette
- * keeps the frame open with the message on it.
+ * The query cache carries each change so every reader moves at once. A write that fails puts back what
+ * the cache held before it, but only when it is the latest write, so the first of two quick changes
+ * cannot undo the second, and then refetches. The rollback matters because a refetch alone leaves the
+ * unsaved value on screen when the node is what failed. The failure is rethrown, because the page and
+ * the palette report it differently.
  */
 const latestWrite = latestSignal()
 export async function writeAgentSessionDefaults(

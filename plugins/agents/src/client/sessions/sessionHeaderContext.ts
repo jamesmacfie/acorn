@@ -42,7 +42,7 @@ function usageByTurn(turns: readonly AgentTurn[], events: readonly AgentEventRec
   for (const turn of turns) if (turn.usage) usage.set(turn.id, turn.usage)
   // Only the usage rows, and sorted only if they are out of order: the store keeps its array in seq
   // order. This runs for every streamed event, and copying and sorting the whole session to read a few
-  // hundred rows was about 40% of its cost.
+  // hundred rows would be most of its cost.
   const rows = events.filter((record) => record.event.type === 'usage')
   if (rows.some((record, at) => at > 0 && rows[at - 1].seq > record.seq)) {
     rows.sort((left, right) => left.seq - right.seq)

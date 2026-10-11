@@ -31,7 +31,7 @@ export const customAgentRegistry = {
 
 // A session row names a harness twice, as `providerId` and `profileId`, and the two differ only for
 // Claude Code, where both names predate the harness seam. Every other harness, built in or contributed,
-// uses one id for both (./harnessRegistry.ts § launchSpec).
+// uses one id for both (`launchSpec` in the harness registry).
 const PROFILE_FOR_PROVIDER: Readonly<Record<string, string>> = { [claudeHarness.id]: claudeHarness.profileId }
 
 /** A plugin's agent as the list holds it. The host already minted the id and qualified the harness. */

@@ -3,14 +3,9 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 
-// Where the scroller sits in the DOM.
-//
-// The followed timeline is the scroller, and it sizes itself against the region that mounts the
-// conversation: `.layout-region-detail` is the flex column with `min-height: 0`, and two rules in
-// client-core's shell.css name `.ui-timeline-scroll` as a *direct child* of it — the measure cap and
-// the padding hand-off. So the conversation has to reach the region as a fragment, and a box put
-// around any of it breaks the pane's scroll with nothing failing anywhere else. That is the claim this
-// file holds, because it is invisible to every other test and to tsc.
+// Where the scroller sits in the DOM. Two rules in client-core's shell.css name `.ui-timeline-scroll`
+// as a *direct child* of `.layout-region-detail`, so the conversation has to reach the region as a
+// fragment. A box around any of it breaks the pane's scroll, and no other test or tsc notices.
 
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({

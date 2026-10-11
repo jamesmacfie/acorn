@@ -44,9 +44,9 @@ export function startCodexAppServer(): CodexRpcProcess {
   const env = usageProcessEnv()
   const executable = resolveUsageCommand('codex', env)
   if (!executable) throw new UsageProcessError('cli_missing', 'codex is not available on PATH.')
-  // `-a never` rather than `-a untrusted`: codex 0.154 dropped `untrusted` from --ask-for-approval,
-  // so the app-server died on the flag before it could answer and usage read as "no data". Reading
-  // rate limits never asks for approval anyway; the flag is only here to keep the probe silent.
+  // `-a never` rather than `-a untrusted`: codex 0.154 and later reject `untrusted` for
+  // --ask-for-approval, so the app-server dies on the flag before it can answer and usage reads as
+  // "no data". Reading rate limits never asks for approval anyway; the flag only keeps the probe silent.
   const { child, owner } = spawnOwnedProcess({
     command: executable,
     args: ['-s', 'read-only', '-a', 'never', 'app-server'],
@@ -261,8 +261,8 @@ function classifyCodexOutput(text: string): UsageProcessError | null {
   if (lower.includes('update available') || lower.includes('update required')) {
     return new UsageProcessError('update_required', 'Codex CLI must be updated before usage can be read.')
   }
-  // A flag this probe passes is no longer one the CLI takes. Named, because the last time it happened
-  // the only symptom was "/status output did not contain usage limits", which pointed at the wrong thing.
+  // A flag this probe passes is not one the CLI takes. Named, because otherwise the only symptom is
+  // "/status output did not contain usage limits", which points at the wrong thing.
   if (/error:\s*(invalid value|unexpected argument|unrecognized)/i.test(text)) {
     return new UsageProcessError('execution_failure', 'The codex CLI rejected the options acorn uses to read usage.')
   }

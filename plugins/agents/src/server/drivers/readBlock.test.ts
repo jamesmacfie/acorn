@@ -131,8 +131,8 @@ describe('the data root read block', () => {
     expect(block.loopback).toBe('127.0.0.1:43123')
   })
 
-  // A penetration review found that the deny rules, built from the entries present at the start, had
-  // nothing for a file created later, and Claude's file tools run outside its sandbox.
+  // Deny rules built from the entries present at the start have nothing for a file created later, and
+  // Claude's file tools run outside its sandbox.
   it('keeps the file tools out of a protected file created after the session started', () => {
     const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
     const settings = claudeReadBlockSettings(

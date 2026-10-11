@@ -1,9 +1,9 @@
 import type { AgentEventRecord, AgentNormalizedEvent, AgentRequest, AgentSubagentUpdate } from '../../contract/wire.ts'
-// The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
-// both sources hand the transcript one usage record a turn already, and it still runs so that a
-// replayed page, an older node, or a subagent's roster usage folds the way it always did.
+// The same merge the node's snapshot fold and the transcript store apply. Both already hand the
+// transcript one usage record a turn; this fold still runs for a replayed page, an older node, or a
+// subagent's roster usage.
 import { mergeAgentUsage as mergeUsage } from '../../shared/usageFold'
-// Tool calls fold by the same rule on the node too, for a reader that asks (../../shared/toolFold.ts).
+// Tool calls fold by the same rule on the node too, for a reader that asks.
 import { mergeToolCall, toolCardKey } from '../../shared/toolFold'
 import type { AgentToolFileChange } from '@acorn/protocol/extensionPoints.ts'
 
@@ -28,7 +28,8 @@ export type AgentConversationItem = {
 
 // Which events are worth a card. `session_state`, `session_metadata` and `request_resolved` are all
 // projected elsewhere: state into the pane header, and a resolution onto the request card it answers.
-// Exported because the transcript and a subagent card render from the same tree and have to agree.
+// Shared through `visibleConversationItems`, because the transcript and a subagent card render from
+// the same tree and have to agree.
 const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'user_message',
   'assistant_message',
@@ -46,10 +47,9 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'diagnostic',
 ])
 
-// `usage` is deliberately absent above. Its tokens and its provider cost used to be a line of their own
-// at the head of each turn; the cost is a plugin's job now (agents:session-header) and the context
-// figure rides the turn's closing line, so the card had nothing left to say that the transcript did
-// not already say twice. The events still fold, because that fold is what feeds the closing line.
+// `usage` is deliberately absent above. Its cost is a plugin's job (agents:session-header) and its
+// context figure rides the turn's closing line, so a card of its own would only repeat both. The events
+// still fold, because that fold is what feeds the closing line.
 
 // Anything the agent is blocked on is drawn where it asked, because that is the moment it interrupted
 // and answering it there costs no hunting. What happens afterwards differs by kind. A question stays:
@@ -83,10 +83,10 @@ export const visibleConversationItems = (
  *  or a note. What the "show chats only" toggle above the composer keeps.
  *
  *  A request counts. It is the agent asking the reader something and the reader answering, which is
- *  the same conversation as a message, and during planning it is most of it: hiding it left a chat-only
- *  transcript where the agent asked nothing and settled a question out of nowhere. `belongsInThread`
- *  above has already dropped the resolved permissions, so what is left is the questions and whatever
- *  is still blocking. */
+ *  the same conversation as a message, and during planning it is most of it: hiding it would leave a
+ *  chat-only transcript where the agent asks nothing and settles a question out of nowhere.
+ *  `belongsInThread` above has already dropped the resolved permissions, so what is left is the
+ *  questions and whatever is still blocking. */
 export const isChatItem = (item: AgentConversationItem): boolean =>
   item.event.type === 'user_message' ||
   item.event.type === 'assistant_message' ||
@@ -104,7 +104,7 @@ type AppendableEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message'
 const isAppendable = (event: AgentNormalizedEvent): event is AppendableEvent =>
   event.type === 'assistant_message' || event.type === 'reasoning'
 
-// Field by field, for the reason on `mergeToolCall` (../../shared/toolFold.ts). A harness that only
+// Field by field, for the reason on `mergeToolCall`. A harness that only
 // learns the model at completion must not wipe the title it reported at spawn, and one that reports
 // usage twice must not lose the first half of it.
 const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate): AgentSubagentUpdate => ({
@@ -203,16 +203,16 @@ type Fold = {
 // to drift from the first.
 function openFold(): Fold {
   const top = newStream()
-  // ponytail: one level of nesting. Both harnesses let a subagent spawn a subagent, and its card
+  // One level of nesting. Both harnesses let a subagent spawn a subagent, and its card
   // becomes a sibling at the top rather than a grandchild. Give the roster a parent id and recurse
   // here if a deep fan-out ever reads as flat.
   const streams = new Map<string, Stream>()
   const subagentCardAt = new Map<string, number>()
   // Tool cards are found across streams, not within one, because a provider need not repeat the
   // attribution on every update. Claude's adapter tags a subagent's `tool_call` and its final
-  // `tool_call_update` with the owning agent and leaves the one in between untagged; a per-stream
-  // lookup could not find the card that update belonged to, so it opened a second one at the top level,
-  // titled with the raw tool id because a mid-call update carries no title either. A tool call belongs
+  // `tool_call_update` with the owning agent and leaves the one in between untagged. A per-stream
+  // lookup would miss the card that update belongs to and open a second one at the top level, titled
+  // with the raw tool id because a mid-call update carries no title either. A tool call belongs
   // to whoever opened it, and every later update folds there wherever it arrives from.
   const toolCards = new Map<string, { stream: Stream; at: number }>()
   // A file change folds the same way, by the edit it belongs to and the file. Both harnesses report an
@@ -271,10 +271,10 @@ function openFold(): Fold {
   }
 
   // Put the turn's context figure on the line that closes it. Positional rather than by turn id,
-  // because a `turn_completed` often has no turn id to match on: the Codex driver clears the current
-  // turn before it emits the event (server/drivers/codexDriver.ts), so the completion arrives
-  // unattributed. What "the context at that point" means is anyway where the reader is looking, and the
-  // usage card above the closing line is the last one before it.
+  // because a `turn_completed` often has no turn id to match on: `CodexAgentDriver` clears the current
+  // turn before it emits the event, so the completion arrives unattributed. What "the context at that
+  // point" means is anyway where the reader is looking, and the usage card above the closing line is the
+  // last one before it.
   //
   // Only the session's own stream, which is where every usage event lands: `subagentIdOf` does not
   // attribute one, and a subagent reports its own tokens on its roster card instead. A late usage
@@ -295,16 +295,16 @@ function openFold(): Fold {
   // Tools, usage, subagents, and plans report evolving state rather than separate moments, so each is
   // folded into the card it started rather than appended. The ledger stores a row per update for
   // usage, subagents and plans. A tool call or a file change it stores as the opening row and one row
-  // with the latest state, which folds here to the same card (../../server/sessions/ledgerFold.ts). A
-  // plan is a complete snapshot and folds only within its own turn; a later turn's plan is a separate
-  // piece of work.
+  // with the latest state, which folds here to the same card (`LedgerFold` on the node). A plan is a
+  // complete snapshot and folds only within its own turn; a later turn's plan is a separate piece of
+  // work.
   //
   // A tool call is keyed by turn and tool id, so a command reads as one panel whose status and output
   // change in place. Plans are keyed by turn. Usage is keyed by turn, with one allowance: a turn's last
   // usage update can arrive after the turn is marked complete, which leaves it with no turn id, and it
   // belongs to the line it is updating. That trailing update is how a cost reaches a line that started
-  // with only a context count, which used to render as a second, near-identical line. A subagent folds
-  // like a tool call, by id, so a completion summary lands on the card the spawn opened.
+  // with only a context count. A subagent folds like a tool call, by id, so a completion summary lands
+  // on the card the spawn opened.
   //
   // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
   const foldTarget = (record: AgentEventRecord, stream: Stream): { stream: Stream; at: number } | undefined => {
@@ -396,7 +396,7 @@ function openFold(): Fold {
   }
 
   // The store merges a streamed usage update into the line's record in place rather than adding a row
-  // (managedStore.ts § foldUsage). The record keeps its id and seq, so it lands where it landed before:
+  // (the store's `foldUsage`). The record keeps its id and seq, so it lands where it landed before:
   // this runs the same decision `add` made for it, against the card as it was before it.
   const replaceLastUsage = (record: AgentEventRecord): void => {
     if (!lastUsage) return
@@ -431,9 +431,8 @@ const bySeq = (events: AgentEventRecord[]): AgentEventRecord[] => [...events].so
 
 export function buildConversationItems(events: AgentEventRecord[]): AgentConversationItem[] {
   const fold = openFold()
-  // Copied and sorted unconditionally, and left that way after measuring it: on a 1,850-row session
-  // both this and an in-order check that would skip it come in around 0.05 ms, because V8's sort walks
-  // an already-ordered array in one pass. Guarding it buys nothing worth a branch.
+  // Copied and sorted unconditionally: V8's sort walks an already-ordered array in one pass, so an
+  // in-order check that would skip it buys nothing worth a branch.
   for (const record of bySeq(events)) fold.add(record)
   return fold.settle().items
 }
@@ -441,15 +440,14 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
 /**
  * The projection a streaming transcript keeps, as a function of the session's event array.
  *
- * A long session is tens of thousands of rows, and rebuilding the whole projection for each streamed
- * event cost a few milliseconds each time, 25 times a second. So this keeps the fold open and adds the
- * rows that arrived since the last call, which is the same fold a rebuild runs, fed the same records
- * in the same order.
+ * A long session is tens of thousands of rows, too many to rebuild the whole projection for each
+ * streamed event. So this keeps the fold open and adds the rows that arrived since the last call,
+ * which is the same fold a rebuild runs, fed the same records in the same order.
  *
  * That only holds while the rows it already took are still there, in the same places, and the new ones
  * come after them. So this checks every one of them by identity, which costs a pointer comparison a row,
  * and that the new rows are in seq order. The one in-place change it takes is the store's own: a
- * streamed usage update merged into the line's record (managedStore.ts § foldUsage). Anything else
+ * streamed usage update merged into the line's record (the store's `foldUsage`). Anything else
  * rebuilds from the start: a row seated behind the tail, or a re-read that replaced a record.
  *
  * An item nothing touched is handed back as the same object as last time, which is what lets the
@@ -510,7 +508,7 @@ export function createConversationProjection(): (events: AgentEventRecord[]) => 
   }
 }
 
-// The store's merge keeps the row's id, seq and turn (managedStore.ts § foldUsage). The turn decides
+// The store's merge keeps the row's id, seq and turn (`foldUsage`). The turn decides
 // which card a usage row folds into, so a row that moved turns is not the same row.
 const sameUsageRow = (held: AgentEventRecord, now: AgentEventRecord): boolean =>
   now.event.type === 'usage' &&

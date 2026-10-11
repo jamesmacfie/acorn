@@ -1,6 +1,6 @@
 // A file change's patch as the files it covers, each as hunks from its first `@@` on, which is the
 // shape the diff rows are built from. A per-edit change is already one file's hunks
-// (contract/wire.ts § file_change). Codex's whole-turn diff has no path and is a multi-file git
+// (the `file_change` event). Codex's whole-turn diff has no path and is a multi-file git
 // patch, so it is split at each `diff --git` header and the header lines are dropped. A file with no
 // hunks, such as a binary file or a mode change, keeps its entry with an empty patch, so the reader
 // still sees that it changed.

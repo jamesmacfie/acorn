@@ -4,8 +4,8 @@ export const agentUsageProviderRefreshRoute = (providerId: string): string =>
   `${agentUsageRefreshRoute}/${encodeURIComponent(providerId)}`
 
 // A harness id, not a member of a closed set, because harnesses are a contribution point
-// (docs/managed-agents/providers.md § Plan usage). The durable model in @acorn/plugin-agents/contract/wire already
-// keeps `providerId` a plain string.
+// (docs/managed-agents/providers.md § Plan usage). The durable session model already keeps `providerId`
+// a plain string.
 export type AgentUsageProviderId = string
 export type AgentUsageHealth = 'healthy' | 'warning' | 'critical' | 'depleted' | 'unknown'
 export type AgentUsageAvailability = 'available' | 'missing' | 'error'
@@ -91,7 +91,7 @@ export type AgentProviderUsage = {
 }
 
 // What a collector answers: the reading, never the naming. The service stamps on the label and glyph
-// from the registration (server/usage/service.ts), so a probe never repeats its own id.
+// from the registration (`createAgentUsageService`), so a probe never repeats its own id.
 export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph'>
 
 export type AgentUsageSnapshot = {

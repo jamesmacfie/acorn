@@ -228,7 +228,7 @@ describe('Claude subagent attribution, against the captured wire', () => {
     expect(subagents.map((subagent) => subagent.title)).not.toContain('Agent')
   })
 
-  // The brief was only ever readable by opening the spawning call and reading JSON with every line
+  // Otherwise the brief is readable only by opening the spawning call and reading JSON with every line
   // break spelled out. It is the child's own turn, so it is posted as one.
   it('posts each subagent\u2019s brief into that subagent\u2019s stream', () => {
     const ids = new Set(subagents.map((subagent) => subagent.id))
@@ -399,7 +399,7 @@ describe('Claude subagent attribution, unit cases', () => {
     )
 
   it('drops a progress heartbeat instead of inventing a call for it', () => {
-    // `Agent` is the one that hurt: every ping minted a subagent row that never settled.
+    // `Agent` matters most: every ping would mint a subagent row that never settles.
     expect(heartbeat('Agent')).toEqual([])
     expect(heartbeat('Bash')).toEqual([])
   })
@@ -437,8 +437,8 @@ describe('the captured fan-out as a transcript', () => {
   }
 
   it('leaves no orphan tool card at the top level', () => {
-    // The bug: the adapter leaves a subagent's mid-call update untagged, and a per-stream fold could not
-    // place it, so seven cards appeared at the top titled with a raw tool id.
+    // The adapter leaves a subagent's mid-call update untagged. A per-stream fold can't place it, and
+    // seven cards would appear at the top titled with a raw tool id.
     const orphans = projected().filter(
       (item) => item.event.type === 'tool' && item.event.tool.title.startsWith('toolu_'),
     )
@@ -638,7 +638,7 @@ describe('Claude’s plan-mode handover', () => {
   })
 
   // The call keeps its title and outcome; without this the plan also sits under it as JSON with every
-  // line break spelled out, which is what sent it here in the first place.
+  // line break spelled out.
   it('leaves the call itself with no parameters to disclose', () => {
     const tool = exitPlanMode().find((event) => event.type === 'tool')
     expect(tool).toMatchObject({ type: 'tool', tool: { title: 'Ready to code?', input: undefined } })
@@ -685,13 +685,12 @@ describe('Claude’s plan-mode handover', () => {
 })
 
 // Claude Code's web tools, against the wire the adapter actually sends
-// (./__fixtures__/claudeWebSearchWire.json, Claude Code 2.1.241 with adapter 0.54.1).
+// (__fixtures__/claudeWebSearchWire.json, Claude Code 2.1.241 with adapter 0.54.1).
 //
-// The capture settled two things this work was planned against and found to be wrong. The adapter
-// does forward structured search results, on `_meta.claudeCode.toolResponse.results`, so a Claude
-// card shows the same sources a Codex one does rather than a wall of prose. And a call arrives in
-// three or four updates, only one of which carries the request, so the mapping has to say nothing
-// on the others rather than say "empty".
+// The adapter forwards structured search results on `_meta.claudeCode.toolResponse.results`, so a
+// Claude card shows the same sources a Codex one does rather than a wall of prose. A call arrives in
+// three or four updates, only one of which carries the request, so the mapping has to say nothing on
+// the others rather than say "empty".
 describe('Claude web activity, against the captured wire', () => {
   const tools = webCapture.updates.map((update) => toolEvent(update as unknown as SessionUpdate))
   const folded = (id: string) =>
@@ -872,8 +871,8 @@ describe('Claude web activity, unit cases', () => {
   })
 
   it('reads a 404 off a fetch that the CLI reports as finished', () => {
-    // The shape Claude Code returned for https://httpbin.org/status/404 on 2026-09-28: not an error,
-    // no page, and the status only in the structured response.
+    // The shape Claude Code returns for https://httpbin.org/status/404: not an error, no page, and the
+    // status only in the structured response.
     expect(
       toolEvent({
         sessionUpdate: 'tool_call_update',

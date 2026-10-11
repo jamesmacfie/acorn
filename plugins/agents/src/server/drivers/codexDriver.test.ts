@@ -560,8 +560,8 @@ describe('Codex collaboration modes', () => {
     ])
   })
 
-  // Captured 2026-10-06: Codex sends the failure as an `error` notification, then again on
-  // `turn/completed`, and puts the provider's raw JSON body in the message.
+  // Codex sends the failure as an `error` notification, then again on `turn/completed`, and puts the
+  // provider's raw JSON body in the message.
   it('shows a failed turn once, with the provider message, and again on the next turn', async () => {
     const body = JSON.stringify({
       type: 'error',

@@ -16,7 +16,7 @@ import { AgentAttachmentStore } from './attachmentStore'
 import { createTranscriptMedia } from './transcriptMedia'
 
 // The `agents.transcriptMedia` capability: what a plugin drawing a sent attachment or an artifact may
-// read, and everything it may not (../../contract/transcriptMedia.ts).
+// read, and everything it may not.
 //
 // Most assertions are refusals. The caller names a task, a session, a kind and an id, and every one of
 // the four has to agree with the stored rows before any bytes come back.

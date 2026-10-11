@@ -1,5 +1,5 @@
-// The retention pass (docs/data-layer/backup-and-retention.md § Retention) against a real migrated database: core's tasks
-// in one file and this plugin's sessions in the other, the way a node has them.
+// The retention pass (docs/data-layer/backup-and-retention.md § Retention) against a real migrated
+// database: core's tasks in one file and this plugin's sessions in the other, the way a node has them.
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -330,7 +330,7 @@ describe('removing the agent history of long-archived tasks', () => {
     expect(count('agent_events', old.id)).toBe(4)
   })
 
-  // The same runtime, deleting a deleted task's sessions outright (runtime.ts § purgeDeletedTasks).
+  // The same runtime, deleting a deleted task's sessions outright (purgeDeletedTasks).
   describe('purging deleted tasks', () => {
     it('deletes the sessions, transcripts, files and ledgers of deleted tasks only', async () => {
       const gone = await session(await task('gone', 'archived', now), 'kettle')

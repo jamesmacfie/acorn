@@ -13,9 +13,9 @@ export type DeletedTaskPurgeDeps = {
   attachments: ManagedAgentEngine['attachments']
   artifacts: ManagedAgentEngine['artifacts']
   db: PluginDatabase
-  // Events per step, the history prune's own step (runtime.ts § removeArchivedHistory).
+  // Events per step, the history prune's own step (removeArchivedHistory).
   batch: number
-  // Passed in rather than imported, so loading this module does not split ./ledgerCompaction.ts out
+  // Passed in rather than imported, so loading this module does not split the ledger compaction module out
   // of the boot chunk it shares with the runtime.
   mergeSearchIndex: (db: PluginDatabase, pages: undefined, signal?: AbortSignal) => Promise<void>
 }
@@ -55,7 +55,7 @@ export async function purgeDeletedTasks(
   }
   let rows = events + sessionIds.length
   if (!stopped()) rows += deleteTaskLedgers(deps.db, taskIds, sessionIds) + (await deleteTaskAttachments(deps, taskIds))
-  // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts).
+  // Each deleted event left a tombstone in the search index until a merge.
   if (events && !engine.isStopped) await deps.mergeSearchIndex(deps.db, undefined, signal)
   return rows
 }

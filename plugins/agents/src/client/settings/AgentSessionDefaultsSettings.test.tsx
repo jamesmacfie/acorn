@@ -5,7 +5,7 @@ import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
 import { startupContextInjection } from './startupContext'
 
 // Settings → Agents → Harnesses and defaults. What is pinned: every harness shows whether this machine
-// can run it, the terminal's startup-context switch lives here now and writes core's preference, the
+// can run it, the terminal's startup-context switch lives here and writes core's preference, the
 // transcript row says it belongs to this device, and a default that seeds new sessions says how to
 // change an open one.
 

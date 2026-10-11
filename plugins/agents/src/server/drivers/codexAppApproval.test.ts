@@ -80,7 +80,7 @@ describe('Computer Use app-access approval', () => {
     expect(event?.type === 'request' ? event.approval?.scopes : undefined).toEqual(['session'])
   })
 
-  // Anything short of the full shape is the consent form it was before, with its plain Allow.
+  // Anything short of the full shape falls back to the plain consent form, with its plain Allow.
   it.each([
     ['no metadata', request(() => ({}))],
     ['another connector', request((base) => ({ ...base, connector_id: 'node_repl' }))],

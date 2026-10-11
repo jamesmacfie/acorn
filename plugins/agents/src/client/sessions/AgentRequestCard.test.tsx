@@ -177,7 +177,7 @@ describe('answering a question that takes more than one answer', () => {
   })
 })
 
-// An app-access approval (../../server/drivers/codexAppApproval.ts). The card says which app, by the
+// An app-access approval (`codexAppApproval` on the node). The card says which app, by the
 // identifier the grant is keyed on, and what each scope means; the buttons are the stored options.
 describe('answering an app-access approval', () => {
   const approvalRequest = (scopes: string[], withApproval = true): AgentRequest => ({

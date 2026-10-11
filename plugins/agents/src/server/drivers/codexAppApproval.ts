@@ -59,8 +59,8 @@ export function codexAppApproval(params: JsonObject): AgentAppApproval | null {
   }
 }
 
-// The ids are Acorn's. `accept` keeps the id a plain Allow always had, so an answer recorded before
-// this existed still reads as the session grant it was.
+// The ids are Acorn's. `accept` is the id a plain Allow has always had, so an answer already on record
+// reads as the session grant it was.
 const OPTION_SCOPE: Record<string, AgentApprovalScope> = { accept: 'session', acceptAlways: 'always' }
 
 export function appApprovalOptions(approval: AgentAppApproval): AgentPermissionOption[] {

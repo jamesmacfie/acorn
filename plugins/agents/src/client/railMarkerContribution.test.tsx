@@ -73,12 +73,12 @@ describe('the agent rail marker while a session streams', () => {
     runs.clear()
     const roster = managedAgentStore.sessions()
 
-    // What the node sends per streamed event now: the event, and no row unless the event changed it
-    // (server/sessions/runtimeEngine.ts § record). s0 is in t0.
+    // What the node sends per streamed event: the event, and no row unless the event changed it
+    // (the runtime engine's `record`). s0 is in t0.
     for (let seq = 1; seq <= 25; seq++) deliver({ channel: 'agent:event', event: event('s0', seq) })
 
     // No row runs at all: an event frame leaves the roster alone, and the live sequence the pane
-    // marks read up to is its own per-session signal (sessions/managedStore.ts § eventSeqs).
+    // marks read up to is its own per-session signal (`eventSeqs` in the managed store).
     expect([...runs.keys()]).toEqual([])
     // Nor anything that reads the whole roster, such as Agent Center.
     expect(managedAgentStore.sessions()).toBe(roster)

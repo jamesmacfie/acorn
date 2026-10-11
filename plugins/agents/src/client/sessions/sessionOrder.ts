@@ -13,7 +13,7 @@ export type SessionOrder = 'status' | 'name' | 'created' | 'activity'
 export type SessionGroup = 'managed' | 'workflow' | 'inline'
 type TaskOrders = Partial<Record<SessionGroup, SessionOrder>>
 
-// Newest first, which is the order the sidebar always drew in before there was a choice.
+// Newest first, so a sidebar nobody has reordered keeps its familiar order.
 export const DEFAULT_SESSION_ORDER: SessionOrder = 'created'
 
 export const SESSION_ORDER_CHOICES: readonly { value: SessionOrder; label: string }[] = [

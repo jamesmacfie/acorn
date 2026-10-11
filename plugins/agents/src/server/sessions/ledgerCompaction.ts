@@ -4,13 +4,13 @@ import * as schema from '../../node/schema'
 import { agentEventSearchText } from '../../contract/wire.ts'
 import { cardKeyColumns, cardKeyOf, foldCard, parseStoredEvent, type CardKeyFields } from './ledgerFold'
 
-// The one-off half of ./ledgerFold.ts: puts the tool calls and file changes stored before that fold
-// existed into the shape it writes. Each card keeps its opening row and its last row, which now holds
-// the folded state, and loses every row between. The opener gives up its search text, so the index
-// holds each card once.
+// The one-off half of LedgerFold: puts tool calls and file changes stored one row per update into the
+// shape it writes. Each card keeps its opening row and its last row, which then holds the
+// folded state, and loses every row between. The opener gives up its search text, so the index holds
+// each card once.
 //
-// It runs in the background after boot (runtimeEngine.ts § reconcile), because the database it was
-// written for is 1.3 GB and boot must not wait on it. It reads and writes in small steps and yields
+// It runs in the background after the runtime's reconcile(), because a large database takes many
+// seconds and boot must not wait on it. It reads and writes in small steps and yields
 // between them, so the node keeps serving. A session is marked when it is done, and a pass reads only
 // unmarked sessions, so a restart part-way through picks up where it stopped. Running a session again
 // changes nothing.
@@ -20,15 +20,15 @@ import { cardKeyColumns, cardKeyOf, foldCard, parseStoredEvent, type CardKeyFiel
 // could hold, so it folds to the same card whichever prefix that is.
 //
 // The space it frees stays inside the file, because the database has no auto-vacuum and turning it
-// on takes a full VACUUM. New rows reuse the pages. docs/data-layer/backup-and-retention.md § Retention says why nothing
-// here runs a VACUUM.
+// on takes a full VACUUM. New rows reuse the pages. docs/data-layer/backup-and-retention.md § Retention
+// says why nothing here runs a VACUUM.
 
 export type LedgerCompaction = { sessions: number; deleted: number; rewritten: number }
 
 // How much each synchronous step takes on: rows read while finding the cards, rows folded per
-// transaction, and pages of search-index merging. On a 1.3 GB database these kept the median step to a
-// few milliseconds. The longest was one card of about a thousand rows, which cannot be split, at about
-// 120 ms. A test passes smaller ones to cross the step boundaries with a handful of rows.
+// transaction, and pages of search-index merging. They keep a step to a few milliseconds, except for one
+// very long card, which cannot be split. A test passes smaller ones to cross the step boundaries with a
+// handful of rows.
 export type LedgerCompactionSteps = { scanRows: number; writeRows: number; mergePages: number }
 const STEPS: LedgerCompactionSteps = { scanRows: 500, writeRows: 30, mergePages: 50 }
 
@@ -168,11 +168,10 @@ export async function compactLedgers(
   return totals
 }
 
-// A deleted row leaves a tombstone in the search index until its segments merge. The first pass
-// deleted 118,000 indexed rows on the measured database, and merging took the index from 132 MB to
-// 63 MB. FTS5 would merge them on its own as rows are written, but slowly. A negative page count
-// merges every level, and a step that changes fewer than two rows means there is nothing left. The
-// history retention pass calls it too (runtime.ts § removeArchivedHistory).
+// A deleted row leaves a tombstone in the search index until its segments merge, so a large delete
+// leaves the index far bigger than its rows. FTS5 would merge them on its own as rows are written, but
+// slowly. A negative page count merges every level, and a step that changes fewer than two rows means
+// there is nothing left. The history retention pass (removeArchivedHistory) calls it too.
 export async function mergeSearchIndex(
   db: PluginDatabase,
   pages = STEPS.mergePages,

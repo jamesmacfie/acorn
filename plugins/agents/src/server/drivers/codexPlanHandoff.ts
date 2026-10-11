@@ -7,7 +7,7 @@ import type { AgentStore } from '../sessions/store'
  * Accepts one completed Codex plan proposal: switches the session's mode from Plan to Default and
  * queues the turn that implements the plan, as one store transaction. Two clients accepting the same
  * proposal queue one turn. A proposal that is no longer the session's latest, or that a turn already
- * accepted, is refused and leaves the session in Plan (../../shared/codexPlanHandoff.ts).
+ * accepted, is refused and leaves the session in Plan (`codexPlanHandoffState`).
  */
 export function acceptCodexPlan(
   store: Pick<AgentStore, 'enqueueAfterLatestTurn'>,

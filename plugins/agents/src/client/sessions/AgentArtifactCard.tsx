@@ -11,7 +11,7 @@ import { imageAlt, isInlineImageType, MAX_INLINE_IMAGE_BYTES } from './inlineIma
 // One artifact the agent produced: its body, then a row that names it and downloads it.
 //
 // The body is the `agents:artifact` point, keyed by media type, so another plugin can draw a JSON
-// file or a log better than a download row can (../../contract/transcriptMedia.ts). With nobody
+// file or a log better than a download row can (`AGENT_ARTIFACT_POINT`). With nobody
 // drawing it, a raster image draws inline and anything else has no body. The download row stays
 // outside the slot, so the title, size and download are there whoever draws the body.
 

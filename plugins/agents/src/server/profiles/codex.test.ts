@@ -81,15 +81,14 @@ describe('the codex profile', () => {
   })
 })
 
-// The stream codex actually emits, recorded from `codex exec --json` on 2026-09-09. It is here rather
-// than beside the adapter in core because this profile is what chooses the adapter, and a renamed event
-// would break codex alone.
+// The stream codex actually emits, recorded from `codex exec --json`. It is here rather than beside the
+// adapter in core because this profile is what chooses the adapter, and a renamed event would break
+// codex alone.
 //
 // Note what is missing: there is no `result` event. Core's shared `lineDelimitedJsonAdapter` looks for
 // one, so reading this stream through it returns a capture of nothing but nulls, `runHeadless` calls
-// the run `malformed`, and every codex turn fails. That was true of codex headless runs before any
-// one-shot mode existed. `streamJson` is per profile rather than per mode, so the adapter below fixes
-// both at once.
+// the run `malformed`, and every codex turn fails. `streamJson` is per profile rather than per mode, so
+// the adapter below serves headless and one-shot runs alike.
 const CODEX_STREAM = [
   '{"type":"thread.started","thread_id":"01a0847a-0000-0000-0000-000000000000"}',
   '{"type":"turn.started"}',

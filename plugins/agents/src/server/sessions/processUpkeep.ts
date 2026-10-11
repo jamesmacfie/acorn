@@ -29,7 +29,7 @@ type ProcessUpkeepDeps = {
 
 /**
  * Stops provider processes nobody can use, and measures what they hold. Each one holds an agent CLI
- * and its MCP servers, about 450 MB, and nothing else stops a session nobody prompts again
+ * and its MCP servers, hundreds of megabytes, and nothing else stops a session nobody prompts again
  * (docs/managed-agents/operations.md § Idle stop).
  */
 export class ProcessUpkeep {
@@ -39,7 +39,7 @@ export class ProcessUpkeep {
 
   constructor(private readonly deps: ProcessUpkeepDeps) {}
 
-  // Called when the task is archived (core:task-archiving, ../../node/index.ts). Each process holds a
+  // Called when the task is archived (core:task-archiving). Each process holds a
   // provider CLI and its MCP servers, and nothing can prompt it until the task is restored. The
   // sessions stay. A restored task resumes them on the next prompt, the same way it does after a
   // restart, so this records what the runtime's reconcile() records.

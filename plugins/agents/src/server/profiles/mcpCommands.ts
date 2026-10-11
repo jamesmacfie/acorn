@@ -1,5 +1,5 @@
-// What each harness's CLI wants on its command line to gain or lose an MCP server. Core runs these
-// (node-core/server/mcpRegister.ts); it no longer knows either CLI by name.
+// What each harness's CLI wants on its command line to gain or lose an MCP server. Core's MCP registration
+// runs these without knowing either CLI by name.
 import { envFlags, type Argv, type Launcher, type McpCommands } from '@acorn/plugin-api/node'
 import type { AgentDriverMcpServer } from '../drivers/types'
 
@@ -30,7 +30,7 @@ export type HandoffMcp = { args: string[]; env: Record<string, string> }
 // processes, so `--resume` in a terminal would start without them. Every value goes through the
 // terminal's environment and the command line only names it, because a command line is readable in
 // `ps` by every user on the machine. The terminal passes that environment the way it passes acorn's
-// own token (plugins/terminal/src/server/terminalUtils.ts).
+// own token (`tmuxNewSessionArgs`).
 
 // Claude Code expands `${NAME}` in an `--mcp-config` value from its own environment, so each value
 // gets a variable of acorn's choosing and nothing can collide.

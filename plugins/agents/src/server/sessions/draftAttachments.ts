@@ -6,7 +6,7 @@ import type {
 import type { AgentAttachment } from '../../contract/wire.ts'
 import { imageEditKind, type AgentAttachmentStore } from './attachmentStore'
 
-// The `agents.draftAttachments` capability over the attachment store (../../contract/draftAttachments.ts).
+// The `agents.draftAttachments` capability over the attachment store.
 //
 // Thin on purpose. Every rule that decides what may be stored already lives in the store, where the
 // upload route reaches it too, so a second copy here would be a second thing to keep in step. What this

@@ -46,7 +46,7 @@ export type TurnFollowUpPorts = {
   runtime: Pick<ManagedAgentRuntime, 'store' | 'cancelTurn'>
   /** The point's live entries, snapshotted when a window opens. */
   entries(): readonly Entry[]
-  /** Whether a delegated turn's owner still waits for its report (../delegation/reports.ts). */
+  /** Whether a delegated turn's owner still waits for its report (DelegationReports). */
   delegationLive(turn: AgentTurn): Promise<boolean>
   /** The shared review deadline. Tests shorten it. */
   deadlineMs?: number

@@ -62,7 +62,7 @@ export type ManagedAgentsBridge = {
   // Settings > Storage and memory. Node-wide, like `runs`.
   footprint(): Promise<AgentFootprint>
   stopIdleNow(): Promise<{ stopped: number }>
-  // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Node-wide by construction.
+  // The merged run list's source for this plugin. Node-wide by construction.
   runs(): Promise<{ runs: RunRowInput[] }>
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
   attachment(attachmentId: string): Promise<AgentAttachment | null>
@@ -143,7 +143,7 @@ const pageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(2_000).default(500),
   // Asked for, not assumed. A reader that sends `fold=1` gets one record per tool call per page and
   // honours `foldedThroughSeq`; an older one would page from the wrong seq and apply streamed output
-  // twice, so it keeps every row (../../shared/toolFold.ts).
+  // twice, so it keeps every row (`foldToolEvents`).
   fold: z.literal('1').optional(),
 })
 
@@ -243,7 +243,7 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/attachments/:attachmentId/*', ownsAttachment)
   .use('/artifacts/:artifactId', ownsArtifact)
   .use('/artifacts/:artifactId/*', ownsArtifact)
-  // This plugin's contribution to core's merged run list (@acorn/protocol/runs.ts). Read by the node
+  // This plugin's contribution to core's merged run list. Read by the node
   // with service authority, so it takes no params and answers node-wide. Task callers use core's
   // filtered merged run list and cannot read this unfiltered source directly.
   //
@@ -480,7 +480,7 @@ export const managedAgents = new Hono<AppEnv>()
       return { ok: true }
     }),
   )
-  // Device only, for the reason Settings → MCP servers is (./mcpServers.ts): the switches decide which
+  // Device only, for the reason Settings → MCP servers is: the switches decide which
   // commands the session's next start runs, and an agent must not pick its own.
   .get('/sessions/:sessionId/mcp', requireDevice, (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.sessionMcp(c.req.param('sessionId'))),

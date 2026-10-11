@@ -5,8 +5,8 @@
 // corrupts the parent's lifecycle: a child's `turn/completed` on the parent path ends the parent's
 // turn, and a child's `thread/status/changed` flips the parent's runtime state mid-turn.
 //
-// Verified against a live capture, codex-cli 0.146.1 with gpt-5.6-luna, two children named alpha and
-// beta (__fixtures__/codexSubagentWire.json). Three things that capture settles:
+// Verified against a capture from codex-cli 0.146.1 with two children named alpha and beta
+// (__fixtures__/codexSubagentWire.json). Three things that capture settles:
 //
 //  1. There is NO `thread/started` for a child on 0.146.1. The root gets one and its `source` is the
 //     string "vscode", not an object naming a spawn. A parent-side `subAgentActivity` item is the only
@@ -98,7 +98,7 @@ type ChildState = {
 }
 
 export type CodexRouted =
-  /** Not child traffic. The caller normalizes it as the session's own, exactly as before. */
+  /** Not child traffic. The caller normalizes it as the session's own. */
   | { to: 'parent' }
   /** Child traffic, already normalized and attributed. May be empty, which means "handled, say nothing". */
   | { to: 'subagent'; events: AgentNormalizedEvent[] }
@@ -238,7 +238,7 @@ export class CodexChildRouter {
         // than these events.
         case 'file_change':
           return [{ ...event, subagentId }]
-        // ponytail: a child's diagnostic stays the session's. There is nowhere on the event to say whose
+        // A child's diagnostic stays the session's. There is nowhere on the event to say whose
         // it is, and one line about a subagent reads fine in the parent's stream. Give it a subagentId
         // if a chatty harness ever makes that noisy.
         case 'diagnostic':

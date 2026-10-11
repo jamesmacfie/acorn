@@ -1,7 +1,7 @@
 // The ledger fold against a real migrated database: a tool call or file change keeps its opening row
-// and one row with its latest state, and every reader still draws the card it drew when each update
-// had a row of its own. The reference in each test is what the old ledger held: every record exactly
-// as recordEvent returned it, which is also what the socket carries.
+// and one row with its latest state, and every reader draws the card it would from a row per update.
+// The reference in each test is that unfolded ledger: every record exactly as recordEvent returned it,
+// which is also what the socket carries.
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { asc, eq, sql } from 'drizzle-orm'
@@ -182,7 +182,7 @@ describe('ledger fold', () => {
 
   it('folds every row of a call stored before the fold existed', async () => {
     const turn = randomUUID()
-    // The old ledger: one row per update, each with its own search text.
+    // An unfolded ledger: one row per update, each with its own search text.
     for (const [index, event] of COMMAND.slice(0, 3).entries()) {
       const row = {
         id: randomUUID(),

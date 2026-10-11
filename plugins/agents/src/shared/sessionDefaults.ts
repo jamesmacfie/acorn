@@ -38,7 +38,8 @@ export const AGENT_IDLE_STOP_CHOICES = [
 
 /**
  * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
- * schedule removes the transcripts of that task's sessions for good (docs/data-layer/backup-and-retention.md § Retention).
+ * schedule removes the transcripts of that task's sessions for good
+ * (docs/data-layer/backup-and-retention.md § Retention).
  */
 export const AGENT_ARCHIVED_HISTORY_CHOICES = [
   { days: 30, label: '30 days' },
@@ -50,7 +51,7 @@ export const AGENT_ARCHIVED_HISTORY_CHOICES = [
 /**
  * "Warn when an agent repeats a tool call", as the number of identical calls in a row, where 0 is Off.
  * Waiting tools such as `task_scripts_wait` repeat on purpose, which is why the warning stops nothing
- * (../server/sessions/repeatedToolCalls.ts).
+ * (`RepeatedToolCallWarnings`).
  */
 export const AGENT_REPEATED_TOOL_CALL_CHOICES = [
   { calls: 3, label: '3 times in a row' },
@@ -69,7 +70,7 @@ export type AgentSessionDefaults = {
   /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
   keepArchivedHistoryDays: number
   /** Refuse a turn while an instruction file or skill the harness reads holds hidden characters
-   *  (../server/sessions/instructionCheck.ts). Drawn on Settings > Security and backup. */
+   *  (`hiddenCharactersIn`). Drawn on Settings > Security and backup. */
   checkInstructionFiles: boolean
   /** Require an owner-approved snapshot of discovered instruction and skill files. */
   reviewChangedInstructions: boolean
@@ -103,7 +104,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   checkInstructionFiles: false,
   reviewChangedInstructions: false,
   // Off, because the harness's sandbox also refuses writes outside the worktree, which breaks package
-  // installs and SSH pushes that work today.
+  // installs and SSH pushes that otherwise work.
   blockDataRootReads: false,
   followLastSession: true,
   pinned: {},

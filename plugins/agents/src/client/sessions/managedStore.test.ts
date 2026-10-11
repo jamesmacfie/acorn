@@ -1,10 +1,6 @@
-// The transcript store's per-event bookkeeping.
-//
-// A streaming session reaches a client about 25 times a second (the node coalesces text deltas at
-// 40 ms in ../../server/sessions/durableEventBuffer.ts), and a long session on this machine's database
-// holds 2,700 events. So everything here is about what one frame costs: it used to be two linear
-// scans, a copy of the whole array and a sort of an already-sorted array, plus a refetch of up to
-// 2,000 rows whenever a projected event arrived.
+// The transcript store's per-event bookkeeping. A streaming session reaches a client about 25 times a
+// second and a long session holds thousands of events, so everything here is about what one frame
+// costs: no scan of the whole list, no copy, no sort, and no refetch for a projected event.
 import { readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -119,8 +115,8 @@ beforeEach(() => {
   gates = {}
 })
 
-// The snapshot route caps its event list, so a session past the cap arrives short. Reopening one used
-// to stop at the cap and show a transcript that ended hours before the last message.
+// The snapshot route caps its event list, so a session past the cap arrives short. Reopening one must
+// not stop at the cap and show a transcript that ends hours before the last message.
 describe('a snapshot the node truncated', () => {
   it('pages forward until it reaches lastEventSeq', async () => {
     servedPages = { 2: [prose(3), prose(4)], 4: [prose(5)] }
@@ -146,8 +142,7 @@ describe('appending a streamed event', () => {
     await seed()
     const sort = vi.spyOn(Array.prototype, 'sort')
     for (let seq = 1; seq <= 2_000; seq++) push({ channel: 'agent:event', event: prose(seq) })
-    // The old path copied the array and sorted it once per frame. Two thousand frames is two thousand
-    // sorts of an array that was already ordered.
+    // A sort per frame would be two thousand sorts of an array that was already ordered.
     expect(sort).not.toHaveBeenCalled()
     sort.mockRestore()
 
@@ -284,8 +279,8 @@ describe('what a projected event costs', () => {
 })
 
 // The rail warms a task's session list on hover, and the pane model asks for the same list a moment
-// later when the reader clicks (docs/panes/contributions.md § Contributions). Without a window between them that is
-// two reads of the same rows for one click.
+// later when the reader clicks (docs/panes/contributions.md § Contributions). Without a window between
+// them that is two reads of the same rows for one click.
 describe('a task’s session list', () => {
   beforeEach(() => {
     sessionCalls.length = 0
@@ -373,8 +368,8 @@ describe('a session’s snapshot', () => {
   it('is one read for two readers in the same tick', async () => {
     served = { session, turns: [], events: [], requests: [] }
     await Promise.all([managedAgentStore.loadSnapshot(SESSION), managedAgentStore.loadSnapshot(SESSION)])
-    // Two panes open on one session, which is what the run pane makes possible. The transcript is up
-    // to a couple of thousand event rows, so the second reader has to be free.
+    // Two panes open on one session, which the run pane makes possible. The second reader has to be
+    // free, because a transcript can be thousands of event rows.
     expect(snapshotCalls).toEqual([SESSION])
   })
 
@@ -388,9 +383,8 @@ describe('a session’s snapshot', () => {
   })
 })
 
-// Switching back to a task used to read its whole session again: 2.9 MB for a 4,000-event transcript
-// the store already held, 11.7 MB for a 16,000-event one. The ledger only appends, so a held session
-// reads on from where its events are whole.
+// Switching back to a task must not read its whole session again. The ledger only appends, so a held
+// session reads on from where its events are whole.
 describe('reading a session the store holds', () => {
   const pending = {
     id: 'r1',
@@ -466,8 +460,7 @@ describe('reading a session the store holds', () => {
   })
 })
 
-// The store kept every transcript it read until the session was deleted: 46 MB of JSON after opening
-// eight real sessions one after another. It keeps what is drawn and the three drawn last.
+// The store keeps what is drawn and the three drawn last, not every transcript it has read.
 describe('which snapshots the store keeps', () => {
   const answer = (id: string): AgentSessionSnapshot => ({
     session: { ...session, id, lastEventSeq: 1 },
@@ -562,7 +555,7 @@ describe('which snapshots the store keeps', () => {
 })
 
 // The transcript keeps its projection open and adds each streamed row to it rather than rebuilding
-// the whole session per event (conversationItems.ts § createConversationProjection). That is only
+// the whole session per event (`createConversationProjection`). That is only
 // right if it always lands where a rebuild would, whatever the store did to the array: pushed a row,
 // merged a usage update into the line in place, seated a late frame behind the tail, or took a row the
 // node's fold already covered. So these drive the real store, a frame at a time, and compare the kept

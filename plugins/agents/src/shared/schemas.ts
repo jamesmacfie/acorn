@@ -87,7 +87,8 @@ export const createAgentSessionSchema = z
     parentSessionId: z.string().uuid().optional(),
     parentTurnId: z.string().uuid().optional(),
     // Start from a saved custom agent. The node reads it and copies what the session keeps onto `config`,
-    // so a caller names the agent and never sends its instructions (docs/managed-agents/custom-agents.md § Custom agents).
+    // so a caller names the agent and never sends its instructions
+    // (docs/managed-agents/custom-agents.md § Custom agents).
     customAgentId: z.string().min(1).max(200).optional(),
     config: z.record(z.string(), z.unknown()).default({}),
   })
@@ -159,6 +160,6 @@ export const agentWaitQuerySchema = z.object({
 export type CreateAgentSessionInput = z.infer<typeof createAgentSessionSchema>
 export type ImportAgentTranscriptInput = z.infer<typeof importAgentTranscriptSchema>
 // `plugin` is the one source no HTTP caller may claim. Only the session messenger writes it, with the
-// host's `sentBy` (server/sessions/sessionMessages.ts), so the schema above leaves it out.
+// host's `sentBy` (`SessionMessages`), so the schema above leaves it out.
 export type EnqueueAgentTurnInput = Omit<z.infer<typeof enqueueAgentTurnSchema>, 'source'> & { source: AgentTurnSource }
 export type ResolveAgentRequestInput = z.infer<typeof resolveAgentRequestSchema>

@@ -90,7 +90,7 @@ export function dataRootReadBlock(input: {
   env: Record<string, string>
   /** The skill folders and plugin folders this start hands the harness. */
   skillPaths: readonly string[]
-  /** The session's copies of the attachments its turns sent (../sessions/attachmentStore.ts). */
+  /** The session's copies of the attachments its turns sent (`AgentAttachmentStore`). */
   attachments: string
   fileGuard: AgentDriverReadBlock['fileGuard']
 }): AgentDriverReadBlock {

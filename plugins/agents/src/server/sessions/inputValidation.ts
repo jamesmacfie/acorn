@@ -28,10 +28,9 @@ export async function validateAgentInputFiles(cwd: string, input: AgentInputPart
   if (contextBytes > MAX_AGENT_CONTEXT_BYTES) {
     throw new Error('Acorn context snapshots are limited to 512 KiB per turn.')
   }
-  // Confinement is CoreServices.fs's job (one implementation, symlink-aware, tested against a
-  // symlinked leaf and a symlinked directory). This kept its own realpath+relative pass; only the
-  // user-facing wording is agents', which is why confineExistingFile returns a classified reason
-  // instead of throwing.
+  // Confinement is CoreServices.fs's job (one implementation, symlink-aware). Only the user-facing
+  // wording is agents', which is why confineExistingFile returns a classified reason instead of
+  // throwing.
   for (const part of input) {
     if (part.type !== 'file') continue
     const confined = await confineExistingFile(cwd, part.path)

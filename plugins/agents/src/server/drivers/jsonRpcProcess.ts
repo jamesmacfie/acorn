@@ -93,8 +93,8 @@ export class JsonRpcProcess {
     return this.#closed
   }
 
-  // The provider's process id, so the runtime can measure its process tree
-  // (../sessions/footprint.ts). Undefined when the spawn failed.
+  // The provider's process id, so the runtime can measure its process tree (`processTreeBytes`).
+  // Undefined when the spawn failed.
   get pid(): number | undefined {
     return this.#child.pid
   }

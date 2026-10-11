@@ -65,10 +65,9 @@ const boundedQuestion = (question: AgentQuestion): AgentQuestion => ({
  *  fits inside the payload budget below on its own. A search at its limit is about 20 KB and a page
  *  action about 16 KB, which leaves the budget's remaining forty-odd for sources.
  *
- *  Generous against the live captures, where a Codex result set is five rows with two-line snippets
- *  and a Claude one is ten titles and URLs. The action's URL gets more room than a result's because
- *  there is only ever one of it, and 2,048 is the length every browser has treated as a URL's
- *  practical ceiling for twenty years. */
+ *  Generous against what Codex and Claude return, a handful of rows with short snippets. The action's
+ *  URL gets more room than a result's because there is only ever one of it, and 2,048 is the length
+ *  browsers treat as a URL's practical ceiling. */
 const WEB_LIMITS = {
   queries: 10,
   query: 1_000,
@@ -88,10 +87,8 @@ const WEB_LIMITS = {
  *  Overflow drops trailing sources, and only that. The action is bounded to fit on its own, so this
  *  loop can always finish, and it never has to touch the one field that explains the call.
  *
- *  The plan this work followed put the aggregate in the materializer and promoted the overflow into
- *  an artifact. It is here and lossy instead: an artifact earns its keep for command output and
- *  patches, which a reader wants in full, and the fortieth search result is not that. Keeping the
- *  field limits and the total in one function is also one place to read and one place to test. */
+ *  Lossy rather than promoted to an artifact: an artifact earns its keep for command output and
+ *  patches, which a reader wants in full, and the fortieth search result is not that. */
 const MAX_WEB_BYTES = 64 * 1024
 
 const boundedStrings = (values: string[] | undefined, count: number, length: number): string[] | undefined =>
@@ -210,7 +207,7 @@ export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: It
           label: option.label.slice(0, 500),
         })),
         questions: event.questions?.slice(0, 50).map(boundedQuestion),
-        // The driver already refuses an identity that does not fit (codexAppApproval.ts); these
+        // The driver already refuses an identity that does not fit (codexAppApproval); these
         // bounds only keep a future driver from widening a row.
         approval: event.approval && {
           connector: event.approval.connector.slice(0, 200),
@@ -218,7 +215,7 @@ export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: It
           scopes: event.approval.scopes.slice(0, 2),
           ...(event.approval.warning ? { warning: event.approval.warning.slice(0, 2_000) } : {}),
         },
-        // The host already capped the reason (pluginHost/hooks.ts); this keeps the row's bound here too.
+        // The host already capped the reason; this keeps the row's bound here too.
         blocked: event.blocked && { by: event.blocked.by.slice(0, 200), reason: event.blocked.reason.slice(0, 200) },
       }
     case 'request_resolved':

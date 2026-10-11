@@ -107,25 +107,20 @@ export const claudeHarness: HarnessLaunchSpec = {
     requires: { command: 'claude', env: 'CLAUDE_CODE_EXECUTABLE' },
   },
   envPassthrough: ['CLAUDE_CODE_*'],
-  // Claude Code now waits and continues inside its own process by default. Acorn disables that
-  // session-local behavior so the durable runtime owns the timer, the opt-out setting, restart
-  // recovery, and the transcript notice consistently with Codex and contributed harnesses.
-  //
-  // Host attendance is fixed at session creation and supplies bootstrap instructions. The runtime
-  // also supplies per-turn instructions for legacy sessions and other harness prompt channels.
   // Claude Code 2.1.292 keeps the appended prompt a session was created with and ignores a new one on
-  // resume, so nothing that can change between starts goes here. The skills index goes ahead of a turn
-  // instead (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
+  // resume, so nothing that can change between starts goes there. Attendance instructions are fixed at
+  // session creation, so they can. The skills index goes ahead of a turn instead
+  // (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
   // (`//` anchors at the filesystem root), so the agent reads a body without a prompt and gains no write
   // access anywhere new. Flag settings are per process, so the rule follows the current index.
   //
   // The skills themselves go in as session plugins, the Agent SDK's `plugins` option, which the adapter
   // passes through unchanged and the SDK turns into `--plugin-dir` on a create and a resume alike. Unlike
-  // the appended prompt, a resume loads the plugins it's given now. See
+  // the appended prompt, a resume loads the plugins it's given. See
   // docs/managed-agents/native-skills.md § Native skills.
   nativeSkills: true,
   // acorn's bridge goes in as command hooks in the same flag settings, which Claude Code runs beside the
-  // person's own and never writes anywhere (claudeLoopHookSettings above, docs/managed-agents/loop-hooks.md).
+  // person's own and never writes anywhere (claudeLoopHookSettings, docs/managed-agents/loop-hooks.md).
   // Like the allow rules, flag settings follow each process, so a resume installs what has a handler now.
   loopHooks: true,
   // The read block goes in the same flag settings, so like the hooks it applies from each start.
@@ -153,6 +148,9 @@ export const claudeHarness: HarnessLaunchSpec = {
       claudeCode: {
         options: {
           settings: {
+            // Claude Code otherwise waits out a usage limit and continues inside its own process. Off,
+            // so the durable runtime owns the timer, the opt-out setting, restart recovery, and the
+            // transcript notice, the same as for Codex and contributed harnesses.
             autoContinueAtUsageLimit: false,
             ...permissions,
             ...hooks,

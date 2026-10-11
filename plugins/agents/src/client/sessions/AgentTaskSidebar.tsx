@@ -52,18 +52,14 @@ import {
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
-// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). Subagents are rows of the sessions collection at depth
-// one, rather than a nested list, because stepping into a child run is a selection and not an
-// expansion.
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). Subagents are rows of the
+// sessions collection at depth one, rather than a nested list, because stepping into a child run is a
+// selection and not an expansion.
 //
-// Workflow runs lists a workflow's sessions, not its steps. An earlier group merged this task's PTY
-// sessions with its workflow steps, and opening a step spawned a terminal on the harness's resume
-// command. The run pane owns a run's steps now
-// (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
-// rows had two better homes and one confusing one (docs/workflows/refusals.md § What workflows refuses).
+// Workflow runs lists a workflow's sessions, not its steps: the run pane owns a run's steps, and the
+// terminal drawer owns PTY sessions (docs/workflows/refusals.md § What workflows refuses).
 
-/** The order button in a group's header. The choice is this task's and this group's alone
- *  (./sessionOrder.ts). */
+/** The order button in a group's header. The choice is this task's and this group's alone. */
 function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }) {
   const chosen = () => sessionOrderFor(props.taskId, props.group)
   return (
@@ -104,9 +100,8 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
 }
 
 /** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
- *  rebroadcasts the row only when an event changes something else on it
- *  (../../server/sessions/runtimeEngine.ts § listedRow), such as a turn ending or a subagent finishing,
- *  so a running one reads as of its last state change. */
+ *  rebroadcasts the row only when an event changes something else on it (`SessionFrames.rowChanged`),
+ *  such as a turn ending or a subagent finishing, so a running one reads as of its last state change. */
 const lastActive = (at: number) => `Last active ${eventTime(at).full}`
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
@@ -114,7 +109,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   // Collapsed, a row is its run state and nothing else. That glyph is already the row's leading mark
   // and already carries the queued count, so the rail says the same thing the full row's first inch
   // said: which of these is working, which is waiting on you, which is done. The title comes back as
-  // the tooltip, from `title` below (client-core kit/lib/layout/collapseState.ts).
+  // the tooltip, from `title` below.
   const collapsed = sidebarCollapsed(paneCollapseKey(AGENT_PANE_ID))
   const view = startAgentView('agents.sidebar.open')
   onCleanup(view.dispose)
@@ -132,7 +127,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
 
   const attentionLoaded = new Map<string, number>()
   // The snapshots read above for their requests, held while this list is drawn, or the store's bound
-  // could drop a waiting request from it (./managedStore.ts § hold).
+  // could drop a waiting request from it (`managedAgentStore.hold`).
   const attentionHeld = new Map<string, () => void>()
   onCleanup(() => {
     for (const release of attentionHeld.values()) release()
@@ -163,8 +158,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   // A subagent row carries its parent session, so it lands in the same group as its parent.
   //
   // Each group builds the roster from every session sorted by that group's order and then keeps its
-  // own rows, so a delegated child nests exactly as it did before there was a choice, and its
-  // siblings and subagents take the group's order with it.
+  // own rows, so a delegated child still nests under its parent, and its siblings and subagents take
+  // the group's order with it.
   const groupRows = (group: SessionGroup, keep: (session: AgentSession) => boolean) => {
     const order = sessionOrderFor(props.task.id, group)
     return agentSessionRoster(
@@ -326,10 +321,9 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
               >
                 {(child) => (
                   // The subagent roster, indented under the session that spawned it. Read straight
-                  // off the session row, which the WebSocket pushes whenever an event this node
-                  // records changes it, so these rows appear and settle live for every session in the task and
-                  // not only the one that happens to be open. Nothing extra is fetched
-                  // (docs/managed-agents/subagents.md § Subagents).
+                  // off the session row, which the WebSocket pushes whenever an event changes it, so
+                  // these rows settle live for every session in the task, not only the open one.
+                  // Nothing extra is fetched (docs/managed-agents/subagents.md § Subagents).
                   <Row
                     item={itemProps}
                     variant="stacked"

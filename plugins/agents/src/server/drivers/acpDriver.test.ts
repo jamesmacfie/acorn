@@ -156,9 +156,9 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     }
   })
 
-  // The other half of the reconnect, and the one acorn used to miss. An agent that keeps its sessions
-  // may offer `session/resume` instead of `session/load`, which is what DeepSeek's ACP server does, and
-  // acorn reading only the older capability meant a fresh agent under the old transcript every time.
+  // The other half of the reconnect. An agent that keeps its sessions may offer `session/resume`
+  // instead of `session/load`, as DeepSeek's ACP server does, and reading only `session/load` would
+  // start a fresh agent under the old transcript every time.
   it('resumes a stored provider session when the agent offers resume rather than load', async () => {
     const events: AgentNormalizedEvent[] = []
     const handle = await new AcpDriver({

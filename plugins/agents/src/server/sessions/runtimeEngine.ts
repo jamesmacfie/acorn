@@ -76,12 +76,10 @@ import { ProcessUpkeep } from './processUpkeep'
  * An unregistered profile gets nothing either. The session could not have started without one, so this
  * is a broken state rather than a case, and the conservative answer is not to hand a credential to it.
  *
- * The environment is spelled out rather than inherited. The agent process already holds these values,
- * because the session environment is what acorn spawned it with, but an agent is free to scrub
- * credential-shaped names out of what it passes its own children, and a stdio MCP server that loses
- * `ACORN_API_TOKEN` or `ACORN_TASK_ID` fails every call. The session environment carries both, plus
- * `ACORN_SESSION_ID`; the token, not these, is what the node trusts for the task, the session, and the
- * tool ceiling (docs/mcp.md § Launch environment).
+ * The environment is spelled out rather than inherited. An agent is free to scrub credential-shaped
+ * names out of what it passes its own children, and a stdio MCP server that loses `ACORN_API_TOKEN` or
+ * `ACORN_TASK_ID` fails every call. The token, not the ids, is what the node trusts for the task, the
+ * session, and the tool ceiling (docs/mcp.md § Launch environment).
  */
 export function acornMcpServers(
   mcp: { name: string; launcher: Launcher } | null,
@@ -106,13 +104,10 @@ export function acornMcpServers(
 const log = createLogger('agents', 'agents')
 
 export type AgentRuntimeOptions = {
-  // This plugin's own SQLite file (server/plugins/storage.ts), not core's handle. Everything the engine reads
-  // and writes is in the ten `agent_*` tables (node/schema.ts).
+  // This plugin's own SQLite file, not core's handle. Everything the engine reads and writes is in the
+  // `agent_*` tables.
   db: PluginDatabase
   dataDir: string
-  // The three questions this engine has to ask about a task and can no longer answer itself: where its
-  // worktree is, which workspace it belongs to (the pump's per-workspace concurrency limit), and
-  // whether a webhook's task exists.
   core: CompiledCoreServices
   internalEnv: InternalEnvFactory
   // acorn's own MCP server, read per session rather than captured, because the composition root sets it
@@ -193,8 +188,8 @@ const persistedToolCeiling = (config: Record<string, unknown>) => {
 
 /**
  * The managed-agent runtime's internal machine: provider process supervision, event durability, and
- * scheduling. Nothing outside this folder talks to it. ManagedAgentRuntime (./runtime.ts) builds it,
- * and exposes the collaborators below that callers need.
+ * scheduling. Nothing outside this folder talks to it. ManagedAgentRuntime builds it, and exposes the
+ * collaborators below that callers need.
  */
 export class ManagedAgentEngine {
   readonly store: AgentStore
@@ -203,18 +198,17 @@ export class ManagedAgentEngine {
   readonly webhooks: AgentWebhookService
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
-  /** Who hears a session frame (./sessionFrames.ts). */
+  /** Who hears a session frame. */
   readonly frames: SessionFrames
-  /** Idle and task-archive stops, and what the provider processes hold (./processUpkeep.ts). */
+  /** Idle and task-archive stops, and what the provider processes hold. */
   readonly upkeep: ProcessUpkeep
-  /** The instruction check every queued turn passes before its driver send (./instructionAdmission.ts). */
+  /** The instruction check every queued turn passes before its driver send. */
   readonly instructionAdmission: LazyService<InstructionAdmission>
-  /** Tool-catalogue reviews for MCP servers that ask for one (../mcpReviewManager.ts). */
+  /** Tool-catalogue reviews for MCP servers that ask for one. */
   readonly mcpReviews: LazyService<McpReviewManager>
-  /** Session goals (./sessionGoalGeneration.ts). */
   readonly goals: LazyService<SessionGoalGeneration>
   readonly processes: ProviderSessionLifecycle
-  // Each start's native skill folder, `<session id>/<generation>` (../drivers/skillFolder.ts).
+  // Each start's native skill folder, `<session id>/<generation>`.
   readonly skillFolders: string
   private readonly db: PluginDatabase
   private readonly core: CompiledCoreServices
@@ -229,7 +223,7 @@ export class ManagedAgentEngine {
   private readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
   private readonly usageContinuationGraceMs: number
   private readonly notice?: (notice: PluginNotice) => void
-  // Loaded on the first tool call that has input (./repeatedToolCalls.ts).
+  // Loaded on the first tool call that has input.
   private repeatedToolCalls: Promise<RepeatedToolCallWarnings> | null = null
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
@@ -488,10 +482,10 @@ export class ManagedAgentEngine {
     return { session, input: enqueued.input, outcome }
   }
 
-  // Tool calls and file changes stored before the ledger fold, put into the shape it writes
-  // (./ledgerCompaction.ts). Startup repair rather than a schedule: it converges, and each session is
-  // done once (docs/schedules.md § Limits). Not awaited, because the first
-  // pass over a 1.3 GB database took about half a minute and boot waits on the runtime's reconcile().
+  // Tool calls and file changes stored before the ledger fold, put into the shape it writes. Startup
+  // repair rather than a schedule: it converges, and each session is done once (docs/schedules.md §
+  // Limits). Not awaited, because a pass over a large database takes many seconds and boot waits on the
+  // runtime's reconcile().
   compactLedgersInBackground(): void {
     if (this.stopped || this.ledgerCompaction) return
     const controller = new AbortController()
@@ -513,7 +507,7 @@ export class ManagedAgentEngine {
   }
 
   // Releases what this engine holds, in the order docs/managed-agents/operations.md § Operations and failure
-  // describes. Called from the plugin's dispose (node/index.ts) before the database closes.
+  // describes. Called from the plugin's dispose before the database closes.
   stop(): Promise<void> {
     return (this.stopPromise ??= this.stopEngine())
   }
@@ -583,8 +577,8 @@ export class ManagedAgentEngine {
     return this.processes.current(sessionId)
   }
 
-  /** A provider event in the shape the ledger stores, for a caller outside the provider's own stream
-   *  (./loopHooks.ts). */
+  /** A provider event in the shape the ledger stores, for a caller outside the provider's own stream,
+   *  such as the loop hook bridge. */
   materialize(sessionId: string, turnId: string | null, event: AgentDriverEvent): Promise<AgentNormalizedEvent[]> {
     return this.eventMaterializer.map(sessionId, turnId, event)
   }
@@ -651,7 +645,7 @@ export class ManagedAgentEngine {
     return env
   }
 
-  // The first turn after a start ran with its skills (../drivers/skillIndex.ts). The catalogue hears which
+  // The first turn after a start ran with its skills. The catalogue hears which
   // harness got which skills and how, the session row keeps the names the agent was told so a later
   // start knows which are gone, and the transcript gets one line a reader on either host can see.
   private async skillsDelivered(sessionId: string, report: SkillReport): Promise<void> {
@@ -983,7 +977,7 @@ export class ManagedAgentEngine {
       }
       if (!this.processes.owns(generation)) return false
       // Attachments leave the machine with this send. With blocking on, their stored bytes pass the
-      // secret gate here, on every turn source, including a retry (./secretPublication.ts).
+      // secret gate here, on every turn source, including a retry.
       if (Object.keys(attachments).length && this.core.secretPublication) {
         const { admitAttachments } = await import('./secretPublication')
         await admitAttachments(this.core.secretPublication, {
@@ -994,7 +988,7 @@ export class ManagedAgentEngine {
         if (!this.processes.owns(generation)) return false
       }
       // Copied only once admitted, because the session can read its folder: under the read block,
-      // the store itself is out of its reach (./attachmentStore.ts).
+      // the store itself is out of its reach.
       const sent = Object.fromEntries(
         await Promise.all(
           Object.entries(attachments).map(
@@ -1093,10 +1087,9 @@ export class ManagedAgentEngine {
     this.frames.emit({ channel: 'agent:event', event: clientRecord })
     await this.emitProjection(sessionId, record.turnId, event)
     // Only when the event changed what the row says. Most events in a streamed reply move nothing on
-    // the row except its sequence and clock, and the row runs 26 KB on average and up to 58 KB, mostly
-    // the harness's skills list. Sent after every event, rows were about 96% of the agent socket's
-    // bytes. The comparison skips `config` because of its size, so the one event that writes it,
-    // `session_metadata`, always sends.
+    // the row except its sequence and clock, and the row is large, mostly the harness's skills list, so
+    // sending it after every event would fill the agent socket with rows. The comparison skips `config`
+    // because of its size, so the one event that writes it, `session_metadata`, always sends.
     if (event.type === 'session_metadata' || this.frames.rowChanged(session)) {
       this.frames.emit({ channel: 'agent:session', session })
     }
@@ -1133,16 +1126,12 @@ export class ManagedAgentEngine {
     }
   }
 
-  // The row a projected event changed, sent with the event.
-  //
-  // `recordEvent` writes the request row in the same transaction as the event, and a turn's status is
-  // already committed by the time its `turn_completed` is recorded, so the node knows what changed. It
-  // used to say nothing, and every client answered a `turn_completed` by refetching the whole snapshot
-  // — up to 2,000 event rows and a JSON body parsed per row — to learn one turn's stop reason
-  // (../../client/sessions/managedStore.ts § PROJECTED_EVENT_TYPES).
+  // The row a projected event changed, sent with the event, so a client updates that row rather than
+  // refetching the whole snapshot. `recordEvent` writes the request row in the same transaction as the
+  // event, and a turn's status is already committed by the time its `turn_completed` is recorded.
   //
   // `error` is deliberately not here: it also expires this session's pending requests, which is a set
-  // this projection cannot name, so the client still refetches for that one.
+  // this projection cannot name, so the client still refetches for that one (REFETCH_EVENT_TYPES).
   private async emitProjection(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<void> {
     if (event.type === 'request' || event.type === 'request_resolved') {
       const request = await this.store.request(sessionId, event.requestId)

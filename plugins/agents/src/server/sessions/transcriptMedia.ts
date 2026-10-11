@@ -8,7 +8,7 @@ import {
 import type { AgentArtifactStore } from './artifactStore'
 import type { AgentAttachmentStore } from './attachmentStore'
 
-// The `agents.transcriptMedia` capability over the two media stores (../../contract/transcriptMedia.ts).
+// The `agents.transcriptMedia` capability over the two media stores.
 //
 // The same ownership the transcript's own routes check, asked the other way round. The routes resolve
 // a media id to its task. A viewer already names the task and session, so this checks that the

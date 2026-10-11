@@ -12,20 +12,15 @@ import { MediaDownloadRow } from './AgentArtifactCard'
 import { createAgentMedia, type holdAgentMedia } from './agentMediaStore'
 import { imageAlt } from './inlineImage'
 
-// One attachment the reader sent, as the thing itself rather than as its id.
-//
-// The turn's text names an attachment as `[Attachment: <id>]` (server/sessions/runtimeContext.ts),
-// which is the right thing to send a harness and the wrong thing to show a person: it is their own
-// screenshot, and they are looking at a UUID.
+// One attachment the reader sent, as the thing itself rather than as the `[Attachment: <id>]` line the
+// harness is sent.
 //
 // Always a tile, whatever it holds, so a turn with four attachments is one wrapping row rather than
-// four full-width bands. The picture sits above its filename because that is the order a reader looks
-// in: the thumbnail is what they recognise, the name is what confirms it. A picture opens full size on
-// press; anything else downloads, which is all a browser can honestly do with a PDF.
+// four full-width bands. A picture opens full size on press; anything else downloads.
 //
-// In a sent turn the tile is the `agents:transcript-attachment` point, keyed by media type
-// (../../contract/transcriptMedia.ts). A plugin that draws one gets the tile's body, and the filename,
-// size and download move outside the slot below it. The queue's editable turns draw the plain tile.
+// In a sent turn the tile is the `agents:transcript-attachment` point, keyed by media type. A plugin that
+// draws one gets the tile's body, and the filename, size and download move outside the slot below it. The
+// queue's editable turns draw the plain tile.
 //
 // Sibling of AgentArtifactCard, which does the same for what the agent produced.
 

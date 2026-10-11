@@ -1,8 +1,8 @@
 import type { AgentAppApproval, AgentApprovalScope, AgentRequest } from '../../contract/wire.ts'
 
 // The words around an app-access approval (docs/managed-agents/app-access.md § App-access approval), shared by
-// the card that takes the answer (./AgentRequestCard.tsx) and the record it leaves in the thread
-// (./AgentEventCard.tsx), so the two never describe the same grant differently.
+// the card that takes the answer (`AgentRequestCard`) and the record it leaves in the thread
+// (`AgentEventCard`), so the two never describe the same grant differently.
 
 const SCOPES: readonly AgentApprovalScope[] = ['session', 'always']
 

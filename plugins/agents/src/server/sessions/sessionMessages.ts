@@ -1,7 +1,7 @@
 // `agents:session-messenger`: a plugin queues an attributed note on a session
 // (docs/managed-agents/session-messages.md). The host binds each sender to the entry's plugin id, so
 // a caller never names itself. A note on a workflow or delegated session joins the operation that owns
-// its origin turn (./turnFollowUps.ts).
+// its origin turn (TurnFollowUps).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, pastedContent } from '@acorn/plugin-api/node'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'

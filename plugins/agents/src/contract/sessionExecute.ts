@@ -113,6 +113,6 @@ export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.
 // on a profile from this (docs/workflows/step-kinds.md § Contributed step kinds).
 //
 // Read off the profile, which names its own driver: the built-in Claude and Codex profiles, and every
-// harness a manifest contributes (../server/harnessRegistry.ts).
+// harness a manifest contributes (`createHarnessRegistry`).
 export const managedProviderForProfile = (profileId: string | undefined): string | null =>
   (profileId ? agentProfileRegistry.get(profileId)?.managedProvider : undefined) ?? null

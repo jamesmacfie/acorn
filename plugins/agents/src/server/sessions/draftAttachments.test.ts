@@ -12,7 +12,7 @@ import { AgentAttachmentStore } from './attachmentStore'
 import { createDraftAttachments } from './draftAttachments'
 
 // The `agents.draftAttachments` capability: what a plugin that edits an unsent image attachment may
-// reach through this plugin, and everything it may not (../../contract/draftAttachments.ts).
+// reach through this plugin, and everything it may not.
 //
 // The interesting assertions are all refusals. The capability's whole job is to be narrower than the
 // upload route beside it: one task, one unsent attachment, two image families, no path, and a source

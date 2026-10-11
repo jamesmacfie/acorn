@@ -29,12 +29,8 @@ import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPref
 import { readingPlace, rememberReadingPlace } from './readingPlaceStore'
 import { codexPlanHandoffState, type CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
-// The session's stream, as a `Timeline` of cards.
-//
-// `follow` is the kit's: the scroller, staying on the newest turn until the reader scrolls away from
-// it, and the place a reader is returned to when they come back are all the timeline's now
-// (client-core/src/kit/components/content/Timeline.tsx). This file used to hold that machinery and a scroll element of
-// its own, and none of it was anything but a transcript's ordinary behaviour.
+// The session's stream, as a `Timeline` of cards. The scroller, staying on the newest turn until the
+// reader scrolls away, and the place a reader comes back to are all the kit timeline's (`follow`).
 export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
@@ -81,9 +77,8 @@ export default function AgentTranscript(props: {
   // ordinary event does not rebuild the maps below, or wake every card that reads from them.
   const turns = createMemo(() => props.snapshot.turns)
   const requests = createMemo(() => props.snapshot.requests)
-  // One map above the list, not `turns.find` inside it. The row body ran that find once per row per
-  // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
-  // of turns, twenty-five times a second.
+  // One map above the list, not `turns.find` inside it. A find in the row body runs once per row per
+  // render, so a streamed event would cost rows times turns, and a long session has thousands of rows.
   const turnsById = createMemo(() => new Map(turns().map((turn) => [turn.id, turn])))
   // Same reason, keyed the way the sidebar and every notice name a request. A request's card draws from
   // the row rather than from its own event, because whether anybody has answered yet, and what they
@@ -131,9 +126,8 @@ export default function AgentTranscript(props: {
   const itemKeys = createMemo(() => items().map((item) => item.key))
   const itemsByKey = createMemo(() => new Map(items().map((item) => [item.key, item])))
   // The rows drawn are the newest page of those keys and as many older pages as the reader asked for
-  // (docs/managed-agents/transcript.md § The window). The canonical 7,000-event session
-  // projects to 3,387 cards, and building all of them on open was the cost the window removes. The
-  // projection above still covers the whole session: only the drawing is windowed.
+  // (docs/managed-agents/transcript.md § The window). The projection above still covers the whole
+  // session: only the drawing is windowed.
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -171,8 +165,7 @@ export default function AgentTranscript(props: {
   })
   // Each row reads its item from a signal of its own, written only when its key's item is a different
   // object. A memo per row over `itemsByKey` would do the same, but the map is new on every event, so
-  // all the memos would re-run: about 10 ms an event on a 1,240-card transcript, against 0.3 ms for this
-  // loop.
+  // every row's memo would re-run on every event.
   const rows = new Map<string, Setter<AgentConversationItem>>()
   createComputed(() => {
     const byKey = itemsByKey()
@@ -278,12 +271,12 @@ export default function AgentTranscript(props: {
           onTrim={drawn.trim}
         >
           {/*
-            `For` over the rows' keys, not `Index` over their positions. An item that changed is a new
-            object, so `For` over the objects would remount a card on each streamed event and take any
-            in-progress selection with it — which is why this was an `Index`. But `Index` keys by
-            position: a filter (chats-only, or a resolved permission leaving the thread) shifts every
-            later row onto a new item while its card keeps the previous item's local state, its
-            open/closed tool fold. Keyed by the projection's stable id instead, a card's DOM stays tied to
+            `For` over the rows' keys, not over the items or `Index` over their positions. An item that
+            changed is a new object, so `For` over the items would remount a card on each streamed event
+            and take any in-progress selection with it. `Index` keys by position: a filter (chats-only,
+            or a resolved permission leaving the thread) shifts every later row onto a new item while its
+            card keeps the previous item's local state, its open/closed tool fold. Keyed by the
+            projection's stable id instead, a card's DOM stays tied to
             its own item — the same key reuses the row, an appended key mounts one card, a removed key
             disposes one — while streamed text and status still update through the row's signal.
           */}

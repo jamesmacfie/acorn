@@ -82,7 +82,8 @@ export function delegatedTurn(
   }
 }
 
-/** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents/delegation.md § Managed delegation). */
+/** Queues one turn on the owner when a turn it gave a child settles
+ *  (docs/managed-agents/delegation.md § Managed delegation). */
 export class DelegationReports {
   // One delivery per child turn at a time: the broadcast and the startup pass can both ask for it.
   private readonly delivering = new Map<string, Promise<void>>()
@@ -95,8 +96,7 @@ export class DelegationReports {
   constructor(
     private readonly runtime: ManagedAgentRuntime,
     private readonly delegations: AgentDelegationStore,
-    // The unattended operations a plugin's note joins (../sessions/turnFollowUps.ts). Absent, a turn
-    // reports as soon as it settles.
+    // The unattended operations a plugin's note joins. Absent, a turn reports as soon as it settles.
     private readonly followUps?: () => Promise<TurnFollowUps>,
     private readonly core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
   ) {}

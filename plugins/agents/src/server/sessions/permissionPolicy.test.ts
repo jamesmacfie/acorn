@@ -228,7 +228,7 @@ describe('agents:before-permission', () => {
       turnId: turn.id,
       resolution: { blocked: { by: 'policy', reason: 'No force-push.' } },
     })
-    // Pending is what notifies, badges, and wakes a delegated parent (../../node/index.ts § publish).
+    // Pending is what notifies, badges, and wakes a delegated parent (the plugin's `publish` handler).
     expect(requestStatuses()).toEqual(['resolved'])
     expect((await runtime.store.requireSession(session.id)).attention).not.toBe('permission')
     expect(await runtime.store.lifecycleRequests({ taskId: session.taskId })).toEqual([

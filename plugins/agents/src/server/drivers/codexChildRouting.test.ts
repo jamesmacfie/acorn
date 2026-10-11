@@ -1,10 +1,7 @@
 /**
- * Codex child-thread routing, pinned against a real capture.
- *
- * This is the code that decides, per notification, whether traffic reaches the parent session at all,
- * so the cost of a wrong answer is not a missing sidebar row but a corrupted parent lifecycle. The
- * fixture is codex-cli 0.146.1 driven over stdio with gpt-5.6-luna, prompted into a two-child fan-out
- * (alpha and beta). Hand-written shapes would only test what we hoped the wire looked like.
+ * Codex child-thread routing, pinned against a real capture: codex-cli 0.146.1 over stdio, prompted into
+ * a two-child fan-out (alpha and beta). A wrong answer corrupts the parent's lifecycle, and hand-written
+ * shapes would only test what we hoped the wire looked like.
  */
 import { describe, expect, it } from 'vitest'
 import capture from './__fixtures__/codexSubagentWire.json' with { type: 'json' }

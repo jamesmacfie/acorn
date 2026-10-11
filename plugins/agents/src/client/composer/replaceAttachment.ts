@@ -1,13 +1,13 @@
 import type { AgentAttachment } from '../../contract/wire.ts'
 
 // Whether one attachment in an unsent draft may be swapped for another, and what the draft becomes
-// (docs/managed-agents/attachments.md § Draft attachments, and docs/plugins/remote-points.md § Asking the owner for who asks).
+// (docs/managed-agents/attachments.md § Draft attachments; for who asks,
+// docs/plugins/remote-points.md § Asking the owner).
 //
-// Pure, and its own file, because it is a compare-and-swap between two owners that cannot share a
-// transaction: the draft is an array in the composer and the replacement is a row on the node. The
-// composer does the I/O around this — fetch the replacement's metadata, write the draft, clean up —
-// and every rule about whether the swap is allowed at all is here, where a test can drive the cases
-// that lose a person's attachment if they are wrong.
+// Pure, because it is a compare-and-swap between two owners that cannot share a transaction: the
+// draft is an array in the composer and the replacement is a row on the node. The composer does the
+// I/O around this, and every rule about whether the swap is allowed is here, where a test can drive
+// the cases that lose a person's attachment if they are wrong.
 
 /** The caps the composer applies to a draft, restated here so this decision is complete on its own.
  *  The node re-checks both at enqueue; these exist so a reader is refused before an upload. */

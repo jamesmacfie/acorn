@@ -1,11 +1,9 @@
 // The task's agent state, on its rail row. One marker in the top-right corner: a turning loader while
 // any agent in the task is moving, replaced by the alert glyph the moment one of them needs the owner.
 //
-// Both kinds of agent count. A managed session is this plugin's own (managedStore.ts); a terminal
-// agent session is a CLI harness running in the task's worktree, which core holds because several
-// surfaces read it but whose meaning — "an agent is working" — is this plugin's to say. Before this,
-// core drew the loader from terminal sessions only, under the task glyph, and a managed agent working
-// away in the background left the row looking idle.
+// Both kinds of agent count. A managed session is this plugin's own; a terminal agent session is a CLI
+// harness running in the task's worktree, which core holds because several surfaces read it but whose
+// meaning, "an agent is working", is this plugin's to say.
 import { agentSessionsFor, type RailMarker, type RailMarkerContribution } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
@@ -25,7 +23,7 @@ export function agentRailMarkers({ working, attention }: AgentRailState): RailMa
         id: 'attention',
         label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
         // The same shape the pane header, the task sidebar and Agent Center give these two states
-        // (stateTone.ts), so a reader learns one vocabulary.
+        // (`runtimeIcon`), so a reader learns one vocabulary.
         icon: runtimeIcon('waiting'),
         tone: 'warn',
         placements: ['top-end'],
@@ -46,7 +44,7 @@ export function agentRailMarkers({ working, attention }: AgentRailState): RailMa
 }
 
 // The task's own slice, not the roster: this runs for every row in the rail, and a slice only wakes the
-// row whose task changed (managedStore.ts § taskSlices).
+// row whose task changed.
 const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) =>
   managedAgentStore.sessionsForTask(taskId).filter(predicate).length
 

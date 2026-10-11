@@ -52,7 +52,7 @@ type LiveSession = {
   acceptedResponse: boolean
   driver: AgentDriver
   // This start's skills, whether the first turn still owes their part, and every command or skill name
-  // the harness has advertised, which is how a native load is confirmed (../drivers/skillIndex.ts).
+  // the harness has advertised, which is how a native load is confirmed.
   skills: SkillStart | null
   skillsOwed: boolean
   advertised: Set<string>
@@ -450,9 +450,9 @@ export class ProviderSessionLifecycle {
   ): void {
     const live = this.require(generation)
     if (!this.owns(generation) || !live.handle) throw new Error('Provider session is not connected.')
-    // The skills part rides ahead of the first turn after a start (../drivers/skillIndex.ts), decided now
-    // from what the harness has advertised so far. It counts as delivered once that turn has run, and is
-    // owed again if the turn failed.
+    // The skills part rides ahead of the first turn after a start, decided now from what the harness has
+    // advertised so far. It counts as delivered once that turn has run, and is owed again if the turn
+    // failed.
     const skills = live.skillsOwed ? (live.skills?.firstTurn(live.advertised) ?? null) : null
     live.skillsOwed = false
     void live.handle

@@ -1,8 +1,8 @@
 // The ManagedAgentsBridge, built over a ManagedAgentRuntime.
 //
-// It sits beside the routes, not in node/index.ts, because it is the error taxonomy that turns the
-// runtime's thrown messages into the status codes managed.ts promises. node/index.ts owns composition,
-// not HTTP semantics.
+// It sits beside the routes, not in the plugin's node entry, because it is the error taxonomy that turns
+// the runtime's thrown messages into the status codes the managed routes promise. The node entry owns
+// composition, not HTTP semantics.
 import { BridgeError, isProviderOperationError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
@@ -16,7 +16,7 @@ import { sessionReferenceContext } from '../sessions/sessionReference'
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
 // shape. An unmatched error rethrows and becomes a 500, which is the honest answer for a bug.
 function bridgeFailure(error: unknown): never {
-  // The secret gate's refusal (../sessions/secretPublication.ts § SecretPublicationRefused), matched by
+  // The secret gate's refusal (`SecretPublicationRefused`), matched by
   // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
   if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
@@ -77,7 +77,7 @@ export function managedAgentsBridge(
       ...(await runtime.upkeep.diskFootprint()),
     }),
     stopIdleNow: async () => ({ stopped: (await runtime.upkeep.stopIdleSessionsNow()).length }),
-    // A session projected to the merged run list's shape (@acorn/protocol/runs.ts). Live sessions
+    // A session projected to the merged run list's shape. Live sessions
     // only: the list answers "what is happening on this node", and an archived session is history the
     // Agents pane already shows in full.
     //
@@ -95,7 +95,7 @@ export function managedAgentsBridge(
           endedAt: TERMINAL_AGENT_STATES.has(session.runtimeState) ? session.updatedAt : null,
           taskId: session.taskId,
           // No cost. It lives per turn inside `usage_json`, and parsing every turn to draw a list is
-          // the wrong trade (routes/managed.ts § /runs).
+          // the wrong trade (see the `/runs` route).
           costUsd: null,
           detail: session.model ? `${session.providerId} · ${session.model}` : session.providerId,
         })),
@@ -111,7 +111,7 @@ export function managedAgentsBridge(
     artifactContent: (artifactId) => guarded(() => runtime.artifacts.read(artifactId)),
     // A device needs the durable row so it can select the conversation while the provider connects.
     // Workflow execution bypasses this HTTP bridge and keeps runtime.createSession's ready-on-return
-    // contract (../sessions/sessionExecute.ts).
+    // contract.
     createSession: (input, idempotencyKey) => guarded(() => runtime.acceptSession(input, idempotencyKey)),
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),
@@ -122,9 +122,8 @@ export function managedAgentsBridge(
       }),
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
     // `store.snapshot` still answers workflow execution and the wait route with every row
-    // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).
-    // Usage folds for every reader, since applying a usage row twice changes nothing; tool calls only
-    // for one that asks (./managed.ts, `fold=1`). The client read paths already omit `searchText`.
+    // (`foldUsageEvents` says why). Usage folds for every reader, since applying a usage row twice
+    // changes nothing; tool calls only for one that asks (`fold=1`). The client read paths already omit `searchText`.
     snapshot: (sessionId, afterSeq, eventLimit, foldTools) =>
       guarded(async () => {
         const snapshot = await runtime.store.clientSnapshot(sessionId, afterSeq, eventLimit)

@@ -2,7 +2,7 @@
 //
 // Shared by the two things a session shows: an artifact the agent produced, and an attachment the
 // reader sent. Both arrive as bytes rather than as a URL — there is no origin a browser could fetch
-// either from (see managedClient.ts) — so both end up as a data URL, and both refuse anything they
+// either from (see `managedAgentApi`) — so both end up as a data URL, and both refuse anything they
 // cannot be sure is an image.
 
 const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])

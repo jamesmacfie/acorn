@@ -36,8 +36,8 @@ describe('the argv each harness CLI wants (docs/mcp.md — never executed here)'
 })
 
 // docs/mcp.md § Your own servers. A value never sits on the command line: the flags name a variable and
-// the terminal's environment holds it. Both shapes were fed to the real CLIs when this was written:
-// `claude --mcp-config` expanded the variable, and `codex mcp list` read the server back.
+// the terminal's environment holds it. Both shapes match what the real CLIs accept: `claude --mcp-config`
+// expands the variable, and `codex mcp list` reads the server back.
 describe('the flags that carry a session\u2019s servers into a terminal', () => {
   const stdio = {
     transport: 'stdio' as const,

@@ -87,7 +87,7 @@ export function registerBuiltInProfiles(): void {
 // fork, compaction, archive, and delete, and ACP expresses none of them.
 //
 // Released in `dispose` like the profiles beside them, because one process can boot the runtime several
-// times. `apps/node/src/service/runtime.test.ts` does.
+// times. `apps/node/src/composition/runtime.test.ts` does.
 let builtInDriverDisposables: (() => void)[] | null = null
 function registerBuiltInDrivers(): void {
   if (builtInDriverDisposables) return
@@ -99,9 +99,9 @@ function registerBuiltInDrivers(): void {
 
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
 // than inside the usage service, because a plugin-contributed harness feeds the same registry
-// (../server/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
-// Each probe's module loads on its first collection: about 27 KB of the node's boot graph for a read
-// that spawns the provider's CLI and takes seconds anyway.
+// (`agentUsageCollectors`). `probeDir` is only known at init, so it arrives as a parameter.
+// Each probe's module loads on its first collection, which keeps it out of the node's boot graph for a
+// read that spawns the provider's CLI and takes seconds anyway.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -124,7 +124,7 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 
-// The one thing this plugin still cannot resolve for itself.
+// What this plugin cannot resolve for itself.
 export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
   // See docs/security/credentials.md § Credential handling.
@@ -207,17 +207,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       // The first decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,
       // a redactor or a context injector registers a handler here; the point exists whether or not
-      // anybody does, because declaring it is the consent.
+      // anybody does, because declaring it is the consent. Required instruction checks don't run here:
+      // the queue dispatcher runs them immediately before the driver sends, and this point keeps its
+      // optional plugin-hook failure semantics.
       ctx.hooks.declare({
         id: 'before-send',
         label: 'send a prompt',
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
       })
-      // Required instruction checks run in the queue dispatcher immediately before driver send.
-      // This extension point retains its optional plugin-hook failure semantics.
       // The second: a harness permission request, before anyone sees it. Observe and veto only
-      // (../server/sessions/permissionPolicy.ts).
+      // (`settlePermissionRequest`).
       ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
       // The third and fourth: every tool call a bridged harness makes, before it runs and after
       // (docs/managed-agents/loop-hooks.md). Only `before-tool` allows `ask`.
@@ -323,13 +323,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       )
       ctx.dataSources.register(usageSource)
 
-      // A plugin's notes to a session (../server/sessions/sessionMessages.ts). Entries are read live, and
+      // A plugin's notes to a session (`SessionMessages`). Entries are read live, and
       // `ready` and every roster change connect the ones a late or reloaded plugin filed.
       // Loaded on the first contribution, to stay inside the service boot budget
       // (apps/node/scripts/check-service-budget.mjs).
       ctx.extensionPoints.declare(AGENTS_SESSION_MESSENGER, 'Session messengers')
       // The reviewers a workflow step or a delegated turn offers its finished turn to, and the
-      // operations their notes join (../server/sessions/turnFollowUps.ts). Loaded on first use.
+      // operations their notes join (`TurnFollowUps`). Loaded on first use.
       ctx.extensionPoints.declare(AGENTS_TURN_FOLLOW_UP, 'Turn reviewers')
       const entries = () => ctx.extensionPoints.handlers(AGENTS_SESSION_MESSENGER)
       const messagesRuntime = runtime
@@ -389,7 +389,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
-      // core's table (../server/pricingStore.ts).
+      // core's table (`readAgentPricingPreferences`).
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
         ...usageService,
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
@@ -468,7 +468,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
 
-      // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
+      // This plugin's sessions, for the merged run list core assembles (`packages/protocol/src/runtime/runs.ts`). A
       // pointer at the route above; nothing here knows workflows is on the same list.
       ctx.runs.register({ runs: '/v1/p/agents/runs' })
       // Transcripts for the archive page's search (docs/plugins/search-providers.md § Search providers).
@@ -572,8 +572,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
       })
 
-      // The owner's "Keep agent history for archived tasks" (docs/data-layer/backup-and-retention.md § Retention). Daily,
-      // and a no-op until the owner picks a limit, so the setting is the one switch that matters.
+      // The owner's "Keep agent history for archived tasks"
+      // (docs/data-layer/backup-and-retention.md § Retention). Daily, and a no-op until the owner picks a
+      // limit, so the setting is the one switch that matters.
       ctx.schedules.register({
         scheduleId: 'archived-history-prune',
         name: 'Remove agent history of long-archived tasks',
@@ -590,11 +591,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
 
       // Deleted tasks' sessions, transcripts and the rest (docs/workspaces-and-tasks/archive.md § Deleting
-      // a task). The longest timeout the engine allows, because a task with a long history takes a while
-      // at 22,000 events a second; the next run carries on from where one stops.
+      // a task). The longest timeout the engine allows, because a task with a long history takes a while;
+      // the next run carries on from where one stops.
       registerDeletedTaskPurge(ctx, (taskIds, signal) => runtime!.purgeDeletedTasks(taskIds, signal), { timeout: 300 })
 
-      // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
+      // agents.sessionExecute. The workflow runner resolves this at call
       // time and falls back to its own headless runner, so a node without this plugin still runs
       // non-managed workflow steps.
       // Loaded on the first step, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
@@ -609,18 +610,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         )(request),
       )
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
-      // Who a signed tool call came from, for another plugin's tools (contract/toolCaller.ts).
+      // Who a signed tool call came from, for another plugin's tools (`AgentToolCallerLookup`).
       toolCallers = createToolCallers(runtime.store)
       ctx.capabilities.provide(AGENTS_TOOL_CALLER, toolCallers.lookup)
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
-      // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
+      // and it interrupts every unsettled session. Same reason as workflows (`AGENTS_RUNTIME`).
       ctx.capabilities.provide(AGENTS_RUNTIME, {
         reconcile: async () => {
           await runtime!.reconcile()
           await delegation!.reconcile()
         },
       })
-      // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
+      // agents.draftAttachments. What a plugin that edits an unsent image
       // attachment reaches this plugin through, since a sandbox cannot call another plugin's routes.
       // Read and write only, and only for a draft: the composer still owns which attachment is in the
       // turn, because the node cannot transact with an array in the client.
@@ -628,7 +629,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         AGENTS_DRAFT_ATTACHMENTS,
         createDraftAttachments(runtime.attachments),
       )
-      // agents.transcriptMedia (contract/transcriptMedia.ts). What a plugin drawing a sent attachment or
+      // agents.transcriptMedia. What a plugin drawing a sent attachment or
       // an artifact reads the bytes through. Read-only, and only after checking the media belongs to
       // the session and the session to the task.
       const sessions = runtime.store

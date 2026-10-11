@@ -2,7 +2,7 @@
 // a provider send that carries attachments (docs/security/secret-publication.md § Agents). The
 // detector and the gate are core's; this module picks the exact bytes each operation consumes.
 //
-// Both run only while blocking is on. Off, export and send behave exactly as before.
+// Both run only while blocking is on. Off, export and send skip the gate.
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import {
@@ -16,7 +16,7 @@ import type { SecretFinding, SecretPublicationRefusal, SecretUnscanned } from '@
 
 /** A transcript larger than this is unscanned, which the gate treats as incomplete. */
 export const EXPORT_SCAN_MAX_BYTES = 64 << 20
-/** Text attachments are already capped at 1 MiB on upload (./attachmentStore.ts). */
+/** Text attachments are already capped at 1 MiB on upload. */
 export const ATTACHMENT_SCAN_MAX_BYTES = 1 << 20
 
 export class SecretPublicationRefused extends Error {

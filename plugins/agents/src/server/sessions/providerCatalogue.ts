@@ -65,7 +65,7 @@ export class ProviderCatalogue {
       : null
   }
 
-  /** Harnesses that turn the person's read block into their own sandbox (../drivers/readBlock.ts). */
+  /** Harnesses that turn the person's read block into their own sandbox. */
   readBlockProviders(): string[] {
     return this.registry.providers().filter((id) => this.registry.create(id)?.readBlock === true)
   }

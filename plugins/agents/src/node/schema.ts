@@ -23,7 +23,7 @@ export const agentSessions = sqliteTable(
     driverVersion: text('driver_version').notNull(),
     providerSessionRef: text('provider_session_ref'),
     controller: text('controller').notNull().default('acorn'), // acorn | terminal | external
-    runtimeState: text('runtime_state').notNull(), // protocol/managedAgents.ts
+    runtimeState: text('runtime_state').notNull(), // AgentRuntimeState
     attention: text('attention').notNull().default('none'),
     statusAuthority: text('status_authority').notNull(),
     title: text('title').notNull(),
@@ -37,14 +37,14 @@ export const agentSessions = sqliteTable(
     parentSessionId: text('parent_session_id'),
     parentTurnId: text('parent_turn_id'),
     // The subagent roster, projected from this session's own `subagent` events by
-    // server/sessions/store.ts. On the row rather than in a table of its own because the row is
+    // `AgentStore`. On the row rather than in a table of its own because the row is
     // broadcast to every client whenever an event changes it, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),
     // How many turns are queued and waiting to dispatch. On the row for the same reason as the subagent
     // roster: the row is broadcast whenever it changes, so the task sidebar can mark a session whose only
-    // sign of a waiting prompt is this count. Kept current by server/sessions/store.ts on every turn that
-    // enters or leaves the queue.
+    // sign of a waiting prompt is this count. Kept current by `AgentStore` on every turn that enters or
+    // leaves the queue.
     queuedTurns: integer('queued_turns').notNull().default(0),
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
@@ -55,11 +55,11 @@ export const agentSessions = sqliteTable(
     lastEventAt: integer('last_event_at'),
     archivedAt: integer('archived_at'),
     // When the background pass last put this session's stored tool calls and file changes into the
-    // shape recordEvent writes (server/sessions/ledgerCompaction.ts). Null means it has not run yet, so
+    // shape recordEvent writes (`compactLedgers`). Null means it has not run yet, so
     // the pass reads only the sessions that still need it.
     ledgerCompactedAt: integer('ledger_compacted_at'),
     // When the retention pass removed this session's history because its task had been archived
-    // longer than the owner keeps it (server/sessions/store.ts § finishHistoryRemoval). The row
+    // longer than the owner keeps it (`AgentStore.finishHistoryRemoval`). The row
     // stays so the task still lists the session. Null means the history is still here.
     historyRemovedAt: integer('history_removed_at'),
     createdAt: integer('created_at').notNull(),
@@ -110,8 +110,8 @@ export const agentTurns = sqliteTable(
 
 // Normalized event ledger, the durable ordered history docs/api-reference/websocket.md § Events describes. It
 // appends, and a sequence is never reused. It deletes a tool call's or a file change's superseded
-// row, once a newer row carries its whole state (server/sessions/ledgerFold.ts), and every row of a
-// session whose task was archived longer than the owner keeps history (docs/data-layer/backup-and-retention.md § Retention).
+// row, once a newer row carries its whole state (`LedgerFold`), and every row of a session whose task
+// was archived longer than the owner keeps history (docs/data-layer/backup-and-retention.md § Retention).
 // `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command output
 // live in agent_artifacts instead of this row.
 export const agentEvents = sqliteTable(
