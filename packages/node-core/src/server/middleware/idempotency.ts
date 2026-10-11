@@ -45,9 +45,12 @@ export const idempotency = createMiddleware<AppEnv>(async (c, next) => {
   if (!store) return next()
 
   // Reading the body here is safe because Hono memoizes c.req body reads. The route handler still
-  // gets its own c.req.json(). The hash covers method + path + body, so the same key on a different
+  // gets its own c.req.json(). The hash covers the method, the path with its query string, and the
+  // body, so the same key on any different request is a conflict rather than a replay. A request with
+  // no query string hashes as it did before the query string was included, so stored keys still match.
   const raw = await c.req.text()
-  const hash = requestHash(c.req.method, new URL(c.req.url).pathname, raw)
+  const url = new URL(c.req.url)
+  const hash = requestHash(c.req.method, url.pathname + url.search, raw)
   const scope = `${deviceId}\n${key}`
 
   const stored = await store.lookup(deviceId, key)

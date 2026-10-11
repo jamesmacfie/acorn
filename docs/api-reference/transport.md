@@ -130,7 +130,8 @@ takes the W3C form only, and the raw header never reaches a log line, because it
 
 `Idempotency-Key` is optional for most mutations. Agent session creation, agent-turn enqueue, request
 resolution, and the plugin install, update, review, and reload routes require it. A device-keyed
-replay stores the request hash and the final answer, and reuse with a different body returns
+replay stores the request hash and the final answer. The hash covers the method, the path with its
+query string, and the body, and reuse with any of them changed returns
 `idempotency_conflict`. Internal callers have no device replay namespace. A replay row expires after
 24 hours. A crash after a domain write but before the replay save can leave an ambiguous result, so a
 caller keeps its key across retries and inspects known resource IDs. Managed agent session and turn

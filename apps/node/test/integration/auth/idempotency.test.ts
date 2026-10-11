@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import '../../helpers/registerProviders'
 import type { ApiError } from '@acorn/protocol/api.ts'
@@ -105,6 +105,23 @@ describe('Idempotency-Key on /v1', () => {
     expect(conflict.status).toBe(409)
     expect(((await conflict.json()) as ApiError).error.code).toBe('idempotency_conflict')
     expect(executions).toBe(1) // the conflicting request never reached the handler
+  })
+
+  it('409s the same key and body with a different query string', async () => {
+    const key = randomUUID()
+    await post('/v1/core/things?force=false', key, { name: 'widget' })
+    const conflict = await post('/v1/core/things?force=true', key, { name: 'widget' })
+    expect(conflict.status).toBe(409)
+    expect(((await conflict.json()) as ApiError).error.code).toBe('idempotency_conflict')
+    expect(executions).toBe(1)
+  })
+
+  // Rows saved before the query string joined the hash must still replay, so this pins the old format.
+  it('hashes a request without a query string the way it always has', async () => {
+    const key = randomUUID()
+    await post('/v1/core/things', key, { name: 'widget' })
+    const legacy = createHash('sha256').update('POST\n/v1/core/things\n{"name":"widget"}').digest('hex')
+    expect((await store.lookup(DEVICE_ID, key))?.requestHash).toBe(legacy)
   })
 
   it('does not store a 5xx, so a genuine retry re-executes', async () => {
