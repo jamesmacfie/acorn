@@ -19,7 +19,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [ui-extension/](./ui-extension/README.md) | Open acceptance for contextual plugin UI. | All fifteen phases shipped by October 10, 2026. [Places to fill](../contribution-kinds.md#places-to-fill) owns the behavior. Native overlay, trusted toolbar press, Linear region, terminal key path, and heap checks remain open. |
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
-| [cleanup/](./cleanup/README.md) | Seventeen maintainability proposals: green the gate, merge duplicated boots, remove legacy and dead code, add a formatter, and clean comments and docs. | Proposed October 11, 2026. Implementation not started. Proposal 11 needs a decision first. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
@@ -63,6 +62,12 @@ These plans remain in Git history. Use their reference owners for implemented be
 | Six Editor phase plans, removed October 8, 2026 | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
 
 ## Retired folders
+
+`cleanup/` shipped all seventeen proposals and was deleted on October 12, 2026. The reference
+pages each proposal touched own the result: [mixed builds](../api-reference/transport.md#mixed-builds) for the
+version policy, [formatting](../local-development/formatting.md) for the formatter, and
+[conventions](../conventions.md) for the comment and staleness rules. Each proposal's completion
+note remains in Git history.
 
 `deerflow/` shipped all five phases and was deleted on October 8, 2026.
 [Composer](../managed-agents/composer.md), [turn operations](../managed-agents/operations.md),
