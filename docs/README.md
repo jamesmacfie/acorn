@@ -399,6 +399,31 @@ These pages describe planned work, not shipped behavior. The first release ends 
 | [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
 | [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
 
+## Cleanup programme
+
+These pages propose maintainability fixes from the October 11, 2026 review. None has shipped.
+
+| Document | What it holds |
+| --- | --- |
+| [Cleanup programme](./future/cleanup/README.md) | Review findings, the `acorn-1` compatibility cutoff, the order, and the rules every proposal follows. |
+| [01: green the gate](./future/cleanup/01-green-the-gate.md) | Type errors in five packages, 15 dead doc links, red tests, and CI on every push. |
+| [02: one Node boot](./future/cleanup/02-one-node-boot.md) | One boot sequence for the supervised and standalone Node, and the drift between them. |
+| [03: one client boot](./future/cleanup/03-one-client-boot.md) | One client start, one navigation command set, and client schedules on both hosts. |
+| [04: core seams at construction](./future/cleanup/04-core-seams-at-construction.md) | Node keys and plugin security supplied at construction instead of after plugins start. |
+| [05: plugin teardown](./future/cleanup/05-plugin-teardown.md) | One undo list per plugin in place of a hand-kept clear list. |
+| [06: agents session core](./future/cleanup/06-agents-session-core.md) | One public runtime and one store in the agents plugin, and the Codex plan handoff moved out. |
+| [07: EditorPane controller](./future/cleanup/07-editor-pane-controller.md) | The editor pane split into a controller and a component. |
+| [08: staleness guards](./future/cleanup/08-staleness-guards.md) | Shared helpers in place of hand-rolled generation counters. |
+| [09: remove the preview tunnel](./future/cleanup/09-remove-preview-tunnel.md) | The unreachable tunnel chain, including the Node's `/v1/tunnel` endpoint. |
+| [10: pre-baseline compatibility](./future/cleanup/10-pre-baseline-compatibility.md) | Code that only serves data or builds from before September 24, 2026. |
+| [11: mixed-version policy](./future/cleanup/11-mixed-version-policy.md) | A decision on mixed-version support, and the code each answer deletes. |
+| [12: dead exports and routes](./future/cleanup/12-dead-exports-and-routes.md) | 74 unused exports, dead routes, facade pruning, and an unused-export check. |
+| [13: formatter](./future/cleanup/13-formatter.md) | One formatter, one mechanical commit, and a check in `pnpm lint`. |
+| [14: dense modules](./future/cleanup/14-dense-modules.md) | Reader rewrites of five modules, including the `PlanRow` split. |
+| [15: comment cleanup](./future/cleanup/15-comment-cleanup.md) | The comment bar, a path check for comments, and a package-by-package pass. |
+| [16: docs cleanup](./future/cleanup/16-docs-cleanup.md) | Shipped plans retired, stale reference text, and unused anchors. |
+| [17: housekeeping](./future/cleanup/17-housekeeping.md) | Small structural fixes and three naming decisions. |
+
 ## Plugin topic pages
 
 Each plugin landing page above has topic pages in a folder of the same name:

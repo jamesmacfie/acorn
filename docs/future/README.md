@@ -20,6 +20,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [ui-extension/](./ui-extension/README.md) | Fifteen phases for contextual plugin UI after Editor file viewers. | All phases done October 10, 2026. [Places to fill](../contribution-kinds.md#places-to-fill) owns the behavior. Native overlay, trusted toolbar press, Linear region, terminal key path, and heap checks remain open. |
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
+| [cleanup/](./cleanup/README.md) | Seventeen maintainability proposals: green the gate, merge duplicated boots, remove legacy and dead code, add a formatter, and clean comments and docs. | Proposed October 11, 2026. Implementation not started. Proposal 11 needs a decision first. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
