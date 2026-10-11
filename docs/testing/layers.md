@@ -31,8 +31,8 @@ those are part of the behavior under test.
 
 Tests that need populated plugin registries go under `apps/node/test/integration/` or the desktop
 integration tree. Test route protection through the real `createApp()` factory, not by mounting
-middleware in the test. Standalone parity tests check that `dev:node` wires the same pure-Node
-capabilities as the supervised Node.
+middleware in the test. The standalone parity tests boot through `bootNode` with each host's options
+and check what the drain did, then the inputs each host still passes differently.
 
 The integration tree is grouped by what a suite boots:
 

@@ -160,7 +160,8 @@ The first desktop start after the upgrade migrates the plain files:
    when its process starts, so no live session needs the old key. Nothing re-signs with it, so a key
    an agent writes into `internal-token` can't sign a token file the Node then trusts.
 3. The Node tries the session key on its stored credentials and reports `ok`, `none`, or `failed` in
-   its start result.
+   its start result. A standalone Node runs the same check on the key it read, and security
+   diagnostics shows the answer.
 4. The helper deletes `internal-token`. It deletes `session.key` only when that file holds the key
    the Node used and the check answered `ok` or `none`. On `failed`, the file stays and the Node
    records `keys.check.failed` in the audit trail.

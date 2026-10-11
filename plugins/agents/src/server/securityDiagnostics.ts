@@ -284,8 +284,8 @@ export async function collectSecurityDiagnostics(
     const exposed = !sealed || keys.plainFiles.length > 0
     add('host.keys', 'core', 'observed', exposed ? 'warning' : 'info', 'core key custody',
       sealed
-        ? `The desktop app delivered this Node's keys in its start message. Plain key files in the data root: ${keys.plainFiles.join(', ') || 'none'}. Session key check: ${keys.keyCheck ?? 'not run'}.`
-        : `This Node reads its signing and encryption keys from files in its data root (${keys.plainFiles.join(', ') || 'not yet written'}) or from SESSION_ENC_KEY in its environment.`,
+        ? `The desktop app delivered this Node's keys in its start message. Plain key files in the data root: ${keys.plainFiles.join(', ') || 'none'}. Session key check: ${keys.keyCheck}.`
+        : `This Node reads its signing and encryption keys from files in its data root (${keys.plainFiles.join(', ') || 'not yet written'}) or from SESSION_ENC_KEY in its environment. Session key check: ${keys.keyCheck}.`,
       "Agents run as the same OS user as the Node and can read the rest of the data root, including other sessions' token files and the task database. Sealed keys are only as safe as the desktop's data key, which a dev build keeps in a plain data.key file.",
       !sealed ? 'Run untrusted work on a Node the desktop app starts.'
         : keys.plainFiles.length ? 'Restart Acorn. If a file stays, Settings > Audit log says why.' : 'No action needed.', {

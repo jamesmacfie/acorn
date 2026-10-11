@@ -1,5 +1,58 @@
 # 02: One Node boot
 
+> **Completion note, October 11, 2026.** `bootNode()` in `apps/node/src/composition/boot.ts` owns
+> the boot sequence and the drain. `runtime.ts` and `standalone.ts` call it and keep only their host's
+> own work. `pnpm lint`, the arch tests, and the `@acorn/node`, `@acorn/node-core`,
+> `@acorn/plugin-agents`, and `@acorn/desktop` suites pass on Node 26.8.1.
+>
+> What landed:
+>
+> - `bootNode()` takes the opened data root and these named options: `appVersion`, `keys`,
+>   `serviceInstanceId`, `bundledPluginsDir`, `development`, `disabledPlugins`, `loginShellPath`,
+>   and `mcp`. It returns `runtime`, `core`, `listener`, `keyCheck`, a `reconciled` promise that
+>   never rejects, and one `stop()`. Every call to `stop()` waits on the same drain. Each drain step
+>   starts as a no-op and gets replaced once the boot builds what it closes, so a boot that fails
+>   partway drains exactly what it built.
+> - Both hosts close task script waits on drain. The parity test boots through `bootNode()` with each
+>   host's options, leaves a setup attempt pending, stops, boots again on the same root, and reads the
+>   attempt as interrupted by `shutdown`. Without the close it reads `restart`, which I checked by
+>   removing the close for one run. The second boot also proves the data root lock came off.
+> - Both hosts run the session key check. `NodeKeyCustody.keyCheck` is no longer nullable, and
+>   security diagnostics shows the check result for a standalone Node too.
+> - The telemetry release is the app version, with the protocol version as the fallback. A standalone
+>   Node has no app version, so it still reports the protocol version.
+> - Reconciliation always runs in the background. The supervised host reports `ready` when
+>   `reconciled` settles, and the standalone host awaits it before the handshake. A returned promise
+>   replaced the proposed option.
+> - `NODE_DRAIN_ORDER` and `NodeComposition.drainOrder` are gone. Only the step-name test used them.
+>   `drainNode` in `composition.ts` holds the order.
+> - The comments and docs that cited `startServiceRuntime`'s boot, `bootTimer`, or `NODE_DRAIN_ORDER`
+>   point at `boot.ts`: `docs/node-distribution.md`, `docs/mcp.md`, `docs/schedules.md`,
+>   `docs/security/credentials.md`, `docs/plugins/data-ownership.md`, `docs/testing/layers.md`, and
+>   `docs/local-development/profiling.md`.
+>
+> Deviations:
+>
+> - **MCP re-registration stays supervised-only.** The `mcp` option carries the staged launcher, and
+>   `bootNode()` re-registers at boot only when it gets one, outside tests. A standalone Node never
+>   learns where its `mcp.js` is. A boot-time refresh there would register the name `acorn` against a
+>   guessed path, and on `pnpm dev:node` that path doesn't exist. Every `dev:node` boot would then
+>   overwrite the person's real `acorn` entry in their Claude and Codex config with a broken one.
+>   `docs/mcp.md` already said a standalone Node offers no server. Spawn-time registration on the
+>   standalone Node is unchanged.
+> - **A failed supervised boot reports `failed` only.** It used to report `failed`, `draining`, and
+>   `stopped`. Custody logs states and keeps the `failed` detail, so the trailing pair only
+>   overwrote the last logged state.
+> - The standalone Node prints the `[service:boot]` and `[service:stop]` timing lines, and its drain
+>   warning moved from the `node` tag to `service:stop`.
+> - Requirement 5 asks for a test of a standalone SIGTERM. The in-process test drives `stop()` with
+>   the standalone options. `standaloneShutdown.test.ts` covers SIGTERM reaching `stop()` through a
+>   spawned process. The handler between them is three lines.
+>
+> For later phases: proposal 04 now has one place to change. `core.nodeKeys` and `core.pluginSecurity`
+> are assigned in `bootNode()` after `initPlugins`. `apps/node/scripts/check-service-budget.mjs` keeps a
+> dated note naming `composition/runtime.ts` on the renewal path. It's history, so I left it.
+
 This proposal moves the Node's boot sequence into one function that the supervised and standalone
 entries both call. Each entry keeps only what is truly its own.
 

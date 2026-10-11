@@ -23,7 +23,6 @@ const reconcileLog = createLogger('node:reconcile')
 // app supervises it rather than owning a second implementation. This lives in apps/node to keep the
 // dependency direction right: the graph names plugins, and node-core stays independent of them
 // (docs/architecture/packages.md § Package boundaries).
-export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
 export type NodeComposition = {
   plugins: NodePlugin[]
@@ -37,11 +36,10 @@ export type NodeComposition = {
   // "Failures are contained, and every failure names itself"). Both roots hand this to the
   // PLUGIN_STATE bridge, which is how it reaches the roster row and the attention inbox.
   failures: readonly PluginLoadFailure[]
-  drainOrder: typeof NODE_DRAIN_ORDER
 }
 
-// Async because loading a plugin from disk is an `await import()`. Both composition roots already
-// awaited initPlugins around this call, so the graph assembles at the same point it always did.
+// Async because loading a plugin from disk is an `await import()`. bootNode awaits it before
+// initPlugins (./boot.ts).
 //
 // A fresh install's empty directory gets exactly the static list. Anything extra arrived through the
 // installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
@@ -60,14 +58,11 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
     loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
     installed,
     failures,
-    drainOrder: NODE_DRAIN_ORDER,
   }
 }
 
-// The compiled-in list only, not derived from assembleNodeGraph: it is the parity fixture the
-// standalone/supervised comparison uses (docs/testing/layers.md § Composition roots), and it must
-// describe what the build contains, not what happens to be installed in whichever data root the
-// process was pointed at.
+// The compiled-in list only, not derived from assembleNodeGraph: the plugin reloader needs what the
+// build contains, not what happens to be installed in whichever data root the process was pointed at.
 export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)
 
 export type BundledReconcileOptions = {
@@ -122,8 +117,7 @@ export type ReconcileOptions = {
   mark?(step: string): void
 }
 
-// The post-listener sequence shared by both hosts (docs/node-distribution.md § Runtime).
-// Host-specific work stays at the call site: MCP registration, state transitions, the ready signal.
+// The post-listener sequence bootNode runs (docs/node-distribution.md § Runtime).
 export async function reconcileNode({ db, dataDir, capabilities, mark = () => {} }: ReconcileOptions): Promise<void> {
   const githubMirror = capabilities.get(GITHUB_MIRROR)
   void logStorageFootprint(
@@ -158,6 +152,7 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
   }
 }
 
+// The bounded drain, in order (docs/node-distribution.md § Operations).
 export type NodeDrainResources = {
   listener: () => Promise<unknown>
   reconciliation: () => Promise<unknown>

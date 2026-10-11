@@ -34,8 +34,7 @@ Client polling, such as a panel refresh, is freshness for a person who's present
 "I'm looking at this". A schedule says "do this whether or not anyone is".
 
 The scheduler lives in `packages/node-core/src/server/schedules/`, so both Node hosts get the same one.
-Each composition root (`apps/node/src/composition/runtime.ts`, `apps/node/src/entries/standalone.ts`)
-builds it, provides it as the `SCHEDULER` capability before the listener binds, starts it after, and
+`bootNode` in `apps/node/src/composition/boot.ts`, which both Node hosts call, builds it, provides it as the `SCHEDULER` capability before the listener binds, starts it after, and
 stops it in the `schedules` step of the ordered drain. That step sits after the listener and before
 plugins and SQLite, because a run holds a database handle.
 

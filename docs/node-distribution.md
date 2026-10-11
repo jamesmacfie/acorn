@@ -16,9 +16,16 @@ dependencies make a platform-specific artifact the safer unit.
 `apps/node/src/composition/` holds what they share. The standalone entry uses `ACORN_DATA_DIR` or a local
 `.acorn` root, binds HTTPS with TLS 1.3, and prints one JSON handshake line with the `nodeId`, endpoint,
 certificate fingerprint and PEM, and a device token for the launcher or first client. It runs plugin
-initialization, reconciliation, the WebSocket and tunnel listeners, and a bounded shutdown. Standalone
-and desktop-supervised Nodes use the same `apps/node/src/composition/composition.ts` graph,
-reconciliation sequence, and drain order. They differ in supervision and native capability injection.
+initialization, reconciliation, the WebSocket and tunnel listeners, and a bounded shutdown.
+
+Standalone and desktop-supervised Nodes boot through one function, `bootNode` in
+`apps/node/src/composition/boot.ts`, so they share the plugin graph, the reconcile sequence, and the
+drain. Each difference is a named option. The supervised Node passes the app version, the keys the
+desktop delivered, the start config's disabled-plugin override, and the staged MCP entry, and a packaged
+app turns on the login-shell `PATH` probe. The standalone Node passes none of these. Its telemetry
+release is the protocol version, because it has no app version. Work only one host does stays in its
+entry: `runtime.ts` reports service states, the installed-bytes report, and preview rules, and
+`standalone.ts` handles enrollment, the pairing banner, the handshake, and signals.
 
 After the handshake it prints a pairing banner: the address, the certificate fingerprint as six words,
 and a live pairing code. Compare those words with the ones acorn shows on its pairing screen, because
@@ -37,10 +44,12 @@ The Node binds its listener at the end of one chain: open the data root and take
 bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run every
 plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, and listen. Plugin
 `init` runs for every plugin at once, and so does `ready` ([activation](./plugins.md#activation)).
-`startServiceRuntime` returns once the Node is listening, and the tmux, worktree, workflow, and agent
-reconcile steps run after that.
+`bootNode` returns once the Node is listening, and the tmux, worktree, workflow, and agent reconcile
+steps run after that. The supervised Node reports `ready` when they finish. The standalone Node waits
+for them before it prints its handshake, because a launcher acts on that line.
 
-The login-shell `PATH` probe starts at the first step and nothing waits on it. A window-launched process
+On a packaged app, the login-shell `PATH` probe starts at the first step and nothing waits on it. A
+standalone Node skips it, because it inherits its shell's `PATH`. A window-launched process
 on packaged macOS inherits a minimal `PATH`, so the Node asks the owner's login shell with
 `$SHELL -lic 'printf %s "$PATH"'`. That took 520 ms on one developer machine and up to two seconds with a
 version manager in the profile. The probe has a five-second ceiling, and `runProcess` and `runHeadless`
@@ -163,8 +172,9 @@ and the Node warns about it at boot ([Node keys](./security/credentials.md#node-
 
 Use a dedicated mode-`0700` data root, and only one process may hold it. The `0700` and `0600` modes are
 POSIX permissions. On Windows they're advisory, so restrict the data root with an NTFS ACL. Send SIGTERM
-for a graceful drain: the listener closes, plugins dispose, SQLite closes, and the lock releases, within
-a 30-second deadline.
+for a graceful drain: open task script waits abort, the listener closes, plugins dispose, SQLite closes,
+and the lock releases, within a 30-second deadline. A setup script that was waiting to start is recorded
+as interrupted by `shutdown`.
 
 ## Dependency security policy
 

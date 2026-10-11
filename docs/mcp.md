@@ -110,7 +110,7 @@ on every start, because it is the reattach credential source.
 
 A standalone Node offers no server through either path. It gets no service handshake, so it never learns
 the staging directory its `mcp.js` is in (`configureAcornMcp` in
-`packages/node-core/src/server/mcpRegister.ts`). Registration also refreshes once at boot for every
+`packages/node-core/src/server/mcpRegister.ts`). The supervised Node also refreshes registration once at boot for every
 installed agent CLI, because the registered launcher is the Node's own binary path, which in a
 development build goes stale after a reinstall, and a restored tmux session never spawns again. An
 isolated `dev:agent` or `dev:tui:agent` session sets `ACORN_SKIP_MCP_REGISTRATION=1` and skips both, so

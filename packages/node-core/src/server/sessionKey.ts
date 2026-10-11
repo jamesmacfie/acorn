@@ -79,13 +79,13 @@ export async function checkSessionKey(db: AppDatabase, secrets: SecretService): 
 export type NodeKeyCustody = {
   // The desktop helper delivered the keys in the start message, or this Node read them from files.
   delivery: 'desktop' | 'files'
-  // The session key check from this boot. Null when the Node didn't run one.
-  keyCheck: NodeKeyCheck | null
+  // The session key check from this boot.
+  keyCheck: NodeKeyCheck
   // Plain key files still in the data root, which any process running as this user can read.
   plainFiles: string[]
 }
 
-export function nodeKeyCustody(dataDir: string, delivery: NodeKeyCustody['delivery'], keyCheck: NodeKeyCheck | null = null): { snapshot(): NodeKeyCustody } {
+export function nodeKeyCustody(dataDir: string, delivery: NodeKeyCustody['delivery'], keyCheck: NodeKeyCheck): { snapshot(): NodeKeyCustody } {
   return {
     snapshot: () => ({ delivery, keyCheck, plainFiles: [KEY_FILE, 'internal-token'].filter((name) => existsSync(join(dataDir, name))) }),
   }

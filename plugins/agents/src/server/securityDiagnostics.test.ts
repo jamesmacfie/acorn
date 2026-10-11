@@ -141,12 +141,12 @@ it('reports bounded plugin counts and observed admission without external text',
 })
 
 it('warns when the Node read its keys from files, or a plain key file is still in the data root', async () => {
-  const keyFinding = async (snapshot: { delivery: 'desktop' | 'files'; keyCheck: 'ok' | 'none' | 'failed' | null; plainFiles: string[] }) =>
+  const keyFinding = async (snapshot: { delivery: 'desktop' | 'files'; keyCheck: 'ok' | 'none' | 'failed'; plainFiles: string[] }) =>
     (await collectSecurityDiagnostics(ports({ core: { ...ports().core, nodeKeys: { snapshot: () => snapshot } } as never }),
       'node-1', 'owner', {}, new AbortController().signal)).findings.find((finding) => finding.id === 'host.keys')
   expect(await keyFinding({ delivery: 'desktop', keyCheck: 'ok', plainFiles: [] })).toMatchObject({ state: 'observed', severity: 'info' })
   expect(await keyFinding({ delivery: 'desktop', keyCheck: 'failed', plainFiles: ['session.key'] })).toMatchObject({ severity: 'warning', repair: expect.stringContaining('Audit log') })
-  expect(await keyFinding({ delivery: 'files', keyCheck: null, plainFiles: ['session.key', 'internal-token'] })).toMatchObject({ severity: 'warning' })
+  expect(await keyFinding({ delivery: 'files', keyCheck: 'none', plainFiles: ['session.key', 'internal-token'] })).toMatchObject({ severity: 'warning' })
   expect((await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)).findings.some((finding) => finding.id === 'host.keys')).toBe(false)
 })
 

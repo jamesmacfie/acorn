@@ -16,7 +16,7 @@ import { sessionCredentialPath } from '../server/auth/credentialFile'
 // is covered at the registry/route layer.
 //
 // The stub is HTTPS with a real acorn certificate, and the child gets ACORN_DATA_DIR and
-// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/runtime.ts): resolve
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/boot.ts): resolve
 // the port from node.json, trust the node's certificate as a CA, and validate fully.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')

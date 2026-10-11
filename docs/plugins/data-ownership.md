@@ -14,7 +14,7 @@ profiles use core services, provider registries, or plain files. Notes writes Ma
 
 Both tiers get their handle from `ctx.storage.open()`, and the host owns the lifecycle. It opens the
 file on the first call, applies the chain, returns the same handle to every later call in that boot,
-and closes it right after the plugin's `dispose()`, inside the `plugins` step of `NODE_DRAIN_ORDER`,
+and closes it right after the plugin's `dispose()`, inside the `plugins` step of the Node's drain (`drainNode` in `apps/node/src/composition/composition.ts`),
 before core's SQLite and the data-root lock. A plugin's `dispose` is for what the plugin opened
 itself, such as timers, child processes, and pools.
 

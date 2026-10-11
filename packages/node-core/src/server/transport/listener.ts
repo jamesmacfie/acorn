@@ -67,7 +67,7 @@ function describePortHolder(port: number): string {
 //
 // `mark` is the composition root's boot timer, threaded in rather than duplicated, because minting a
 // certificate on a first launch and binding a port are two very different costs and a caller timing
-// this from outside sees only their sum (apps/node/src/composition/runtime.ts § bootTimer).
+// this from outside sees only their sum (apps/node/src/composition/boot.ts § bootTimer).
 export function startListener(
   runtime: RuntimeBindings,
   root: DataRoot,

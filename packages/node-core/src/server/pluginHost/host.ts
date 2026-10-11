@@ -75,7 +75,7 @@ export type PluginHostOptions = {
   // These are the marks that refused the 503-until-ready wire contract. Both passes together measure
   // 24 ms warm and 38 to 41 ms on a first boot against a realistic data root, out of a 132 ms boot,
   // which is not worth a code every client and the MCP child would honour forever
-  // (apps/node/src/composition/runtime.ts § bootTimer).
+  // (apps/node/src/composition/boot.ts § bootTimer).
   mark?: (label: string) => void
 }
 
@@ -623,7 +623,7 @@ export function clearRegistrations(name: string): void {
 //
 // Each plugin's storage closes right after its own dispose rather than in a second sweep, so each WAL
 // file drains inside the caller's `plugins` drain step, before `sqlite` and before the data-root lock
-// (apps/node/src/server/composition.ts § NODE_DRAIN_ORDER).
+// (apps/node/src/composition/composition.ts § drainNode).
 async function disposeStarted(
   started: readonly NodePlugin[],
   closeStorage: (name: string) => void,
