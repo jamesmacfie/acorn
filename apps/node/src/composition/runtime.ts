@@ -197,7 +197,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       ACORN_NODE_ID: runtime.NODE_ID,
       ACORN_DATA_DIR: config.dataDir,
       NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
-    }), config.keys.previousSigningKey)
+    }))
     // Whether the delivered session key opens a stored credential. The helper keeps the plain
     // session.key unless it does (docs/security/credentials.md § Node keys).
     const keyCheck = await checkSessionKey(db, runtime.SECRETS)

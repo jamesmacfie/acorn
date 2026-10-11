@@ -10,13 +10,10 @@ const RETAIN_MS = 30 * 24 * 60 * 60 * 1000
 // A tmux environment cannot be changed after its process starts. Keep a node-owned file at a stable
 // path for each session; the MCP and task CLI read it for every request. The file is scoped by its
 // signed contents, not by its name. No HTTP route can renew it.
-// `previousKey` re-mints files signed before a signing key rotation. Only the boot pass accepts it, so
-// a leaked old key can't keep a forged file alive.
 export function renewingInternalEnv(
   key: string,
   dataDir: string,
   baseEnv: () => Record<string, string>,
-  previousKey?: string,
 ): { internalEnv: InternalEnvFactory; dispose(): void } {
   const dir = join(dataDir, 'internal-credentials')
   mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -45,7 +42,7 @@ export function renewingInternalEnv(
       const path = join(dir, entry.name)
       try {
         if (Date.now() - lstatSync(path).mtimeMs > RETAIN_MS) { rmSync(path); continue }
-        const renewed = renewInternalToken(key, readFileSync(path, 'utf8'), previousKey)
+        const renewed = renewInternalToken(key, readFileSync(path, 'utf8'))
         const claims = renewed ? verifyInternalToken(key, renewed) : null
         if (renewed && claims?.scope === 'task' && claims.taskId && claims.sessionId
           && path === sessionCredentialPath(dataDir, claims.taskId, claims.sessionId)) replace(path, renewed)
@@ -66,7 +63,6 @@ export function renewingInternalEnv(
     }
   }
   refresh() // The signing key survives a restart, even if the old token expired while the Node was down.
-  previousKey = undefined
   const timer = setInterval(refresh, REFRESH_MS)
   timer.unref()
 

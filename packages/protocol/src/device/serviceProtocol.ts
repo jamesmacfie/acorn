@@ -30,9 +30,6 @@ export const SEALED_NODE_KEYS_FILE = 'node-keys.sealed'
 export const nodeKeysSchema = z.strictObject({
   sessionKey: z.string().regex(/^[0-9a-fA-F]{64}$/, 'sessionKey must be 64 hex characters'),
   signingKey: z.string().min(32),
-  // The signing key from before the one-time rotation. The Node re-mints the session token files it
-  // signed under the sealed key, then forgets it. Absent once the plain key file is gone.
-  previousSigningKey: z.string().min(1).optional(),
 })
 export type NodeKeys = z.infer<typeof nodeKeysSchema>
 

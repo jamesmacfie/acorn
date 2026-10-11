@@ -55,8 +55,7 @@ whatever else it read while failing.
 
 Internal tokens are stateless HMAC credentials with a 48-hour expiry. Verification returns the same
 null result for expired, malformed, and forged tokens. The signing key persists across restarts
-([Node keys](#node-keys)). Rotating it revokes every outstanding token, except the session files the
-one-time migration re-signs. The Node accepts these tokens only from a loopback TCP
+([Node keys](#node-keys)). Rotating it revokes every outstanding token. The Node accepts these tokens only from a loopback TCP
 peer, even when its listener is advertised. Forwarded headers do not establish that peer.
 
 Two scopes exist:
@@ -132,19 +131,19 @@ The first desktop start after the upgrade migrates the plain files:
 
 1. The helper seals the existing `session.key` as it is, because a new session key would leave every
    stored credential unreadable. It mints a new signing key, because any agent that ran before could
-   have read the old one. The old signing key goes into the sealed file too, never read again from
-   `internal-token`, so a key an agent writes there later can't sign anything the Node re-signs.
-2. The Node boots with the sealed keys. Its first refresh pass re-signs every session token file
-   that verifies under the old key, keeping the same task, session, and tool ceiling. Only that pass
-   accepts the old key, so a token signed with it fails from then on.
+   have read the old one. Nothing reads `internal-token` again.
+2. The Node boots with the sealed keys. A token signed with the old key fails from then on. The Node
+   writes a new token file for each terminal session it reattaches, and an agent session gets one
+   when its process starts, so no live session needs the old key. Nothing re-signs with it, so a key
+   an agent writes into `internal-token` can't sign a token file the Node then trusts.
 3. The Node tries the session key on its stored credentials and reports `ok`, `none`, or `failed` in
    its start result.
-4. The helper drops the old signing key from the sealed file and deletes `internal-token`. It deletes
-   `session.key` only when that file holds the key the Node used and the check answered `ok` or
-   `none`. On `failed`, the file stays and the Node records `keys.check.failed` in the audit trail.
+4. The helper deletes `internal-token`. It deletes `session.key` only when that file holds the key
+   the Node used and the check answered `ok` or `none`. On `failed`, the file stays and the Node
+   records `keys.check.failed` in the audit trail.
 
-A crash between steps is safe: the next start finds the old key still sealed and finishes the same
-migration. If the helper can't open the sealed file, because the keychain item was lost or the file
+A crash between steps is safe: the next start finds the sealed file and the plain files, and
+finishes the same migration. If the helper can't open the sealed file, because the keychain item was lost or the file
 was damaged, it refuses to start the Node and says why. It never reseals from a plain `session.key`
 on its own, because an agent could plant one. Deleting the sealed file is the person's decision, and
 the next start then seals whatever plain `session.key` is left.

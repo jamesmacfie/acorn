@@ -84,8 +84,9 @@ What a Node the desktop app starts keeps from its agents:
 - The signing key and the session key. Neither is in plain form on disk or in the Node's start
   environment. The helper seals both under its keychain data key and sends them in the start message
   ([Node keys](./security/credentials.md#node-keys)).
-- Tokens signed before that change. The first start after the upgrade rotates the signing key and
-  re-signs live session files, so a key an agent read earlier stops working.
+- Tokens signed before that change. The first start after the upgrade rotates the signing key, so a
+  key an agent read earlier stops working. Live sessions get new token files from the Node, not by
+  re-signing old ones.
 
 What stays readable to an agent:
 

@@ -21,18 +21,16 @@ const log = createLogger('node-keys')
 //
 // A Node that ran before this wrote both keys in plain form. The first start after upgrade seals the
 // session key as it is, because a new one would make every stored credential unreadable, and mints a
-// new signing key, because any agent that ran before could have read the old one. `settle` deletes
-// each plain file only once the Node has shown it no longer needs it.
+// new signing key, because any agent that ran before could have read the old one. Nothing re-signs
+// with the old key: the Node writes fresh token files for the terminal sessions it reattaches, and an
+// agent session gets one when its process starts. A plain `internal-token` is never read, so one an
+// agent writes can't sign a token file the Node then trusts.
 
 const PLAIN_SESSION_KEY = 'session.key'
 const PLAIN_SIGNING_KEY = 'internal-token'
 const HEX_KEY = /^[0-9a-fA-F]{64}$/
 
-// `previousSigningKey` is the plain key from before the migration. It lives in the sealed file, not the
-// plain one, because an agent can write a plain `internal-token` at any time. Trusting that file would
-// let it sign a forged session file that the Node then re-signs with the real key. `settle` drops it
-// once the Node has re-signed.
-type SealedKeys = { sessionKey: string; signingKey: string; previousSigningKey?: string }
+type SealedKeys = { sessionKey: string; signingKey: string }
 
 export type NodeKeyCustody = {
   // The keys for the next start, sealing them first when the data root has no sealed file.
@@ -66,8 +64,7 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
     try {
       const keys = JSON.parse(cipher.decrypt(Buffer.from(body, 'base64'))) as Partial<SealedKeys>
       if (typeof keys.sessionKey === 'string' && HEX_KEY.test(keys.sessionKey) && typeof keys.signingKey === 'string' && keys.signingKey) {
-        const previous = typeof keys.previousSigningKey === 'string' && keys.previousSigningKey ? { previousSigningKey: keys.previousSigningKey } : {}
-        return { sessionKey: keys.sessionKey, signingKey: keys.signingKey, ...previous }
+        return { sessionKey: keys.sessionKey, signingKey: keys.signingKey }
       }
     } catch {
       // A different data key or a damaged file. The caller decides whether anything can rebuild it.
@@ -111,27 +108,15 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
         throw new Error(`${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`)
       }
       if (!sealed) {
-        const previousSigningKey = readPlain(PLAIN_SIGNING_KEY)
-        sealed = {
-          sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'),
-          signingKey: randomBytes(32).toString('hex'),
-          ...(previousSigningKey ? { previousSigningKey } : {}),
-        }
+        sealed = { sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'), signingKey: randomBytes(32).toString('hex') }
         seal(sealed)
       }
-      return {
-        sessionKey: envSessionKey ?? sealed.sessionKey,
-        signingKey: sealed.signingKey,
-        ...(sealed.previousSigningKey ? { previousSigningKey: sealed.previousSigningKey } : {}),
-      }
+      return { sessionKey: envSessionKey ?? sealed.sessionKey, signingKey: sealed.signingKey }
     },
 
     settle(keys, check) {
-      // The Node's boot pass has re-signed every session file under the sealed key, so the old
-      // signing key has nothing left to do. A plain file is never read again after sealing, so one an
-      // agent wrote goes too.
-      const sealed = unseal()
-      if (sealed && sealed !== 'unreadable' && sealed.previousSigningKey) seal({ sessionKey: sealed.sessionKey, signingKey: sealed.signingKey })
+      // Nothing reads a plain signing key, the old one or one an agent wrote, so it goes once the Node
+      // is up on the sealed one.
       if (readPlain(PLAIN_SIGNING_KEY)) remove(PLAIN_SIGNING_KEY)
       // The plain session key goes only when it's the key the Node used and that key opened a stored
       // credential, or there was none to open. Anything else keeps it, and the Node records why.

@@ -50,7 +50,6 @@ describe('node key custody', () => {
     const custody = nodeKeyCustody(dir, cipherFor(dataKey))
     const keys = custody.prepare()
     expect(keys.sessionKey).toMatch(/^[0-9a-f]{64}$/)
-    expect(keys.previousSigningKey).toBeUndefined()
     custody.settle(keys, 'none')
     expect(readdirSync(dir)).toEqual([SEALED_NODE_KEYS_FILE])
     // Neither key appears in the file in plain form, and the next start gets the same pair.
@@ -65,8 +64,8 @@ describe('node key custody', () => {
     const custody = nodeKeyCustody(dir, cipherFor(dataKey))
     const keys = custody.prepare()
     expect(keys.sessionKey).toBe(SESSION)
-    expect(keys.signingKey).not.toBe(OLD_SIGNING)
-    expect(keys.previousSigningKey).toBe(OLD_SIGNING)
+    // A new signing key, and the old one isn't passed on: nothing re-signs with it.
+    expect(keys).toEqual({ sessionKey: SESSION, signingKey: expect.not.stringMatching(OLD_SIGNING) })
     // Nothing is deleted before the Node has started and answered.
     expect(existsSync(join(dir, 'session.key'))).toBe(true)
     expect(existsSync(join(dir, 'internal-token'))).toBe(true)
@@ -108,16 +107,19 @@ describe('node key custody', () => {
     expect(() => nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toThrow(/can't be opened with this app's data key/)
   })
 
-  it('never takes a plain signing key written after the migration as the old key', () => {
+  it('never reads a plain signing key, so one an agent writes signs nothing the Node trusts', () => {
     const dir = upgraded()
     const custody = nodeKeyCustody(dir, cipherFor(dataKey))
-    custody.settle(custody.prepare(), 'ok')
-    // An agent plants a key it chose, hoping the next start re-signs a token file it forged with it.
+    const sealed = custody.prepare()
+    custody.settle(sealed, 'ok')
+    // Planted after the migration, or with the sealed file deleted to make the next start look like one.
     writeFileSync(join(dir, 'internal-token'), 'agent-chosen-signing-key')
-    const next = nodeKeyCustody(dir, cipherFor(dataKey))
-    const keys = next.prepare()
-    expect(keys.previousSigningKey).toBeUndefined()
-    next.settle(keys, 'ok')
+    expect(nodeKeyCustody(dir, cipherFor(dataKey)).prepare()).toEqual(sealed)
+    rmSync(join(dir, SEALED_NODE_KEYS_FILE))
+    const reset = nodeKeyCustody(dir, cipherFor(dataKey))
+    const keys = reset.prepare()
+    expect(Object.values(keys)).not.toContain('agent-chosen-signing-key')
+    reset.settle(keys, 'none')
     expect(existsSync(join(dir, 'internal-token'))).toBe(false)
   })
 
