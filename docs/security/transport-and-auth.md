@@ -103,6 +103,27 @@ and none to see every other task's title, branch, worktree path, and dirty count
 filters before it runs any Git, so a confined caller can't make the Node do work for tasks it may not
 see. Plugin frames reach that path under `core.tasks:read`, and the same filter covers them.
 
+## Execution routes
+
+A route that runs a command as the person is device-only, even when it's addressed by task. A task
+token with a read-only ceiling started run targets and opened terminals through these routes, skipping
+the tool permissions and signed ceiling the `run_*` tools apply, and the commands ran outside the
+agent's sandbox. These answer 403 to a task token:
+
+- `POST /v1/core/tasks/:id/run/:target/start`, `stop`, and `restart`. An agent uses the `run_*` tools.
+- `POST /v1/core/tasks/:id/preview-url`, which runs the script in its body.
+- `POST /v1/core/tasks/:id/on-created`, which can run the setup script.
+- `POST /v1/core/tasks/:id/config-trust`, because trusting a repository's config is what lets its
+  commands run, and an agent could otherwise edit the config and approve it.
+- Terminal's `POST /sessions`, `POST /sessions/:sid/send`, and `POST /tasks/:taskId/setup`.
+
+`EXECUTION_ROUTES` in `apps/node/test/integration/pluginMountCoverage.test.ts` lists them, and the
+test fails unless `requireDevice` covers each one. Add a route there when it can start a process.
+
+An agent that may run commands outside its harness does so only through an execute-risk tool. A
+session in the [read block](../managed-agents/read-block.md#what-stops-working) gets a token whose
+signed ceiling stops at write tools, because every execute tool runs outside the harness's sandbox.
+
 ## The WebSocket hub
 
 The hub (`server/transport/wsHub.ts`) keeps a connection's verified claims and checks scope once,

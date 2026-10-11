@@ -13,7 +13,7 @@ import { editorWorktreeChanged } from './worktreeInvalidation'
 import { exclusiveRename, exclusiveRenameAvailability } from './exclusiveRename'
 
 const validName = (name: string): boolean => !!name && name !== '.' && name !== '..' && !/[\\/\0]/.test(name) && name.toLowerCase() !== '.git'
-const gitMetadata = (path: string): boolean => path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git')
+export const gitMetadata = (path: string): boolean => path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git')
 export const entryIdentity = (info: { dev: number; ino: number; birthtimeMs: number; ctimeMs: number }): string =>
   `${info.dev}:${info.ino}:${info.birthtimeMs}:${info.ctimeMs}`
 export const stableEntryId = (info: { dev: number; ino: number; birthtimeMs: number }): string =>

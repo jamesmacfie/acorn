@@ -539,6 +539,23 @@ describe('editor routes over a real worktree', () => {
     expect(readFileSync(join(work, 'sub/new.txt'), 'utf8')).toBe('ordinary content')
   })
 
+  it('refuses to save git metadata, by path or through a link in the worktree', async () => {
+    const config = join(work, '.git', 'config')
+    const before = readFileSync(config, 'utf8')
+    const revision = createHash('sha256').update(before).digest('hex')
+    symlinkSync(join(work, '.git'), join(work, 'git-alias'))
+    const app = authed()
+    for (const path of ['.git/config', '.GIT/config', 'git-alias/config']) {
+      const res = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path, content: '[core]\n\tfsmonitor = touch pwned\n', expectedRevision: revision }), {} as Env)
+      expect(await res.json()).toMatchObject({ ok: false, reason: 'Git metadata cannot be changed.' })
+    }
+    const fresh = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'git-alias/hooks/pre-commit', content: 'x', expectedRevision: null }), {} as Env)
+    expect(await fresh.json()).toMatchObject({ ok: false })
+    expect(readFileSync(config, 'utf8')).toBe(before)
+    expect(existsSync(join(work, '.git', 'hooks', 'pre-commit'))).toBe(false)
+    rmSync(join(work, 'git-alias'))
+  })
+
   it('400s a malformed write body; 401s without a principal', async () => {
     expect((await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: '' }), {} as Env)).status).toBe(400)
     expect((await authed().fetch(req('/api/tasks/task1/editor/read'), {} as Env)).status).toBe(400)

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http'
+import { EveryCredentialActive } from '../../testkit/db'
 import { createConnection } from 'node:net'
 import { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
@@ -29,7 +30,7 @@ async function start(over: Partial<DeviceService> = {}, maxMessageBytes = 128, r
   servers.push(server)
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const host = `127.0.0.1:${(server.address() as { port: number }).port}`
-  attachWsHub(server, { devices: devices(over), allowedHosts: new Set([host]), internalToken: 'synthetic', maxMessageBytes, revocationCheckMs })
+  attachWsHub(server, { devices: devices(over), allowedHosts: new Set([host]), internalToken: 'synthetic', internalCredentials: new EveryCredentialActive(), maxMessageBytes, revocationCheckMs })
   const open = async (multiplexed = false) => {
     const ws = new WebSocket(`ws://${host}/v1/events`, { headers: { authorization: 'Bearer dummy', ...(multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) } })
     peers.push(ws)
@@ -163,7 +164,7 @@ it('owns peer errors during delayed authorization and discards a late completion
   const auth = new Promise<{ deviceId: string } | null>((resolve) => { complete = resolve })
   const server = createServer()
   servers.push(server)
-  attachWsHub(server, { devices: devices({ authenticate: () => auth }), allowedHosts: new Set(['synthetic']), internalToken: 'dummy' })
+  attachWsHub(server, { devices: devices({ authenticate: () => auth }), allowedHosts: new Set(['synthetic']), internalToken: 'dummy', internalCredentials: new EveryCredentialActive() })
   const socket = new Peer()
   server.emit('upgrade', { url: '/v1/events', headers: { host: 'synthetic', authorization: 'Bearer dummy' } } as IncomingMessage, socket, Buffer.alloc(0))
   expect(socket.listenerCount('error')).toBeGreaterThan(0)

@@ -48,6 +48,13 @@ export const acornLoopHook = (): { command: string; args: string[] } | null => {
   return configuredMcp && entry ? { command: configuredMcp.launcher.command, args: [join(dirname(entry), 'loop-hook.js')] } : null
 }
 
+// The file guard (docs/managed-agents/read-block.md § Claude's own file tools), emitted as
+// file-guard.js beside mcp.js like the bridge above. Null on a Node that learned no MCP entry.
+export const acornFileGuard = (): { command: string; args: string[] } | null => {
+  const entry = configuredMcp?.launcher.args[0]
+  return configuredMcp && entry ? { command: configuredMcp.launcher.command, args: [join(dirname(entry), 'file-guard.js')] } : null
+}
+
 export type Argv = { file: string; args: string[] }
 
 // The two command lines a harness declares. `add` is given the launcher because every CLI spells the

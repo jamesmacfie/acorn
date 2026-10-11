@@ -93,7 +93,7 @@ const credentials = renewingInternalEnv(runtime.INTERNAL_TOKEN, root.dir, () => 
   ACORN_NODE_ID: runtime.NODE_ID,
   ACORN_DATA_DIR: root.dir,
   NODE_EXTRA_CA_CERTS: join(root.dir, 'tls', 'cert.pem'),
-}))
+}), runtime.INTERNAL_CREDENTIALS)
 const internalEnv = credentials.internalEnv
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))

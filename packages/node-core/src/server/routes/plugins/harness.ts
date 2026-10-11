@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { routeCapability, routeCapabilityFor, setRouteTestCapability } from '../../bridge'
+import { requireDevice } from '../../middleware/requireUser'
 
 export type RunBridge = {
   targets(taskId: string): Promise<unknown>
@@ -51,11 +52,14 @@ async function respond<B>(c: Context<AppEnv>, bridge: B | null | undefined, fn: 
 }
 
 // Auth is enforced globally by requireUser in createApp() (docs/security/transport-and-auth.md § The gates).
+// Starting, stopping, and restarting a target is the person's, so those three are device-only. An agent
+// uses the run_* tools, which apply the tool permissions and the session's signed ceiling. A task token
+// that reached these routes skipped both (docs/terminal/run-targets.md § Trust and execution).
 export const harness = new Hono<AppEnv>()
   .get('/:id/run', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.targets(c.req.param('id'))))
   // Static 'default-url' before the ':target' routes so it can't be shadowed by a target id.
   .get('/:id/run/default-url', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), async (b) => ({ url: (await b.defaultUrl(c.req.param('id'))) ?? null })))
-  .post('/:id/run/:target/start', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.start(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/stop', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.stop(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/restart', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.restart(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/start', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.start(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/stop', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.stop(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/restart', requireDevice, (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.restart(c.req.param('id'), c.req.param('target'))))
   .get('/:id/run/:target/status', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.status(c.req.param('id'), c.req.param('target'))))

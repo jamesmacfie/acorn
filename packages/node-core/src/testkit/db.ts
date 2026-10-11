@@ -9,6 +9,7 @@ import { openDb, type Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
 import { createCoreServices } from '../server/core'
 import { SecretService } from '../server/core/secrets'
+import { ActiveCredentials } from '../server/auth/activeCredentials'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
 
@@ -51,10 +52,21 @@ export function makeTestCoreServices(testDb: TestDb, userId: string | null = nul
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
 // credential read goes through (server/core/secrets.ts). docs/testing/layers.md § The testkit has why these are
 // minted together.
-export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService; incoming: Env['incoming'] } {
+/** Treats every signed task token as live. A test that mints its own tokens gets the auth it had
+ *  before credential ids; a revocation test passes a real ActiveCredentials instead. */
+export class EveryCredentialActive extends ActiveCredentials {
+  override isActive(): boolean {
+    return true
+  }
+}
+
+export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService; incoming: Env['incoming']; INTERNAL_CREDENTIALS: ActiveCredentials } {
   // Direct app.fetch tests have no socket. Give their existing internal-token requests the same peer
   // as the real listener; security tests override this with a remote or missing peer explicitly.
-  return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey), incoming: { socket: { remoteAddress: '127.0.0.1' } } as Env['incoming'] }
+  return {
+    SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey), incoming: { socket: { remoteAddress: '127.0.0.1' } } as Env['incoming'],
+    INTERNAL_CREDENTIALS: new EveryCredentialActive(),
+  }
 }
 
 // The 64-hex session key every test in the repo uses (docs/testing/layers.md § The testkit).

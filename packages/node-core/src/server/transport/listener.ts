@@ -139,6 +139,7 @@ export function startListener(
   // must not be copied.
   const upgradeDeps: TunnelDeps = {
     internalToken: runtime.INTERNAL_TOKEN,
+    internalCredentials: runtime.INTERNAL_CREDENTIALS,
     allowedHosts,
     devices: runtime.DEVICES,
     // Derived from what this node already resolves for the task, so the tunnel's allowlist is not a new

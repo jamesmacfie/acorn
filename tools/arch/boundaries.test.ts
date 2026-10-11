@@ -630,7 +630,9 @@ describe('architecture boundaries', () => {
       // One more on 2026-10-10 for rail status: `host/annotations/statusAnnotations.ts`, which the
       // terminal imports directly because the annotations barrel carries the DOM's AnnotationMarks.
       '@acorn/client-core': 183, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
-      '@acorn/node-core': 65,
+      // One more on 2026-10-11 for `mcp/fileGuard.ts`, the read block's file guard, a build entry like
+      // `mcp/loopHook.ts` (docs/managed-agents/read-block.md).
+      '@acorn/node-core': 66,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
       '@acorn/diff-document': 2,

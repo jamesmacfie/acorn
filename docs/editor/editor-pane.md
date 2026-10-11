@@ -84,8 +84,8 @@ changes, and reads the image again when the window regains focus.
 
 **Show ignored files** is a device preference, on by default. Ignored rows are muted and named
 accessibly; turning it off hides them. Explicit reveal temporarily shows an ignored active path.
-The tree still shows dotfiles and excludes `.git` and `node_modules` from listings. An unavailable
-ignore read leaves entries visible and shows its error. **Collapse all folders** clears retained
+The tree shows dotfiles and excludes `.git` and `node_modules`. A save into `.git` is refused, even
+through a link. An unavailable ignore read leaves entries visible and shows its error. **Collapse all folders** clears retained
 descendant expansions; **Reveal active file** opens ancestors and scrolls to the row.
 
 ### Git status

@@ -425,6 +425,8 @@ node: DeliverableSkill
 node: Disposable
 node: Extension
 node: ExtensionPointId
+node: FILE_GUARD_MATCHER
+node: FileGuardPolicy
 node: GenerateTextRequest
 node: HEADLESS_TIMEOUT_MS
 node: HarnessProbe
@@ -527,6 +529,7 @@ node: TelemetrySink
 node: ToolContext
 node: ToolError
 node: VersionedDataValue
+node: acornFileGuard
 node: acornLoopHook
 node: acornMcp
 node: agentProfileRegistry
@@ -558,6 +561,7 @@ node: describeError
 node: describeSecretRefusal
 node: diffDocumentBlobKey
 node: encodeCached
+node: encodeFileGuardPolicy
 node: envFlags
 node: extensionPointId
 node: externalIdsFor
@@ -693,6 +697,7 @@ testkit: createCoreServices
 testkit: createProjectService
 testkit: createTaskService
 testkit: decryptSecret
+testkit: fileToolRefusal
 testkit: finishTaskArchive
 testkit: harness
 testkit: isContainedPath

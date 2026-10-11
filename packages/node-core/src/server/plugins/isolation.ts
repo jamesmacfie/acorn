@@ -1,7 +1,7 @@
 // Host side of rung 2 for loaded Node plugins: one permission-scoped worker realm per package, with
 // the already-scoped NodePluginContext as its only authority-bearing object.
-import { existsSync, realpathSync } from 'node:fs'
-import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MessageChannel, Worker } from 'node:worker_threads'
 import { assertSupportedNodeRuntime } from '@acorn/protocol/nodeRuntime.ts'
@@ -64,6 +64,29 @@ const runtimeReadRoots = (bootstrap: string): string[] => {
   ]
 }
 
+const within = (path: string, root: string): boolean => path === root || path.startsWith(`${root}${sep}`)
+
+/** Where a file grant really points, or null when it can't be a single regular file. A missing file is
+ *  allowed, because a read-write grant creates it, and is canonicalized through its folder. A dangling
+ *  link is refused, because a write through it would create its target wherever it points. */
+export function fileGrantTarget(path: string): string | null {
+  try {
+    lstatSync(path)
+  } catch {
+    try {
+      return join(realpathSync(dirname(path)), basename(path))
+    } catch {
+      return path
+    }
+  }
+  try {
+    const real = realpathSync(path)
+    return statSync(real).isFile() ? real : null
+  } catch {
+    return null
+  }
+}
+
 const unstarted = new WeakMap<NodePlugin, () => Promise<void>>()
 
 /** Terminate a realm the dependency resolver rejected before the host acquired it. */
@@ -112,27 +135,28 @@ export async function isolateNodePlugin(options: {
     const value = process.env[name]
     if (value !== undefined) environment[name] = value
   }
-  const protectedRoot = resolve(options.dataRoot)
-  const isProtected = (path: string) => path === protectedRoot || path.startsWith(`${protectedRoot}${sep}`)
+  // Both spellings of the data root, so a grant that names it through a link is still caught. A grant
+  // is refused when it sits inside the root or holds it, and it must be one regular file, because
+  // Node's read grant on a folder covers everything below it.
+  const protectedRoots = [...new Set([resolve(options.dataRoot), realpathSync(options.dataRoot)])]
+  const isProtected = (path: string) => protectedRoots.some((root) => within(path, root) || within(root, path))
+  const refusal = (permission: { env: string }, reason: string) =>
+    new Error(`Plugin '${options.plugin}' file grant ${permission.env} ${reason}.`)
   for (const permission of options.permissions.files ?? []) {
     const configured = process.env[permission.env]
     if (!configured) continue
-    if (!isAbsolute(configured)) {
-      throw new Error(`Plugin '${options.plugin}' file grant ${permission.env} must name an absolute path.`)
-    }
+    if (!isAbsolute(configured)) throw refusal(permission, 'must name an absolute path')
     const path = resolve(configured)
-    const real = existsSync(path) ? realpathSync(path) : path
-    if (isProtected(path) || isProtected(real)) {
-      throw new Error(`Plugin '${options.plugin}' file grant ${permission.env} must stay outside acorn's data root.`)
-    }
+    const real = fileGrantTarget(path)
+    if (isProtected(path) || (real && isProtected(real))) throw refusal(permission, "must stay outside acorn's data root")
+    if (!real) throw refusal(permission, 'must name a single regular file')
     read.add(path)
     read.add(real)
     if (permission.access === 'read-write') {
       write.add(path)
       const temporary = `${path}.acorn-tmp`
-      if (existsSync(temporary) && isProtected(realpathSync(temporary))) {
-        throw new Error(`Plugin '${options.plugin}' file grant ${permission.env} has a protected atomic-write sidecar.`)
-      }
+      const temporaryReal = fileGrantTarget(temporary)
+      if (!temporaryReal || isProtected(temporaryReal)) throw refusal(permission, 'has a protected atomic-write sidecar')
       read.add(temporary)
       write.add(temporary)
     }

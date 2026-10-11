@@ -104,7 +104,10 @@ sealed, and a standalone Node keeps it in `internal-token` in its data root
 - `task`: a PTY, agent, workflow step, or MCP process bound to one `taskId`, optionally a `sessionId`,
   and optionally a server-owned tool ceiling.
 
-Task tokens are checked at task route mounts, stream upgrades, and task-owned operations. They can't pair
+Task tokens are checked at task route mounts, stream upgrades, and task-owned operations. Each one
+carries a credential ID that's revoked when its child ends or its session is removed
+([revoking a credential](./security/credentials.md#revoking-a-credential)). They can't run a command
+through a route ([execution routes](./security/transport-and-auth.md#execution-routes)), pair
 devices, administer devices or plugins, read the HTTP client's encrypted request material, or use the
 renderer-facing agent-tool route or managed-agent execution and approval controls. Managed-agent HTTP
 execution controls refuse service tokens too, because trusted workflow and delegation execution use
@@ -129,8 +132,8 @@ mints the token. The agent-tool route enforces only the signed ceiling. `ACORN_T
 `x-acorn-tool-ceiling` are compatibility metadata and can't widen authority. Internal tokens expire
 after 48 hours and authenticate only from a loopback socket peer. Session children receive a token
 file that the Node refreshes without widening those signed claims, including after a restart.
-Workflow child files are refreshed while their steps run and removed when the child ends. Rotating
-the signing key still revokes all outstanding tokens.
+Workflow child files are refreshed while their steps run and removed, and their tokens revoked, when
+the child ends. Rotating the signing key still revokes all outstanding tokens.
 
 The GitHub credential is an integration secret, not part of `Principal`. GitHub routes read it through
 `plugins/github/src/server/githubToken.ts`, which calls core's `providerCredential`. That returns the

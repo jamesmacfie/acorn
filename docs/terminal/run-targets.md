@@ -27,6 +27,11 @@ and URL discovery use that captured URL command after the file changes. Fixed UR
 running instance. acorn doesn't allocate or proxy arbitrary ports. Preview uses the declared target
 and the authenticated tunnel when it needs one.
 
+Starting, stopping, and restarting a target through `/v1/core/tasks/:id/run/:target/*`, and
+acknowledging the config through `config-trust`, need a device. An agent uses the `run_*` tools,
+which apply the tool permissions and the session's signed ceiling
+([execution routes](../security/transport-and-auth.md#execution-routes)).
+
 Another plugin gets a turn before a process starts. `terminal:before-run-target` runs in
 `RuntimeService.start`, after the trust gate and before the spawn. A veto stops the start, and the
 reason reaches the caller prefixed with the vetoing plugin's ID. It can observe and veto, not

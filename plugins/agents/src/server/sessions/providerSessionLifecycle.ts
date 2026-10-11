@@ -57,7 +57,8 @@ export type ProviderLifecyclePorts = {
   taskRoot(taskId: string): Promise<string>
   workspaceId(taskId: string): Promise<string>
   hasProviderExecutionHistory(sessionId: string): Promise<boolean>
-  scopedEnvironment(session: AgentSession): Record<string, string>
+  /** The session's environment and task token. A `sandboxed` start's token can't reach execute tools. */
+  scopedEnvironment(session: AgentSession, sandboxed: boolean): Record<string, string>
   mcpServers(session: AgentSession, env: Record<string, string>, signal: AbortSignal): Promise<{
     servers: AgentDriverMcpServer[]
     unavailable: string[]
@@ -70,8 +71,10 @@ export type ProviderLifecyclePorts = {
   skillsDelivered(sessionId: string, report: SkillReport): Promise<void>
   /** The bridge for a start of a driver with `loopHooks`, or null when no loop point has a handler. */
   loopHooks(session: AgentSession): Promise<AgentDriverLoopHooks | null>
-  /** The read block for a start of a driver with `readBlock`, or null when the person left it off. */
-  readBlock(input: { worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock | null>
+  /** Whether the person switched the read block on, read at every start. */
+  readBlockOn(): Promise<boolean>
+  /** The read block for a start of a driver with `readBlock`, once `readBlockOn` said yes. */
+  readBlock(input: { worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -252,8 +255,12 @@ export class ProviderSessionLifecycle {
       const cwd = await prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId)))
       if (!live.workspaceId) live.workspaceId = await prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId)))
       const noProviderExecutionHistory = !(await prepare('history.read', () => read(() => this.ports.hasProviderExecutionHistory(session.id))))
+      // Read at every start, like the hooks, so switching it applies from the next start. Decided before
+      // the token is minted, because every execute tool runs outside the harness's sandbox, so a
+      // sandboxed session's token stops at write tools (docs/managed-agents/read-block.md).
+      const sandboxed = live.driver.readBlock === true && await read(() => this.ports.readBlockOn())
       signal.throwIfAborted()
-      const env = this.ports.scopedEnvironment(session)
+      const env = this.ports.scopedEnvironment(session, sandboxed)
       const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
       live.retireMcp = mcp.retire ?? null
       signal.throwIfAborted()
@@ -266,8 +273,7 @@ export class ProviderSessionLifecycle {
       live.skills = skills
       live.skillsOwed = true
       const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
-      // Read at every start, like the hooks, so switching it applies from the next start.
-      const readBlock = live.driver.readBlock
+      const readBlock = sandboxed
         ? await read(() => this.ports.readBlock({ worktree: cwd, env, skillPaths: [...skills.folders, ...skills.plugins] }))
         : null
       const { attendanceInstructions } = await import('./attendanceInstructions')

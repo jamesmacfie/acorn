@@ -184,7 +184,14 @@ function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'te
   releaseCallbacks(s)
   s.pendingOut = ''
   drain([() => settleSession(s, null), () => s.display.dispose(), () => agentSender.clear(s.meta.id),
-    () => { if (s.meta.status === 'running') s.pty.kill() }])
+    () => { if (s.meta.status === 'running') s.pty.kill() },
+    // A removed terminal's token stops working now, not when it expires. A shutdown keeps it, because
+    // a tmux shell outlives this Node (docs/security/credentials.md § Revoking a credential).
+    () => { if (reason === 'terminal_removed') revokeCredential(s.meta) }])
+}
+
+function revokeCredential(meta: { taskId: string; id: string }): void {
+  internalEnv.revokeSession?.({ taskId: meta.taskId, sessionId: meta.id })
 }
 
 // A session's command went quiet, exited, or finished setting up. Whatever it was doing to the files in
@@ -405,6 +412,9 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, scri
           engine.complete?.(event)
         },
         () => settleSession(s, s.script && s.meta.backend === 'tmux' ? null : exitCode),
+        // A plain shell that exited is gone for good. A tmux attach client exiting says nothing
+        // about the shell, which removal or the next reconcile revokes.
+        () => { if (s.meta.backend !== 'tmux') revokeCredential(s.meta) },
         () => releaseCallbacks(s),
         () => { if (s.admitted) engine.status() },
       ])
@@ -711,6 +721,7 @@ export async function reconcileTmux() {
         reattached++
       } else {
         await deleteRow(row.id, engine.db)
+        revokeCredential(row)
       }
     } catch (e) {
       drain([() => log.warn(`tmux reconcile failed for session ${row.id}: ${describeError(e).message}`)])

@@ -5,8 +5,8 @@
 // node/index.ts.
 import { BridgeError, type CoreServices, gitOrThrow, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { createHash } from 'node:crypto'
-import { lstat, open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, open, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, relative } from 'node:path'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
 import type { EditorFileStatusProvider } from '../contract/fileStatus'
@@ -14,7 +14,7 @@ import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 import { MAX_EDITOR_FILE_READ_BYTES, type EditorFilesCapability } from '../contract/files'
 import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
 import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
-import { createFileActions, entryIdentity, entryKind, stableEntryId } from './fileActions'
+import { createFileActions, entryIdentity, entryKind, gitMetadata, stableEntryId } from './fileActions'
 import { editorWorktreeChanged } from './worktreeInvalidation'
 
 const revisionOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
@@ -27,6 +27,21 @@ async function diskRevision(path: string): Promise<string | null> {
   }
 }
 
+
+// The Node runs git in the worktree for every status refresh, so a saved `.git/config` with an
+// `fsmonitor` setting would run a command as the person. A task token reaches this write, and a
+// sandboxed agent can't write `.git` itself (docs/managed-agents/read-block.md), so the save refuses
+// it too, by the path given and by the real path, which a symlink in the worktree could change.
+async function inGitMetadata(root: string, relPath: string, abs: string): Promise<boolean> {
+  if (gitMetadata(relPath)) return true
+  try {
+    const real = await realpath(abs).catch(async () => join(await realpath(dirname(abs)), basename(abs)))
+    return gitMetadata(relative(await realpath(root), real))
+  } catch {
+    // No such folder, so the write below fails on its own.
+    return false
+  }
+}
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs' | 'proc'>
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
@@ -154,6 +169,7 @@ export const editorBridge = (
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, kind: 'failure', reason: 'Path is outside the worktree.' }
+    if (await inGitMetadata(root, relPath, abs)) return { ok: false, kind: 'failure', reason: 'Git metadata cannot be changed.' }
     const key = await canonicalCheckoutKey(root).catch(() => null)
     if (!key) return { ok: false, kind: 'failure', reason: 'Cannot resolve the file path.' }
     return withFileWriteLock(key, async () => {

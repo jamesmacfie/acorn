@@ -1,4 +1,5 @@
 import { createServer as createHttpServer, type Server } from 'node:http'
+import { EveryCredentialActive } from '../../testkit/db'
 import { createConnection, createServer as createTcpServer, type Server as TcpServer } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
@@ -58,6 +59,7 @@ beforeEach(async () => {
   allowedHost = `127.0.0.1:${httpPort}`
   attachTunnel(http, {
     internalToken: INTERNAL_KEY,
+    internalCredentials: new EveryCredentialActive(),
     allowedHosts: new Set([allowedHost]),
     devices,
     declaredPorts: async () => {

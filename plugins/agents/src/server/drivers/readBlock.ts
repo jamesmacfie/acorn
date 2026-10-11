@@ -86,6 +86,7 @@ export function dataRootReadBlock(input: {
   env: Record<string, string>
   /** The skill folders and plugin folders this start hands the harness. */
   skillPaths: readonly string[]
+  fileGuard: AgentDriverReadBlock['fileGuard']
 }): AgentDriverReadBlock {
   const dataDir = resolve(input.dataDir)
   const worktree = resolve(input.worktree)
@@ -102,9 +103,11 @@ export function dataRootReadBlock(input: {
   }
   return {
     dataDir,
+    worktree,
     readable: [...new Set([...workspace, ...credentials])],
     ...gitWrites(worktree),
     hidden: hiddenBeside(dataDir, workspace),
     loopback,
+    fileGuard: input.fileGuard,
   }
 }

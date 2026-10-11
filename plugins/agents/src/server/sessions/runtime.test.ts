@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agentProfileRegistry } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, configureAcornMcp } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -632,6 +632,48 @@ describe('managed agent runtime conformance', () => {
     expect(turn).toMatchObject({ source: 'delegation', status: 'queued' })
     driver.release()
     expect((await runtime.wait(session.id, 0, 'ready', 2_000)).session.runtimeState).toBe('ready')
+  })
+
+  it('mints a sandboxed start a token that stops at write tools', async () => {
+    // Every execute tool runs outside Claude Code's sandbox, so a session in the read block can't reach one.
+    class SandboxedDriver extends DeferredStartDriver {
+      readonly readBlock = true
+      blocked: unknown
+      override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+        this.blocked = options.readBlock
+        return super.start(options)
+      }
+    }
+    const seed = await seedTask(testDb, dataDir)
+    await writeAgentSessionDefaults(core.prefs, 'owner', { ...defaultAgentSessionDefaults(), blockDataRootReads: true })
+    // A blocked start needs the file guard, which sits beside the MCP entry.
+    configureAcornMcp('acorn-dev', { command: '/app/node', args: ['/app/helper/mcp.js'], env: {} })
+    const registry = new AgentDriverRegistry()
+    const driver = new SandboxedDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    const minted: unknown[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: (claims) => (minted.push(claims), {}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry,
+    })
+
+    await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'delegated',
+      config: { toolCeiling: { allow: ['run_start', 'notes_write'], maxRisk: 'execute' } },
+    })
+    await driver.entered
+    driver.release()
+
+    expect(driver.blocked).toMatchObject({ fileGuard: { command: '/app/node', args: ['/app/helper/file-guard.js'] } })
+    expect(minted).toContainEqual(expect.objectContaining({ toolCeiling: { allow: ['run_start', 'notes_write'], maxRisk: 'write' } }))
   })
 
   it('does not miss a condition committed between the initial wait snapshot and subscription', async () => {

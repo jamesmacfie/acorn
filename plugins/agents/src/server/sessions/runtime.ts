@@ -776,6 +776,7 @@ export class ManagedAgentRuntime {
     }
     await this.engine.stopLive(sessionId)
     const removed = await this.store.deleteSession(sessionId)
+    this.engine.revokeSessionCredential(session)
     await Promise.all([
       this.attachments.collectNow(removed.attachmentIds),
       this.artifacts.collectRemoved(removed.artifactObjects),

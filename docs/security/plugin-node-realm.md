@@ -100,8 +100,11 @@ The launch grant is narrow:
   worker opens that database itself, checks the migration history, and never receives the host
   database or storage service.
 - The environment starts from the process broker's credential-free base. `env` names add single
-  values. `files` resolves single absolute paths from named values and refuses anything under acorn's
-  data root.
+  values. `files` resolves single absolute paths from named values. Each must be one regular file, or
+  a file not created yet whose folder is resolved instead, because Node's read grant on a folder
+  covers everything below it. A link to a missing target is refused. A grant inside acorn's data
+  root, or on a folder that holds it, is refused, by both the path the Node was given and its real
+  path (`fileGrantTarget` in `packages/node-core/src/server/plugins/isolation.ts`).
 - Direct `node:sqlite` is refused, including through `process.getBuiltinModule`, which would otherwise
   bypass Node's filesystem checks.
 - Raw socket modules are refused. `fetch` exists only when `permissions.node.net` is non-empty. Exact

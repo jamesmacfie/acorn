@@ -195,7 +195,8 @@ export {
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
 export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { acornLoopHook, acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export { acornFileGuard, acornLoopHook, acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export { encodeFileGuardPolicy, FILE_GUARD_MATCHER, type FileGuardPolicy } from '@acorn/node-core/mcp/fileGuard.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────

@@ -77,6 +77,8 @@ export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool
  *  docs/managed-agents/read-block.md). Paths are absolute. */
 export type AgentDriverReadBlock = {
   dataDir: string
+  /** The session's working folder, which its file tools may write. */
+  worktree: string
   /** What the agent's commands still read inside the data root: its worktree, its own token file, the
    *  Node's certificate, and its skill folders. */
   readable: string[]
@@ -91,6 +93,9 @@ export type AgentDriverReadBlock = {
   hidden: string[]
   /** `host:port` of the Node's loopback API, for the task CLI. */
   loopback: string | null
+  /** The program that checks each of the harness's own file tool calls against this block
+   *  (@acorn/node-core/mcp/fileGuard.ts). */
+  fileGuard: { command: string; args: string[] }
 }
 
 export type AgentDriverStartOptions = {

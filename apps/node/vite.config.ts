@@ -68,6 +68,7 @@ export default defineConfig({
         service: resolve(__dirname, 'src/entries/service.ts'),
         mcp: resolve(__dirname, 'src/entries/mcp.ts'),
         'loop-hook': resolve(__dirname, 'src/entries/loop-hook.ts'),
+        'file-guard': resolve(__dirname, 'src/entries/file-guard.ts'),
         standalone: resolve(__dirname, 'src/entries/standalone.ts'),
         'archive-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         'plugin-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/nodePluginWorker.ts'),

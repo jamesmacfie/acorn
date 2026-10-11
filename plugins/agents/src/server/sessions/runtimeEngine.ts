@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION, type AgentLoopHookReply, type AgentLoopHookRequest } from '../../contract/loopHook.ts'
 import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { acornLoopHook, agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
+import { acornFileGuard, acornLoopHook, agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentConfigOption,
@@ -20,6 +20,7 @@ import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import { delegatedToolCeiling } from '../delegation/policy'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
 import { persistedAttendance, sessionAttendance } from './attendance'
 import { readAgentConcurrency } from '../concurrencyStore'
@@ -302,7 +303,7 @@ export class ManagedAgentEngine {
       taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
       workspaceId: (taskId) => this.core.tasks.workspaceId(taskId),
       hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
-      scopedEnvironment: (session) => this.scopedProviderEnvironment(session),
+      scopedEnvironment: (session, sandboxed) => this.scopedProviderEnvironment(session, sandboxed),
       mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
       // Loaded on the first start rather than at boot, like the rest of a start's preparation. A driver
       // with its own skill support gets a folder per start, which the lifecycle removes when it's done.
@@ -320,10 +321,16 @@ export class ManagedAgentEngine {
         return { command: bridge.command, args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION], beforeTool: before!.length > 0, afterTool: after!.length > 0 }
       },
       // The person's switch on Settings > Security and backup (docs/managed-agents/read-block.md).
-      readBlock: async (input) => {
+      readBlockOn: async () => {
         const userId = this.currentUserId()
-        if (!userId || !(await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads) return null
-        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, ...input })
+        return !!userId && (await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads
+      },
+      readBlock: async (input) => {
+        // Claude's own file tools run outside its sandbox, so a blocked session doesn't start without
+        // the guard that checks them.
+        const fileGuard = acornFileGuard()
+        if (!fileGuard) throw new Error("This Node can't keep an agent's file tools out of Acorn's data folder, because it has no file guard program.")
+        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, fileGuard, ...input })
       },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
@@ -666,12 +673,21 @@ export class ManagedAgentEngine {
   }
   flushProviderEvents(sessionId: string): Promise<void> { return this.providerEvents.flush(sessionId) }
 
-  private scopedProviderEnvironment(session: AgentSession): Record<string, string> {
-    // The session row is the authority for the tool ceiling across restarts.
+  /** Revokes a deleted session's task token, so a copy of it stops working at once
+   *  (docs/security/credentials.md § Revoking a credential). */
+  revokeSessionCredential(session: Pick<AgentSession, 'id' | 'taskId'>): void {
+    this.internalEnv.revokeSession?.({ taskId: session.taskId, sessionId: session.id })
+  }
+
+  private scopedProviderEnvironment(session: AgentSession, sandboxed: boolean): Record<string, string> {
+    // The session row is the authority for the tool ceiling across restarts. A sandboxed start narrows
+    // it to write tools, because every execute tool, such as a run target, a workflow, a delegated
+    // agent, or the browser, runs outside the harness's sandbox (docs/managed-agents/read-block.md).
+    const persisted = persistedToolCeiling(session.config)
     const env = {
       ...this.internalEnv({
         scope: 'task', taskId: session.taskId, sessionId: session.id,
-        toolCeiling: persistedToolCeiling(session.config),
+        toolCeiling: sandboxed ? delegatedToolCeiling(persisted, { maxRisk: 'write' }) : persisted,
       }),
       ACORN_TASK_ID: session.taskId,
       ACORN_SESSION_ID: session.id,

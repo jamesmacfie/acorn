@@ -53,8 +53,9 @@ whatever else it read while failing.
 
 ## Internal tokens
 
-Internal tokens are stateless HMAC credentials with a 48-hour expiry. Verification returns the same
-null result for expired, malformed, and forged tokens. The signing key persists across restarts
+Internal tokens are HMAC credentials with a 48-hour expiry. A task token also carries a credential
+ID, which must still be live when it's used ([revoking a credential](#revoking-a-credential)).
+Verification returns the same null result for expired, malformed, forged, and revoked tokens. The signing key persists across restarts
 ([Node keys](#node-keys)). Rotating it revokes every outstanding token. The Node accepts these tokens only from a loopback TCP
 peer, even when its listener is advertised. Forwarded headers do not establish that peer.
 
@@ -91,6 +92,28 @@ A one-shot workflow step gets a separate file while its child runs. The Node ref
 same timer and removes it when the step ends; orphaned child files are removed at startup.
 Node-owned service calls mint on demand. A direct custom loopback client in a long-lived PTY should
 read the file for each request instead of retaining `ACORN_API_TOKEN` from its environment.
+
+### Revoking a credential
+
+Each task token carries a random credential ID, and renewal keeps it. HTTP auth and the WebSocket hub
+refuse a task token whose ID isn't in the Node's set of live IDs (`ActiveCredentials` in
+`packages/node-core/src/server/auth/activeCredentials.ts`). A copy of a token stops working when its
+owner goes, rather than up to 48 hours later:
+
+- A workflow step's token is revoked when the step releases its file.
+- A session has one live token. Minting it again, when the agent process restarts or a tmux session is
+  reattached, revokes the one before.
+- Deleting an agent session, removing or dropping a terminal session, a plain shell exiting, and a
+  dead tmux session found at boot each revoke that session's token and delete its file.
+
+The set lives in memory. At start, the Node rebuilds it from the session files it renews, and deletes
+every workflow file, so a released step's token never comes back. After start, it renews only the
+files it wrote, and deletes a token copied back to a removed session's path. A token file planted in
+the data root before a restart is adopted, like the other planted files in
+[what this doesn't stop](../security.md). A token minted before credential IDs existed has none, so
+it fails, and the first start after the upgrade gives each session file a new token with an ID.
+
+A service token never leaves the Node's process, so it carries no ID.
 
 The agent-tool route reads session identity and tool limits from the verified principal only. The
 `x-acorn-session-id` and `x-acorn-tool-ceiling` headers grant nothing. Session-required tools drop

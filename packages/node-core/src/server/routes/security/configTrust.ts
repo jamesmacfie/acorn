@@ -4,6 +4,7 @@ import { acknowledgeRepoConfig, repoConfigTrustReview } from '../../repoConfigTr
 import { auditRequest } from '../../auditRequest'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
+import { requireDevice } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 
 // Called directly rather than through a bridge slot. It had one, filled by a wireConfigTrust() in the
@@ -17,7 +18,9 @@ const ackBody = z.object({ hash: z.string().regex(/^[a-f0-9]{64}$/) })
 
 export const configTrust = new Hono<AppEnv>()
   .get('/:id/config-trust', async (c) => c.json(await repoConfigTrustReview(getDb(c.env), c.req.param('id'))))
-  .post('/:id/config-trust', async (c) => {
+  // Device-only. Trusting the config is what lets its commands run, so an agent that edited the
+  // config can't approve it with its own task token.
+  .post('/:id/config-trust', requireDevice, async (c) => {
     const parsed = ackBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     try {

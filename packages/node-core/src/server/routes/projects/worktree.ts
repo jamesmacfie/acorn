@@ -121,14 +121,17 @@ export const worktree = new Hono<AppEnv>()
   .get('/task-statuses', async (c) =>
     c.json(await computeTaskStatuses(getDb(c.env), isTaskConfined(c) ? (taskId) => mayActOnTask(c, taskId) : undefined)))
   // --- task lifecycle ---
-  .post('/tasks/:id/preview-url', async (c) => {
+  // Device-only, because it runs the script in the body as the person. The renderer sends the
+  // project's own preview script.
+  .post('/tasks/:id/preview-url', requireDevice, async (c) => {
     const parsed = previewBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return c.json(await capturePreviewUrl(getDb(c.env), c.req.param('id'), parsed.data.script))
   })
   // Notified right after a task is created. Branchless tasks already run in the project folder, so
-  // only a Git branch task can have a newly-created worktree to eagerly prepare.
-  .post('/tasks/:id/on-created', async (c) => {
+  // only a Git branch task can have a newly-created worktree to eagerly prepare. Device-only, because
+  // it can run the setup script, and the clients that create tasks hold a device token.
+  .post('/tasks/:id/on-created', requireDevice, async (c) => {
     const db = getDb(c.env)
     const taskId = c.req.param('id')
     if (!taskId) return c.json({ ok: true })

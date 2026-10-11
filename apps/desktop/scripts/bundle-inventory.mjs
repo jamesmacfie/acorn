@@ -9,7 +9,7 @@ const trees = [
 ]
 const required = [
   'client/index.html', 'bridge/bridge.js', 'bridge/plugin-frame.css',
-  'helper/helper.js', 'helper/service.js', 'helper/mcp.js', 'helper/loop-hook.js', 'helper/package.json',
+  'helper/helper.js', 'helper/service.js', 'helper/mcp.js', 'helper/loop-hook.js', 'helper/file-guard.js', 'helper/package.json',
   'cli/cli.js', 'cli/package.json', 'helper/migrations/meta/_journal.json',
 ]
 

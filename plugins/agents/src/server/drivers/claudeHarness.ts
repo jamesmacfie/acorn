@@ -5,6 +5,7 @@
 // persisted, the first on every session row, the second on session rows and workflow steps
 // (docs/managed-agents/harnesses.md § Harnesses).
 import { createRequire } from 'node:module'
+import { encodeFileGuardPolicy, FILE_GUARD_MATCHER } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { LOOP_HOOK_TIMEOUT_SECONDS, type AgentLoopHookEvent } from '../../contract/loopHook.ts'
 import type { HarnessLaunchSpec } from './harness'
@@ -31,11 +32,21 @@ export function claudeLoopHookSettings(bridge: AgentDriverLoopHooks): Record<str
   }
 }
 
+// How long Claude waits for the file guard. It reads a few paths and exits, so this is generous.
+const FILE_GUARD_TIMEOUT_SECONDS = 10
+
 /** Claude Code's settings for a session kept out of the data root (docs/managed-agents/read-block.md).
- *  The sandbox confines every shell command and the processes it starts. Claude's own Read and Edit
- *  tools run outside it, so deny rules keep them out of the entries that hold nothing this session
- *  reads. The Edit rules also stop the agent planting files there, such as a `.env` or a key file. */
-export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox: Record<string, unknown>; deny: string[] } {
+ *  The sandbox confines every shell command and the processes it starts. Claude's own file tools run
+ *  outside it, so a PreToolUse hook runs the file guard on each call, which checks the real path against
+ *  the block, including a file created after the start. The deny rules keep Claude's own permission
+ *  check out of the entries that existed at the start too, so the guard isn't the only line. */
+export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox: Record<string, unknown>; deny: string[]; preToolUse: unknown[] } {
+  const policy = encodeFileGuardPolicy({
+    dataDir: [block.dataDir],
+    read: block.readable,
+    write: [block.worktree, ...block.writable],
+    writeDenied: block.writeDenied,
+  })
   return {
     sandbox: {
       enabled: true,
@@ -49,6 +60,14 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox:
     },
     // `//` anchors at the filesystem root, as the skill allow rules below do.
     deny: block.hidden.flatMap((path) => [`Read(/${path})`, `Read(/${path}/**)`, `Edit(/${path})`, `Edit(/${path}/**)`]),
+    preToolUse: [{
+      matcher: FILE_GUARD_MATCHER,
+      hooks: [{
+        type: 'command',
+        command: [block.fileGuard.command, ...block.fileGuard.args, policy].map(shellQuote).join(' '),
+        timeout: FILE_GUARD_TIMEOUT_SECONDS,
+      }],
+    }],
   }
 }
 
@@ -99,7 +118,10 @@ export const claudeHarness: HarnessLaunchSpec = {
     const allow = skills.folders.map((dir) => `Read(/${dir}/**)`)
     const permissions = allow.length || block ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } } : {}
     const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
-    const hooks = loopHooks ? { hooks: claudeLoopHookSettings(loopHooks) } : {}
+    const bridged = loopHooks ? claudeLoopHookSettings(loopHooks) : {}
+    const preToolUse = [...(block?.preToolUse ?? []), ...((bridged.PreToolUse as unknown[] | undefined) ?? [])]
+    const hookSettings = { ...bridged, ...(preToolUse.length ? { PreToolUse: preToolUse } : {}) }
+    const hooks = Object.keys(hookSettings).length ? { hooks: hookSettings } : {}
     return {
       claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
       ...(append ? { systemPrompt: { append } } : {}),

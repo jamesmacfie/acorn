@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, RUN_TARGETS, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, RUN_TARGETS, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../../shared/send'
 
 export type { SendSubmit }
@@ -84,14 +84,14 @@ export const terminal = new Hono<AppEnv>()
       return { options: (result.targets ?? []).map((target) => ({ value: target.id, label: target.id, ...(target.command ? { description: target.command } : {}) })) }
     }),
   )
-  // The task is in the path, so core's task-scope gate already covers this route.
-  .post('/tasks/:taskId/setup', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))))
-  .post('/sessions', async (c) => {
+  // Running the setup script, opening a terminal, and typing into one each run a command as the person,
+  // outside any agent's sandbox, so all three are device-only. An agent starts commands through the
+  // run_* tools, which check its tool permissions and signed ceiling. A task token used to open a
+  // terminal with any `command` here (docs/security/transport-and-auth.md § Execution routes).
+  .post('/tasks/:taskId/setup', requireDevice, (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))))
+  .post('/sessions', requireDevice, async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    // taskId lives in the body here, not a path param, so the scope gate cannot mount over this
-    // route; the check happens by hand instead (docs/security/transport-and-auth.md § Transport and auth).
-    if (!mayActOnTask(c, p.data.taskId)) return respondError(c, 404, 'not_found')
     return viaBridge(c, TERMINAL_ROUTE, (t) => t.create(p.data as CreateOpts))
   })
   .use('/sessions/:sid/*', ownsSession)
@@ -103,7 +103,7 @@ export const terminal = new Hono<AppEnv>()
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, TERMINAL_ROUTE, (t) => t.resize(c.req.param('sid'), p.data.cols, p.data.rows))
   })
-  .post('/sessions/:sid/send', async (c) => {
+  .post('/sessions/:sid/send', requireDevice, async (c) => {
     const p = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, TERMINAL_ROUTE, (t) => t.sendToAgent(c.req.param('sid'), p.data.text, p.data.submit))

@@ -64,3 +64,5 @@ export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.
 export type { PluginDatabase } from '@acorn/node-core/server/plugins'
 export type { RunBridge } from '@acorn/node-core/server/routes'
 export type { RunTarget } from '@acorn/node-core/server/runConfig.ts'
+// The file guard's decision, for a harness test that checks what its read block lets a file tool reach.
+export { fileToolRefusal } from '@acorn/node-core/mcp/fileGuard.ts'

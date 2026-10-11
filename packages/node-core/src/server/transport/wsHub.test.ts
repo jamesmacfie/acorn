@@ -1,4 +1,5 @@
 import { mintInternalToken } from '../auth/internalTokens'
+import { EveryCredentialActive } from '../../testkit/db'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
@@ -64,7 +65,7 @@ beforeEach(async () => {
   devices = stubDevices()
   // 20ms sweep everywhere: the interval is injected rather than faked, so the sweep runs for real and
   // the assertion is about the socket closing, not about a timer having been scheduled.
-  attachWsHub(server, { internalToken: INTERNAL, allowedHosts: new Set([host]), devices, revocationCheckMs: 20 })
+  attachWsHub(server, { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([host]), devices, revocationCheckMs: 20 })
 })
 
 afterEach(() => {
@@ -247,7 +248,7 @@ describe('wsHub auth', () => {
     const request = (headers: Record<string, string>) => ({
       headers: { host, ...headers }, socket: { remoteAddress: '192.0.2.12' },
     }) as unknown as IncomingMessage
-    const deps = { internalToken: INTERNAL, allowedHosts: new Set([host]), devices }
+    const deps = { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([host]), devices }
     expect(await authorizeWsUpgrade(request({ 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }), 'x-forwarded-for': '127.0.0.1' }), deps)).toBeNull()
     expect(await authorizeWsUpgrade(request({ authorization: `Bearer ${DEVICE_TOKEN}` }), deps)).toEqual({ deviceId: 'd1' })
   })
@@ -728,7 +729,7 @@ describe('wsHub backpressure', () => {
     tiny = createServer()
     await listen(tiny)
     tinyHost = `127.0.0.1:${(tiny.address() as AddressInfo).port}`
-    attachWsHub(tiny, { internalToken: INTERNAL, allowedHosts: new Set([tinyHost]), devices, revocationCheckMs: 5_000, maxBufferedBytes: 1 })
+    attachWsHub(tiny, { internalToken: INTERNAL, internalCredentials: new EveryCredentialActive(), allowedHosts: new Set([tinyHost]), devices, revocationCheckMs: 5_000, maxBufferedBytes: 1 })
   })
 
   afterEach(() => {

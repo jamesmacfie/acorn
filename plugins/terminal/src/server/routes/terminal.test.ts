@@ -117,8 +117,11 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
     expect((await app.fetch(req('/api/sessions/nope/send', 'POST', { text: 'x', submit: 'now' }), {} as Env)).status).toBe(404)
     // Nothing reached the engine.
     expect(typed).toEqual([])
-    // Its own session still works: the guard confines, it does not break the agent.
-    expect((await app.fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(200)
+    // Its own session is refused too. Typing into a shell runs a command outside the agent's sandbox
+    // and tool permissions, so sending is the person's.
+    expect((await app.fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(403)
+    expect(typed).toEqual([])
+    expect((await authed().fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(200)
     expect(typed).toEqual(['s1:ls'])
   })
 
@@ -138,15 +141,21 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
     expect(touched).toEqual([])
   })
 
-  it('cannot spawn a PTY in another task worktree', async () => {
+  it('cannot open a terminal or run the setup script, even in its own task', async () => {
     const spawned: string[] = []
-    setTerminalBridge(fake({ create: async (opts) => (spawned.push(opts.taskId), session as never) }))
+    setTerminalBridge(fake({
+      create: async (opts) => (spawned.push(opts.taskId), session as never),
+      runSetup: async (taskId) => (spawned.push(`setup:${taskId}`), { sessionId: 's1' }),
+    }))
     const app = asTask1()
-    // The taskId is in the body here, not the path, so this is the one check a mount could never
-    // make.
-    expect((await app.fetch(req('/api/sessions', 'POST', { taskId: 'task2' }), {} as Env)).status).toBe(404)
+    // A task token with a read-only ceiling opened a terminal running any command here. Opening one
+    // is the person's, like typing into one.
+    for (const taskId of ['task1', 'task2']) {
+      expect((await app.fetch(req('/api/sessions', 'POST', { taskId, command: 'printf probe' }), {} as Env)).status).toBe(403)
+    }
+    expect((await app.fetch(req('/api/tasks/task1/setup', 'POST'), {} as Env)).status).toBe(403)
     expect(spawned).toEqual([])
-    expect((await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1' }), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req('/api/sessions', 'POST', { taskId: 'task1' }), {} as Env)).status).toBe(200)
     expect(spawned).toEqual(['task1'])
   })
 

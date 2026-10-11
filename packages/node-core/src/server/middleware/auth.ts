@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 import type { Env } from '../bindings'
-import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
+import { authenticateInternalToken, type InternalScope } from '../auth/internalTokens'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { isLoopbackPeer } from '../transport/loopbackPeer'
 
@@ -40,13 +40,13 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; 
 // still see an unbound store: a bare test Env built without ensureBoundIdentity.
 //
 // The token is verified by HMAC against INTERNAL_TOKEN, which is now the signing key rather than the
-// credential itself. secretEquals is no longer used here; verifyInternalToken does its own
-// constant-time comparison over the signature.
+// credential itself, and a task token's id must still be live in INTERNAL_CREDENTIALS. secretEquals is
+// no longer used here; verifyInternalToken does its own constant-time comparison over the signature.
 function internalPrincipal(c: { env: Env; req: { header(name: string): string | undefined } }): Principal | null {
   if (!isLoopbackPeer(c.env.incoming?.socket.remoteAddress)) return null
   const token = c.req.header('x-acorn-internal')
   if (!token || !c.env.INTERNAL_TOKEN) return null
-  const claims = verifyInternalToken(c.env.INTERNAL_TOKEN, token)
+  const claims = authenticateInternalToken(c.env.INTERNAL_TOKEN, c.env.INTERNAL_CREDENTIALS, token)
   if (!claims) return null
   const userId = c.env.ACTIVE_IDENTITY.get()
   return userId

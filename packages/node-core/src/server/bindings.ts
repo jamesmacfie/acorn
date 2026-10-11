@@ -12,6 +12,7 @@ import { ensureBoundIdentity } from './core/identity'
 import { deviceService, type DeviceService } from './auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from './auth/idempotency'
 import { pairingCodes, type PairingCodes } from './auth/pairingCodes'
+import { ActiveCredentials } from './auth/activeCredentials'
 import { SecretService } from './core/secrets'
 import { drizzleOverSqlite, openSqlite } from './storage/sqlite'
 import { assertMigrationHistory } from './storage/migrationHistory'
@@ -60,6 +61,10 @@ export type RuntimeBindings = {
   // The key that signs internal tokens (server/auth/internalTokens.ts). Spawned children get a token
   // signed with it as ACORN_API_TOKEN, never the key itself (docs/mcp.md § Launch environment).
   INTERNAL_TOKEN: string
+  // The task tokens still live, which authentication checks after the signature
+  // (server/auth/activeCredentials.ts). The composition root hands the same object to the credential
+  // files, which add and revoke ids.
+  INTERNAL_CREDENTIALS: ActiveCredentials
   // The machine's bound owner identity: an opaque `owner-<uuid>` minted at first boot
   // (ensureBoundIdentity below), read by every principal. Installs that bound a GitHub login under
   // the old scheme keep that login as the opaque id, with no data rewrite. Providers never bind.
@@ -263,6 +268,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInst
     SESSION_ENC_KEY: encKey,
     SECRETS: new SecretService(encKey),
     INTERNAL_TOKEN: keys?.signingKey ?? loadOrCreateInternalToken(dataDir),
+    INTERNAL_CREDENTIALS: new ActiveCredentials(),
     ACTIVE_IDENTITY: activeIdentity,
     DEVICES: deviceService(db),
     IDEMPOTENCY: idempotencyStore(db),

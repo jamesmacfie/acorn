@@ -45,15 +45,40 @@ A blocked session's shell commands, and every process they start:
 - Can't rerun a refused command outside the sandbox, because `allowUnsandboxedCommands` is off.
   Without that, a skip-permissions session could retry any blocked command unconfined.
 
-Claude's own Read and Edit tools run outside the sandbox, so deny rules keep them out of everything in
-the data folder beside what the session works in, including other tasks' worktrees and the plugin
-databases beside a plugin's skill folder. The Edit rules also stop the agent planting a
-file there, such as a `.env` the helper would load at the next start.
+A blocked session's task token stops at write tools, whatever its own ceiling allows. Every
+execute tool, such as a run target, a workflow, a delegated agent, or the browser, runs outside the
+sandbox, so allowing one would let the agent run a command the block can't see
+([execution routes](../security/transport-and-auth.md#execution-routes)).
 
 If the machine can't run the sandbox, for example Linux without `bubblewrap`, the session fails to
 start rather than running unconfined.
 
+### Claude's own file tools
+
+Claude's own file tools, such as Read, Write, Edit, Glob, and Grep, run outside the sandbox. A
+PreToolUse hook runs Acorn's file guard before each call (`packages/node-core/src/mcp/fileGuard.ts`,
+built as `file-guard.js` beside `mcp.js`). The guard resolves every link in the target, and resolves a
+file that doesn't exist yet through its folder, then checks that real path against the session's
+allowlist:
+
+- Inside the data folder, a read must fall within the session's worktree, its skill folders, its own
+  token file, or the Node's certificate. A write must fall within the worktree or the git folders a
+  commit writes.
+- The git files listed above can't be written, inside the data folder or not.
+- A search can't start from a folder that holds the data folder.
+
+So a `.env` created in the data folder after the session started is refused, as is a write reached
+through a link in the worktree. The guard decides from the policy on its command line and never asks
+the Node. It refuses a call when it can't read its policy or the call, because Claude Code reads exit
+code 2 as a refusal. A Node that has no guard program, such as a standalone Node, refuses to start a
+blocked session.
+
+Deny rules for the entries present at the start stay in Claude's own permission settings too, so
+Claude's check and the guard each cover them.
+
 ## What stops working
+
+- Execute tools, including run targets, workflow runs, delegated agents, and the browser tools.
 
 - Installs that write outside the worktree, such as `pnpm install` writing to its package store.
 - Git commands that change the repository's settings or submodules, such as `git config`,

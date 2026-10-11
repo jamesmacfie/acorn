@@ -10,6 +10,7 @@ describe('scoped internal tokens', () => {
       taskId: undefined,
       sessionId: undefined,
       toolCeiling: undefined,
+      credentialId: undefined,
     })
     expect(verifyInternalToken(KEY, mintInternalToken(KEY, {
       scope: 'task',
@@ -21,6 +22,8 @@ describe('scoped internal tokens', () => {
       taskId: 'task-1',
       sessionId: 'sess-1',
       toolCeiling: { allow: ['notes_list'], maxRisk: 'read' },
+      // Only a task token carries a revocable id (./activeCredentials.ts).
+      credentialId: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/),
     })
   })
 

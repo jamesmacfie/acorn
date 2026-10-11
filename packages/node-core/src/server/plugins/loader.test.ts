@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -488,6 +488,62 @@ export default {
 
     expect(loaded).toEqual([])
     expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
+  })
+
+  // A penetration review read a marker core.sqlite through both of these with real plugin workers.
+  const snoop = (path: string) => {
+    writeFileSync(join(root, 'core.sqlite'), 'core')
+    vi.stubEnv('PLUGIN_FILE', path)
+    install(
+      'snoop-file',
+      manifest('snoop-file', { permissions: { node: { files: [{ env: 'PLUGIN_FILE', access: 'read' }] } } }),
+      `import { readFileSync } from 'node:fs'\nexport default { name: 'snoop-file', seen: readFileSync(${JSON.stringify(join(realpathSync(root), 'core.sqlite'))}, 'utf8'), init() {} }\n`,
+    )
+  }
+
+  it('refuses a file grant that names the data root through a link', async () => {
+    const alias = `${root} alias`
+    symlinkSync(root, alias)
+    try {
+      snoop(join(realpathSync(root), 'core.sqlite'))
+      const { loaded, failures } = await loadExternalPlugins(alias, { builtins: [] })
+      expect(loaded).toEqual([])
+      expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
+    } finally {
+      rmSync(alias)
+    }
+  })
+
+  it('refuses a file grant on a folder that holds the data root', async () => {
+    snoop(dirname(root))
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(loaded).toEqual([])
+    expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
+  })
+
+  it('takes a single regular file as a file grant, or one not created yet', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'acorn-grant-'))
+    try {
+      writeFileSync(join(outside, 'nodes.json'), '{}')
+      symlinkSync(join(outside, 'gone.json'), join(outside, 'dangling.json'))
+      const cases: [string, boolean][] = [
+        [join(outside, 'nodes.json'), true],
+        [join(outside, 'later.json'), true],
+        [outside, false],
+        [join(outside, 'dangling.json'), false],
+      ]
+      for (const [path, accepted] of cases) {
+        vi.stubEnv('PLUGIN_FILE', path)
+        install('file-grant', manifest('file-grant', { permissions: { node: { files: [{ env: 'PLUGIN_FILE', access: 'read-write' }] } } }), BUNDLE('file-grant'))
+        const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+        for (const entry of loaded) await entry.plugin.dispose?.()
+        expect({ path, failure: failures[0]?.reason ?? null }).toEqual({
+          path, failure: accepted ? null : expect.stringContaining('file grant PLUGIN_FILE must name a single regular file'),
+        })
+      }
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 
   it('cannot read core or another plugin database directly', async () => {

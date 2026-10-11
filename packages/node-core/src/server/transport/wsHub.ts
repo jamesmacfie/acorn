@@ -2,7 +2,8 @@
 // utility service beside the PTY engine: terminal.ts registers the stream handlers and notify.ts
 // broadcasts pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it
 // shares the loopback listener and its Host guard.
-import { verifyInternalToken, type InternalClaims } from '../auth/internalTokens'
+import { authenticateInternalToken, type InternalClaims } from '../auth/internalTokens'
+import type { ActiveCredentials } from '../auth/activeCredentials'
 import { isLoopbackPeer } from './loopbackPeer'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -303,6 +304,8 @@ export const wsHasClients = (): boolean => conns.size > 0
 
 export type WsAuthDeps = {
   internalToken: string
+  // The live task token ids (../auth/activeCredentials.ts), checked at upgrade like HTTP checks them.
+  internalCredentials: Pick<ActiveCredentials, 'isActive'>
   // Held by reference and filled in once the listener knows its port (server/transport/listener.ts). A copy taken at
   // attach time is empty forever, which refuses every upgrade with no log line.
   allowedHosts: ReadonlySet<string>
@@ -345,7 +348,7 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
   // device row to revoke, but the claims are carried so a future sweep can close a task's sockets when
   // the task ends.
   if (!isLoopbackPeer(req.socket.remoteAddress) || typeof token !== 'string' || !token) return null
-  const claims = verifyInternalToken(deps.internalToken, token)
+  const claims = authenticateInternalToken(deps.internalToken, deps.internalCredentials, token)
   return claims ? { deviceId: null, internal: claims } : null
 }
 

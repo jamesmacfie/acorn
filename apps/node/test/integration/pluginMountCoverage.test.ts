@@ -46,7 +46,6 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
 
   // The task is in the body or query, so no mount can see it. The handler checks it.
   'POST /v1/p/agents/attachments': 'checks the taskId query with mayActOnTask',
-  'POST /v1/p/terminal/sessions': 'checks the body taskId with mayActOnTask',
 
   // Refused to a task's agent in the handler.
   'GET /v1/p/agents/runs': 'answers 403 to a task-confined caller',
@@ -67,6 +66,22 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   'POST /v1/p/agents/usage/refresh/:providerId': 're-reads one provider\'s plan usage and changes nothing',
   'GET /v1/p/terminal/profiles': 'shell profile labels and availability, no task data',
 }
+
+// Routes that run a command as the person, outside any agent's sandbox. A task-scope gate isn't enough
+// for these: a task token with a read-only ceiling started run targets and opened terminals through
+// them, skipping the tool permissions and signed ceiling the run_* tools apply. Each must sit behind
+// requireDevice, as a mount or on the route.
+const EXECUTION_ROUTES = [
+  'POST /v1/core/tasks/:id/run/:target/start',
+  'POST /v1/core/tasks/:id/run/:target/stop',
+  'POST /v1/core/tasks/:id/run/:target/restart',
+  'POST /v1/core/tasks/:id/preview-url',
+  'POST /v1/core/tasks/:id/on-created',
+  'POST /v1/core/tasks/:id/config-trust',
+  'POST /v1/p/terminal/sessions',
+  'POST /v1/p/terminal/sessions/:sid/send',
+  'POST /v1/p/terminal/tasks/:taskId/setup',
+]
 
 describe('compiled plugin mount coverage', () => {
   let plugins: { dispose(): Promise<void> }
@@ -103,6 +118,14 @@ describe('compiled plugin mount coverage', () => {
     const live = new Map(pluginRoutes.map((r) => [`${r.method} ${r.path}`, r]))
     const gone = Object.keys(OPEN_TO_A_TASK_TOKEN).filter((key) => !live.has(key) || gated(live.get(key)!))
     expect(gone.sort()).toEqual([])
+  })
+
+  it('every route that runs a command is device-only', () => {
+    const { routes } = table()
+    const deviceGates = routes.filter((r) => r.handler === requireDevice)
+    const deviceOnly = (key: string) => routes.some((route) => `${route.method} ${route.path}` === key && route.handler !== requireDevice
+      && deviceGates.some((gate) => gate.index < route.index && (gate.method === 'ALL' || gate.method === route.method) && mountCovers(gate.path, route.path)))
+    expect(EXECUTION_ROUTES.filter((key) => !deviceOnly(key))).toEqual([])
   })
 
   it('every named ownership gate is mounted as plugin middleware', () => {
