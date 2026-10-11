@@ -156,9 +156,13 @@ export function revokePluginContext(ctx: NodePluginContext): void {
  * every sink would be filed under `core` and Settings could not say which plugin is reading the
  * stream. Absent for a plugin whose manifest never asked for the token, and absent means absent:
  * the whole point of gating by omission is that an ungranted facet is not there to call.
+ *
+ * A copy with the shared object as its prototype. The composition root fills some seams after the
+ * plugins have initialized, such as `pluginSecurity` and `nodeKeys`, and a plain copy taken at init
+ * never saw them. The own fields keep a spread of the context's core working, as test helpers do.
  */
 const withOwnedTelemetry = <T extends CoreServices>(core: T, plugin: string): T =>
-  core.telemetry ? { ...core, telemetry: telemetryServiceFor(plugin) } : core
+  core.telemetry ? Object.assign(Object.create(core) as T, core, { telemetry: telemetryServiceFor(plugin) }) : core
 
 export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
   const plugin = options.plugin
