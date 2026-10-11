@@ -30,7 +30,7 @@ export default function FileTree(props: {
   onOpen: (path: string, ephemeral: boolean) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
-  onRevealed: (revision: number) => void
+  onRevealed: (request: FileTreeRevealRequest) => void
   onRevealActive: () => void
   actions: ReturnType<typeof createFileActionModel>
   /** The file rows in expanded folders, for the pane's one annotation batch. Folders are left out. */
@@ -355,7 +355,7 @@ export default function FileTree(props: {
     if (!request) return
     const task = taskId
     const revision = generation
-    const current = () => live(revision, task) && props.reveal?.revision === request.revision
+    const current = () => live(revision, task) && props.reveal === request
     if (!current()) return
     setTemporaryReveal(request.path)
     void (async () => {
@@ -370,7 +370,7 @@ export default function FileTree(props: {
       }
       if (!current()) return
       revealCollectionItem(treeId(), request.path)
-      props.onRevealed(request.revision)
+      props.onRevealed(request)
     })()
   }))
 

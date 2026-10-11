@@ -9,9 +9,10 @@
 // module and the terminal client carried seventeen CodeMirror grammars and a colour theme it has no
 // way to draw.
 //
-// A module rather than an empty alias, with the facade's names and the facade's types, so
-// `EditorPane.tsx` compiles and runs unchanged and this host loses no feature. The CodeMirror types
-// are type-only imports and are erased, so nothing below puts a byte of the library in the bundle.
+// A module rather than an empty alias, with the facade's names and the facade's types, so the
+// editor pane's controller (`editorController.ts`) compiles and runs unchanged and this host loses no
+// feature. The CodeMirror types are type-only imports and are erased, so nothing below puts a byte
+// of the library in the bundle.
 //
 // Graphical engine imports and state construction belong to the DOM Rectangle's mount.
 // The terminal host retains the shared text custody API without importing grammars or views.
@@ -49,7 +50,7 @@ export type { LanguageServiceSource }
  *  commands instead (../plugins/DocumentSurface.tsx, Editor's own Diagnostics button). */
 export const languageServices = (_source: LanguageServiceSource): Extension => []
 /** Never dispatched here, because this host builds no view to dispatch to. Typed as the real effect
- *  so `EditorPane.tsx` compiles unchanged, with no CodeMirror byte behind it. */
+ *  so `editorController.ts` compiles unchanged, with no CodeMirror byte behind it. */
 export const refreshLanguageServices = { of: () => ({}) } as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
 
 export const refreshEditorTheme = (_view: EditorView): void => {}

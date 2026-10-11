@@ -106,7 +106,11 @@ draws, surface actions, and the document API on the bridge.
 <a id="from-the-command-palette"></a>
 
 [The editor pane](./editor/editor-pane.md) covers the editor plugin's pane: opening files, image
-previews, the file tree, reloading on focus, editing in `$EDITOR`, and its palette commands.
+previews, the file tree, reloading on focus, editing in `$EDITOR`, and its palette commands. In
+`plugins/editor/src/client/`, `EditorPane.tsx` draws the pane, and `editorController.ts` owns its
+CodeMirror view, pooled documents, disk reads, saves, and navigation. Its tests drive the
+controller without rendering the pane. Each async job that a newer one can make stale holds an
+`AbortSignal`, and the newer job aborts it.
 
 [File renderers](./editor/file-renderers.md) covers the `editor:document` point another plugin draws a
 file in, the **Preview** toggle, and the `editor.files` capability that reads a file's bytes.

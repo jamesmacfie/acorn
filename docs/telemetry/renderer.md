@@ -159,7 +159,7 @@ These features report for themselves:
 | Feature | Owner | Usable when |
 | --- | --- | --- |
 | Agent pane | `plugins/agents/src/client/sessions/AgentPane.tsx` | The session list answered, and the open session's transcript, the start cards, or an error is on screen |
-| Editor pane | `plugins/editor/src/client/EditorPane.tsx` | The checkout answered and the remembered document is editable, or there's no document or no checkout |
+| Editor pane | `plugins/editor/src/client/editorController.ts` | The checkout answered and the remembered document is editable, or there's no document or no checkout |
 | Changes tab | `plugins/git/src/client/changes/ChangesPane.tsx` | The first status read answered, with changes or a clean tree, or the project isn't Git |
 | Settings | `packages/client-core/src/features/settings/SettingsView.tsx` | The page's code and the data it read have arrived. The record starts at the request in `apps/desktop/src/client/App.tsx` |
 

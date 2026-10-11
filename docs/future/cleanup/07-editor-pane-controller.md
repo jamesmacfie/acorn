@@ -1,5 +1,60 @@
 # 07: EditorPane controller
 
+> **Completion note, October 11, 2026.** `EditorPane.tsx` is 422 lines and declares no counter. The
+> controller is `plugins/editor/src/client/editorController.ts`, and its tests are in
+> `editorController.test.tsx`. `pnpm lint`, the arch tests, and the `@acorn/plugin-editor` and
+> `@acorn/tui` suites pass on Node 26.8.1. In `pnpm dev:agent`, on a project-folder task, the pane
+> opened a file, autosaved an edit, wrote on Cmd+S, took an outside change into a clean file, held a
+> draft under **Changed on disk**, reloaded it after confirmation, and stepped back and forward
+> between two files from the palette.
+>
+> What landed:
+>
+> - `createEditorController({ task, api, queryClient, prefs })` holds every job the pane did apart
+>   from drawing: the CodeMirror mount, the pooled documents and their custody, the root read and the
+>   remembered-file warm-up, saves, disk reads and file decisions, closing tabs, tab menu write holds,
+>   history and reopen, terminal mode, contributed renderers, the status bar facts, and the selection
+>   target. It returns signals and commands. The pane calls it once in its body, so the controller's
+>   effects and cleanups belong to the pane's owner, as they did before.
+> - The component keeps the sidebar, the tab strip and its menu, the banners, the status bar, the
+>   palette commands, and pane intents. An `editor:reveal` intent goes to `editor.reveal()`. Search and
+>   tree-reveal intents stay in the component, because they only move the sidebar.
+> - Five `AbortSignal` lifetimes replace five counters, each from a small `latestSignal()` helper in
+>   the controller. `surface` replaces `surfaceGeneration`, `showing` replaces `showGeneration`,
+>   `navigation` replaces `navigationGeneration`, `diskRead` replaces `reloadGeneration`, and
+>   `renderedRead` replaces `renderedGeneration`. Each job aborts exactly where its counter used to
+>   increment, so no cancellation moved.
+> - `treeRevealRevision` is gone. A tree reveal request is `{ path }`, and `FileTree` acknowledges it
+>   by identity through `onRevealed(request)`. Its tests changed to match.
+> - `documentRevision` stays, renamed `renderedRevision`. It's data, the `revision` a contributed
+>   renderer receives with each set of props, not a staleness guard.
+> - The controller tests open, edit, save, reload, confirm a reload over a draft, and step back and
+>   forward, with no pane rendered. One test checks that a newer navigation aborts a pending back
+>   step. I checked that it fails when `recordNavigation` stops aborting.
+> - `docs/editor.md` names the two files beside its link to the pane's page. `docs/telemetry/renderer.md`,
+>   the terminal client's editor alias, and two comments in the plugin name the controller where they
+>   described its work.
+>
+> Decisions and deviations:
+>
+> - **Requirement 4 was already done.** Proposal 01 fixed the four status menu tests, which used a
+>   stale `button:last-child` selector. The suite was green before this change started.
+> - **One controller per lifetime, not one for every job.** Each lifetime has its own rule for what
+>   makes it stale. A tab close can start a new `show()` without cancelling a history step, and a
+>   second disk read of the same file has to cancel the first. Folding them into one signal would
+>   have changed behavior.
+> - **The helper is local.** Proposal 08 adds a shared multi-step helper beside `latestOnly`. It
+>   should replace `latestSignal()` and keep the five call sites as they are.
+> - **One module, about 1,200 lines.** The jobs share the view, the pool, and a dozen signals, so
+>   splitting them would mean passing a state bag between files. Divider comments split the file into
+>   sections by job. Proposal 14 can take it further if it needs to.
+> - `pendingReveal` was a signal that nothing read reactively. It's a plain variable.
+> - `PooledFile.markersGeneration` stays. It isn't one of the seven, and proposal 08 covers it.
+>
+> For later phases: the pane's async staleness checks are in `editorController.ts`. A new pane
+> feature that reads or writes documents goes in the controller and gets a controller test. The pane
+> only draws it.
+
 This proposal splits the editor pane into a plain controller and a Solid component. It replaces
 seven hand-rolled staleness counters with one cancellation per navigation.
 

@@ -7,6 +7,7 @@ import type { createFileActionModel } from './fileActionModel'
 import { evictEditorTreeState, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { projectFileStatus } from './fileStatusModel'
 import type { FileStatusProjection } from './fileStatusModel'
+import type { FileTreeRevealRequest } from './fileTreeReveal'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { saveEditorShowIgnored } from './editorPrefs'
 import { registerContextMenuItems } from '@acorn/plugin-api/client'
@@ -148,7 +149,7 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
 
-const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean; onVisibleFiles?: (paths: readonly string[]) => void }) => {
+const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => FileTreeRevealRequest | null; onRevealed?: (request: FileTreeRevealRequest) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean; onVisibleFiles?: (paths: readonly string[]) => void }) => {
   host = document.createElement('div')
   document.body.append(host)
   const queryClient = new QueryClient()
@@ -182,7 +183,7 @@ describe('the editor file tree', () => {
       ? [{ name: 'build', dir: true }, { name: 'source.ts', dir: false }]
       : [{ name: 'output.ts', dir: false }])
     ignored.mockImplementation(async (_task, dir) => ({ available: true, ignored: dir ? ['output.ts'] : ['build'] }))
-    const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+    const [reveal, setReveal] = createSignal<FileTreeRevealRequest | null>(null)
     const [openPath, setOpenPath] = createSignal<string | null>('build/output.ts')
     mount(vi.fn(), { hideIgnored: true, reveal, openPath })
     await vi.waitFor(() => expect(host.textContent).toContain('source.ts'))
@@ -190,7 +191,7 @@ describe('the editor file tree', () => {
     expect(ignored).toHaveBeenCalled()
     await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
     expect(host.textContent).not.toContain('output.ts')
-    setReveal({ path: 'build/output.ts', revision: 1 })
+    setReveal({ path: 'build/output.ts' })
     await vi.waitFor(() => expect(host.textContent).toContain('output.ts'))
     setOpenPath('source.ts')
     await vi.waitFor(() => expect(host.textContent).not.toContain('output.ts'))
@@ -296,14 +297,15 @@ it('stops a superseded reveal before opening its next directory or acknowledging
     if (dir === 'two') return [{ name: 'goal.ts', dir: false }]
     return []
   })
-  const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+  const [reveal, setReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const onRevealed = vi.fn()
   mount(vi.fn(), { reveal, onRevealed })
   await vi.waitFor(() => expect(host.textContent).toContain('one'))
-  setReveal({ path: 'one/nested/obsolete.ts', revision: 1 })
+  setReveal({ path: 'one/nested/obsolete.ts' })
   await vi.waitFor(() => expect(completeOld).toBeDefined())
-  setReveal({ path: 'two/goal.ts', revision: 2 })
-  await vi.waitFor(() => expect(onRevealed).toHaveBeenCalledWith(2))
+  const latest = { path: 'two/goal.ts' }
+  setReveal(latest)
+  await vi.waitFor(() => expect(onRevealed).toHaveBeenCalledWith(latest))
   completeOld([{ name: 'nested', dir: true }])
   await Promise.resolve(); await Promise.resolve()
   expect(listing.mock.calls.some(([, path]) => path === 'one/nested')).toBe(false)
@@ -312,11 +314,11 @@ it('stops a superseded reveal before opening its next directory or acknowledging
 
 it('does not finish a cached-listing reveal after Collapse all', async () => {
   setEditorTreeDirectoryOpen(taskId, 'src', true)
-  const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+  const [reveal, setReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const onRevealed = vi.fn()
   mount(vi.fn(), { reveal, onRevealed })
   await vi.waitFor(() => expect(host.textContent).toContain('app.ts'))
-  setReveal({ path: 'src/app.ts', revision: 1 })
+  setReveal({ path: 'src/app.ts' })
   const collapse = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Collapse all folders')!
   collapse.click()
   await Promise.resolve(); await Promise.resolve()

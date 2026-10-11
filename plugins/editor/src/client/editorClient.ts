@@ -107,7 +107,7 @@ export const editorRootKey = (taskId: string): readonly unknown[] => ['editor', 
  * A task's worktree path does not move underneath it — it is derived from the task and removed with
  * it — so the only transition this window can hide is "no checkout yet" becoming a path. The pane
  * never paints a cached *absent* root: it shows the cached value only when there is one, and awaits
- * the fetch otherwise (EditorPane.tsx).
+ * the fetch otherwise (editorController.ts).
  */
 export const EDITOR_ROOT_STALE_MS = 60_000
 

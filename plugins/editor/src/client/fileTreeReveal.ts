@@ -1,6 +1,7 @@
+/** One request to reveal a path in the tree. The tree acknowledges it by identity, so asking
+ *  for the same path twice makes two requests. */
 export type FileTreeRevealRequest = {
   path: string
-  revision: number
 }
 
 // `directoryContainsFile` lived here until phase 9 of the layout programme: the recursive tree asked
