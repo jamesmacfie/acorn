@@ -10,7 +10,6 @@ import {
   nodePairRequestSchema,
   nodeProbeRequestSchema,
   nodeRenameRequestSchema,
-  nodeTunnelRequestSchema,
   type NodeProbeResult,
   type NodeRecord,
 } from '@acorn/protocol/broker.ts'
@@ -271,25 +270,12 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       for (const owner of connections.values()) owner.forget(nodeId)
       helper.fleet.forget(nodeId)
       helper.pluginCache.forgetNode(nodeId)
-      // A pipe to a node we have just stopped trusting must not outlive the pairing.
-      helper.tunnels.closeFor({ nodeId })
     },
     'node-reconnect': (raw) => {
       const { nodeId } = z.object({ nodeId: z.string().min(1) }).parse(raw)
       connect(nodeId)
     },
     'node-restart-local': () => helper.restartLocalNode(),
-    'node-tunnel-open': async (raw) => ({ port: await helper.tunnels.open(nodeTunnelRequestSchema.parse(raw)) }),
-    'node-tunnel-close': (raw) => {
-      // Best-effort cleanup (a task archived, a pane disposed), so an unparseable payload is ignored
-      // rather than thrown back at a renderer that is already tearing down.
-      if (!raw || typeof raw !== 'object') return
-      const { nodeId, taskId } = raw as { nodeId?: unknown; taskId?: unknown }
-      helper.tunnels.closeFor({
-        ...(typeof nodeId === 'string' ? { nodeId } : {}),
-        ...(typeof taskId === 'string' ? { taskId } : {}),
-      })
-    },
     'plugins-state': (): PluginsState => ({
       // Projected rather than passed through: `nodeIds` and the eviction timestamps are the helper's
       // bookkeeping, and a field added to the cache entry must not reach the renderer by default.

@@ -362,10 +362,6 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         },
         move |signal| match signal {
             Signal::CrashBudgetExhausted { reason } => show_recovery(&handle, reason.as_deref()),
-            // The credential for a preview tunnel, seeded into the pane's cookie store by
-            // src/webviews.rs. Never forwarded to the renderer.
-            Signal::TunnelOpened { port, secret } => handle.state::<Webviews<tauri::Wry>>().tunnel_opened(port, secret),
-            Signal::TunnelClosed { port } => handle.state::<Webviews<tauri::Wry>>().tunnel_closed(port),
             Signal::FootprintRequest => footprint::answer(&handle),
             Signal::Ready(_) => {}
         },

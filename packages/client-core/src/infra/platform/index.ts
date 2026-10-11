@@ -57,9 +57,6 @@ export type FleetBridge = {
   // Only the local node is supervised by the app that hosts this client; a remote node is
   // restarted by whatever started it.
   restartLocal(): Promise<void>
-  // Preview tunnel: in, a port on the node; out, a port on this machine.
-  tunnelOpen(request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }>
-  tunnelClose(match: { nodeId?: string; taskId?: string }): void
 }
 
 // Custody of third-party plugin bundles. See docs/security/plugin-bundles.md § Third-party plugin bundles for
@@ -276,8 +273,6 @@ type AcornPreload = {
   nodeForget?: FleetBridge['forget']
   nodeReconnect?: FleetBridge['reconnect']
   nodeRestartLocal?: FleetBridge['restartLocal']
-  nodeTunnelOpen?: FleetBridge['tunnelOpen']
-  nodeTunnelClose?: FleetBridge['tunnelClose']
   plugins?: PluginCustody
   config?: DeviceConfigBridge
   recovery?: RecoveryActions
@@ -372,12 +367,6 @@ export const fleetBridge = (): FleetBridge | null => {
       if (!restart) throw new Error('This build does not supervise a local node.')
       await restart()
     },
-    tunnelOpen: async (request) => {
-      const open = acorn.nodeTunnelOpen
-      if (!open) throw new Error('This build cannot tunnel.')
-      return open(request)
-    },
-    tunnelClose: (match) => acorn.nodeTunnelClose?.(match),
   }
 }
 

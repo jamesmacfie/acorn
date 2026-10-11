@@ -169,14 +169,3 @@ export const nodeForgetRequestSchema = z.strictObject({
   revoke: z.boolean(),
 })
 export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>
-
-// Opening a preview tunnel (docs/api-reference/websocket.md § WebSocket). The renderer names a task and a port
-// on the node and gets back a loopback port on this machine, never an endpoint and never a token. The
-// pipe itself is main's, like every other byte to or from a node.
-export const nodeTunnelRequestSchema = z.strictObject({
-  nodeId: z.string().min(1),
-  taskId: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
-})
-export type NodeTunnelRequest = z.infer<typeof nodeTunnelRequestSchema>
-export type NodeTunnelResult = { port: number }

@@ -155,9 +155,9 @@ the table is bounded and nothing sweeps it.
 ## Limits
 
 Calendar-shaped work runs as a schedule row, and anything a person might want to see, pause, or retune
-is calendar-shaped. A timer whose lifetime is an object's stays on its own: the WebSocket hub sweep, the
-tunnel sweep, the MCP keepalive, the terminal idle watch, and the agents plugin's sweep over its live
-provider processes, whose limit is an agents setting
+is calendar-shaped. A timer whose lifetime is an object's stays on its own: the WebSocket hub sweep, the MCP keepalive,
+the terminal idle watch, and the agents plugin's sweep over its live provider processes, whose limit
+is an agents setting
 ([operations and failure](./managed-agents/operations.md)). Startup repairs that converge to
 zero stay boot-time calls, such as `pruneOrphanedGithubMirror` and the agents ledger compaction.
 

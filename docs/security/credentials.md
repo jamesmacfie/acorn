@@ -182,7 +182,7 @@ refuses to mint a session key on a root that has a sealed file but no plain `ses
 
 The node-owner identity is opaque, explicit, and persisted at first boot. It's independent of
 provider connections, and internal auth fails closed if it's unset. A task token can't use another
-task's routes, terminal streams, preview tunnel, or worktree operations.
+task's routes, terminal streams, or worktree operations.
 
 A task token can't spend a stored provider credential. Core's `providerCredential`
 (`server/integrations/credential.ts`) returns the credential only to a device or the Node's own

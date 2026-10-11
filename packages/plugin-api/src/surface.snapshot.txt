@@ -168,7 +168,6 @@ client: clientCapability
 client: clientCapabilityId
 client: clientEvents
 client: closeRefPanel
-client: closeTunnelsForTask
 client: compareDataValues
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
@@ -340,7 +339,6 @@ client: termFontSize
 client: toast
 client: token
 client: tokenizeAnsiLines
-client: tunnelUrl
 client: useSettingsDetail
 client: useUnsavedChanges
 client: validateDataValue

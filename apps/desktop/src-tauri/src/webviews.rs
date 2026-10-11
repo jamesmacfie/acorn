@@ -4,25 +4,17 @@ use std::sync::{Arc, Mutex};
 use crate::webview_target::Target;
 
 use serde::{Deserialize, Serialize};
-use tauri::webview::{Cookie, NewWindowResponse, PageLoadEvent, WebviewBuilder};
+use tauri::webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl};
 
 // Host-owned child webviews: the browser preview pane and loaded-plugin webview surfaces. See
 // docs/shell.md, "Host-owned webviews", for why one module covers both.
-//
-// wry has no `webRequest`, so there is no `onBeforeSendHeaders` to inject `x-acorn-tunnel` per
-// request. The pane's cookie store is seeded before its first real navigation instead, from secrets
-// the helper pushes to the shell per port. The secret never reaches the renderer.
 
 /// Preview keys are `preview:<taskId>`; plugin surfaces are
 /// `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`.
 /// The prefix selects the policy below, so it is validated rather than assumed.
 const PREVIEW_PREFIX: &str = "preview:";
 const PLUGIN_PREFIX: &str = "plugin:";
-
-/// The cookie the preview tunnel accepts in place of the `x-acorn-tunnel` header. Spelled here and
-/// in `previewTunnel.ts`.
-const TUNNEL_COOKIE: &str = "acorn_tunnel";
 
 /// A renderer bug that ensures in a loop should cost a refused call, not every webview the OS will
 /// give us.
@@ -121,32 +113,21 @@ struct Record<R: Runtime> {
     home: Target,
 }
 
-/// The shell's webview state. `tunnels` is written from the helper's stdout signals, never from the
-/// renderer.
+/// The shell's webview state.
 pub struct Webviews<R: Runtime> {
     /// Serializes ensure/evict without holding `records` across native webview operations.
     operations: Mutex<()>,
     records: Mutex<HashMap<String, Record<R>>>,
-    tunnels: Mutex<HashMap<u16, String>>,
 }
 
 // Hand-written because `derive(Default)` would ask the runtime parameter to be Default too.
 impl<R: Runtime> Default for Webviews<R> {
     fn default() -> Self {
-        Self { operations: Mutex::new(()), records: Mutex::new(HashMap::new()), tunnels: Mutex::new(HashMap::new()) }
+        Self { operations: Mutex::new(()), records: Mutex::new(HashMap::new()) }
     }
 }
 
 impl<R: Runtime> Webviews<R> {
-    /// A preview tunnel opened on this port with this secret. Called from the helper signal reader.
-    pub fn tunnel_opened(&self, port: u16, secret: String) {
-        self.tunnels.lock().unwrap().insert(port, secret);
-    }
-
-    pub fn tunnel_closed(&self, port: u16) {
-        self.tunnels.lock().unwrap().remove(&port);
-    }
-
     /// Close every webview, so none outlives the window it is composited over.
     pub fn dispose(&self) {
         let _operation = self.operations.lock().unwrap();
@@ -284,10 +265,7 @@ pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, h
             let changed = record.policy.replace(policy.clone());
             if !changed && !record.invalidated {
                 // Browsing location is independent of the configured home, including redirects.
-                let ready = record.home.reconcile(home, |target| {
-                    seed_tunnel_cookie(&app, &record.webview, target.as_str());
-                    record.webview.navigate(target.clone()).is_ok()
-                });
+                let ready = record.home.reconcile(home, |target| record.webview.navigate(target.clone()).is_ok());
                 if ready {
                     emit_state(&app, &key, &record.nav.lock().unwrap());
                 }
@@ -406,11 +384,6 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     // top-left corner for those two frames is a visible artefact.
     let _ = webview.hide();
 
-    // The tunnel credential, before the first real navigation. The webview has to exist before its
-    // cookie store can be written, and `cookies_for_url` returns nothing for an incognito webview, so
-    // the store is write-only from here. The helper checks that the cookie arrived.
-    seed_tunnel_cookie(app, &webview, home);
-
     if let Err(error) = webview.navigate(home_url.clone()) {
         eprintln!("[webview] could not navigate {key}: {error}");
         let _ = webview.close();
@@ -428,16 +401,6 @@ fn webview_label(key: &str) -> String {
         label.push(if ch.is_ascii_alphanumeric() { ch } else { '-' });
     }
     label
-}
-
-fn seed_tunnel_cookie<R: Runtime>(app: &AppHandle<R>, webview: &Webview<R>, url: &str) {
-    let Some(parsed) = Url::parse(url).ok().filter(|parsed| parsed.host_str() == Some("127.0.0.1")) else { return };
-    let Some(port) = parsed.port() else { return };
-    let Some(secret) = app.state::<Webviews<R>>().tunnels.lock().unwrap().get(&port).cloned() else { return };
-    let cookie = Cookie::build((TUNNEL_COOKIE, secret)).domain("127.0.0.1").path("/").build();
-    if let Err(error) = webview.set_cookie(cookie) {
-        eprintln!("[webview] could not seed the tunnel cookie: {error}");
-    }
 }
 
 #[tauri::command]

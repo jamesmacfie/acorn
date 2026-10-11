@@ -25,8 +25,8 @@ Some preparation already shipped:
   ([Node providers](../../plugins/node-providers.md#node-providers)).
 - The loopback-API gates and plugin containment rung 2 shipped
   ([security](../../security.md)).
-- A task-scoped port tunnel exists at `/v1/tunnel` (`packages/node-core/src/server/transport/tunnel.ts`),
-  which previews already use.
+- The task-scoped port tunnel at `/v1/tunnel` is gone. Remote previews were refused on September 28,
+  and cleanup phase 09 deleted `packages/node-core/src/server/transport/tunnel.ts` on October 12.
 
 What does not exist: a container image, any hosted service, accounts, teams, roles, a relay, a
 project shared across Nodes, a task that runs on a different Node from its project, an archive of a

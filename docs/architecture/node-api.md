@@ -14,7 +14,7 @@ The Node runs one Hono application:
 | `/v1/node` and `/v1/pair` | The two pre-auth pairing routes. |
 | `/v1/core/*` | Core-owned workspaces, projects, tasks, worktrees, integrations, settings, security, backup, audit, schedules, agent tools, and task context. |
 | `/v1/p/<plugin>/*` | Plugin routes. A compiled plugin's router is mounted when the app is built. A loaded plugin's handler is looked up per request, so a plugin reloaded in place serves its new handler without a restart. |
-| `/v1/events` | The authenticated WebSocket for invalidation events, PTY and process streams, Docker streams, workflow notices, agent events, and preview tunnels. |
+| `/v1/events` | The authenticated WebSocket for invalidation events, PTY and process streams, Docker streams, workflow notices, and agent events. |
 
 A plugin owns its own wire surface. Its route builders, request and response types, and query keys
 live in its `shared/` folder, or in `contract/` when another plugin reads them. Copy

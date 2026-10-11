@@ -9,5 +9,5 @@ export type { HostCapabilityRequirement, HostRequirement } from './hostCapabilit
 export { disabledNodePlugins, refreshNodePlugins } from './nodePlugins.ts'
 export { warnOnceAboutDisk } from './nodeSecurity.ts'
 export { pluginFailureAttention, pluginWaitingAttention } from './pluginFailures.ts'
-export { closeTunnelsForTask, previewUrlForClient, remotePreviewBlocked, tunnelUrl } from './tunnelUrl.ts'
+export { previewUrlForClient, remotePreviewBlocked } from './previewUrl.ts'
 export { registerWsChannel, wsChannelPrefixes } from './wsChannels.ts'

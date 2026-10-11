@@ -13,7 +13,7 @@ The shell has three processes and one rule between them:
 
 ```text
 Rust shell     window, app:// and app-plugin:// schemes, menu, dialogs, keychain, child webviews
-  └─ helper    custody: broker, fleet, device tokens, plugin cache, tunnels (packages/custody)
+  └─ helper    custody: broker, fleet, device tokens, plugin cache (packages/custody)
        └─ Node service.js: data, routes, agents, plugins (apps/node)
 Renderer       app://acorn, reaches the helper over one authenticated loopback WebSocket
 ```
@@ -62,7 +62,7 @@ terminal bytes, dialogs, notifications, the broker, the fleet, and adopting a pr
 <a id="background-scheduling-and-document-loss"></a>
 
 [Host-owned webviews](./shell/webviews.md) covers the preview and plugin webviews, their history and
-lifetime, the preview URL, and the dormant preview tunnel.
+lifetime, and the preview URL.
 
 <a id="build-and-packaging"></a>
 <a id="windows-test-installer"></a>

@@ -85,12 +85,10 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 }
 
 // Anything the shell has to react to. Rust reads these off stdout the same way it reads the ready
-// line. The recovery screen is a native dialog, so the crash budget has to reach Rust, and so does
-// each preview tunnel's secret, which the shell seeds into the pane's cookie store because wry cannot
-// inject a request header. This pipe reaches Rust and nothing else, which is why a secret may travel
-// on it. See docs/shell.md, "Host-owned webviews". A footprint request asks Rust for memory numbers
-// only it can read, and the answer comes back as a command (docs/shell/node-child.md § What the shell reports).
-const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed' | 'footprint-request', detail?: object): void =>
+// line. The recovery screen is a native dialog, so the crash budget has to reach Rust. A footprint
+// request asks Rust for memory numbers only it can read, and the answer comes back as a command
+// (docs/shell/node-child.md § What the shell reports).
+const emit = (event: 'crash-budget-exhausted' | 'footprint-request', detail?: object): void =>
   console.log(JSON.stringify({ [TAG]: event, ...detail }))
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
@@ -139,10 +137,6 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     // certificate, and token.
     onNodeReplaced: () => server?.push({ push: 'node-replaced' }),
     onCrashBudgetExhausted: (reason) => emit('crash-budget-exhausted', reason ? { reason } : undefined),
-    tunnelEvents: {
-      opened: (port, secret) => emit('tunnel-opened', { port, secret }),
-      closed: (port) => emit('tunnel-closed', { port }),
-    },
     requestFootprint: () => emit('footprint-request'),
   })
 

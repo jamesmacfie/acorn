@@ -18,7 +18,6 @@ import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, t
 import { WsViewers, type EventViewer } from './wsViewers'
 import { createWsViewerDispatch, isTaskConfinedWs } from './wsViewerDispatch'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { claimUpgrade } from './upgradeClaim'
 import { emitEvent, measure } from '../telemetry/collector'
 import { createLogger } from '../telemetry/logger'
 
@@ -431,7 +430,9 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   // A background sweep must never be the reason the process stays alive.
   sweep.unref?.()
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    // Only claim our path. Other upgrades, if any, are left for their own handlers.
+    // This is the listener's only upgrade handler, so it destroys an upgrade to any other path. Node
+    // stops doing that once an 'upgrade' listener exists, and an unanswered socket would stay open for
+    // the life of the process and hang `server.close()`.
     let path: string
     try {
       // Only a syntactic base for parsing the path out. A request with no Host is refused by
@@ -441,10 +442,10 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       socket.destroy()
       return
     }
-    if (path !== WS_PATH) return
-    // Synchronously, before the async authorize below: the "nobody answered" sweeper runs as the last
-    // upgrade listener and cannot wait for our promise (server/transport/upgradeClaim.ts).
-    claimUpgrade(socket)
+    if (path !== WS_PATH) {
+      socket.destroy()
+      return
+    }
     pending.add(socket)
     const onPeerError = (): void => { socket.destroy() }
     socket.on('error', onPeerError)

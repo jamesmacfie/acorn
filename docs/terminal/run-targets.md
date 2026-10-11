@@ -24,8 +24,7 @@ project-settings targets run without the gate.
 
 A running instance keeps the command, URL command, stop command, and folder it started with. Status
 and URL discovery use that captured URL command after the file changes. Fixed URLs work without a
-running instance. acorn doesn't allocate or proxy arbitrary ports. Preview uses the declared target
-and the authenticated tunnel when it needs one.
+running instance. acorn doesn't allocate or proxy arbitrary ports. Preview uses the declared target.
 
 Starting, stopping, and restarting a target through `/v1/core/tasks/:id/run/:target/*`, and
 acknowledging the config through `config-trust`, need a device. An agent uses the `run_*` tools,

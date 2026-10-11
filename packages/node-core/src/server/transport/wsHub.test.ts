@@ -217,6 +217,16 @@ describe('opted-in event viewers', () => {
 })
 
 describe('wsHub auth', () => {
+  // The hub is the listener's only upgrade handler, so an upgrade to any other path, such as the
+  // removed `/v1/tunnel`, must be destroyed rather than left open.
+  it('destroys an authenticated upgrade to any other path', async () => {
+    const ws = new WebSocket(`ws://${host}/v1/tunnel`, { headers: authHeaders() })
+    await expect(new Promise((resolve, reject) => {
+      ws.on('open', resolve)
+      ws.on('error', reject)
+    })).rejects.toThrow(/socket hang up/)
+  })
+
   it('rejects a socket with no token at all', async () => {
     await expect(open({ host })).rejects.toThrow(/403/)
   })

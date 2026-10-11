@@ -16,7 +16,7 @@ dependencies make a platform-specific artifact the safer unit.
 `apps/node/src/composition/` holds what they share. The standalone entry uses `ACORN_DATA_DIR` or a local
 `.acorn` root, binds HTTPS with TLS 1.3, and prints one JSON handshake line with the `nodeId`, endpoint,
 certificate fingerprint and PEM, and a device token for the launcher or first client. It runs plugin
-initialization, reconciliation, the WebSocket and tunnel listeners, and a bounded shutdown.
+initialization, reconciliation, the WebSocket listener, and a bounded shutdown.
 
 Standalone and desktop-supervised Nodes boot through one function, `bootNode` in
 `apps/node/src/composition/boot.ts`, so they share the plugin graph, the reconcile sequence, and the

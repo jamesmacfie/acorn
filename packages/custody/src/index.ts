@@ -10,7 +10,6 @@ import { NodeBroker, type BrokerEvents } from './broker/nodeBroker'
 import { PluginCache } from './plugins/pluginCache'
 import { PluginTrustStore } from './plugins/pluginTrustStore'
 import { DeviceConfigStore } from './config/deviceConfig'
-import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
 import { ServiceHost } from './supervision/serviceHost'
 import { startHelperTelemetry, type FootprintSample } from './telemetry'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
@@ -18,7 +17,7 @@ import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 const log = createLogger('service-host')
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
-// cache and trust store, the preview tunnels, and the supervised node service. Nothing here imports a
+// cache and trust store, and the supervised node service. Nothing here imports a
 // shell binding, which is what lets it run in a process of its own. See docs/shell.md, "The shell
 // process".
 //
@@ -55,10 +54,6 @@ export type HelperOptions = {
   // Hosts multiplexing renderer sockets request the advertised viewer codec. In-process hosts keep
   // raw transport by default, including the terminal client.
   viewerMultiplexing?: boolean
-  // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these.
-  // The Tauri shell seeds the listener's secret into the preview webview's cookie store instead. See
-  // previewTunnel.ts.
-  tunnelEvents?: TunnelEvents
   // A restart or crash recovery replaced the node the renderer was talking to. Its endpoint,
   // certificate, and token are all new, so whatever is rendering has to start over.
   onNodeReplaced?(): void
@@ -75,7 +70,6 @@ export type HelperOptions = {
 export type Helper = {
   broker: NodeBroker
   fleet: FleetStore
-  tunnels: PreviewTunnels
   pluginCache: PluginCache
   pluginTrust: PluginTrustStore
   config: DeviceConfigStore
@@ -135,23 +129,6 @@ export function createHelper(options: HelperOptions): Helper {
 
   const broker = new NodeBroker(options.push, { viewerMultiplexing: options.viewerMultiplexing })
   const fleet = new FleetStore(userDataDir, tokens)
-  // Preview tunnels re-resolve their node from the fleet store on every connection, so a new
-  // endpoint, token, or certificate applies to new connections. Restart, adoption, and forget tear
-  // down established pipes explicitly.
-  const tunnels = new PreviewTunnels(
-    (nodeId) => {
-      const node = fleet.get(nodeId)
-      const token = node && fleet.tokenFor(nodeId)
-      if (!node || !token) return null
-      return {
-        endpoint: node.endpoint,
-        token,
-        ...(node.certPem ? { certPem: node.certPem } : {}),
-        ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
-      }
-    },
-    options.tunnelEvents,
-  )
 
   // Third-party plugin bundles a node has served, and this device's decisions about running them. See
   // docs/plugins.md. Both stores belong to the host: the bytes never pass through the renderer, and
@@ -185,8 +162,6 @@ export function createHelper(options: HelperOptions): Helper {
   // is ephemeral, so the endpoint, the certificate, and the token can all change between starts. Each
   // start result drives this rather than a cache. The label stays the owner's, so a rename survives.
   const adoptLocalNode = (started: ServiceStartResult): void => {
-    // Any surviving pipe to this node points at a process that is gone.
-    tunnels.closeFor({ nodeId: started.nodeId })
     const node = fleet.remember(
       {
         nodeId: started.nodeId,
@@ -246,8 +221,6 @@ export function createHelper(options: HelperOptions): Helper {
     if (disposed) return
     if (recovering) throw new Error('acorn is already restarting the background service.')
     recovering = true
-    // A pipe to the process about to be killed is dead either way.
-    tunnels.closeFor({})
     try {
       await service.stop()
       await start()
@@ -291,7 +264,6 @@ export function createHelper(options: HelperOptions): Helper {
   return {
     broker,
     fleet,
-    tunnels,
     pluginCache,
     pluginTrust,
     config,
@@ -326,7 +298,6 @@ export function createHelper(options: HelperOptions): Helper {
       disposed = true
       telemetry.dispose()
       await service.stop()
-      tunnels.dispose()
       broker.dispose()
     },
   }

@@ -79,8 +79,7 @@ focusable.
 
 Authentication uses paired device tokens held by the desktop helper, and scoped internal HMAC tokens
 for children the Node spawns. GitHub uses OAuth device flow. Credentials are encrypted at rest and
-removed from backups. Preview views are isolated, and remote preview tunnels need per-tunnel
-authentication.
+removed from backups. Preview views are isolated, and only a local Node's preview loads.
 
 The app reports disk-encryption status where it can, keeps a 90-day audit trail, and drains the Node
 listener, plugins, and databases on shutdown within a bounded deadline.

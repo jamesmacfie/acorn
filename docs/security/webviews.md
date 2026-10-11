@@ -27,20 +27,16 @@ A loaded plugin may declare a host-owned webview. Unlike its sandboxed interface
 page has live network access and its own cookies and login state for the life of the process. The
 trust prompt names the declared hosts as a separate grant. The shell enforces that allowlist across
 requested navigations and redirects, and gives each surface an isolated ephemeral partition. The
-plugin gets no page preload, devtools protocol driver, devtools, tunnel headers, script injection, or
+plugin gets no page preload, devtools protocol driver, devtools, script injection, or
 `postMessage` path, so it can choose the URL but can't inspect or operate the page.
 
 ## Previews
 
-The remote preview tunnel accepts only declared task ports
-([preview tunnel](../api-reference/websocket.md#preview-tunnel)) and authenticates its loopback request
-with a per-tunnel secret before forwarding it to the Node.
-
-The preview pane refuses every remote Node URL, public and tunnelled loopback alike. A child webview
-can check a navigation but can't confine the page's redirects and subrequests to the remote Node's
-network, so a tunnelled first request would still let page script reach services on the client's
-private network. Only a Node that custody marks local can supply a loadable preview URL. Switching a
-pane to a remote Node evicts its kept-alive native view.
+The preview pane refuses every remote Node URL, public and loopback alike. A child webview can check
+a navigation but can't confine the page's redirects and subrequests to the remote Node's network, so
+page script could reach services on the client's private network. Only a Node that custody marks
+local can supply a loadable preview URL. Switching a pane to a remote Node evicts its kept-alive
+native view.
 
 ## Desktop automation driver
 

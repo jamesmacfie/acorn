@@ -51,10 +51,8 @@ const GONE = ['delete', 'replaced', 'moved to', 'git history', 'git log', '(new'
 const isDataRoot = (path: string) => path.endsWith('.sqlite')
 
 // A review is dated evidence. Rewriting one so a path resolves would falsify what was true when it
-// was written, so reviews are read-only here and excluded. The list is empty today — the last entry
-// went with the folder reorganisation whose record it was — and it stays here because the next review
-// that lands in `docs/` needs the same exemption.
-const REVIEWS: string[] = []
+// was written, so reviews are read-only here and excluded.
+const REVIEWS: string[] = ['docs/security/review-2026-10-01.md']
 const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
 
 const decodeFragment = (fragment: string): string => {

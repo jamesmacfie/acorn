@@ -41,7 +41,7 @@ The terminal installs these platform groups:
 | Group | What the terminal installs |
 | --- | --- |
 | `transport` | `NodeBroker`, in process. Responses stay buffered `Uint8Array`. |
-| `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` and tunnels aren't installed. |
+| `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` isn't installed. |
 | `pairing` | Probe only. The seam remembers the probe, so confirming a fingerprint is a step a caller can't skip. |
 | `plugins` | File-backed custody ([loaded plugins](./plugins.md#custody)). |
 | `files` | A path prompt reads local bytes for attachments and writes exports locally. It needs an absolute path, rejects attachments over the Agent route's 10 MiB limit before reading, reports errors, and confirms before replacing a file. The Node never sees the local path. |

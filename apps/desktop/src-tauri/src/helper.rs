@@ -60,11 +60,6 @@ pub enum Signal {
     /// `reason` is what the service said about the last attempt, when it said anything. The recovery
     /// dialog is the only place an owner reads it.
     CrashBudgetExhausted { reason: Option<String> },
-    /// A preview tunnel is listening on this loopback port under this secret. wry cannot inject a
-    /// per-request header, so src/webviews.rs seeds the credential into the preview webview's cookie
-    /// store. It travels on this pipe so the renderer never sees it.
-    TunnelOpened { port: u16, secret: String },
-    TunnelClosed { port: u16 },
     /// Telemetry is on and the helper wants this machine's memory numbers. Answered on stdin by
     /// src/footprint.rs, because only this process can find the renderer's web content process.
     FootprintRequest,
@@ -72,14 +67,11 @@ pub enum Signal {
 
 fn parse_signal(line: &str) -> Option<Signal> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
-    let port = || u16::try_from(value.get("port")?.as_u64()?).ok();
     match value.get("acorn-helper")?.as_str()? {
         "ready" => serde_json::from_value(value.clone()).ok().map(Signal::Ready),
         "crash-budget-exhausted" => Some(Signal::CrashBudgetExhausted {
             reason: value.get("reason").and_then(|r| r.as_str()).map(str::to_string),
         }),
-        "tunnel-opened" => Some(Signal::TunnelOpened { port: port()?, secret: value.get("secret")?.as_str()?.to_string() }),
-        "tunnel-closed" => Some(Signal::TunnelClosed { port: port()? }),
         "footprint-request" => Some(Signal::FootprintRequest),
         _ => None,
     }
@@ -435,16 +427,5 @@ mod tests {
         assert!(line.contains("\"isPackaged\":false"), "{line}");
         assert!(line.contains("\"envFiles\":[\"/a/.env\"]"), "{line}");
         assert!(!line.contains("bundledPluginsDir"), "{line}");
-    }
-
-    #[test]
-    fn a_tunnel_signal_carries_a_port_and_a_secret() {
-        let opened = parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":51999,\"secret\":\"s3cr3t\"}");
-        let Some(Signal::TunnelOpened { port, secret }) = opened else { panic!("expected a tunnel-opened signal") };
-        assert_eq!((port, secret.as_str()), (51999, "s3cr3t"));
-        assert!(matches!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":51999}"), Some(Signal::TunnelClosed { port: 51999 })));
-        // A port that cannot be one is not a signal, rather than a signal about port 0.
-        assert!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":70000}").is_none());
-        assert!(parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":1}").is_none());
     }
 }

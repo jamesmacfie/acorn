@@ -73,7 +73,7 @@ parameters when present.
 
 HTTPS is required except for `localhost`, `127.0.0.1`, and `::1`. The renderer's broker validates a
 requested navigation, and the shell enforces the same list on direct navigation and redirects. The
-page has an isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and
+page has an isolated ephemeral partition, no preload, no CDP, no devtools, and
 no script or message bridge. A webview needs a client bundle. The plugin's sandboxed client frame
 controls only `navigate`, `back`, `forward`, and `reload`, and it can't read the page or type into
 it. [Host-owned webviews](../shell/webviews.md) covers the shell side.

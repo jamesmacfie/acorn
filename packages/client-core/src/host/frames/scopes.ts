@@ -6,10 +6,10 @@
 // "what can a third-party plugin do to my machine" is decided here, and the table is deliberately an
 // allowlist of (path shape, method) pairs rather than a prefix match.
 //
-// Why not `core.tasks:read ⇒ GET /v1/core/tasks*`, which is what the phase doc sketches: that glob
-// also matches `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL, and the same shape
+// Why not `core.tasks:read ⇒ /v1/core/tasks*`, which is what the phase doc sketches: that glob also
+// matches `/v1/core/tasks/:id/preview-url`, which runs the project's preview script, and the same shape
 // over `/v1/core/projects*` would match `GET /v1/core/projects/:id/mcp`, which hands out the commands a
-// project's agents run. Both are read-shaped and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
+// project's agents run. Neither belongs to a plugin. The star was the wrong granularity; every rule below names its
 // path.
 //
 // Three groups, and the difference between the last two is intent rather than effect:
@@ -234,7 +234,7 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/tasks/${SEG}/run/${SEG}/stop`), scopes: {} },
   { path: shape(`/v1/core/tasks/${SEG}/run/${SEG}/status`), scopes: {} },
   { path: shape(`/v1/core/tasks/${SEG}/config-trust`), scopes: {}, note: 'Acknowledging repo config trust is the user’s act, and the whole guard on the code-execution path.' },
-  { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Read-shaped, but hands out a tunnel URL.' },
+  { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Runs the project’s preview script.' },
   { path: shape(`/v1/core/tasks/${SEG}/on-created`), scopes: {}, note: 'Runs the task setup script.' },
   { path: shape('/v1/core/integrations'), scopes: {}, note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.' },
   { path: shape(`/v1/core/integrations/${SEG}`), scopes: {} },

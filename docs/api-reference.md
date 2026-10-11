@@ -59,8 +59,8 @@ history, definition, and schedule binding routes.
 <a id="websocket"></a>
 <a id="logical-event-viewers"></a>
 
-[WebSocket](./api-reference/websocket.md) covers `/v1/events`, logical viewers, the preview tunnel,
-channel prefixes, and the eleven Node events.
+[WebSocket](./api-reference/websocket.md) covers `/v1/events`, logical viewers, channel prefixes, and
+the eleven Node events.
 
 ## Related pages
 

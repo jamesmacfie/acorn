@@ -17,7 +17,6 @@ WebSocket, and it serves no HTML, JavaScript, or static assets. `createApp()` in
 | Core | `/v1/core/*` | A device, or an internal principal the route permits |
 | Plugin | `/v1/p/<plugin>/*` | A device, or an internal principal the route permits |
 | Events and streams | `/v1/events` | Authenticated WebSocket upgrade |
-| Preview tunnel | `/v1/tunnel` | Authenticated WebSocket upgrade |
 
 An authenticated `GET /v1/node` answer includes `nodeId`. A background Node the CLI started also
 includes `serviceInstanceId`, a UUID the CLI uses to prove it owns that process. The unauthenticated

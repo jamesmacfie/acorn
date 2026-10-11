@@ -1,5 +1,5 @@
-import { createMemo, createRenderEffect, createResource, onCleanup } from 'solid-js'
-import { activeNodeId, closeTunnelsForTask, onPluginFrame, previewUrlForClient, readJson, remotePreviewBlocked, type Task } from '@acorn/plugin-api/client'
+import { createMemo, createResource, onCleanup } from 'solid-js'
+import { activeNodeId, onPluginFrame, previewUrlForClient, readJson, remotePreviewBlocked, type Task } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { PreviewUrlState } from '../contract/urls'
 import { previewUrlRoute } from '../shared/api'
@@ -17,17 +17,11 @@ export function PreviewTaskPane(props: { task: Task }) {
   }))
 
   // Only a local node's URL may enter the native webview. A remote page could contact the client's
-  // private network from a redirect or subrequest even if its first request used a tunnel.
+  // private network from a redirect or subrequest.
   const loadable = createMemo(() => {
     if (resolved.error) return null
     const value = resolved.latest
     return previewUrlForClient(value?.origin === owner() && value.state?.taskId === props.task.id ? value.state.url : null, owner().nodeId)
-  })
-
-  // Cleanup captures the outgoing Node/task even when the shell updates props before disposal.
-  createRenderEffect(() => {
-    const origin = owner()
-    onCleanup(() => closeTunnelsForTask(origin.taskId, origin.nodeId))
   })
 
   return <PreviewPane taskId={props.task.id} projectId={props.task.projectId} url={loadable()} remoteBlocked={remotePreviewBlocked(owner().nodeId)} resolving={resolved.loading} resolutionFailed={!!resolved.error} retryResolution={() => void refetch()} />

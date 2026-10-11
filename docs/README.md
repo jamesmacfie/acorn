@@ -34,7 +34,7 @@ the whole plugin system in one page.
 | [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
 | [api-reference/editor.md](./api-reference/editor.md) | Editor file reads, guarded writes, task-addressed file actions, and mixed-version behavior. |
 | [api-reference/workflow-routes.md](./api-reference/workflow-routes.md) | The workflows plugin's run, processing history, definition, and schedule binding routes. |
-| [api-reference/websocket.md](./api-reference/websocket.md) | `/v1/events`, logical viewers, the preview tunnel, and the Node event channels. |
+| [api-reference/websocket.md](./api-reference/websocket.md) | `/v1/events`, logical viewers, and the Node event channels. |
 | [data-layer.md](./data-layer.md) | The map of Node storage, and the ownership rules for provider data, identity, and blobs. |
 | [data-layer/data-root.md](./data-layer/data-root.md) | The data root's location, contents, `node.json`, and how it opens. |
 | [data-layer/core-database.md](./data-layer/core-database.md) | Core tables, the external-item read model, the merged run list, and task script history. |

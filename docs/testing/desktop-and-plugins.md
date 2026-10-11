@@ -8,7 +8,7 @@ The numbers retain their original acceptance-check IDs.
 1. Install and launch; the window appears and the local node reaches online.
 2. Pair a second node by code; fingerprint words match.
 3. Open a terminal; a TUI renders and survives resize.
-4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
+4. Open a preview pane against a local task's dev server. Navigate, go back, and cover it
    with an overlay; the child webview hides rather than floating above it.
 5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
    Install a client-only plugin on this device from a remote package. Accept its trust prompt, confirm

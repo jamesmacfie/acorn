@@ -29,8 +29,6 @@ const fullHost = () => ({
   nodeForget: vi.fn(),
   nodeReconnect: vi.fn(),
   nodeRestartLocal: vi.fn(),
-  nodeTunnelOpen: vi.fn(),
-  nodeTunnelClose: vi.fn(),
   plugins: { state: vi.fn(), cachePut: vi.fn(), install: vi.fn(), remove: vi.fn(), trustRecord: vi.fn(), trustForget: vi.fn(), devGrant: vi.fn() },
   config: { read: vi.fn(), write: vi.fn(), onChange: vi.fn(), location: vi.fn() },
   recovery: { openDataFolder: vi.fn(), quit: vi.fn() },

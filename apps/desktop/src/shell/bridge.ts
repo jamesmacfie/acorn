@@ -208,7 +208,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
 }
 
 // Fire-and-forget from the seam's point of view: the reply still comes back, and a rejection is logged
-// rather than thrown, because nobody is awaiting `nodeAbort` or `tunnelClose`.
+// rather than thrown, because nobody is awaiting `nodeAbort` or `nodeReconnect`.
 const tell = (method: HelperMethod, params?: unknown): void => {
   void call(method, params).catch((error: unknown) => log.warn(`${method} failed`, error, { 'helper.method': method }))
 }
@@ -321,8 +321,6 @@ const acorn = {
   nodeForget: (nodeId: string, revoke: boolean) => call('node-forget', { nodeId, revoke }),
   nodeReconnect: (nodeId: string) => tell('node-reconnect', { nodeId }),
   nodeRestartLocal: () => call<void>('node-restart-local'),
-  nodeTunnelOpen: (request: { nodeId: string; taskId: string; port: number }) => call<{ port: number }>('node-tunnel-open', request),
-  nodeTunnelClose: (match: { nodeId?: string; taskId?: string }) => tell('node-tunnel-close', match),
 
   // Third-party plugin bundles. The bundle itself never crosses this bridge: the renderer names a node
   // and a plugin and gets back the hash the helper computed from the bytes it fetched.

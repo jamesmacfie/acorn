@@ -62,7 +62,7 @@ to its bundled `index.html` for client-side routes.
 
 | Process | Owns |
 | --- | --- |
-| Node | Core and plugin SQLite connections and migrations. Workspaces, projects, tasks, worktrees, Git, files, and project configuration. PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access. Provider integrations, encrypted secrets, mirrors, blobs, audit, backup, and reconciliation. The HTTPS listener, the WebSocket, stream and tunnel sockets, and the shutdown drain. |
+| Node | Core and plugin SQLite connections and migrations. Workspaces, projects, tasks, worktrees, Git, files, and project configuration. PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access. Provider integrations, encrypted secrets, mirrors, blobs, audit, backup, and reconciliation. The HTTPS listener, the WebSocket and stream sockets, and the shutdown drain. |
 | Desktop shell | The window, child webviews, dialogs, menus, navigation policy, and the data key in the OS keychain. The injected renderer bridge and the helper behind it. Node endpoint records, certificate pins, device tokens, fleet membership, and service supervision. |
 | Terminal client | What the shell and helper own, in one process: the screen, endpoint records and pins, device tokens, plugin custody, and supervision of a Node it started. |
 | Headless CLI | Nothing persistent, except a local Node started with `node start --background`. |
