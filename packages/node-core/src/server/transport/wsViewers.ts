@@ -6,7 +6,9 @@ export type EventViewer = { id: string | null; active: boolean; sinks: Map<strin
 const viewer = (id: string | null): EventViewer => ({ id, active: true, sinks: new Map() })
 
 export class WsViewers {
-  readonly legacy = viewer(null)
+  // The connection's own viewer. A connection that doesn't send `WS_VIEWERS_HEADER`, such as the
+  // terminal client's or the CLI's, sends every frame through it.
+  readonly single = viewer(null)
   private readonly viewers = new Map<string, EventViewer>()
 
   acquire(id: string): EventViewer | null {
@@ -28,7 +30,7 @@ export class WsViewers {
   }
 
   all(): EventViewer[] {
-    return [this.legacy, ...this.viewers.values()]
+    return [this.single, ...this.viewers.values()]
   }
   hasStream(id: string): boolean {
     return this.all().some((owner) => owner.sinks.has(id))

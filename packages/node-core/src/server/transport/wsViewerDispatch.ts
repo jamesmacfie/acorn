@@ -48,7 +48,7 @@ export function createWsViewerDispatch(
       const envelope = wsFrameSchema.safeParse(parsed)
       if (!envelope.success) return
       let frame = envelope.data
-      let owner = parent.viewers.legacy
+      let owner = parent.viewers.single
       if (parent.multiplexed) {
         if (frame.channel === 'ws:viewer-close') {
           const closing = wsViewerCloseSchema.safeParse(frame)
