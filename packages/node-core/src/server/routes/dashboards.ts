@@ -15,9 +15,8 @@ import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 // rendered, with last-write-wins buckets to make several clients converge, all of it compensating for
 // the wrong writer and obsoleted by the scheduler.
 //
-// Behind the ordinary `requireUser` gate rather than `requireDevice`, unlike the schedules routes it
-// sits beside: this is read-only panel data, not node administration, and a task-scoped agent
-// rendering a dashboard is a legitimate reader.
+// Device-only, like the library operations below, by the mount in server/index.ts. A panel id carries
+// no scope, so a task token reading history could reach any workspace's panel.
 
 export const dashboards = new Hono<AppEnv>().get('/history', async (c) => {
   const panelId = c.req.query('panelId')
@@ -37,7 +36,7 @@ export const dashboards = new Hono<AppEnv>().get('/history', async (c) => {
     if (!parsed.success || parsed.data.operation !== c.req.param('operation')) return respondError(c, 400, 'invalid-request')
     const input = parsed.data
     const principal = c.get('principal')!
-    if (principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
+    if (principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required') // narrows the type; the mount already refused
     const invocation = { principal, signal: c.req.raw.signal }
     await authorizeQueryScope(c.env, input.scope, invocation)
     const store = dashboardStore(getDb(c.env))

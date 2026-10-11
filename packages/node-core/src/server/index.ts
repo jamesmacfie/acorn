@@ -147,6 +147,9 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/authoring/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/datasets`, requireDevice)
     .use(`${CORE_NAMESPACE}/datasets/*`, requireDevice)
+    // Dashboards and their measure history. The only reader is the dashboards view on a device, and
+    // the history route takes a panel id with no scope, so a task token could read any workspace's panel.
+    .use(`${CORE_NAMESPACE}/dashboards/*`, requireDevice)
     // Telemetry another runtime collected. Device-only for a different reason from the rest of this
     // group: it is a write, not a read. Everything admitted here reaches every subscribed sink, and a
     // sink can post it off the machine, so a task-scoped agent must not be able to put words in one

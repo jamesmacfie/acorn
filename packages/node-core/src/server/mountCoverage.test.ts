@@ -35,15 +35,6 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // agent already sees the tools it may call at /tasks/:id/tools, which this cannot widen.
   'GET /v1/core/agent-tools': 'static catalog, no task or owner data',
 
-  // Read-only panel data, argued at the route itself (routes/dashboards.ts). An agent rendering a
-  // dashboard is a legitimate reader, and there is no write route to reach.
-  'GET /v1/core/dashboards/history': 'read-only measure series; see the comment on the route',
-
-  // The library shares the dashboards router with the history read above, so it cannot use a
-  // prefix gate without closing the task-readable history route. Its handler rejects every
-  // principal except a device before reading or changing dashboard state.
-  'POST /v1/core/dashboards/:operation': 'routes/dashboards.ts requires a device principal in the handler',
-
   // Filtered rather than gated, like the two task reads above and for the same reason: "what is
   // running for me" is a fair question for an agent about its own task, and the unfiltered answer
   // enumerates every task on the machine. A run with no task is never shown to a confined caller.
