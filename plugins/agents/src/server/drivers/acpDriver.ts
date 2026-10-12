@@ -39,6 +39,10 @@ export class AcpDriver implements AgentDriver {
     return this.spec.readBlock === true
   }
 
+  get accounts(): HarnessLaunchSpec['accounts'] {
+    return this.spec.accounts
+  }
+
   // Only where this node has the bridge program to install. A standalone node has none.
   get loopHooks(): boolean {
     return this.spec.loopHooks === true && acornLoopHook() != null
@@ -100,6 +104,13 @@ export class AcpDriver implements AgentDriver {
       skills: [],
       diagnostics: launch.diagnostics,
     }
+  }
+
+  async probeAccount(home: string): Promise<boolean | null> {
+    const executable = this.launch().executable
+    const accounts = this.spec.accounts
+    if (!executable || !accounts || !this.spec.probeAuth) return null
+    return this.spec.probeAuth(executable, { [accounts.env]: home })
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {

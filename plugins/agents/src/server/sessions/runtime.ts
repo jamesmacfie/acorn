@@ -1,5 +1,6 @@
 import type {
   AgentDeleteResult,
+  AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
   AgentSessionSnapshot,
@@ -33,6 +34,8 @@ import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
 import type { SessionSummaryInput } from '../../shared/sessionSummary'
 import { agentDriverRegistry } from '../drivers/registry'
 import { ProviderCatalogue } from './providerCatalogue'
+import { sessionAccount } from '../../shared/accounts'
+import type { AgentDriverRegistry } from '../drivers/registry'
 import { isActiveSubagent } from './stateMachine'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. A step this size
@@ -72,6 +75,7 @@ export class ManagedAgentRuntime {
   readonly instructionAdmission: ManagedAgentEngine['instructionAdmission']
   readonly mcpReviews: ManagedAgentEngine['mcpReviews']
   readonly providers: ProviderCatalogue
+  private readonly registry: AgentDriverRegistry
   private readonly core: AgentRuntimeOptions['core']
   private readonly db: AgentRuntimeOptions['db']
   private readonly currentUserId: AgentRuntimeOptions['currentUserId']
@@ -96,7 +100,8 @@ export class ManagedAgentRuntime {
     this.upkeep = engine.upkeep
     this.instructionAdmission = engine.instructionAdmission
     this.mcpReviews = engine.mcpReviews
-    this.providers = new ProviderCatalogue(options.registry ?? agentDriverRegistry, engine.store, engine.shutdownSignal)
+    this.registry = options.registry ?? agentDriverRegistry
+    this.providers = new ProviderCatalogue(this.registry, engine.store, engine.accounts, engine.shutdownSignal)
     this.core = options.core
     this.db = options.db
     this.currentUserId = options.currentUserId
@@ -288,12 +293,19 @@ export class ManagedAgentRuntime {
           created: false,
         }
     }
+    // The caller's choice, or the one a fork's config carries from its source. The HTTP route drops a
+    // client's own `config.account`, so a request names an account only through `account`.
+    const account = input.account ?? sessionAccount(input.config)
     const provider = await this.engine.readWhileRunning(() =>
-      this.providers.usable((candidate) => candidate.id === input.providerId),
+      this.providers.usable((candidate) => candidate.id === input.providerId, account),
     )
     if (!provider) throw new Error(`Unknown agent provider: ${input.providerId}`)
     if (!provider.installed) throw new Error(provider.diagnostics[0] ?? `${provider.label} is unavailable.`)
-    if (provider.authenticated === false) {
+    if (account) {
+      const known = provider.accounts?.find((candidate) => candidate.name === account)
+      if (!known) throw new Error(`${provider.label} has no account called '${account}' on this Node.`)
+      if (known.authenticated === false) throw new Error(`The '${account}' ${provider.label} account is not signed in.`)
+    } else if (provider.authenticated === false) {
       throw new Error(`${provider.label} is installed but its CLI account is not authenticated.`)
     }
     if (input.profileId !== provider.profileId) {
@@ -308,13 +320,49 @@ export class ManagedAgentRuntime {
       () => this.standingContext?.(input.taskId) ?? Promise.resolve(null),
     )
     this.engine.shutdownSignal.throwIfAborted()
+    const { account: _account, ...config } = withAgent.config
     const session = await this.store.createSession(
-      { ...withAgent, config: { ...withAgent.config, mcpServers, standingContext } },
+      { ...withAgent, config: { ...config, mcpServers, standingContext, ...(account ? { account } : {}) } },
       provider,
       posture,
     )
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
+  }
+
+  /** Makes the folder for a harness's next login. The person signs in by running the CLI's own login
+   *  against it, so Acorn never handles the token (docs/managed-agents/accounts.md). */
+  async addAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]> {
+    if (!this.registry.create(providerId)?.accounts)
+      throw new Error(`'${providerId}' doesn't support a second account.`)
+    await this.engine.accounts.create(providerId, name)
+    return this.providers.list(true)
+  }
+
+  /** What points a harness's CLI at the session's account, for a process the driver doesn't start,
+   *  such as the terminal handoff. Empty for the default login. */
+  async accountEnv(session: AgentSession): Promise<Record<string, string>> {
+    const home = await this.engine.accountHome(session)
+    if (!home) return {}
+    const accounts = this.registry.create(session.providerId)?.accounts
+    if (!accounts) throw new Error(`'${session.providerId}' doesn't support a second account.`)
+    return { [accounts.env]: home }
+  }
+
+  /** Signs the account out, then deletes its folder. A session pinned to it can no longer start. */
+  async removeAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]> {
+    const accounts = this.registry.create(providerId)?.accounts
+    if (!accounts || !(await this.engine.accounts.has(providerId, name))) {
+      throw new Error(`The '${name}' account for '${providerId}' was not found.`)
+    }
+    // Claude Code names its Keychain entry after the folder path, so deleting the folder alone would
+    // leave the login behind for a later account given the same name.
+    const executable = (await this.providers.list()).find((provider) => provider.id === providerId)?.executable
+    const home = this.engine.accounts.home(providerId, name)
+    if (executable)
+      await (await import('../drivers/authProbe')).signOut(executable, accounts.logout, { [accounts.env]: home })
+    await this.engine.accounts.remove(providerId, name)
+    return this.providers.list(true)
   }
 
   /** The owner's custom agents and every plugin's, read per call because an account switch changes

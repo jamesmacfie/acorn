@@ -11,6 +11,19 @@ import { startupContextInjection } from './startupContext'
 
 const mocks = vi.hoisted(() => ({
   prefs: {} as Record<string, string>,
+  providers: [
+    {
+      id: 'claude',
+      profileId: 'claude-code',
+      label: 'Claude Code',
+      installed: true,
+      executableVersion: '2.1.0',
+      authenticated: true,
+      diagnostics: [],
+      accounts: [{ name: 'work', authenticated: false, loginCommand: "CLAUDE_CONFIG_DIR='/a/work' claude auth login" }],
+    },
+    { id: 'codex', profileId: 'codex', label: 'Codex', installed: false, authenticated: null, diagnostics: [] },
+  ],
   saveStartup: vi.fn(async (_client: unknown, _on: boolean) => true),
 }))
 vi.mock('@tanstack/solid-query', () => ({
@@ -18,6 +31,7 @@ vi.mock('@tanstack/solid-query', () => ({
     get data() {
       const key = options().queryKey
       if (key.includes('session-defaults')) return defaultAgentSessionDefaults()
+      if (key.includes('providers')) return mocks.providers
       if (key.includes('model-backends'))
         return {
           backends: [
@@ -42,18 +56,7 @@ vi.mock('./startupContext', async (importOriginal) => ({
 }))
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
-    providers: async () => [
-      {
-        id: 'claude',
-        profileId: 'claude-code',
-        label: 'Claude Code',
-        installed: true,
-        executableVersion: '2.1.0',
-        authenticated: true,
-        diagnostics: [],
-      },
-      { id: 'codex', profileId: 'codex', label: 'Codex', installed: false, authenticated: null, diagnostics: [] },
-    ],
+    providers: async () => mocks.providers,
     sessions: async () => ({ sessions: [] }),
   },
 }))
@@ -85,6 +88,12 @@ describe('the harnesses and defaults page', () => {
     await settle()
     expect(row('Claude Code')?.textContent).toContain('Version 2.1.0.')
     expect(row('Codex')?.textContent).toContain('Not installed')
+  })
+
+  it("shows a signed-out account's sign-in command", async () => {
+    await settle()
+    expect(row('Claude Code · work')?.textContent).toContain("CLAUDE_CONFIG_DIR='/a/work' claude auth login")
+    expect(row('Add a Claude Code account')).toBeDefined()
   })
 
   it('draws the startup-context switch on for an untouched preference and writes a change to it', async () => {

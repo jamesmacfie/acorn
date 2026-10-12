@@ -29,6 +29,8 @@ export type StartCodexRpcProcess = () => CodexRpcProcess
 
 export type CodexUsageOptions = {
   cwd: string
+  /** An extra account's CODEX_HOME (docs/managed-agents/accounts.md). Absent reads the default login. */
+  home?: string
   now?: () => number
   startRpc?: StartCodexRpcProcess
   runPty?: (options: PtyCaptureOptions) => Promise<PtyCaptureResult>
@@ -40,8 +42,8 @@ function asObject(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-export function startCodexAppServer(): CodexRpcProcess {
-  const env = usageProcessEnv()
+export function startCodexAppServer(overrides: Record<string, string> = {}): CodexRpcProcess {
+  const env = usageProcessEnv(overrides)
   const executable = resolveUsageCommand('codex', env)
   if (!executable) throw new UsageProcessError('cli_missing', 'codex is not available on PATH.')
   // `-a never` rather than `-a untrusted`: codex 0.154 and later reject `untrusted` for
@@ -332,14 +334,19 @@ export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): Agen
 
 export async function collectCodexUsage(options: CodexUsageOptions): Promise<AgentProviderUsageReading> {
   const now = options.now ?? Date.now
+  const env: Record<string, string> = options.home ? { CODEX_HOME: options.home } : {}
   try {
-    return parseCodexRpcResponse(await readCodexRateLimitsViaRpc(options.startRpc), now())
+    return parseCodexRpcResponse(
+      await readCodexRateLimitsViaRpc(options.startRpc ?? (() => startCodexAppServer(env))),
+      now(),
+    )
   } catch (rpcError) {
     try {
       const result = await (options.runPty ?? capturePty)({
         command: 'codex',
         args: ['-s', 'read-only', '-a', 'never'],
         cwd: options.cwd,
+        env,
         startupInput: '/status\r',
       })
       return parseCodexTtyOutput(result.output, now())

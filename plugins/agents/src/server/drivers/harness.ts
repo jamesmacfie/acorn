@@ -6,7 +6,7 @@
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
 import type { AgentCapability, AgentSession } from '../../contract/wire.ts'
-import type { AgentDriverLoopHooks, AgentDriverReadBlock } from './types'
+import type { AgentDriverLoopHooks, AgentDriverReadBlock, HarnessAccounts } from './types'
 
 /** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
  *  second harness needs it. See docs/plugin-authoring/harnesses.md § Harnesses. */
@@ -79,9 +79,11 @@ export type HarnessLaunchSpec = {
    *  agents). */
   systemPromptInstructions?: true
   quirks?: HarnessQuirks
+  /** Built-in only. Set when the CLI can run more than one login side by side. */
+  accounts?: HarnessAccounts
   /** Whether the harness's own account is logged in, for the Agent Center's provider-health row.
-   *  Absent means the row shows installed-or-not only. */
-  probeAuth?: (executable: string) => Promise<boolean | null>
+   *  Absent means the row shows installed-or-not only. `env` points the CLI at an account's folder. */
+  probeAuth?: (executable: string, env?: Record<string, string>) => Promise<boolean | null>
 }
 
 // What any ACP harness can carry, because the protocol defines these update kinds and the shared

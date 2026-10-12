@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { AgentTurnSource } from '../contract/wire.ts'
+import { ACCOUNT_NAME_PATTERN } from './accounts'
 
 const agentInputPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().max(1_000_000) }),
@@ -66,6 +67,9 @@ export const createAgentSessionSchema = z
     // so a caller names the agent and never sends its instructions
     // (docs/managed-agents/custom-agents.md § Custom agents).
     customAgentId: z.string().min(1).max(200).optional(),
+    // One of the harness's extra logins, pinned for the life of the session. Absent is the harness's
+    // default login (docs/managed-agents/accounts.md).
+    account: z.string().regex(ACCOUNT_NAME_PATTERN).optional(),
     config: z.record(z.string(), z.unknown()).default({}),
   })
   .superRefine((input, context) => {

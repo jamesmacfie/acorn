@@ -82,6 +82,9 @@ export type ProviderLifecyclePorts = {
   skillsDelivered(sessionId: string, report: SkillReport): Promise<void>
   /** The bridge for a start of a driver with `loopHooks`, or null when no loop point has a handler. */
   loopHooks(session: AgentSession): Promise<AgentDriverLoopHooks | null>
+  /** The config folder of the account the session is pinned to, or null for the harness's default
+   *  login. Throws when that account was removed. */
+  accountHome(session: AgentSession): Promise<string | null>
   /** Whether the person switched the read block on, read at every start. */
   readBlockOn(): Promise<boolean>
   /** The read block for a start of a driver with `readBlock`, once `readBlockOn` said yes. */
@@ -323,6 +326,8 @@ export class ProviderSessionLifecycle {
       const sandboxed = live.driver.readBlock === true && (await read(() => this.ports.readBlockOn()))
       signal.throwIfAborted()
       const env = this.ports.scopedEnvironment(session, sandboxed)
+      // Every start and resume, because the CLI finds the session it resumes only in this folder.
+      const accountHome = await read(() => this.ports.accountHome(session))
       const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
       live.retireMcp = mcp.retire ?? null
       signal.throwIfAborted()
@@ -357,6 +362,7 @@ export class ProviderSessionLifecycle {
           skillPlugins: skills.plugins,
           ...(loopHooks ? { loopHooks } : {}),
           ...(readBlock ? { readBlock } : {}),
+          ...(accountHome ? { accountHome } : {}),
           noProviderExecutionHistory,
           signal,
           session,

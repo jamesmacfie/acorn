@@ -13,6 +13,7 @@ import {
   normalizeCodexServerRequest,
 } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
+import { CODEX_ACCOUNTS, withAccountHome } from './accountEnv'
 import type { AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { contextBlock } from './contextBlock'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
@@ -185,7 +186,11 @@ export async function startCodexSession(
     // environment, so spreading process.env hands every Codex session the master encryption key.
     // With owner-level filesystem access to core.sqlite, that decrypts every stored provider
     // credential, bypassing canUseProviderCredential and SecretService.
-    env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
+    env: withAccountHome(
+      brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
+      CODEX_ACCOUNTS,
+      options.accountHome,
+    ),
     onNotification: (notification) => {
       if (options.signal?.aborted || rpc.closed) return
       // Server start-up is the process's, not a thread's, so it is kept for the panel and goes no

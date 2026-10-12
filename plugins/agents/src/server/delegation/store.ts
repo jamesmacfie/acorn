@@ -43,6 +43,8 @@ export type AgentSpawnProvisioning = {
   checks?: AgentCheck[]
   configOptions?: Record<string, string>
   customAgentId?: string
+  // The parent's account, when the child runs on the parent's harness (docs/managed-agents/accounts.md).
+  account?: string
 }
 
 export type AgentDelegationVisibility = {

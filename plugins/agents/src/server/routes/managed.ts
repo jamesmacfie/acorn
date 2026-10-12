@@ -1,4 +1,5 @@
 import { sessionListQuerySchema, type SessionListFilter } from '../../shared/sessionList'
+import { ACCOUNT_NAME_PATTERN, isAccountName } from '../../shared/accounts'
 import type { Context } from 'hono'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
@@ -59,6 +60,9 @@ export type ManagedAgentsBridge = {
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
+  // Settings > Agents > Accounts (docs/managed-agents/accounts.md). Each answers the fresh provider list.
+  addAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
+  removeAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
   // Settings > Storage and memory. Node-wide, like `runs`.
   footprint(): Promise<AgentFootprint>
   stopIdleNow(): Promise<{ stopped: number }>
@@ -254,6 +258,19 @@ export const managedAgents = new Hono<AppEnv>()
     isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()),
   )
   .get('/providers', (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
+  // Device only: which logins the Node's agents run on is the owner's choice, never a task agent's.
+  .post('/providers/:providerId/accounts', requireDevice, async (c) => {
+    const parsed = z
+      .object({ name: z.string().regex(ACCOUNT_NAME_PATTERN) })
+      .safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.addAccount(c.req.param('providerId'), parsed.data.name))
+  })
+  .delete('/providers/:providerId/accounts/:name', requireDevice, (c) => {
+    const name = c.req.param('name')
+    if (!isAccountName(name)) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.removeAccount(c.req.param('providerId'), name))
+  })
   // Settings > Storage and memory (docs/managed-agents/operations.md § Operations and failure). Device only: the
   // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
   // something a task-scoped agent may ask for.
@@ -369,6 +386,7 @@ export const managedAgents = new Hono<AppEnv>()
       customAgent: _unread,
       standingContext: _standingContext,
       skillIndex: _skillIndex,
+      account: _account,
       ...config
     } = parsed.data.config
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.createSession({ ...parsed.data, config }, key))

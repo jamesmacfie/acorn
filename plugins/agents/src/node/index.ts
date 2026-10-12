@@ -55,6 +55,7 @@ import {
   saveCustomAgent,
 } from '../server/customAgents'
 import { createAgentUsageService } from '../server/usage/service'
+import { AgentAccounts, agentAccountsRoot } from '../server/accounts'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
@@ -111,14 +112,17 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
       provider: claudeHarness.id,
       label: claudeHarness.label,
       ...(claudeHarness.glyph ? { glyph: claudeHarness.glyph } : {}),
-      collect: async (pricing) =>
-        (await import('../server/usage/claudeUsage')).collectClaudeUsage({ probeDir, pricing }),
+      collect: async (pricing, home) =>
+        (await import('../server/usage/claudeUsage')).collectClaudeUsage({ probeDir, pricing, home }),
+      accounts: true,
     }),
     agentUsageCollectors.register({
       provider: 'codex',
       label: 'Codex',
       glyph: 'brand:agents/codex',
-      collect: async () => (await import('../server/usage/codexUsage')).collectCodexUsage({ cwd: probeDir }),
+      collect: async (_pricing, home) =>
+        (await import('../server/usage/codexUsage')).collectCodexUsage({ cwd: probeDir, home }),
+      accounts: true,
     }),
   ]
 }
@@ -200,8 +204,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // harness collector for a fresh reset time; ordinary page reads keep using the cached snapshot.
       const probeDir = join(dataDir, 'agent-usage-probe')
       registerBuiltInUsageCollectors(probeDir)
+      // One folder record for the runtime and the usage service, so both see the same accounts.
+      const accounts = new AgentAccounts(agentAccountsRoot(dataDir))
       const usageService = createAgentUsageService({
         probeDir,
+        accounts: async (providerId) =>
+          (await accounts.list(providerId)).map((name) => ({ name, home: accounts.home(providerId, name) })),
         pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
         onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
       })
@@ -228,6 +236,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       runtime = new ManagedAgentRuntime({
         db: store,
         dataDir,
+        accounts,
         core,
         hooks: ctx.hooks,
         telemetry: ctx.telemetry,
@@ -242,12 +251,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
         notice: (notice) => ctx.events.notice(notice),
-        usageLimitResetAt: async (providerId) => {
+        usageLimitResetAt: async (providerId, account) => {
           const userId = core.identity.active()
           if (!userId) return null
           const defaults = await readAgentSessionDefaults(core.prefs, userId)
           if (!defaults.continueAfterUsageLimit) return null
-          return usageService.depletedUntil({ userId, providerId })
+          return usageService.depletedUntil({ userId, providerId, account })
         },
         publish: (frame) => {
           ctx.events.send(frame)
@@ -288,7 +297,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             profileId: session.profileId,
             title: `${session.title} · terminal`,
             command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
-            env: handoff.env,
+            // The CLI finds the session only in the folder of the account it started under.
+            env: { ...handoff.env, ...(await runtime!.accountEnv(session)) },
             agentSessionId: session.id,
           })
           return terminal.id

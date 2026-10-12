@@ -9,7 +9,12 @@ import type { AgentPricingPreferences } from '../../shared/pricing'
 // registered by the delivery seam. A harness with no collector shows no usage section, which is the
 // honest answer for most agent CLIs.
 
-export type AgentUsageCollector = (pricing: AgentPricingPreferences) => Promise<AgentProviderUsageReading>
+/** `home` is an extra account's config folder, for a collector with `accounts`. Absent reads the
+ *  harness's default login. */
+export type AgentUsageCollector = (
+  pricing: AgentPricingPreferences,
+  home?: string,
+) => Promise<AgentProviderUsageReading>
 
 export type AgentUsageCollectorEntry = {
   provider: string
@@ -17,6 +22,8 @@ export type AgentUsageCollectorEntry = {
   label: string
   glyph?: string
   collect: AgentUsageCollector
+  /** The collector can read one account's folder, so the service asks it once per extra account too. */
+  accounts?: boolean
 }
 
 export class AgentUsageCollectorRegistry {

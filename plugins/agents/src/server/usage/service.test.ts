@@ -286,3 +286,43 @@ describe('agent usage service', () => {
     expect(await service.depletedUntil({ userId: 'james', providerId: 'codex' })).toBeNull()
   })
 })
+
+describe('agent usage service with extra accounts', () => {
+  it('reads each account of a harness that can, and checks the account that ran out', async () => {
+    const homes: Array<string | undefined> = []
+    const registry = new AgentUsageCollectorRegistry()
+    registry.register({
+      provider: 'claude',
+      label: 'Claude Code',
+      accounts: true,
+      collect: async (_pricing, home) => {
+        homes.push(home)
+        return home
+          ? {
+              ...provider('claude', 0),
+              quotas: [{ ...provider('claude').quotas[0]!, percentRemaining: 0, health: 'depleted', resetsAt: 9_000 }],
+            }
+          : provider('claude')
+      },
+    })
+    registry.register({ provider: 'codex', label: 'Codex', collect: async () => provider('codex') })
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      collectors: registry,
+      now: () => 1_000,
+      accounts: async (providerId) => [{ name: 'work', home: `/accounts/${providerId}/work` }],
+    })
+
+    const snapshot = await service.read({ userId: 'james' })
+    expect(snapshot.providers.map((row) => [row.label, row.accountName])).toEqual([
+      ['Claude Code', undefined],
+      ['Claude Code · work', 'work'],
+      ['Codex', undefined],
+    ])
+    expect(homes).toEqual([undefined, '/accounts/claude/work'])
+
+    expect(await service.depletedUntil({ userId: 'james', providerId: 'claude', account: 'work' })).toBe(9_000)
+    expect(await service.depletedUntil({ userId: 'james', providerId: 'claude' })).toBeNull()
+    expect(await service.depletedUntil({ userId: 'james', providerId: 'claude', account: 'gone' })).toBeNull()
+  })
+})

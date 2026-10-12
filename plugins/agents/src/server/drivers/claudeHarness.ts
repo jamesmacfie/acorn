@@ -172,5 +172,14 @@ export const claudeHarness: HarnessLaunchSpec = {
   // on. Compaction is the CLI's `/compact`, but ACP cannot request it, so it stays undeclared until
   // the adapter carries it.
   quirks: { sessionPersistence: true },
-  probeAuth: async (executable) => (await import('./authProbe')).probeClaudeAuthentication(executable),
+  // Claude Code 2.1 and later also name their macOS Keychain entry after the folder, so two folders
+  // hold two logins there too. CLAUDE_CODE_OAUTH_TOKEN would beat the folder's login, and the
+  // passthrough above carries it.
+  accounts: {
+    env: 'CLAUDE_CONFIG_DIR',
+    login: ['auth', 'login'],
+    logout: ['auth', 'logout'],
+    overrides: ['CLAUDE_CODE_OAUTH_TOKEN'],
+  },
+  probeAuth: async (executable, env) => (await import('./authProbe')).probeClaudeAuthentication(executable, env),
 }

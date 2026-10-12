@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import type { CustomAgent } from '../../shared/customAgents'
-import { choiceDescription, newSessionChoices } from './newSessionChoices'
+import { choiceAvailable, choiceDescription, choiceLabel, choiceStart, newSessionChoices } from './newSessionChoices'
 
 const provider = (id: string, installed = true) =>
   ({
@@ -31,5 +31,20 @@ describe('new session choices', () => {
     // An agent on an uninstalled harness says why it cannot start.
     expect(choiceDescription(choices[2]!)).toBe('Not on PATH')
     expect(choiceDescription({ provider: provider('codex'), agent: agent('Reviewer', 'codex') })).toBe('Codex · high')
+  })
+
+  it('follows each harness with its extra accounts, and a signed-out one cannot start', () => {
+    const claude = {
+      ...provider('claude'),
+      accounts: [
+        { name: 'work', authenticated: true, loginCommand: null },
+        { name: 'old', authenticated: false, loginCommand: null },
+      ],
+    }
+    const choices = newSessionChoices([claude, provider('codex')], [])
+    expect(choices.map(choiceLabel)).toEqual(['Claude Code', 'Claude Code · work', 'Claude Code · old', 'Codex'])
+    expect(choices.map(choiceAvailable)).toEqual([true, true, false, true])
+    expect(choiceStart(choices[1]!)).toEqual({ account: 'work' })
+    expect(choiceDescription(choices[2]!)).toMatch(/Not signed in/)
   })
 })

@@ -31,7 +31,7 @@ import {
   selectedManagedSession,
 } from './managedSelection'
 import { agentSessionRoster } from './sessionRoster'
-import { newSessionChoices, type NewSessionChoice } from './newSessionChoices'
+import { choiceAvailable, choiceStart, newSessionChoices, type NewSessionChoice } from './newSessionChoices'
 import { customAgentsOptions } from '../settings/customAgentsClient'
 import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
 
@@ -210,13 +210,14 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     }
   }
 
-  async function createSession({ provider: descriptor, agent }: NewSessionChoice) {
-    if (!descriptor.installed || creating()) return
+  async function createSession(choice: NewSessionChoice) {
+    const descriptor = choice.provider
+    if (!choiceAvailable(choice) || creating()) return
     const owner = managedAgentStore.captureRead()
     setCreating(true)
     setError('')
     try {
-      const session = await managedAgentStore.startSession(task.id, descriptor, agent?.id)
+      const session = await managedAgentStore.startSession(task.id, descriptor, choiceStart(choice))
       owner.check()
       selectManagedSession(task.id, session.id)
       await managedAgentStore.loadSnapshot(session.id)

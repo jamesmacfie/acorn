@@ -26,6 +26,8 @@ import type { EnqueueAgentTurnInput } from '../../shared/schemas'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
+import { AgentAccounts, agentAccountsRoot } from '../accounts'
+import { sessionAccount } from '../../shared/accounts'
 import type { McpReviewManager } from '../mcpReviewManager'
 import { sessionMcpSelection } from '../../shared/mcpServers'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
@@ -136,8 +138,12 @@ export type AgentRuntimeOptions = {
   idleSweepMs?: number
   /** How often provider processes are counted for telemetry. Overridable for the same reason. */
   footprintSampleMs?: number
-  /** Confirms a suspected provider usage-limit error and returns the account's reset time. */
-  usageLimitResetAt?(providerId: string): Promise<number | null>
+  /** Confirms a suspected provider usage-limit error and returns the account's reset time. A null
+   *  `account` is the harness's default login. */
+  usageLimitResetAt?(providerId: string, account: string | null): Promise<number | null>
+  /** The Node's extra harness logins. Defaults to the folder under `dataDir`; the composition root
+   *  passes its own so the usage service reads the same one. */
+  accounts?: AgentAccounts
   /** Test seam for the small delay after the provider's advertised reset boundary. */
   usageContinuationGraceMs?: number
   /** `ctx.events.notice`, for a bell row when an agent repeats a tool call. Optional so a test can build
@@ -196,6 +202,7 @@ export class ManagedAgentEngine {
   readonly attachments: AgentAttachmentStore
   readonly artifacts: AgentArtifactStore
   readonly webhooks: AgentWebhookService
+  readonly accounts: AgentAccounts
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
   /** Who hears a session frame. */
@@ -220,7 +227,7 @@ export class ManagedAgentEngine {
   private readonly currentUserId: () => string | null
   private readonly hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   private readonly telemetry?: PluginTelemetry
-  private readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
+  private readonly usageLimitResetAt?: AgentRuntimeOptions['usageLimitResetAt']
   private readonly usageContinuationGraceMs: number
   private readonly notice?: (notice: PluginNotice) => void
   // Loaded on the first tool call that has input.
@@ -254,6 +261,7 @@ export class ManagedAgentEngine {
     this.notice = options.notice
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.skillFolders = join(options.dataDir, 'agent-skills')
+    this.accounts = options.accounts ?? new AgentAccounts(agentAccountsRoot(options.dataDir))
     const publish = options.publish
     this.store = new AgentStore(options.db, options.core, (frame) => {
       if (!this.stopped) publish?.(frame)
@@ -289,6 +297,7 @@ export class ManagedAgentEngine {
             afterTool: after!.length > 0,
           }
         },
+        accountHome: (session) => this.accountHome(session),
         // The person's switch on Settings > Security and backup (docs/managed-agents/read-block.md).
         readBlockOn: async () => {
           const userId = this.currentUserId()
@@ -625,6 +634,16 @@ export class ManagedAgentEngine {
     this.internalEnv.revokeSession?.({ taskId: session.taskId, sessionId: session.id })
   }
 
+  /** The config folder of the account the session is pinned to, or null for the harness's default
+   *  login (docs/managed-agents/accounts.md). */
+  async accountHome(session: AgentSession): Promise<string | null> {
+    const account = sessionAccount(session.config)
+    if (!account) return null
+    if (!(await this.accounts.has(session.providerId, account)))
+      throw new Error(`This session runs on the '${account}' account, which was removed from this Node.`)
+    return this.accounts.home(session.providerId, account)
+  }
+
   private scopedProviderEnvironment(session: AgentSession, sandboxed: boolean): Record<string, string> {
     // The session row is the authority for the tool ceiling across restarts. A sandboxed start narrows
     // it to write tools, because every execute tool, such as a run target, a workflow, a delegated
@@ -787,8 +806,10 @@ export class ManagedAgentEngine {
     if (!this.usageLimitResetAt || !mayBeUsageLimit(event)) return false
     const providerId = this.processes.current(sessionId)?.providerId
     if (!providerId) return false
+    // The session's own account, whose quota ran out, not the harness's default login.
+    const account = sessionAccount((await this.store.requireSession(sessionId)).config)
     const resetAt = await awaitWithSignal(
-      this.usageLimitResetAt(providerId).catch(() => null),
+      this.usageLimitResetAt(providerId, account).catch(() => null),
       this.processes.signal(generation),
     )
     if (resetAt == null || !this.processes.owns(generation)) return false

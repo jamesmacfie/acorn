@@ -39,6 +39,7 @@ import {
 } from './sessionOrder'
 import { isStale } from '../inlineDiff/patchStatus.ts'
 import { eventTime } from './eventTime'
+import { sessionAccount } from '../../shared/accounts'
 import {
   clearManagedSubagent,
   openManagedSession,
@@ -304,7 +305,12 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                         {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
                       </Show>
                       <Text emphasis="muted">
-                        {[current().providerId, sessionModelSummary(current()), current().runtimeState]
+                        {[
+                          current().providerId,
+                          sessionAccount(current().config),
+                          sessionModelSummary(current()),
+                          current().runtimeState,
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </Text>

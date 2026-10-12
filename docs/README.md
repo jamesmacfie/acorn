@@ -255,7 +255,7 @@ Each feature landing page above has topic pages in a folder of the same name:
   setup](./workspaces-and-tasks/worktrees.md), [Workspace
   icons](./workspaces-and-tasks/workspace-icons.md).
 - [managed-agents.md](./managed-agents.md): [Web activity and file
-  changes](./managed-agents/activity.md), [App-access approval](./managed-agents/app-access.md),
+  changes](./managed-agents/activity.md), [Harness accounts](./managed-agents/accounts.md), [App-access approval](./managed-agents/app-access.md),
   [Context, files, and attachments](./managed-agents/attachments.md), [Background
   commands](./managed-agents/background-commands.md), [Client
   surfaces](./managed-agents/client-surfaces.md), [The composer](./managed-agents/composer.md),
@@ -334,8 +334,6 @@ Each feature landing page above has topic pages in a folder of the same name:
   kept while its real-app acceptance is open.
 - [Inline line blame](./future/editor-line-blame.md): the plan behind Git blame on the Editor cursor
   line, with its four open questions.
-- [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
-  Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 

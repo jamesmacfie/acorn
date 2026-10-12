@@ -18,6 +18,7 @@ import type {
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { TurnFollowUps } from '../sessions/turnFollowUps'
 import { findCustomAgent, type CustomAgent } from '../../shared/customAgents'
+import { sessionAccount, signedIn } from '../../shared/accounts'
 import { assistantResult, parseStructuredResult } from '../sessions/resultContract'
 import {
   assertBoundedDelegationConfig,
@@ -317,9 +318,12 @@ export class AgentDelegationService {
     const custom = await this.customAgentFor(input)
     const defaults = await this.runtime.spawnedAgentDefaults()
     const profileId = spawnProfileId(defaults, caller.profileId, input.profileId, custom)
-    const provider = await this.runtime.providers.usable((candidate) => candidate.profileId === profileId)
+    // A child on its parent's harness runs on the parent's login, which the person picked for this work.
+    // Another harness has logins of its own, so its child takes that harness's default.
+    const account = caller.managedSession?.profileId === profileId ? sessionAccount(caller.managedSession.config) : null
+    const provider = await this.runtime.providers.usable((candidate) => candidate.profileId === profileId, account)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
-    if (!provider.installed || provider.authenticated === false) {
+    if (!provider.installed || signedIn(provider, account) === false) {
       throw new ToolError('bad_request', provider.diagnostics[0] ?? `Profile '${profileId}' is unavailable.`)
     }
     // A custom agent narrows like any other ceiling, between the caller's and the one asked for here.
@@ -354,6 +358,7 @@ export class AgentDelegationService {
                 ...(input.checks ? { checks: input.checks } : {}),
                 ...(input.configOptions ? { configOptions: input.configOptions } : {}),
                 ...(custom ? { customAgentId: custom.id } : {}),
+                ...(account ? { account } : {}),
               },
             })
           : this.store.reserveShared({
@@ -389,6 +394,7 @@ export class AgentDelegationService {
           parentSessionId: caller.managedSession?.id,
           parentTurnId: caller.parentTurnId ?? undefined,
           ...(custom ? { customAgentId: custom.id } : {}),
+          ...(account ? { account } : {}),
           config: {
             delegationSpawnId: reserved.spawn.id,
             toolCeiling,

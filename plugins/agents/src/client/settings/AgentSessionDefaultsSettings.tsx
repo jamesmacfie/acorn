@@ -41,6 +41,7 @@ import {
 } from '../sessions/toolFoldPrefs'
 import { saveStartupContextInjection, startupContextInjection } from './startupContext'
 import SpawnedAgentDefaultsSettings from './SpawnedAgentDefaultsSettings'
+import AgentAccountsSection from './AgentAccountsSection'
 
 /** The line under a harness's name: its version and sign-in, or why it is missing. The row's badge says
  *  whether it is installed. */
@@ -163,6 +164,8 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
           )}
         </For>
       </SettingsSection>
+
+      <AgentAccountsSection />
 
       <SettingsSection id="usage" label="Usage limits">
         <SettingRow

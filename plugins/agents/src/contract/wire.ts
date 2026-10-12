@@ -157,6 +157,17 @@ export type AgentProviderDescriptor = {
   commands: AgentCommandDescriptor[]
   skills: AgentSkillDescriptor[]
   diagnostics: string[]
+  /** Present when the harness can run more than one login: the extra accounts this Node holds, beside
+   *  the default login `authenticated` describes (docs/managed-agents/accounts.md). */
+  accounts?: AgentAccountDescriptor[]
+}
+
+export type AgentAccountDescriptor = {
+  name: string
+  authenticated: boolean | null
+  /** The shell line that signs this account in, for the person to run on the Node. Null when the CLI
+   *  isn't installed. */
+  loginCommand: string | null
 }
 
 // The context source of the notes a delegated child starts with. The transcript draws this part in full.

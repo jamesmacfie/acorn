@@ -9,7 +9,13 @@ import {
 import { startSessionFromPalette } from './commands'
 import { agentProvidersOptions } from './providersClient'
 import { customAgentsOptions } from './settings/customAgentsClient'
-import { choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
+import {
+  choiceAvailable,
+  choiceLabel,
+  choiceStart,
+  newSessionChoices,
+  type NewSessionChoice,
+} from './sessions/newSessionChoices'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './settings/sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
@@ -91,7 +97,7 @@ function AgentCommands() {
     newSessionChoices(
       (providers.data ?? []).filter((provider) => provider.installed),
       customAgents.data ?? [],
-    ),
+    ).filter(choiceAvailable),
   )
 
   return null
@@ -99,7 +105,9 @@ function AgentCommands() {
 
 /** A row's id. It never changes for a harness or an agent, so a keyboard shortcut can name it. */
 const commandId = (choice: NewSessionChoice): string =>
-  choice.agent ? `agents.custom-agent.${choice.agent.id}` : `agents.harness.${choice.provider.id}`
+  choice.agent
+    ? `agents.custom-agent.${choice.agent.id}`
+    : `agents.harness.${choice.provider.id}${choice.account ? `.account.${choice.account}` : ''}`
 
 /**
  * One "New <harness or agent> session" row per choice the pane's New picker offers, so typing
@@ -137,7 +145,7 @@ function registerNewSessionCommands(list: () => readonly NewSessionChoice[]): vo
           return startSessionFromPalette(
             context.taskId,
             { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
-            choice.agent?.id,
+            choiceStart(choice),
           )
         },
       })),

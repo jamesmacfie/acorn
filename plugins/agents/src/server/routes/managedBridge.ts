@@ -24,6 +24,7 @@ function bridgeFailure(error: unknown): never {
   // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
   if (/^Unknown agent provider/.test(message)) throw new BridgeError(400, 'bad_request', message)
   if (/not found/i.test(message)) throw new BridgeError(404, 'agent_not_found', message)
+  if (/already exists/.test(message)) throw new BridgeError(409, 'agent_conflict', message)
   if (/not available|unavailable|no mapped checkout/i.test(message)) {
     throw new BridgeError(422, 'agent_provider_unavailable', message)
   }
@@ -72,6 +73,8 @@ export function managedAgentsBridge(
       return sessionId ? await taskIdForSession(sessionId) : null
     },
     providers: (force) => guarded(() => runtime.providers.list(force)),
+    addAccount: (providerId, name) => guarded(() => runtime.addAccount(providerId, name)),
+    removeAccount: (providerId, name) => guarded(() => runtime.removeAccount(providerId, name)),
     footprint: async () => ({
       ...(await runtime.upkeep.processFootprint()),
       ...(await runtime.upkeep.diskFootprint()),

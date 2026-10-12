@@ -44,6 +44,16 @@ const jsonWrite = <T>(
 export const managedAgentApi = {
   providers: (force = false, options: AgentOrigin = {}) =>
     readJson<AgentProviderDescriptor[]>(`${ROOT}/providers${force ? '?force=true' : ''}`, options),
+  // Settings > Agents > Accounts. Each answers the fresh provider list.
+  addAccount: (providerId: string, name: string) =>
+    jsonWrite<AgentProviderDescriptor[]>(`${ROOT}/providers/${encodeURIComponent(providerId)}/accounts`, 'POST', {
+      name,
+    }),
+  removeAccount: (providerId: string, name: string) =>
+    jsonWrite<AgentProviderDescriptor[]>(
+      `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}`,
+      'DELETE',
+    ),
   // Settings > Storage and memory. At a named node, because the page says which node it shows.
   footprint: (options: { nodeId?: string } = {}) => readJson<AgentFootprint>(`${ROOT}/footprint`, options),
   stopIdle: (options: { nodeId?: string } = {}) =>

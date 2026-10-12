@@ -31,6 +31,7 @@ import { contextBlock } from './contextBlock'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
 import type { AcpLaunch } from './acpDriver'
+import { withAccountHome } from './accountEnv'
 import type {
   AgentDriverEvent,
   AgentDriverMcpServer,
@@ -292,13 +293,17 @@ export async function startAcpSession(
     // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security/credentials.md § Credential
     // handling. A passthrough glob is for tool configuration, never for credentials, which is why
     // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist AGENT_TOOL_PASSTHROUGH names.
-    env: {
-      ...brokerEnv({
-        env: options.env,
-        passthrough: [...AGENT_TOOL_PASSTHROUGH, ...(spec.envPassthrough ?? [])],
-      }),
-      ...launch.env,
-    },
+    env: withAccountHome(
+      {
+        ...brokerEnv({
+          env: options.env,
+          passthrough: [...AGENT_TOOL_PASSTHROUGH, ...(spec.envPassthrough ?? [])],
+        }),
+        ...launch.env,
+      },
+      spec.accounts,
+      options.accountHome,
+    ),
   })
   // The node's log, not the transcript: an adapter writes its startup banner here, which would put a
   // useless row in the reader's conversation on every spawn. The content stays unlogged

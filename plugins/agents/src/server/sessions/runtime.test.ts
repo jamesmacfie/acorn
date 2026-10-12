@@ -3005,3 +3005,105 @@ describe('managed agent runtime conformance', () => {
     expect(starts.at(-1)!.mcpServers.map((server) => server.name)).toEqual(['docs'])
   })
 })
+
+describe('sessions pinned to an extra account', () => {
+  // docs/managed-agents/accounts.md: the account is chosen at creation, kept on the session, and handed
+  // to the driver as a config folder at every start.
+  class AccountDriver extends FakeAgentDriver {
+    readonly accounts = { env: 'FAKE_HOME', login: ['login'], logout: ['logout'] }
+    readonly signedIn = new Set<string>()
+    readonly starts: AgentDriverStartOptions[] = []
+
+    async probeAccount(home: string): Promise<boolean | null> {
+      return this.signedIn.has(home)
+    }
+
+    override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+      this.starts.push(options)
+      return super.start(options)
+    }
+  }
+
+  let testDb: TestDb
+  let pluginDb: TestPluginDb
+  let dataDir: string
+  let runtime: ManagedAgentRuntime
+  let driver: AccountDriver
+  let taskId: string
+
+  beforeEach(async () => {
+    testDb = makeTestDb()
+    pluginDb = makeTestPluginDb('agents')
+    dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-accounts-'))
+    taskId = (await seedTask(testDb, dataDir)).taskId
+    driver = new AccountDriver()
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core: createCoreServices({
+        secrets: SECRETS,
+        db: testDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+  })
+
+  afterEach(async () => {
+    await runtime.stop()
+    pluginDb.cleanup()
+    testDb.cleanup()
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  const create = (input: { account?: string; config?: Record<string, unknown> }) =>
+    runtime.createSession({
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: input.config ?? {},
+      ...(input.account ? { account: input.account } : {}),
+    })
+
+  it('starts on the account folder only once that account is signed in', async () => {
+    const [listed] = await runtime.addAccount('fake', 'work')
+    expect(listed.accounts).toEqual([{ name: 'work', authenticated: false, loginCommand: null }])
+    await expect(create({ account: 'work' })).rejects.toThrow(/not signed in/)
+
+    const home = join(dataDir, 'agent-accounts', 'fake', 'work')
+    driver.signedIn.add(home)
+    const session = await create({ account: 'work' })
+
+    expect(session.config.account).toBe('work')
+    expect(driver.starts.at(-1)?.accountHome).toBe(home)
+  })
+
+  it('keeps an account a fork carries in its config, and refuses one the Node does not hold', async () => {
+    await runtime.addAccount('fake', 'work')
+    driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))
+    expect((await create({ config: { account: 'work' } })).config.account).toBe('work')
+    await expect(create({ account: 'other' })).rejects.toThrow(/no account called 'other'/)
+  })
+
+  it('starts the default login with no folder', async () => {
+    const session = await create({})
+    expect(session.config.account).toBeUndefined()
+    expect(driver.starts.at(-1)?.accountHome).toBeUndefined()
+  })
+
+  it('fails a start whose account was removed', async () => {
+    await runtime.addAccount('fake', 'work')
+    driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))
+    const session = await create({ account: 'work' })
+    await runtime.removeAccount('fake', 'work')
+    expect((await runtime.providers.list()).find((provider) => provider.id === 'fake')?.accounts).toEqual([])
+    await expect(runtime.accountEnv(session)).rejects.toThrow(/was removed/)
+  })
+})

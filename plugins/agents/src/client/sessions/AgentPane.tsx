@@ -29,7 +29,13 @@ import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
-import { choiceDescription, choiceGlyph, choiceLabel, type NewSessionChoice } from './newSessionChoices'
+import {
+  choiceAvailable,
+  choiceDescription,
+  choiceGlyph,
+  choiceLabel,
+  type NewSessionChoice,
+} from './newSessionChoices'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { canStopAgent, canStopSubagent } from './agentActivity'
 import { selectedManagedSubagent } from './managedSelection'
@@ -41,6 +47,7 @@ import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderCon
 import { runningBackgroundCommands } from './backgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../paneIdentity'
+import { sessionAccount } from '../../shared/accounts'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -72,10 +79,12 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
     <Toolbar ariaLabel="Agent session">
       {/* The provider's mark, then the title, on one line. The mark takes the title here because
           nothing beside it names the provider. */}
-      <Show when={model.selected()?.providerId}>
-        {(providerId) => (
-          <ProviderGlyph glyph={providerMarkName(providerId())} label={providerId()} title={providerId()} />
-        )}
+      <Show when={model.selected()}>
+        {(session) => {
+          const account = () => sessionAccount(session().config)
+          const name = () => (account() ? `${session().providerId} · ${account()}` : session().providerId)
+          return <ProviderGlyph glyph={providerMarkName(session().providerId)} label={name()} title={name()} />
+        }}
       </Show>
       <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
       <Show when={model.selected()}>
@@ -225,7 +234,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           rowLabel={choiceLabel}
           rowDescription={choiceDescription}
           isActive={() => false}
-          isDisabled={(item) => !item.provider.installed || model.creating()}
+          isDisabled={(item) => !choiceAvailable(item) || model.creating()}
           onSelect={(item) => void model.createSession(item)}
           tools={
             <IconButton
@@ -269,7 +278,7 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
             {(choice) => (
               <Card
                 interactive
-                disabled={!choice.provider.installed || model.creating()}
+                disabled={!choiceAvailable(choice) || model.creating()}
                 onPress={() => void model.createSession(choice)}
               >
                 <Stack gap="row">
@@ -278,11 +287,7 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
                     <Text emphasis="strong">{choiceLabel(choice)}</Text>
                   </Inline>
                   <Text emphasis="muted">
-                    {!choice.provider.installed
-                      ? (choice.provider.diagnostics[0] ?? 'Unavailable')
-                      : choice.agent
-                        ? choiceDescription(choice)
-                        : 'Start managed session'}
+                    {!choiceAvailable(choice) || choice.agent ? choiceDescription(choice) : 'Start managed session'}
                   </Text>
                 </Stack>
               </Card>

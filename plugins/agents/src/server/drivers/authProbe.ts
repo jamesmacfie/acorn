@@ -15,10 +15,14 @@ export async function probeExecutableVersion(executable: string): Promise<string
   }
 }
 
-export async function probeCodexAuthentication(executable: string): Promise<boolean | null> {
+// `env` points the CLI at one account's folder (docs/managed-agents/accounts.md).
+export async function probeCodexAuthentication(
+  executable: string,
+  env: Record<string, string> = {},
+): Promise<boolean | null> {
   try {
     const { stdout } = await execFileAsync(executable, ['login', 'status'], {
-      env: usageProcessEnv(),
+      env: usageProcessEnv(env),
       timeout: 5_000,
       maxBuffer: 64 * 1024,
     })
@@ -30,10 +34,13 @@ export async function probeCodexAuthentication(executable: string): Promise<bool
   }
 }
 
-export async function probeClaudeAuthentication(executable: string): Promise<boolean | null> {
+export async function probeClaudeAuthentication(
+  executable: string,
+  env: Record<string, string> = {},
+): Promise<boolean | null> {
   try {
     const { stdout } = await execFileAsync(executable, ['auth', 'status', '--json'], {
-      env: usageProcessEnv(),
+      env: usageProcessEnv(env),
       timeout: 5_000,
       maxBuffer: 64 * 1024,
     })
@@ -42,4 +49,9 @@ export async function probeClaudeAuthentication(executable: string): Promise<boo
   } catch {
     return null
   }
+}
+
+// Best effort: an account folder is deleted whether or not the CLI could sign it out first.
+export async function signOut(executable: string, args: readonly string[], env: Record<string, string>): Promise<void> {
+  await execFileAsync(executable, [...args], { env: usageProcessEnv(env), timeout: 10_000 }).catch(() => undefined)
 }

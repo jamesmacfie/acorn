@@ -184,11 +184,7 @@ describe('the agents plugin catalogue', () => {
     const rows = await start().query('', world, signal())
     expect(await start().select(rows[0], world)).toEqual({ effect: 'close' })
     // The profile travels on the row, because the pick is all `select` is handed.
-    expect(mocks.startSession).toHaveBeenCalledWith(
-      'task-1',
-      { id: 'claude-code', profileId: 'claude-code-fast' },
-      undefined,
-    )
+    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code-fast' }, {})
     expect(mocks.openManagedSession).toHaveBeenCalledWith('task-1', 'new-1')
   })
 
@@ -227,6 +223,10 @@ describe('the agents plugin catalogue', () => {
       ref: 'claude-code',
     })
     await start().select(rows[1], world)
-    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code' }, 'a1')
+    expect(mocks.startSession).toHaveBeenCalledWith(
+      'task-1',
+      { id: 'claude-code', profileId: 'claude-code' },
+      { customAgentId: 'a1' },
+    )
   })
 })

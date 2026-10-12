@@ -6,7 +6,8 @@ each harness's plan usage. The usage collectors are in `plugins/agents/src/serve
 ## Providers
 
 `GET /v1/p/agents/providers` lists the harnesses, whether each is installed and signed in, and the
-configuration options each advertises. The workflow editor reads the same route, so its model and
+configuration options each advertises. A harness that can run more than one login also lists its
+[extra accounts](./accounts.md) and whether each is signed in. The workflow editor reads the same route, so its model and
 reasoning lists match the Agent pane's.
 
 Model and effort choices come from the newest connected session for each provider among the 50
@@ -38,7 +39,8 @@ The client reads the list through the shared `['agents', 'providers']` query
 
 ## Plan usage
 
-Plan usage is per harness and per account. The built-in CLI probes and a contributed harness's
+Plan usage is per harness and per account. A collector that can read one account's folder gets a row
+for each [extra account](./accounts.md#plan-usage) too. The built-in CLI probes and a contributed harness's
 `probes.usage` route feed one registry (`collectors.ts`), and a harness with no collector shows no
 usage section. The Node probes availability and usage on bounded intervals. Five-minute polling and
 the full refresh action check every harness. The refresh icon beside the harness name probes only

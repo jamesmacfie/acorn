@@ -1,5 +1,8 @@
-import type { AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentAccountDescriptor, AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentAccounts } from '../accounts'
+import { signedIn } from '../../shared/accounts'
 import type { AgentDriverRegistry } from '../drivers/registry'
+import type { AgentDriver } from '../drivers/types'
 import type { AgentStore } from './store'
 
 // How long a providers answer is served without probing again. After this it is still served, and a
@@ -24,6 +27,7 @@ export class ProviderCatalogue {
   constructor(
     private readonly registry: AgentDriverRegistry,
     private readonly store: Pick<AgentStore, 'listSessions'>,
+    private readonly accounts: Pick<AgentAccounts, 'list' | 'home'>,
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
   ) {
@@ -49,12 +53,15 @@ export class ProviderCatalogue {
   /**
    * The provider `pick` finds, probed afresh when the served answer would refuse it. The served answer
    * can be minutes old, and a start must not be turned down for a CLI the owner has since installed or
-   * signed in to.
+   * signed in to. `account` names the login the start will use; null is the harness's default.
    */
-  async usable(pick: (provider: AgentProviderDescriptor) => boolean): Promise<AgentProviderDescriptor | undefined> {
+  async usable(
+    pick: (provider: AgentProviderDescriptor) => boolean,
+    account: string | null = null,
+  ): Promise<AgentProviderDescriptor | undefined> {
     const served = (await this.list()).find(pick)
     this.shutdown.throwIfAborted()
-    if (served?.installed && served.authenticated !== false) return served
+    if (served?.installed && signedIn(served, account) !== false) return served
     return (await this.list(true)).find(pick)
   }
 
@@ -81,6 +88,26 @@ export class ProviderCatalogue {
     }))
   }
 
+  private async probeAccounts(
+    driver: AgentDriver,
+    descriptor: AgentProviderDescriptor,
+  ): Promise<AgentAccountDescriptor[]> {
+    const accounts = driver.accounts!
+    const names = await this.accounts.list(driver.providerId)
+    return Promise.all(
+      names.map(async (name) => {
+        const home = this.accounts.home(driver.providerId, name)
+        return {
+          name,
+          authenticated: (await driver.probeAccount?.(home)) ?? null,
+          loginCommand: descriptor.executable
+            ? [`${accounts.env}=${shellQuote(home)}`, shellQuote(descriptor.executable), ...accounts.login].join(' ')
+            : null,
+        }
+      }),
+    )
+  }
+
   // A forced read starts its own probe, because one already running may have started before the
   // install or sign-in the caller is asking about. Any other caller joins the one running.
   private probeProviders(force: boolean): Promise<AgentProviderDescriptor[]> {
@@ -95,7 +122,10 @@ export class ProviderCatalogue {
         const driver = this.registry.create(providerId)
         if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
         try {
-          return await driver.probe()
+          const descriptor = await driver.probe()
+          return driver.accounts
+            ? { ...descriptor, accounts: await this.probeAccounts(driver, descriptor) }
+            : descriptor
         } catch (error) {
           return {
             id: providerId,
@@ -130,3 +160,5 @@ export class ProviderCatalogue {
     return probe
   }
 }
+
+const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`

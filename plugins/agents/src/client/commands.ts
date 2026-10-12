@@ -15,9 +15,11 @@ import { openManagedSession, requestComposerFocus } from './sessions/managedSele
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
 import {
+  choiceAvailable,
   choiceDescription,
   choiceGlyph,
   choiceLabel,
+  choiceStart,
   newSessionChoices,
   type NewSessionChoice,
 } from './sessions/newSessionChoices'
@@ -48,10 +50,10 @@ const pickedRows = new Map<string, NewSessionChoice>()
 export async function startSessionFromPalette(
   taskId: string,
   provider: { id: string; profileId: string },
-  customAgentId?: string,
+  choice: { customAgentId?: string; account?: string } = {},
 ): Promise<void> {
   const owner = managedAgentStore.captureRead()
-  const session = await managedAgentStore.startSession(taskId, provider, customAgentId)
+  const session = await managedAgentStore.startSession(taskId, provider, choice)
   owner.check()
   openManagedSession(taskId, session.id)
   requestComposerFocus(session.id)
@@ -87,7 +89,8 @@ export const agentsCommands: readonly ContributedCommand[] = [
     // The pane's New picker as a palette row: the providers this node runs and then the custom agents,
     // read once when the frame opens and filtered here, because that list does not move while somebody
     // types. Only installed harnesses, and only agents on one: an absent CLI cannot start a session,
-    // and the pane's cards are where the diagnostic that says why belongs.
+    // and the pane's cards are where the diagnostic that says why belongs. A signed-out account is
+    // left out for the same reason.
     ...localSearch(async () => {
       const [providers, agents] = await Promise.all([
         managedAgentApi.providers(),
@@ -98,21 +101,27 @@ export const agentsCommands: readonly ContributedCommand[] = [
       return newSessionChoices(
         providers.filter((provider) => provider.installed),
         agents,
-      ).map((choice): CommandSearchItem => {
-        const glyph = choiceGlyph(choice)
-        const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
-        pickedRows.set(id, choice)
-        return {
-          id,
-          title: choiceLabel(choice),
-          subtitle: choiceDescription(choice),
-          ...(glyph ? { icon: glyph } : {}),
-          ...(choice.agent ? { badge: 'Agent' } : {}),
-          // The profile the session runs under. The row carries it because a picked row is all
-          // `select` gets, and the two ids differ for a provider that ships more than one profile.
-          ref: choice.provider.profileId,
-        }
-      })
+      )
+        .filter(choiceAvailable)
+        .map((choice): CommandSearchItem => {
+          const glyph = choiceGlyph(choice)
+          const id = choice.agent
+            ? `custom-agent:${choice.agent.id}`
+            : choice.account
+              ? `${choice.provider.id}:account:${choice.account}`
+              : choice.provider.id
+          pickedRows.set(id, choice)
+          return {
+            id,
+            title: choiceLabel(choice),
+            subtitle: choiceDescription(choice),
+            ...(glyph ? { icon: glyph } : {}),
+            ...(choice.agent ? { badge: 'Agent' } : {}),
+            // The profile the session runs under. The row carries it because a picked row is all
+            // `select` gets, and the two ids differ for a provider that ships more than one profile.
+            ref: choice.provider.profileId,
+          }
+        })
     }),
     select: async (item, context) => {
       const taskId = context.taskId
@@ -121,7 +130,11 @@ export const agentsCommands: readonly ContributedCommand[] = [
       // Not caught: a failed create leaves the frame open with the reason, which is the only place a
       // palette pick has to say anything.
       const provider = choice?.provider ?? { id: item.id, profileId: item.ref ?? item.id }
-      await startSessionFromPalette(taskId, { id: provider.id, profileId: provider.profileId }, choice?.agent?.id)
+      await startSessionFromPalette(
+        taskId,
+        { id: provider.id, profileId: provider.profileId },
+        choice ? choiceStart(choice) : {},
+      )
       return COMMAND_CLOSED
     },
   },

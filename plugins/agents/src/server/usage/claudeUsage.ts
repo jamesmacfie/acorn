@@ -25,6 +25,8 @@ type RunPty = (options: PtyCaptureOptions) => Promise<PtyCaptureResult>
 
 export type ClaudeUsageOptions = {
   probeDir: string
+  /** An extra account's config folder (docs/managed-agents/accounts.md). Absent reads the default login. */
+  home?: string
   configFile?: string
   claudeDir?: string
   pricing?: AgentPricingPreferences
@@ -46,8 +48,8 @@ function asObject(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-function claudePaths(): { configFile: string; claudeDir: string } {
-  const configured = process.env.CLAUDE_CONFIG_DIR
+function claudePaths(home?: string): { configFile: string; claudeDir: string } {
+  const configured = home ?? process.env.CLAUDE_CONFIG_DIR
   return configured
     ? { configFile: join(configured, '.claude.json'), claudeDir: configured }
     : { configFile: join(homedir(), '.claude.json'), claudeDir: join(homedir(), '.claude') }
@@ -351,13 +353,13 @@ export function parseClaudeUsageOutput(
 }
 
 export async function collectClaudeUsage(options: ClaudeUsageOptions): Promise<AgentProviderUsageReading> {
-  const paths = claudePaths()
+  const paths = claudePaths(options.home)
   const configFile = options.configFile ?? paths.configFile
   const claudeDir = options.claudeDir ?? paths.claudeDir
   const now = options.now ?? Date.now
   const runPty = options.runPty ?? capturePty
   await mkdir(options.probeDir, { recursive: true })
-  const env = usageProcessEnv()
+  const env = usageProcessEnv(options.home ? { CLAUDE_CONFIG_DIR: options.home } : {})
   delete env.CLAUDE_CODE_OAUTH_TOKEN
   const run = (command: '/usage' | '/cost') =>
     runPty({

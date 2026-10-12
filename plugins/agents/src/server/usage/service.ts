@@ -3,7 +3,6 @@ import type {
   AgentProviderUsage,
   AgentProviderUsageReading,
   AgentUsageError,
-  AgentUsageProviderId,
   AgentUsageSnapshot,
 } from '../../shared/usage'
 import { emptyProviderUsage } from '../../shared/usage'
@@ -29,14 +28,18 @@ export type AgentUsageServiceOptions = {
   collectors?: AgentUsageCollectorRegistry
   /** A fresh snapshot landed; a consumer re-reads the route rather than running its own poll. */
   onRefreshed?: () => void
+  /** A harness's extra logins, read per refresh like the collectors (docs/managed-agents/accounts.md). */
+  accounts?: (providerId: string) => Promise<UsageAccount[]>
 }
+
+type UsageAccount = { name: string; home: string }
 
 export type AgentUsageService = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
   refreshProvider(options: { userId: string; providerId: string }): Promise<AgentUsageSnapshot | null>
   /** Freshly confirm that every depleted quota for one harness has a known future reset, then return
    *  the latest of those resets. `null` means the runtime cannot schedule safely. */
-  depletedUntil(options: { userId: string; providerId: string }): Promise<number | null>
+  depletedUntil(options: { userId: string; providerId: string; account?: string | null }): Promise<number | null>
 }
 
 function normalizeError(error: unknown): AgentUsageError {
@@ -47,28 +50,40 @@ function normalizeError(error: unknown): AgentUsageError {
   }
 }
 
+// One row of the snapshot: a harness's default login, or one of its extra accounts.
+type UsageTarget = { entry: AgentUsageCollectorEntry; account: UsageAccount | null }
+
+const rowKey = (provider: string, accountName: string | null | undefined): string =>
+  accountName ? `${provider}\u0000${accountName}` : provider
+
+const targetKey = (target: UsageTarget): string => rowKey(target.entry.provider, target.account?.name)
+
 function failedProvider(
-  entry: AgentUsageCollectorEntry,
+  target: UsageTarget,
   error: unknown,
   lastSuccess: AgentProviderUsage | undefined,
 ): AgentProviderUsage {
   const normalized = normalizeError(error)
   if (lastSuccess) return { ...lastSuccess, stale: true, error: normalized }
-  return emptyProviderUsage(
-    entry.provider,
-    entry.label,
-    normalized.code === 'cli_missing' ? 'missing' : 'error',
-    normalized,
+  return named(
+    target,
+    emptyProviderUsage(
+      target.entry.provider,
+      target.entry.label,
+      normalized.code === 'cli_missing' ? 'missing' : 'error',
+      normalized,
+    ),
   )
 }
 
 // The collector answers about usage, the registration owns the naming. Stamped here so a collector
 // never repeats its own id and label, and the two cannot disagree.
-const named = (entry: AgentUsageCollectorEntry, usage: AgentProviderUsageReading): AgentProviderUsage => ({
+const named = ({ entry, account }: UsageTarget, usage: AgentProviderUsageReading): AgentProviderUsage => ({
   ...usage,
   provider: entry.provider,
-  label: entry.label,
+  label: account ? `${entry.label} · ${account.name}` : entry.label,
   ...(entry.glyph ? { glyph: entry.glyph } : {}),
+  ...(account ? { accountName: account.name } : {}),
 })
 
 export function createAgentUsageService(options: AgentUsageServiceOptions): AgentUsageService {
@@ -76,7 +91,18 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS
   const pricingForUser = options.pricingForUser ?? (async () => emptyAgentPricingPreferences())
   const collectors = options.collectors ?? agentUsageCollectors
-  const lastSuccess = new Map<AgentUsageProviderId, AgentProviderUsage>()
+  const accountsOf = async (entry: AgentUsageCollectorEntry): Promise<UsageAccount[]> =>
+    entry.accounts && options.accounts ? options.accounts(entry.provider) : []
+  const targetsOf = async (entries: AgentUsageCollectorEntry[]): Promise<UsageTarget[]> =>
+    (
+      await Promise.all(
+        entries.map(async (entry) => [
+          { entry, account: null },
+          ...(await accountsOf(entry)).map((account) => ({ entry, account })),
+        ]),
+      )
+    ).flat()
+  const lastSuccess = new Map<string, AgentProviderUsage>()
   let activeKey: string | null = null
   let cached: { key: string; snapshot: AgentUsageSnapshot } | null = null
   let inFlight: { key: string; providerId: string | null; promise: Promise<AgentUsageSnapshot> } | null = null
@@ -91,28 +117,34 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
       activeKey = key
     }
     await mkdir(options.probeDir, { recursive: true })
-    const entries = collectors.entries()
+    const targets = await targetsOf(collectors.entries())
     const previous =
-      cached?.key === key ? new Map(cached.snapshot.providers.map((item) => [item.provider, item])) : null
+      cached?.key === key
+        ? new Map(cached.snapshot.providers.map((item) => [rowKey(item.provider, item.accountName), item]))
+        : null
     // A cold cache or a changed registry needs one complete snapshot before individual rows can be
-    // replaced. Otherwise a manual refresh could silently hide a newly registered harness.
+    // replaced. Otherwise a manual refresh could silently hide a newly registered harness or account.
     const partial =
-      providerId !== null && previous?.has(providerId) && entries.every((entry) => previous.has(entry.provider))
-    const selected = partial ? entries.filter((entry) => entry.provider === providerId) : entries
-    const settled = await Promise.allSettled(selected.map((entry) => entry.collect(pricing)))
+      providerId !== null && previous?.has(providerId) && targets.every((target) => previous.has(targetKey(target)))
+    // A harness's refresh reads all of its accounts, so its rows stay comparable.
+    const selected = partial ? targets.filter((target) => target.entry.provider === providerId) : targets
+    const settled = await Promise.allSettled(
+      selected.map((target) => target.entry.collect(pricing, target.account?.home)),
+    )
     const updated = new Map(
-      selected.map((entry, index) => {
+      selected.map((target, index) => {
         const result = settled[index]
+        const id = targetKey(target)
         if (result.status === 'fulfilled') {
-          const usage = named(entry, result.value)
-          lastSuccess.set(entry.provider, usage)
-          return [entry.provider, usage] as const
+          const usage = named(target, result.value)
+          lastSuccess.set(id, usage)
+          return [id, usage] as const
         }
-        return [entry.provider, failedProvider(entry, result.reason, lastSuccess.get(entry.provider))] as const
+        return [id, failedProvider(target, result.reason, lastSuccess.get(id))] as const
       }),
     )
-    const providers = entries.flatMap((entry) => {
-      const item = updated.get(entry.provider) ?? previous?.get(entry.provider)
+    const providers = targets.flatMap((target) => {
+      const item = updated.get(targetKey(target)) ?? previous?.get(targetKey(target))
       return item ? [item] : []
     })
     // The TTL belongs to the complete probe. Refreshing Claude must not postpone the next Codex
@@ -159,14 +191,17 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     return promise
   }
 
-  const depletedUntil: AgentUsageService['depletedUntil'] = async ({ userId, providerId }) => {
+  const depletedUntil: AgentUsageService['depletedUntil'] = async ({ userId, providerId, account = null }) => {
     const entry = collectors.get(providerId)
     if (!entry) return null
+    // The quota of the login that ran out. An account the collector can't read has no known reset.
+    const home = account ? (await accountsOf(entry)).find((candidate) => candidate.name === account)?.home : undefined
+    if (account && !home) return null
     const pricing = await pricingForUser(userId)
     let usage: AgentProviderUsageReading
     try {
       await mkdir(options.probeDir, { recursive: true })
-      usage = await entry.collect(pricing)
+      usage = await entry.collect(pricing, home)
     } catch {
       return null
     }

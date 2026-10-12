@@ -209,6 +209,11 @@ export const agentsClientPlugin: ClientPlugin = {
       ],
       sections: [
         { id: 'harnesses', label: 'Harnesses', keywords: ['installed', 'cli'] },
+        {
+          id: 'accounts',
+          label: 'Accounts',
+          keywords: ['subscription', 'second account', 'work account', 'sign in', 'login'],
+        },
         { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
         { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
         {

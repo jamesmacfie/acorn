@@ -2,6 +2,7 @@
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { awaitWithSignal, startCancellation } from '../processes/startCancellation'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
+import { CODEX_ACCOUNTS } from './accountEnv'
 import type { MeasureAgentStartup } from './startupTelemetry'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions } from './types'
 
@@ -12,6 +13,13 @@ export class CodexAgentDriver implements AgentDriver {
   readonly profileId = 'codex'
   // Delivered through `skills/extraRoots/set` in `startCodexSession`.
   readonly nativeSkills = true
+  readonly accounts = CODEX_ACCOUNTS
+
+  async probeAccount(home: string): Promise<boolean | null> {
+    const executable = resolveUsageCommand('codex', usageProcessEnv())
+    if (!executable) return null
+    return (await import('./authProbe')).probeCodexAuthentication(executable, { [CODEX_ACCOUNTS.env]: home })
+  }
 
   async probe(): Promise<AgentProviderDescriptor> {
     const env = usageProcessEnv()

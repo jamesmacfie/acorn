@@ -103,6 +103,19 @@ export type AgentDriverReadBlock = {
   fileGuard: { command: string; args: string[] }
 }
 
+/** How a harness's CLI keeps more than one login: one config folder per account, chosen by a variable
+ *  (docs/managed-agents/accounts.md). Built-in only for now. */
+export type HarnessAccounts = {
+  /** The variable that moves the CLI's whole config folder, such as `CLAUDE_CONFIG_DIR`. */
+  env: string
+  /** CLI arguments that sign in to, and out of, the login in that folder. */
+  login: readonly string[]
+  logout: readonly string[]
+  /** Node variables that would override the folder's login. Removed from a session pinned to an
+   *  account, which would otherwise quietly run on the Node's token. */
+  overrides?: readonly string[]
+}
+
 export type AgentDriverStartOptions = {
   /** Local compiled-runtime cancellation. This signal never crosses plugin RPC. */
   signal?: AbortSignal
@@ -127,6 +140,9 @@ export type AgentDriverStartOptions = {
   /** acorn's harness bridge for this start, for a driver with `loopHooks`. Absent when no point has a
    *  handler, so a session nobody would gain from pays no process per tool call. */
   loopHooks?: AgentDriverLoopHooks
+  /** For a driver with `accounts`: the config folder of the account the session is pinned to. Absent
+   *  means the CLI's own default login. */
+  accountHome?: string
   /** For a driver with `readBlock`, when the person switched the block on. Absent means unconfined. */
   readBlock?: AgentDriverReadBlock
   noProviderExecutionHistory: boolean
@@ -182,7 +198,12 @@ export interface AgentDriver {
   /** The harness can keep its agent out of the data root, so the lifecycle passes `readBlock` when the
    *  person switched it on. */
   readonly readBlock?: boolean
+  /** The harness can run more than one login, one config folder each, so a session may be pinned to
+   *  an account and the lifecycle passes its folder as `accountHome`. */
+  readonly accounts?: HarnessAccounts
   probe(): Promise<AgentProviderDescriptor>
+  /** Whether the login in one account's folder is signed in. Present with `accounts`. */
+  probeAccount?(home: string): Promise<boolean | null>
   start(options: AgentDriverStartOptions): Promise<AgentDriverSession>
   classifyTurnFailure?(error: unknown): 'safe_transient' | 'uncertain' | 'permanent'
 }

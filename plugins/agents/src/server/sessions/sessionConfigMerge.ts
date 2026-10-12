@@ -12,6 +12,8 @@ const serverOwnedKeys = [
   'customAgent',
   'standingContext',
   'initialAttendance',
+  // Pinned at creation, because the CLI resumes a session only from its account's folder.
+  'account',
   // The skill names the agent was last told about, natively or in the index.
   'skillIndex',
 ] as const
