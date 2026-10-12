@@ -120,6 +120,16 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     )
   }
 
+  // Straight after hydrating, a slice holds what the node stored, or its default for a key the prefs
+  // map didn't carry. Neither is a change, so both count as already stored. A restore that read an
+  // incomplete map then shows defaults, but never writes them over the node's real values.
+  const adoptHydrated = (slice: PersistedStateSlice<unknown>) => {
+    for (const [scopeId, value] of Object.entries(slice.binding!.values())) {
+      const key = storageKeyFor(slice, scopeId, nodeId)
+      if (!lastStored.has(key)) lastStored.set(key, stringifyPersistedValue(slice, value))
+    }
+  }
+
   createEffect(() => {
     const prefs = options.prefs()
     if (restored() || !prefs || !options.ready()) return
@@ -127,7 +137,11 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     for (const [key, value] of Object.entries(prefs)) lastStored.set(key, value)
     const slices = untrack(options.slices)
     restorePersistedSlices(slices, prefs, nodeId)
-    for (const slice of slices) if (slice.binding) hydratedSlices.add(slice)
+    for (const slice of slices) {
+      if (!slice.binding) continue
+      hydratedSlices.add(slice)
+      untrack(() => adoptHydrated(slice))
+    }
     performance.mark('acorn:restore:end')
     performance.measure('acorn:restore', 'acorn:restore:start', 'acorn:restore:end')
     setRestored(true)
@@ -153,7 +167,10 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     const lateSlices = slices.filter((slice) => !hydratedSlices.has(slice))
     if (lateSlices.length) {
       untrack(() => restorePersistedSlices(lateSlices, prefs, nodeId))
-      for (const slice of lateSlices) hydratedSlices.add(slice)
+      for (const slice of lateSlices) {
+        hydratedSlices.add(slice)
+        untrack(() => adoptHydrated(slice))
+      }
     }
 
     for (const slice of slices) {

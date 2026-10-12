@@ -176,8 +176,10 @@ describe('independent persisted slice effects', () => {
     await vi.advanceTimersByTimeAsync(500)
     expect(mocks.savePref.mock.calls[0]?.[2]).toBe(PERSISTED_STATE_TOMBSTONE)
     expect(mocks.savePref.mock.calls[0]?.[3]).toEqual({ surfaceFailure: false })
-    const bounded = { ...slice('bounded', () => ({ task: { keep: 123, transient: 0 } })), maxBytes: 3 }
+    const [big, setBig] = createSignal({ task: { keep: 0, transient: 0 } })
+    const bounded = { ...slice('bounded', big), maxBytes: 3 }
     boot(() => [bounded], {})
+    setBig({ task: { keep: 123, transient: 0 } })
     await vi.advanceTimersByTimeAsync(500)
     expect(mocks.savePref).toHaveBeenCalledTimes(1)
     expect(mocks.pushBackgroundError).toHaveBeenCalledWith(
@@ -185,5 +187,18 @@ describe('independent persisted slice effects', () => {
       'Could not save bounded',
       expect.stringContaining('3 bytes'),
     )
+  })
+
+  it('leaves a key the prefs map lacked on the Node until its value changes', async () => {
+    // The map the restore read is incomplete: the Node holds this slice's value, but the map doesn't
+    // carry it, so the slice keeps its default. Writing that default would replace the Node's value.
+    const [state, setState] = createSignal({ task: { keep: 0, transient: 0 } })
+    const descriptor = slice('missing', state)
+    boot(() => [descriptor], { unrelated: 'x' })
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mocks.savePref).not.toHaveBeenCalled()
+    setState({ task: { keep: 1, transient: 0 } })
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mocks.savePref.mock.calls.map((call) => call[2])).toEqual(['{"keep":1}'])
   })
 })

@@ -28,31 +28,40 @@ Node's projects with the desktop closed.
    with separate Chrome and Firefox manifests and small API adapters. Build extension pages and
    packaged background/content scripts without remote execution code.
 
-2. Add CLI install, status, and uninstall commands for the native host. Register stable development
+2. Build the [development loop](./README.md#development-loop) next. Answer its open browser
+   questions first. Add `pnpm dev:extension` for Chrome and Firefox, the pinned development
+   identities, the development native host, the session manifest, and the shared browser fake.
+   The development host can echo frames until step 4 adds the real entry. Later phases run their
+   real-browser checks through the loop.
+
+3. Add CLI install, status, and uninstall commands for the native host. Register stable development
    extension identities and exact allowlists. Resolve absolute launcher and Node-runtime paths
    during installation; do not depend on the browser's shell PATH.
 
-3. Create a native-host entry that reads length-prefixed messages and emits framed replies only.
+4. Create a native-host entry that reads length-prefixed messages and emits framed replies only.
    Send diagnostics to stderr. Validate Chrome and Firefox invocation arguments independently. Bound
    input, response, and transfer assembly sizes; chunk large replies below the native message limit.
 
-4. Add the minimal typed native operations for node listing, probe, pair, select, forget, and
+5. Add the minimal typed native operations for node listing, probe, pair, select, forget, and
    project listing. Keep the native process as a thin adapter over custody. Add later operations
    only with their consuming phase.
 
-5. Build sidebar pairing with address entry, compatible/incompatible status, fingerprint comparison
+6. Build sidebar pairing with address entry, compatible/incompatible status, fingerprint comparison
    confirmation, and code entry. Reuse probe and pinned pair helpers; never return a token or
    certificate private material to the extension.
 
-6. Remember nodes in separate browser bridge custody. Connect only the active selection through
+7. Remember nodes in separate browser bridge custody. Connect only the active selection through
    NodeBroker. Bind requests and replies to that node. Preserve device selection in browser storage
    and restore it when the native connection restarts.
 
-7. Show missing-host, invalid-code, offline, revoked, identity-change, and incompatible-node states
+8. Show missing-host, invalid-code, offline, revoked, identity-change, and incompatible-node states
    with an actionable next step. Keep pairing and forgetting usable when restoring a stale selection
    fails.
 
 ## Demo and acceptance
+
+Start `pnpm dev:extension` for each browser from a fresh worktree. Edit a sidebar file and watch
+the extension reload. Stop the session and confirm its native host registration is gone.
 
 Build both development bundles. Register the host through the CLI. Pair a local Node, list projects,
 pair a remote Node, switch to it, and restart the browser. Repeat with the desktop closed.
@@ -69,7 +78,7 @@ pair a remote Node, switch to it, and restart the browser. Repeat with the deskt
 ## Verify and complete
 
 Run custody and CLI suites, the extension suite, lint, and architecture checks. Inspect the built
-manifests and run real native messaging in both browsers.
+manifests and run real native messaging in both browsers through the development loop.
 
 Complete only when the deliverable and acceptance are demonstrated. Record any failure or
 real-browser

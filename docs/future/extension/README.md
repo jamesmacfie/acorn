@@ -1,6 +1,7 @@
 # Acorn browser extension
 
-Status: proposed implementation programme, October 10, 2026.
+Status: proposed implementation programme, October 10, 2026. Development loop added October 13,
+2026.
 Baseline: `f643f1f117261e1b67a21595ef787070731b1103`.
 
 This document holds the decisions and architectural context for the browser extension.
@@ -210,6 +211,56 @@ and [Chrome Manifest V3
 requirements](https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements).
 Recheck them when implementation begins.
 
+## Development loop
+
+Every phase ends with real-browser checks, so build the loop that repeats them in phase 01, before
+the sidebar has features. Model it on [Silo](https://github.com/jamesmacfie/silo), a Firefox
+extension whose `npm run dev` opens a browser with the extension loaded and reloads it on save. Copy
+that shape. Don't copy Silo's React, Jest, and Extension.js tooling.
+
+The loop has these parts:
+
+- A launch command per browser. `pnpm dev:extension -- --browser chrome --session <name>` (or
+  `--browser firefox`) runs the Vite build in watch mode. It opens a separate browser profile under
+  `.acorn/extension-dev/<name>/`, loads the unpacked extension, and reloads it after each rebuild.
+  Your everyday browser profile stays untouched.
+- Fixed development identities. The Chrome development manifest carries a pinned `key`, so the
+  unpacked extension ID doesn't change with the checkout folder. Firefox uses a fixed
+  `browser_specific_settings.gecko.id`. A worktree or a fresh clone then matches the native host
+  allowlist without reinstalling.
+- A development native host. The launcher registers a host under a development-only name that runs
+  the workspace CLI build. It doesn't overwrite a host installed by the standalone CLI, and it
+  removes its registration when the session stops.
+- An isolated Node. `--node <address>` points the session at a running local or remote Node.
+  Without it, the launcher starts a Node with its own data root in the session folder, as
+  `pnpm dev:agent` does, so pairing checks don't touch your everyday Node.
+- Scripted driving. The launcher writes the browser's automation endpoint to a session manifest, as
+  the [agent drivers](../../local-development/agent-drivers.md) do for the desktop. An agent can
+  open the sidebar, click an injected button, and read the result. This is test tooling, not the
+  browser automation feature deferred below.
+- One browser fake. Keep a single typed fake of the browser extension APIs in the extension's test
+  helpers, shared by background, content-script, and sidebar tests. Vitest covers most behavior with
+  it. The loop covers what a fake can't: native messaging, permissions, gestures, and live site
+  selectors.
+
+Prefer `web-ext run` as the launcher for both browsers. It supports Firefox and Chromium targets and
+reloads on change. Extension.js, which Silo uses, bundles the code itself with Rspack, and that
+would duplicate the Vite build.
+
+List only commands that work. Silo lists a `test:e2e` command with no tests behind it, and its
+README still describes loading the add-on by hand.
+
+Confirm these before building the rest of phase 01, because each one can change the design:
+
+1. Recent branded Chrome builds may refuse to load an unpacked extension from the command line. If
+   so, the loop needs Chromium or Chrome for Testing.
+2. Chrome launched with a custom profile folder may read native host registrations from inside that
+   folder instead of the user-level directory. Register a host and call it from the launched
+   profile.
+3. Firefox should read the user-level registration from a temporary profile. Check it the same way.
+4. Each browser must expose an automation endpoint while `web-ext` controls it. If one doesn't, the
+   launcher starts the browser itself and keeps `web-ext` for reloads only.
+
 ## Phases and dependencies
 
 | Phase | Depends on | Demo |
@@ -243,6 +294,9 @@ supported runtime from root `package.json`. If project settings require a schema
 and
 check that migration without changing unrelated plugin chains.
 
+Run each phase's real-browser checks through the [development loop](#development-loop), and
+record the session name and browser version with the result.
+
 Finish with recorded real-browser acceptance on macOS against local and remote nodes, with the
 desktop closed. Builds and mocked browser APIs alone do not prove native host registration, browser
 permissions, sidebar gestures, or website selectors. Record limitations without marking those checks
@@ -251,9 +305,9 @@ as passed. Move verified behavior into its owning reference docs as phases ship.
 ## Deferred work and simplicity gate
 
 Defer screenshot annotation, arbitrary-page task creation, custom Node actions, full desktop tool
-renderers, simultaneous node aggregation, browser automation, browser-driven plugin installation,
-public store submissions, a separate bridge installer, other operating systems, and a new capture
-library or database.
+renderers, simultaneous node aggregation, browser automation as a product feature, browser-driven
+plugin installation, public store submissions, a separate bridge installer, other operating systems,
+and a new capture library or database.
 
 The wider research included documentation capture, incident triage, cloud-console context, design
 review, and workflow supervision. These remain uses for later contributions, not additional v1

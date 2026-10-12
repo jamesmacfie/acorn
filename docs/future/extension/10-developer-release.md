@@ -31,7 +31,9 @@ and recorded end-to-end acceptance.
    standalone installation, and uninstall. State how retained browser custody can be removed
    separately.
 
-3. Test clean Chrome unpacked installation and Firefox temporary installation. Document that Firefox
+3. Test clean Chrome unpacked installation and Firefox temporary installation. Install from the
+   built bundles and the CLI-registered host, not through `pnpm dev:extension`. The loop's own
+   profile and development host would hide installation faults. Document that Firefox
    development loading is not signed persistent distribution. Do not promise browser store approval.
 
 4. Run all release journeys against a local Node and a paired remote Node with the desktop closed.
