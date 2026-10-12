@@ -1,6 +1,7 @@
 # Agent search after a restart
 
-Date: October 9, 2026. Status: proposed; implementation not started.
+Date: October 9, 2026. Status: implemented October 12, 2026.
+[Transcript search](../managed-agents/transcript-search.md) owns the behavior.
 
 [Transcript search](../managed-agents/transcript-search.md) owns the index and its maintenance. This
 plan removes the full-ledger work the agents plugin does after every Node start.
@@ -120,3 +121,15 @@ Settings later. This plan doesn't add one.
   first search after reopening takes under 200 ms. Record both numbers in the pull request.
 - Update [transcript search](../managed-agents/transcript-search.md#tool-rows) to describe when the
   full check runs.
+
+## Result
+
+Measured on a copy of a 2.7 GB development database with 298 tasks:
+
+| Step | Before | After, normal start |
+| --- | --- | --- |
+| `new AgentSearchProjection(db)` | 50.9 s | 0.5 ms |
+| First archive search | 28.1 s | 22 ms |
+
+The first start after migration 0015 runs the full check once, because the format table starts empty.
+On that copy it took 34.5 s to construct the projection and 21.9 s for the first search.

@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sql } from 'drizzle-orm'
@@ -10,6 +11,7 @@ import {
   type TestPluginDb,
 } from '@acorn/plugin-api/testkit'
 import type { AgentProviderDescriptor } from '../../contract/wire'
+import { AgentSearchProjection } from './searchProjection'
 import { AgentStore } from './store'
 import { ManagedAgentRuntime } from './runtime'
 import * as schema from '../../node/schema'
@@ -119,17 +121,24 @@ describe('durable message search projection', () => {
     ).toEqual(['firstword', 'run', 'secondword', 'thirdword', 'fourthword', 'fifthword', 'seventhword'])
   })
 
-  it('recovers lost dirty progress and corrupt or missing indexes from canonical content after reopening', async () => {
+  it('trusts dirty progress on reopen and rechecks every session when the index format changes', async () => {
     const s = await session()
     await store.recordEvent(s.id, null, chunk('flux ca'))
     await store.recordEvent(s.id, null, chunk('pacitor'))
-    fixture.db.run(sql`DELETE FROM agent_search_dirty`)
+    await store.flushSearch()
     fixture.db.close()
     const reopened = fixture.openConnection()
+    const dirtySessions = () => reopened.all(sql`SELECT session_id AS sessionId FROM agent_search_dirty`)
     try {
-      store = new AgentStore(reopened, ctx.core)
-      expect((await store.searchSessions('capacitor')).map((row) => row.id)).toEqual([s.id])
-      reopened.run(sql`DELETE FROM agent_events_fts`)
+      new AgentSearchProjection(reopened)
+      expect(dirtySessions()).toEqual([])
+      reopened.run(sql`UPDATE agent_search_format SET version = 0`)
+      new AgentSearchProjection(reopened)
+      expect(dirtySessions()).toEqual([{ sessionId: s.id }])
+      expect(reopened.all(sql`SELECT version FROM agent_search_format`)).toEqual([{ version: 1 }])
+
+      // A missing index counts as a format change, because the progress it held is gone.
+      reopened.run(sql`DELETE FROM agent_search_dirty`)
       reopened.run(sql`UPDATE agent_events SET search_text = 'wrong' WHERE seq = 1`)
       reopened.run(sql`DROP TABLE agent_events_fts`)
       reopened.run(sql`DROP TRIGGER agent_search_insert`)
@@ -143,15 +152,33 @@ describe('durable message search projection', () => {
     }
   })
 
-  it('repairs incorrect index content and rowid drift without changing event identity', async () => {
+  it('clears the stored format when FTS5 reports damage, so the next open rebuilds the index', async () => {
+    const s = await session()
+    await store.recordEvent(s.id, null, { type: 'assistant_message', text: 'flux capacitor' })
+    // Acorn's connection refuses writes to FTS5's own tables, so damage the file from a raw one.
+    const file = readdirSync(fixture.dataDir, { recursive: true, encoding: 'utf8' }).find((name) =>
+      name.endsWith('agents.sqlite'),
+    )!
+    const raw = new DatabaseSync(join(fixture.dataDir, file), { defensive: false })
+    raw.exec('DELETE FROM agent_events_fts_data WHERE id > 1')
+    raw.close()
+    await expect(store.searchSessions('capacitor')).rejects.toMatchObject({ errcode: 267 })
+    expect(fixture.db.all(sql`SELECT * FROM agent_search_format`)).toEqual([])
+    store = new AgentStore(fixture.db, ctx.core)
+    expect((await store.searchSessions('capacitor')).map((row) => row.id)).toEqual([s.id])
+  })
+
+  it('repairs incorrect index content and rowid drift when the index format changes', async () => {
     const s = await session()
     const event = await store.recordEvent(s.id, null, chunk('canonical capacitor'))
     await store.flushSearch()
     fixture.db.run(sql`UPDATE agent_events_fts SET content = 'incorrect content' WHERE event_id = ${event.id}`)
+    fixture.db.run(sql`DELETE FROM agent_search_format`)
     store = new AgentStore(fixture.db, ctx.core)
     expect((await store.searchSessions('capacitor')).map((row) => row.id)).toEqual([s.id])
     fixture.db.run(sql`UPDATE agent_events SET rowid = rowid + 100`)
     fixture.db.run(sql`VACUUM`)
+    fixture.db.run(sql`DELETE FROM agent_search_format`)
     store = new AgentStore(fixture.db, ctx.core)
     expect((await store.searchSessions('capacitor')).map((row) => row.id)).toEqual([s.id])
     expect(

@@ -82,9 +82,10 @@ describe('agent_events_fts schema drift guard', () => {
     `)
         .map((row) => ({ name: row.name, sql: row.sql.replaceAll('`', '').replace(/\s+/g, ' ').trim() }))
     const migrated = objects()
-    for (const row of migrated.filter((row) => row.name !== 'agent_search_dirty'))
+    const tables = ['agent_search_dirty', 'agent_search_format']
+    for (const row of migrated.filter((row) => !tables.includes(row.name)))
       t.db.run(sql.raw(`DROP TRIGGER ${row.name}`))
-    t.db.run(sql`DROP TABLE agent_search_dirty`)
+    for (const table of tables) t.db.run(sql.raw(`DROP TABLE ${table}`))
     new AgentSearchProjection(t.db)
     expect(objects()).toEqual(migrated)
     expect(t.db.all(sql`SELECT name FROM pragma_table_info('agent_search_dirty')`)).toEqual([

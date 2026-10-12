@@ -37,9 +37,21 @@ keeps index order. Raw `snapshot`, `eventPage`, `eventsForTurn`, and `exportSnap
 their session, so waits, workflows, delegation, forks, and export see whole messages. Client snapshots
 skip this, because they carry no search text.
 
-Before the first projection read or event write, the Node reinstalls missing derived objects, checks
-the index, and marks sessions for reconciliation. A missing or corrupt index is rebuilt from canonical
-message JSON.
+Before the first projection read or event write, the Node reinstalls missing derived objects and sets
+the stored rank. It trusts the dirty markers, because a crash rolls back a marker and its ledger change
+together. The full check runs only when the format in `agent_search_format` differs from
+`SEARCH_INDEX_FORMAT` in `searchProjection.ts`, or when the dirty table or the index is missing. It
+marks every session for reconciliation, runs the FTS5 integrity check, compares every search row with
+its event, and rebuilds from canonical message JSON when either check fails. Raise the constant when
+the index's text or columns change.
+
+When a search or a flush fails because FTS5 reports damage (`SQLITE_CORRUPT_VTAB`), the projection logs
+it and clears the stored format, so the next start runs the full check and rebuilds. Damage that never
+makes a statement fail stays until the next format change. It costs missing or wrong hits, never
+ledger data.
+
+The full check reads every event. On a 2.5 GB database it took about 80 seconds of event-loop time,
+which is why a normal start skips it.
 
 ## Search from a managed session
 
@@ -69,8 +81,9 @@ does the same. Tool text ranks below the conversation: it goes in a `tool` colum
 weighs at 0.3 of `content`, because file dumps and command output buried the conversation.
 
 Search rows are keyed by the event's rowid. Inserts replace on rowid and deletes also check
-`event_id`, so a table a VACUUM renumbered repairs itself on the next write. Reconciliation also
-detects rowid drift and rebuilds.
+`event_id`, so a table a VACUUM renumbered repairs itself on the next write. Acorn never runs VACUUM on
+the agents database. The full check also detects rowid drift and rebuilds, but it runs only on a
+format change.
 
 ## Why the index keeps its own copy
 

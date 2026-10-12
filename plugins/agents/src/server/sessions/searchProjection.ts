@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { PluginDatabase } from '@acorn/plugin-api/node'
+import { createLogger, describeError, type PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentNormalizedEvent } from '../../contract/wire'
 import { agentEventSearchText } from '../../contract/wire'
 import { continuesStream, isAppendDelta } from './durableEventBuffer'
@@ -10,6 +10,12 @@ type Transaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 type Row = { id: string; seq: number; turnId: string | null; eventJson: string; searchText: string | null }
 type Head = { row: Row; fragments: string[] }
 
+const log = createLogger('agents', 'agents')
+
+// Raise this when the index's text or columns change. The next start then checks every row.
+const SEARCH_INDEX_FORMAT = 1
+const SQLITE_CORRUPT_VTAB = 267
+
 /** SQLite owns dirty progress; this owner holds only one canonical page and one complete message.
  * A synchronous transaction couples materialization, FTS replacement, and clearing dirty progress.
  * There is no retained message cache, timer, or asynchronous task that can revive deleted history. */
@@ -19,7 +25,21 @@ export class AgentSearchProjection {
   }
 
   flush(sessionId?: string): void {
-    this.db.transaction((tx) => this.catchUp(tx, sessionId))
+    this.guard(() => this.db.transaction((tx) => this.catchUp(tx, sessionId)))
+  }
+
+  /** Runs index work that must not sit inside a caller's transaction. When FTS5 reports damage, this
+   * clears the stored format, so the next start rebuilds the index. */
+  guard<T>(work: () => T): T {
+    try {
+      return work()
+    } catch (error) {
+      if (reportsIndexDamage(error)) {
+        log.warn(`agent search index is damaged and rebuilds on the next start: ${describeError(error).message}`)
+        this.db.run(sql`DELETE FROM agent_search_format`)
+      }
+      throw error
+    }
   }
 
   catchUp(tx: Transaction, sessionId?: string): void {
@@ -103,28 +123,44 @@ export class AgentSearchProjection {
   }
 
   private recover(): void {
+    // The dirty markers live in these tables, so losing one loses progress, like a format change.
+    const intact =
+      this.db.get<{ count: number }>(sql`
+      SELECT count(*) AS count FROM sqlite_master WHERE name IN ('agent_search_dirty', 'agent_events_fts')
+    `)!.count === 2
     for (const statement of searchDirtySchema) this.db.run(sql.raw(statement))
     for (const statement of searchFtsTriggers) this.db.run(sql.raw(statement))
-    // Restart reconciliation also detects lost dirty markers and stale materializations. It only
-    // records work here; the first read or runtime shutdown performs the canonical scan.
-    this.db.run(sql`INSERT INTO agent_search_dirty SELECT DISTINCT session_id, 0 FROM agent_events WHERE true
-      ON CONFLICT (session_id) DO UPDATE SET from_seq = 0`)
+    // Triggers commit dirty markers with each ledger change, so a normal start trusts them. The full
+    // scan below reads every event and runs only when the stored format differs.
+    const checked =
+      intact &&
+      this.db.get<{ version: number }>(sql`SELECT version FROM agent_search_format`)?.version === SEARCH_INDEX_FORMAT
+    if (!checked)
+      this.db.run(sql`INSERT INTO agent_search_dirty SELECT DISTINCT session_id, 0 FROM agent_events WHERE true
+        ON CONFLICT (session_id) DO UPDATE SET from_seq = 0`)
     let repair = false
     try {
-      this.db.run(sql`INSERT INTO agent_events_fts (agent_events_fts) VALUES ('integrity-check')`)
-      repair = !!this.db.get(sql`
-        SELECT 1 FROM agent_events_fts f LEFT JOIN agent_events e ON e.rowid = f.rowid AND e.id = f.event_id
-        WHERE e.id IS NULL OR e.search_text IS NULL OR
-          CASE WHEN json_extract(e.event_json, '$.type') = 'tool' THEN f.tool ELSE f.content END IS NOT e.search_text
-        UNION ALL
-        SELECT 1 FROM agent_events e LEFT JOIN agent_events_fts f ON f.rowid = e.rowid AND f.event_id = e.id
-        WHERE e.search_text IS NOT NULL AND f.event_id IS NULL LIMIT 1
-      `)
+      if (!checked) {
+        this.db.run(sql`INSERT INTO agent_events_fts (agent_events_fts) VALUES ('integrity-check')`)
+        repair = !!this.db.get(sql`
+          SELECT 1 FROM agent_events_fts f LEFT JOIN agent_events e ON e.rowid = f.rowid AND e.id = f.event_id
+          WHERE e.id IS NULL OR e.search_text IS NULL OR
+            CASE WHEN json_extract(e.event_json, '$.type') = 'tool' THEN f.tool ELSE f.content END IS NOT e.search_text
+          UNION ALL
+          SELECT 1 FROM agent_events e LEFT JOIN agent_events_fts f ON f.rowid = e.rowid AND f.event_id = e.id
+          WHERE e.search_text IS NOT NULL AND f.event_id IS NULL LIMIT 1
+        `)
+      }
       this.db.run(sql`INSERT INTO agent_events_fts (agent_events_fts, rank) VALUES ('rank', 'bm25(0, 0, 1.0, 0.3)')`)
     } catch {
       repair = true
     }
     if (repair) this.rebuildIndex()
+    if (!checked)
+      this.db.transaction((tx) => {
+        tx.run(sql`DELETE FROM agent_search_format`)
+        tx.run(sql`INSERT INTO agent_search_format VALUES (${SEARCH_INDEX_FORMAT})`)
+      })
   }
 
   private rebuildIndex(): void {
@@ -144,4 +180,10 @@ export class AgentSearchProjection {
       `)
     })
   }
+}
+
+function reportsIndexDamage(error: unknown): boolean {
+  for (let cause = error; cause instanceof Error; cause = cause.cause)
+    if ((cause as { errcode?: unknown }).errcode === SQLITE_CORRUPT_VTAB) return true
+  return false
 }
