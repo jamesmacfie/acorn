@@ -30,6 +30,8 @@ import { DelegationReports, delegatedTurn, turnResultSchema } from './reports'
 import { AgentDelegationStore, DelegationLimitError, type AgentSpawn } from './store'
 import { WorktreeProvisioning, type WorktreeTaskService } from './worktreeProvisioning'
 import { spawnConfigOptions, spawnProfileId } from './spawnConfiguration'
+import { withSpawnNotes } from './spawnNotes'
+import type { SpawnNotesCapture } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
 
 type Caller = {
   taskId: string
@@ -127,8 +129,10 @@ export class AgentDelegationService {
     private readonly reconciled: Promise<void> = Promise.resolve(),
     followUps?: () => Promise<TurnFollowUps>,
     core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
+    // Read per spawn, because the Notes plugin may be absent.
+    private readonly spawnNotes: () => SpawnNotesCapture | undefined = () => undefined,
   ) {
-    this.worktrees = new WorktreeProvisioning(runtime, store, tasks, core)
+    this.worktrees = new WorktreeProvisioning(runtime, store, tasks, core, spawnNotes)
     this.reports = new DelegationReports(runtime, store, followUps, core)
   }
 
@@ -395,17 +399,26 @@ export class AgentDelegationService {
         `delegation:${reserved.spawn.id}:session`,
       )
       childSessionId = session.id
-      const turn = await this.runtime.enqueueTurn(session.id, {
-        ...delegatedTurn(ownerOf(caller), input.prompt, input.resultSchema, {
-          delegationSpawnId: reserved.spawn.id,
-          toolCeiling,
-          ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
-          ...(input.checks ? { checks: input.checks } : {}),
-          ...(input.configOptions ? { configOptions: input.configOptions } : {}),
-        }),
-        source: 'delegation',
-        idempotencyKey: `delegation:${reserved.spawn.id}:turn`,
-      })
+      const turnKey = `delegation:${reserved.spawn.id}:turn`
+      // An accepted first turn already holds its notes. Only a turn not yet queued captures them.
+      const turn =
+        (await this.runtime.store.turnForIdempotency(session.id, turnKey)) ??
+        (await this.runtime.enqueueTurn(session.id, {
+          ...(await withSpawnNotes(
+            this.spawnNotes(),
+            this.runtime.store,
+            { taskId: caller.taskId, parentTaskId: caller.taskId, parentSessionId: caller.managedSession?.id ?? null },
+            delegatedTurn(ownerOf(caller), input.prompt, input.resultSchema, {
+              delegationSpawnId: reserved.spawn.id,
+              toolCeiling,
+              ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+              ...(input.checks ? { checks: input.checks } : {}),
+              ...(input.configOptions ? { configOptions: input.configOptions } : {}),
+            }),
+          )),
+          source: 'delegation',
+          idempotencyKey: turnKey,
+        }))
       childTurnId = turn.id
       return spawnResult(await this.store.complete(reserved.spawn.id, session.id, turn.id))
     } catch (error) {

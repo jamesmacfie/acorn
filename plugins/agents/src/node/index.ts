@@ -13,6 +13,7 @@ import {
   resolveCommand,
 } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
+import { NOTES_SPAWN_SNAPSHOT } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
 import { join } from 'node:path'
 import type { McpPackageManager } from '../server/mcpPackageManager'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -365,6 +366,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         deps.reconciled,
         followUpRegistry,
         core,
+        () => ctx.capabilities.get(NOTES_SPAWN_SNAPSHOT),
       )
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
       for (const tool of sessionHistoryTools(runtime.store)) ctx.tools.register(tool)

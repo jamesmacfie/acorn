@@ -1,6 +1,8 @@
 # PRD: Include notes in spawned Acorn agents
 
-Date: October 12, 2026. Status: proposed; implementation not started.
+Date: October 12, 2026. Status: implemented October 12, 2026. Acceptance is open for real managed
+Claude and Codex runs and the real-app checks under [release and validation](#release-and-validation).
+The shipped behavior is in [notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents).
 
 This PRD defines automatic note snapshots for managed agents started through `agent_spawn`, with
 shared or worktree isolation. Read it before implementing note inheritance in managed delegation.

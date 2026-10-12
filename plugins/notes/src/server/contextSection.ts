@@ -9,13 +9,17 @@ export type ContextNotesSource = (
   repo: string,
 ) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
 
+// Shared with the snapshot a delegated agent starts with, which applies it once across every task it
+// draws notes from.
+export const NOTES_CONTEXT_BUDGET = { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' } as const
+
 export function notesSection(source: ContextNotesSource): PluginContextSection {
   return {
     id: 'notes',
     order: 30,
     label: 'Notes',
     defaultIncluded: true,
-    budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
+    budget: NOTES_CONTEXT_BUDGET,
     async assemble({ task, repo, workflowRunId }) {
       const allNotes = await source(task.id, repo)
       const notes = workflowRunId

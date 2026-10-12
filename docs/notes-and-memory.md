@@ -126,6 +126,43 @@ profiles receive the combined task context and standing memory at the first idle
 `terminal:launch-context`. The queued path has a 256 KiB aggregate ceiling, allowing both configured
 index caps and the contract. Command overrides receive no automatic agent context.
 
+## Notes in delegated agents
+
+An agent started with `agent_spawn` gets a snapshot of the notes that apply to its work with its first
+turn, so nobody has to repeat them in each delegation prompt. The child's transcript shows the
+snapshot in a **Notes · attached** fold.
+
+| Spawn | Notes in the snapshot |
+| --- | --- |
+| Shared | The shared task's notes, its workspace's notes, and global notes. |
+| Worktree | The child task's notes, the delegating task's notes, the workspace's notes, and global notes. |
+| Nested | What the delegating session was given, plus a fresh read of the delegating task and the child task. |
+
+The snapshot follows the `notes` context section's rules: a note needs **Include in context** and a
+body, and a workspace note seeded by another task stays out. It reads each note's flag on the Node.
+The Context pane's section selection is per device, and a spawn may start with no client open, so
+that selection doesn't apply. If core's `core:before-snapshot` hook keeps notes out of the child
+task's context, the child gets no snapshot.
+
+A note is identified by its scope, its owning task or workspace, and its slug, so two notes with the
+same slug in different places both appear. A fresh read of a task or workspace replaces what the
+delegating session inherited from it, so a note deleted or excluded since then stays out. A task note
+from another task is marked as inherited and names that task. The text tells the child which task is
+its own, and that the delegating task's branch and worktree aren't.
+
+The notes budget applies once across every source, after duplicates go: at most 10 notes, each cut at
+2,000 bytes. The snapshot says how many notes it left out, how many it cut, and which it couldn't
+read.
+
+The snapshot is fixed when the child's first turn is queued. Retries, restart recovery, and resumes
+reuse it. A later edit doesn't change it, and `agent_prompt` doesn't refresh it. A new spawn reads
+the notes again. Nothing is copied into the child task, and the child's task credential still reaches
+only its own task's notes.
+
+The Notes plugin builds the snapshot through the `notes.spawnSnapshot` capability, in
+`plugins/notes/src/server/spawnSnapshot.ts`. For how the agents plugin stores and delivers it, see
+[managed delegation](./managed-agents/delegation.md#notes-in-delegated-agents).
+
 ## From the command palette
 
 Three rows across the two plugins, all registered by their own client half.

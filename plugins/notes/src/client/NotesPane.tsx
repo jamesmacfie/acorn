@@ -30,6 +30,10 @@ import type { NoteScope, NoteSummary } from './notesClient'
 // the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
 // share is in ./notesModel.ts.
 
+// Spawned agents read this flag on the node, so the Context pane's own selection does not reach them.
+const INCLUDE_TIP =
+  "Include in the agent's context. Agents started with agent_spawn get every included note, whatever the Context pane has selected."
+
 const virtualScratchpad = (): NoteSummary => ({
   slug: SCRATCHPAD_SLUG,
   title: 'Scratchpad',
@@ -86,7 +90,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
       size="sm"
       checked={boxProps.note.included}
       ariaLabel="Include in the agent's context"
-      title="Include in the agent's context"
+      title={INCLUDE_TIP}
       onChange={(checked) => void model().toggleIncluded(boxProps.scope, boxProps.note.slug, checked)}
     />
   )
@@ -218,7 +222,7 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   checked={model().selectedIncluded()}
                   disabled={sel().virtual}
                   ariaLabel="Include in the agent's context"
-                  title="Include in the agent's context"
+                  title={INCLUDE_TIP}
                   onChange={(checked) => void model().toggleIncluded(sel().scope, sel().slug, checked)}
                 />
                 {/* Two named states, so the control says where you are rather than where a press goes. */}

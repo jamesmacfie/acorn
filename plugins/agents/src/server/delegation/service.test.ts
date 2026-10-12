@@ -4,7 +4,13 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { ToolContext } from '@acorn/plugin-api/node'
-import type { AgentProviderDescriptor, AgentRequestKind } from '../../contract/wire.ts'
+import {
+  DELEGATED_NOTES_SOURCE,
+  type AgentProviderDescriptor,
+  type AgentRequestKind,
+  type AgentTurn,
+} from '../../contract/wire.ts'
+import type { SpawnNotesCapture } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
 import type { TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { AgentStore } from '../sessions/store'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
@@ -1129,6 +1135,155 @@ describe('agent delegation service', () => {
         context('33333333-3333-4333-8333-333333333333', root.id),
       ),
     ).rejects.toMatchObject({ kind: 'not_found' })
+  })
+
+  describe('notes the child starts with', () => {
+    const notesPart = (turn: AgentTurn | null) =>
+      turn?.input.find((part) => part.type === 'context' && part.source === DELEGATED_NOTES_SOURCE)
+    const withNotes = (capture: SpawnNotesCapture) =>
+      new AgentDelegationService(
+        runtime,
+        service.store,
+        async () => terminals,
+        { createChild: createChildTask },
+        undefined,
+        undefined,
+        undefined,
+        () => capture,
+      )
+
+    it('attaches the captured notes to a shared child’s first turn, and a retry reuses them', async () => {
+      const capture = vi.fn<SpawnNotesCapture>(async () => ({
+        content: '## Notes\n### Git branches (scratch)\nNever create a branch.',
+        notes: [{ slug: 'git-branches' }],
+        capturedAt: 42,
+      }))
+      const notesService = withNotes(capture)
+      const parent = await managedCaller()
+      const caller = context(parent.taskId, parent.id, 'notes-shared')
+      const spawn = { title: 'Child', prompt: 'Work.', isolation: 'shared' as const }
+
+      const first = await notesService.spawn(spawn, caller)
+      const replay = await notesService.spawn(spawn, caller)
+
+      expect(replay).toEqual(first)
+      expect(capture).toHaveBeenCalledTimes(1)
+      expect(capture).toHaveBeenCalledWith({ taskId: parent.taskId, parentTaskId: parent.taskId, inherited: undefined })
+      const turn = await sessions.turn(first.turnId!)
+      expect(notesPart(turn)).toMatchObject({
+        label: 'Notes · attached',
+        content: expect.stringContaining('Never create a branch.'),
+        capturedAt: 42,
+      })
+      expect(turn?.effectivePolicy.spawnNotes).toEqual([{ slug: 'git-branches' }])
+    })
+
+    it('captures a worktree child’s own and delegating tasks, and passes on what its owner inherited', async () => {
+      const capture = vi.fn<SpawnNotesCapture>(async ({ taskId }) => ({
+        content: `notes for ${taskId}`,
+        notes: [{ capturedFor: taskId }],
+        capturedAt: 1,
+      }))
+      const notesService = withNotes(capture)
+      const parent = await managedCaller()
+      const child = await notesService.spawn(
+        { title: 'Child', prompt: 'Work.', isolation: 'worktree' },
+        context(parent.taskId, parent.id, 'notes-child'),
+      )
+      const grandchild = await notesService.spawn(
+        { title: 'Grandchild', prompt: 'Work.', isolation: 'worktree' },
+        context(child.taskId, child.sessionId!, 'notes-grandchild'),
+      )
+
+      expect(capture).toHaveBeenNthCalledWith(1, {
+        taskId: child.taskId,
+        parentTaskId: parent.taskId,
+        inherited: undefined,
+      })
+      expect(capture).toHaveBeenNthCalledWith(2, {
+        taskId: grandchild.taskId,
+        parentTaskId: child.taskId,
+        inherited: [{ capturedFor: child.taskId }],
+      })
+      expect(notesPart(await sessions.turn(grandchild.turnId!))).toMatchObject({
+        content: `notes for ${grandchild.taskId}`,
+      })
+    })
+
+    it('does not capture again when restart recovery finds the first turn already written', async () => {
+      const capture = vi.fn<SpawnNotesCapture>(async () => ({ content: 'fresh', notes: [], capturedAt: 1 }))
+      const spawn = service.store.reserveWorktree({
+        ownerTaskId: 'parent-task',
+        ownerSessionId: 'owner',
+        idempotencyKey: 'agent_spawn:notes-recovery',
+        provisioning: provisioningPlan(),
+      }).spawn
+      childTasks.set(spawn.childTaskId, {
+        parentTaskId: 'parent-task',
+        title: 'Worktree child',
+        branch: 'Worktree child',
+      })
+      const session = await sessions.createSession(
+        {
+          taskId: spawn.childTaskId,
+          providerId: 'codex',
+          profileId: 'codex',
+          title: 'Worktree child',
+          kind: 'delegated',
+          config: { delegationSpawnId: spawn.id },
+        },
+        PROVIDER,
+      )
+      const { turn } = await sessions.enqueueTurn(session.id, {
+        input: [{ type: 'text', text: 'Inspect the branch.' }],
+        source: 'delegation',
+        effectivePolicy: { delegationSpawnId: spawn.id, spawnNotes: ['accepted'] },
+        idempotencyKey: `delegation:${spawn.id}:turn`,
+      })
+
+      await withNotes(capture).reconcile()
+
+      expect(capture).not.toHaveBeenCalled()
+      expect(await service.store.get(spawn.id)).toMatchObject({
+        provisioningState: 'provisioned',
+        childTurnId: turn.id,
+      })
+      expect((await sessions.turn(turn.id))?.effectivePolicy.spawnNotes).toEqual(['accepted'])
+    })
+
+    it('fails the spawn with a clear error instead of starting without the notes', async () => {
+      const notesService = withNotes(async () => {
+        throw new Error('The notes folder is unreadable.')
+      })
+      const parent = await managedCaller()
+
+      const failed = await notesService.spawn(
+        { title: 'Child', prompt: 'Work.', isolation: 'shared' },
+        context(parent.taskId, parent.id, 'notes-failed'),
+      )
+
+      expect(failed).toMatchObject({ provisioningState: 'failed', turnId: null })
+      expect(failed.error).toContain('could not read the notes this agent should start with')
+      expect(failed.error).toContain('The notes folder is unreadable.')
+    })
+
+    it('attaches nothing when no note applies or the Notes plugin is absent', async () => {
+      const parent = await managedCaller()
+      const empty = await withNotes(async () => ({ content: '', notes: [], capturedAt: 1 })).spawn(
+        { title: 'Child', prompt: 'Work.', isolation: 'shared' },
+        context(parent.taskId, parent.id, 'notes-empty'),
+      )
+      const absent = await service.spawn(
+        { title: 'Child', prompt: 'Work.', isolation: 'shared' },
+        context(parent.taskId, parent.id, 'notes-absent'),
+      )
+
+      for (const spawned of [empty, absent]) {
+        const turn = await sessions.turn(spawned.turnId!)
+        expect(notesPart(turn)).toBeUndefined()
+        expect(turn?.effectivePolicy).not.toHaveProperty('spawnNotes')
+      }
+    })
   })
 
   describe('reports to the owner', () => {

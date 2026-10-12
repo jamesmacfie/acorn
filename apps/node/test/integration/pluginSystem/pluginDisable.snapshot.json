@@ -133,6 +133,7 @@
       "memory.knowledgeRoute",
       "memory.library",
       "notes.seedTask",
+      "notes.spawnSnapshot",
       "notes.store",
       "preview.urls",
       "terminal.route",
