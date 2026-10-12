@@ -3062,7 +3062,7 @@ describe('sessions pinned to an extra account', () => {
     await rm(dataDir, { recursive: true, force: true })
   })
 
-  const create = (input: { account?: string; config?: Record<string, unknown> }) =>
+  const create = (input: { account?: string; config?: Record<string, unknown>; resumeProviderSessionRef?: string }) =>
     runtime.createSession({
       taskId,
       providerId: 'fake',
@@ -3070,7 +3070,22 @@ describe('sessions pinned to an extra account', () => {
       kind: 'interactive',
       config: input.config ?? {},
       ...(input.account ? { account: input.account } : {}),
+      ...(input.resumeProviderSessionRef ? { resumeProviderSessionRef: input.resumeProviderSessionRef } : {}),
     })
+
+  it('starts a session that names no account on the default one, unless it resumes a provider reference', async () => {
+    await runtime.addAccount('fake', 'work')
+    driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))
+    const [listed] = await runtime.setDefaultAccount('fake', 'work')
+    expect(listed.defaultAccount).toBe('work')
+
+    expect((await create({})).config.account).toBe('work')
+    // The CLI finds a resumed reference only in the folder it was made in, here the CLI's own login.
+    expect((await create({ resumeProviderSessionRef: 'fake-old' })).config.account).toBeUndefined()
+
+    await runtime.removeAccount('fake', 'work')
+    expect((await create({})).config.account).toBeUndefined()
+  })
 
   it('starts on the account folder only once that account is signed in', async () => {
     const [listed] = await runtime.addAccount('fake', 'work')

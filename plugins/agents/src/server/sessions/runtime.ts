@@ -293,9 +293,16 @@ export class ManagedAgentRuntime {
           created: false,
         }
     }
-    // The caller's choice, or the one a fork's config carries from its source. The HTTP route drops a
-    // client's own `config.account`, so a request names an account only through `account`.
-    const account = input.account ?? sessionAccount(input.config)
+    // The caller's choice, or the one a fork's config carries from its source, or else the harness's
+    // default account. The HTTP route drops a client's own `config.account`, so a request names an
+    // account only through `account`. A session resuming a provider reference stays on the login it
+    // came from, because the CLI finds the reference only in that folder.
+    const account =
+      input.account ??
+      sessionAccount(input.config) ??
+      (input.resumeProviderSessionRef
+        ? null
+        : await this.engine.readWhileRunning(() => this.engine.accounts.defaultAccount(input.providerId)))
     const provider = await this.engine.readWhileRunning(() =>
       this.providers.usable((candidate) => candidate.id === input.providerId, account),
     )
@@ -347,6 +354,15 @@ export class ManagedAgentRuntime {
     const accounts = this.registry.create(session.providerId)?.accounts
     if (!accounts) throw new Error(`'${session.providerId}' doesn't support a second account.`)
     return { [accounts.env]: home }
+  }
+
+  /** Chooses the account new sessions of a harness start on when they name none. Null is the CLI's own
+   *  login. */
+  async setDefaultAccount(providerId: string, name: string | null): Promise<AgentProviderDescriptor[]> {
+    if (!this.registry.create(providerId)?.accounts)
+      throw new Error(`'${providerId}' doesn't support a second account.`)
+    await this.engine.accounts.setDefaultAccount(providerId, name)
+    return this.providers.list(true)
   }
 
   /** Signs the account out, then deletes its folder. A session pinned to it can no longer start. */

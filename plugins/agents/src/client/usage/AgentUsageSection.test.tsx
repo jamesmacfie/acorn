@@ -73,7 +73,7 @@ describe('AgentUsageSection', () => {
     const host = mount()
 
     const tabs = [...host.querySelectorAll<HTMLElement>('[role="tab"]')]
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Default', 'work'])
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Usual sign-in', 'work'])
     expect(host.textContent).toContain('me@home.test')
     tabs[1]!.click()
     await Promise.resolve()

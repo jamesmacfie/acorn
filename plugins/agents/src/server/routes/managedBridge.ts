@@ -75,6 +75,7 @@ export function managedAgentsBridge(
     providers: (force) => guarded(() => runtime.providers.list(force)),
     addAccount: (providerId, name) => guarded(() => runtime.addAccount(providerId, name)),
     removeAccount: (providerId, name) => guarded(() => runtime.removeAccount(providerId, name)),
+    setDefaultAccount: (providerId, name) => guarded(() => runtime.setDefaultAccount(providerId, name)),
     footprint: async () => ({
       ...(await runtime.upkeep.processFootprint()),
       ...(await runtime.upkeep.diskFootprint()),

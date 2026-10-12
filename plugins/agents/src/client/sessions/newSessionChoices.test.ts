@@ -41,6 +41,10 @@ describe('new session choices', () => {
         { name: 'old', authenticated: false, loginCommand: null },
       ],
     }
+    expect(newSessionChoices([{ ...claude, defaultAccount: 'old' }], []).map(choiceLabel)).toEqual([
+      'Claude Code · old',
+      'Claude Code · work',
+    ])
     const choices = newSessionChoices([claude, provider('codex')], [])
     expect(choices.map(choiceLabel)).toEqual(['Claude Code · work', 'Claude Code · old', 'Codex'])
     expect(choices.map(choiceAvailable)).toEqual([true, false, true])

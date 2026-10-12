@@ -23,12 +23,18 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   that it's signed in, then writes it to the session's `config.account`, a key only the Node writes.
   An `account` a client put in `config` is dropped. A fork copies its source's config, so it stays on
   the same account.
+- **The default account.** A session that names no account starts on the harness's default account,
+  if one is set. That covers workflow steps, custom agents, inline diff chats, and a delegated child
+  on another harness. The choice is a `.default` file beside the account folders
+  (`AgentAccounts.defaultAccount`), so it applies across the Node and goes away with its folder. A
+  session that resumes a provider reference skips it, because the CLI finds the reference only in the
+  folder it came from.
 - **Every start.** The lifecycle reads the account at every start and resume, because the CLI finds a
   session only in the folder it started in. `withAccountHome` sets the variable after the env
   allowlist and removes the overriding variables. A session whose account was removed fails to start
   and says so.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
-  harness inherits the parent's account. A child on another harness uses that harness's default.
+  harness inherits the parent's account.
 
 ## Add an account
 
@@ -36,6 +42,10 @@ In Settings, open **Agents** > **Harnesses and defaults** > **Accounts**, type a
 **Add**. Acorn makes the folder and shows the sign-in command, such as
 `CLAUDE_CONFIG_DIR='…/agent-accounts/claude/work' claude auth login`. Run it on the computer the Node
 runs on, then click **Check again**. The CLI writes the token itself, so Acorn never handles it.
+
+Once a harness has an account, the section shows a **Default account** dropdown for it: your usual
+sign-in or one of the accounts. `PUT /v1/p/agents/providers/:providerId/default-account` saves it,
+and the provider descriptor reports it as `defaultAccount`.
 
 `POST /v1/p/agents/providers/:providerId/accounts` and `DELETE …/accounts/:name` back the page. Both
 are device-only and answer the fresh provider list. A provider descriptor lists its accounts under
@@ -46,14 +56,14 @@ the old Keychain login.
 Each account shows as its own row in **New**, on the empty pane's cards, and in the palette, labeled
 `Claude Code · work`. Once a harness has an account, its plain row goes away, so the default login
 can't start a new session from **New**. Add your usual login as an account too if you want to keep
-picking it. A signed-out account's row is disabled. Custom agents start on the default login.
+picking it. The default account is listed first. A signed-out account's row is disabled.
 
 ## Plan usage
 
 A collector registered with `accounts: true` is asked once for the default login and once for each
 account, with that account's folder (`createAgentUsageService` in `server/usage/service.ts`). Each
 reading is its own row, labeled with the account name and carrying `accountName`. The plan usage
-panel groups a harness's readings and draws a tab per login, **Default** first, so the numbers below
+panel groups a harness's readings and draws a tab per login, **Usual sign-in** first, so the numbers below
 are one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). When a session hits
 a usage limit, the wait reads the quota of the session's own account. For more information, see
 [Providers and plan usage](./providers.md#plan-usage).

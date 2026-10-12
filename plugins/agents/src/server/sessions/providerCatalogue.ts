@@ -27,7 +27,7 @@ export class ProviderCatalogue {
   constructor(
     private readonly registry: AgentDriverRegistry,
     private readonly store: Pick<AgentStore, 'listSessions'>,
-    private readonly accounts: Pick<AgentAccounts, 'list' | 'home'>,
+    private readonly accounts: Pick<AgentAccounts, 'list' | 'home' | 'defaultAccount'>,
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
   ) {
@@ -123,9 +123,13 @@ export class ProviderCatalogue {
         if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
         try {
           const descriptor = await driver.probe()
-          return driver.accounts
-            ? { ...descriptor, accounts: await this.probeAccounts(driver, descriptor) }
-            : descriptor
+          if (!driver.accounts) return descriptor
+          const defaultAccount = await this.accounts.defaultAccount(driver.providerId)
+          return {
+            ...descriptor,
+            accounts: await this.probeAccounts(driver, descriptor),
+            ...(defaultAccount ? { defaultAccount } : {}),
+          }
         } catch (error) {
           return {
             id: providerId,

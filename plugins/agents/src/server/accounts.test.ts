@@ -27,6 +27,17 @@ describe('agent accounts', () => {
     expect(await accounts.list('claude')).toEqual(['personal'])
   })
 
+  it('keeps a default account only while its folder exists', async () => {
+    await accounts.create('claude', 'work')
+    expect(await accounts.defaultAccount('claude')).toBeNull()
+    await expect(accounts.setDefaultAccount('claude', 'gone')).rejects.toThrow(/not found/)
+    await accounts.setDefaultAccount('claude', 'work')
+    expect(await accounts.defaultAccount('claude')).toBe('work')
+    expect(await accounts.list('claude')).toEqual(['work'])
+    await accounts.remove('claude', 'work')
+    expect(await accounts.defaultAccount('claude')).toBeNull()
+  })
+
   it('refuses a name that could leave its folder or break a shell line', () => {
     for (const name of ['../x', 'Work', "it's", '', '-x']) expect(() => accounts.home('claude', name)).toThrow()
   })

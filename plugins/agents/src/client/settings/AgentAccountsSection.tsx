@@ -7,6 +7,7 @@ import {
   ConfirmButton,
   Inline,
   Input,
+  Select,
   SettingRow,
   SettingsSection,
   Stack,
@@ -57,6 +58,22 @@ export default function AgentAccountsSection() {
         <For each={withAccounts()}>
           {(provider) => (
             <Stack gap="stack">
+              <Show when={provider.accounts?.length}>
+                <SettingRow
+                  label={`Default ${provider.label} account`}
+                  help="New sessions that don't name an account start here, including workflow steps, custom agents, and inline diff chats."
+                >
+                  <Select
+                    label={`Default ${provider.label} account`}
+                    value={provider.defaultAccount ?? ''}
+                    options={[
+                      { value: '', label: 'Your usual sign-in' },
+                      ...(provider.accounts ?? []).map((account) => ({ value: account.name, label: account.name })),
+                    ]}
+                    onChange={(name) => void apply(() => managedAgentApi.setDefaultAccount(provider.id, name || null))}
+                  />
+                </SettingRow>
+              </Show>
               <For each={provider.accounts}>
                 {(account) => (
                   <AccountRow

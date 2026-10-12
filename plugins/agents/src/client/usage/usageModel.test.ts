@@ -229,8 +229,8 @@ describe('usage groups', () => {
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
     const groups = usageGroups({ providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 })
     expect(groups.map((group) => [group.label, group.readings.map(usageTabLabel)])).toEqual([
-      ['Claude Code', ['Default', 'work']],
-      ['Codex', ['Default']],
+      ['Claude Code', ['Usual sign-in', 'work']],
+      ['Codex', ['Usual sign-in']],
     ])
   })
 })

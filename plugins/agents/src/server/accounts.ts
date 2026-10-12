@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isAccountName } from '../shared/accounts'
 
@@ -41,5 +41,23 @@ export class AgentAccounts {
 
   async remove(providerId: string, name: string): Promise<void> {
     await rm(this.home(providerId, name), { recursive: true, force: true })
+  }
+
+  /** The account a new session of this harness starts on when it names none, or null for the CLI's own
+   *  login. Kept beside the folders, so removing the account's folder retires it too. */
+  async defaultAccount(providerId: string): Promise<string | null> {
+    const name = (await readFile(this.defaultFile(providerId), 'utf8').catch(() => '')).trim()
+    return (await this.has(providerId, name)) ? name : null
+  }
+
+  async setDefaultAccount(providerId: string, name: string | null): Promise<void> {
+    if (name === null) return rm(this.defaultFile(providerId), { force: true })
+    if (!(await this.has(providerId, name))) throw new Error(`The '${name}' account was not found.`)
+    await writeFile(this.defaultFile(providerId), `${name}\n`)
+  }
+
+  // A dot name, so `list` never reads it as an account.
+  private defaultFile(providerId: string): string {
+    return join(this.root, providerId, '.default')
   }
 }

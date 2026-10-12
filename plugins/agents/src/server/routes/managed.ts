@@ -63,6 +63,7 @@ export type ManagedAgentsBridge = {
   // Settings > Agents > Accounts (docs/managed-agents/accounts.md). Each answers the fresh provider list.
   addAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
   removeAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
+  setDefaultAccount(providerId: string, name: string | null): Promise<AgentProviderDescriptor[]>
   // Settings > Storage and memory. Node-wide, like `runs`.
   footprint(): Promise<AgentFootprint>
   stopIdleNow(): Promise<{ stopped: number }>
@@ -265,6 +266,15 @@ export const managedAgents = new Hono<AppEnv>()
       .safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.addAccount(c.req.param('providerId'), parsed.data.name))
+  })
+  .put('/providers/:providerId/default-account', requireDevice, async (c) => {
+    const parsed = z
+      .object({ name: z.string().regex(ACCOUNT_NAME_PATTERN).nullable() })
+      .safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
+      bridge.setDefaultAccount(c.req.param('providerId'), parsed.data.name),
+    )
   })
   .delete('/providers/:providerId/accounts/:name', requireDevice, (c) => {
     const name = c.req.param('name')

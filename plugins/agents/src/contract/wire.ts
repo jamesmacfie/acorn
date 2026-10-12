@@ -160,6 +160,8 @@ export type AgentProviderDescriptor = {
   /** Present when the harness can run more than one login: the extra accounts this Node holds, beside
    *  the default login `authenticated` describes (docs/managed-agents/accounts.md). */
   accounts?: AgentAccountDescriptor[]
+  /** The account a new session starts on when it names none. Absent is the CLI's own login. */
+  defaultAccount?: string
 }
 
 export type AgentAccountDescriptor = {

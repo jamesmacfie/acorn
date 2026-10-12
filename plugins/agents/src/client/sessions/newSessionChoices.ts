@@ -21,7 +21,7 @@ export function newSessionChoices(
   return [
     ...providers.flatMap((provider) =>
       provider.accounts?.length
-        ? provider.accounts.map((account) => ({ provider, account: account.name }))
+        ? defaultFirst(provider).map((account) => ({ provider, account: account.name }))
         : [{ provider }],
     ),
     ...agents.flatMap((agent) => {
@@ -30,6 +30,11 @@ export function newSessionChoices(
     }),
   ]
 }
+
+const defaultFirst = (provider: AgentProviderDescriptor) =>
+  [...(provider.accounts ?? [])].sort(
+    (left, right) => Number(right.name === provider.defaultAccount) - Number(left.name === provider.defaultAccount),
+  )
 
 const choiceAccount = (choice: NewSessionChoice) =>
   choice.account ? choice.provider.accounts?.find((account) => account.name === choice.account) : undefined
@@ -56,6 +61,7 @@ export function choiceDescription(choice: NewSessionChoice): string {
   const { provider, agent } = choice
   if (!provider.installed) return provider.diagnostics[0] ?? 'Not installed'
   if (choiceAccount(choice)?.authenticated === false) return 'Not signed in. Sign in from Settings > Agents.'
+  if (choice.account && choice.account === provider.defaultAccount) return 'Default account'
   if (!agent) return provider.executableVersion ?? 'Available'
   return agent.description || [provider.label, ...Object.values(agent.options)].join(' · ')
 }

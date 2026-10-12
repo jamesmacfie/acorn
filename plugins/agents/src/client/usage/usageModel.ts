@@ -94,9 +94,9 @@ export function providerMetaLine(provider: AgentProviderUsage, now = Date.now())
  *  (docs/managed-agents/accounts.md). */
 export type UsageGroup = { provider: string; label: string; readings: AgentProviderUsage[] }
 
-/** The tab a reading sits under. The default login has no account name. */
+/** The tab a reading sits under. The CLI's own login has no account name. */
 export const usageTabId = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
-export const usageTabLabel = (reading: AgentProviderUsage): string => reading.accountName ?? 'Default'
+export const usageTabLabel = (reading: AgentProviderUsage): string => reading.accountName ?? 'Usual sign-in'
 
 // The node sends a harness's readings together, default first, so grouping keeps its order. The label
 // is the harness's own, which the default reading carries without an account suffix.
