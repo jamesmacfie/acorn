@@ -9,7 +9,9 @@ import {
   providerMetaLine,
   providerUsageRows,
   quotaPace,
+  usageGroups,
   usageSummaryEntries,
+  usageTabLabel,
 } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
@@ -219,5 +221,16 @@ describe('agent usage detail formatting', () => {
         { label: 'Unpriced models', value: 'claude-new-model' },
       ]),
     )
+  })
+})
+
+describe('usage groups', () => {
+  it("puts a harness's accounts under its own name, default first, in the node's order", () => {
+    const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
+    const groups = usageGroups({ providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 })
+    expect(groups.map((group) => [group.label, group.readings.map(usageTabLabel)])).toEqual([
+      ['Claude Code', ['Default', 'work']],
+      ['Codex', ['Default']],
+    ])
   })
 })

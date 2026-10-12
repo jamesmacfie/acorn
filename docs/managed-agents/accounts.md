@@ -52,7 +52,9 @@ picking it. A signed-out account's row is disabled. Custom agents start on the d
 
 A collector registered with `accounts: true` is asked once for the default login and once for each
 account, with that account's folder (`createAgentUsageService` in `server/usage/service.ts`). Each
-reading is its own row, labeled with the account name and carrying `accountName`. When a session hits
+reading is its own row, labeled with the account name and carrying `accountName`. The plan usage
+panel groups a harness's readings and draws a tab per login, **Default** first, so the numbers below
+are one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). When a session hits
 a usage limit, the wait reads the quota of the session's own account. For more information, see
 [Providers and plan usage](./providers.md#plan-usage).
 

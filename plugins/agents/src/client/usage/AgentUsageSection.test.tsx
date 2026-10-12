@@ -16,7 +16,7 @@ const provider = (id: string, label: string): AgentProviderUsage => ({
   stale: false,
   error: null,
 })
-const snapshot: AgentUsageSnapshot = {
+let snapshot: AgentUsageSnapshot = {
   providers: [provider('claude', 'Claude Code'), provider('codex', 'Codex')],
   refreshedAt: 1,
 }
@@ -37,6 +37,12 @@ vi.mock('./usageStore', () => ({
 
 const { default: AgentUsageSection } = await import('./AgentUsageSection')
 const disposers: Array<() => void> = []
+const mount = () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  disposers.push(render(() => <AgentUsageSection showHeader={false} />, host))
+  return host
+}
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose()
   refreshProvider.mockClear()
@@ -55,5 +61,23 @@ describe('AgentUsageSection', () => {
     claude?.click()
     codex?.click()
     expect(refreshProvider.mock.calls).toEqual([['claude'], ['codex']])
+  })
+
+  it("tabs a harness's accounts and shows the chosen one's reading", async () => {
+    const reading = (email: string, accountName?: string): AgentProviderUsage => ({
+      ...provider('claude', accountName ? `Claude Code · ${accountName}` : 'Claude Code'),
+      account: { email, organization: null },
+      ...(accountName ? { accountName } : {}),
+    })
+    snapshot = { providers: [reading('me@home.test'), reading('me@work.test', 'work')], refreshedAt: 1 }
+    const host = mount()
+
+    const tabs = [...host.querySelectorAll<HTMLElement>('[role="tab"]')]
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Default', 'work'])
+    expect(host.textContent).toContain('me@home.test')
+    tabs[1]!.click()
+    await Promise.resolve()
+    expect(host.textContent).toContain('me@work.test')
+    expect(host.textContent).not.toContain('me@home.test')
   })
 })

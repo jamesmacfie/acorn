@@ -90,6 +90,30 @@ export function providerMetaLine(provider: AgentProviderUsage, now = Date.now())
     .join(' · ')
 }
 
+/** One harness in the usage panel: its default login's reading, then one per extra account
+ *  (docs/managed-agents/accounts.md). */
+export type UsageGroup = { provider: string; label: string; readings: AgentProviderUsage[] }
+
+/** The tab a reading sits under. The default login has no account name. */
+export const usageTabId = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
+export const usageTabLabel = (reading: AgentProviderUsage): string => reading.accountName ?? 'Default'
+
+// The node sends a harness's readings together, default first, so grouping keeps its order. The label
+// is the harness's own, which the default reading carries without an account suffix.
+export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
+  const groups = new Map<string, UsageGroup>()
+  for (const reading of snapshot?.providers ?? []) {
+    const group = groups.get(reading.provider)
+    if (group) group.readings.push(reading)
+    else groups.set(reading.provider, { provider: reading.provider, label: reading.label, readings: [reading] })
+  }
+  for (const group of groups.values()) {
+    const plain = group.readings.find((reading) => !reading.accountName)
+    if (plain) group.label = plain.label
+  }
+  return [...groups.values()]
+}
+
 // Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row,
 // so a harness the client has never heard of still gets named.
 export function usageSummaryEntries(snapshot: AgentUsageSnapshot | null): UsageSummaryEntry[] {
