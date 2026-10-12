@@ -2,6 +2,8 @@ import type { CreateAgentSessionInput } from '../../shared/schemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import { delegatedTurn } from './reports'
+import { withSpawnNotes } from './spawnNotes'
+import type { SpawnNotesCapture } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
 import type { AgentDelegationStore, AgentSpawn, AgentSpawnProvisioning } from './store'
 
 export type WorktreeTaskService = {
@@ -19,6 +21,7 @@ export class WorktreeProvisioning {
     private readonly store: AgentDelegationStore,
     private readonly tasks?: WorktreeTaskService,
     private readonly core?: Pick<CoreServices, 'tasks' | 'git'>,
+    private readonly spawnNotes: () => SpawnNotesCapture | undefined = () => undefined,
   ) {}
 
   async reconcile(): Promise<void> {
@@ -63,19 +66,24 @@ export class WorktreeProvisioning {
         : undefined
       const parent = plan.parentSessionId ? await this.runtime.store.getSession(plan.parentSessionId) : null
       turn = await this.runtime.enqueueTurn(session.id, {
-        ...delegatedTurn(
-          parent ? { sessionId: parent.id, title: parent.title } : { sessionId: null, title: 'Terminal agent' },
-          plan.prompt,
-          plan.resultSchema,
-          {
-            delegationSpawnId: spawn.id,
-            ...(baseCommit ? { baseCommit } : {}),
-            toolCeiling: plan.toolCeiling,
-            ...(plan.checks ? { checks: plan.checks } : {}),
-            ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
-            ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
-          },
-        ),
+        ...(await withSpawnNotes(
+          this.spawnNotes(),
+          this.runtime.store,
+          { taskId: spawn.childTaskId, parentTaskId: spawn.ownerTaskId, parentSessionId: plan.parentSessionId },
+          delegatedTurn(
+            parent ? { sessionId: parent.id, title: parent.title } : { sessionId: null, title: 'Terminal agent' },
+            plan.prompt,
+            plan.resultSchema,
+            {
+              delegationSpawnId: spawn.id,
+              ...(baseCommit ? { baseCommit } : {}),
+              toolCeiling: plan.toolCeiling,
+              ...(plan.checks ? { checks: plan.checks } : {}),
+              ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
+              ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
+            },
+          ),
+        )),
         source: 'delegation',
         idempotencyKey: turnKey,
       })

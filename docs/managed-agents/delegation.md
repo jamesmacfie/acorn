@@ -32,6 +32,24 @@ from its last durable step. A permanent failure keeps the row and any child task
 recovery doesn't delete a checkout that might hold work. The Node can open its listener before
 recovery finishes, so every orchestration tool waits for it.
 
+## Notes in delegated agents
+
+Every spawned child's first turn carries the notes snapshot that
+[notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents) describes. The
+delegation service asks the Notes plugin for it through `notes.spawnSnapshot` just before it queues
+that turn, on the shared path and in worktree provisioning. It passes the child's task, the owning
+task from the spawn ledger, and the notes stored on the owner's first turn when the owner was itself
+delegated.
+
+The snapshot travels in the turn. A `notes.delegated` context part holds the text, and `spawnNotes`
+in the turn's effective policy holds the notes a nested spawn inherits. Both commit with the turn, so
+the snapshot exists before the turn can dispatch. A retry or startup recovery that finds the turn
+already written doesn't capture again.
+
+Without the Notes plugin, the turn goes out with no snapshot. If the capture fails, the spawn fails
+with an error that says so, instead of starting without the notes. The code is
+`plugins/agents/src/server/delegation/spawnNotes.ts`.
+
 ## Limits
 
 Only the direct owner can address a child. A child can create one more level, and a third level is

@@ -51,7 +51,9 @@ export const agentSpawnInputSchema = z.object({
     .string()
     .min(1)
     .max(1_000_000)
-    .describe("The child's first message. The child sees none of your conversation, so write a complete brief."),
+    .describe(
+      "The child's first message. The child sees none of your conversation, so write a complete brief. Acorn attaches the included task, workspace, and global notes for you, so don't repeat them.",
+    ),
   profileId: z
     .string()
     .min(1)

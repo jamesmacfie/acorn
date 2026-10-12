@@ -159,6 +159,9 @@ export type AgentProviderDescriptor = {
   diagnostics: string[]
 }
 
+// The context source of the notes a delegated child starts with. The transcript draws this part in full.
+export const DELEGATED_NOTES_SOURCE = 'notes.delegated'
+
 export type AgentInputPart =
   | { type: 'text'; text: string }
   | { type: 'attachment'; attachmentId: string }

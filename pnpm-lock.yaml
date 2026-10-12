@@ -951,6 +951,9 @@ importers:
       '@acorn/plugin-editor':
         specifier: workspace:*
         version: link:../editor
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../notes
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../terminal

@@ -329,8 +329,8 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [UI extension open acceptance](./future/ui-extension/README.md) and
   [Git client open acceptance](./future/git-client/README.md): the checks still open after those
   programmes shipped.
-- [Spawned agent notes](./future/spawned-agent-notes.md): proposed automatic note snapshots and parent
-  note inheritance in shared and worktree agent spawns.
+- [Spawned agent notes](./future/spawned-agent-notes.md): the PRD for note snapshots in spawned agents,
+  kept while its real-app acceptance is open.
 - [Inline line blame](./future/editor-line-blame.md): a proposal for Git blame on the Editor cursor
   line, with a commit tooltip, built on a new `editor:line` annotation point.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or

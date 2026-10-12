@@ -1,6 +1,12 @@
 import { createMemo, createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '../../contract/wire.ts'
+import {
+  DELEGATED_NOTES_SOURCE,
+  type AgentNormalizedEvent,
+  type AgentPlanEntry,
+  type AgentRequest,
+  type AgentTurn,
+} from '../../contract/wire.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, openPane, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
@@ -257,6 +263,24 @@ export default function AgentEventCard(props: {
                         )}
                       </For>
                     </Stack>
+                  )}
+                </Show>
+                {/* Show, not For: the projection hands out a fresh input array on every snapshot, and an
+                    unkeyed Show keeps the fold open across them. */}
+                <Show
+                  when={props.turn?.input.find(
+                    (part): part is Extract<typeof part, { type: 'context' }> =>
+                      part.type === 'context' && part.source === DELEGATED_NOTES_SOURCE,
+                  )}
+                >
+                  {(notes) => (
+                    <Fold
+                      label={notes().label}
+                      level="sub"
+                      meta={<Text emphasis="muted">{new Date(notes().capturedAt).toLocaleString()}</Text>}
+                    >
+                      <AgentMarkdown text={notes().content} taskId={props.taskId} />
+                    </Fold>
                   )}
                 </Show>
                 <Show when={attachments().length}>

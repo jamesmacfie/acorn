@@ -19,6 +19,11 @@ core's arithmetic, and core keeps the assembly, the order, and the 512 KiB budge
 system prompt explains. `pr` wraps the pull request body with it. The tag ID is a hash of the text,
 because context is assembled again on every read and compared for changes.
 
+The notes walk and budget also build the snapshot a delegated agent starts with, which doesn't go
+through this registry. It applies the `notes` budget once across several tasks, and asks the
+`core:before-snapshot` hook by assembling only the `notes` section. See
+[notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents).
+
 Core's own `issues` section registers at module scope, not through `wireAgentTools`, because the
 standalone Node (`pnpm dev:node`, and any Node paired over the LAN) doesn't call `wireAgentTools`.
 `issues` and `task_links` are core tables ([external items](../data-layer.md)). GitHub and Rollbar

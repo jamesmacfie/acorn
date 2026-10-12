@@ -29,14 +29,14 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
-| [editor-line-blame.md](./editor-line-blame.md) | Inline Git blame on the Editor cursor line with a commit tooltip, through a new `editor:line` annotation point, rich mark detail, and compiled mark contributors. | Proposed October 12, 2026. Implementation not started. |
+| [editor-line-blame.md](./editor-line-blame.md) | Inline Git blame on the Editor cursor line with a commit tooltip, through a new `editor:line` annotation point, rich mark detail, and compiled mark contributors. | Implemented October 12, 2026. Real-app acceptance open. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [spawned-agent-notes.md](./spawned-agent-notes.md) | PRD for automatic note snapshots and parent note inheritance in shared and worktree agent spawns. | Proposed October 12, 2026. Implementation not started. |
+| [spawned-agent-notes.md](./spawned-agent-notes.md) | PRD for automatic note snapshots and parent note inheritance in shared and worktree agent spawns. | Implemented October 12, 2026. Real-app acceptance open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan

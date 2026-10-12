@@ -1,8 +1,10 @@
 import { join } from 'node:path'
 import { registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
 import { notesSection } from '../server/contextSection'
-import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import { NOTES_SEED_TASK, NOTES_STORE } from '../contract/store'
+import { NOTES_SPAWN_SNAPSHOT } from '../contract/spawnSnapshot'
+import { includedNotes } from '../server/includedNotes'
+import { captureSpawnNotes } from '../server/spawnSnapshot'
 import { notesAgentTools } from '../server/agentTools'
 import { NotesStore } from '../server/notes'
 import { seedTaskNotes } from '../server/seedTaskNotes'
@@ -31,44 +33,38 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
     // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)
-    // The `notes` context section: the three-scope walk, the empty-note skip and the workspace-note
-    // compatibility filter, here because this plugin owns the files. Core keeps the section's budget and
-    // compact formatter.
+    // The `notes` context section. This plugin owns the files, so it walks them. Core keeps the
+    // section's budget and compact formatter.
+    const workspaceIdOrNull = (taskId: string) => ctx.core.tasks.workspaceIdOrNull(taskId)
     ctx.contextSections.register(
-      notesSection(async (taskId) => {
-        const workspaceId = await ctx.core.tasks.workspaceIdOrNull(taskId)
-        const locations: { scope: NoteScope; location: NoteLocation }[] = [
-          { scope: 'task', location: { scope: 'task', taskId } },
-          ...(workspaceId
-            ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }]
-            : []),
-          { scope: 'global', location: { scope: 'global' } },
-        ]
-        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] =
-          []
-        for (const { scope, location } of locations) {
-          for (const summary of await store.list(location)) {
-            if (!summary.included) continue
-            // Keep the current task's rows and exclude sibling task notes. New task notes are isolated
-            // structurally by their directory.
-            if (scope === 'workspace' && summary.originTaskId && summary.originTaskId !== taskId) continue
-            const note = await store.read(location, summary.slug).catch(() => null)
-            // Skip empty notes, such as an untouched scratchpad: they contribute only a `### title` of
-            // noise.
-            if (note && note.body.trim()) {
-              out.push({
-                slug: summary.slug,
-                scope,
-                title: `${note.title} (${note.kind})`,
-                kind: note.kind,
-                body: note.body,
-                author: note.author,
-              })
-            }
-          }
-        }
-        return out
-      }),
+      notesSection(async (taskId) =>
+        (await includedNotes(store, workspaceIdOrNull, taskId)).notes.map(({ location, note }) => ({
+          slug: note.slug,
+          scope: location.scope,
+          title: `${note.title} (${note.kind})`,
+          kind: note.kind,
+          body: note.body,
+          author: note.author,
+        })),
+      ),
+    )
+    // The snapshot a delegated agent starts with. The agents plugin calls it while it queues the
+    // child's first turn and keeps the result with that turn.
+    ctx.capabilities.provide(NOTES_SPAWN_SNAPSHOT, (input) =>
+      captureSpawnNotes(
+        {
+          store,
+          workspaceIdOrNull,
+          taskTitle: async (taskId) => (await ctx.core.tasks.load(taskId))?.title ?? null,
+          // Assembling only the notes section is how a plugin asks core's snapshot hook. The login
+          // picks linked issues, which this does not ask for.
+          notesAllowed: async (taskId) =>
+            !!(await ctx.core.context.assemble('', taskId, new Set(['notes'])))?.sections.some(
+              (section) => section.id === 'notes',
+            ),
+        },
+        input,
+      ),
     )
   },
 })
