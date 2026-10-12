@@ -233,4 +233,17 @@ describe('usage groups', () => {
       ['Codex', ['Usual sign-in']],
     ])
   })
+
+  it('sums up a harness with accounts as the account new sessions start on', () => {
+    const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
+    const snapshot = { providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 }
+    expect(usageSummaryEntries(snapshot).map((entry) => `${entry.label} ${entry.value}`)).toEqual([
+      'Claude Code 80%',
+      'Codex 50%',
+    ])
+    expect(usageSummaryEntries(snapshot, { claude: 'work' }).map((entry) => `${entry.label} ${entry.value}`)).toEqual([
+      'Claude Code · work 30%',
+      'Codex 50%',
+    ])
+  })
 })

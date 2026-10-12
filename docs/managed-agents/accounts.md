@@ -64,7 +64,14 @@ A collector registered with `accounts: true` is asked once for the default login
 account, with that account's folder (`createAgentUsageService` in `server/usage/service.ts`). Each
 reading is its own row, labeled with the account name and carrying `accountName`. The plan usage
 panel groups a harness's readings and draws a tab per login, **Usual sign-in** first, so the numbers below
-are one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). When a session hits
+are one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). The button that opens
+the panel shows one figure per harness: the default account's, or the CLI's own login when none is
+set.
+
+`claude auth login` signs a folder in without running Claude Code's first-run setup, so the CLI
+opens an account folder on its theme picker and the probe never reaches `/usage`. Before it reads an
+account folder, the probe sets `hasCompletedOnboarding` in that folder's `.claude.json`
+(`markClaudeOnboarded`). It never edits the person's own config. When a session hits
 a usage limit, the wait reads the quota of the session's own account. For more information, see
 [Providers and plan usage](./providers.md#plan-usage).
 

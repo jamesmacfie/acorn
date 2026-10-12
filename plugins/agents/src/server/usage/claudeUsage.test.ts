@@ -150,6 +150,30 @@ describe('Claude collection and trust handling', () => {
     expect(provider.account).toEqual({ email: 'person@example.test', organization: 'Example Org' })
   })
 
+  it("finishes first-run setup in an account folder before reading it, and never in the person's own", async () => {
+    const paths = await fixture()
+    const seen: PtyCaptureOptions[] = []
+    const runPty = async (options: PtyCaptureOptions) => {
+      seen.push(options)
+      return { output: usageOutput, exitCode: null }
+    }
+    const onboarded = async () =>
+      (JSON.parse(await readFile(paths.configFile, 'utf8')) as { hasCompletedOnboarding?: boolean })
+        .hasCompletedOnboarding
+
+    await collectClaudeUsage({
+      probeDir: paths.probeDir,
+      configFile: paths.configFile,
+      claudeDir: paths.claudeDir,
+      runPty,
+    })
+    expect(await onboarded()).toBeUndefined()
+
+    await collectClaudeUsage({ probeDir: paths.probeDir, home: paths.root, runPty })
+    expect(await onboarded()).toBe(true)
+    expect(seen.at(-1)?.env?.CLAUDE_CONFIG_DIR).toBe(paths.root)
+  })
+
   it('atomically preserves unknown config keys while trusting only the dedicated probe directory', async () => {
     const paths = await fixture()
     expect(await trustClaudeProbeDirectory(paths.configFile, paths.probeDir)).toBe(true)

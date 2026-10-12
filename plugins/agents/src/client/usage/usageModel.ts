@@ -114,14 +114,22 @@ export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
   return [...groups.values()]
 }
 
-// Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row,
-// so a harness the client has never heard of still gets named.
-export function usageSummaryEntries(snapshot: AgentUsageSnapshot | null): UsageSummaryEntry[] {
-  return (snapshot?.providers ?? []).map((provider) => {
-    const quota = sessionQuota(provider)
+// Whatever harnesses the snapshot came back with, in the node's order, one entry each. The label
+// travels with the row, so a harness the client has never heard of still gets named. A harness with
+// extra accounts shows the one new sessions start on, `defaultAccounts` by harness id, and the label
+// names it.
+export function usageSummaryEntries(
+  snapshot: AgentUsageSnapshot | null,
+  defaultAccounts: Readonly<Record<string, string | undefined>> = {},
+): UsageSummaryEntry[] {
+  return usageGroups(snapshot).map((group) => {
+    const reading =
+      group.readings.find((candidate) => candidate.accountName === defaultAccounts[group.provider]) ??
+      group.readings[0]!
+    const quota = sessionQuota(reading)
     return {
       health: quota?.health ?? 'unknown',
-      label: provider.label,
+      label: reading.label,
       value: quota ? formatPercent(quota.percentRemaining) : '—',
     }
   })

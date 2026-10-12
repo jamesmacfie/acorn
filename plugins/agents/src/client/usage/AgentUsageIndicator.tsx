@@ -9,13 +9,15 @@ import { agentUsageStore } from './usageStore'
 //
 // A Popover, not a hover tooltip: the panel it holds has a refresh button and several lines of
 // numbers in it, so it has to be reachable from the keyboard and stay open while it is read.
-export default function AgentUsageIndicator() {
+// `defaultAccounts` names, by harness id, the account new sessions start on, which is the one the
+// button reads for a harness with extra accounts (docs/managed-agents/accounts.md).
+export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<Record<string, string | undefined>> }) {
   // The button is the always-mounted reader, so it starts the load itself. A Popover does not render
   // its content until it opens, so with the panel as the only caller the button would sit on "reading
   // usage…" forever. The panel calls init() too, which is fine: the store counts consumers.
   onMount(() => onCleanup(agentUsageStore.init()))
 
-  const entries = () => usageSummaryEntries(agentUsageStore.snapshot())
+  const entries = () => usageSummaryEntries(agentUsageStore.snapshot(), props.defaultAccounts)
 
   return (
     <Popover

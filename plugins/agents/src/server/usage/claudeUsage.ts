@@ -68,7 +68,12 @@ async function readAccount(configFile: string): Promise<ClaudeAccount> {
   }
 }
 
-export async function trustClaudeProbeDirectory(configFile: string, probeDir: string): Promise<boolean> {
+// Rewrites Claude's config atomically and keeps its mode. `edit` answers false for a shape it doesn't
+// recognise, which writes nothing and fails, or 'unchanged' when the file already says what it should.
+async function editClaudeConfig(
+  configFile: string,
+  edit: (root: Record<string, unknown>) => boolean | 'unchanged',
+): Promise<boolean> {
   let metadata
   let root: Record<string, unknown>
   try {
@@ -81,16 +86,8 @@ export async function trustClaudeProbeDirectory(configFile: string, probeDir: st
   } catch {
     return false
   }
-  const currentProjects = root.projects
-  if (currentProjects != null && !asObject(currentProjects)) return false
-  const projects = { ...asObject(currentProjects) }
-  const currentEntry = projects[probeDir]
-  if (currentEntry != null && !asObject(currentEntry)) return false
-  const entry = { ...asObject(currentEntry) }
-  if (entry.hasTrustDialogAccepted === true) return true
-  entry.hasTrustDialogAccepted = true
-  projects[probeDir] = entry
-  root.projects = projects
+  const result = edit(root)
+  if (result !== true) return result === 'unchanged'
 
   const temporary = join(dirname(configFile), `.${basename(configFile)}.${randomUUID()}.tmp`)
   try {
@@ -102,6 +99,34 @@ export async function trustClaudeProbeDirectory(configFile: string, probeDir: st
     await rm(temporary, { force: true }).catch(() => undefined)
     return false
   }
+}
+
+export function trustClaudeProbeDirectory(configFile: string, probeDir: string): Promise<boolean> {
+  return editClaudeConfig(configFile, (root) => {
+    const currentProjects = root.projects
+    if (currentProjects != null && !asObject(currentProjects)) return false
+    const projects = { ...asObject(currentProjects) }
+    const currentEntry = projects[probeDir]
+    if (currentEntry != null && !asObject(currentEntry)) return false
+    const entry = { ...asObject(currentEntry) }
+    if (entry.hasTrustDialogAccepted === true) return 'unchanged'
+    entry.hasTrustDialogAccepted = true
+    projects[probeDir] = entry
+    root.projects = projects
+    return true
+  })
+}
+
+/** `claude auth login` signs a folder in without running Claude's first-run setup, so the CLI opens an
+ *  account folder on its theme picker and never reaches `/usage`. Only for the folders Acorn owns
+ *  (docs/managed-agents/accounts.md), never the person's own config. A terminal handoff in the folder
+ *  skips the picker too once this has run. */
+export function markClaudeOnboarded(configFile: string): Promise<boolean> {
+  return editClaudeConfig(configFile, (root) => {
+    if (root.hasCompletedOnboarding === true) return 'unchanged'
+    root.hasCompletedOnboarding = true
+    return true
+  })
 }
 
 function classifyClaudeOutput(text: string): 'trust' | 'cost' | UsageProcessError | null {
@@ -359,6 +384,7 @@ export async function collectClaudeUsage(options: ClaudeUsageOptions): Promise<A
   const now = options.now ?? Date.now
   const runPty = options.runPty ?? capturePty
   await mkdir(options.probeDir, { recursive: true })
+  if (options.home) await markClaudeOnboarded(configFile)
   const env = usageProcessEnv(options.home ? { CLAUDE_CONFIG_DIR: options.home } : {})
   delete env.CLAUDE_CODE_OAUTH_TOKEN
   const run = (command: '/usage' | '/cost') =>
