@@ -10,7 +10,6 @@ import {
   type ExtensionPointKind,
   type ExtensionPointLocation,
   type PluginAnnotationKey,
-  type PluginAnnotationMark,
   type PluginExtensionItem,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { Component } from 'solid-js'
@@ -44,6 +43,9 @@ export type ExtensionPointContribution = {
   /** `annotation` only: accepted marks retained from each contributor for one request. The raw
    * response ceiling is a separate protocol guard; this is the owner's surface policy. */
   acceptedMarks?: number
+  /** `annotation` only: keep each mark's `detail`. Absent means the host strips it, so a point drawing
+   *  thousands of marks never carries content it has nowhere to show. */
+  acceptsDetail?: boolean
   /** `remote` only: what a contributor's tree may ask this owner to do (docs/plugins/remote-points.md § Asking the
    *  owner). Names only. The owner binds a handler of the same name on each `Slot` it draws, and the
    *  host refuses a request missing from either list, so declaring one here grants nothing on its own. */
@@ -101,9 +103,10 @@ export type ExtensionContribution = {
   when?: () => boolean
   /** `items` only. */
   fetch?: (signal: AbortSignal) => Promise<PluginExtensionItem[]>
-  /** `items` on an annotation point only: the batched marks call. */
-  marks?: (keys: PluginAnnotationKey[], signal: AbortSignal) => Promise<PluginAnnotationMark[]>
-  /** Host-owned request scope. Loaded contributions use the active node id. */
+  /** `items` on an annotation point only: the batched marks call. The answer is unchecked, whichever
+   *  tier it came from; the annotation host sanitizes each row (../../annotations/annotationMark.ts). */
+  marks?: (keys: PluginAnnotationKey[], signal: AbortSignal) => Promise<readonly unknown[]>
+  /** Host-owned request scope. Loaded and compiled contributions use the active node id. */
   requestScope?: () => string
   /** Host-owned freshness dependency. Loaded contributions use `chromeDeps(pluginId)`. */
   freshnessRevision?: () => number

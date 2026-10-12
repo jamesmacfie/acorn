@@ -17,6 +17,7 @@ import {
   type ExtensionPointContribution,
 } from '../registries/extensionPoints/extensionPoints'
 import { recordSurfaceFailure } from '../plugins/surfaceFailures'
+import { sanitizeAnnotationMark } from './annotationMark'
 import { createLogger } from '../../infra/telemetry/logger'
 
 /** One mark with contributor provenance stamped by the host registration. */
@@ -138,8 +139,20 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
 
     void contribution
       .marks([...keys], controller.signal)
-      .then((answer) => {
+      .then((rows) => {
         if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
+        const answer = rows.flatMap((row) => {
+          const mark = sanitizeAnnotationMark(row)
+          if (!mark) {
+            log.warn(`${contribution.pluginId} returned an unusable annotation mark`, row, {
+              'plugin.id': contribution.pluginId,
+            })
+            return []
+          }
+          if (point.acceptsDetail) return [mark]
+          const { detail: _detail, ...plain } = mark
+          return [plain]
+        })
         const limit = point.acceptedMarks ?? Number.POSITIVE_INFINITY
         if (answer.length > limit) {
           log.warn(

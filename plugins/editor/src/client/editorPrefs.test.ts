@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { readEditorIndentation, readEditorMode, readEditorShowIgnored, readEditorWordWrap } from './editorPrefs'
+import {
+  readEditorIndentation,
+  readEditorLineBlame,
+  readEditorMode,
+  readEditorShowIgnored,
+  readEditorWordWrap,
+} from './editorPrefs'
 
 describe('the editor mode preference', () => {
   it('is graphical unless the stored value says terminal', () => {
@@ -16,6 +22,8 @@ describe('editing defaults on this device', () => {
     expect(readEditorShowIgnored(undefined)).toBe(true)
     expect(readEditorShowIgnored({ editor_show_ignored: '0' })).toBe(false)
     expect(readEditorWordWrap({ editor_word_wrap: '1' })).toBe(true)
+    expect(readEditorLineBlame(undefined)).toBe(true)
+    expect(readEditorLineBlame({ editor_line_blame: '0' })).toBe(false)
     expect(readEditorIndentation(undefined)).toEqual({ mode: 'spaces', width: 2 })
     expect(readEditorIndentation({ editor_indentation: 'tabs:4' })).toEqual({ mode: 'tabs', width: 4 })
     expect(readEditorIndentation({ editor_indentation: 'spaces:3' })).toEqual({ mode: 'spaces', width: 2 })

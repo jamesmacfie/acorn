@@ -82,9 +82,25 @@ POST /v1/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side
 ```
 
 A mark holds scalar key fields, one of three severities, up to 200 characters of text, and an
-optional host-resolved icon. It holds no markup, CSS, geometry, color, or action. The host builds the
-lookup from the owner's declared fields in the owner's order, so a contributor can't widen its match
-by inventing a field. The host stamps provenance on every mark.
+optional host-resolved icon. It holds no CSS, geometry, color, or action. The host builds the lookup
+from the owner's declared fields in the owner's order, so a contributor can't widen its match by
+inventing a field. The host stamps provenance on every mark.
+
+A mark may also carry `detail`, `{ "kind": "markdown" | "plaintext", "value": "…" }`, for an owner to
+show on demand, such as in a tooltip. The host keeps it only for a point that sets `acceptsDetail`, and
+strips it everywhere else, so a batch of thousands of diff-line marks never carries it. A `value` over
+16 KiB of UTF-8, or a detail of the wrong shape, is dropped and the rest of the mark kept. Detail is
+untrusted: the owner draws it only through `richTooltipDom` from `@acorn/plugin-api/ui/editor`, which
+sanitizes Markdown and writes the "From <plugin>" credit. `editor:line` is the one point that accepts
+detail ([line annotations](../editor/line-annotations.md)).
+
+A compiled plugin contributes marks with a `marks(keys, signal)` function instead of a route:
+
+```ts
+ctx.extensions.register({ id: 'line-blame', point: 'editor:line', label: 'Git blame', order: 10, marks })
+```
+
+The host scopes it to the active Node and checks its answer exactly as it checks a loaded plugin's.
 
 Annotation state belongs to one contributor at one point. Its request identity includes the point and
 contributor registrations, the active Node, the plugin's chrome revision, and the visible-key
@@ -94,8 +110,8 @@ same turn. A late response can't restore stale marks, even when the contributor 
 contributor stays empty and leaves the others' marks alone. Reload, disable, removal, and Node
 changes clear the state before replacement registrations can reuse ids.
 
-The transport reads at most 4,096 raw rows from one response, drops malformed rows one at a time, and
-reports one overflow summary past that ceiling. A point owner may set a smaller accepted-mark limit.
+The transport reads at most 4,096 raw rows from one response and reports one overflow summary past
+that ceiling. The annotation host then drops malformed rows one at a time, from either tier. A point owner may set a smaller accepted-mark limit.
 
 ### Task annotations
 
@@ -113,7 +129,8 @@ legend ([rail controls and status markers](../ui-design/shell-hierarchy.md#rail-
 [task markers](../tui/chrome.md#task-markers)).
 
 Editor's `editor:file` point works the same way for tree rows and document tabs, keyed
-`{ taskId, path }` ([file annotations](../editor/file-annotations.md)).
+`{ taskId, path }` ([file annotations](../editor/file-annotations.md)). Its `editor:line` point marks
+the cursor line, keyed `{ taskId, path, line, revision }` ([line annotations](../editor/line-annotations.md)).
 
 ### Source and pane annotations
 

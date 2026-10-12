@@ -33,6 +33,8 @@ type PublicAnnotationPoint = PublicPointCommon & {
   max: number
   /** Marks kept from one contributor's answer. Absent means the registry default. */
   acceptedMarks?: number
+  /** Does the host keep each mark's `detail`? Absent means it strips it. */
+  acceptsDetail?: boolean
 }
 
 export type PublicExtensionPoint = PublicRemotePoint | PublicAnnotationPoint
@@ -158,6 +160,16 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
     max: 1,
     acceptedMarks: 256,
     note: 'asked about the open tabs and the files in expanded folders; never a folder',
+  },
+  {
+    id: 'editor:line',
+    kind: 'annotation',
+    key: ['taskId', 'path', 'line', 'revision'],
+    max: 2,
+    acceptedMarks: 1,
+    acceptsDetail: true,
+    note: 'asked about the cursor line of a saved file; `line` is one-based and `revision` is the SHA-256 of the file on disk',
+    terminal: 'never asked, because the terminal edits in `$EDITOR`',
   },
   { id: 'github:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
   { id: 'github:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },

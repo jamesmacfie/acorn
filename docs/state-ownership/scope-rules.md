@@ -57,6 +57,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Show ignored files | Device preference; on unless explicitly disabled |
 | Editor close and navigation history | Session memory keyed by Node and task; at most 20 closes and 100 locations |
 | Editor word wrap default | Device preference `editor_word_wrap`; off when absent |
+| Editor line blame | Device preference `editor_line_blame`; on unless explicitly disabled |
 | Editor indentation fallback | Device preference `editor_indentation`; two spaces when absent or invalid |
 | Editor per-tab wrap and indentation choices | Session memory keyed by Node, task, and path; rename moves them, close, trash, archive, and Node removal prune them |
 | Git section, selections, filters, comparison inputs, loaded history window, and reading places | Session memory keyed by Node and project, with separate task views |

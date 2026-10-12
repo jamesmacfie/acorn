@@ -190,7 +190,17 @@ export type PluginAnnotationMark = {
   text: string
   // A Lucide name or a `brand:` mark, resolved client-side.
   icon?: string
+  /** Longer content the owner may show on demand, such as in a tooltip. Kept only for a point that
+   *  sets `acceptsDetail`, so a batch of thousands of diff-line marks never carries it. */
+  detail?: AnnotationDetail
 }
+
+/** The content shape language hover uses. Markdown is untrusted and is drawn only through the host's
+ *  sanitizer. */
+export type AnnotationDetail = { kind: 'markdown' | 'plaintext'; value: string }
+
+/** The most UTF-8 a mark's `detail` may carry. A larger detail is dropped and the mark kept. */
+export const MAX_ANNOTATION_DETAIL_BYTES = 16 * 1024
 
 /**
  * The most raw rows a host inspects from one annotation response.

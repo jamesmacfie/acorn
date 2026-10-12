@@ -27,6 +27,12 @@ export const readEditorShowIgnored = (prefs: Record<string, string> | undefined)
 export const saveEditorShowIgnored = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
   savePref(qc, PrefKeys.editorShowIgnored, enabled ? '1' : '0')
 
+export const readEditorLineBlame = (prefs: Record<string, string> | undefined): boolean =>
+  prefs?.[PrefKeys.editorLineBlame] !== '0'
+
+export const saveEditorLineBlame = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
+  savePref(qc, PrefKeys.editorLineBlame, enabled ? '1' : '0')
+
 export const readEditorIndentation = (prefs: Record<string, string> | undefined): Indentation => {
   const match = /^(spaces|tabs):(2|4|8)$/.exec(prefs?.[PrefKeys.editorIndentation] ?? '')
   return match

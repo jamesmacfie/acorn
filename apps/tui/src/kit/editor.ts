@@ -84,3 +84,12 @@ export const mountEmbeddedEditor = (
   write: () => {},
   destroy: () => {},
 })
+
+export type { RichTooltipContent } from '@acorn/client-core/features/editor'
+import type { RichTooltipContent } from '@acorn/client-core/features/editor'
+/** Only the DOM editor's line annotation extension draws a rich tooltip, and this host never loads it.
+ *  These keep `editorEngine.ts` compiling, with no CodeMirror byte behind them. */
+export const richTooltipDom = (_content: RichTooltipContent, _credit: string): HTMLElement => {
+  throw new Error('The terminal client has no editor tooltips')
+}
+export const richTooltipTheme: Extension = []

@@ -20,7 +20,7 @@ vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 const POINT = 'changes:diff-line'
 const registered: Disposable[] = []
 
-const point = () =>
+const point = (options: { acceptsDetail?: boolean } = {}) =>
   registered.push(
     extensionPointRegistry.register({
       id: POINT,
@@ -29,6 +29,7 @@ const point = () =>
       kind: 'annotation',
       key: ['file', 'line', 'side'],
       max: 4,
+      ...options,
     }),
   )
 
@@ -125,6 +126,43 @@ describe('requestAnnotations', () => {
     requestAnnotations(POINT, [key(42)])
     await vi.waitFor(() => expect(annotationsFor(POINT, key(42))).toHaveLength(1))
     expect(annotationsFor(POINT, key(42))[0]!.pluginId).toBe('lint')
+  })
+
+  it('sanitizes each mark, keeping the valid ones around a malformed one', async () => {
+    point()
+    contributor('coverage', async () => [
+      { key: key(1), severity: 'info', text: 'Covered' },
+      { broken: true } as unknown as PluginAnnotationMark,
+      { key: key(1), severity: 'loud', text: 'Bad severity' } as unknown as PluginAnnotationMark,
+      { key: key(2), severity: 'warn', text: 'x'.repeat(300) },
+    ])
+    requestAnnotations(POINT, [key(1), key(2)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(2))).toHaveLength(1))
+    expect(annotationsFor(POINT, key(1)).map((mark) => mark.text)).toEqual(['Covered'])
+    expect(annotationsFor(POINT, key(2))[0]!.text).toHaveLength(200)
+  })
+
+  it('keeps detail only for a point that accepts it', async () => {
+    const detailed = {
+      key: key(1),
+      severity: 'info' as const,
+      text: 'Ada',
+      detail: { kind: 'markdown' as const, value: '**Fix**' },
+    }
+    point()
+    const plain = contributor('blame', async () => [detailed])
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(1))
+    expect(annotationsFor(POINT, key(1))[0]).not.toHaveProperty('detail')
+
+    plain.disposable.dispose()
+    for (const disposable of registered.splice(0).reverse()) disposable.dispose()
+    clearAnnotations()
+    point({ acceptsDetail: true })
+    contributor('blame', async () => [detailed])
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(1))
+    expect(annotationsFor(POINT, key(1))[0]!.detail).toEqual({ kind: 'markdown', value: '**Fix**' })
   })
 
   it('says nothing about a point that is not an annotation point, or one nobody declared', async () => {

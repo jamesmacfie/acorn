@@ -1,13 +1,21 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
 import { Checkbox, Select, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
-import { readEditorIndentation, readEditorWordWrap, saveEditorIndentation, saveEditorWordWrap } from './editorPrefs'
+import {
+  readEditorIndentation,
+  readEditorLineBlame,
+  readEditorWordWrap,
+  saveEditorIndentation,
+  saveEditorLineBlame,
+  saveEditorWordWrap,
+} from './editorPrefs'
 
 export default function EditorSettings() {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const wrapSave = createSettingSave()
   const indentationSave = createSettingSave()
+  const blameSave = createSettingSave()
   const indentation = () => readEditorIndentation(prefs.data)
   const indentationChoices = (['spaces', 'tabs'] as const).flatMap((mode) =>
     ([2, 4, 8] as const).map((width) => ({
@@ -44,6 +52,18 @@ export default function EditorSettings() {
             const choice = indentationChoices.find((option) => option.value === value)
             if (choice) void indentationSave.run(() => saveEditorIndentation(queryClient, choice.indentation))
           }}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Show line blame"
+        description="Show who last changed the line the cursor is on, after the end of the line."
+        error={blameSave.error()}
+      >
+        <Checkbox
+          switch
+          ariaLabel="Show line blame"
+          checked={readEditorLineBlame(prefs.data)}
+          onChange={(enabled) => blameSave.run(() => saveEditorLineBlame(queryClient, enabled))}
         />
       </SettingRow>
     </SettingsSection>

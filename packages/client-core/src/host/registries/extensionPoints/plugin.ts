@@ -17,7 +17,12 @@ import {
   type ExtensionContribution,
   type ExtensionPointContribution,
 } from './extensionPoints'
-import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import {
+  qualifiedExtensionPointId,
+  type PluginAnnotationKey,
+  type PluginAnnotationMark,
+} from '@acorn/protocol/extensionPoints.ts'
+import { activeNodeId } from '../../../infra/node/activeNode'
 import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
 import {
@@ -49,12 +54,31 @@ type ClientContributionPoint<T> = {
  *  `id` here is the bare point id, and `ownerId` is stamped from the plugin doing the registering. */
 type CompiledExtensionPoint = Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
 
-/** What a compiled plugin declares when it fills somebody else's point. `pluginId` and `carrier` are
- *  the host's; `component` is the only carrier a plugin in this process can bring. */
+/** What a compiled plugin declares when it fills somebody else's point. `pluginId`, `carrier` and
+ *  `requestScope` are the host's. A plugin in this process brings either a `component` for a remote
+ *  point or a `marks` function for an annotation point, never both. */
 type CompiledExtension = Omit<
   ExtensionContribution,
-  'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'
-> & { component: NonNullable<ExtensionContribution['component']> }
+  | 'pluginId'
+  | 'carrier'
+  | 'component'
+  | 'entry'
+  | 'hash'
+  | 'frame'
+  | 'fetch'
+  | 'marks'
+  | 'run'
+  | 'requestScope'
+  | 'freshnessRevision'
+> &
+  (
+    | { component: NonNullable<ExtensionContribution['component']>; marks?: never }
+    | {
+        // Typed for the author. The host still sanitizes each mark, as it does a loaded plugin's.
+        marks: (keys: PluginAnnotationKey[], signal: AbortSignal) => Promise<PluginAnnotationMark[]>
+        component?: never
+      }
+  )
 
 // What a plugin loaded from disk would be handed, if one were ever handed this object. It is not: a
 // loaded plugin's client half is a manifest plus a tree or a frame, and the descriptor pass turns those
@@ -81,8 +105,9 @@ type ClientPluginContext = {
   // `<pluginId>:<id>` and stamps the owner, so a plugin cannot open a point in somebody else's name.
   extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
   // What this plugin brings to somebody else's point. The compiled half of the manifest's
-  // `extensions`, and the only carrier available here is a component: a loaded plugin ships bytes for a
-  // worker, and a compiled one is already in this process (./extensionPoints.ts).
+  // `extensions`: a component where a loaded plugin ships bytes for a worker, because a compiled one is
+  // already in this process, or a `marks` function where a loaded plugin names a route
+  // (./extensionPoints.ts).
   extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
   agentContexts: ClientContributionPoint<AgentContextContribution>
@@ -263,9 +288,18 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
       settingsPages.register(entry)
     },
   }
+  // A `marks` entry is the compiled half of a loaded plugin's `items` carrier, scoped to the active Node
+  // the same way, so a Node switch asks again rather than showing the old Node's marks.
   const ownExtension: ClientContributionPoint<CompiledExtension> = {
     register: (entry) => {
-      record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }, name))
+      record(
+        extensionRegistry.register(
+          entry.marks
+            ? { ...entry, pluginId: name, carrier: 'items', requestScope: () => activeNodeId() ?? 'local' }
+            : { ...entry, pluginId: name, carrier: 'component' },
+          name,
+        ),
+      )
     },
   }
   return {

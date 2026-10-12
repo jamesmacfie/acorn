@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import { annotationsFor, requestAnnotations } from '../../annotations/annotations'
+import { extensionDeliveries } from './extensionPoints'
 import { commandRegistry } from '../commands/commands'
 import { paneRegistry, type PaneContribution } from '../panes/panes'
 import { initClientPlugins, type ClientPlugin } from './plugin'
@@ -444,5 +447,37 @@ describe('the client plugin host', () => {
     ).toThrow(/registered 'host.stamped' under provider 'linear'/)
     expect(plugin.entries()).toEqual([])
     clear('github')
+  })
+
+  it('lets a compiled marks function fill an annotation point, sanitized like a loaded answer', async () => {
+    const answer = [
+      { key: { line: 1 }, severity: 'info', text: 'Ada', detail: { kind: 'markdown', value: 'Fix' } },
+      { key: { line: 1 }, severity: 'loud', text: 'Not a severity' },
+    ] as PluginAnnotationMark[]
+    initClientPlugins([
+      {
+        name: 'owner',
+        init: (ctx) => ctx.extensionPoints.register({ id: 'lines', label: 'Lines', kind: 'annotation', key: ['line'] }),
+      },
+      {
+        name: 'contributor',
+        init: (ctx) =>
+          ctx.extensions.register({
+            id: 'marks',
+            point: 'owner:lines',
+            label: 'Marks',
+            order: 1,
+            marks: async () => answer,
+          }),
+      },
+    ])
+    expect(extensionDeliveries('owner:lines').map((entry) => entry.carrier)).toEqual(['items'])
+    requestAnnotations('owner:lines', [{ line: 1 }])
+    await vi.waitFor(() => expect(annotationsFor('owner:lines', { line: 1 })).toHaveLength(1))
+    // The point didn't opt into detail, so the host stripped it.
+    expect(annotationsFor('owner:lines', { line: 1 })).toEqual([
+      { key: { line: 1 }, severity: 'info', text: 'Ada', pluginId: 'contributor' },
+    ])
+    clear('owner', 'contributor')
   })
 })

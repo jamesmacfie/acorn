@@ -45,7 +45,8 @@ both is asked about once. No row or tab starts its own request, and no timer run
 - A Node switch, a disable, or a removed contributor clears its marks in the same turn. A late answer
   for an old batch is dropped.
 
-Each contributor keeps at most 256 marks per batch; the rest are dropped with a warning. The shared
+Each contributor keeps at most 256 marks per batch; the rest are dropped with a warning. The point
+doesn't accept `detail`, so the host strips it from every mark. The shared
 transport reads at most 4,096 raw rows and drops a malformed mark on its own.
 
 ## Drawing
@@ -60,5 +61,5 @@ Severity maps the same way on both hosts: `info` is muted, `warn` is warn, and `
   tab's marks after its Git status below the strip. The close control and the unsaved dot stay
   Editor's own.
 
-Git's status (`editor:file-status`) and [line markers](./line-markers.md) are separate contracts and
-don't change.
+Git's status (`editor:file-status`), [line markers](./line-markers.md), and
+[line annotations](./line-annotations.md) are separate contracts and don't change.

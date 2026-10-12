@@ -20,6 +20,7 @@ import {
 } from '@acorn/plugin-api/testkit/client'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 import { EDITOR_FILE_KEY, EDITOR_FILE_POINT, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
+import { EDITOR_LINE_KEY, EDITOR_LINE_POINT, type EditorLineAnnotationKey } from '../contract/lineAnnotations'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -106,7 +107,7 @@ vi.mock('./EditorTerminal', () => ({
 const { default: EditorPane } = await import('./EditorPane')
 const { activeFile, editorActivate, editorClose, editorOpen, openFiles, requestEditorReveal } =
   await import('./editorState')
-const { saveEditorMode } = await import('./editorPrefs')
+const { saveEditorLineBlame, saveEditorMode } = await import('./editorPrefs')
 const { editorViewState } = await import('./editorViewState')
 
 // A task per test. The per-file document pool is held by the host per (pane, task) and outlives a
@@ -1718,6 +1719,126 @@ describe('the editor pane', () => {
     // Without the flush this is a 1.5s debounce the test would have to sit through.
     view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
     await vi.waitFor(() => expect(disk.get('b.ts')).toContain('// blurred'))
+  })
+})
+
+describe('other plugins’ line marks', () => {
+  const registrations: { dispose(): void }[] = []
+  afterEach(() => registrations.splice(0).forEach((handle) => handle.dispose()))
+  const asked: EditorLineAnnotationKey[][] = []
+  const sha = (text: string) => createHash('sha256').update(text).digest('hex')
+  // The point as Editor registers it, and a contributor as the compiled host binds one.
+  const setup = () => {
+    asked.length = 0
+    registrations.push(
+      extensionPointRegistry.register({
+        id: EDITOR_LINE_POINT,
+        ownerId: 'editor',
+        label: 'Editor line',
+        kind: 'annotation',
+        key: [...EDITOR_LINE_KEY],
+        max: 2,
+        acceptedMarks: 1,
+        acceptsDetail: true,
+      }),
+      extensionRegistry.register({
+        id: 'line-blame',
+        pluginId: 'blame',
+        point: EDITOR_LINE_POINT,
+        label: 'Blame',
+        order: 10,
+        carrier: 'items',
+        requestScope: () => activeNodeId() ?? 'local',
+        marks: async (keys: EditorLineAnnotationKey[]) => {
+          asked.push(keys)
+          return keys.map((key) => ({
+            key,
+            severity: 'info',
+            text: `Ada, line ${key.line}`,
+            detail: { kind: 'markdown', value: '**Fix the build** <script>window.ran = true</script>' },
+          }))
+        },
+      } as unknown as ExtensionContribution),
+    )
+  }
+  const label = (host: HTMLElement) => host.querySelector<HTMLElement>('.cm-line-annotation')
+  const open = async (text = 'const a = 1\nconst b = 2\n') => {
+    disk.set('a.ts', text)
+    setup()
+    const mounted = mount()
+    const view = await editor(mounted.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const b')
+    return { ...mounted, view }
+  }
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 400))
+
+  it('asks about the settled cursor line of a saved file and draws the answer after its end', async () => {
+    const { host, view } = await open()
+    view.dispatch({ selection: { anchor: view.state.doc.line(2).from + 3 } })
+    await vi.waitFor(() => expect(label(host)?.textContent).toBe('Ada, line 2'))
+    expect(asked.at(-1)).toEqual([{ taskId, path: 'a.ts', line: 2, revision: sha('const a = 1\nconst b = 2\n') }])
+    expect(label(host)!.closest('.cm-line')?.textContent).toBe('const b = 2Ada, line 2')
+    // A widget, not text: the document and anything copied from it are unchanged.
+    expect(view.state.doc.toString()).toBe('const a = 1\nconst b = 2\n')
+    expect(getComputedStyle(label(host)!).userSelect).toBe('none')
+  })
+
+  it('hides the label on a move or an edit, asks nothing while dirty, and comes back after the save', async () => {
+    const { host, view } = await open()
+    view.dispatch({ selection: { anchor: 0 } })
+    await vi.waitFor(() => expect(label(host)?.textContent).toBe('Ada, line 1'))
+    view.dispatch({ selection: { anchor: view.state.doc.line(2).from } })
+    expect(label(host)).toBeNull()
+    await vi.waitFor(() => expect(label(host)?.textContent).toBe('Ada, line 2'))
+
+    const before = asked.length
+    view.dispatch({ changes: { from: view.state.doc.line(2).to, insert: ' // edited' } })
+    expect(label(host)).toBeNull()
+    await settle()
+    expect(asked).toHaveLength(before)
+
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    await vi.waitFor(() => expect(disk.get('a.ts')).toContain('// edited'))
+    await vi.waitFor(() => expect(label(host)?.textContent).toBe('Ada, line 2'))
+    expect(asked.at(-1)![0]!.revision).toBe(sha('const a = 1\nconst b = 2 // edited\n'))
+  })
+
+  it('asks nothing for a selection over more than one line', async () => {
+    const { host, view } = await open()
+    view.dispatch({ selection: EditorSelection.range(0, view.state.doc.line(2).from + 2) })
+    await settle()
+    expect(asked).toEqual([])
+    expect(label(host)).toBeNull()
+  })
+
+  it('opens the sanitized detail from the label or the command', async () => {
+    const { host, view } = await open()
+    view.dispatch({ selection: { anchor: 0 } })
+    await vi.waitFor(() => expect(label(host)).not.toBeNull())
+    label(host)!.dispatchEvent(new MouseEvent('mouseenter'))
+    const tooltip = () => view.dom.querySelector<HTMLElement>('.cm-tooltip .cm-document-hover')
+    await vi.waitFor(() => expect(tooltip()?.querySelector('strong')?.textContent).toBe('Fix the build'))
+    expect(tooltip()!.querySelector('script')).toBeNull()
+    expect(tooltip()!.lastElementChild?.textContent).toBe('From blame')
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await vi.waitFor(() => expect(tooltip()).toBeNull())
+
+    runEditorCommand('editor.line-annotations.details')
+    await vi.waitFor(() => expect(tooltip()).not.toBeNull())
+  })
+
+  it('turns everything off with the setting', async () => {
+    const { host, view } = await open()
+    view.dispatch({ selection: { anchor: 0 } })
+    await vi.waitFor(() => expect(label(host)).not.toBeNull())
+    await saveEditorLineBlame(queryClient, false)
+    await vi.waitFor(() => expect(label(host)).toBeNull())
+    const before = asked.length
+    view.dispatch({ selection: { anchor: view.state.doc.line(2).from } })
+    await settle()
+    expect(asked).toHaveLength(before)
+    expect(label(host)).toBeNull()
   })
 })
 

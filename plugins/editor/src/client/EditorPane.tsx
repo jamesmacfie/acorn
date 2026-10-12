@@ -223,6 +223,16 @@ export default function EditorPane(props: { task: Task }) {
         when: () => editorFocused() && !!editor.graphicalView(),
         run: editor.toggleWrap,
       },
+      {
+        id: 'editor.line-annotations.details',
+        title: 'Show line blame details',
+        category: 'action',
+        palette: true,
+        when: () => editorFocused() && !!editor.graphicalView(),
+        run: () => {
+          editor.showLineAnnotationDetails()
+        },
+      },
       ...EDITOR_ACTIONS.map((action) => ({
         id: `editor.edit.${action.id}`,
         title: action.title,

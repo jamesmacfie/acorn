@@ -16,3 +16,5 @@ export {
   reserveFileSourceCustodies,
   type DocumentCustody,
 } from './documentCustody'
+export { richTooltipDom, richTooltipTheme } from './richTooltip.ts'
+export type { RichTooltipContent } from './richTooltip.ts'

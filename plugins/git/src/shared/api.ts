@@ -138,6 +138,9 @@ export type RefChangeResult = {
   postState: 'fresh' | 'unavailable'
   command: { code: number | null; error: string | null } | null
 }
+/** Posts `editor:line` keys and answers `{ items }` of annotation marks. */
+export const lineBlameRoute = '/v1/p/git/editor/line-blame'
+
 export const refsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/refs`
 
 export type GitRemote = { name: string; fetchUrl: string; pushUrl: string; fetchUrlCount: number; pushUrlCount: number }

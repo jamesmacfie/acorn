@@ -219,7 +219,8 @@ Each landing page in the tables above has topic pages in a folder of the same na
   [File annotations](./editor/file-annotations.md), [File navigation](./editor/file-navigation.md),
   [Editing controls](./editor/editing-controls.md),
   [File renderers](./editor/file-renderers.md),
-  [Find in files](./editor/find-in-files.md), [Line markers](./editor/line-markers.md),
+  [Find in files](./editor/find-in-files.md), [Line annotations](./editor/line-annotations.md),
+  [Line markers](./editor/line-markers.md),
   [Saving and recovery](./editor/save-and-recovery.md).
 - [notifications.md](./notifications.md): [Notification channels and settings](./notifications/channels.md),
   [The notification gate](./notifications/gate.md),
@@ -331,8 +332,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   programmes shipped.
 - [Spawned agent notes](./future/spawned-agent-notes.md): proposed automatic note snapshots and parent
   note inheritance in shared and worktree agent spawns.
-- [Inline line blame](./future/editor-line-blame.md): a proposal for Git blame on the Editor cursor
-  line, with a commit tooltip, built on a new `editor:line` annotation point.
+- [Inline line blame](./future/editor-line-blame.md): the plan behind Git blame on the Editor cursor
+  line, with its open questions and the real-host check still to run.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once

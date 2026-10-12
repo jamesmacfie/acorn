@@ -12,6 +12,7 @@ import './wsChannel'
 import { editorCommands } from './commands'
 import { editorPaneContribution } from './paneContribution'
 import { EDITOR_FILE_KEY, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
+import { EDITOR_LINE_KEY } from '../contract/lineAnnotations'
 
 const EditorSettings = lazy(() => import('./EditorSettings'))
 
@@ -37,6 +38,18 @@ export const editorClientPlugin: ClientPlugin = {
       key: [...EDITOR_FILE_KEY],
       acceptedMarks: MAX_EDITOR_FILE_MARKS,
     })
+    // What another plugin knows about the cursor line, drawn after its end: line blame, coverage
+    // (docs/editor/line-annotations.md). One mark from each of up to two contributors, with detail for
+    // the tooltip.
+    ctx.extensionPoints.register({
+      id: 'line',
+      label: 'Editor line',
+      kind: 'annotation',
+      key: [...EDITOR_LINE_KEY],
+      max: 2,
+      acceptedMarks: 1,
+      acceptsDetail: true,
+    })
     ctx.settingsPages.register({
       id: 'editor',
       label: 'Editor',
@@ -45,8 +58,8 @@ export const editorClientPlugin: ClientPlugin = {
       icon: 'file-code',
       order: 20,
       requires: { plugin: 'editor' },
-      keywords: ['word wrap', 'indentation', 'spaces', 'tabs'],
-      sections: [{ id: 'defaults', label: 'Editing defaults', rows: ['Word wrap', 'Indentation'] }],
+      keywords: ['word wrap', 'indentation', 'spaces', 'tabs', 'blame'],
+      sections: [{ id: 'defaults', label: 'Editing defaults', rows: ['Word wrap', 'Indentation', 'Show line blame'] }],
       component: EditorSettings,
     })
     // ⌘P quick-open and find-in-files (./commands.ts). Quick-open is a search command on the shared

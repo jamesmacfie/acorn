@@ -1,7 +1,7 @@
 // Loaded only after a DOM editor Rectangle admits its surface.
 export { basicSetup } from 'codemirror'
 export { Compartment, EditorState, Prec, StateEffect } from '@codemirror/state'
-export { EditorView, keymap } from '@codemirror/view'
+export { EditorView, keymap, tooltips } from '@codemirror/view'
 export { indentUnit } from '@codemirror/language'
 export {
   copyLineDown,
@@ -17,3 +17,4 @@ export {
 } from '@codemirror/commands'
 export { openSearchPanel, selectNextOccurrence } from '@codemirror/search'
 export { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
+export { lineAnnotationEffect, lineAnnotationExtension, showLineAnnotationDetails } from './lineAnnotationExtension'

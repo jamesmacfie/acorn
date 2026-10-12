@@ -167,7 +167,7 @@ describe('descriptor source row parsing', () => {
 describe('annotation response budget', () => {
   beforeEach(() => writeJson.mockReset())
 
-  it('inspects only the generic raw-row ceiling and keeps valid rows around malformed ones', async () => {
+  it('passes on only the generic raw-row ceiling, unchecked, for the annotation host to sanitize', async () => {
     const rows = Array.from({ length: MAX_RAW_ANNOTATION_ROWS + 2 }, (_, index) =>
       index === 1 ? { broken: true } : { key: { line: index }, severity: 'info', text: `Line ${index}` },
     )
@@ -181,9 +181,7 @@ describe('annotation response budget', () => {
       new AbortController().signal,
     )
 
-    expect(marks).toHaveLength(MAX_RAW_ANNOTATION_ROWS - 1)
-    expect(marks.some((mark) => mark.text === 'Line 2')).toBe(true)
-    expect(marks.some((mark) => mark.text === `Line ${MAX_RAW_ANNOTATION_ROWS}`)).toBe(false)
+    expect(marks).toEqual(rows.slice(0, MAX_RAW_ANNOTATION_ROWS))
   })
 })
 

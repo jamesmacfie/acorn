@@ -60,7 +60,7 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | Context menus | Both | `ctx.contextMenus` (or `ctx.contribute(contextMenuRegistry)`) / `contributions.contextMenus` | Host-drawn context menus on task rows, item rows, the plugin's own rail icons, Editor's files and tabs, transcript messages and turns, and selected text ([context menus](./plugins/menus-and-markers.md#context-menus)) |
 | Document services | Both | — / `contributions.documentServices` | Hover and diagnostics for Editor's files in one language, from the plugin's own routes. On a tie the person picks one per Node ([language smarts](./editor/document-surface.md#language-smarts)) |
 | Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds ([cooperative extension points](./plugins/cooperative-extension-points.md)). A `remote` point may declare `actions` a contributor's tree may ask for, and a loaded owner's `mounts` places it above or below its own detail views ([detail regions](./plugins/detail-regions.md)) |
-| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into another plugin's point. A compiled carrier is a `component`, and a loaded one is `items`, `remote`, `frame`, or `route`. `matches` narrows a tree or rectangle to the keys it draws. See [places to fill](#places-to-fill) |
+| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into another plugin's point. A compiled carrier is a `component` or a `marks` function, and a loaded one is `items`, `remote`, `frame`, or `route`. `matches` narrows a tree or rectangle to the keys it draws. See [places to fill](#places-to-fill) |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the Node, which runs with no client open |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** The flow is a sequence of steps, not a component ([compiled tier](./future/compiled-tier.md)) |
@@ -111,6 +111,7 @@ the owner declared. The `plugin_authoring` tool lists every point's props and ke
 | A row on a message or a finished turn | `agent.message`, `agent.turn` | Menu descriptor | Agents' menus take any plugin | The same menus |
 | A row on selected text | `content.selection` | Menu descriptor | An owner wraps its content in `SelectionActions` | A message's whole text only |
 | A mark on a file | `editor:file` | `items` route | Registered by Editor | Dots and a legend |
+| Text after the cursor line, with a tooltip | `editor:line` | `items` route or compiled `marks` | Registered by Editor | None |
 | A mark on a task, source, or task pane | `core:task`, `core:source`, `core:pane` | `items` route | None for `core:task`. A source or pane sets `statusAnnotations: true` | Counts and a legend |
 | A preview of an HTTPS link | `core:link-preview` | Tree | Core | From the link's menu |
 | A view of a code fence | `core:markdown-fence` | Tree | Transcripts and pane regions | Under a **Source** line |

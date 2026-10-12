@@ -24,13 +24,16 @@ type Shape = {
   mode?: string
   max?: number
   acceptedMarks?: number
+  acceptsDetail?: boolean
   actions?: readonly string[]
   key?: readonly string[]
 }
 const shape = (entry: Shape): Shape => {
-  const { kind, mode, max, acceptedMarks, actions, key } = entry
+  const { kind, mode, max, acceptedMarks, acceptsDetail, actions, key } = entry
   return Object.fromEntries(
-    Object.entries({ kind, mode, max, acceptedMarks, actions, key }).filter(([, value]) => value !== undefined),
+    Object.entries({ kind, mode, max, acceptedMarks, acceptsDetail, actions, key }).filter(
+      ([, value]) => value !== undefined,
+    ),
   ) as Shape
 }
 

@@ -10,6 +10,9 @@ export { languageForPath, shouldHighlightDocument } from '@acorn/client-core/fea
 // Hover and diagnostics from routes the host resolved, drawn by the host's editor. The owner names
 // routes and its edit counter, nothing more.
 export { languageServices, refreshLanguageServices } from '@acorn/client-core/features/editor'
+// The same sanitized body and credit line, for a tooltip an owner opens itself, such as annotation
+// detail on a line.
+export { richTooltipDom, richTooltipTheme, type RichTooltipContent } from '@acorn/client-core/features/editor'
 export { applyViewState, captureViewState, type EditorViewState } from '@acorn/client-core/features/editor'
 // Find and replace drawn with the kit's controls.
 export { editorSearch, openReplacePanel } from '@acorn/client-core/features/editor'

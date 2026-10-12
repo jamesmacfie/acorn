@@ -1,6 +1,7 @@
 # Inline line blame in the Editor
 
-Date: October 12, 2026. Status: proposed. Implementation not started.
+Date: October 12, 2026. Status: implemented October 12, 2026. The real-host check and the open
+questions below remain. [Line annotations](../editor/line-annotations.md) owns the shipped behavior.
 
 This page is the requirements and design for showing Git blame on the cursor line in the desktop
 Editor. It's for the developer who builds it. [Rows and annotations](../plugins/rows-and-annotations.md)

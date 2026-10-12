@@ -364,7 +364,7 @@ const describePoint = (point: PublicExtensionPoint): string => {
           ...(point.actions ? [`actions ${point.actions.map((action) => `\`${action}\``).join(', ')}`] : []),
         ]
       : [
-          `\`${point.id}\` \`{ ${point.key.join(', ')} }\` — annotation${point.acceptedMarks ? `, ${point.acceptedMarks} marks kept` : ''}`,
+          `\`${point.id}\` \`{ ${point.key.join(', ')} }\` — annotation${point.acceptedMarks ? `, ${point.acceptedMarks} marks kept` : ''}${point.acceptsDetail ? ', keeps `detail`' : ''}`,
         ]
   return `- ${[...parts, point.note, point.terminal && `terminal: ${point.terminal}`].filter(Boolean).join('; ')}.`
 }

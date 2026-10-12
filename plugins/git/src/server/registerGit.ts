@@ -44,6 +44,8 @@ export async function registerGit(ctx: Context): Promise<() => void> {
     timeout: 300,
     run: (signal) => autoFetcher.tick(signal),
   })
+  const { lineBlameRoutes } = await import('./routes/lineBlame')
+  ctx.routes.register(lineBlameRoutes(ctx.core), { prefix: '', note: 'who last changed the Editor cursor line' })
   const { comparisonRoutes } = await import('./routes/comparison')
   ctx.routes.register(comparisonRoutes(ctx.core), { prefix: '', note: 'pin direct and merge-base comparisons' })
   const { settingsRoutes } = await import('./routes/settings')

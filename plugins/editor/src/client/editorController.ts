@@ -58,7 +58,8 @@ import {
   type FileDecision,
 } from './editorDocumentLifecycle'
 import { editorRootKey, EDITOR_ROOT_STALE_MS, type EditorApi } from './editorClient'
-import { readEditorIndentation, readEditorMode, readEditorWordWrap } from './editorPrefs'
+import { readEditorIndentation, readEditorLineBlame, readEditorMode, readEditorWordWrap } from './editorPrefs'
+import { createLineAnnotations } from './lineAnnotations'
 import {
   activeFile,
   editorActivate,
@@ -202,6 +203,26 @@ export function createEditorController(input: EditorControllerInput) {
   // Who answers hover and diagnostics for a file, by its language, on this pane's Node.
   const servicesFor = (path: string) => resolveDocumentServices(nodeId ?? '', languageIdForPath(path), prefs())
 
+  // Other plugins' marks on the cursor line of a saved document, such as line blame.
+  const lineAnnotations = createLineAnnotations({
+    taskId,
+    enabled: createMemo(() => readEditorLineBlame(prefs())),
+    cursorLine: () => {
+      const entry = currentPath ? pool.files.get(currentPath) : undefined
+      if (!view || !currentPath || !entry || entry.custody.dirty || entry.custody.writing || !live()) return null
+      const { doc, selection } = view.state
+      const line = doc.lineAt(selection.main.head).number
+      if (doc.lineAt(selection.main.anchor).number !== line) return null
+      return { path: currentPath, line, body: doc }
+    },
+    draw: (annotation) => {
+      if (!view || !engine) return
+      const custody = annotation && pool.files.get(annotation.path)?.custody
+      if (annotation && (annotation.path !== currentPath || !custody || custody.dirty || custody.writing)) return
+      view.dispatch({ effects: engine.lineAnnotationEffect(annotation) })
+    },
+  })
+
   // ── File decisions ────────────────────────────────────────────────────────────────────────────
 
   const captureDecision = (action: FileDecision['action'], destination?: string): FileDecision | null => {
@@ -303,6 +324,10 @@ export function createEditorController(input: EditorControllerInput) {
     editorSearch(),
     editorTheme(),
     engine!.lineMarkerExtension(),
+    engine!.lineAnnotationExtension(),
+    // The pane clips anything outside the editor's box, so tooltips measure their room inside it and
+    // open below a line near the top instead of being cut off above it.
+    engine!.tooltips({ tooltipSpace: (view) => view.dom.getBoundingClientRect() }),
     // Hover and diagnostics from the file-language provider this Node chose. Read at each request, so
     // a provider change needs only the refresh below, and the live buffer is sent, saved or not.
     languageServices({
@@ -324,7 +349,10 @@ export function createEditorController(input: EditorControllerInput) {
       engine!.EditorState.tabSize.of(indentation.width),
     ]),
     engine!.EditorView.updateListener.of((update) => {
-      if (currentPath === path && (update.docChanged || update.selectionSet)) updateStatus()
+      if (currentPath === path && (update.docChanged || update.selectionSet)) {
+        updateStatus()
+        lineAnnotations.moved()
+      }
       if (!update.docChanged || applyingAcknowledgement || !live()) return
       const entry = pool.files.get(path)
       if (!entry) return
@@ -512,6 +540,8 @@ export function createEditorController(input: EditorControllerInput) {
   }
 
   async function refreshLineMarkers(relPath: string): Promise<void> {
+    // The same moments can change the saved body under the cursor line.
+    if (relPath === currentPath) lineAnnotations.settle()
     const entry = pool.files.get(relPath)
     if (!api || !entry || entry.custody.dirty || entry.custody.writing) return
     entry.markersReadAt = Date.now()
@@ -696,6 +726,9 @@ export function createEditorController(input: EditorControllerInput) {
     updateStatus()
     noteActivated(nodeId, taskId, relPath)
     view.setState(adopt(relPath, entryAtShow))
+    // A pooled state may still carry the label it had when it was last on screen.
+    view.dispatch({ effects: engine!.lineAnnotationEffect(null) })
+    lineAnnotations.moved()
     featureUsable('editor', 'content')
     updateStatus()
     // A cached state carries the theme it was built with, so a file opened before a theme change
@@ -1480,6 +1513,7 @@ export function createEditorController(input: EditorControllerInput) {
     runAction,
     toggleWrap,
     setIndentation,
+    showLineAnnotationDetails: () => !!view && !!engine && engine.showLineAnnotationDetails(view),
     // Navigation
     openPath,
     activatePath,

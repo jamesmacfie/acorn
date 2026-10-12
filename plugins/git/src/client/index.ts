@@ -7,6 +7,8 @@ import { openChangesTab } from './gitPane'
 import { changeViewSlice } from './changes/changesPrefs'
 import { changesRailMarkerContribution } from './changes/railMarker'
 import { DIFF_LINE_KEY, PUSH_ACTIONS_MAX } from './changes/extensionPoints'
+import { EDITOR_LINE_POINT } from '@acorn/plugin-editor/contract/lineAnnotations.ts'
+import { readLineBlame } from './lineBlame'
 const GitSettings = lazy(() => import('./GitSettings'))
 const GitAppearance = lazy(() => import('./GitSettings').then((module) => ({ default: module.GitAppearanceSettings })))
 const ChangesToolCard = lazy(() => import('./changes/ToolCard').then((module) => ({ default: module.ChangesToolCard })))
@@ -48,6 +50,16 @@ export const gitClientPlugin: ClientPlugin = {
       component: GitAppearance,
     })
     registerChanges(ctx)
+    // Who last changed the line under Editor's cursor, drawn by Editor after the line's end. Editor
+    // never learns about Git: it opens the point, and this fills it (docs/editor/line-annotations.md).
+    ctx.extensions.register({
+      id: 'line-blame',
+      point: EDITOR_LINE_POINT,
+      label: 'Git blame',
+      order: 10,
+      requires: { plugin: 'git' },
+      marks: readLineBlame,
+    })
   },
 }
 

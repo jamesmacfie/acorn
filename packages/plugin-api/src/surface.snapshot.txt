@@ -509,6 +509,7 @@ ui/diff: synth
 ui/editor: DocumentCustody
 ui/editor: EditorViewState
 ui/editor: EmbeddedEditor
+ui/editor: RichTooltipContent
 ui/editor: applyViewState
 ui/editor: captureViewState
 ui/editor: documentCustody
@@ -524,6 +525,8 @@ ui/editor: refreshEditorTheme
 ui/editor: refreshLanguageServices
 ui/editor: reserveDocumentDestinations
 ui/editor: reserveFileSourceCustodies
+ui/editor: richTooltipDom
+ui/editor: richTooltipTheme
 ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn

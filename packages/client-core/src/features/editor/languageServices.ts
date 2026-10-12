@@ -18,8 +18,7 @@ import {
   type DocumentServiceRoute,
   type DocumentServiceRoutes,
 } from '../../host/registries/panes/documentServices'
-import { renderMarkdown } from '../../kit/lib/rendering/markdown'
-import { sanitizedHtmlFragment } from '../../kit/lib/rendering/sanitizedHtml'
+import { richTooltipDom, richTooltipTheme } from './richTooltip'
 
 export type LanguageServiceSource = {
   nodeId: string
@@ -48,23 +47,8 @@ const SEVERITY: Record<string, Diagnostic['severity']> = {
 const credit = (route: DocumentServiceRoute, ...parts: (string | undefined)[]): string =>
   [route.label, ...parts].filter(Boolean).join(' · ')
 
-function hoverDom(hover: CheckedHover | string, route: DocumentServiceRoute): HTMLElement {
-  const dom = document.createElement('div')
-  dom.className = 'cm-document-hover'
-  const body = document.createElement('div')
-  if (typeof hover === 'string') body.textContent = hover
-  // Escaped and then sanitized, with every image a placeholder, so a provider's Markdown can't reach
-  // the network or run anything.
-  else if (hover.kind === 'markdown') {
-    body.className = 'ui-markdown'
-    body.append(sanitizedHtmlFragment(renderMarkdown(hover.value, { images: 'placeholder' })))
-  } else body.textContent = hover.value
-  const from = document.createElement('div')
-  from.className = 'cm-document-hover-from'
-  from.textContent = `From ${route.label}`
-  dom.append(body, from)
-  return dom
-}
+const hoverDom = (hover: CheckedHover | string, route: DocumentServiceRoute): HTMLElement =>
+  richTooltipDom(typeof hover === 'string' ? hover : { kind: hover.kind, value: hover.value }, route.label)
 
 /** What a hover over `pos` draws, or null. Exported for tests, which have no pointer to hover with. */
 export function hoverSource(source: LanguageServiceSource): (view: EditorView, pos: number) => Promise<Tooltip | null> {
@@ -151,14 +135,9 @@ function diagnostics(source: LanguageServiceSource): Extension {
   )
 }
 
-const languageServiceTheme = EditorView.baseTheme({
-  '.cm-document-hover': { maxWidth: '480px', maxHeight: '320px', overflow: 'auto', padding: '6px 8px' },
-  '.cm-document-hover-from': { marginTop: '4px', fontSize: '0.85em', opacity: '0.7' },
-})
-
 /** Hover and diagnostics for one editor state. Asks nothing while `routes()` names neither. */
 export const languageServices = (source: LanguageServiceSource): Extension => [
   hoverTooltip(hoverSource(source)),
   diagnostics(source),
-  languageServiceTheme,
+  richTooltipTheme,
 ]

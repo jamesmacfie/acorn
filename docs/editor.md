@@ -108,6 +108,9 @@ revision, never a filesystem grant ([context menus](./plugins/menus-and-markers.
 
 [Line markers](./editor/line-markers.md) covers the bars that mark pull request and uncommitted lines.
 
+[Line annotations](./editor/line-annotations.md) covers the `editor:line` point, the text other plugins
+draw after the cursor line, and Git's line blame.
+
 [Saving and recovery](./editor/save-and-recovery.md) covers write ownership, save acknowledgements,
 dirty-text recovery, and exporting an oversized host document.
 
