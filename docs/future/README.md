@@ -37,6 +37,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
 | [spawned-agent-notes.md](./spawned-agent-notes.md) | PRD for automatic note snapshots and parent note inheritance in shared and worktree agent spawns. | Implemented October 12, 2026. Real-app acceptance open. |
+| [workflow-poll.md](./workflow-poll.md) | Polling `gate-policy` steps with pass, wait, and fail verdicts; CI, review, command, and agent policies; `ci-loop` rebuilt on the CI policy. | Proposed October 12, 2026. Implementation not started. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan

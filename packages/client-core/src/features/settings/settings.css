@@ -60,6 +60,7 @@
 .settings-rail-chevron { flex: none; display: inline-flex; width: 1em; margin-left: -1.25em; color: var(--text-muted); }
 .settings-rail-item:hover { background: var(--bg-hover); }
 .settings-rail-item[aria-current='page'] { background: var(--bg-selected); }
+.settings-rail-item:focus-visible { outline: none; background: var(--bg-selected); }
 .settings-rail-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* A search result: its page as a faint step, the section it lands on, then the row label or keyword
    that matched. Three lines, each the rail's full width. */

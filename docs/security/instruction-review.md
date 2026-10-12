@@ -21,16 +21,22 @@ highlights first, and keep text previews collapsed. **What was checked** holds s
 limits. Acorn redacts credential-shaped spans from displayed text. Approval checks the discovered bytes again and
 returns a conflict when they changed. The next turn checks again, even after approval.
 
-Enabling **Review changed instruction files** opens the selected task's review automatically. Settings
-prefers the task open in the workspace; choose another task to check its worktree. Opening Settings
-with review enabled also checks that task, so a blocked turn's **Review instructions** action leads
-directly to its review. After approval, send the blocked message again. No turn is retried automatically.
-If there are no tasks, create one on that Node before reviewing its instructions.
+Settings reviews a project, not a task. It scans the project's folder as it stands on the branch
+checked out there, and shows that branch beside the picker. Enabling **Review changed instruction
+files** opens the selected project's review automatically. Settings prefers the project of the task
+open in the workspace. Opening Settings with review enabled also checks that project, so a blocked
+turn's **Review instructions** action leads directly to its review. After approval, send the blocked
+message again. No turn is retried automatically. If the Node has no project with a folder, add one
+before reviewing its instructions. The pre-turn check still scans the task's own folder.
 
 When the exact discovered snapshot matches a readable approval on the Node, the panel shows
 **Instructions already approved**, with no approval button or scan details. Projects with the same
-shared skills and no additional instructions reuse that approval. Matching includes canonical file
-paths, byte hashes, scan coverage, and analyzer version; copied files at different paths do not match.
+shared skills and no additional instructions reuse that approval. Matching includes file identities,
+byte hashes, scan coverage, and analyzer version. A file inside the checkout is identified by its
+resolved path relative to the checkout, so a worktree whose files match the project folder's bytes
+and repository paths reuses the folder's approval. A file outside the checkout, such as a plugin
+skill or a linked skill folder, keeps its absolute resolved path. The same bytes at another
+repository path do not match.
 An empty scan needs no approval. Acorn still discovers files before each turn to detect additions or
 changes. These reads create no pending snapshot. A change to review coverage still requires approval
 for discovered files even if their text is unchanged. Runtime refusals

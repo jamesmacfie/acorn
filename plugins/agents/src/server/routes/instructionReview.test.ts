@@ -28,8 +28,8 @@ afterEach(() => setAgentInstructionReviewBridge(null))
 it('requires a device before reading or approving instruction bodies', async () => {
   const calls: string[] = []
   setAgentInstructionReviewBridge({
-    tasks: async () => {
-      calls.push('tasks')
+    projects: async () => {
+      calls.push('projects')
       return []
     },
     admission: async () => {
@@ -39,10 +39,11 @@ it('requires a device before reading or approving instruction bodies', async () 
   })
   for (const kind of ['task', 'service'] as const) {
     const client = app(kind)
-    expect((await client.fetch(request('/instruction-review/tasks'), {} as Env)).status).toBe(403)
-    expect((await client.fetch(request('/instruction-review?taskId=task'), {} as Env)).status).toBe(403)
+    expect((await client.fetch(request('/instruction-review/projects'), {} as Env)).status).toBe(403)
+    expect((await client.fetch(request('/instruction-review?projectId=project'), {} as Env)).status).toBe(403)
     expect(
-      (await client.fetch(request('/instruction-review/review/approve', 'POST', { taskId: 'task' }), {} as Env)).status,
+      (await client.fetch(request('/instruction-review/review/approve', 'POST', { projectId: 'project' }), {} as Env))
+        .status,
     ).toBe(403)
   }
   expect(calls).toEqual([])
@@ -51,30 +52,31 @@ it('requires a device before reading or approving instruction bodies', async () 
 it('reports drift as a conflict and accepts a device review', async () => {
   const calls: string[] = []
   setAgentInstructionReviewBridge({
-    tasks: async () => [{ id: 'task', title: 'Task', projectId: 'project' }],
+    projects: async () => [{ id: 'project', name: 'Project' }],
     admission: async () =>
       ({
         review: async (id: string) => {
           calls.push(`review:${id}`)
           return { id: 'review' }
         },
-        approve: async (taskId: string, id: string) => {
-          calls.push(`approve:${taskId}:${id}`)
+        approve: async (projectId: string, id: string) => {
+          calls.push(`approve:${projectId}:${id}`)
           throw new Error('changed')
         },
       }) as unknown as InstructionAdmission,
   })
   const client = app('device')
-  expect((await client.fetch(request('/instruction-review?taskId=task'), {} as Env)).status).toBe(200)
+  expect((await client.fetch(request('/instruction-review?projectId=project'), {} as Env)).status).toBe(200)
   expect(
-    (await client.fetch(request('/instruction-review/review/approve', 'POST', { taskId: 'task' }), {} as Env)).status,
+    (await client.fetch(request('/instruction-review/review/approve', 'POST', { projectId: 'project' }), {} as Env))
+      .status,
   ).toBe(409)
-  expect(calls).toEqual(['review:task', 'approve:task:review'])
+  expect(calls).toEqual(['review:project', 'approve:project:review'])
 })
 
 it('returns an actionable incomplete result when required discovery fails', async () => {
   setAgentInstructionReviewBridge({
-    tasks: async () => [],
+    projects: async () => [],
     admission: async () =>
       ({
         review: async () => {
@@ -82,7 +84,7 @@ it('returns an actionable incomplete result when required discovery fails', asyn
         },
       }) as unknown as InstructionAdmission,
   })
-  const response = await app('device').fetch(request('/instruction-review?taskId=task'), {} as Env)
+  const response = await app('device').fetch(request('/instruction-review?projectId=project'), {} as Env)
   expect(response.status).toBe(422)
   expect(await response.text()).toContain('Retry')
 })

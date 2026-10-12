@@ -1,6 +1,6 @@
 export const instructionReviewRoute = '/v1/p/agents/instruction-review'
 
-export type InstructionReviewTask = { id: string; title: string; projectId: string }
+export type InstructionReviewProject = { id: string; name: string }
 export type InstructionFinding = {
   file: string
   line: number
@@ -16,8 +16,9 @@ export type InstructionChange = {
 }
 export type InstructionReview = {
   id: string | null
-  taskId: string
   projectId: string
+  /** The branch checked out in the project folder when it was scanned, or null when detached or not Git. */
+  branch: string | null
   digest: string
   scope: string
   analyzerVersion: number

@@ -33,8 +33,8 @@ those, or an unknown scope, throws at registration. Workspaces are rows under Ov
 workspace's projects are rows under it while it's expanded.
 
 The arrow keys move through the rail, and Enter opens a page. The rail's one Tab stop is the open
-page's row, so Tab moves into the page. A dot beside a row marks an attention row that targets that
-page.
+page's row, so Tab moves into the page. Selected and keyboard-focused rows use a background fill
+without an outline. A dot beside a row marks an attention row that targets that page.
 
 A page is a column at most 960px wide, centered beside the rail, with the header's title and close
 button over it. Below 900px, the rail is its own screen and a page opens over it with a back link. The

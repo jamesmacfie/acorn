@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeTaskId, createSettingSave, readJson, writeJson } from '@acorn/plugin-api/client'
+import { activeTaskId, createSettingSave, readJson, tasksOptions, writeJson } from '@acorn/plugin-api/client'
 import { Checkbox, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { agentSessionDefaultsQueryKey } from './sessionDefaultsClient'
@@ -27,6 +27,10 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
       readJson<AgentSessionDefaults>(agentSessionDefaultsRoute, { signal, nodeId: nodeId() }),
   }))
   const save = createSettingSave()
+  // The open task's project is the default review choice. The task list is the active Node's, so another
+  // Node's panel finds no match and starts on its first project.
+  const tasks = createQuery(() => tasksOptions(true))
+  const activeProjectId = () => tasks.data?.find((task) => task.id === activeTaskId())?.projectId
 
   const write = async (
     field: 'checkInstructionFiles' | 'reviewChangedInstructions' | 'blockDataRootReads',
@@ -87,7 +91,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
         <InstructionReviewPanel
           nodeId={props.nodeId}
           enabled={stored.data?.reviewChangedInstructions}
-          preferredTaskId={activeTaskId()}
+          preferredProjectId={activeProjectId()}
         />
       </SettingsSection>
       <SettingsSection
