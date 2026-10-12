@@ -5,8 +5,15 @@ import { type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { GateFormOutput, GateFormProposal } from '../../shared/gateForm'
 import { resolveGateFormProposal } from '../validation/bindings'
+import { setTimeout as delay } from 'node:timers/promises'
+import { CI_SETTLED_POLICY, type CiSettledValue } from '@acorn/plugin-github/contract/workflowPolicies.ts'
+import { DEFAULT_POLL_INTERVAL_MS, MIN_POLL_INTERVAL_MS, readPolicyWait } from '../../shared/policyWait'
+import { waitForPolicy, type PolicyWaitOptions } from './policyWait'
+import { intersectToolCeilings } from './tools'
 import type {
-  PolicyEvaluator,
+  PolicyContext,
+  PolicyContribution,
+  PolicyVerdict,
   StepHandler,
   StepHandlerContext,
   StepHandlerOutcome,
@@ -17,6 +24,26 @@ import type {
 import { inlinePrompt, type RunnerDeps, type StepContextItem, type StepRunRequest } from '../runs/deps'
 
 const MAX_STEP_TURNS = 8
+const DEFAULT_CHECKS_TIMEOUT_MS = 1_800_000
+/** Each agent poll takes an agent slot and spends the run's budget, so it may not ask often. */
+const AGENT_POLICY_MIN_INTERVAL_MS = 300_000
+const AGENT_VERDICT_SCHEMA = {
+  type: 'object',
+  properties: { verdict: { type: 'string', enum: ['pass', 'wait', 'fail'] }, reason: { type: 'string' } },
+  required: ['verdict', 'reason'],
+  additionalProperties: false,
+}
+const AGENT_VERDICT_INSTRUCTIONS =
+  'Answer with a verdict. Say pass when the condition holds, wait when it does not hold yet but still could, and fail when it never will. Give one line on what you saw as the reason.'
+
+const sleepUnlessAborted = (ms: number, signal: AbortSignal): Promise<void> =>
+  delay(ms, undefined, { signal }).catch(() => undefined)
+
+/** A policy as a gate runs it. A built-in also gets the step it is polling for, because the agent
+ *  policy runs its turn against that step's budget. A contribution never sees the step. */
+export type RunnablePolicy = Omit<PolicyContribution, 'evaluate'> & {
+  evaluate(ctx: PolicyContext, step: StepHandlerContext): Promise<PolicyVerdict>
+}
 
 export { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../definitions/builtinDefinitions'
 
@@ -38,7 +65,7 @@ type BuiltinServices = {
   // `gate-policy` resolves its verdict source by the name the workflow file wrote, which may be a
   // built-in or another plugin's contribution. The runner owns that lookup, so the built-in asks it
   // rather than holding a registry of its own.
-  policy(id: string): PolicyEvaluator | undefined
+  policy(id: string): RunnablePolicy | undefined
 }
 
 function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
@@ -72,10 +99,42 @@ function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
 // (`agent`, `join`) while a contributed kind is qualified (../../contract/extensions.ts).
 export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   stepKinds: Map<string, StepKindContribution>
-  policies: Map<string, PolicyEvaluator>
+  policies: Map<string, RunnablePolicy>
 } {
-  const policies = new Map<string, PolicyEvaluator>([
-    ['checks-green', (taskId: string) => services.deps.evaluatePolicy(taskId, 'checks-green')],
+  const policies = new Map<string, RunnablePolicy>([
+    [
+      'checks-green',
+      {
+        describe: {
+          label: 'Checks passed',
+          description: 'Whether every check on the pull request passed. Another name for github:ci-settled.',
+          icon: 'shield-check',
+          fields: [],
+        },
+        // Resolved per call: the GitHub plugin may init after this one, or be turned off. Off means
+        // there is nothing to check, which fails closed rather than passing.
+        evaluate: async (ctx, step) =>
+          (await services.policy(CI_SETTLED_POLICY)?.evaluate(ctx, step)) ?? {
+            verdict: 'fail',
+            detail: 'The GitHub plugin is off, so there are no checks to read.',
+          },
+      },
+    ],
+    [
+      'agent',
+      {
+        describe: {
+          label: 'Ask an agent',
+          description: 'Ask an agent with read-only tools whether a condition holds yet.',
+          icon: 'bot',
+          minIntervalMs: AGENT_POLICY_MIN_INTERVAL_MS,
+          fields: [{ id: 'prompt', label: 'Condition', type: 'prompt', required: true }],
+        },
+        validate: (settings) =>
+          typeof settings.prompt === 'string' && settings.prompt.trim() ? [] : ['needs a condition to ask about'],
+        evaluate: askAgent,
+      },
+    ],
   ])
   const stepKinds: Record<(typeof BUILTIN_STEP_KINDS)[number], StepHandler> = {
     ...workflowDataHandlers({
@@ -234,39 +293,144 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     return outcome
   }
 
+  /** The step-row plumbing every wait needs: where it saves, how it takes the checkout, and what it
+   *  tells the run pane. */
+  function waitServices(
+    ctx: StepHandlerContext,
+  ): Pick<PolicyWaitOptions, 'taskId' | 'signal' | 'save' | 'admit' | 'progress' | 'sleep'> {
+    const taskId = ctx.run.taskId
+    return {
+      taskId,
+      signal: ctx.signal,
+      // Merged into what execution already wrote this attempt, so the prompt and ceiling stay readable.
+      save: async (record) => {
+        const row = (await services.steps(ctx.run.id)).find((candidate) => candidate.id === ctx.step.id)
+        const inputs = row?.inputsJson ? (JSON.parse(row.inputsJson) as Record<string, unknown>) : {}
+        if (record) inputs.policyWait = record
+        else delete inputs.policyWait
+        await services.setStep(ctx.step.id, { inputsJson: JSON.stringify(inputs) })
+      },
+      admit: (write) => (services.deps.admitWork ? services.deps.admitWork(taskId, write) : write()),
+      progress: (text) => ctx.emit({ at: Date.now(), event: { type: 'progress', text } }),
+      sleep: services.deps.sleep ?? sleepUnlessAborted,
+    }
+  }
+
   async function runPolicy(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
-    const policy = ctx.def.policy ? services.policy(ctx.def.policy) : undefined
-    if (!policy) return { status: 'failed', error: `Unknown policy '${ctx.def.policy ?? ''}'.` }
-    const verdict = await policy(ctx.run.taskId)
-    return verdict.pass
-      ? { status: 'done', result: verdict }
-      : { status: 'failed', error: verdict.detail ?? `Policy '${ctx.def.policy}' failed.` }
+    const id = ctx.def.policy ?? ''
+    const policy = services.policy(id)
+    if (!policy) return { status: 'failed', error: `Unknown policy '${id}'.` }
+    // A timeout is what makes a gate poll. Without one it asks once, as every gate did before polling.
+    const timing =
+      ctx.def.timeoutMs === undefined
+        ? undefined
+        : {
+            intervalMs: ctx.def.intervalMs ?? Math.max(DEFAULT_POLL_INTERVAL_MS, policy.describe.minIntervalMs ?? 0),
+            timeoutMs: ctx.def.timeoutMs,
+          }
+    const result = await waitForPolicy({
+      ...waitServices(ctx),
+      evaluate: (policyCtx) => policy.evaluate(policyCtx, ctx),
+      settings: ctx.def.with ?? {},
+      timing,
+      saved: timing ? readPolicyWait(ctx.step.inputsJson) : undefined,
+    })
+    if ('cancelled' in result) return { status: 'cancelled', error: 'Step cancelled.' }
+    if ('error' in result) return { status: 'failed', error: `Policy '${id}' could not be checked: ${result.error}` }
+    // With branches, every answer that has a branch finishes the step and the runner takes it.
+    if (result.verdict === 'pass' || ctx.def.branches?.[result.verdict])
+      return { status: 'done', result, structured: result }
+    const reason = result.verdict === 'timed-out' ? 'did not pass before its timeout' : 'failed'
+    return {
+      status: 'failed',
+      error: `Policy '${id}' ${reason}${result.detail ? `: ${result.detail}` : '.'}`,
+      result,
+      structured: result,
+    }
+  }
+
+  // A fresh one-shot turn per poll, as `decide` runs, with read-only tools so it can notice a change,
+  // and its last answer as context so it can say what changed.
+  async function askAgent(policyCtx: PolicyContext, ctx: StepHandlerContext): Promise<PolicyVerdict> {
+    const condition = typeof policyCtx.with.prompt === 'string' ? policyCtx.with.prompt : ''
+    const inputs = await agentPrompt(ctx, `${condition}\n\n${AGENT_VERDICT_INSTRUCTIONS}`)
+    const previous = policyCtx.previous?.detail
+    const tools = intersectToolCeilings(ctx.tools, { maxRisk: 'read' })
+    const result = await services.runHeadless(
+      ctx.run.taskId,
+      ctx.def,
+      {
+        prompt: inputs.prompt,
+        context: [
+          ...inputs.context,
+          ...(previous ? [{ label: 'Your last answer', source: 'workflow.policy-previous', content: previous }] : []),
+        ],
+        model: ctx.def.model,
+        schema: AGENT_VERDICT_SCHEMA,
+        mode: 'ai',
+        signal: policyCtx.signal,
+        tools,
+      },
+      // No session to resume: each poll is a turn of its own.
+      { ...ctx, step: { ...ctx.step, agentSessionId: null } },
+    )
+    // A failed turn is a failed poll, which the wait retries at the next interval.
+    if (result.status !== 'ok')
+      throw new Error(
+        `The agent turn ended ${result.status}${result.stderrTail ? `: ${result.stderrTail.slice(0, 300)}` : '.'}`,
+      )
+    const answer = (result.capture.structuredOutput ?? {}) as { verdict?: unknown; reason?: unknown }
+    return {
+      verdict: answer.verdict as PolicyVerdict['verdict'],
+      ...(typeof answer.reason === 'string' ? { detail: answer.reason } : {}),
+    }
   }
 
   async function runCiLoop(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     const max = Math.min(ctx.def.maxIterations ?? 3, ctx.budget.maxTurns ?? MAX_STEP_TURNS, MAX_STEP_TURNS)
+    const ci = services.policy(CI_SETTLED_POLICY)
+    if (!ci) return { status: 'failed', error: 'The GitHub plugin is off, so there are no checks to read.' }
     let iteration = ctx.step.iteration
     let sessionId = ctx.step.sessionId ?? undefined
     let agentSessionId = ctx.step.agentSessionId ?? undefined
+    let saved = readPolicyWait(ctx.step.inputsJson)
+    const checksTimeoutMs = ctx.def.checksTimeoutMs ?? DEFAULT_CHECKS_TIMEOUT_MS
     const fallback = ctx.renderedPrompt || 'Fix the failing CI checks, then commit and push.'
     // Only the turn that opens the session pays for the upstream output and the context block. A
     // resumed turn already has both in its history.
     const opening = sessionId ? { prompt: fallback, context: [] } : await agentPrompt(ctx, fallback)
     for (;;) {
       if (ctx.signal.aborted) return { status: 'cancelled' }
-      const failing = await services.deps.failingChecks(ctx.run.taskId)
-      if (failing === '') {
+      const checks = await waitForPolicy({
+        ...waitServices(ctx),
+        evaluate: (policyCtx) => ci.evaluate(policyCtx, ctx),
+        // After a fix turn pushes, the new commit has no checks for a moment. That is not "no checks".
+        settings: iteration > 0 ? { missing: 'wait' } : {},
+        timing: {
+          intervalMs: Math.max(MIN_POLL_INTERVAL_MS, ci.describe.minIntervalMs ?? 0),
+          timeoutMs: checksTimeoutMs,
+        },
+        saved,
+      })
+      saved = undefined
+      if ('cancelled' in checks) return { status: 'cancelled' }
+      if ('error' in checks) return { status: 'failed', error: `The checks could not be read: ${checks.error}` }
+      if (checks.verdict === 'pass') {
         return { status: 'done', result: { green: true, iterations: iteration }, sessionId, agentSessionId }
       }
-      if (failing === null) return { status: 'failed', error: 'No checks to poll (no PR?).' }
+      if (checks.verdict === 'timed-out')
+        return { status: 'failed', error: `The checks did not finish within ${checksTimeoutMs} ms.` }
+      const failing = (checks.value as CiSettledValue | undefined)?.failing ?? []
+      if (!failing.length) return { status: 'failed', error: checks.detail ?? 'No checks to poll (no PR?).' }
       if (iteration >= max) return { status: 'safety-rail', error: `Safety rail: ${max} fix iterations exhausted.` }
       iteration += 1
       await services.setStep(ctx.step.id, { iteration })
+      const list = failing.map((check) => `- ${check.name}: ${check.status}${check.url ? ` (${check.url})` : ''}`)
       const result = await services.runHeadless(
         ctx.run.taskId,
         ctx.def,
         {
-          prompt: `${sessionId ? fallback : opening.prompt}\n\nFailing checks:\n${failing}`,
+          prompt: `${sessionId ? fallback : opening.prompt}\n\nFailing checks:\n${list.join('\n')}`,
           context: sessionId ? undefined : opening.context,
           model: ctx.def.model,
           schema: ctx.def.schema,

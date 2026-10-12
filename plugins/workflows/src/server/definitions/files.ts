@@ -242,6 +242,10 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     goal: rawGoal(o.goal),
     schema,
     policy: str(o.policy),
+    // Kept as written, not just when numeric, so validation can name a mistyped value.
+    intervalMs: o.interval_ms as number | undefined,
+    timeoutMs: o.timeout_ms as number | undefined,
+    checksTimeoutMs: o.checks_timeout_ms as number | undefined,
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
     agent:

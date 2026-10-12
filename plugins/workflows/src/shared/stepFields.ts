@@ -9,6 +9,7 @@
 // kind's are named fields on the step itself, which is what keeps them checkable by the host. The
 // editor does not know the difference: it asks FIELD_HOME.
 import type { StepField, StepKindDescription } from './workflowContracts'
+import { DEFAULT_POLL_INTERVAL_MS, MIN_POLL_INTERVAL_MS } from './policyWait'
 
 const PROMPT_FIELD: StepField = { id: 'prompt', label: 'Prompt', type: 'prompt', required: true }
 // The plain agent step is the one kind whose prompt is optional, because `inputs = "append"` puts
@@ -191,7 +192,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
   },
   'gate-policy': {
     label: 'Check a policy',
-    description: 'Ask a policy for a verdict and fail the run when it says no.',
+    description: 'Ask a policy for a verdict, and keep asking while it says not yet.',
     icon: 'shield-check',
     fields: [
       {
@@ -201,12 +202,39 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
         required: true,
         hint: 'The policies this node offers, from the catalog.',
       },
+      {
+        id: 'timeoutMs',
+        label: 'Keep asking for',
+        type: 'number',
+        min: 1,
+        hint: 'Milliseconds. Leave empty to ask once. Set it to keep asking while the policy says not yet.',
+      },
+      {
+        id: 'intervalMs',
+        label: 'Ask every',
+        type: 'number',
+        min: MIN_POLL_INTERVAL_MS,
+        hint: `Milliseconds between checks. Defaults to ${DEFAULT_POLL_INTERVAL_MS}.`,
+      },
     ],
-    output: { description: 'Whether the policy passed, and its detail when it did not.' },
+    output: {
+      description:
+        'The verdict (pass, fail, or timed-out), the policy’s detail and value, and how many times it asked.',
+      schema: {
+        type: 'object',
+        properties: {
+          verdict: { type: 'string' },
+          detail: { type: 'string' },
+          polls: { type: 'number' },
+        },
+        required: ['verdict', 'polls'],
+      },
+    },
   },
   'ci-loop': {
     label: 'Fix the checks',
-    description: 'Re-run an agent until the pull request’s checks go green, or the iteration ceiling stops it.',
+    description:
+      'Wait for the pull request’s checks to finish, and run an agent to fix them until they pass or the iteration ceiling stops it.',
     icon: 'refresh-cw',
     runsAgent: true,
     fields: [
@@ -218,6 +246,13 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
         min: 1,
         max: 8,
         hint: 'Defaults to 3. Never more than 8.',
+      },
+      {
+        id: 'checksTimeoutMs',
+        label: 'Wait for checks',
+        type: 'number',
+        min: 1,
+        hint: 'Milliseconds each round waits for the checks to finish. Defaults to 1800000.',
       },
     ],
     output: { description: 'Whether the checks went green, and how many iterations it took.' },

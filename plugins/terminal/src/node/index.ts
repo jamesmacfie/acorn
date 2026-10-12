@@ -15,8 +15,8 @@ import { TERMINAL_RUNTIME } from '../contract/runtime'
 import { TERMINAL_LAUNCH_CONTEXT } from '../contract/launchContext'
 import { deliverLaunchContext, readLaunchContext } from '../server/launchContext'
 import { runAgentTools } from '../server/agentTools'
-import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
-import { commandStep, runTargetStep } from '../server/workflowSteps'
+import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
+import { commandCheckPolicy, commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
 import {
   disposeTerminal,
@@ -153,6 +153,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // a node with workflows disabled, because the point is never opened.
       ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'command', value: commandStep(ctx.core) })
       ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'run-target', value: runTargetStep(runTargetService) })
+      // `terminal:command-check`: the same command as a polling gate's verdict source.
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: 'command-check', value: commandCheckPolicy(ctx.core) })
       // The run_* agent tools, over the service built above.
       for (const tool of runAgentTools(runTargetService, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
       // terminal.sendToAgent (contract/sendToAgent.ts): PTY delivery for explicit actions such as

@@ -14,8 +14,9 @@ task pull request relation, and returns whether the pull request became primary 
 so neither spends a credential or touches the network. `pr_review_comments` includes outdated unresolved
 threads with separate current line, original line, and nullable outdated status. It groups the mirror's
 `review_threads` rows into threads and leaves resolved ones out unless asked. `pr_checks` returns every
-check with its raw status and the failing names, by the rule the ci-loop step uses (`checkFailed` in
-`plugins/github/src/server/mirrorQueries.ts`). Both say in a `status` field whether the pull request
+check with its raw status, the failing names, and the names still running, by the rules the
+`github:ci-settled` workflow policy uses (`checkFailed` and `checkPending` in
+`plugins/github/src/server/mirrorQueries.ts`). A check that is still running isn't failed. Both say in a `status` field whether the pull request
 is unmirrored, because an unmirrored pull request isn't one with no feedback or a green one.
 
 Core's `pr_current` and `pr_changed_files` read the task's primary pull request.

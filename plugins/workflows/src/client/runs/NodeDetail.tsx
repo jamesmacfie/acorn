@@ -55,6 +55,7 @@ import {
   statusLabel,
   stepElapsed,
   stepGlyph,
+  stepProgressLine,
   stepTone,
 } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
@@ -156,8 +157,12 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     if (!current) return []
     return model.eventsFor(current.id).filter((event) => {
       const type = (event as { type?: unknown })?.type
-      return type !== 'stdout' && type !== 'stderr' && type !== 'managed-agent'
+      return type !== 'stdout' && type !== 'stderr' && type !== 'managed-agent' && type !== 'progress'
     })
+  })
+  const progressLine = createMemo(() => {
+    const current = step()
+    return current ? stepProgressLine(current, model.eventsFor(current.id)) : undefined
   })
 
   const openAgentPane = (sessionId: string): void => {
@@ -240,6 +245,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
 
   const alerts = (current: () => WorkflowStepRow) => (
     <>
+      <Show when={progressLine()}>{(line) => <Text emphasis="muted">{line()}</Text>}</Show>
       <Show when={model.error()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
       <Show when={current().error}>
         {(message) => (

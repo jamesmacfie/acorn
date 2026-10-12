@@ -1,8 +1,8 @@
 # Contributed step kinds
 
 Any plugin can add a step kind, a policy, or a trigger to workflows. This page covers how a kind is
-named and configured, how it describes its own form, the kinds other plugins ship, and the progress
-events a handler can emit. The contract is in `plugins/workflows/src/shared/`.
+named and configured, how it describes its own form, the kinds other plugins ship, gate policies, and
+the progress events a handler can emit. The contract is in `plugins/workflows/src/shared/`.
 
 ## Contributed step kinds
 
@@ -24,8 +24,8 @@ shadowing the other.
 A contributed kind's inputs go in `[steps.with]`, an opaque table the runner passes through unread.
 The contributing plugin validates it at load time, so a bad step is a red row in the workflow list
 rather than a run that starts and fails on its third step, and reads it again in its handler.
-Built-in kinds do not use `with`. Their inputs are named fields, which is what keeps them checkable
-by the host.
+Built-in kinds keep their own inputs in named fields, which is what keeps them checkable by the host.
+The one built-in that uses `with` is `gate-policy`, which passes it to its policy as settings.
 
 A handler's `with` arrives rendered. `${inputs.x}` and `${steps.x.output}` are substituted one level
 deep before the handler runs, so `terminal:command` is handed the command it will run and never a
@@ -81,16 +81,59 @@ admitting a kind at all. The command kind sits beside the process broker's envir
 HTTP kind beside the scheme check that runs after interpolation, the database kinds beside the
 connection resolution and the row cap.
 
+## Gate policies
+
+A `gate-policy` step asks a policy whether something outside Acorn has happened yet, such as CI
+finishing or a reviewer commenting ([polling gates](./polling-gates.md)). A policy is a
+contribution with the same shape as a step kind (`PolicyContribution` in
+`plugins/workflows/src/shared/workflowContracts.ts`):
+
+```ts
+type PolicyContribution = {
+  evaluate(ctx: PolicyContext): Promise<PolicyVerdict>
+  describe: PolicyDescription // label, description, icon, fields, and an optional minIntervalMs
+  validate?: (settings: Record<string, unknown>) => string[]
+}
+type PolicyContext = { taskId: string; with: Record<string, unknown>; since: number; previous?: PolicyVerdict; signal: AbortSignal }
+type PolicyVerdict = { verdict: 'pass' | 'wait' | 'fail'; detail?: string; value?: unknown }
+```
+
+`with` is the gate's rendered `[steps.with]` table. `since` is when the wait started, kept across a
+restart. `previous` is the last answer. `detail` is one line for the run pane, and `value` is
+structured data a later step can bind to. The host checks the settings against `describe.fields`
+before it calls `validate`, the same way it checks a kind's fields. Settings always live in `with`,
+even when one shares a name with a gate field, such as a command's `timeoutMs`. A throw is a failed
+poll, which the gate retries at its next interval.
+
+| Policy | Owner | Answers |
+| --- | --- | --- |
+| `github:ci-settled` | [GitHub](../github-integration/mirror.md#checks-and-workflow-policies) | `wait` while a check runs, `fail` when one failed, `pass` when all passed. |
+| `github:review-received` | [GitHub](../github-integration/mirror.md#checks-and-workflow-policies) | `pass` once someone other than the author or a bot reviews or comments after `since`. |
+| `terminal:command-check` | [terminal](../terminal/run-targets.md#workflow-steps) | A command's exit code: 0 passes, 75 waits, anything else fails. |
+| `agent` | workflows | A one-shot agent turn with read-only tools answers. |
+| `checks-green` | workflows | Another name for `github:ci-settled`, kept for workflows that use it. |
+
+The built-in `agent` policy runs a fresh one-shot turn per poll, as `decide` does, with a fixed
+`{ verdict, reason }` schema. It gets read-only tools so it can notice a change, and its last answer
+as context so it can say what changed. Its settings take one `prompt`, the condition to ask about.
+Each poll takes an agent slot and adds to the run's budget, so its minimum interval is 300,000 ms and
+`max_cost_usd` stops a wait that costs too much. Prefer a cheaper policy when one can see the
+condition.
+
+A plugin that workflows depends on can't import the workflows package, so it keeps a copy of the
+type. The GitHub copy is `plugins/github/src/contract/workflowPolicies.ts`, and the terminal copy is
+beside its step kinds. A test in the workflows plugin holds both against the real type.
+
 ## Progress events
 
-A handler's `emit` takes anything, and the run pane shows what it does not recognise as JSON. Four
-shapes it does recognise (`plugins/workflows/src/shared/stepEvents.ts`):
+A handler's `emit` takes anything, and the run pane shows what it does not recognise as JSON under
+**Events**. Four shapes it does recognise (`plugins/workflows/src/shared/stepEvents.ts`):
 
 | Event | From | Drawn as |
 | --- | --- | --- |
 | `{ type: 'managed-agent', … }` | agent kinds | State, last assistant text, cost |
 | `{ type: 'stdout' \| 'stderr', text }` | `terminal:command` | A tail of the output |
-| `{ type: 'progress', text }` | any kind | One line under the node |
+| `{ type: 'progress', text }` | any kind | One line under the step's header, the latest only |
 | `{ type: 'rows', count }` | database kinds | "n rows" while it runs |
 
 The worked example is `http:request`, contributed by the http plugin, where the post-interpolation

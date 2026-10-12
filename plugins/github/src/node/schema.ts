@@ -85,6 +85,8 @@ export const reviews = sqliteTable(
     number: integer('number').notNull(),
     id: text('id').notNull(), // GraphQL node id
     author: text('author'),
+    // Null on a row mirrored before this column, which the review-received policy counts as a person.
+    authorIsBot: integer('author_is_bot', { mode: 'boolean' }),
     state: text('state'), // APPROVED | CHANGES_REQUESTED | COMMENTED | DISMISSED | PENDING
     body: text('body'),
     submittedAt: integer('submitted_at'),
@@ -101,6 +103,7 @@ export const comments = sqliteTable(
     number: integer('number').notNull(),
     id: text('id').notNull(), // GraphQL node id
     author: text('author'),
+    authorIsBot: integer('author_is_bot', { mode: 'boolean' }),
     body: text('body'),
     createdAt: integer('created_at'),
     position: integer('position').notNull(), // place in the issue comments connection
@@ -144,6 +147,7 @@ export const reviewThreads = sqliteTable(
     side: text('side'), // RIGHT | LEFT
     resolved: integer('resolved', { mode: 'boolean' }).notNull().default(false),
     author: text('author'),
+    authorIsBot: integer('author_is_bot', { mode: 'boolean' }),
     body: text('body'),
     createdAt: integer('created_at'),
     // Across every comment of every thread: threads in connection order, then each thread's comments

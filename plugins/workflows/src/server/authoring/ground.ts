@@ -54,6 +54,9 @@ const STEP_KEYS = [
   'goal',
   'schema',
   'policy',
+  'intervalMs',
+  'timeoutMs',
+  'checksTimeoutMs',
   'maxIterations',
   'requiresRun',
   'agent',
@@ -276,9 +279,10 @@ function groundStep(
       `Step '${label}' asked for the kind '${kindId}', which this node cannot run, so it is now an ordinary agent step${ending}.`,
       label,
     )
-  } else if (described && described.pluginId === null && next.with !== undefined) {
-    // Only a kind that runs an agent has a prompt to hoist into. A `with.prompt` on a gate is text
-    // for nobody, and moving it onto the step would leave a key the gate never reads.
+  } else if (described && described.pluginId === null && kindId !== 'gate-policy' && next.with !== undefined) {
+    // A policy gate is not here, because its `with` holds the policy's settings. Only a kind that runs
+    // an agent has a prompt to hoist into. A `with.prompt` on a human gate is text for nobody, and
+    // moving it onto the step would leave a key the gate never reads.
     const hoist = described.describe?.runsAgent ? hoistPrompt(next) : { step: next, hoisted: false }
     next = without(hoist.step, 'with')
     const ending = hoist.hoisted

@@ -137,8 +137,6 @@ describe('workflow map lifecycle', () => {
       runStep: async (_taskId, def) => result(def.name === 'source' ? { tickets } : { reviewed: def.name }),
       writeHandoff: async () => undefined,
       assembleContext: async () => '',
-      evaluatePolicy: async () => ({ pass: true }),
-      failingChecks: async () => '',
       notify: vi.fn(),
       cancelChildTask: async (taskId) => void cancelledTasks.push(taskId),
       ...overrides,

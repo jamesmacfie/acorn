@@ -12,6 +12,9 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
   } else {
     lines.push('', 'A `gate-policy` step asks a policy for a verdict and fails the run when it says no. Its `policy`')
     lines.push(`is one of: ${policies.map((policy) => `\`${policy.id}\``).join(', ')}.`)
+    lines.push('To wait for something, such as CI or a review, give it `timeoutMs` and it asks again every minute')
+    lines.push("until then. Its `with` holds the policy's settings, and `branches` can map pass, fail, and timed-out")
+    lines.push('to the steps that wait on it.')
     if (!compact) {
       lines.push(
         '',

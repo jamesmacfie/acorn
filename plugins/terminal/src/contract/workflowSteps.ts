@@ -1,14 +1,15 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
 
-// What this plugin contributes to the workflows plugin's `workflows:step-kind` point
-// (docs/terminal/run-targets.md § Workflow steps), declared here rather than imported from that package.
+// What this plugin contributes to the workflows plugin's `workflows:step-kind` and `workflows:policy`
+// points (docs/terminal/run-targets.md § Workflow steps), declared here rather than imported from that
+// package.
 //
 // plugins/workflows already depends on this one, directly and through plugins/agents, and the
 // workspace graph has to stay acyclic (turbo.json § topo). So the point is named by the string the
 // two packages agree on — which docs/workflows/step-kinds.md § Contributed step kinds says is the contract —
 // and the shapes below mirror as much of `@acorn/plugin-workflows/contract/extensions.ts` as these
-// two kinds use. The mirror is held against the real types by a test in that package, which may
-// import this file because a plugin's contract/ is the one cross-plugin surface.
+// two kinds and the command policy use. The mirror is held against the real types by a test in that
+// package, which may import this file because a plugin's contract/ is the one cross-plugin surface.
 
 /** One input of a step's form, as `StepField` in plugins/workflows spells it. */
 export type StepField = {
@@ -45,3 +46,18 @@ export type TerminalWorkflowStepKind = {
 }
 
 export const WORKFLOW_STEP_KIND = extensionPointId<TerminalWorkflowStepKind>('workflows:step-kind')
+
+/** A `gate-policy` verdict source, as `PolicyContribution` in plugins/workflows spells it. */
+export type TerminalWorkflowPolicy = {
+  evaluate(ctx: {
+    taskId: string
+    with: Record<string, unknown>
+    since: number
+    previous?: { verdict: 'pass' | 'wait' | 'fail'; detail?: string; value?: unknown }
+    signal: AbortSignal
+  }): Promise<{ verdict: 'pass' | 'wait' | 'fail'; detail?: string; value?: unknown }>
+  describe: { label: string; description: string; icon: string; fields: StepField[]; minIntervalMs?: number }
+  validate?: (settings: Record<string, unknown>) => string[]
+}
+
+export const WORKFLOW_POLICY = extensionPointId<TerminalWorkflowPolicy>('workflows:policy')

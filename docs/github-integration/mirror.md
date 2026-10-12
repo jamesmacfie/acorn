@@ -2,7 +2,8 @@
 
 The GitHub plugin keeps a local, disposable mirror of repositories and pull requests, so reads are fast
 and agents can read review state without a network call. This page covers what the mirror holds, how a
-pull request's detail and files are fetched, and the diff document the viewer reads. The code is in
+pull request's detail and files are fetched, the diff document the viewer reads, and the checks and
+reviews the workflow policies read. The code is in
 `plugins/github/src/server/routes/mirror/`.
 
 ## Mirror
@@ -133,3 +134,36 @@ served, and the viewer places each one by its line number from the document's se
 its space is reserved before its segment loads. The diff source reports loading until both the
 document and the detail are in. The plugin withholds inline threads while the two resources describe
 different comparisons. A thread without a matching file or rendered line receives no substitute anchor.
+
+## Checks and workflow policies
+
+The mirror stores a check run's `conclusion ?? status` and a status context's `state`. A check that
+hasn't finished reads as `QUEUED`, `IN_PROGRESS`, `PENDING`, `WAITING`, `REQUESTED`, or `EXPECTED`, or
+has no status at all. `checkPending` in `plugins/github/src/server/mirrorQueries.ts` names those, and
+`checkFailed` counts a check as failed only when it has finished and isn't `SUCCESS`, `NEUTRAL`, or
+`SKIPPED`. The `pr_checks` agent tool and the `github:ci-settled` policy share both rules, so neither
+calls a running check a failure.
+
+The detail query asks for the latest commit's `oid` beside the PR's `headRefOid`, and
+`refreshPullDetail` returns both. Right after a push the two can differ, and the checks then belong to
+the older commit. Review, comment, and thread-comment authors carry their GraphQL `__typename`, and
+the mirror stores `author_is_bot` for each. A row mirrored before that column has no value, and counts
+as a person.
+
+The plugin contributes two `gate-policy` verdict sources
+([gate policies](../workflows/step-kinds.md#gate-policies)), in
+`plugins/github/src/server/workflowPolicies.ts`. Each poll refreshes the task's PR from GitHub first
+through `refreshPullDetail`, because the mirror otherwise refreshes only when a client opens the PR,
+and a run nobody is watching would read a copy older than the agent's push. A push that lands while
+the PR is being read answers `wait`. Any other refresh failure is a failed poll.
+
+- **`github:ci-settled`** answers `wait` while the checks belong to an older commit or any check is
+  running. Once every check has finished, it answers `fail` with the failing checks in `value`, or
+  `pass`. A task with no PR fails. A PR with no checks fails too, unless the `missing` setting is
+  `wait`, for a repository whose checks take a minute to appear.
+- **`github:review-received`** answers `pass` once a review, an inline comment, or a conversation
+  comment arrives after the wait started from someone other than the PR's author. Bots don't count
+  unless `include_bots` is true. `value` holds what they said, so the next step can bind to it. A closed
+  or merged PR fails. An approval with no comments still passes. It reads its own query,
+  `reviewActivitySince`, rather than the `pr_review_comments` tool's, because that one keeps only the
+  oldest hundred rows of each kind and would drop new comments on a long-lived PR.

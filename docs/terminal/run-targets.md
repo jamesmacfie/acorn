@@ -45,7 +45,7 @@ can't run queued work, and a process that exits at once can't become a running i
 
 ## Workflow steps
 
-The plugin contributes two step kinds to `workflows:step-kind`
+The plugin contributes two step kinds to `workflows:step-kind` and one policy to `workflows:policy`
 ([contributed step kinds](../workflows/step-kinds.md)), because the broker's environment rules, the
 checkout resolution, and the run target service are here.
 
@@ -64,7 +64,16 @@ whose choices come from `GET /v1/p/terminal/tasks/:taskId/run-targets`, and `wai
 default, which gives the target 60 seconds to report a URL. The output is
 `{ targetId, sessionId, url }`. The trust gate applies, because it calls `RuntimeService.start`.
 
-Both kinds use a local mirror of the workflows contribution type in
+**`terminal:command-check`** is a `gate-policy` verdict source
+([gate policies](../workflows/step-kinds.md#gate-policies)). It runs one command the way
+`terminal:command` does, with the same `command`, `timeoutMs`, and `env` settings and the same limits.
+Exit 0 answers `pass`, 75 answers `wait`, and anything else answers `fail`. 75 is `EX_TEMPFAIL` from
+`sysexits.h`, the Unix code for "temporary failure, try again later". `detail` is the last line of
+stdout, and `value` is the same `{ exitCode, stdout, stderr, truncated }` the step gives. A command
+that can't start or runs out of time is a failed poll, which the gate retries. A committed workflow
+that uses it passes the same repository trust check at admission as any other committed workflow.
+
+The kinds and the policy use a local mirror of the workflows contribution types in
 `plugins/terminal/src/contract/workflowSteps.ts`, because importing the workflows package here would
 make the package graph cyclic. A test in the workflows plugin checks the mirror.
 

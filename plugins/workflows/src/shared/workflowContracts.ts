@@ -106,7 +106,13 @@ export type WorkflowStepDef = {
   goal?: string
   schema?: object
   policy?: string
+  // `gate-policy` only. How long to sleep after a `wait` answer, and how long to keep asking. A gate
+  // with no interval asks once (docs/workflows/polling-gates.md).
+  intervalMs?: number
+  timeoutMs?: number
   maxIterations?: number
+  // `ci-loop` only. How long each round waits for the checks to settle before the step fails.
+  checksTimeoutMs?: number
   requiresRun?: string
   // Runtime child workflows use a separate key from static `workflow` file composition. Resolution
   // freezes the referenced definition before any child task exists.
@@ -290,7 +296,7 @@ export type StepKindContribution = { handler: StepHandler; validate?: StepValida
  *  (docs/api-reference/workflow-routes.md § Runs). `pluginId` is null for a built-in. */
 export type WorkflowCatalog = {
   kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
-  policies: { id: string; pluginId: string | null }[]
+  policies: { id: string; pluginId: string | null; describe?: PolicyDescription }[]
   profiles: { id: string; label: string; managed: boolean; structured: boolean }[]
   /** Saved workflows that the selected project can resolve. This metadata contains no definition
    *  body, input default, credential, or runtime value. */
@@ -305,7 +311,33 @@ export type WorkflowCatalogTarget = {
   inputs: Array<Omit<WorkflowInput, 'default'> & { hasDefault?: boolean }>
   outputs?: { step?: string; name?: string; schema: object }[]
 }
-export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
+
+/** A policy's answer. `wait` means "not yet", which a polling gate asks again about and a one-shot
+ *  gate reads as `fail`. `value` is structured data a later step can bind to. */
+export type PolicyVerdict = { verdict: 'pass' | 'wait' | 'fail'; detail?: string; value?: unknown }
+
+export type PolicyContext = {
+  taskId: string
+  /** The gate's rendered `[steps.with]` table. */
+  with: Record<string, unknown>
+  /** When the wait started. Kept across a Node restart, so "since" never moves forward. */
+  since: number
+  /** The last answer, or nothing on the first poll. */
+  previous?: PolicyVerdict
+  signal: AbortSignal
+}
+
+/** What the editor draws for a policy's settings, the way it draws a step kind's fields. */
+export type PolicyDescription = Pick<StepKindDescription, 'label' | 'description' | 'icon' | 'fields'> & {
+  /** The shortest interval a gate may poll this policy at. The gate's own floor still applies. */
+  minIntervalMs?: number
+}
+
+export type PolicyContribution = {
+  evaluate(ctx: PolicyContext): Promise<PolicyVerdict>
+  describe: PolicyDescription
+  validate?: (settings: Record<string, unknown>) => string[]
+}
 
 type WorkflowTriggerMatch = {
   taskId: string

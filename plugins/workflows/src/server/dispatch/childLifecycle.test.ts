@@ -111,8 +111,6 @@ describe('single-child workflow lifecycle', () => {
       runStep: async (_taskId, def) => result(def.name === 'source' ? { ticket: 'ABC-7' } : null),
       writeHandoff: async () => undefined,
       assembleContext: async () => '',
-      evaluatePolicy: async () => ({ pass: true }),
-      failingChecks: async () => '',
       notify: vi.fn(),
       cancelChildTask: async (taskId) => void cancelledTasks.push(taskId),
       ...overrides,

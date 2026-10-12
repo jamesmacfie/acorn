@@ -37,8 +37,23 @@ export default function StepConfigurationFields(props: {
   const optionsFor = (
     field: StepField,
   ): readonly { value: string; label: string; description?: string }[] | undefined => {
-    if (field.id === 'policy') return props.catalog?.policies.map((policy) => ({ value: policy.id, label: policy.id }))
+    if (field.id === 'policy')
+      return props.catalog?.policies.map((policy) => ({
+        value: policy.id,
+        label: policy.describe?.label ?? policy.id,
+        description: policy.describe?.description,
+      }))
     return undefined
+  }
+  // A policy gate also draws the chosen policy's own settings. They always land in `with`, even when a
+  // setting shares a name with one of the gate's own fields, such as a command's `timeoutMs`.
+  const policy = () =>
+    kind() === 'gate-policy' ? props.catalog?.policies.find((entry) => entry.id === props.step.policy) : undefined
+  const setSetting = (id: string, value: unknown): void => {
+    const table: Record<string, unknown> = { ...props.step.with }
+    if (value === '' || value === undefined || value === null) delete table[id]
+    else table[id] = value
+    props.onStepChange({ with: Object.keys(table).length ? table : undefined })
   }
 
   return (
@@ -161,6 +176,34 @@ export default function StepConfigurationFields(props: {
                     onChange={(value) => props.onFieldChange(field.id, value)}
                   />
                 </Show>
+              </Show>
+            )}
+          </For>
+          <For each={policy()?.describe?.fields ?? []}>
+            {(field) => (
+              <Show
+                when={field.type === 'prompt'}
+                fallback={
+                  <FieldControl
+                    field={field}
+                    pluginId={policy()?.pluginId ?? null}
+                    projectId={props.projectId}
+                    disabled={props.disabled}
+                    value={props.step.with?.[field.id]}
+                    onChange={(value) => setSetting(field.id, value)}
+                  />
+                }
+              >
+                <PromptField
+                  label={field.label}
+                  hint={field.hint}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  disabled={props.disabled}
+                  references={props.references}
+                  value={String(props.step.with?.[field.id] ?? '')}
+                  onChange={(value) => setSetting(field.id, value)}
+                />
               </Show>
             )}
           </For>

@@ -1,13 +1,38 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
-import type { ExtensionPointId } from '@acorn/plugin-api/node'
+import type { Extension, ExtensionPointId } from '@acorn/plugin-api/node'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runs/runner'
-import type { WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
+import { WORKFLOW_POLICY } from '../contract/extensions'
+import { readPolicyWait } from '../shared/policyWait'
+import type {
+  PolicyContext,
+  PolicyContribution,
+  PolicyVerdict,
+  WorkflowDef,
+  WorkflowStepDef,
+} from '../shared/workflowContracts'
 
-// The human gate over a real runner and a real plugin database (docs/workflows/execution.md § Execution model).
-// No step here runs an agent, so no profile or process is involved.
+// The human gate and the policy gate over a real runner and a real plugin database
+// (docs/workflows/execution.md § Execution model). No step here runs an agent, so no profile or
+// process is involved.
 
-const noExtensions: WorkflowExtensions = { handlers: <T>(_point: ExtensionPointId<T>) => [] }
+/** A policy that answers from a script. The last answer repeats. */
+const scripted = (...answers: PolicyVerdict[]) => {
+  let poll = 0
+  return {
+    describe: { label: 'Scripted', description: 'Answers from a script.', icon: 'list', fields: [] },
+    evaluate: vi.fn(async (_ctx: PolicyContext) => answers[Math.min(poll++, answers.length - 1)]!),
+  } satisfies PolicyContribution
+}
+
+const policies = (entries: Record<string, PolicyContribution>): WorkflowExtensions => ({
+  handlers: <T>(point: ExtensionPointId<T>) =>
+    (point === WORKFLOW_POLICY
+      ? Object.entries(entries).map(([id, value]) => ({ id, pluginId: 'test', order: 0, value }))
+      : []) as Extension<T>[],
+})
+
+const passing = () => policies({ 'test:pass': scripted({ verdict: 'pass' }) })
 
 const deps = (over: Partial<RunnerDeps> = {}): RunnerDeps => ({
   runStep: async () => {
@@ -15,8 +40,6 @@ const deps = (over: Partial<RunnerDeps> = {}): RunnerDeps => ({
   },
   writeHandoff: async () => {},
   assembleContext: async () => '',
-  evaluatePolicy: async () => ({ pass: true }),
-  failingChecks: async () => '',
   notify: () => {},
   ...over,
 })
@@ -34,7 +57,7 @@ describe('the human gate', () => {
   let runner: WorkflowRunner
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'workflows' } })
-    runner = new WorkflowRunner(ctx.storage.open(), deps(), noExtensions)
+    runner = new WorkflowRunner(ctx.storage.open(), deps(), passing())
   })
   afterEach(() => {
     runner.stop()
@@ -52,7 +75,7 @@ describe('the human gate', () => {
     const { runId, gate } = await gated(
       def([
         { id: 'approve', name: 'approve', kind: 'gate-human' },
-        { id: 'check', name: 'check', kind: 'gate-policy', policy: 'checks-green', after: ['approve'] },
+        { id: 'check', name: 'check', kind: 'gate-policy', policy: 'test:pass', after: ['approve'] },
       ]),
     )
     const answers = (
@@ -104,8 +127,8 @@ describe('the human gate', () => {
               right: { address: { from: 'literal', value: true } },
             },
           },
-          { id: 'yes', name: 'yes', kind: 'gate-policy', policy: 'checks-green', after: ['branch'] },
-          { id: 'no', name: 'no', kind: 'gate-policy', policy: 'checks-green', after: ['branch'] },
+          { id: 'yes', name: 'yes', kind: 'gate-policy', policy: 'test:pass', after: ['branch'] },
+          { id: 'no', name: 'no', kind: 'gate-policy', policy: 'test:pass', after: ['branch'] },
         ],
         { inputs: [{ name: 'title', schema: { type: 'string' } }], ...extra },
       )
@@ -177,5 +200,141 @@ describe('the human gate', () => {
         'The run is autonomous, so nobody was asked to fill the required form fields: title.',
       )
     })
+  })
+})
+
+describe('the policy gate', () => {
+  let ctx: TestNodeContext
+  const runners: WorkflowRunner[] = []
+  const runnerWith = (extensions: WorkflowExtensions, over: Partial<RunnerDeps> = {}) => {
+    const runner = new WorkflowRunner(ctx.storage.open(), deps(over), extensions)
+    runners.push(runner)
+    return runner
+  }
+  // The sleep between polls moves the clock instead of waiting, so a day-long timeout takes no time.
+  const clockSleep = async (ms: number) => {
+    vi.setSystemTime(Date.now() + ms)
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    ctx = makeTestNodeContext({ plugin: { name: 'workflows' } })
+  })
+  afterEach(() => {
+    for (const runner of runners.splice(0)) runner.stop()
+    ctx.cleanup()
+    vi.useRealTimers()
+  })
+
+  const settled = async (runner: WorkflowRunner, runId: string) => {
+    await vi.waitFor(async () => expect((await runner.run(runId))?.status).toMatch(/^(done|failed)$/))
+    return runner.steps(runId)
+  }
+
+  it('asks again while the policy says wait, and finishes on pass', async () => {
+    const policy = scripted({ verdict: 'wait', detail: 'Not yet' }, { verdict: 'wait' }, { verdict: 'pass' })
+    const runner = runnerWith(policies({ 'test:ci': policy }), { sleep: clockSleep })
+    const runId = await runner.start(
+      'task-1',
+      def([{ id: 'ci', name: 'ci', kind: 'gate-policy', policy: 'test:ci', timeoutMs: 3_600_000 }]),
+    )
+    const [gate] = await settled(runner, runId)
+    expect(gate!.status).toBe('done')
+    expect(JSON.parse(gate!.structuredJson!)).toEqual({ verdict: 'pass', polls: 3 })
+    expect(policy.evaluate).toHaveBeenCalledTimes(3)
+    // The second poll is told what the first said.
+    expect(policy.evaluate.mock.calls[1]![0].previous).toEqual({ verdict: 'wait', detail: 'Not yet' })
+    // A settled wait leaves nothing behind, so a retry would start a fresh one.
+    expect(readPolicyWait(gate!.inputsJson)).toBeUndefined()
+  })
+
+  it('reads wait as fail when the gate asks only once', async () => {
+    const runner = runnerWith(policies({ 'test:ci': scripted({ verdict: 'wait', detail: 'Still running' }) }))
+    const runId = await runner.start('task-1', def([{ id: 'ci', name: 'ci', kind: 'gate-policy', policy: 'test:ci' }]))
+    const [gate] = await settled(runner, runId)
+    expect(gate!.status).toBe('failed')
+    expect(gate!.error).toBe("Policy 'test:ci' failed: Still running")
+  })
+
+  it('keeps since and the deadline across a restart, and times out at the original deadline', async () => {
+    const policy = scripted({ verdict: 'wait' })
+    const workflow = def([
+      { id: 'ci', name: 'ci', kind: 'gate-policy', policy: 'test:ci', intervalMs: 30_000, timeoutMs: 60_000 },
+    ])
+    // The first Node polls once, then is shut down while it sleeps.
+    const first = runnerWith(policies({ 'test:ci': policy }), {
+      sleep: (_ms, signal) => new Promise((resolve) => signal.addEventListener('abort', () => resolve())),
+    })
+    const runId = await first.start('task-1', workflow)
+    let saved: ReturnType<typeof readPolicyWait>
+    await vi.waitFor(async () => {
+      saved = readPolicyWait((await first.steps(runId))[0]!.inputsJson)
+      expect(saved?.state).toBe('sleeping')
+    })
+    expect(saved!.polls).toBe(1)
+    first.stop()
+
+    vi.setSystemTime(Date.now() + 10_000)
+    const second = runnerWith(policies({ 'test:ci': policy }), { sleep: clockSleep })
+    await second.reconcile()
+    const [gate] = await settled(second, runId)
+    expect(gate!.status).toBe('failed')
+    expect(JSON.parse(gate!.structuredJson!)).toMatchObject({ verdict: 'timed-out' })
+    // Every poll, before and after the restart, measured from the same start.
+    expect(new Set(policy.evaluate.mock.calls.map(([call]) => call.since))).toEqual(new Set([saved!.since]))
+    // Polls at the restart, 30 seconds later, and on the deadline itself: 60 seconds after the start,
+    // not 60 seconds after the restart.
+    expect(JSON.parse(gate!.structuredJson!).polls).toBe(4)
+    // The faked clock still drifts with real time by a few milliseconds, so this is a window.
+    expect(Date.now()).toBeGreaterThanOrEqual(saved!.deadlineAt)
+    expect(Date.now()).toBeLessThan(saved!.deadlineAt + 1_000)
+  })
+
+  it('takes the timed-out branch and skips the pass branch', async () => {
+    const runner = runnerWith(
+      policies({ 'test:ci': scripted({ verdict: 'wait' }), 'test:pass': scripted({ verdict: 'pass' }) }),
+      {
+        sleep: clockSleep,
+      },
+    )
+    const runId = await runner.start(
+      'task-1',
+      def([
+        {
+          id: 'await',
+          name: 'await',
+          kind: 'gate-policy',
+          policy: 'test:ci',
+          intervalMs: 30_000,
+          timeoutMs: 60_000,
+          branches: { pass: 'next', 'timed-out': 'nudge' },
+        },
+        { id: 'next', name: 'next', kind: 'gate-policy', policy: 'test:pass', after: ['await'] },
+        { id: 'nudge', name: 'nudge', kind: 'gate-policy', policy: 'test:pass', after: ['await'] },
+      ]),
+    )
+    const steps = await settled(runner, runId)
+    expect((await runner.run(runId))?.status).toBe('done')
+    expect(Object.fromEntries(steps.map((step) => [step.name, step.status]))).toEqual({
+      await: 'done',
+      next: 'skipped',
+      nudge: 'done',
+    })
+  })
+
+  it('fails the step after three failed polls in a row', async () => {
+    const policy = {
+      ...scripted({ verdict: 'wait' }),
+      evaluate: vi.fn(async (): Promise<PolicyVerdict> => {
+        throw new Error('token revoked')
+      }),
+    }
+    const runner = runnerWith(policies({ 'test:ci': policy }), { sleep: clockSleep })
+    const runId = await runner.start(
+      'task-1',
+      def([{ id: 'ci', name: 'ci', kind: 'gate-policy', policy: 'test:ci', timeoutMs: 86_400_000 }]),
+    )
+    const [gate] = await settled(runner, runId)
+    expect(gate!.error).toBe("Policy 'test:ci' could not be checked: token revoked")
+    expect(policy.evaluate).toHaveBeenCalledTimes(3)
   })
 })

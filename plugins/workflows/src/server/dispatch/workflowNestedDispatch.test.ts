@@ -139,8 +139,6 @@ describe('nested workflow execution', () => {
       runStep,
       writeHandoff: async () => {},
       assembleContext: async () => '',
-      evaluatePolicy: async () => ({ pass: true }),
-      failingChecks: async () => '',
       notify: vi.fn(),
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),

@@ -11,13 +11,13 @@ import {
 } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type { WorkflowDef, WorkflowRunRow, WorkflowStepRow } from '../../shared/workflowContracts'
-import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../../shared/workflowContracts'
+import type { StepKindContribution, WorkflowCatalog } from '../../shared/workflowContracts'
 import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
 import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
-import { buildBuiltinWorkflowContributions } from '../steps/builtins'
+import { buildBuiltinWorkflowContributions, type RunnablePolicy } from '../steps/builtins'
 import { WorkflowTreeSafety } from '../validation/treeSafety'
 import { assertValidWorkflow, workflowEdges, type WorkflowValidationCatalog } from '../validation/definition'
 import { WorkflowChildLifecycle } from '../dispatch/childLifecycle'
@@ -56,7 +56,7 @@ const NO_EXTENSIONS: WorkflowExtensions = { handlers: () => [] }
 export class WorkflowRunner {
   // This plugin's own kinds and policies, addressed as bare words. Everything another plugin adds is
   // qualified and comes from the extension points (../../contract/extensions.ts).
-  readonly #builtins: { stepKinds: Map<string, StepKindContribution>; policies: Map<string, PolicyEvaluator> }
+  readonly #builtins: { stepKinds: Map<string, StepKindContribution>; policies: Map<string, RunnablePolicy> }
   readonly #extensions: WorkflowExtensions
   readonly #reportedInvalidKinds = new Map<string, string>()
   readonly #activeRuns = new Set<string>()
@@ -170,11 +170,20 @@ export class WorkflowRunner {
     })
   }
 
-  #policy(policy: string): PolicyEvaluator | undefined {
-    return (
-      this.#builtins.policies.get(policy) ??
-      this.#extensions.handlers(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
-    )
+  #policy(policy: string): RunnablePolicy | undefined {
+    const builtin = this.#builtins.policies.get(policy)
+    if (builtin) return builtin
+    const contributed = this.#policyEntries().find((entry) => entry.id === policy)?.value
+    // Wrapped so a contribution is called with its own context alone, never the step's.
+    return contributed && { ...contributed, evaluate: (ctx) => contributed.evaluate(ctx) }
+  }
+
+  /** Contributed policies that can actually run. One without a description or an evaluator is left
+   *  out of the catalog and validation, the way an incomplete step kind is. */
+  #policyEntries() {
+    return this.#extensions
+      .handlers(WORKFLOW_POLICY)
+      .filter((entry) => typeof entry.value?.evaluate === 'function' && !!entry.value.describe)
   }
 
   /** Every kind this node can run, with the description the editor draws from. Resolved per call for
@@ -202,10 +211,7 @@ export class WorkflowRunner {
     const kinds = this.#kindEntries()
     return {
       stepKinds: new Set(kinds.map((kind) => kind.id)),
-      policies: new Set([
-        ...this.#builtins.policies.keys(),
-        ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => entry.id),
-      ]),
+      policies: new Set([...this.#builtins.policies.keys(), ...this.#policyEntries().map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(
         agentProfileRegistry
@@ -224,6 +230,8 @@ export class WorkflowRunner {
       agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),
       describeStepKind: (kind) => this.#stepKind(kind)?.describe,
       validateStepKind: (kind, step, context) => this.#stepKind(kind)?.validate?.(step, context) ?? [],
+      describePolicy: (id) => this.#policy(id)?.describe,
+      validatePolicy: (id, settings) => this.#policy(id)?.validate?.(settings) ?? [],
     }
   }
 
@@ -236,8 +244,12 @@ export class WorkflowRunner {
         describe: contribution.describe ?? null,
       })),
       policies: [
-        ...[...this.#builtins.policies.keys()].map((id) => ({ id, pluginId: null })),
-        ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => ({ id: entry.id, pluginId: entry.pluginId })),
+        ...[...this.#builtins.policies].map(([id, policy]) => ({ id, pluginId: null, describe: policy.describe })),
+        ...this.#policyEntries().map((entry) => ({
+          id: entry.id,
+          pluginId: entry.pluginId,
+          describe: entry.value.describe,
+        })),
       ],
       profiles: agentProfileRegistry.list().map((profile) => ({
         id: profile.id,

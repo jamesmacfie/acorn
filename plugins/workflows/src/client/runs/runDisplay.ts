@@ -6,6 +6,7 @@
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 import type { WorkflowUsageSummary } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { readPolicyWait } from '../../shared/policyWait'
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted'
 
@@ -89,6 +90,23 @@ export function stepElapsed(step: WorkflowStepRow | undefined, now: number): str
   if (!step || step.status === 'pending' || step.status === 'skipped') return ''
   const end = step.status === 'running' || step.status === 'waiting-gate' ? now : step.updatedAt
   return formatDuration(end - step.createdAt)
+}
+
+/** The one line under a running step: its latest `progress` event, and for a polling gate the wait it
+ *  saved on its row, so a reload or a second client shows when it asks next without waiting for it. */
+export function stepProgressLine(step: WorkflowStepRow, events: readonly unknown[]): string | undefined {
+  if (step.status !== 'running') return undefined
+  const latest = [...events]
+    .reverse()
+    .find((event): event is { type: 'progress'; text: string } => (event as { type?: unknown })?.type === 'progress')
+  const wait = readPolicyWait(step.inputsJson)
+  if (!wait) return latest?.text
+  const detail = latest?.text ?? wait.detail ?? 'Not yet'
+  const next =
+    wait.state === 'sleeping' && wait.nextPollAt
+      ? `next check at ${new Date(wait.nextPollAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      : 'checking now'
+  return `Waiting: ${detail} ${wait.polls} ${wait.polls === 1 ? 'check' : 'checks'} so far, ${next}.`
 }
 
 export const formatCost = (usd: number): string => (usd > 0 ? `$${usd.toFixed(2)}` : '')

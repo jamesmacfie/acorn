@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, gt } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import type { MirroredPullRequest } from '../contract/mirror'
 import { checks, comments, prFiles, pullRequests, repos, reviews, reviewThreads, syncState } from '../node/schema'
@@ -51,22 +51,23 @@ export async function mirroredPullRequest(
  * are core-owned, and the repo id is this plugin's, so this is the one place the two meet.
  *
  * Null covers every way there is nothing to read: no task, no PR on it, no GitHub project, no mirrored
- * repo, and no owner. Callers must not read that as "nothing wrong" — see `failingChecksFor` for why
- * the distinction is load-bearing there.
+ * repo, and no owner. Callers must not read that as "nothing wrong": an unmirrored repo is not a green
+ * one, and the CI workflow policy fails closed on it.
  */
-async function mirroredTaskPull(
+export async function mirroredTaskPull(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects'>,
   userId: string | null,
   taskId: string,
-): Promise<{ userId: string; repoId: number; number: number } | null> {
+): Promise<{ userId: string; repoId: number; number: number; owner: string; repo: string } | null> {
   const task = await core.tasks.load(taskId)
   if (!task || task.pullNumber == null || !userId) return null
   const project = await core.projects.byId(task.projectId)
   if (!project?.github) return null
-  const repoId = await mirroredRepoId(db, userId, project.github.owner, project.github.name)
+  const { owner, name: repo } = project.github
+  const repoId = await mirroredRepoId(db, userId, owner, repo)
   if (repoId == null) return null
-  return { userId, repoId, number: task.pullNumber }
+  return { userId, repoId, number: task.pullNumber, owner, repo }
 }
 
 /** Scoped comparison facts and identity for GitHub's active marker waves. */
@@ -91,10 +92,17 @@ export async function taskPullComparison(
   return row ? { ...pull, ...row } : null
 }
 
-// The failure rule, in one place because the ci-loop prompt and the `pr_checks` agent tool must not
-// disagree about what a red PR is. A check with no status yet is not a failure: it has not run.
+// The mirror stores a check run's `conclusion ?? status` and a status context's `state`, so a check
+// that has not finished reads as one of these. A check with no status yet has not run either.
+const PENDING_CHECK = new Set(['queued', 'in_progress', 'pending', 'waiting', 'requested', 'expected'])
+const PASSED_CHECK = new Set(['success', 'neutral', 'skipped'])
+
+export const checkPending = (status: string | null): boolean => !status || PENDING_CHECK.has(status.toLowerCase())
+
+// The failure rule, in one place because the CI workflow policy and the `pr_checks` agent tool must not
+// disagree about what a red PR is. A check that is still running has not failed.
 export const checkFailed = (status: string | null): boolean =>
-  !!status && !['success', 'neutral', 'skipped'].includes(status.toLowerCase())
+  !checkPending(status) && !PASSED_CHECK.has(status!.toLowerCase())
 
 /**
  * Every mirrored check on the task's PR, newest mirror state, for the `pr_checks` agent tool. Null for
@@ -218,22 +226,99 @@ export async function taskReviewFeedback(
   }
 }
 
+export type ReviewActivity = {
+  kind: 'review' | 'thread-comment' | 'comment'
+  author: string | null
+  body: string | null
+  at: number
+  /** A review's verdict, such as APPROVED or CHANGES_REQUESTED. */
+  state?: string | null
+  /** An inline comment's file. */
+  path?: string | null
+}
+
 /**
- * Three values, all load-bearing. '' means every check passed. Text is the rendered failure list that
- * becomes the fix prompt. Null means there is nothing to check, which the ci-loop step treats as a
- * hard failure rather than success, so every null from `taskChecks` passes through: an unmirrored
- * repo must not be mistaken for a green one.
+ * Reviews, inline comments, and conversation comments on the task's PR made after `since`, oldest
+ * first, with the PR's state and author. For the review-received workflow policy.
+ *
+ * Its own query rather than `taskReviewFeedback`, which keeps the oldest hundred of each and drops
+ * resolved threads. A long-lived PR would lose exactly the new comments this looks for.
  */
-export async function failingChecksFor(
+export async function reviewActivitySince(
   db: PluginDatabase,
-  core: Pick<CoreServices, 'tasks' | 'projects'>,
-  userId: string | null,
-  taskId: string,
-): Promise<string | null> {
-  const mirrored = await taskChecks(db, core, userId, taskId)
-  if (!mirrored) return null
-  const bad = mirrored.checks.filter((row) => checkFailed(row.status))
-  return bad.length ? bad.map((r) => `- ${r.name}: ${r.status}${r.url ? ` (${r.url})` : ''}`).join('\n') : ''
+  pull: { userId: string; repoId: number; number: number },
+  since: number,
+  options: { includeBots: boolean },
+): Promise<{ state: string; author: string | null; activity: ReviewActivity[] } | null> {
+  const [pr] = await db
+    .select({ state: pullRequests.state, author: pullRequests.author })
+    .from(pullRequests)
+    .where(
+      and(
+        eq(pullRequests.userId, pull.userId),
+        eq(pullRequests.repoId, pull.repoId),
+        eq(pullRequests.number, pull.number),
+      ),
+    )
+  if (!pr) return null
+  const [reviewRows, threadRows, commentRows] = await Promise.all([
+    db
+      .select()
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.userId, pull.userId),
+          eq(reviews.repoId, pull.repoId),
+          eq(reviews.number, pull.number),
+          gt(reviews.submittedAt, since),
+        ),
+      ),
+    db
+      .select()
+      .from(reviewThreads)
+      .where(
+        and(
+          eq(reviewThreads.userId, pull.userId),
+          eq(reviewThreads.repoId, pull.repoId),
+          eq(reviewThreads.number, pull.number),
+          gt(reviewThreads.createdAt, since),
+        ),
+      ),
+    db
+      .select()
+      .from(comments)
+      .where(
+        and(
+          eq(comments.userId, pull.userId),
+          eq(comments.repoId, pull.repoId),
+          eq(comments.number, pull.number),
+          gt(comments.createdAt, since),
+        ),
+      ),
+  ])
+  // The PR's author answering their own reviewers is not a review.
+  const counts = (row: { author: string | null; authorIsBot: boolean | null }) =>
+    row.author !== pr.author && (options.includeBots || row.authorIsBot !== true)
+  const activity: ReviewActivity[] = [
+    ...reviewRows.filter(counts).map((row) => ({
+      kind: 'review' as const,
+      author: row.author,
+      body: row.body,
+      at: row.submittedAt!,
+      state: row.state,
+    })),
+    ...threadRows.filter(counts).map((row) => ({
+      kind: 'thread-comment' as const,
+      author: row.author,
+      body: row.body,
+      at: row.createdAt!,
+      path: row.path,
+    })),
+    ...commentRows
+      .filter(counts)
+      .map((row) => ({ kind: 'comment' as const, author: row.author, body: row.body, at: row.createdAt! })),
+  ]
+  return { state: pr.state, author: pr.author, activity: activity.sort((a, b) => a.at - b.at) }
 }
 
 /**

@@ -138,8 +138,6 @@ describe('workflow dispatch authoring', () => {
       runStep: vi.fn(async () => stepResult),
       writeHandoff: vi.fn(async () => undefined),
       assembleContext: vi.fn(async () => ''),
-      evaluatePolicy: vi.fn(async () => ({ pass: true })),
-      failingChecks: vi.fn(async () => ''),
       notify: vi.fn(),
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),

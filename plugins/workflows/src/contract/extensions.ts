@@ -1,5 +1,5 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
-import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution } from '../shared/workflowContracts'
+import type { PolicyContribution, StepKindContribution, WorkflowTriggerContribution } from '../shared/workflowContracts'
 
 // What another plugin may add to a workflow run, and the only way in (docs/workflows/step-kinds.md § Contributed
 // step kinds). These are node extension points rather than capabilities because each of the three is
@@ -11,7 +11,7 @@ import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution
 // entry `request` and neither shadows the other, and the workflow file says which one it meant.
 
 export type {
-  PolicyEvaluator,
+  PolicyContribution,
   StepField,
   StepHandler,
   StepHandlerContext,
@@ -33,8 +33,9 @@ export type {
 /** A step kind the runner will dispatch to. Entry id becomes the second half of `kind`. */
 export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workflows:step-kind')
 
-/** A `gate-policy` verdict source. Entry id becomes the second half of `policy`. */
-export const WORKFLOW_POLICY = extensionPointId<PolicyEvaluator>('workflows:policy')
+/** A `gate-policy` verdict source, answering pass, wait, or fail (docs/workflows/step-kinds.md § Gate
+ *  policies). Entry id becomes the second half of `policy`. */
+export const WORKFLOW_POLICY = extensionPointId<PolicyContribution>('workflows:policy')
 
 /** Something that decides, on each sweep, which workflows should start. The sweep runs on the node's
  *  scheduler, so a trigger fires with no client attached (docs/schedules.md). */

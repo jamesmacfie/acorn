@@ -1,4 +1,5 @@
-// This plugin's two workflow step kinds (docs/terminal/run-targets.md § Workflow steps).
+// This plugin's two workflow step kinds and its command policy (docs/terminal/run-targets.md §
+// Workflow steps).
 //
 // They live here rather than in the workflows plugin for the reason the http step gives: everything a
 // command needs to run safely is already in this package — the process broker's environment
@@ -8,7 +9,7 @@
 // `terminal:command` runs a captured child process, not a PTY. Capturing a clean stdout out of a PTY
 // is lossy, and a headless node with nobody attached would still have to hold the terminal open.
 import { buildSessionEnv, type CoreServices } from '@acorn/plugin-api/node'
-import type { StepField, TerminalWorkflowStepKind } from '../contract/workflowSteps'
+import type { StepField, TerminalWorkflowPolicy, TerminalWorkflowStepKind } from '../contract/workflowSteps'
 import type { TerminalRunTargets } from '../contract/runTargets'
 
 // The point id and the shapes these two kinds are written against live in ../contract/workflowSteps.ts,
@@ -92,10 +93,10 @@ export function parseEnvLines(text: string): { env: Record<string, string>; prob
   return { env, problems }
 }
 
-const validateCommand: TerminalWorkflowStepKind['validate'] = (step, { label }) => {
-  const config = (step.with ?? {}) as CommandConfig
+/** What is wrong with a command's settings, without a label, for the step kind and the policy alike. */
+function commandProblems(config: CommandConfig): string[] {
   const errors: string[] = []
-  if (typeof config.command !== 'string' || !config.command.trim()) errors.push(`${label} has no command`)
+  if (typeof config.command !== 'string' || !config.command.trim()) errors.push('has no command')
   if (config.timeoutMs !== undefined) {
     const timeout = config.timeoutMs
     if (
@@ -104,19 +105,20 @@ const validateCommand: TerminalWorkflowStepKind['validate'] = (step, { label }) 
       timeout < MIN_COMMAND_TIMEOUT_MS ||
       timeout > MAX_COMMAND_TIMEOUT_MS
     ) {
-      errors.push(
-        `${label} timeout must be between ${MIN_COMMAND_TIMEOUT_MS} and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`,
-      )
+      errors.push(`timeout must be between ${MIN_COMMAND_TIMEOUT_MS} and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`)
     }
   }
   if (config.allowFailure !== undefined && typeof config.allowFailure !== 'boolean')
-    errors.push(`${label} allowFailure must be true or false`)
+    errors.push('allowFailure must be true or false')
   if (config.env !== undefined) {
-    if (typeof config.env !== 'string') errors.push(`${label} env must be KEY=value lines`)
-    else for (const problem of parseEnvLines(config.env).problems) errors.push(`${label} env: ${problem}`)
+    if (typeof config.env !== 'string') errors.push('env must be KEY=value lines')
+    else for (const problem of parseEnvLines(config.env).problems) errors.push(`env: ${problem}`)
   }
   return errors
 }
+
+const validateCommand: TerminalWorkflowStepKind['validate'] = (step, { label }) =>
+  commandProblems((step.with ?? {}) as CommandConfig).map((problem) => `${label} ${problem}`)
 
 const validateRunTarget: TerminalWorkflowStepKind['validate'] = (step, { label }) => {
   const config = (step.with ?? {}) as RunTargetConfig
@@ -129,8 +131,69 @@ const validateRunTarget: TerminalWorkflowStepKind['validate'] = (step, { label }
   return errors
 }
 
+type CommandCore = Pick<CoreServices, 'tasks' | 'projects' | 'proc'>
+type ProcessResult = Awaited<ReturnType<CommandCore['proc']['runProcess']>>
+type CommandRun =
+  | { error: string }
+  | {
+      result: ProcessResult
+      timeoutMs: number
+      structured: { exitCode: ProcessResult['code']; stdout: string; stderr: string; truncated: boolean }
+    }
+
+/** Runs one command in the task's checkout with the allowed environment and the step's `env` lines.
+ *  The step kind and the command policy both run through it, so they share one set of limits. */
+async function runTaskCommand(
+  core: CommandCore,
+  taskId: string,
+  config: CommandConfig,
+  signal: AbortSignal,
+  onOutput?: (stream: 'stdout' | 'stderr', text: string) => void,
+): Promise<CommandRun> {
+  // Already rendered: `${inputs.x}` and `${steps.x.output}` were substituted before the handler was
+  // called, so this is the command as it will run.
+  const command = typeof config.command === 'string' ? config.command : ''
+  if (!command.trim()) return { error: 'This step has no command.' }
+  const task = await core.tasks.load(taskId)
+  if (!task) return { error: 'The run has no task to run in.' }
+  const project = task.projectId ? await core.projects.byId(task.projectId) : null
+  const { cwd } = await core.tasks.resolveCwd(task, undefined)
+  const extra = typeof config.env === 'string' ? parseEnvLines(config.env).env : {}
+  const env = buildSessionEnv({
+    taskId: task.id,
+    cwd,
+    task: project
+      ? {
+          projectId: project.id,
+          projectName: project.name,
+          github: project.github,
+          branch: task.branch,
+          title: task.title,
+        }
+      : null,
+    env: extra,
+  })
+  const timeoutMs = typeof config.timeoutMs === 'number' ? config.timeoutMs : COMMAND_TIMEOUT_MS
+  const result = await core.proc.runProcess({
+    file: '/bin/sh',
+    args: ['-c', command],
+    cwd,
+    env,
+    timeoutMs,
+    signal,
+    ...(onOutput
+      ? { onStdout: (text: string) => onOutput('stdout', text), onStderr: (text: string) => onOutput('stderr', text) }
+      : {}),
+  })
+  return {
+    result,
+    timeoutMs,
+    structured: { exitCode: result.code, stdout: result.stdout, stderr: result.stderr, truncated: result.truncated },
+  }
+}
+
 /** `terminal:command`: one shell command in the task's checkout, streamed and captured. */
-export function commandStep(core: Pick<CoreServices, 'tasks' | 'projects' | 'proc'>): TerminalWorkflowStepKind {
+export function commandStep(core: CommandCore): TerminalWorkflowStepKind {
   return {
     describe: {
       label: 'Run a command',
@@ -142,49 +205,13 @@ export function commandStep(core: Pick<CoreServices, 'tasks' | 'projects' | 'pro
     validate: validateCommand,
     handler: async (ctx) => {
       const config = (ctx.def.with ?? {}) as CommandConfig
-      // Already rendered: `${inputs.x}` and `${steps.x.output}` were substituted before the handler
-      // was called, so this is the command as it will run.
-      const command = typeof config.command === 'string' ? config.command : ''
-      if (!command.trim()) return { status: 'failed', error: 'This step has no command.' }
-      const task = await core.tasks.load(ctx.run.taskId)
-      if (!task) return { status: 'failed', error: 'The run has no task to run in.' }
-      const project = task.projectId ? await core.projects.byId(task.projectId) : null
-      const { cwd } = await core.tasks.resolveCwd(task, undefined)
-      const extra = typeof config.env === 'string' ? parseEnvLines(config.env).env : {}
-      const env = buildSessionEnv({
-        taskId: task.id,
-        cwd,
-        task: project
-          ? {
-              projectId: project.id,
-              projectName: project.name,
-              github: project.github,
-              branch: task.branch,
-              title: task.title,
-            }
-          : null,
-        env: extra,
-      })
-      const timeoutMs = typeof config.timeoutMs === 'number' ? config.timeoutMs : COMMAND_TIMEOUT_MS
       const started = Date.now()
-      const result = await core.proc.runProcess({
-        file: '/bin/sh',
-        args: ['-c', command],
-        cwd,
-        env,
-        timeoutMs,
-        signal: ctx.signal,
-        onStdout: (text) => ctx.emit({ at: Date.now(), event: { type: 'stdout', text } }),
-        onStderr: (text) => ctx.emit({ at: Date.now(), event: { type: 'stderr', text } }),
-      })
-      const durationMs = Date.now() - started
-      const structured = {
-        exitCode: result.code,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        truncated: result.truncated,
-      }
-      const data = { result: { durationMs }, structured }
+      const ran = await runTaskCommand(core, ctx.run.taskId, config, ctx.signal, (type, text) =>
+        ctx.emit({ at: Date.now(), event: { type, text } }),
+      )
+      if ('error' in ran) return { status: 'failed', error: ran.error }
+      const { result, timeoutMs, structured } = ran
+      const data = { result: { durationMs: Date.now() - started }, structured }
       if (result.aborted) return { status: 'cancelled', error: 'Step cancelled.' }
       if (result.spawnError)
         return { status: 'failed', error: `The command could not start: ${result.spawnError}`, ...data }
@@ -201,6 +228,35 @@ export function commandStep(core: Pick<CoreServices, 'tasks' | 'projects' | 'pro
         }
       }
       return { status: 'done', ...data, handoff: result.stdout.trim() || undefined }
+    },
+  }
+}
+
+/** `EX_TEMPFAIL` from sysexits.h: the Unix code for "temporary failure, try again later". */
+const EXIT_WAIT = 75
+
+/** `terminal:command-check`: a `gate-policy` verdict from one command's exit code. 0 passes, 75 waits,
+ *  and anything else fails. A command that cannot start or runs out of time is a failed poll, which
+ *  the gate retries. */
+export function commandCheckPolicy(core: CommandCore): TerminalWorkflowPolicy {
+  return {
+    describe: {
+      label: 'Command exit code',
+      description: 'Run a command in the task’s checkout. Exit 0 passes, 75 means not yet, anything else fails.',
+      icon: 'terminal',
+      fields: COMMAND_FIELDS.filter((field) => field.id !== 'allowFailure'),
+    },
+    validate: (settings) => commandProblems(settings as CommandConfig),
+    evaluate: async (ctx) => {
+      const ran = await runTaskCommand(core, ctx.taskId, ctx.with as CommandConfig, ctx.signal)
+      if ('error' in ran) throw new Error(ran.error)
+      const { result, timeoutMs, structured } = ran
+      if (result.aborted) throw new Error('The check was cancelled.')
+      if (result.spawnError) throw new Error(`The command could not start: ${result.spawnError}`)
+      if (result.timedOut) throw new Error(`The command did not finish within ${timeoutMs}ms.`)
+      const lastLine = result.stdout.trim().split('\n').at(-1)?.trim()
+      const verdict = result.code === 0 ? 'pass' : result.code === EXIT_WAIT ? 'wait' : 'fail'
+      return { verdict, ...(lastLine ? { detail: lastLine } : {}), value: structured }
     },
   }
 }

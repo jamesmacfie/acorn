@@ -206,7 +206,7 @@ describe('detail mirror', () => {
       'fetch',
       fakeGithub(makeFakePull({ threads: 400, commentsPerThread: (t) => (t === 0 ? 120 : 1), commits: 150 })).fetch,
     )
-    expect(await refreshPullDetail('token', plugin.db, refreshKey)).toEqual({ ok: true })
+    expect(await refreshPullDetail('token', plugin.db, refreshKey)).toMatchObject({ ok: true, headSha: 'head-sha' })
 
     const detail = await readComposite(plugin.db, key)
     expect(detail.threads).toHaveLength(400)

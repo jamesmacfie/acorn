@@ -343,8 +343,13 @@ export default function NodeInspector(props: {
                 </Button>
               </Show>
 
-              <Show when={['decide', 'if'].includes(kindOf(current()))}>
+              <Show when={['decide', 'if', 'gate-policy'].includes(kindOf(current()))}>
                 <BranchesField
+                  help={
+                    kindOf(current()) === 'gate-policy'
+                      ? 'Each answer, pass, fail, or timed-out, leads to a step. Without branches, fail and timed-out stop the run.'
+                      : undefined
+                  }
                   branches={current().branches ?? {}}
                   targets={branchTargets()}
                   disabled={props.readOnly}

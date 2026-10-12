@@ -247,16 +247,21 @@ describe('the pull-request read tools', () => {
         position: 1,
       },
       { userId: USER, repoId: 1, number: 7, name: 'deploy', status: null, url: null, runId: null, position: 2 },
+      // How the mirror stores a check run that has not finished: its status, since it has no conclusion.
+      { userId: USER, repoId: 1, number: 7, name: 'e2e', status: 'QUEUED', url: null, runId: null, position: 3 },
+      { userId: USER, repoId: 1, number: 7, name: 'build', status: 'IN_PROGRESS', url: null, runId: null, position: 4 },
     ])
 
     const result = (await tools().checks.handler({}, { taskId: 'task-1', userLogin: USER })) as {
       number: number
       checks: { name: string }[]
       failing: string[]
+      pending: string[]
     }
     expect(result.number).toBe(7)
-    expect(result.checks.map((check) => check.name)).toEqual(['deploy', 'lint', 'test'])
+    expect(result.checks.map((check) => check.name)).toEqual(['build', 'deploy', 'e2e', 'lint', 'test'])
     expect(result.failing).toEqual(['test'])
+    expect(result.pending).toEqual(['build', 'deploy', 'e2e'])
   })
 
   // An unmirrored PR is not a PR with no feedback and not a green one, and both tools have to say so.

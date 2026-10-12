@@ -16,6 +16,7 @@ import { renderWorkspaceExamples, selectExamples, type WorkflowExample } from '.
  *  node, so the request orchestrator passes the runner's full validation catalog instead. */
 export function catalogValidation(catalog: WorkflowCatalog): WorkflowValidationCatalog {
   const described = new Map(catalog.kinds.map((kind) => [kind.id, kind.describe]))
+  const policies = new Map(catalog.policies.map((policy) => [policy.id, policy.describe]))
   return {
     stepKinds: new Set(catalog.kinds.map((kind) => kind.id)),
     policies: new Set(catalog.policies.map((policy) => policy.id)),
@@ -24,6 +25,7 @@ export function catalogValidation(catalog: WorkflowCatalog): WorkflowValidationC
     managedProfiles: new Set(catalog.profiles.filter((profile) => profile.managed).map((profile) => profile.id)),
     agentStepKinds: new Set(catalog.kinds.filter((kind) => kind.describe?.runsAgent).map((kind) => kind.id)),
     describeStepKind: (kind) => described.get(kind) ?? undefined,
+    describePolicy: (id) => policies.get(id),
     workflowTargets: catalog.workflows,
   }
 }

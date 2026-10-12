@@ -6,7 +6,9 @@ import { declaredOutputSchema } from '../../shared/gateForm'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { MAX_AGENT_GOAL_CHARS } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../../shared/stepFields'
+import { policyWaitProblems } from './policyGate'
 import type {
+  PolicyDescription,
   StepField,
   StepKindDescription,
   StepValidationContext,
@@ -98,6 +100,9 @@ export type WorkflowValidationCatalog = {
   // A kind's description, for the host-applied field checks below. Absent for a kind that has none.
   describeStepKind?: (kind: string) => StepKindDescription | undefined
   validateStepKind?: (kind: string, step: WorkflowStepDef, context: StepValidationContext) => string[]
+  // A policy's description and validator, for a `gate-policy` step's interval floor and `with` table.
+  describePolicy?: (id: string) => PolicyDescription | undefined
+  validatePolicy?: (id: string, settings: Record<string, unknown>) => string[]
   /** Present only when validation runs in an editor or generation request with a project scope. */
   workflowTargets?: readonly WorkflowCatalogTarget[]
 }
@@ -186,10 +191,10 @@ function validateBudget(label: string, budget: WorkflowBudget | undefined): stri
  * meaning. A select with an `optionsRoute` is skipped: the node reading the file may not be able to
  * reach the project whose route lists the choices.
  */
-function fieldProblems(label: string, step: WorkflowStepDef, kind: string, fields: readonly StepField[]): string[] {
+function fieldProblems(label: string, read: (fieldId: string) => unknown, fields: readonly StepField[]): string[] {
   const errors: string[] = []
   for (const field of fields) {
-    const value = readStepField(step as Parameters<typeof readStepField>[0], kind, field.id)
+    const value = read(field.id)
     const missing = value == null || (typeof value === 'string' && !value.trim())
     if (missing) {
       if (field.required) errors.push(`${label} needs ${field.label.toLowerCase()}`)
@@ -327,7 +332,13 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     // The description's own checks first, and the kind's validator only when they pass: the
     // contract a validator relies on is "the shape is already right".
     const described = catalog.describeStepKind?.(kind)
-    const fieldErrors = described ? fieldProblems(label, step, kind, described.fields) : []
+    const fieldErrors = described
+      ? fieldProblems(
+          label,
+          (fieldId) => readStepField(step as Parameters<typeof readStepField>[0], kind, fieldId),
+          described.fields,
+        )
+      : []
     errors.push(...fieldErrors)
     if (!fieldErrors.length) {
       errors.push(
@@ -342,6 +353,25 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
         }) ?? []),
       )
     }
+    errors.push(
+      ...policyWaitProblems(step, {
+        label,
+        indexes,
+        precedes,
+        policies: catalog.policies,
+        describePolicy: catalog.describePolicy,
+        workflowBudget: def.budget,
+      }),
+    )
+    // A policy's settings get the same host checks a kind's fields do, then the policy's own validator.
+    // They are always read from `with`, whatever the gate's own fields are called.
+    const policy = kind === 'gate-policy' && step.policy ? catalog.describePolicy?.(step.policy) : undefined
+    const settingErrors = policy ? fieldProblems(label, (fieldId) => step.with?.[fieldId], policy.fields) : []
+    errors.push(...settingErrors)
+    if (kind === 'gate-policy' && step.policy && !settingErrors.length)
+      errors.push(
+        ...(catalog.validatePolicy?.(step.policy, step.with ?? {}).map((problem) => `${label} ${problem}`) ?? []),
+      )
     errors.push(
       ...workflowDispatchProblems({
         label,

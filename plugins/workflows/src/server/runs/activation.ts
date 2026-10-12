@@ -3,7 +3,6 @@ import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
-import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import {
   buildHeadlessArgv,
@@ -41,8 +40,6 @@ export const createWorkflowExecution = (
   settleSchedule: (runId: string) => Promise<void>,
 ): { runner: WorkflowRunner; dispatcher: WorkflowDispatcher } => {
   const core = ctx.core
-  const failingChecks = async (taskId: string): Promise<string | null> =>
-    (await ctx.capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null
   const notify: RunnerDeps['notify'] = (taskId, kind, title, ref) =>
     ctx.events.notice({
       taskId,
@@ -227,16 +224,6 @@ export const createWorkflowExecution = (
           return ''
         }
       },
-      // Policy verdicts are re-derived here: a lying step result is ignored by construction.
-      evaluatePolicy: async (taskId, policy) => {
-        if (policy === 'checks-green') {
-          const failing = await failingChecks(taskId)
-          if (failing === '') return { pass: true }
-          return { pass: false, detail: failing == null ? 'No PR/checks to verify.' : `Failing checks:\n${failing}` }
-        }
-        return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
-      },
-      failingChecks,
       notify,
       // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
       stepChanged: (runId, stepId, status) =>

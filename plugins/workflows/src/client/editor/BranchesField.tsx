@@ -1,7 +1,8 @@
 import { createSignal, Index, Show } from 'solid-js'
 import { Button, Field, Icon, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 
-// A `decide` step's branches: a verdict, and the step it takes (docs/workflows/execution.md § Execution model).
+// A `decide`, `if`, or `gate-policy` step's branches: a verdict, and the step it takes
+// (docs/workflows/execution.md § Execution model).
 //
 // Not a `StepField`, because a field is one control and this is a list of pairs. The field vocabulary
 // stays closed on purpose and the two shapes it does not cover are drawn by the editor itself, here
@@ -11,6 +12,8 @@ export default function BranchesField(props: {
   branches: Readonly<Record<string, string>>
   /** Every step that could be a target: the ones that wait on the deciding step. */
   targets: readonly string[]
+  /** What the answers are. Defaults to the agent's verdicts that `decide` takes. */
+  help?: string
   disabled?: boolean
   onChange: (branches: Record<string, string>) => void
 }) {
@@ -32,7 +35,7 @@ export default function BranchesField(props: {
   return (
     <Field
       label="Branches"
-      help="Each answer the agent gives leads to a step. A branch called default catches anything else."
+      help={props.help ?? 'Each answer the agent gives leads to a step. A branch called default catches anything else.'}
       group
     >
       <Stack gap="row">

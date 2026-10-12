@@ -133,13 +133,14 @@ export async function refreshOpenPulls(
 
 /** Force-refresh one PR's GraphQL composite. Every connection is walked before anything is written.
  *  The fetcher loads on demand, which keeps provider pagination out of the Node service's startup
- *  graph. */
+ *  graph. On success it also says which commit the checks belong to, which can trail the head for a
+ *  moment after a push. */
 export async function refreshPullDetail(
   token: string,
   db: PluginDatabase,
   key: PullRefreshKey & { number: number },
   emit: GithubEmit = NO_EMIT,
-): Promise<RefreshResult> {
+): Promise<Exclude<RefreshResult, { ok: true }> | { ok: true; headSha: string | null; checksSha: string | null }> {
   const { fetchPullComposite } = await import('../mirror/prFetch')
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
   if (!pull.ok) return pull
@@ -150,7 +151,7 @@ export async function refreshPullDetail(
     Date.now(),
   )
   announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
-  return { ok: true }
+  return { ok: true, headSha: pull.value.headRefOid, checksSha: pull.value.checksOid ?? null }
 }
 
 /** Force-refresh one PR's changed files: every page GitHub lists, then one swap. */

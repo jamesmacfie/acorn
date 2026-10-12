@@ -7,7 +7,7 @@ import {
   type StoredConnection,
 } from '@acorn/plugin-api/node'
 import { createPullRequest } from './createPull'
-import { checkFailed, taskChecks, taskReviewFeedback } from './mirrorQueries'
+import { checkFailed, checkPending, taskChecks, taskReviewFeedback } from './mirrorQueries'
 import { type GithubEmit, NO_EMIT } from './events'
 
 type GithubToolCore = Pick<CoreServices, 'projects' | 'tasks'>
@@ -127,7 +127,7 @@ export function githubAgentTools(
     {
       name: 'pr_checks',
       description:
-        "The CI checks on the current task's pull request from acorn's local mirror, with the failing ones called out. A check with no status has not run yet.",
+        "The CI checks on the current task's pull request from acorn's local mirror, with the failing and still-running ones called out. A running check has not failed.",
       input: z.object({}),
       scope: 'task',
       risk: 'read',
@@ -142,6 +142,7 @@ export function githubAgentTools(
           number: mirrored.number,
           checks: mirrored.checks,
           failing: mirrored.checks.filter((row) => checkFailed(row.status)).map((row) => row.name),
+          pending: mirrored.checks.filter((row) => checkPending(row.status)).map((row) => row.name),
         }
       },
     },

@@ -10,9 +10,11 @@ checks the exact repository configuration trust snapshot before starting a run f
 managed agent sessions, terminal/run targets, GitHub checks policies, or human gates. Structured step
 output is the only value that controls branching and joins; transcript prose cannot satisfy a gate.
 
-Runs and steps persist state transitions. A restart reconciles persisted operation IDs and never
-blindly repeats an external side effect with unknown outcome. Ambiguous work parks in an explicit
-recovery/gated state. Cancellation propagates to child sessions and process groups.
+Runs and steps persist state transitions. A restart puts every step that was running back to
+`pending`, and its handler runs again from the start (`reconcile` in `runs/runner.ts`). A handler that
+must not start over saves its progress on the step row first: `ci-loop` saves its iteration, and a
+polling gate saves when its wait started and when it ends. A step waiting at a human gate stays
+waiting. Cancellation propagates to child sessions and process groups.
 
 The Node implementation follows those boundaries under `plugins/workflows/src/server/`.
 `definitions/` loads and resolves frozen definitions, and owns file, row, and publication commands.
@@ -184,6 +186,9 @@ fails validation, because a plain gate declares no structured output, so such a 
 load there.
 
 ## Related pages
+
+[Polling gates](./polling-gates.md) covers a `gate-policy` step that waits for CI or a review, the
+checkout while a run waits, and `ci-loop`.
 
 [Agent steps](./agent-steps.md) covers what an agent step sees and a turn that ends early.
 

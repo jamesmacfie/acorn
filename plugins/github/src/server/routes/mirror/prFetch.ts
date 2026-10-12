@@ -22,7 +22,8 @@ const CONTINUATION_CONCURRENCY = 4
 type PageInfo = { endCursor: string | null; hasNextPage: boolean }
 type Connection<T> = { pageInfo: PageInfo; nodes: T[] }
 
-type GqlActor = { login: string } | null
+// `__typename` tells a bot from a person, which the review-received workflow policy needs.
+type GqlActor = { login: string; __typename?: string } | null
 export type GqlLabel = { name: string; color: string | null }
 export type GqlReview = {
   id: string
@@ -101,15 +102,17 @@ export type PullComposite = PullScalars & {
   commits: GqlCommit[]
   threads: GqlThread[]
   checks: GqlContext[]
+  /** The commit the checks belong to. Usually the head, but not always right after a push. */
+  checksOid?: string | null
 }
 
 const PAGE_INFO = 'pageInfo { endCursor hasNextPage }'
 const LABEL_NODES = 'name color'
-const REVIEW_NODES = 'id author { login } state bodyHTML submittedAt'
+const REVIEW_NODES = 'id author { __typename login } state bodyHTML submittedAt'
 const REVIEW_REQUEST_NODES = 'id requestedReviewer { ... on User { login } ... on Team { name slug } }'
-const COMMENT_NODES = 'id author { login } bodyHTML createdAt'
+const COMMENT_NODES = 'id author { __typename login } bodyHTML createdAt'
 const COMMIT_NODES = 'commit { oid messageHeadline committedDate author { name user { login } } }'
-const THREAD_COMMENT_NODES = 'id databaseId author { login } bodyHTML createdAt'
+const THREAD_COMMENT_NODES = 'id databaseId author { __typename login } bodyHTML createdAt'
 const CONTEXT_NODES = `__typename
   ... on CheckRun { id name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
   ... on StatusContext { id context state targetUrl }`
@@ -144,7 +147,7 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
       ${Object.entries(PULL_CONNECTIONS)
         .map(([alias, c]) => `${alias}: ${page(c.field, c.nodes, false)}`)
         .join('\n      ')}
-      latestCommit: commits(last: 1) { nodes { commit { statusCheckRollup { id ${page('contexts', CONTEXT_NODES, false)} } } } }
+      latestCommit: commits(last: 1) { nodes { commit { oid statusCheckRollup { id ${page('contexts', CONTEXT_NODES, false)} } } } }
     }
   }
 }`
@@ -227,7 +230,9 @@ export async function walkConnection<T>(
 
 type FirstPull = PullScalars &
   Record<keyof typeof PULL_CONNECTIONS, unknown> & {
-    latestCommit?: { nodes?: { commit?: { statusCheckRollup?: { id: string; contexts: unknown } | null } }[] }
+    latestCommit?: {
+      nodes?: { commit?: { oid?: string; statusCheckRollup?: { id: string; contexts: unknown } | null } }[]
+    }
   }
 
 /** Fetch one pull request's detail with every connection exhausted. Nothing is written. */
@@ -330,6 +335,7 @@ export async function fetchPullComposite(
       commits: commits.value as GqlCommit[],
       threads,
       checks: checks.value,
+      checksOid: pull.latestCommit?.nodes?.[0]?.commit?.oid ?? null,
     },
   }
 }

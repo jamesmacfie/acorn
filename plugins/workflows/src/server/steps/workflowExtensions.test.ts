@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb } from '@acorn/plugin-api/testkit'
 import type { Extension, ExtensionPointId } from '@acorn/plugin-api/node'
-import type { TerminalWorkflowStepKind } from '@acorn/plugin-terminal/contract/workflowSteps.ts'
-import { WORKFLOW_STEP_KIND, type StepKindContribution } from '../../contract/extensions'
+import type { TerminalWorkflowPolicy, TerminalWorkflowStepKind } from '@acorn/plugin-terminal/contract/workflowSteps.ts'
+import type { GithubWorkflowPolicy } from '@acorn/plugin-github/contract/workflowPolicies.ts'
+import { WORKFLOW_STEP_KIND, type PolicyContribution, type StepKindContribution } from '../../contract/extensions'
 import { BUILTIN_STEP_KINDS } from './builtins'
 import { validateWorkflow } from '../validation/definition'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from '../runs/runner'
@@ -16,8 +17,6 @@ const deps: RunnerDeps = {
   }),
   writeHandoff: async () => {},
   assembleContext: async () => '',
-  evaluatePolicy: async () => ({ pass: true }),
-  failingChecks: async () => '',
   notify: () => {},
 }
 
@@ -123,7 +122,7 @@ describe('the kind catalog', () => {
         ).toEqual(['bell', 'volume'])
         expect(catalog.kinds.find((kind) => kind.id === 'other:quiet')).toBeUndefined()
         expect(runner.validationCatalog().stepKinds.has('other:quiet')).toBe(false)
-        expect(catalog.policies).toContainEqual({ id: 'checks-green', pluginId: null })
+        expect(catalog.policies).toContainEqual(expect.objectContaining({ id: 'checks-green', pluginId: null }))
       },
     )
   })
@@ -202,5 +201,14 @@ describe('the terminal mirror of the contribution type', () => {
     const mirrored = null as unknown as TerminalWorkflowStepKind
     const real: StepKindContribution = mirrored
     expect(real).toBeNull()
+  })
+})
+
+// The same for the policy copies in plugins/terminal and plugins/github, which this package depends on.
+describe('the mirrors of the policy type', () => {
+  it('still satisfy the type the gate polls through', () => {
+    const terminal: PolicyContribution = null as unknown as TerminalWorkflowPolicy
+    const github: PolicyContribution = null as unknown as GithubWorkflowPolicy
+    expect([terminal, github]).toEqual([null, null])
   })
 })

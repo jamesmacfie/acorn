@@ -37,19 +37,6 @@ export type GithubMirrorCapability = {
   ): Promise<MirroredPullRequest | null>
 
   /**
-   * Re-derived CI state for a task's PR, as the workflow runner's `checks-green` policy needs it.
-   * Three values, not a boolean:
-   *   ''    is every mirrored check passed (the ci-loop step is done, the policy passes)
-   *   text  is a rendered list of the failing ones, which becomes the fix prompt
-   *   null  is nothing to check at all: no PR, no active identity, or the repo is not mirrored yet.
-   *         The ci-loop step treats this as a hard failure rather than as success.
-   *
-   * The workflow plugin resolves this capability through the runtime registry rather than importing
-   * the GitHub implementation directly.
-   */
-  failingChecks(userId: string | null, taskId: string): Promise<string | null>
-
-  /**
    * Row counts for the boot-time storage log. The GitHub plugin owns these tables, so it reports their
    * counts through this capability instead of exposing its database handle.
    */

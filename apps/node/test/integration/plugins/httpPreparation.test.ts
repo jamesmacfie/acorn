@@ -22,8 +22,6 @@ describe('HTTP preparation errors in durable workflows', () => {
         },
         writeHandoff: async () => {},
         assembleContext: async () => '',
-        evaluatePolicy: async () => ({ pass: true }),
-        failingChecks: async () => null,
         notify: vi.fn(),
       },
       { handlers: (point) => workflows.extensionPoints.handlers(point) },

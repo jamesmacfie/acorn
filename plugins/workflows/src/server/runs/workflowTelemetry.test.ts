@@ -35,8 +35,6 @@ const baseDeps = (telemetry: PluginTelemetry, over: Partial<RunnerDeps> = {}): R
   runStep: async () => ok,
   writeHandoff: async () => {},
   assembleContext: async () => '',
-  evaluatePolicy: async () => ({ pass: true }),
-  failingChecks: async () => '',
   notify: () => {},
   telemetry,
   ...over,

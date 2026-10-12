@@ -3,7 +3,14 @@ import type { CoreServices } from '@acorn/plugin-api/node'
 
 type ProcSpec = Parameters<CoreServices['proc']['runProcess']>[0]
 type ProcResult = Awaited<ReturnType<CoreServices['proc']['runProcess']>>
-import { commandStep, COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS, parseEnvLines, runTargetStep } from './workflowSteps'
+import {
+  commandCheckPolicy,
+  commandStep,
+  COMMAND_TIMEOUT_MS,
+  MAX_COMMAND_TIMEOUT_MS,
+  parseEnvLines,
+  runTargetStep,
+} from './workflowSteps'
 
 // The step context and definition shapes come from plugins/workflows, which this package cannot
 // depend on (../contract/workflowSteps.ts says why). The mirrors there are what these fakes satisfy.
@@ -51,6 +58,7 @@ const SCRIPTS = new Map<string, { result?: ProcResult; chunks?: ['out' | 'err', 
   ['slow', { result: procResult({ code: null, timedOut: true }) }],
   ['interrupted', { result: procResult({ code: null, aborted: true }) }],
   ['missing', { result: procResult({ code: null, spawnError: 'ENOENT' }) }],
+  ['not-yet', { result: procResult({ code: 75, stdout: 'building\nstill waiting on the file\n' }) }],
 ])
 
 const core = {
@@ -204,5 +212,35 @@ describe('the terminal:run-target step', () => {
     const died = service({ status: async () => ({ running: false, exitCode: 1 }) })
     const outcome = await runTargetStep(died).handler(context({ target: 'dev' }))
     expect((outcome as { error: string }).error).toContain('stopped with exit code 1')
+  })
+})
+
+describe('terminal:command-check', () => {
+  const ask = (command: string) =>
+    commandCheckPolicy(core).evaluate({
+      taskId: 'task1',
+      with: { command },
+      since: 0,
+      signal: new AbortController().signal,
+    })
+
+  it('maps exit 0 to pass, 75 to wait, and anything else to fail', async () => {
+    expect(await ask('two-chunks')).toMatchObject({ verdict: 'pass', detail: 'two' })
+    expect(await ask('not-yet')).toEqual({
+      verdict: 'wait',
+      detail: 'still waiting on the file',
+      value: { exitCode: 75, stdout: 'building\nstill waiting on the file\n', stderr: '', truncated: false },
+    })
+    expect(await ask('fails')).toMatchObject({ verdict: 'fail', value: { exitCode: 3 } })
+  })
+
+  it('throws when the command cannot answer, so the gate counts a failed poll and retries', async () => {
+    await expect(ask('slow')).rejects.toThrow(`did not finish within ${COMMAND_TIMEOUT_MS}ms`)
+    await expect(ask('missing')).rejects.toThrow('could not start: ENOENT')
+  })
+
+  it('checks its settings like the command step, without a label of its own', () => {
+    expect(commandCheckPolicy(core).validate?.({})).toEqual(['has no command'])
+    expect(commandCheckPolicy(core).describe.fields.map((field) => field.id)).toEqual(['command', 'timeoutMs', 'env'])
   })
 })

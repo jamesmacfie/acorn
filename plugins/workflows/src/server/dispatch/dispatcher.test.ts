@@ -27,8 +27,6 @@ const deps = (): RunnerDeps => ({
   }),
   writeHandoff: vi.fn(async () => undefined),
   assembleContext: vi.fn(async () => ''),
-  evaluatePolicy: vi.fn(async () => ({ pass: true })),
-  failingChecks: vi.fn(async () => ''),
   notify: vi.fn(),
 })
 

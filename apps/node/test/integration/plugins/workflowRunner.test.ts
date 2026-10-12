@@ -14,6 +14,8 @@ import {
   WORKFLOW_STEP_KIND,
   WORKFLOW_TRIGGER,
   type Extension,
+  type PolicyContext,
+  type PolicyVerdict,
   type RunnerDeps,
   type WorkflowDef,
 } from '@acorn/plugin-workflows/testkit'
@@ -66,8 +68,6 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         : null
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
-    evaluatePolicy: vi.fn(async () => ({ pass: true })),
-    failingChecks: vi.fn(async () => ''),
     notify: vi.fn(),
   })
 
@@ -112,10 +112,32 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
   }
 
+  // A stand-in for the GitHub plugin's CI policy, answering from a script. The last answer repeats.
+  const ciPolicy = (answers: PolicyVerdict[]) => {
+    let poll = 0
+    const evaluate = vi.fn(async (_ctx: PolicyContext) => answers[Math.min(poll++, answers.length - 1)]!)
+    const policy = {
+      id: 'github:ci-settled',
+      pluginId: 'github',
+      order: 0,
+      value: { evaluate, describe: { label: 'CI', description: 'CI.', icon: 'x', fields: [], minIntervalMs: 30_000 } },
+    }
+    const extensions = { handlers: (point: unknown) => (point === WORKFLOW_POLICY ? [policy] : []) as never }
+    return { evaluate, extensions }
+  }
+  const red = (...names: string[]): PolicyVerdict => ({
+    verdict: 'fail',
+    detail: 'CI red',
+    value: { failing: names.map((name) => ({ name, status: 'FAILURE', url: null })), pending: [], total: names.length },
+  })
+  // No real interval passes between polls in a test.
+  const noSleep = async () => {}
+
   it.each([true, false])('If persists and applies its %s branch without a model call', async (enabled) => {
     const d = deps()
     const runStep = vi.fn(d.runStep)
-    const runner = new WorkflowRunner(wf.db, { ...d, runStep })
+    // Green checks, so whichever branch runs passes.
+    const runner = new WorkflowRunner(wf.db, { ...d, runStep }, ciPolicy([{ verdict: 'pass' }]).extensions)
     const runId = await runner.start('task1', {
       baseline: 'acorn-1',
       formatVersion: 1,
@@ -227,9 +249,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   it('autonomous posture skips human gates but policy gates still bind', async () => {
-    const d = deps()
-    d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'CI red' }))
-    const runner = new WorkflowRunner(wf.db, d)
+    const ci = ciPolicy([red('test')])
+    const runner = new WorkflowRunner(wf.db, deps(), ci.extensions)
     const runId = await runner.start('task1', {
       baseline: 'acorn-1',
       formatVersion: 1,
@@ -249,11 +270,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   it('policy gate ignores a lying step result — the verdict is re-derived in the runtime', async () => {
-    // The agent step claims success in its structured output; the policy dep says red. Red wins.
+    // The agent step claims success in its structured output; the policy says red. Red wins.
     structuredByStep = { build: '{"ci":"green","trust_me":true}' }
-    const d = deps()
-    d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
-    const runner = new WorkflowRunner(wf.db, d)
+    const ci = ciPolicy([red('test')])
+    const runner = new WorkflowRunner(wf.db, deps(), ci.extensions)
     const runId = await runner.start('task1', {
       baseline: 'acorn-1',
       formatVersion: 1,
@@ -268,15 +288,19 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const steps = await runner.steps(runId)
     expect(JSON.parse(steps[0].structuredJson!)).toMatchObject({ ci: 'green' }) // the lie was recorded…
     expect(steps[1].status).toBe('failed') // …and ignored
-    expect(d.evaluatePolicy).toHaveBeenCalledWith('task1', 'checks-green')
+    expect(ci.evaluate).toHaveBeenCalledWith(expect.objectContaining({ taskId: 'task1' }))
   })
 
-  it('CI loop: seeded failures flip green → done; exhaustion → safety-rail, NOT failed', async () => {
-    // Green after two fix iterations.
-    let polls = 0
+  it('CI loop waits for running checks, then runs one fix turn per red round', async () => {
+    // Running, then red, then green: one wait, one fix turn, and green on the second round.
+    const ci = ciPolicy([
+      { verdict: 'wait', detail: 'Checks running: 1 of 2 finished.' },
+      red('test'),
+      { verdict: 'pass' },
+    ])
     const d = deps()
-    d.failingChecks = vi.fn(async () => (++polls <= 2 ? '- test: failure' : ''))
-    const runner = new WorkflowRunner(wf.db, d)
+    const runStep = vi.fn(d.runStep)
+    const runner = new WorkflowRunner(wf.db, { ...d, runStep, sleep: noSleep }, ci.extensions)
     const runId = await runner.start('task1', {
       baseline: 'acorn-1',
       formatVersion: 1,
@@ -286,12 +310,18 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
     const [step] = await runner.steps(runId)
-    expect(step.iteration).toBe(2)
+    expect(step.iteration).toBe(1)
+    expect(runStep).toHaveBeenCalledTimes(1)
+    expect(runStep.mock.calls[0]![2].prompt).toContain('- test: FAILURE')
+    expect(ci.evaluate).toHaveBeenCalledTimes(3)
+    // The round after a fix waits for the new commit's checks to appear rather than failing on none.
+    expect(ci.evaluate.mock.calls[2]![0].with).toEqual({ missing: 'wait' })
+  })
 
+  it('CI loop: exhaustion → safety-rail, NOT failed', async () => {
     // Never green, so the bound is a first-class terminal state.
-    const d2 = deps()
-    d2.failingChecks = vi.fn(async () => '- test: failure')
-    const runner2 = new WorkflowRunner(wf.db, d2)
+    const ci = ciPolicy([red('test')])
+    const runner2 = new WorkflowRunner(wf.db, { ...deps(), sleep: noSleep }, ci.extensions)
     const runId2 = await runner2.start('task1', {
       baseline: 'acorn-1',
       formatVersion: 1,
@@ -699,7 +729,17 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
           },
         },
       ],
-      [WORKFLOW_POLICY]: [{ id: 'src:always', pluginId: 'src', order: 0, value: async () => ({ pass: true }) }],
+      [WORKFLOW_POLICY]: [
+        {
+          id: 'src:always',
+          pluginId: 'src',
+          order: 0,
+          value: {
+            evaluate: async () => ({ verdict: 'pass' }),
+            describe: { label: 'Always', description: 'Always passes.', icon: 'check', fields: [] },
+          },
+        },
+      ],
       [WORKFLOW_TRIGGER]: [
         {
           id: 'src:pr-opened',

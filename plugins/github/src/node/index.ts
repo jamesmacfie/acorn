@@ -4,7 +4,9 @@ import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
-import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
+import { mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
+import { WORKFLOW_POLICY } from '../contract/workflowPolicies'
+import { githubWorkflowPolicies } from '../server/workflowPolicies'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
 import { githubAgentTools } from '../server/agentTools'
@@ -104,13 +106,17 @@ export const githubPlugin = (): NodePlugin => {
         ctx.tools.register(tool)
       discovery = startPullDiscovery(ctx)
 
+      // Two `gate-policy` verdict sources, filed against the workflows plugin's point by its id string
+      // (../contract/workflowPolicies.ts says why). They become `github:ci-settled` and
+      // `github:review-received`.
+      const policies = githubWorkflowPolicies(store, ctx.core, ctx.providers, emit)
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: 'ci-settled', value: policies.ciSettled })
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: 'review-received', value: policies.reviewReceived })
+
       ctx.capabilities.provide(GITHUB_MIRROR, {
         repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
         pullRequest: (userId, repoOwner, repoName, pullNumber) =>
           mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
-        // Resolving the task itself is core's job (`tasks` is core's table and this plugin has no
-        // handle to it), so the taskId round-trips through CoreServices before the mirror is consulted.
-        failingChecks: (userId, taskId) => failingChecksFor(store, ctx.core, userId, taskId),
         footprint: () => mirrorFootprint(store),
       })
 

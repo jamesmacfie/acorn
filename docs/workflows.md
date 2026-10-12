@@ -1,7 +1,7 @@
 # Workflows
 
 Workflows are durable orchestration on the Node: a graph of steps, such as agent turns, commands,
-data reads, and human gates, that runs on a task. Read this page for the version 1 definition values,
+data reads, human gates, and gates that wait for CI or a review, that runs on a task. Read this page for the version 1 definition values,
 limits, trust, and triggers, and for the topic pages. The plugin is in `plugins/workflows/`.
 
 A definition is a committed `.acorn/workflows/*.toml` file or a `workflow_defs` row you typed in the
@@ -86,6 +86,8 @@ now** on Settings → Schedules ([schedules](./schedules.md)).
 
 - [Workflow execution](./workflows/execution.md): the execution model, the graph, what an agent step
   sees, isolation, retry, and human gates.
+- [Polling gates](./workflows/polling-gates.md): gates that wait for CI or a review, the checkout while
+  a run waits, and `ci-loop`.
 - [Agent steps](./workflows/agent-steps.md): what an agent step sees, and a turn that ends early.
 - [Running child workflows](./workflows/child-runs.md): what a run reports, where a file comes from,
   child workflow tasks, and live output.
@@ -103,7 +105,8 @@ now** on Settings → Schedules ([schedules](./schedules.md)).
 
 - [File drafts and portable export](./workflows/file-drafts.md).
 
-- [Contributed step kinds](./workflows/step-kinds.md): kinds, policies, triggers, and progress events.
+- [Contributed step kinds](./workflows/step-kinds.md): kinds, gate policies, triggers, and progress
+  events.
 
 - [Routes and UI](./workflows/routes-and-ui.md): the run pane and its frames.
 
