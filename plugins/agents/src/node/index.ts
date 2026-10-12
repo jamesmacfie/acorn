@@ -416,7 +416,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         deleteCustomAgent: (userId, id) => deleteCustomAgent(core.prefs, userId, id),
       })
       instructionReviewRoute = ctx.capabilities.provide(AGENT_INSTRUCTION_REVIEW, {
-        tasks: async () => (await core.tasks.active()).map(({ id, title, projectId }) => ({ id, title, projectId })),
+        projects: async () => {
+          const checkouts = await core.projects.checkouts()
+          const projects = await Promise.all(checkouts.map(({ id }) => core.projects.byId(id)))
+          return projects.flatMap((project) => (project?.path ? [{ id: project.id, name: project.name }] : []))
+        },
         admission: () => runtime!.instructionAdmission.get(),
       })
       securityDiagnosticsRoute = ctx.capabilities.provide(AGENT_SECURITY_DIAGNOSTICS, {

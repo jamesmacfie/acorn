@@ -4,28 +4,27 @@ import { Alert, Button, Field, Inline, Link, Select, Stack, Text } from '@acorn/
 import {
   instructionReviewRoute as route,
   type InstructionReview,
-  type InstructionReviewTask,
+  type InstructionReviewProject,
 } from '../../shared/instructionReview'
 import InstructionReviewResults from './InstructionReviewResults'
 
 export default function InstructionReviewPanel(props: {
   nodeId?: string | null
   enabled?: boolean
-  preferredTaskId?: string | null
+  preferredProjectId?: string | null
 }) {
-  const [tasks, setTasks] = createSignal<InstructionReviewTask[]>([])
-  const [loadingTasks, setLoadingTasks] = createSignal(true)
-  const [taskId, setTaskId] = createSignal('')
+  const [projects, setProjects] = createSignal<InstructionReviewProject[]>([])
+  const [loadingProjects, setLoadingProjects] = createSignal(true)
+  const [projectId, setProjectId] = createSignal('')
   const [review, setReview] = createSignal<InstructionReview | null>(null)
   const [reviewNodeId, setReviewNodeId] = createSignal<string | undefined>()
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [approved, setApproved] = createSignal(false)
-  // The task list read, the review read, or the approval. Each clear aborts it.
+  // The project list read, the review read, or the approval. Each clear aborts it.
   const request = latestSignal()
   const nodeId = () => props.nodeId ?? undefined
   const enabled = createMemo(() => props.enabled ?? false)
-  const selectedProject = () => tasks().find((task) => task.id === taskId())?.projectId
 
   const clear = () => {
     request.abort()
@@ -39,21 +38,21 @@ export default function InstructionReviewPanel(props: {
     on(nodeId, (selectedNode) => {
       clear()
       const signal = request.next()
-      setTasks([])
-      setTaskId('')
-      setLoadingTasks(true)
-      const preferredTask = props.preferredTaskId
-      void readJson<InstructionReviewTask[]>(`${route}/tasks`, { nodeId: selectedNode, signal })
+      setProjects([])
+      setProjectId('')
+      setLoadingProjects(true)
+      const preferred = props.preferredProjectId
+      void readJson<InstructionReviewProject[]>(`${route}/projects`, { nodeId: selectedNode, signal })
         .then((found) => {
           if (signal.aborted) return
-          setTasks(found)
-          setLoadingTasks(false)
-          setTaskId(found.some((task) => task.id === preferredTask) ? preferredTask! : (found[0]?.id ?? ''))
+          setProjects(found)
+          setLoadingProjects(false)
+          setProjectId(found.some((project) => project.id === preferred) ? preferred! : (found[0]?.id ?? ''))
         })
         .catch(() => {
           if (!signal.aborted) {
-            setLoadingTasks(false)
-            setError('Could not load tasks for instruction review. Reopen Settings to try again.')
+            setLoadingProjects(false)
+            setError('Could not load projects for instruction review. Reopen Settings to try again.')
           }
         })
     }),
@@ -62,17 +61,17 @@ export default function InstructionReviewPanel(props: {
 
   const load = async () => {
     const selectedNode = nodeId()
-    const selectedTask = taskId()
-    if (!selectedTask) return
+    const selectedProject = projectId()
+    if (!selectedProject) return
     clear()
     const signal = request.next()
     setBusy(true)
     try {
-      const result = await readJson<InstructionReview>(`${route}?taskId=${encodeURIComponent(selectedTask)}`, {
+      const result = await readJson<InstructionReview>(`${route}?projectId=${encodeURIComponent(selectedProject)}`, {
         nodeId: selectedNode,
         signal,
       })
-      if (!signal.aborted && taskId() === selectedTask) {
+      if (!signal.aborted && projectId() === selectedProject) {
         setReview(result)
         setReviewNodeId(selectedNode)
       }
@@ -83,15 +82,15 @@ export default function InstructionReviewPanel(props: {
       if (!signal.aborted) setBusy(false)
     }
   }
-  // Opening Settings or enabling review checks the selected worktree before the next agent turn.
+  // Opening Settings or enabling review checks the selected project before the next agent turn.
   createEffect(
-    on([enabled, taskId], ([reviewEnabled, selectedTask]) => {
-      if (reviewEnabled && selectedTask) void load()
+    on([enabled, projectId], ([reviewEnabled, selectedProject]) => {
+      if (reviewEnabled && selectedProject) void load()
     }),
   )
   const approve = async () => {
     const current = review()
-    if (!current?.id || nodeId() !== reviewNodeId() || taskId() !== current.taskId) return
+    if (!current?.id || nodeId() !== reviewNodeId() || projectId() !== current.projectId) return
     const selectedNode = nodeId()
     // Approval joins the current lifetime rather than starting one, so it doesn't abort the review read.
     const signal = request.signal
@@ -103,7 +102,7 @@ export default function InstructionReviewPanel(props: {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ taskId: current.taskId }),
+          body: JSON.stringify({ projectId: current.projectId }),
           nodeId: selectedNode,
           signal,
         },
@@ -126,23 +125,30 @@ export default function InstructionReviewPanel(props: {
   return (
     <Stack gap="row">
       <Show
-        when={tasks().length}
+        when={projects().length}
         fallback={
           <Text emphasis="muted" wrap>
-            {loadingTasks()
-              ? 'Loading tasks…'
-              : 'Create a task on this Node to review its instruction files before starting an agent.'}
+            {loadingProjects()
+              ? 'Loading projects…'
+              : 'Add a project folder on this Node to review its instruction files before starting an agent.'}
           </Text>
         }
       >
-        <Field label="Task" hint="Review the instructions in this task’s worktree.">
+        <Field
+          label="Project"
+          hint={
+            review()?.branch
+              ? `Reviewing the project folder on ${review()!.branch}. Worktrees with the same files share the approval.`
+              : 'Review the instructions in the project folder on its current branch.'
+          }
+        >
           <Select
-            label="Task for instruction review"
-            value={taskId()}
-            options={tasks().map((task) => ({ value: task.id, label: task.title }))}
+            label="Project for instruction review"
+            value={projectId()}
+            options={projects().map((project) => ({ value: project.id, label: project.name }))}
             onChange={(value) => {
               clear()
-              setTaskId(value)
+              setProjectId(value)
             }}
           />
         </Field>
@@ -167,9 +173,9 @@ export default function InstructionReviewPanel(props: {
           <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'plugins' })}>
             Plugins and skills
           </Link>
-          <Show when={selectedProject()}>
-            {(projectId) => (
-              <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: `project/${projectId()}` })}>
+          <Show when={projectId()}>
+            {(selected) => (
+              <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: `project/${selected()}` })}>
                 Project configuration
               </Link>
             )}

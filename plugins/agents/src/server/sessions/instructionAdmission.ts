@@ -1,4 +1,4 @@
-import { deliverableSkills, type CoreServices } from '@acorn/plugin-api/node'
+import { deliverableSkills, git, type CoreServices } from '@acorn/plugin-api/node'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import { hiddenCharacterReason, hiddenCharactersIn } from './instructionCheck'
 import { InstructionScanIncomplete, scanInstructions, type InstructionSnapshot } from './instructionSnapshot'
@@ -32,21 +32,33 @@ export class InstructionAdmission {
     if (this.observations.size > 100) this.observations.delete(this.observations.keys().next().value!)
   }
 
-  async scan(taskId: string, signal?: AbortSignal): Promise<{ projectId: string; snapshot: InstructionSnapshot }> {
-    this.checkCancellation(signal)
-    const task = await this.core.tasks.load(taskId)
-    this.checkCancellation(signal)
-    if (!task) throw new Error('Task no longer exists.')
-    const root = await this.core.tasks.requireRoot(taskId)
+  private async scan(root: string, signal?: AbortSignal): Promise<InstructionSnapshot> {
     this.checkCancellation(signal)
     const skills = await deliverableSkills(this.dataDir)
     this.checkCancellation(signal)
-    const snapshot = await scanInstructions(root, skills, signal)
-    return { projectId: task.projectId, snapshot }
+    return scanInstructions(root, skills, signal)
   }
 
-  async review(taskId: string, signal?: AbortSignal): Promise<InstructionReview> {
-    const { projectId, snapshot } = await this.scan(taskId, signal)
+  // Settings reviews the project folder as it stands on its checked-out branch. Worktrees with the
+  // same files match the approval, because the digest names files inside a checkout by repo path.
+  private async scanProject(
+    projectId: string,
+    signal?: AbortSignal,
+  ): Promise<{ snapshot: InstructionSnapshot; branch: string | null }> {
+    this.checkCancellation(signal)
+    const project = await this.core.projects.byId(projectId)
+    this.checkCancellation(signal)
+    if (!project) throw new Error('Project no longer exists.')
+    if (!project.path) throw new Error('This project has no folder on this Node.')
+    const [snapshot, head] = await Promise.all([
+      this.scan(project.path, signal),
+      git(['branch', '--show-current'], { cwd: project.path, signal }),
+    ])
+    return { snapshot, branch: (head.code === 0 && head.stdout.trim()) || null }
+  }
+
+  async review(projectId: string, signal?: AbortSignal): Promise<InstructionReview> {
+    const { snapshot, branch } = await this.scanProject(projectId, signal)
     this.checkCancellation(signal)
     const digest = snapshotDigest(snapshot)
     const limits =
@@ -54,8 +66,8 @@ export class InstructionAdmission {
     if (!snapshot.files.length)
       return {
         id: null,
-        taskId,
         projectId,
+        branch,
         digest,
         scope: snapshot.scope,
         analyzerVersion: snapshot.version,
@@ -73,8 +85,8 @@ export class InstructionAdmission {
       if (matching)
         return {
           id: matching.id,
-          taskId,
           projectId,
+          branch,
           digest,
           scope: snapshot.scope,
           analyzerVersion: snapshot.version,
@@ -85,7 +97,8 @@ export class InstructionAdmission {
           limits,
         }
       const approved = await this.store.approved(projectId)
-      prior = approved ? await this.store.get(approved.id) : null
+      // An approval from another analyzer version names files differently, so it can't be diffed against.
+      prior = approved?.analyzerVersion === snapshot.version ? await this.store.get(approved.id) : null
     } catch {
       /* Damaged or unavailable ciphertext means a fresh baseline review. */
     }
@@ -101,8 +114,8 @@ export class InstructionAdmission {
     const saved = await this.store.save(projectId, snapshot, signal)
     return {
       id: saved.id,
-      taskId,
       projectId,
+      branch,
       digest: saved.digest,
       scope: snapshot.scope,
       analyzerVersion: snapshot.version,
@@ -117,20 +130,17 @@ export class InstructionAdmission {
     }
   }
 
-  async approve(taskId: string, id: string, signal?: AbortSignal): Promise<void> {
+  async approve(projectId: string, id: string, signal?: AbortSignal): Promise<void> {
     this.checkCancellation(signal)
     const pending = await this.store.get(id)
     this.checkCancellation(signal)
     if (!pending) throw new Error('Review expired. Open the review again.')
-    const current = await this.scan(taskId, signal)
-    if (
-      pending.metadata.projectId !== current.projectId ||
-      pending.metadata.digest !== snapshotDigest(current.snapshot)
-    ) {
+    const { snapshot } = await this.scanProject(projectId, signal)
+    if (pending.metadata.projectId !== projectId || pending.metadata.digest !== snapshotDigest(snapshot)) {
       throw new Error('Instruction files changed since this review opened. Open a new review.')
     }
     this.checkCancellation(signal)
-    await this.store.approve(id, current.projectId)
+    await this.store.approve(id, projectId)
   }
 
   /** This runs for every queued turn, immediately before driver send. Hooks have separate semantics. */
@@ -144,9 +154,9 @@ export class InstructionAdmission {
     if (!settings.checkInstructionFiles && !settings.reviewChangedInstructions) return
     const task = await this.core.tasks.load(taskId)
     if (!task) throw new Error('Task no longer exists.')
-    let result
+    let snapshot
     try {
-      result = await this.scan(taskId, signal)
+      snapshot = await this.scan(await this.core.tasks.requireRoot(taskId), signal)
     } catch (error) {
       if (signal?.aborted) throw error
       this.observe(taskId, task.projectId, 'incomplete')
@@ -158,33 +168,33 @@ export class InstructionAdmission {
     this.checkCancellation(signal)
     try {
       if (settings.checkInstructionFiles) {
-        for (const file of result.snapshot.files) {
+        for (const file of snapshot.files) {
           if (file.text === null) continue
           const found = hiddenCharactersIn(file.text, file.path, 1)
           if (found.length)
             throw new InstructionAdmissionError('instruction_hidden_characters', hiddenCharacterReason(found))
         }
       }
-      if (settings.reviewChangedInstructions && result.snapshot.files.length) {
+      if (settings.reviewChangedInstructions && snapshot.files.length) {
         let approved
         try {
-          approved = await this.store.approvedSnapshot(snapshotDigest(result.snapshot))
+          approved = await this.store.approvedSnapshot(snapshotDigest(snapshot))
         } catch {
           throw new InstructionAdmissionError(
             'instruction_review_required',
             'Instruction review required: the saved approval could not be read. Review the instructions again.',
           )
         }
-        if (!approved || approved.digest !== snapshotDigest(result.snapshot)) {
+        if (!approved || approved.digest !== snapshotDigest(snapshot)) {
           throw new InstructionAdmissionError(
             'instruction_review_required',
-            'Instruction review required: approve the instructions for this task before the agent continues.',
+            'Instruction review required: approve the instructions for this project before the agent continues.',
           )
         }
       }
-      this.observe(taskId, result.projectId, 'passed')
+      this.observe(taskId, task.projectId, 'passed')
     } catch (error) {
-      if (!signal?.aborted) this.observe(taskId, result.projectId, 'blocked')
+      if (!signal?.aborted) this.observe(taskId, task.projectId, 'blocked')
       throw error
     }
   }

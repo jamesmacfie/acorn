@@ -7,7 +7,7 @@ import { dirname, extname, join, relative, resolve } from 'node:path'
 import { git } from '@acorn/plugin-api/node'
 type SkillFolder = { name: string; dir: string }
 
-const INSTRUCTION_ANALYZER_VERSION = 2
+const INSTRUCTION_ANALYZER_VERSION = 3
 const NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md'])
 const SKILLS = ['.claude/skills', '.agents/skills', '.codex/skills']
 const EXCLUDED = new Set([
@@ -139,6 +139,10 @@ export async function scanInstructions(
     check()
     return resolved
   }
+  let realRoot = root
+  // Inside the checkout, a file's identity is its repo path, so a worktree with the same files matches
+  // the approval given in the project folder. Files outside it keep their absolute path.
+  const identity = (real: string) => (real.startsWith(realRoot + '/') ? relative(realRoot, real) : real)
   const label = (path: string) => (path.startsWith(root + '/') ? relative(root, path) : path.replace(homedir(), '~'))
   const readBounded = async (path: string, real: string): Promise<Buffer> => {
     const limit = Math.min(MAX_FILE_BYTES, MAX_BYTES - totalBytes)
@@ -221,7 +225,7 @@ export async function scanInstructions(
     const text = supported ? decode(bytes, true) : null
     files.set(path, {
       path: label(path),
-      canonicalPath: real,
+      canonicalPath: identity(real),
       sha256: createHash('sha256').update(bytes).digest('hex'),
       bytes: bytes.byteLength,
       text,
@@ -301,6 +305,7 @@ export async function scanInstructions(
   }
   try {
     check()
+    realRoot = (await canonical(root, false))!
     try {
       ignored = await ignoredDirectories(root, controller.signal)
     } catch {

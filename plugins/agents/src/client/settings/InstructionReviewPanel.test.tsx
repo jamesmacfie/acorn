@@ -21,12 +21,12 @@ afterEach(() => {
 
 it('shows findings before collapsed diffs and does not approve a review after switching Nodes', async () => {
   mocks.reads.mockImplementation(async (path: string) =>
-    path.endsWith('/tasks')
-      ? [{ id: 'task', title: 'Project task', projectId: 'project' }]
+    path.endsWith('/projects')
+      ? [{ id: 'project', name: 'Project' }]
       : {
           id: 'review',
-          taskId: 'task',
           projectId: 'project',
+          branch: 'main',
           digest: 'digest',
           scope: 'nested instructions and skills',
           baseline: true,
@@ -83,15 +83,15 @@ it('shows findings before collapsed diffs and does not approve a review after sw
 it('opens review when enabled and reduces an approved unchanged review to one status', async () => {
   let approved = false
   mocks.reads.mockImplementation(async (path: string) =>
-    path.endsWith('/tasks')
+    path.endsWith('/projects')
       ? [
-          { id: 'other', title: 'Another task', projectId: 'project' },
-          { id: 'task', title: 'Current task', projectId: 'project' },
+          { id: 'other', name: 'Another project' },
+          { id: 'project', name: 'Current project' },
         ]
       : {
           id: 'review',
-          taskId: 'task',
           projectId: 'project',
+          branch: 'main',
           digest: 'digest',
           scope: 'technical scan limits',
           baseline: !approved,
@@ -107,7 +107,7 @@ it('opens review when enabled and reduces an approved unchanged review to one st
   const host = document.createElement('div')
   document.body.append(host)
   const [enabled, setEnabled] = createSignal(false)
-  const dispose = render(() => <InstructionReviewPanel enabled={enabled()} preferredTaskId="task" />, host)
+  const dispose = render(() => <InstructionReviewPanel enabled={enabled()} preferredProjectId="project" />, host)
   hosts.push(() => {
     dispose()
     host.remove()
@@ -116,7 +116,7 @@ it('opens review when enabled and reduces an approved unchanged review to one st
   expect(mocks.reads).toHaveBeenCalledTimes(1)
   setEnabled(true)
   await settle()
-  expect(mocks.reads).toHaveBeenLastCalledWith(expect.stringContaining('?taskId=task'), expect.anything())
+  expect(mocks.reads).toHaveBeenLastCalledWith(expect.stringContaining('?projectId=project'), expect.anything())
   expect(host.textContent).toContain('Review instructions before agents use them')
   expect(mocks.writes).not.toHaveBeenCalled()
   const button = (label: string) => [...host.querySelectorAll('button')].find((button) => button.textContent === label)!
@@ -135,8 +135,8 @@ it('opens review when enabled and reduces an approved unchanged review to one st
 it('cancels a pending review when switching Nodes and ignores its late response', async () => {
   let finish!: (review: unknown) => void
   mocks.reads.mockImplementation((path: string) =>
-    path.endsWith('/tasks')
-      ? Promise.resolve([{ id: 'task', title: 'Task', projectId: 'project' }])
+    path.endsWith('/projects')
+      ? Promise.resolve([{ id: 'project', name: 'Project' }])
       : new Promise((resolve) => {
           finish = resolve
         }),
@@ -158,7 +158,7 @@ it('cancels a pending review when switching Nodes and ignores its late response'
   setNode('node-b')
   await settle()
   expect(signal.aborted).toBe(true)
-  finish({ id: 'stale', taskId: 'task', findings: [], changes: [], baseline: true })
+  finish({ id: 'stale', projectId: 'project', findings: [], changes: [], baseline: true })
   await settle()
   expect(host.textContent).not.toContain('Approve instructions')
   expect(mocks.writes).not.toHaveBeenCalled()
@@ -166,9 +166,9 @@ it('cancels a pending review when switching Nodes and ignores its late response'
 
 it('shows an empty scan without an approval action or unrelated approval links', async () => {
   mocks.reads.mockImplementation(async (path: string) =>
-    path.endsWith('/tasks')
-      ? [{ id: 'task', title: 'Task', projectId: 'project' }]
-      : { id: null, taskId: 'task', projectId: 'project', empty: true, approved: false, changes: [], findings: [] },
+    path.endsWith('/projects')
+      ? [{ id: 'project', name: 'Project' }]
+      : { id: null, projectId: 'project', empty: true, approved: false, changes: [], findings: [] },
   )
   const host = document.createElement('div')
   document.body.append(host)
