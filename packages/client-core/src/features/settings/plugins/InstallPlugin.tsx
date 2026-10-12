@@ -123,7 +123,6 @@ export function InstallPlugin(props: {
           <Input label="Package" value={spec()} placeholder={PLACEHOLDER[kind()]} disabled={busy()} onInput={setSpec} />
           <Show when={canBrowse()}>
             <Button
-              variant="ghost"
               disabled={busy()}
               onPress={() =>
                 void pickFolder().then((path) => {
@@ -135,14 +134,6 @@ export function InstallPlugin(props: {
             </Button>
           </Show>
         </SettingRow>
-        {/* A folder is linked, not copied, so it is the one install whose bytes keep changing after the
-            fact (docs/security/plugin-install.md § Installing from a folder). */}
-        <Show when={kind() === 'path' && target() === 'node'}>
-          <Alert tone="warn">
-            acorn links to this folder instead of copying it. Whatever is in it when the node starts is what runs, so
-            acorn can't check it the way it checks a download.
-          </Alert>
-        </Show>
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
