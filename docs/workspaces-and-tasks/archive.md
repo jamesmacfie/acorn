@@ -85,6 +85,8 @@ Three things delete later or elsewhere:
 The **Archive** entry at the bottom of the rail lists archived tasks, newest first, with a search box
 over every [search provider](../plugins/search-providers.md#search-providers).
 Selecting a task previews it read-only in the ordinary pane host, without adding it to the rail.
+Each row offers compact **Restore task** and **Delete task** icons with tooltips, leaving room for
+the task title.
 
 Only panes that declare `readsArchived` appear in the preview. The agents and notes panes opt in.
 Every other pane would need the worktree or would start work on an archived task

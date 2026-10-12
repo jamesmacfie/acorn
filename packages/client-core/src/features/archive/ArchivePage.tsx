@@ -34,6 +34,7 @@ import { Stack } from '../../kit/components/layout/Stack'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Text } from '../../kit/components/content/Text'
 import { sidebarCollapsed } from '../../kit/lib/layout/collapseState'
 import { retainScroll } from '../../kit/lib/layout/retainScroll'
@@ -224,22 +225,20 @@ export default function ArchivePage() {
                             onPress={() => setSelectedId(current().id)}
                             meta={<Text emphasis="muted">{archivedOn(current().archivedAt)}</Text>}
                             trailing={
-                              <Inline>
-                                <Button
-                                  size="sm"
+                              <Inline gap="none">
+                                <IconButton
+                                  icon="archive-restore"
+                                  label="Restore task"
                                   busy={restoring() === current().id}
                                   onPress={() => void restore(current())}
-                                >
-                                  Restore
-                                </Button>
-                                <Button
-                                  size="sm"
+                                />
+                                <IconButton
+                                  icon="trash-2"
+                                  label="Delete task"
                                   tone="danger"
                                   busy={deleting() === current().id}
                                   onPress={() => void remove(current())}
-                                >
-                                  Delete
-                                </Button>
+                                />
                               </Inline>
                             }
                           >
