@@ -140,6 +140,12 @@ export const agentSearchDirty = sqliteTable('agent_search_dirty', {
   fromSeq: integer('from_seq').notNull(),
 })
 
+// One row: the index format the search projection last checked the whole index against. No row,
+// or a different number, makes the next start run the full check.
+export const agentSearchFormat = sqliteTable('agent_search_format', {
+  version: integer('version').notNull(),
+})
+
 export const agentRequests = sqliteTable(
   'agent_requests',
   {

@@ -25,7 +25,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
-| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Proposed October 9, 2026. Implementation not started. |
+| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Implemented October 12, 2026. [Transcript search](../managed-agents/transcript-search.md) owns the behavior. |
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |

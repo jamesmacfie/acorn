@@ -1,6 +1,7 @@
-// Repair definitions mirror migrations 0005 and 0012; ftsSchema.test.ts compares migrated and repaired objects.
+// Repair definitions mirror migrations 0005, 0012, and 0015; ftsSchema.test.ts compares migrated and repaired objects.
 export const searchDirtySchema = [
   `CREATE TABLE IF NOT EXISTS agent_search_dirty (session_id text PRIMARY KEY NOT NULL, from_seq integer NOT NULL);`,
+  `CREATE TABLE IF NOT EXISTS agent_search_format (version integer NOT NULL);`,
   `CREATE TRIGGER IF NOT EXISTS agent_search_insert AFTER INSERT ON agent_events
 BEGIN
   INSERT INTO agent_search_dirty VALUES (NEW.session_id, NEW.seq)

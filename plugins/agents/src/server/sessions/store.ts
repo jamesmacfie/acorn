@@ -800,10 +800,12 @@ export class AgentStore {
       this.ensureSearchProjection(),
       import('./sessionSearch'),
     ])
-    return this.db.transaction((tx) => {
-      projection.catchUp(tx)
-      return searchSessions(tx, query, filter, taskIds)
-    })
+    return projection.guard(() =>
+      this.db.transaction((tx) => {
+        projection.catchUp(tx)
+        return searchSessions(tx, query, filter, taskIds)
+      }),
+    )
   }
 
   async searchTaskSessions(query: string, taskIds: readonly string[], limit: number): Promise<SearchHit[]> {
@@ -811,10 +813,12 @@ export class AgentStore {
       this.ensureSearchProjection(),
       import('./sessionSearch'),
     ])
-    return this.db.transaction((tx) => {
-      projection.catchUp(tx)
-      return searchTaskSessions(tx, query, taskIds, limit)
-    })
+    return projection.guard(() =>
+      this.db.transaction((tx) => {
+        projection.catchUp(tx)
+        return searchTaskSessions(tx, query, taskIds, limit)
+      }),
+    )
   }
 
   async searchSessionHistory(sessionId: string, query: string, role?: HistoryRole, limit = 8): Promise<HistoryHit[]> {
@@ -822,10 +826,12 @@ export class AgentStore {
       this.ensureSearchProjection(),
       import('./sessionHistory'),
     ])
-    return this.db.transaction((tx) => {
-      projection.catchUp(tx, sessionId)
-      return searchSessionHistory(tx, sessionId, query, role, limit)
-    })
+    return projection.guard(() =>
+      this.db.transaction((tx) => {
+        projection.catchUp(tx, sessionId)
+        return searchSessionHistory(tx, sessionId, query, role, limit)
+      }),
+    )
   }
 
   async readSessionHistory(sessionId: string, seq: number, offset = 0): Promise<HistoryPage | null> {
