@@ -333,7 +333,7 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [Spawned agent notes](./future/spawned-agent-notes.md): the PRD for note snapshots in spawned agents,
   kept while its real-app acceptance is open.
 - [Inline line blame](./future/editor-line-blame.md): the plan behind Git blame on the Editor cursor
-  line, with its open questions and the real-host check still to run.
+  line, with its four open questions.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
