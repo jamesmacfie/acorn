@@ -3074,8 +3074,12 @@ describe('sessions pinned to an extra account', () => {
     })
 
   it('starts a session that names no account on the default one, unless it resumes a provider reference', async () => {
-    await runtime.addAccount('fake', 'work')
-    driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))
+    for (const name of ['personal', 'work']) {
+      await runtime.addAccount('fake', name)
+      driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', name))
+    }
+    // Unchosen, the first account by name, never the CLI's own login.
+    expect((await create({})).config.account).toBe('personal')
     const [listed] = await runtime.setDefaultAccount('fake', 'work')
     expect(listed.defaultAccount).toBe('work')
 
@@ -3084,6 +3088,7 @@ describe('sessions pinned to an extra account', () => {
     expect((await create({ resumeProviderSessionRef: 'fake-old' })).config.account).toBeUndefined()
 
     await runtime.removeAccount('fake', 'work')
+    await runtime.removeAccount('fake', 'personal')
     expect((await create({})).config.account).toBeUndefined()
   })
 

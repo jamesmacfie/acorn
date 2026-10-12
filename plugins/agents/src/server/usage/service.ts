@@ -93,13 +93,15 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
   const collectors = options.collectors ?? agentUsageCollectors
   const accountsOf = async (entry: AgentUsageCollectorEntry): Promise<UsageAccount[]> =>
     entry.accounts && options.accounts ? options.accounts(entry.provider) : []
+  // A harness with accounts is read as those accounts only. Its CLI's own login starts no new session
+  // then (`AgentAccounts.defaultAccount`), so its quota answers nothing the person asked.
   const targetsOf = async (entries: AgentUsageCollectorEntry[]): Promise<UsageTarget[]> =>
     (
       await Promise.all(
-        entries.map(async (entry) => [
-          { entry, account: null },
-          ...(await accountsOf(entry)).map((account) => ({ entry, account })),
-        ]),
+        entries.map(async (entry) => {
+          const accounts = await accountsOf(entry)
+          return accounts.length ? accounts.map((account) => ({ entry, account })) : [{ entry, account: null }]
+        }),
       )
     ).flat()
   const lastSuccess = new Map<string, AgentProviderUsage>()

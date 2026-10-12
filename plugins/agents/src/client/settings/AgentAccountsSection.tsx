@@ -66,11 +66,8 @@ export default function AgentAccountsSection() {
                   <Select
                     label={`Default ${provider.label} account`}
                     value={provider.defaultAccount ?? ''}
-                    options={[
-                      { value: '', label: 'Your usual sign-in' },
-                      ...(provider.accounts ?? []).map((account) => ({ value: account.name, label: account.name })),
-                    ]}
-                    onChange={(name) => void apply(() => managedAgentApi.setDefaultAccount(provider.id, name || null))}
+                    options={(provider.accounts ?? []).map((account) => ({ value: account.name, label: account.name }))}
+                    onChange={(name) => void apply(() => managedAgentApi.setDefaultAccount(provider.id, name))}
                   />
                 </SettingRow>
               </Show>

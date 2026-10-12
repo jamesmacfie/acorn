@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
       authenticated: true,
       diagnostics: [],
       accounts: [{ name: 'work', authenticated: false, loginCommand: "CLAUDE_CONFIG_DIR='/a/work' claude auth login" }],
+      defaultAccount: 'work',
     },
     { id: 'codex', profileId: 'codex', label: 'Codex', installed: false, authenticated: null, diagnostics: [] },
   ],

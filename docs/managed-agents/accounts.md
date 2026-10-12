@@ -23,12 +23,13 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   that it's signed in, then writes it to the session's `config.account`, a key only the Node writes.
   An `account` a client put in `config` is dropped. A fork copies its source's config, so it stays on
   the same account.
-- **The default account.** A session that names no account starts on the harness's default account,
-  if one is set. That covers workflow steps, custom agents, inline diff chats, and a delegated child
-  on another harness. The choice is a `.default` file beside the account folders
+- **The default account.** Once a harness has an account, a session that names none starts on its
+  default account: the one the person chose, or else the first by name. That covers workflow steps,
+  custom agents, inline diff chats, and a delegated child on another harness. The CLI's own login
+  then starts no new session. The choice is a `.default` file beside the account folders
   (`AgentAccounts.defaultAccount`), so it applies across the Node and goes away with its folder. A
   session that resumes a provider reference skips it, because the CLI finds the reference only in the
-  folder it came from.
+  folder it came from. That is how a session started before the first account keeps resuming.
 - **Every start.** The lifecycle reads the account at every start and resume, because the CLI finds a
   session only in the folder it started in. `withAccountHome` sets the variable after the env
   allowlist and removes the overriding variables. A session whose account was removed fails to start
@@ -43,8 +44,8 @@ In Settings, open **Agents** > **Harnesses and defaults** > **Accounts**, type a
 `CLAUDE_CONFIG_DIR='…/agent-accounts/claude/work' claude auth login`. Run it on the computer the Node
 runs on, then click **Check again**. The CLI writes the token itself, so Acorn never handles it.
 
-Once a harness has an account, the section shows a **Default account** dropdown for it: your usual
-sign-in or one of the accounts. `PUT /v1/p/agents/providers/:providerId/default-account` saves it,
+Once a harness has an account, the section shows a **Default account** dropdown that lists its
+accounts. `PUT /v1/p/agents/providers/:providerId/default-account` saves it,
 and the provider descriptor reports it as `defaultAccount`.
 
 `POST /v1/p/agents/providers/:providerId/accounts` and `DELETE …/accounts/:name` back the page. Both
@@ -60,13 +61,13 @@ picking it. The default account is listed first. A signed-out account's row is d
 
 ## Plan usage
 
-A collector registered with `accounts: true` is asked once for the default login and once for each
-account, with that account's folder (`createAgentUsageService` in `server/usage/service.ts`). Each
-reading is its own row, labeled with the account name and carrying `accountName`. The plan usage
-panel groups a harness's readings and draws a tab per login, **Usual sign-in** first, so the numbers below
-are one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). The button that opens
-the panel shows one figure per harness: the default account's, or the CLI's own login when none is
-set.
+A collector registered with `accounts: true` is asked once for each account, with that account's
+folder, and not for the CLI's own login, which starts no new session once accounts exist
+(`createAgentUsageService` in `server/usage/service.ts`). A harness without accounts is read as
+before. Each reading is its own row, labeled with the account name and carrying `accountName`. The
+plan usage panel groups a harness's readings and draws a tab per account, so the numbers below are
+one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). The button that opens the
+panel shows one figure per harness, the default account's.
 
 `claude auth login` signs a folder in without running Claude Code's first-run setup, so the CLI
 opens an account folder on its theme picker and the probe never reaches `/usage`. Before it reads an

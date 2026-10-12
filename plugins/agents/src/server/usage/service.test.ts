@@ -288,7 +288,7 @@ describe('agent usage service', () => {
 })
 
 describe('agent usage service with extra accounts', () => {
-  it('reads each account of a harness that can, and checks the account that ran out', async () => {
+  it('reads a harness with accounts as those accounts, and checks the one that ran out', async () => {
     const homes: Array<string | undefined> = []
     const registry = new AgentUsageCollectorRegistry()
     registry.register({
@@ -315,14 +315,15 @@ describe('agent usage service with extra accounts', () => {
 
     const snapshot = await service.read({ userId: 'james' })
     expect(snapshot.providers.map((row) => [row.label, row.accountName])).toEqual([
-      ['Claude Code', undefined],
       ['Claude Code · work', 'work'],
       ['Codex', undefined],
     ])
-    expect(homes).toEqual([undefined, '/accounts/claude/work'])
+    expect(homes).toEqual(['/accounts/claude/work'])
 
     expect(await service.depletedUntil({ userId: 'james', providerId: 'claude', account: 'work' })).toBe(9_000)
+    // A session that started on the CLI's own login still has its quota read when it runs out.
     expect(await service.depletedUntil({ userId: 'james', providerId: 'claude' })).toBeNull()
+    expect(homes.at(-1)).toBeUndefined()
     expect(await service.depletedUntil({ userId: 'james', providerId: 'claude', account: 'gone' })).toBeNull()
   })
 })

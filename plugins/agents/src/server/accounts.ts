@@ -43,11 +43,14 @@ export class AgentAccounts {
     await rm(this.home(providerId, name), { recursive: true, force: true })
   }
 
-  /** The account a new session of this harness starts on when it names none, or null for the CLI's own
-   *  login. Kept beside the folders, so removing the account's folder retires it too. */
+  /** The account a new session of this harness starts on when it names none: the chosen one, else the
+   *  first by name. Null only when the harness has no accounts, which leaves the CLI's own login. Once
+   *  the person has named their logins, the unnamed one is never picked for them. The choice is kept
+   *  beside the folders, so removing the account's folder retires it too. */
   async defaultAccount(providerId: string): Promise<string | null> {
-    const name = (await readFile(this.defaultFile(providerId), 'utf8').catch(() => '')).trim()
-    return (await this.has(providerId, name)) ? name : null
+    const names = await this.list(providerId)
+    const chosen = (await readFile(this.defaultFile(providerId), 'utf8').catch(() => '')).trim()
+    return names.includes(chosen) ? chosen : (names[0] ?? null)
   }
 
   async setDefaultAccount(providerId: string, name: string | null): Promise<void> {
