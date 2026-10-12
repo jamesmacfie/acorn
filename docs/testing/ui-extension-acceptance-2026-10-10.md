@@ -4,7 +4,7 @@ Date: October 10, 2026. Status: dated delivery evidence for the plugin UI extens
 later runs in a new dated page rather than editing this one.
 
 This page records how the contextual extension points were checked, what each host drew, and what
-acceptance is still open. The [programme](../future/ui-extension/README.md) keeps the phase records,
+acceptance is still open. The programme's phase records are in Git history,
 and [places to fill](../contribution-kinds.md#places-to-fill) owns the shipped list.
 
 ## Regression commands

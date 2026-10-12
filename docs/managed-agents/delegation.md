@@ -50,6 +50,10 @@ Without the Notes plugin, the turn goes out with no snapshot. If the capture fai
 with an error that says so, instead of starting without the notes. The code is
 `plugins/agents/src/server/delegation/spawnNotes.ts`.
 
+Real-app acceptance is still open. Nobody has yet checked that real managed Claude and Codex children
+receive the snapshot and show it in their transcripts, across shared, worktree, and nested spawns and
+a Node restart during provisioning.
+
 ## Limits
 
 Only the direct owner can address a child. A child can create one more level, and a third level is

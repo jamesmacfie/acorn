@@ -327,13 +327,6 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file.
   Shipped behavior belongs in an owning doc above.
-- [UI extension open acceptance](./future/ui-extension/README.md) and
-  [Git client open acceptance](./future/git-client/README.md): the checks still open after those
-  programmes shipped.
-- [Spawned agent notes](./future/spawned-agent-notes.md): the PRD for note snapshots in spawned agents,
-  kept while its real-app acceptance is open.
-- [Inline line blame](./future/editor-line-blame.md): the plan behind Git blame on the Editor cursor
-  line, with its four open questions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 

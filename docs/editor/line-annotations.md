@@ -78,3 +78,14 @@ Git's own blame configuration applies, such as `blame.ignoreRevsFile`.
   request, so widen it only with a cheaper freshness check.
 - A mark has no actions. The tooltip has no copy button and no link into the Git pane.
 - The label is drawn only by the desktop Editor.
+
+## Open questions
+
+These came with the plan and haven't been decided:
+
+1. Should **Show line blame** stay on by default, as in Zed?
+2. Should `#1234` be a link? Git could build an `https` address from a GitHub `origin` remote, but
+   that puts more code in Git and ties the tooltip to one host.
+3. Should blame ignore whitespace-only changes with `-w`? It keeps Git's default for now.
+4. Should the date use the device's locale and time zone? Git formats it on the Node, which may be a
+   remote machine.

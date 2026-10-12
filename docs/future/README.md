@@ -12,11 +12,9 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [git-client/](./git-client/README.md) | Open acceptance for the built-in Git client. | All eight phases shipped by October 11, 2026. Two terminal checks remain. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
-| [ui-extension/](./ui-extension/README.md) | Open acceptance for contextual plugin UI. | All fifteen phases shipped by October 10, 2026. [Places to fill](../contribution-kinds.md#places-to-fill) owns the behavior. Native overlay, trusted toolbar press, Linear region, terminal key path, and heap checks remain open. |
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
@@ -25,17 +23,14 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
-| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Implemented October 12, 2026. [Transcript search](../managed-agents/transcript-search.md) owns the behavior. |
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
-| [editor-line-blame.md](./editor-line-blame.md) | Inline Git blame on the Editor cursor line with a commit tooltip, through a new `editor:line` annotation point, rich mark detail, and compiled mark contributors. | Implemented October 12, 2026. [Line annotations](../editor/line-annotations.md) owns the behavior. Four open questions remain. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [spawned-agent-notes.md](./spawned-agent-notes.md) | PRD for automatic note snapshots and parent note inheritance in shared and worktree agent spawns. | Implemented October 12, 2026. Real-app acceptance open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
@@ -50,6 +45,9 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
+| `agent-search-startup.md`, removed October 13, 2026 | [Transcript search](../managed-agents/transcript-search.md). |
+| `editor-line-blame.md`, removed October 13, 2026 | [Line annotations](../editor/line-annotations.md), which lists the open questions. |
+| `spawned-agent-notes.md`, removed October 13, 2026 | [Notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents). [Managed delegation](../managed-agents/delegation.md#notes-in-delegated-agents) notes the open acceptance. |
 | `multi-account.md`, removed October 12, 2026 | [Harness accounts](../managed-agents/accounts.md), which lists what didn't ship. |
 | `lazy-plugin-code.md`, removed October 12, 2026 | [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use). |
 | `task-deletion.md`, removed October 12, 2026 | [Deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task). |
