@@ -20,6 +20,7 @@ export function TaskDraftDialog(props: {
 }) {
   const navigate = useNavigate()
   const model = createTaskDraftStore(props.draft, props.tasks, props.onClose, navigate, props.onCreated)
+  const recoveryTask = () => (!model.saving() && model.error() ? model.createdTask() : null)
   let titleInput: HTMLInputElement | undefined
   const isNew = props.draft.mode === 'new'
   const fallbackIcon = taskOriginAppearance(props.draft.mode === 'new' ? 'local' : props.draft.task.origin).glyph
@@ -55,8 +56,13 @@ export function TaskDraftDialog(props: {
         <Show when={model.error()}>
           <Alert>{model.error()}</Alert>
         </Show>
-        <Show when={model.createdTask()}>
-          {(task) => <Alert>Task {task().title} was created. Retry the workflow on this task or open it.</Alert>}
+        <Show when={recoveryTask()}>
+          {(task) => (
+            <Alert tone="muted">
+              Task {task().title} was created.{' '}
+              {props.onCreated ? 'Retry the workflow on this task or open it.' : 'Open it or retry.'}
+            </Alert>
+          )}
         </Show>
         <Show when={model.baseCommit()}>
           {(commit) => (
@@ -165,13 +171,13 @@ export function TaskDraftDialog(props: {
         <Button variant="ghost" onPress={props.onClose}>
           Cancel
         </Button>
-        <Show when={model.createdTask()}>
+        <Show when={recoveryTask()}>
           <Button variant="ghost" onPress={model.openCreatedTask}>
             Open task
           </Button>
         </Show>
         <Button variant="solid" disabled={!model.canSubmit()} onPress={() => void model.submit()}>
-          {model.createdTask() ? 'Retry workflow' : isNew ? 'Create task' : 'Rename'}
+          {recoveryTask() ? (props.onCreated ? 'Retry workflow' : 'Retry') : isNew ? 'Create task' : 'Rename'}
         </Button>
       </Modal.Actions>
     </Modal>

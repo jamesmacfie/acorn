@@ -26,6 +26,11 @@ Node switch closes the dialog, and a response from a closed dialog cannot enable
 task mutation carries the captured Node through creation, setup notification, or rename. The rail
 continues to own task rows, source selection, context menus, drag, and navigation.
 
+Successful creation refreshes the task list and opens the task without showing recovery guidance.
+If a follow-on action or refresh fails after creation, the dialog keeps the created task and shows
+the error with neutral recovery text. **Open task** opens that task, and retry reuses it instead of
+creating another one.
+
 ## Branch names
 
 The Node adds `-2`, `-3`, and further suffixes to a title-derived branch until one is free. The
