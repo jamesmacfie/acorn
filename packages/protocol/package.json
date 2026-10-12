@@ -17,6 +17,7 @@
     "./branch.ts": "./src/projects/branch.ts",
     "./workspacesMode.ts": "./src/projects/workspacesMode.ts",
     "./broker.ts": "./src/transport/broker.ts",
+    "./extensionBridge.ts": "./src/transport/extensionBridge.ts",
     "./chrome.ts": "./src/chrome/surfaces.ts",
     "./commands.ts": "./src/chrome/commands.ts",
     "./contentLinkPattern.ts": "./src/content/contentLinkPattern.ts",

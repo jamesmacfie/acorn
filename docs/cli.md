@@ -17,6 +17,7 @@ source is `apps/cli/src/`, and `apps/cli/src/args.ts` holds the parser and the h
 | [Agents and workflows](./cli/agents-and-workflows.md) | Managed agent sessions, workflow runs, and the merged run list |
 | [Plugin commands](./cli/plugin-commands.md) | Discovering and invoking a plugin's CLI commands |
 | [The local service](./cli/local-service.md) | `node start --background`, `status`, and `stop` |
+| [The browser host](./cli/browser-host.md) | `browser install`, `status`, and `uninstall` for the browser extension |
 
 ## Choosing a Node
 
@@ -57,6 +58,7 @@ acorn [--node NODE] workflow start --task ID --definition ID [--inputs-file FILE
 acorn [--node NODE] workflow run list --task ID
 acorn [--node NODE] workflow run show ID|steps ID|wait ID [--until finished|attention] [--timeout SECONDS|30m] [--check]
 acorn [--node NODE] run list [--workspace ID|--project ID]
+acorn browser install|status|uninstall [--browser chrome|firefox]
 acorn [--node NODE] plugin list
 acorn [--node NODE] plugin ID commands
 acorn [--node NODE] plugin ID COMMAND --help

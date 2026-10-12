@@ -40,6 +40,9 @@ const valueOptions = new Set([
   'attempt',
   'tail',
   'max-bytes',
+  'browser',
+  'bridge-dir',
+  'registry-dir',
 ])
 const flagOptions = new Set([
   'help',
@@ -50,6 +53,7 @@ const flagOptions = new Set([
   'include-hidden',
   'follow',
   'check',
+  'development',
 ])
 
 export function parseCliArgs(argv: string[]): ParsedArgs {
@@ -135,15 +139,22 @@ export function helpFor(positionals: string[]): string {
                     ]
                   : section === 'node'
                     ? ['node info', 'node start --background', 'node status', 'node stop [--force]']
-                    : [
-                        'node info|start|status|stop',
-                        'workspace list|show|create|rename|remove|external-projects',
-                        'project list|show|add|rename|move|hide|unhide|detect|remove|config',
-                        'task list|show|create|scripts status|scripts wait|scripts logs',
-                        'agent providers|list|show|start|send|events|wait',
-                        'workflow list|start|run list|run show|run steps|run wait',
-                        'run list',
-                        'plugin list|ID commands|ID COMMAND',
-                      ]
+                    : section === 'browser'
+                      ? [
+                          'browser install|status|uninstall [--browser chrome|firefox]',
+                          'install registers the native host the Acorn browser extension starts; run it again to repair',
+                          'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
+                        ]
+                      : [
+                          'node info|start|status|stop',
+                          'workspace list|show|create|rename|remove|external-projects',
+                          'project list|show|add|rename|move|hide|unhide|detect|remove|config',
+                          'task list|show|create|scripts status|scripts wait|scripts logs',
+                          'agent providers|list|show|start|send|events|wait',
+                          'workflow list|start|run list|run show|run steps|run wait',
+                          'run list',
+                          'plugin list|ID commands|ID COMMAND',
+                          'browser install|status|uninstall',
+                        ]
   return `Usage: acorn [--node ID|LABEL|https://HOST:PORT] ${lines.join('\n       acorn ')}\n\nOptions: --output text|json|jsonl  --no-header  --help\nExit codes: 0 success, 1 internal, 2 usage, 3 connection/auth/identity/protocol, 4 domain, 5 timeout, 6 failed wait, 7 ambiguous mutation or partial write.\n`
 }

@@ -111,6 +111,12 @@ export function validateCommand(args: ParsedArgs): void {
     },
     run: { list: { count: 2, options: ['workspace', 'project'] } },
     plugin: { list: { count: 2 } },
+    browser: Object.fromEntries(
+      ['install', 'status', 'uninstall'].map((verb) => [
+        verb,
+        { count: 2, options: ['browser', 'development', 'bridge-dir', 'registry-dir'] },
+      ]),
+    ),
   }
   const spec = subject && verb ? grammar[subject]?.[verb] : undefined
   if (!spec) throw new CliError('usage', 'Unknown command. Run acorn --help.', 2)
@@ -159,6 +165,8 @@ export function validateCommand(args: ParsedArgs): void {
       throw new CliError('usage', 'JSON Lines is for agent events and plugin command results.', 2)
   }
   const allowed = new Set(['node', 'output', 'no-header', 'help', ...(spec.options ?? [])])
+  if (subject === 'browser' && args.node)
+    throw new CliError('usage', 'Browser host commands act on this computer; omit --node.', 2)
   if (subject === 'node' && verb !== 'info') {
     if (args.node) throw new CliError('usage', 'Node service commands act on the local data root; omit --node.', 2)
     if (verb === 'start') {

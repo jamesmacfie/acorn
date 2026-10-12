@@ -134,6 +134,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
+| [local-development/extension-dev-loop.md](./local-development/extension-dev-loop.md) | `pnpm dev:extension`: an isolated browser with the extension loaded and reloading, its native host and Node, and the sidebar driver. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
@@ -180,6 +181,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
+| [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
+| [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

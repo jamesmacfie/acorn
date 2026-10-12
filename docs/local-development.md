@@ -12,6 +12,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | Page | Covers |
 | --- | --- |
 | [Agent drivers](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client from the command line, native control, and the large-surface flow. |
+| [Extension development loop](./local-development/extension-dev-loop.md) | Opening Chrome or Firefox with the browser extension loaded and reloading, and driving its sidebar. |
 | [Profiling](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [Formatting](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, making `git blame` skip formatting commits with `blame.ignoreRevsFile`, and carrying a branch across one. |
@@ -48,6 +49,7 @@ Other ways to run it:
 | `pnpm dev:plugin <id>` | Rebuilds one loaded plugin's package on every save. [Plugins](./plugins.md) § The dev loop has the whole loop. |
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. See [agent drivers](./local-development/agent-drivers.md). |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |
+| `pnpm dev:extension -- --browser chrome --session <name>` | Opens an isolated browser with the extension loaded and reloading. See [the extension loop](./local-development/extension-dev-loop.md). |
 
 Pass `--workspaces on` or `--workspaces off` to either agent launcher to seed its workspace mode
 before it adds a project. See [agent drivers](./local-development/agent-drivers.md).

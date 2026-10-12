@@ -96,6 +96,7 @@ Only serializable values cross a process boundary. Product requests and streams 
 | Which state lives on the Node and which on the device | [State ownership](./state-ownership.md) |
 | Loaded plugin activation, `active` and `installed`, and trust | [Plugin activation](./plugins/activation.md) |
 | Remote trees and mounted bridge ownership | [Descriptors](./plugins/descriptors.md) |
+| The browser extension's native messaging contract and custody | [Browser extension](./browser-extension.md) |
 
 Package boundaries moved to [package boundaries](./architecture/packages.md). The Node API, client
 flow, and wire validation moved to [Node API and client flow](./architecture/node-api.md).

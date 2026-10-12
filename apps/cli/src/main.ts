@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { parseCliArgs, helpFor } from './args'
 import { runCommand, validateCommand } from './commands'
 import { CliError, reportError } from './error'
@@ -5,6 +6,10 @@ import { openCliNode } from './node'
 import { writeOutput } from './output'
 import { nodeServiceStatus, startNodeService, stopNodeService } from './supervision/lifecycle'
 import { pluginCommandHelp } from './pluginCommands'
+import { hostTargets, installNativeHost, nativeHostStatus, uninstallNativeHost } from './browser/hostInstall'
+
+// The native host is its own bundle entry beside this one, so the browser never loads the CLI.
+const nativeHostEntry = fileURLToPath(new URL('./native-host.js', import.meta.url))
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const outputAt = argv.indexOf('--output')
@@ -41,6 +46,27 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
             ? await nodeServiceStatus()
             : await stopNodeService(args.options.force === 'true')
       writeOutput(result, args)
+      return 0
+    }
+    if (args.positionals[0] === 'browser') {
+      const verb = args.positionals[1]
+      const targets = hostTargets({
+        browser: args.options.browser,
+        development: args.options.development === 'true',
+        bridgeDir: args.options['bridge-dir'],
+        registryDir: args.options['registry-dir'],
+      })
+      const runtime = { nodeExecutable: process.execPath, hostEntry: nativeHostEntry }
+      writeOutput(
+        targets.map((target) =>
+          verb === 'install'
+            ? installNativeHost(target, runtime)
+            : verb === 'uninstall'
+              ? uninstallNativeHost(target)
+              : nativeHostStatus(target),
+        ),
+        args,
+      )
       return 0
     }
     const node = await openCliNode(args.node)

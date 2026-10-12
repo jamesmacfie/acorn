@@ -132,7 +132,9 @@ function unverifiedGet(url: URL, timeoutMs: number): Promise<{ body: string; cer
       if (result) resolve(result)
       else reject(error)
     }
-    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false }, (res) => {
+    // `agent: false` gives every probe a fresh TLS handshake. Through the shared agent, a second probe
+    // of the same address resumes the cached session, and a resumed session exposes no certificate.
+    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, agent: false }, (res) => {
       if (settled) {
         res.destroy()
         return

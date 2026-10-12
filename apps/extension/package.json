@@ -1,0 +1,27 @@
+{
+  "name": "@acorn/extension",
+  "version": "0.1.0",
+  "description": "The Chrome and Firefox extension: a sidebar that reaches a paired Node through the CLI's native bridge.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --mode chrome && vite build --mode firefox",
+    "dev": "node scripts/dev/session.mjs",
+    "dev:ui": "node scripts/dev/ui.mjs",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/protocol": "workspace:*",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "jsdom": "^30.0.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11",
+    "web-ext": "^10.7.0"
+  }
+}
