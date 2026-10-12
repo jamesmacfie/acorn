@@ -114,6 +114,10 @@ export type HarnessAccounts = {
   /** Node variables that would override the folder's login. Removed from a session pinned to an
    *  account, which would otherwise quietly run on the Node's token. */
   overrides?: readonly string[]
+  /** Where the default login keeps the person's own skills, and the folder inside an account's that
+   *  holds them. Each one is linked into the account before a start (`linkSharedSkills`). The CLI's
+   *  own per-login entries, named in `own`, are never linked. */
+  skills?: { shared(): string; folder: string; own: readonly string[] }
 }
 
 export type AgentDriverStartOptions = {

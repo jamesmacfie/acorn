@@ -1,6 +1,7 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isAccountName } from '../shared/accounts'
+import type { HarnessAccounts } from './drivers/types'
 
 export const agentAccountsRoot = (dataDir: string): string => join(dataDir, 'agent-accounts')
 
@@ -62,5 +63,33 @@ export class AgentAccounts {
   // A dot name, so `list` never reads it as an account.
   private defaultFile(providerId: string): string {
     return join(this.root, providerId, '.default')
+  }
+}
+
+/**
+ * Links each of the person's own skills into an account's folder, so every account has the ones the
+ * default login has, and drops a link whose skill they've since removed. Anything else in the folder
+ * stays: a skill added to that account alone, or one the CLI keeps per login. Run before every start,
+ * so a skill added since the last one shows up.
+ */
+export async function linkSharedSkills(home: string, skills: NonNullable<HarnessAccounts['skills']>): Promise<void> {
+  const from = skills.shared()
+  const into = join(home, skills.folder)
+  const shared = (await readdir(from).catch(() => [])).filter(
+    (name) => !name.startsWith('.') && !skills.own.includes(name),
+  )
+  await mkdir(into, { recursive: true })
+  const present = await readdir(into)
+  for (const name of present) {
+    if (shared.includes(name)) continue
+    const target = await readlink(join(into, name)).catch(() => null)
+    if (target === join(from, name)) await rm(join(into, name), { force: true })
+  }
+  for (const name of shared) {
+    if (present.includes(name)) continue
+    // Two sessions on one account can start at once, and the other may have made the link first.
+    await symlink(join(from, name), join(into, name)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EEXIST') throw error
+    })
   }
 }

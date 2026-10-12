@@ -34,6 +34,12 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   session only in the folder it started in. `withAccountHome` sets the variable after the env
   allowlist and removes the overriding variables. A session whose account was removed fails to start
   and says so.
+- **Shared skills.** Before every start and terminal handoff, Acorn links each of the person's own
+  skills from the default login into the account's folder (`linkSharedSkills` in `accounts.ts`). For
+  Claude Code that's every entry in `~/.claude/skills`, except `synced`, which holds the skills
+  claude.ai syncs for each login separately. It removes a link whose skill is gone and leaves anything
+  else in the folder alone. A skill added later shows up from the next start. If the links fail, the
+  session still starts without them.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
   harness inherits the parent's account.
 
@@ -78,9 +84,10 @@ a usage limit, the wait reads the quota of the session's own account. For more i
 
 ## Limits
 
-- A new account starts with no settings, skills, MCP servers, or history from the default folder.
-  Linking the shared parts in, as T3 Code does, needs a list of private files per CLI release. Wait
-  until someone misses them.
+- A new account starts with no settings, MCP servers, or history from the default folder. Only the
+  person's skills are linked in. Linking the rest, as T3 Code does, needs a list of private files per
+  CLI release. Wait until someone misses them. Acorn's own server isn't one of them either. A session on an account gets it
+  when it starts, and again in a terminal handoff ([MCP](../mcp.md#configuration)).
 - A contributed harness can't declare `accounts`. The field would let a plugin choose a variable that
   Acorn sets to a path in its data root, so it needs its own review before it joins the manifest.
 - Acorn doesn't offer to start a session on another account when one runs out of quota.

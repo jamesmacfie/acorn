@@ -23,6 +23,7 @@ import { agentDriverRegistry } from '../server/drivers/registry'
 import { createHarnessRegistry } from '../server/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
+import { acornMcpServers } from '../server/sessions/runtimeEngine'
 import { BEFORE_PERMISSION_HOOK } from '../contract/permissionHook.ts'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK } from '../contract/loopHook.ts'
 import { AGENTS_SESSION_MESSENGER } from '../contract/sessionMessages.ts'
@@ -286,9 +287,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             sessionMcpSelection(session.config),
             'agent MCP server: continue in a terminal',
           )
+          // A Claude session on an account also needs acorn's own server, which its folder doesn't have. It
+          // carries no login of its own: Claude passes the terminal's environment to every server it
+          // starts, and the terminal holds its own task login.
           const handoff =
             profile.id === claudeCodeProfile.id
-              ? claudeHandoffMcp(mcp.servers)
+              ? claudeHandoffMcp([...acornMcpServers(acornMcp(), session, {}), ...mcp.servers])
               : profile.id === codexProfile.id
                 ? codexHandoffMcp(mcp.servers, mcp.secrets)
                 : { args: [], env: {} }

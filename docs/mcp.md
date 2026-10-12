@@ -106,6 +106,11 @@ and again on load or resume. Claude Code uses its CLI registration. Managed Code
 `acorn` or `acorn-dev`, to override that config-file entry with the session's explicit environment, and
 never writes the signed token into the user's config file (`acornMcpServers` in `runtimeEngine.ts`).
 
+A Claude Code session on an [account](./managed-agents/accounts.md) receives the declaration too. The
+CLI registration writes only the default config folder, and an account has its own. Its terminal
+handoff adds acorn's server to `--mcp-config` with no login values. Claude passes its own environment
+to every server it starts, so the server uses the terminal's own task login.
+
 The declaration names the whole launch environment rather than relying on inheritance, because an agent
 may scrub credential-shaped names from what it passes its children. DeepSeek's does, and a stdio server
 that loses `ACORN_API_TOKEN_FILE` fails after the launch token expires. The token file is declared again

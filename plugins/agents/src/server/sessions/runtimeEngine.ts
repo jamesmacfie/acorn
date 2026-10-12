@@ -26,7 +26,7 @@ import type { EnqueueAgentTurnInput } from '../../shared/schemas'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
-import { AgentAccounts, agentAccountsRoot } from '../accounts'
+import { AgentAccounts, agentAccountsRoot, linkSharedSkills } from '../accounts'
 import { sessionAccount } from '../../shared/accounts'
 import type { McpReviewManager } from '../mcpReviewManager'
 import { sessionMcpSelection } from '../../shared/mcpServers'
@@ -75,6 +75,9 @@ import { ProcessUpkeep } from './processUpkeep'
  * overrides its config-file entry. Codex filters inherited MCP environment variables, so registration
  * alone drops the signed task context and leaves the server with no tools.
  *
+ * A session on an account receives a declaration too. The CLI registers into the default config folder,
+ * and an account has its own folder that registration never writes to (docs/managed-agents/accounts.md).
+ *
  * An unregistered profile gets nothing either. The session could not have started without one, so this
  * is a broken state rather than a case, and the conservative answer is not to hand a credential to it.
  *
@@ -85,12 +88,15 @@ import { ProcessUpkeep } from './processUpkeep'
  */
 export function acornMcpServers(
   mcp: { name: string; launcher: Launcher } | null,
-  session: Pick<AgentSession, 'profileId' | 'driverKind'>,
+  session: Pick<AgentSession, 'profileId' | 'driverKind' | 'config'>,
   sessionEnv: Record<string, string>,
 ): AgentDriverMcpServer[] {
   if (!mcp) return []
   const profile = agentProfileRegistry.get(session.profileId)
-  if (!profile || (profile.mcpRegistration && session.driverKind !== 'codex-app-server')) return []
+  if (!profile) return []
+  const registered =
+    profile.mcpRegistration && session.driverKind !== 'codex-app-server' && !sessionAccount(session.config)
+  if (registered) return []
   return [
     {
       transport: 'stdio',
@@ -203,6 +209,7 @@ export class ManagedAgentEngine {
   readonly artifacts: AgentArtifactStore
   readonly webhooks: AgentWebhookService
   readonly accounts: AgentAccounts
+  private readonly registry: AgentDriverRegistry
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
   /** Who hears a session frame. */
@@ -262,13 +269,14 @@ export class ManagedAgentEngine {
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.skillFolders = join(options.dataDir, 'agent-skills')
     this.accounts = options.accounts ?? new AgentAccounts(agentAccountsRoot(options.dataDir))
+    this.registry = options.registry ?? agentDriverRegistry
     const publish = options.publish
     this.store = new AgentStore(options.db, options.core, (frame) => {
       if (!this.stopped) publish?.(frame)
     })
     this.processes = new ProviderSessionLifecycle(
       {
-        registry: options.registry ?? agentDriverRegistry,
+        registry: this.registry,
         taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
         workspaceId: (taskId) => this.core.tasks.workspaceId(taskId),
         hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
@@ -635,13 +643,21 @@ export class ManagedAgentEngine {
   }
 
   /** The config folder of the account the session is pinned to, or null for the harness's default
-   *  login (docs/managed-agents/accounts.md). */
+   *  login (docs/managed-agents/accounts.md). Every start and terminal handoff reads it, so this is
+   *  also where the person's own skills are linked in. */
   async accountHome(session: AgentSession): Promise<string | null> {
     const account = sessionAccount(session.config)
     if (!account) return null
     if (!(await this.accounts.has(session.providerId, account)))
       throw new Error(`This session runs on the '${account}' account, which was removed from this Node.`)
-    return this.accounts.home(session.providerId, account)
+    const home = this.accounts.home(session.providerId, account)
+    const skills = this.registry.create(session.providerId)?.accounts?.skills
+    // A session that starts without the person's skills still works, so a failure here doesn't stop it.
+    if (skills)
+      await linkSharedSkills(home, skills).catch((error) =>
+        log.warn(`could not link shared skills into account '${account}': ${describeError(error).message}`),
+      )
+    return home
   }
 
   private scopedProviderEnvironment(session: AgentSession, sandboxed: boolean): Record<string, string> {

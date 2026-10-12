@@ -5,6 +5,8 @@
 // persisted, the first on every session row, the second on session rows and workflow steps
 // (docs/managed-agents/harnesses.md § Harnesses).
 import { createRequire } from 'node:module'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { encodeFileGuardPolicy, FILE_GUARD_MATCHER } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { LOOP_HOOK_TIMEOUT_SECONDS, type AgentLoopHookEvent } from '../../contract/loopHook.ts'
@@ -180,6 +182,12 @@ export const claudeHarness: HarnessLaunchSpec = {
     login: ['auth', 'login'],
     logout: ['auth', 'logout'],
     overrides: ['CLAUDE_CODE_OAUTH_TOKEN'],
+    // `synced` holds the skills claude.ai syncs for a login, which differ between accounts.
+    skills: {
+      shared: () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'skills'),
+      folder: 'skills',
+      own: ['synced'],
+    },
   },
   probeAuth: async (executable, env) => (await import('./authProbe')).probeClaudeAuthentication(executable, env),
 }
